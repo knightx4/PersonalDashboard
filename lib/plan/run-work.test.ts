@@ -109,6 +109,14 @@ describe('featureWork', () => {
     expect(featureWork(touched, 'f', window, NOW, 20).busy).toBe(true);
   });
 
+  it('counts a step built on the feature branch as work, and not as a claim', () => {
+    const rows = [
+      row({ id: 'f' }),
+      row({ id: 'a', parentId: 'f', status: 'in_progress', built: true, updatedAt: at(100) }),
+    ];
+    expect(featureWork(rows, 'f', window, NOW, 20)).toEqual({ done: 1, busy: false });
+  });
+
   it('is never busy once the feature itself has closed', () => {
     const rows = [row({ id: 'f', status: 'done', updatedAt: at(1) })];
     expect(featureWork(rows, 'f', window, NOW, 20).busy).toBe(false);

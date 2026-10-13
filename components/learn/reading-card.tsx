@@ -1,7 +1,8 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle, BadgeCheck, CircleDashed, CircleSlash, Check } from 'lucide-react';
 import type { ReadingRow, SourceAccess } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * One reading, in a list.
@@ -32,9 +33,9 @@ function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents:
   // marking off, and a fill marks them off without adding a frame to a row
   // that is already inside a card -- law 11's "a shared ground groups".
   return (
-    <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+    <Chip>
       {price ? `${label} · ${price}` : label}
-    </span>
+    </Chip>
   );
 }
 
@@ -69,9 +70,9 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
           already tell the claims apart. The caution keeps its colour because
           it is the one of the pair you have to act on. */}
       {verified ? (
-        <BadgeCheck className="size-3.5 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+        <BadgeCheck className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       ) : (
-        <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={2} aria-hidden />
+        <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
       )}
       <span>{where || 'Location not confirmed'}</span>
       {!verified && where && <span className="text-small">· unconfirmed</span>}
@@ -84,18 +85,18 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
     // Read is not a refund. The four statuses are told apart by their glyphs
     // -- tick, slash, dashed circle, nothing -- and only the one that means
     // "in progress" earns the accent. Law 4.
-    return <Check className="size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Read" />;
+    return <Check className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-label="Read" />;
   }
   if (status === 'abandoned') {
     return (
-      <CircleSlash className="size-4 shrink-0 text-ink-ghost" strokeWidth={2} aria-label="Gave up" />
+      <CircleSlash className="size-4 shrink-0 text-ink-ghost" strokeWidth={1.75} aria-label="Gave up" />
     );
   }
   if (status === 'reading') {
     return (
       <CircleDashed
         className="size-4 shrink-0 text-accent"
-        strokeWidth={2}
+        strokeWidth={1.75}
         aria-label="Started"
       />
     );
@@ -144,9 +145,9 @@ export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: str
               // Written down, nothing found for it yet. Said plainly rather
               // than left blank, because a row with no source and no note
               // about it reads as a row that failed.
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-ghost">
+              <Chip className="text-ink-ghost">
                 No source yet
-              </span>
+              </Chip>
             )}
           </span>
 

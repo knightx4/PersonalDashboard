@@ -53,17 +53,17 @@ export function StateMark({ concept, className }: { concept: Concept; className?
   const shared = cn('size-4 shrink-0', className);
   switch (concept.state) {
     case 'sharp':
-      return <Gem className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+      return <Gem className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
     case 'known':
-      return <BadgeCheck className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+      return <BadgeCheck className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
     case 'recognised':
-      return <Eye className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+      return <Eye className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
     case 'misconception':
-      return <AlertTriangle className={cn(shared, 'text-danger')} strokeWidth={2} aria-hidden />;
+      return <AlertTriangle className={cn(shared, 'text-danger')} strokeWidth={1.75} aria-hidden />;
     case 'shaky':
-      return <CircleDot className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+      return <CircleDot className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
     default:
-      return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+      return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
   }
 }
 

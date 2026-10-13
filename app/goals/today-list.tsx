@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { BellRing, ChevronDown, Copy, ExternalLink } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
@@ -9,16 +9,13 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Input } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Note } from '@/components/ui/note';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import { areaHref, stepHref } from '@/lib/goals/all-goals';
 import { preparedExcerpt } from '@/lib/goals/home';
-import {
-  SET_ASIDE_CHOICES,
-  SET_ASIDE_LABELS,
-  canSetAside,
-} from '@/lib/goals/set-aside';
+import { SET_ASIDE_CHOICES, SET_ASIDE_LABELS, canSetAside } from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
 import { SnoozeMenu } from '@/components/inbox/snooze-menu';
 import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
@@ -168,9 +165,7 @@ export function TodayRow({
   const primary = PRIMARY_VALUE[item.kind];
   const second = SECOND[item.kind];
   const href = hrefFor(item);
-  const meta = [item.on ? formatDay(item.on) : null, item.detail]
-    .filter(Boolean)
-    .join(' · ');
+  const meta = [item.on ? formatDay(item.on) : null, item.detail].filter(Boolean).join(' · ');
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-3">
@@ -191,15 +186,19 @@ export function TodayRow({
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="press-area inline-flex items-start gap-1 text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
+            className="press-area inline-flex items-start gap-1 text-body font-semibold break-words text-ink hover:underline"
           >
             {item.title}
-            <ExternalLink className="mt-1.5 size-3 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <ExternalLink
+              className="mt-1.5 size-3.5 shrink-0 text-ink-muted"
+              strokeWidth={1.75}
+              aria-hidden
+            />
           </a>
         ) : (
           <Link
             href={href}
-            className="press-area block text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
+            className="press-area block text-body font-semibold break-words text-ink hover:underline"
           >
             {item.title}
           </Link>
@@ -208,7 +207,7 @@ export function TodayRow({
           {meta && <>{meta} · </>}
           <Link
             href={`/goals/${item.goalId}`}
-            className="press-area text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
           >
             {item.goalTitle}
           </Link>
@@ -240,12 +239,7 @@ export function TodayRow({
                 className="w-full max-sm:min-h-11 sm:w-64"
               />
             )}
-            <Button
-              type="submit"
-              name={primary?.[0]}
-              value={primary?.[1]}
-              pending={pending}
-            >
+            <Button type="submit" name={primary?.[0]} value={primary?.[1]} pending={pending}>
               {item.action}
             </Button>
             {second && (
@@ -261,7 +255,9 @@ export function TodayRow({
             )}
             <span className="ml-auto flex items-center gap-1">
               {preparable && <PrepareButton item={item} onHanded={onHanded} />}
-              {onSnoozed && snoozeRefOf(item.kind, item.id) && <SnoozeRow item={item} onSnoozed={onSnoozed} />}
+              {onSnoozed && snoozeRefOf(item.kind, item.id) && (
+                <SnoozeRow item={item} onSnoozed={onSnoozed} />
+              )}
               {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
             </span>
             {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
@@ -282,50 +278,55 @@ function PreparedDraft({ text, title }: { text: string; title: string }) {
   const [open, setOpen] = useState(false);
   const excerpt = preparedExcerpt(text);
   return (
-    <div className="space-y-1.5 rounded-control bg-sunken px-3 py-2">
-      <p className="inline-flex items-center gap-1.5 text-small font-semibold text-ink">
-        <DashMark size="2xs" tone="brand" decorative />
-        Dash’s draft is ready
-      </p>
-      {open ? (
-        <div className="max-w-prose">
-          <FileBody markdown={text} compact />
+    <Note
+      title={
+        <span className="inline-flex items-center gap-1.5">
+          <DashMark size="2xs" tone="brand" decorative />
+          Dash’s draft is ready
+        </span>
+      }
+    >
+      <div className="space-y-1.5">
+        {open ? (
+          <div className="max-w-prose">
+            <FileBody markdown={text} compact />
+          </div>
+        ) : (
+          <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">
+            <LinkedText text={excerpt} />
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            aria-expanded={open}
+            aria-label={open ? `Close Dash’s draft for ${title}` : `Open Dash’s draft for ${title}`}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? 'Close' : 'Open'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label={`Copy Dash’s draft for ${title}`}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(text);
+                toast({ text: 'Copied.' });
+              } catch {
+                toast({ text: 'It could not be copied. Open it and copy it by hand.' });
+              }
+            }}
+          >
+            <Copy className="size-3.5" strokeWidth={1.75} aria-hidden />
+            Copy
+          </Button>
         </div>
-      ) : (
-        <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">
-          <LinkedText text={excerpt} />
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          aria-expanded={open}
-          aria-label={open ? `Close Dash’s draft for ${title}` : `Open Dash’s draft for ${title}`}
-          onClick={() => setOpen(!open)}
-        >
-          {open ? 'Close' : 'Open'}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-label={`Copy Dash’s draft for ${title}`}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(text);
-              toast({ text: 'Copied.' });
-            } catch {
-              toast({ text: 'It could not be copied. Open it and copy it by hand.' });
-            }
-          }}
-        >
-          <Copy className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Copy
-        </Button>
       </div>
-    </div>
+    </Note>
   );
 }
 
@@ -370,7 +371,7 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
       trigger={
         <span className="inline-flex items-center gap-1">
           Not now
-          <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+          <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
         </span>
       }
       items={SET_ASIDE_CHOICES.map((choice) => ({

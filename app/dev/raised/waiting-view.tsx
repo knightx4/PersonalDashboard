@@ -2,7 +2,7 @@
 
 import { BackFromSnoozeMark, SnoozeMenu } from '@/components/inbox/snooze';
 import { planRowRef } from '@/lib/dev/inbox-snoozes';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import {
   answerBlockedStep,

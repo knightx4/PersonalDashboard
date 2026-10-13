@@ -1,3 +1,5 @@
+import { IconButton } from '@/components/ui/icon-button';
+
 /**
  * One of the row's quick actions, on the dev plan and a goal's steps alike.
  *
@@ -20,15 +22,8 @@ export function RowIconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type={type}
-      title={label}
-      onClick={onClick}
-      disabled={pending}
-      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
-    >
+    <IconButton type={type} label={label} onClick={onClick} disabled={pending}>
       {children}
-      <span className="sr-only">{label}</span>
-    </button>
+    </IconButton>
   );
 }

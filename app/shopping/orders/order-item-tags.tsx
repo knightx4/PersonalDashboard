@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { addOrderItemTag, removeOrderItemTag } from '@/app/shopping/orders/actions';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { Input } from '@/components/ui/field';
 
 /**
@@ -31,17 +32,14 @@ export function OrderItemTags({
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {tags.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex items-center gap-1 rounded-md bg-canvas px-1.5 py-0.5 text-small text-ink-muted"
-        >
+        <Chip key={tag.id}>
           <span>{tag.name}</span>
           {/* A glyph inside the chip, not a standalone icon button: the
               32px icon-button shape would be taller than the chip. */}
           {!readOnly && (
             <button
               type="button"
-              className="press flex items-center rounded-sm text-ink-muted transition-colors duration-quick hover:text-danger disabled:opacity-50"
+              className="press flex items-center rounded-control text-ink-muted transition-colors duration-quick hover:text-danger disabled:opacity-50"
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
@@ -53,11 +51,11 @@ export function OrderItemTags({
                 })
               }
             >
-              <X className="size-3" strokeWidth={2} aria-hidden />
+              <X strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Remove {tag.name} tag</span>
             </button>
           )}
-        </span>
+        </Chip>
       ))}
       {!readOnly && !adding && (
         <AddTrigger label="Add tag" onClick={() => setAdding(true)} className="ml-0 py-0.5" />

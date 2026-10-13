@@ -8,7 +8,7 @@ import { FieldError, Select } from '@/components/ui/field';
 import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
 import { PLAN_STATUS_LABEL, isClosed } from '@/lib/plan/load';
 import { checkDay } from '@/lib/plan/check-backs';
-import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
@@ -99,47 +99,46 @@ export function Dependencies<E extends TreeCatalogEntry>({
           {node.dependsOn.map((link) => (
             <form key={link.dependencyId} action={removeAction} className="contents">
               <input type="hidden" name="id" value={link.dependencyId} />
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-small',
-                  isClosed(link.item.status)
-                    ? 'bg-positive-tint text-positive'
-                    : 'bg-caution-tint text-caution',
-                )}
+              <Chip
+                tone={isClosed(link.item.status) ? 'positive' : 'caution'}
+                className="max-w-full pr-1"
               >
-                {stepName(link.item)}
-                {isClosed(link.item.status) &&
-                  ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                <span className="min-w-0 truncate">
+                  {stepName(link.item)}
+                  {isClosed(link.item.status) &&
+                    ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                </span>
                 <button
                   type="submit"
                   disabled={removePending}
                   aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
                   className="press rounded-full p-0.5 hover:bg-surface/60"
                 >
-                  <X className="size-3" strokeWidth={2} aria-hidden />
+                  <X strokeWidth={1.75} aria-hidden />
                 </button>
-              </span>
+              </Chip>
             </form>
           ))}
           {inherited.map((ref) => (
-            <span
+            <Chip
               key={ref.id}
+              tone="caution"
               title="Through a step above this one"
-              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
+              className="max-w-full opacity-80"
             >
-              {stepName(ref)} · above
-            </span>
+              <span className="min-w-0 truncate">{stepName(ref)} · above</span>
+            </Chip>
           ))}
           {/* A check-back: the step needs something that does not exist yet,
               and a session looks again on the day. */}
           {checks.map((check) => (
-            <span
+            <Chip
               key={check.id}
+              tone="caution"
               title={`${check.title}. A session looks again on ${checkDay(check.dueAt)}, and the step waits until then.`}
-              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution"
             >
               Check on {checkDay(check.dueAt)}
-            </span>
+            </Chip>
           ))}
         </div>
       )}

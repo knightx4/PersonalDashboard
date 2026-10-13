@@ -97,7 +97,7 @@ export function Deck({
         </span>
         <Button size="lg" onClick={advance} data-deck-next>
           {forward}
-          <ArrowRight className="size-4" strokeWidth={2} aria-hidden />
+          <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
         </Button>
       </Card>
       {next?.image && (

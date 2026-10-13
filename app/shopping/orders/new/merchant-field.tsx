@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { ComposeTitle, Input } from '@/components/ui/field';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { resolveMerchant, suggestMerchants, type MerchantOption } from '@/lib/merchants/suggest';
 
 /**
@@ -121,8 +122,7 @@ export function MerchantField({
           id={listId}
           role="listbox"
           aria-label="Merchants"
-          // ui-ok: a floating listbox, drawn as components/ui/timezone-field.tsx draws its own
-          className="popover-panel absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-raised py-1 shadow-lg"
+          className={cn(popoverSurface, 'absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto p-1')}
         >
           {matches.map((merchant, index) => (
             <li
@@ -136,12 +136,9 @@ export function MerchantField({
                 choose(merchant);
               }}
               onMouseEnter={() => setActive(index)}
-              className={cn(
-                'cursor-pointer truncate px-3 py-1.5 text-ui',
-                index === active ? 'bg-accent-tint text-accent' : 'text-ink',
-              )}
+              className={cn(menuItemClass(), 'cursor-pointer', index === active && 'bg-sunken')}
             >
-              {merchant.name}
+              <span className="truncate">{merchant.name}</span>
             </li>
           ))}
         </ul>

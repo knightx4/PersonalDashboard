@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import {
@@ -235,13 +235,7 @@ function Switch({
           onClick={viewOnClick(() => set(option.change))}
           aria-pressed={options.length === 1 ? option.on : undefined}
           aria-current={options.length > 1 && option.on ? 'true' : undefined}
-          className={cn(
-            'press inline-flex h-(--control-h) shrink-0 items-center px-2.5 text-ui font-medium whitespace-nowrap',
-            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-            option.on
-              ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
+          className={cn(segmentClass(option.on), 'shrink-0 whitespace-nowrap')}
         >
           {option.label}
         </Link>

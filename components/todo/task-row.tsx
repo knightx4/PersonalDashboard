@@ -18,6 +18,8 @@ import {
   X,
 } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
+import { IconButton } from '@/components/ui/icon-button';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -518,7 +520,7 @@ export function TaskRow({
             />
 
             {task.pinned && !done && !dropped && (
-              <Pin className={cn('size-3 text-accent', archive && 'ml-1')} strokeWidth={1.75} aria-label="Pinned" />
+              <Pin className={cn('size-3.5 text-accent', archive && 'ml-1')} strokeWidth={1.75} aria-label="Pinned" />
             )}
 
             {files.length > 0 && (
@@ -559,15 +561,9 @@ export function TaskRow({
             )}
 
             {anchor && (
-              <a
-                href={anchor.href}
-                className={cn(
-                  'truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent',
-                  inset,
-                )}
-              >
+              <Link href={anchor.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }), inset)}>
                 {anchor.label}
-              </a>
+              </Link>
             )}
             {/* A subscribed appointment the calendar has dropped: the label is
                 the name and date saved when it was linked, and this says why
@@ -579,12 +575,9 @@ export function TaskRow({
             {under && (
               <span className={cn('truncate text-small text-ink-muted', inset)}>
                 in{' '}
-                <a
-                  href={under.href}
-                  className="underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
-                >
+                <Link href={under.href} className={linkVariants({ tone: 'quiet' })}>
                   {under.label}
-                </a>
+                </Link>
               </span>
             )}
 
@@ -630,12 +623,12 @@ export function TaskRow({
               <span className="contents [@media(hover:hover)]:hidden [@media(hover:hover)]:group-focus-within:contents">
                 {index > 0 && (
                   <IconButton label="Move up" onClick={() => move('up')}>
-                    <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    <ArrowUp strokeWidth={1.75} aria-hidden />
                   </IconButton>
                 )}
                 {index !== -1 && index < siblings.length - 1 && (
                   <IconButton label="Move down" onClick={() => move('down')}>
-                    <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    <ArrowDown strokeWidth={1.75} aria-hidden />
                   </IconButton>
                 )}
               </span>
@@ -648,7 +641,7 @@ export function TaskRow({
                   })
                 }
               >
-                <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Pin strokeWidth={1.75} aria-hidden />
               </IconButton>
               {task.snoozedUntil ? (
                 <IconButton
@@ -657,32 +650,32 @@ export function TaskRow({
                     run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) })
                   }
                 >
-                  <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  <Undo2 strokeWidth={1.75} aria-hidden />
                 </IconButton>
               ) : (
                 <IconButton label="Later" onClick={later}>
-                  <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  <Clock strokeWidth={1.75} aria-hidden />
                 </IconButton>
               )}
               <IconButton label="Drop" onClick={drop}>
-                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <X strokeWidth={1.75} aria-hidden />
               </IconButton>
               {/* Breaking the task up: the box opens under the row, where the
                 list is. Hidden with the rest of the actions until the row is
                 pointed at, so a task with no list looks as it always did. */}
               <IconButton label="Add an item" onClick={() => setAdding(true)}>
-                <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Plus strokeWidth={1.75} aria-hidden />
               </IconButton>
               {/* The whole form, for the parts of a task the row does not
                 show: the notes, and a date given to a task that has none.
                 The title and an existing date are edited in the row itself,
                 which is what this used to be the only way to do. */}
               <IconButton label="Edit everything" onClick={() => setEditing(true)}>
-                <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Pencil strokeWidth={1.75} aria-hidden />
               </IconButton>
               {/* A note on the task, or a question for Dash about it (plan #1471). */}
               <IconButton label="Comment" onClick={() => setCommenting(true)}>
-                <MessageSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <MessageSquare strokeWidth={1.75} aria-hidden />
               </IconButton>
               {/* Last in the group, because it is the one action here that opens
                 something rather than doing something. `anchor` is what the
@@ -709,10 +702,10 @@ export function TaskRow({
               {!archive && (
                 <>
                   <IconButton label="Drop" onClick={drop}>
-                    <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    <X strokeWidth={1.75} aria-hidden />
                   </IconButton>
                   <IconButton label="Edit everything" onClick={() => setEditing(true)}>
-                    <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    <Pencil strokeWidth={1.75} aria-hidden />
                   </IconButton>
                 </>
               )}
@@ -733,7 +726,7 @@ export function TaskRow({
                 label="Reopen"
                 onClick={() => run({ patch: { status: 'open' }, write: () => reopenTask(task.id) })}
               >
-                <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <RotateCcw strokeWidth={1.75} aria-hidden />
               </IconButton>
               <ConfirmStep
                 prompt="Deletes this task for good. Dropping it keeps it in the archive."
@@ -850,7 +843,7 @@ function TaskItems({
           type="button"
           aria-expanded={expanded}
           onClick={() => setOpen(!expanded)}
-          className="press flex items-center gap-1 rounded-lg py-0.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
+          className="press flex items-center gap-1 rounded-control py-0.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
         >
           {expanded ? (
             <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -923,15 +916,14 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         {item.title}
       </span>
 
-      <button
-        type="button"
-        title="Remove"
+      <IconButton
+        label="Remove"
+        size="sm"
         onClick={onDrop}
-        className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
+        className="opacity-100 sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
       >
-        <X className="size-3" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Remove</span>
-      </button>
+        <X strokeWidth={1.75} aria-hidden />
+      </IconButton>
     </li>
   );
 }
@@ -990,28 +982,6 @@ function AddItem({ parentId, onClose }: { parentId: string; onClose: () => void 
         className="min-w-0 flex-1 border-none bg-transparent p-0 text-small text-ink outline-none placeholder:text-ink-ghost"
       />
     </form>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      onClick={onClick}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-    >
-      {children}
-      <span className="sr-only">{label}</span>
-    </button>
   );
 }
 

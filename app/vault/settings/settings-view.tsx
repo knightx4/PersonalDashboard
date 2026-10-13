@@ -1,7 +1,11 @@
 import { AlertTriangle, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
+import { Meter } from '@/components/ui/meter';
+import { Note } from '@/components/ui/note';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import type { VaultConnectionSummary } from '@/lib/vault/notes/load';
 import type { WriteAccess } from '@/lib/vault/notes/write-access';
 import { describeRun, type SyncProgress, type SyncRunSummary } from '@/lib/vault/sync/progress';
@@ -75,51 +79,48 @@ export function VaultSettingsView({
                   {STATUS_LABEL[connection.status]}
                 </span>
               ) : (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-caution-tint px-2 py-0.5 text-small font-medium text-caution">
-                  <AlertTriangle className="size-3" strokeWidth={2} aria-hidden />
+                <Chip tone="caution">
+                  <AlertTriangle strokeWidth={1.75} aria-hidden />
                   {STATUS_LABEL[connection.status] ?? connection.status}
-                </span>
+                </Chip>
               )}
             </CardHeader>
             <CardBody className="space-y-3">
-              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
-                <dt className="text-ink-muted">Branch</dt>
-                <dd className="flex items-center gap-1 text-ink">
-                  <GitBranch className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
-                  {connection.branch}
-                </dd>
-
-                {connection.subpath && (
-                  <>
-                    <dt className="text-ink-muted">Folder</dt>
-                    <dd className="text-ink">{connection.subpath}</dd>
-                  </>
-                )}
-
-                <dt className="text-ink-muted">Notes</dt>
-                <dd className="tabular text-ink">{count ?? 0}</dd>
-
-                <dt className="text-ink-muted">Last synced</dt>
-                <dd className="text-ink">
-                  {connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
-                </dd>
-
+              <ValueList>
+                <ValueRow
+                  align="end"
+                  label="Branch"
+                  value={
+                    <span className="inline-flex items-center gap-1">
+                      <GitBranch className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                      {connection.branch}
+                    </span>
+                  }
+                />
+                {connection.subpath && <ValueRow align="end" label="Folder" value={connection.subpath} />}
+                <ValueRow align="end" label="Notes" value={String(count ?? 0)} />
+                <ValueRow
+                  align="end"
+                  label="Last synced"
+                  value={connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
+                />
                 {writeAccess !== 'reconnect' && (
-                  <>
-                    <dt className="text-ink-muted">Editing</dt>
-                    <dd className={writeAccess === 'no' ? 'text-caution' : 'text-ink'}>
-                      {WRITE_ACCESS_LABEL[writeAccess]}
-                    </dd>
-                  </>
+                  <ValueRow
+                    align="end"
+                    label="Editing"
+                    value={
+                      <span className={writeAccess === 'no' ? 'text-caution' : undefined}>
+                        {WRITE_ACCESS_LABEL[writeAccess]}
+                      </span>
+                    }
+                  />
                 )}
-              </dl>
+              </ValueList>
 
               {progress && <SyncProgressBar progress={progress} />}
 
               {connection.lastError && (
-                <p className="rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
-                  Last run reported: {connection.lastError}
-                </p>
+                <Note tone="caution">Last run reported: {connection.lastError}</Note>
               )}
 
               {/* The shared fold, with the count on the closed line. It was a
@@ -229,7 +230,7 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
         : 'bg-accent';
 
   return (
-    <div className="rounded-lg bg-canvas px-3 py-2.5">
+    <Note>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-ui font-medium text-ink">{progress.headline}</span>
         {progress.percent !== null && (
@@ -238,23 +239,18 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
       </div>
 
       {progress.percent !== null && (
-        <div
-          role="progressbar"
-          aria-valuenow={progress.percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Vault sync progress"
-          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border"
-        >
-          <div
-            className={`h-full rounded-full transition-[width] duration-moment ${tone}`}
-            style={{ width: `${progress.percent}%` }}
-          />
-        </div>
+        <Meter
+          value={progress.percent}
+          max={100}
+          label={`Vault sync progress: ${progress.percent}%`}
+          fill={tone}
+          moves
+          className="mt-1.5"
+        />
       )}
 
       <p className="mt-1.5 text-small text-ink-muted">{progress.detail}</p>
-    </div>
+    </Note>
   );
 }
 

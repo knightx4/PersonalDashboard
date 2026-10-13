@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Play, TriangleAlert } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
@@ -177,7 +177,7 @@ export function RunRoutineButton({
           <Link
             href={allHref}
             onClick={onNavigate}
-            className="press-area ml-auto text-ui text-accent hover:underline"
+            className={cn('press-area ml-auto text-ui', linkVariants())}
           >
             See all
           </Link>

@@ -527,12 +527,12 @@ export async function handFeatureToClaude(input: {
     'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
     'first step that needs a decision from me: block it with the exact question rather ' +
     'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
-    'each step to main as it closes, before you send the next one. The Building section ' +
-    'says how. A step that needs data that does not exist yet, or a run that has not ' +
+    'each step into the feature branch and mark it built as it reports, and put the ' +
+    'feature on main in one merge once its steps are built. The Building section says how. A step that needs data that does not exist yet, or a run that has not ' +
     'fired, gets a check-back with --from <its outline>, which holds it until then. If you end ' +
     `having closed and blocked nothing, first write why with plan.ts stopped ${node.outline} ` +
     '--reason "…": a run that says nothing is sent a session to find out why. Report every ' +
-    'step you closed by its outline, the 1073.4 the plan page heads it with, and its ' +
+    'step you closed or built by its outline, the 1073.4 the plan page heads it with, and its ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true, liveness, visions });

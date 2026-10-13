@@ -1,11 +1,10 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Clapperboard, MonitorPlay } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/shell/search-field';
 import { EmptyState } from '@/components/ui/empty-state';
-import { segmentedFrame } from '@/components/ui/segmented';
-import { cn } from '@/lib/cn';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { pileCounts, PILE_LABEL, type ListVideo, type Pile } from '@/lib/learn/youtube/videos';
 import type { PlayerClip } from '@/lib/learn/clips/stream';
 import type { ChannelSummary, Usage } from '@/lib/learn/youtube/load';
@@ -164,11 +163,7 @@ function Piles({ current, counts, q }: { current: Pile | null; counts: Record<Pi
             href={href(option.pile)}
             scroll={false}
             aria-current={on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center gap-1.5 px-2.5 text-ui font-medium',
-              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on ? 'bg-accent-tint text-accent' : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(on)}
           >
             {option.label}
             <span className="tabular-nums text-small">{option.count}</span>

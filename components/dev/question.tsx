@@ -6,6 +6,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
 import { LinkedText } from '@/components/ui/linked-text';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * A question put to you, wherever it is read.
@@ -29,9 +30,7 @@ import { LinkedText } from '@/components/ui/linked-text';
  * not by working it out from the prose.
  */
 export function QuestionPartLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">{children}</p>
-  );
+  return <SectionLabel>{children}</SectionLabel>;
 }
 
 /**

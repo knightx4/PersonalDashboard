@@ -274,16 +274,11 @@ function MeasureLine({
       {unit && target !== null && !addingDate && (
         // No date yet: one quiet press rather than an empty date box waiting
         // for typing (plan #1671).
-        <button
-          type="button"
-          onClick={() => setAddingDate(true)}
-          disabled={saving}
-          className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-ink"
-        >
+        <Button type="button" variant="link" onClick={() => setAddingDate(true)} disabled={saving}>
           {committed.dueOn
             ? `by ${formatDue(committed.dueOn, committed.duePrecision)}`
             : 'add a date'}
-        </button>
+        </Button>
       )}
       {unit && target !== null && addingDate && (
         <>
@@ -634,6 +629,7 @@ function ReadingLine({
                 d={chart.path}
                 fill="none"
                 stroke="currentColor"
+                /* ui-ok: the chart's line, drawn heavier than an icon on purpose */
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"

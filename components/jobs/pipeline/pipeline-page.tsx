@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';

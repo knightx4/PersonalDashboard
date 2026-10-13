@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransiti
 import { Check, Palette } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Popover } from '@/components/ui/popover';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { usePopover } from '@/lib/use-popover';
 import { setTheme } from '@/app/theme-actions';
 import { setDensity } from '@/app/density-actions';
@@ -267,23 +269,17 @@ export function ThemePicker({ value }: { value: Theme }) {
 
   return (
     <div className="relative shrink-0">
-      <button
+      <IconButton
         ref={triggerRef}
-        type="button"
+        label="Theme"
         onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Theme"
-        className={cn(
-          'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open
-            ? 'bg-accent-tint text-accent'
-            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-        )}
+        active={open}
+        className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
       >
-        <Palette className="size-4" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Theme</span>
-      </button>
+        <Palette strokeWidth={1.75} aria-hidden />
+      </IconButton>
 
       {open && (
         <Popover
@@ -295,9 +291,7 @@ export function ThemePicker({ value }: { value: Theme }) {
           padding="menu"
           className="sm:w-72"
         >
-          <p className="px-2 pb-1.5 pt-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Theme
-          </p>
+          <SectionLabel className="px-2 pb-1.5 pt-1">Theme</SectionLabel>
 
           <div role="radiogroup" aria-label="Light or dark" className="flex gap-1 px-1 pb-1">
             {THEME_POLARITIES.map((option) => {
@@ -313,7 +307,7 @@ export function ThemePicker({ value }: { value: Theme }) {
                   onClick={() => save(inPolarity(option.id))}
                   title={option.mood}
                   className={cn(
-                    'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                    'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
                     on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
                   )}
                 >
@@ -323,9 +317,7 @@ export function ThemePicker({ value }: { value: Theme }) {
             })}
           </div>
 
-          <p className="px-2 pb-1.5 pt-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Surface
-          </p>
+          <SectionLabel className="px-2 pb-1.5 pt-2">Surface</SectionLabel>
 
           <div role="radiogroup" aria-label="Surface" className="flex gap-1 px-1 pb-1">
             {THEME_SURFACES.map((option) => {
@@ -339,7 +331,7 @@ export function ThemePicker({ value }: { value: Theme }) {
                   onClick={() => save(inSurface(option.id))}
                   title={option.mood}
                   className={cn(
-                    'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                    'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
                     on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
                   )}
                 >
@@ -349,9 +341,7 @@ export function ThemePicker({ value }: { value: Theme }) {
             })}
           </div>
 
-          <p className="px-2 pb-1.5 pt-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Colour
-          </p>
+          <SectionLabel className="px-2 pb-1.5 pt-2">Colour</SectionLabel>
 
           {poster ? (
             <div className="flex flex-wrap gap-1.5 px-2 pb-2">
@@ -418,16 +408,14 @@ export function ThemePicker({ value }: { value: Theme }) {
             onClick={() => save({ kind: 'system' })}
             aria-pressed={showing.kind === 'system'}
             className={cn(
-              'mt-1 flex w-full items-center gap-2.5 rounded-lg border-t border-border px-2 pb-1.5 pt-2 text-left text-ui transition-colors',
+              'mt-1 flex w-full items-center gap-2.5 rounded-control border-t border-border px-2 pb-1.5 pt-2 text-left text-ui transition-colors',
               showing.kind === 'system' ? 'text-accent' : 'text-ink-muted hover:text-ink',
             )}
           >
             Follow the system
           </button>
 
-          <p className="mt-1 border-t border-border px-2 pb-1.5 pt-2.5 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Density
-          </p>
+          <SectionLabel className="mt-1 border-t border-border px-2 pb-1.5 pt-2.5">Density</SectionLabel>
           <div role="radiogroup" aria-label="Density" className="flex gap-1 px-1 pb-1">
             {DENSITIES.map((option) => (
               <button
@@ -437,7 +425,7 @@ export function ThemePicker({ value }: { value: Theme }) {
                 aria-checked={density === option.id}
                 onClick={() => chooseDensity(option.id)}
                 className={cn(
-                  'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                  'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
                   density === option.id
                     ? 'bg-accent-tint text-accent'
                     : 'text-ink-muted hover:bg-sunken hover:text-ink',
@@ -532,7 +520,7 @@ function Swatch({
       title={label}
       className={cn(
         // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
-        'press flex size-8 items-center justify-center rounded-md border border-border-strong transition-transform hover:scale-105',
+        'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
         way && 'wash-chip',
       )}
       // ui-ok: raw-hex -- this is the generated colour itself, which is the
@@ -633,7 +621,7 @@ function SkySwatch({
       title={label}
       className={cn(
         // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
-        'press wash-chip flex size-8 items-center justify-center rounded-md border border-border-strong transition-transform hover:scale-105',
+        'press wash-chip flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
       )}
       // ui-ok: raw-hex -- this is the sky itself, which is the one thing on the
       // screen that cannot be a token.

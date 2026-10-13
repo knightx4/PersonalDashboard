@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
@@ -11,6 +11,7 @@ import { outstandingCount, rightCount, type Quiz } from '@/lib/learn/quiz/model'
 import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
 import { WriteQuestions } from './write-questions';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 /**
  * One quiz: what it was over, how it went, and every question with what you
@@ -49,7 +50,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
           href={QUIZZES_HREF}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Quizzes
         </Link>
       </p>
@@ -66,7 +67,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
       />
 
       <div className="max-w-2xl">
-        <h2 className="mb-2 text-body font-semibold text-ink">What it is over</h2>
+        <SectionHeading title="What it is over" className="mb-2" />
 
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {material.map((piece) => (
@@ -107,7 +108,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
 
             {answered > 0 && (
               <>
-                <h2 className="mb-2 mt-8 text-body font-semibold text-ink">How it went</h2>
+                <SectionHeading title="How it went" className="mb-2 mt-8" />
 
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                   {quiz.questions

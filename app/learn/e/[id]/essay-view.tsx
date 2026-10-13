@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight, ChevronLeft } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
@@ -411,10 +411,10 @@ function VaultSaveError({
       {(vault.reason === 'read-only' || vault.reason === 'reconnect') && (
         <Link
           href={SETTINGS_HREF}
-          className="inline-flex min-h-11 items-center gap-1 text-ui font-medium text-accent hover:underline"
+          className={cn('inline-flex min-h-11 items-center gap-1 text-ui font-medium', linkVariants())}
         >
           Open vault settings
-          <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
         </Link>
       )}
       {reloadError && <p className="text-ui text-danger">{reloadError}</p>}
@@ -699,7 +699,7 @@ export function EssayView({
           href="/learn/essays"
           className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ChevronLeft className="size-4" strokeWidth={2} aria-hidden />
+          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
           Essays
         </Link>
         <div className="flex items-center gap-1">

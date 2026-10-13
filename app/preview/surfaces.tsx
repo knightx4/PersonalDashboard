@@ -22,6 +22,7 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
 import { DashMarkLooks } from './dash-mark-surface';
+import { UiKit } from './ui-kit-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -5486,6 +5487,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <DashMarkLooks />,
+  },
+
+  /* Every shared component in components/ui, in each state it has. A change
+   * to a primitive is looked at here instead of on every page that imports
+   * it (COMPONENT_SURFACES in lib/preview/routes.ts). */
+  {
+    id: 'ui-kit',
+    label: 'Design · Every shared component',
+    module: 'dev',
+    width: 'wide',
+    render: () => <UiKit />,
   },
 
   /* The day closing on the agenda (plan #1556): played by ticking the last

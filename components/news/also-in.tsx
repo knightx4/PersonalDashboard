@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { issueHref } from '@/lib/news/issues/list';
 import type { AlsoIn } from '@/lib/news/quick/next';
@@ -37,7 +37,7 @@ export function AlsoInLine({
               {i > 0 && (i === named.length - 1 && more === 0 ? ' and ' : ', ')}
               <Link
                 href={issueHref(other.issueId, { original: false, pictures, from: null })}
-                className="text-accent hover:underline"
+                className={linkVariants()}
               >
                 {other.from}
               </Link>

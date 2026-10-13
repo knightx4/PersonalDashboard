@@ -17,6 +17,7 @@ import {
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
 import { readableRefs } from '@/lib/plan/ref';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import {
   PLAN_COMMENTS,
@@ -52,7 +53,7 @@ function AskQuestion({
   useSettled(state, onDone);
 
   return (
-    <form action={action} className="space-y-2 rounded-lg bg-surface px-3 py-2.5">
+    <form action={action} className="space-y-2 rounded-control bg-surface px-3 py-2.5">
       <input type="hidden" name="module" value={node.module ?? ''} />
       <input type="hidden" name="parent" value={node.id} />
       <input type="hidden" name="kind" value="decision" />
@@ -136,12 +137,12 @@ export function QuestionRow({
   return (
     <li
       className={cn(
-        'rounded-lg px-3 py-2.5',
+        'rounded-control px-3 py-2.5',
         node.status === 'dropped'
           ? 'bg-sunken'
           : settled
-            ? 'bg-positive-tint/40'
-            : 'bg-caution-tint/40',
+            ? 'bg-positive-tint'
+            : 'bg-caution-tint',
       )}
     >
       <div className="flex items-start gap-2">
@@ -157,7 +158,7 @@ export function QuestionRow({
           )}
         >
           {settled && node.status !== 'dropped' ? (
-            <Check className="size-3.5" strokeWidth={2} />
+            <Check className="size-3.5" strokeWidth={1.75} />
           ) : (
             '?'
           )}
@@ -290,14 +291,14 @@ export function Questions({
 
   return (
     <div className="space-y-2">
-      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+      <SectionLabel>
         Questions
         {unanswered > 0 && (
           <span className="ml-1.5 font-normal normal-case tracking-normal text-caution">
             {unanswered} unanswered
           </span>
         )}
-      </p>
+      </SectionLabel>
 
       {questions.length > 0 && (
         <ul className="space-y-1.5">

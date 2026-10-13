@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { CalendarClock, ChevronDown } from 'lucide-react';
+import { CalendarClock, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { RoundPrep } from './prep-note';
 import {
@@ -136,19 +139,18 @@ export function InterviewGroupCard({
     // interviews belong to which round without indenting them.
     <Card padding="dense" className="border-accent/40 bg-accent-tint/30">
       <header className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+        <IconButton
+          size="sm"
+          label={open ? 'Fold this round away' : 'Open this round'}
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          aria-label={open ? 'Fold this round away' : 'Open this round'}
-          className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-accent"
         >
           <ChevronDown
-            className={cn('size-4 transition-transform duration-quick', !open && '-rotate-90')}
+            className={cn('transition-transform duration-quick', !open && '-rotate-90')}
             strokeWidth={1.75}
             aria-hidden
           />
-        </button>
+        </IconButton>
         <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
         {/* The number is the round's, not the interviews'. Four conversations
             on one afternoon are all the second round; numbering each of them
@@ -214,8 +216,9 @@ export function InterviewGroupCard({
             removed by taking those out first, so nothing is swept away by a
             click on the wrong card. */}
         {interviews.length === 0 && (
-          <button
+          <Button
             type="button"
+            variant="link"
             disabled={pending}
             onClick={() => {
               if (!removing) {
@@ -230,10 +233,10 @@ export function InterviewGroupCard({
                 }
               });
             }}
-            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-danger"
+            className="ml-auto hover:text-danger"
           >
             {removing ? 'Really remove it?' : 'Remove this round'}
-          </button>
+          </Button>
         )}
       </header>
 
@@ -271,14 +274,9 @@ export function InterviewGroupCard({
               {/* The number and the name are saved here whether or not the
                 round has a note, and only once one of them has changed. */}
               {headingChanged && (
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={save}
-                  className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-                >
+                <Button type="button" variant="link" disabled={pending} onClick={save}>
                   Save the round
-                </button>
+                </Button>
               )}
               {saved && <span className="text-small text-ink-muted">{saved}</span>}
             </div>
@@ -376,17 +374,11 @@ function RoundMail({
           an email" -- three lines to report an absence, on a tab where a round
           with one phone screen in it already runs past the fold. */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Emails about this round
-        </h4>
+        <SectionLabel as="h4">Emails about this round</SectionLabel>
         {!adding && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-          >
+          <Button type="button" variant="link" onClick={() => setAdding(true)}>
             Add an email
-          </button>
+          </Button>
         )}
       </div>
 
@@ -399,20 +391,20 @@ function RoundMail({
               ) : (
                 <span className="text-ink">{message.subject ?? '(no subject)'}</span>
               )}
-              <button
-                type="button"
+              <IconButton
+                size="sm"
+                label={`Take ${message.subject ?? 'this email'} off this round`}
                 disabled={pending}
-                aria-label={`Take ${message.subject ?? 'this email'} off this round`}
                 onClick={() =>
                   startTransition(async () => {
                     const result = await unlinkRoundMessage({ groupId, messageId: message.id });
                     setError(result.error);
                   })
                 }
-                className="text-ink-muted hover:text-danger"
+                className="-my-1 self-center hover:text-danger"
               >
-                ×
-              </button>
+                <X strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </li>
           ))}
         </ul>

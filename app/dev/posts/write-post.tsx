@@ -87,7 +87,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
                 <img
                   src={postImageSrc(path) ?? ''}
                   alt="An image to post with this"
-                  className="h-20 w-auto max-w-40 rounded-sm bg-sunken object-cover"
+                  className="h-20 w-auto max-w-40 rounded-card bg-sunken object-cover"
                 />
                 <button
                   type="button"

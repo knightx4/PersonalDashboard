@@ -1,7 +1,8 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { Press } from '@/app/learn/youtube/press';
 import { unfollowSubjectChannelAction } from '@/app/learn/youtube/actions';
 import { PILE_LABEL } from '@/lib/learn/youtube/videos';
@@ -57,14 +58,7 @@ function ChannelRow({ channel, kept }: { channel: SubjectChannelView; kept: Read
           {channel.title}
           {channel.handle && <span className="ml-1.5 font-normal text-ink-muted">{channel.handle}</span>}
         </h3>
-        <span
-          className={cn(
-            'rounded-pill px-1.5 py-0.5 text-small font-medium',
-            good ? 'bg-accent-tint text-accent' : 'text-ink-muted',
-          )}
-        >
-          {STATE_LABEL[channel.state]}
-        </span>
+        <Chip tone={good ? 'accent' : 'neutral'}>{STATE_LABEL[channel.state]}</Chip>
       </div>
 
       {channel.why ? (
@@ -75,7 +69,7 @@ function ChannelRow({ channel, kept }: { channel: SubjectChannelView; kept: Read
       {note && <p className="mt-1 text-small text-ink-muted">{note}</p>}
       {channel.state === 'following' && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Link href={YOUTUBE_HREF} className="text-small text-accent hover:underline">
+          <Link href={YOUTUBE_HREF} className={cn('text-small', linkVariants())}>
             In your YouTube library
           </Link>
           <Press
@@ -94,7 +88,7 @@ function ChannelRow({ channel, kept }: { channel: SubjectChannelView; kept: Read
             <li key={sample.video_id} className="text-ui">
               <span className="mr-1.5 text-small font-medium text-ink-muted">{PILE_LABEL[sample.verdict]}</span>
               {kept.has(sample.video_id) ? (
-                <Link href={`/learn/videos/${sample.video_id}`} className="text-accent hover:underline">
+                <Link href={`/learn/videos/${sample.video_id}`} className={linkVariants()}>
                   {sample.title}
                 </Link>
               ) : (

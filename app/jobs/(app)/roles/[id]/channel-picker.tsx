@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/field';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { APPLICATION_SOURCES, SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
@@ -44,14 +45,15 @@ export function ChannelPicker({
 
   if (!editing) {
     return (
-      <button
+      <Button
         type="button"
+        variant="link"
         onClick={() => setEditing(true)}
         title="Change how you applied"
-        className="press block max-w-full whitespace-normal rounded-control text-left text-ink underline decoration-border underline-offset-2 hover:decoration-ink max-sm:-my-3 max-sm:py-3"
+        className="block max-w-full whitespace-normal text-left text-ui text-ink max-sm:-my-3 max-sm:py-3"
       >
         {label}
-      </button>
+      </Button>
     );
   }
 
@@ -97,13 +99,9 @@ export function ChannelPicker({
           ))}
         </Select>
       )}
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="press rounded-control text-small text-ink-muted underline decoration-border underline-offset-2 hover:text-ink max-sm:min-h-11"
-      >
+      <Button type="button" variant="link" onClick={() => setEditing(false)}>
         Done
-      </button>
+      </Button>
     </span>
   );
 }

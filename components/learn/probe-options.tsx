@@ -65,14 +65,14 @@ export function ProbeOptions({
           {answered && index === answered.correctIndex && (
             <Check
               className="absolute right-3 top-3.5 size-4 text-ink-muted"
-              strokeWidth={2}
+              strokeWidth={1.75}
               aria-label="The correct answer"
             />
           )}
           {answered && index === answered.chosenIndex && index !== answered.correctIndex && (
             <X
               className="absolute right-3 top-3.5 size-4 text-danger"
-              strokeWidth={2}
+              strokeWidth={1.75}
               aria-label="What you picked"
             />
           )}

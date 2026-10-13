@@ -22,7 +22,9 @@ import { SearchMark } from '@/components/ui/search-mark';
 import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
-import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
+import { KeyHintsProvider } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
+import { IconButton } from '@/components/ui/icon-button';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
@@ -336,7 +338,7 @@ export function AppShell({
       data-capture-nav={href}
       title={narrow ? label : undefined}
       className={cn(
-        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
+        'group relative flex items-center gap-2 rounded-control py-1.5 text-ui font-medium transition-colors duration-quick',
         narrow ? 'justify-center px-2' : 'pl-3 pr-2',
         on
           ? 'bg-shell-hover text-shell-ink'
@@ -610,7 +612,7 @@ export function AppShell({
                 title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
                 aria-pressed={collapsed}
                 className={cn(
-                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
+                  'press flex w-full items-center gap-2 rounded-control py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
                   collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
                 )}
               >
@@ -637,14 +639,13 @@ export function AppShell({
               />
               <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
                 <div className="flex justify-end px-2 pt-2">
-                  <button
-                    type="button"
+                  <IconButton
+                    label="Close navigation"
                     onClick={() => setDrawer(false)}
-                    className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                    className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
                   >
-                    <X className="size-4" strokeWidth={2} aria-hidden />
-                    <span className="sr-only">Close navigation</span>
-                  </button>
+                    <X strokeWidth={1.75} aria-hidden />
+                  </IconButton>
                 </div>
                 {/* Never narrow: a drawer you opened on purpose has no width to
                 save, and it closes the moment you pick something. */}
@@ -671,14 +672,13 @@ export function AppShell({
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
               <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
-                <button
-                  type="button"
+                <IconButton
+                  label="Open navigation"
                   onClick={() => setDrawer(true)}
-                  className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                  aria-label="Open navigation"
+                  className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                 >
-                  <Menu className="size-4" strokeWidth={1.75} aria-hidden />
-                </button>
+                  <Menu strokeWidth={1.75} aria-hidden />
+                </IconButton>
 
                 {/* The mark in the bar is the switcher, not a picture of one.
                 From lg up the column carries it -- and still does when the
@@ -791,15 +791,13 @@ export function AppShell({
                   with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
                   the left and a second way in beside it would be two controls
                   for one thing. */}
-                  <button
-                    type="button"
+                  <IconButton
+                    label="Search"
                     onClick={() => openSearch()}
-                    title="Search"
-                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                    className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                   >
                     <SearchMark />
-                    <span className="sr-only">Search</span>
-                  </button>
+                  </IconButton>
 
                   {/* Dash, from any page (plan #1090): a question about
                   anything in the app, answered with links to what it used. */}

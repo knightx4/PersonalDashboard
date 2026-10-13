@@ -108,6 +108,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/onboarding',
   '/open/[ref]',
   '/preview',
+  '/preview/overhaul',
+  '/preview/overhaul/[id]',
   '/privacy',
   '/reset-password',
   '/s/[token]',

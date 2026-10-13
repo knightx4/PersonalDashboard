@@ -321,9 +321,9 @@ function PracticeCard({
                 {latest.marks.map((mark, index) => (
                   <li key={index} className="flex items-start gap-1.5 text-ui">
                     {mark.met ? (
-                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={2} aria-label="Right" />
+                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={1.75} aria-label="Right" />
                     ) : (
-                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Missing" />
+                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-label="Missing" />
                     )}
                     <span className={mark.met ? 'text-ink' : 'text-ink-muted'}>{mark.note}</span>
                   </li>
@@ -526,9 +526,9 @@ function PieceCheckCard({
           {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', check.correct ? 'text-ink' : 'text-ink-muted')}>
             {check.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {check.correct ? 'Right.' : 'Not yet.'}
           </p>

@@ -1,7 +1,7 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { moduleById } from '@/lib/modules';
 import type { MonthKey, TimelineMonth } from '@/lib/timeline/months';
@@ -93,14 +93,14 @@ export function TimelineView({
       {(earlier || later) && (
         <nav aria-label="More months" className="mt-6 flex items-center justify-between gap-3 text-ui">
           {later ? (
-            <Link href={timelineUrl({ module, to: later === 'now' ? null : later })} className="text-accent hover:underline">
+            <Link href={timelineUrl({ module, to: later === 'now' ? null : later })} className={linkVariants()}>
               Later months
             </Link>
           ) : (
             <span />
           )}
           {earlier && (
-            <Link href={timelineUrl({ module, to: earlier })} className="text-accent hover:underline">
+            <Link href={timelineUrl({ module, to: earlier })} className={linkVariants()}>
               Earlier months
             </Link>
           )}
@@ -136,11 +136,7 @@ function ModuleFilter({
               href={timelineUrl({ module: option.key, to })}
               scroll={false}
               aria-current={on ? 'true' : undefined}
-              className={cn(
-                'press inline-flex h-(--control-h) shrink-0 items-center px-2.5 text-ui font-medium whitespace-nowrap',
-                'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-                on ? 'bg-accent-tint text-accent' : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-              )}
+              className={cn(segmentClass(on), 'shrink-0 whitespace-nowrap')}
             >
               {option.label}
             </Link>

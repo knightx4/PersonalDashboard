@@ -172,7 +172,7 @@ function ToastItem({
         onClick={() => dismiss(toast.id)}
         className="press flex size-6 items-center justify-center rounded-md text-ink-muted hover:bg-sunken hover:text-ink"
       >
-        <X className="size-3.5" strokeWidth={2} aria-hidden />
+        <X className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Dismiss</span>
       </button>
     </div>

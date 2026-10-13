@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { popoverSurface } from '@/components/ui/popover';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { addToShare } from '@/app/shopping/share/actions';
 
@@ -84,7 +84,7 @@ export function SendToShare({
               <button
                 type="button"
                 onClick={() => send(share.id)}
-                className="press w-full rounded-control px-2.5 py-1.5 text-left text-ui text-ink transition-colors duration-quick hover:bg-sunken"
+                className={menuItemClass()}
               >
                 {share.title}
               </button>

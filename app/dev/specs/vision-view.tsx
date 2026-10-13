@@ -10,6 +10,7 @@ import { commentWhen } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { ModuleVision, VisionScope } from '@/lib/specs/vision';
 import { LinkedText } from '@/components/ui/linked-text';
+import { IconButton } from '@/components/ui/icon-button';
 
 /**
  * A workspace's vision, at the head of its group on the specs page.
@@ -92,20 +93,14 @@ export function ModuleVisionPanel({
   }
 
   return (
-    <div className="mb-3 space-y-1 rounded-lg border-l-2 border-border-strong bg-sunken px-4 py-3">
+    <div className="mb-3 space-y-1 rounded-control border-l-2 border-border-strong bg-sunken px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 whitespace-pre-wrap text-body italic text-ink">
           <LinkedText text={vision.body} />
         </p>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          title={`Edit the vision for ${label}`}
-          className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <Pencil className="size-3.5" strokeWidth={2} aria-hidden />
-          <span className="sr-only">Edit the vision for {label}</span>
-        </button>
+        <IconButton size="sm" label={`Edit the vision for ${label}`} onClick={() => setEditing(true)}>
+          <Pencil strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </div>
       {/* When it was last thought about. A vision nobody has touched in a year
           is the one worth re-reading, and nothing else on the row says so. */}

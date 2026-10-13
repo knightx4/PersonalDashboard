@@ -86,7 +86,7 @@ function Term({ children }: { children: ReactNode }) {
 
 function Code({ children }: { children: ReactNode }) {
   return (
-    <code className="mt-1.5 block rounded-md bg-sunken px-2.5 py-1.5 font-mono text-small text-ink select-all [overflow-wrap:anywhere]">
+    <code className="mt-1.5 block rounded-control bg-sunken px-3 py-2 font-mono text-small text-ink select-all [overflow-wrap:anywhere]">
       {children}
     </code>
   );
