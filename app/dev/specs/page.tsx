@@ -8,6 +8,7 @@ import { loadModuleVisions } from '@/lib/specs/vision';
 import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
 import { loadSpecInterviews } from '@/lib/specs/interviews';
 import { interviewCards } from '@/lib/specs/interview-view';
+import { summariseAgentActions } from '@/lib/agent-actions/summary';
 import { SpecsView } from './specs-view';
 
 export const metadata = { title: 'Specs' };
@@ -73,6 +74,7 @@ export default async function SpecsPage() {
       changes={changes}
       audit={audit}
       interviews={cards}
+      agentActions={summariseAgentActions()}
     />
   );
 }

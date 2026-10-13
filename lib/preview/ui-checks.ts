@@ -43,6 +43,23 @@ export type CriticFix = {
   change: string;
 };
 
+/**
+ * The three questions every round answers (docs/UI-QUALITY-SPEC.md Part 2,
+ * R19), in the order the critic is told to answer them: where the eye goes
+ * first and whether that is what the screen is for, whether anything competes
+ * with the data, and whether the lines are lighter than the text.
+ */
+export const CRITIC_QUESTIONS = ['eye', 'competition', 'lines'] as const;
+export type CriticQuestion = (typeof CRITIC_QUESTIONS)[number];
+
+/**
+ * One answer: what the critic saw, and `ok` when it is the answer a good
+ * screen gives (the eye lands clearly on what the screen is for; nothing
+ * competes; the lines are lighter). `eye.ok` false fails the screen.
+ */
+export type CriticAnswer = { answer: string; ok: boolean };
+export type CriticAnswers = Record<CriticQuestion, CriticAnswer>;
+
 export type CriticVerdict = {
   surface: string;
   round: number;
@@ -50,6 +67,7 @@ export type CriticVerdict = {
   fixes: CriticFix[];
   earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
+  questions: CriticAnswers;
 };
 
 /** The row a round writes, with the user and the shot paths filled in later. */
@@ -62,6 +80,7 @@ export type UiCheckRow = {
   fixes: CriticFix[];
   earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
+  questions: CriticAnswers;
   shots: string[];
   commit_sha: string | null;
 };
@@ -180,7 +199,34 @@ export function parseVerdict(raw: string, surface: string, round: number): Criti
   });
 
   const notes = v.notes === undefined || v.notes === null ? null : text(v.notes, 'notes');
-  return { surface, round, verdict: v.verdict, fixes, earlier, notes };
+  const questions = parseQuestions(v.questions);
+  // A screen with no clear answer to where the eye goes first fails
+  // (Part 2), so a pass that says the eye has nowhere clear to go is refused.
+  if (v.verdict === 'pass' && !questions.eye.ok) {
+    throw new Error('The verdict passes a screen whose first answer says the eye has no clear place to go; that is a fix.');
+  }
+  return { surface, round, verdict: v.verdict, fixes, earlier, notes, questions };
+}
+
+/** The `questions` object: all three answered, each with its words and `ok`. */
+function parseQuestions(value: unknown): CriticAnswers {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`The verdict has no questions object. It answers ${CRITIC_QUESTIONS.join(', ')}.`);
+  }
+  const q = value as Record<string, unknown>;
+  const answers = {} as CriticAnswers;
+  for (const key of CRITIC_QUESTIONS) {
+    const item = q[key];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error(`The verdict does not answer the question "${key}".`);
+    }
+    const a = item as Record<string, unknown>;
+    const answer = text(a.answer, `${key} answer`);
+    if (!answer.trim()) throw new Error(`The verdict's answer to "${key}" is empty.`);
+    if (typeof a.ok !== 'boolean') throw new Error(`The verdict's answer to "${key}" has no ok of true or false.`);
+    answers[key] = { answer, ok: a.ok };
+  }
+  return answers;
 }
 
 export function checkRow(
@@ -198,6 +244,7 @@ export function checkRow(
     fixes: verdict.fixes,
     earlier: verdict.earlier,
     notes: verdict.notes,
+    questions: verdict.questions,
     shots,
     commit_sha: commitSha,
   };
@@ -231,15 +278,17 @@ export function connectorSql(row: UiCheckRow): string {
     ? `array[${row.shots.map((s) => `'${s.replace(/'/g, '')}'`).join(', ')}]::text[]`
     : `'{}'::text[]`;
   return [
-    'insert into ui_checks (user_id, step, note_id, surface, round, verdict, fixes, earlier, notes, shots, commit_sha)',
+    'insert into ui_checks (user_id, step, note_id, surface, round, verdict, fixes, earlier, notes, questions, shots, commit_sha)',
     `select ${owner}, ${row.step ?? 'null'}, ${row.note_id ? `'${row.note_id}'::uuid` : 'null'},`,
     `  '${row.surface}', ${row.round}, '${row.verdict}',`,
     `  ${encoded(JSON.stringify(row.fixes))}::jsonb,`,
     `  ${encoded(JSON.stringify(row.earlier))}::jsonb,`,
     `  ${row.notes === null ? 'null' : encoded(row.notes)},`,
+    `  ${encoded(JSON.stringify(row.questions))}::jsonb,`,
     `  ${shots}, ${row.commit_sha ? `'${row.commit_sha.replace(/[^0-9a-f]/gi, '')}'` : 'null'}`,
     `on conflict ${conflict} do update set verdict = excluded.verdict, fixes = excluded.fixes,`,
-    '  earlier = excluded.earlier, notes = excluded.notes, commit_sha = excluded.commit_sha,',
+    '  earlier = excluded.earlier, notes = excluded.notes, questions = excluded.questions,',
+    '  commit_sha = excluded.commit_sha,',
     '  shots = case when cardinality(excluded.shots) > 0 then excluded.shots else ui_checks.shots end',
     'returning id, surface, round, verdict, jsonb_array_length(fixes) as fixes;',
   ].join('\n');
