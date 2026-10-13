@@ -81,7 +81,7 @@ describe('runnerSlots', () => {
   });
 
   it('puts the tick reason on a slot with nothing ready', () => {
-    const note = 'Waiting: one session is running, and nothing else is ready outside its module.';
+    const note = 'Waiting: one session is running, and nothing else ready can run beside it.';
     const slots = runnerSlots({
       run: night({ lastTickNote: note }),
       sessions: [session('a', 1)],

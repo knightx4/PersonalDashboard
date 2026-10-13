@@ -47,16 +47,17 @@ import {
 import { startUnstick } from '@/lib/plan/unstick-run';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
+import { besideRunning } from '@/lib/plan/module-share';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
 
 /**
  * One tick of the overnight runner: fire a feature, or leave everything alone.
  *
  * The clock calls this every few minutes all night. Most calls do nothing: the
- * runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, each in a
- * different module, and starts at most one a tick. So the ordinary answer is
- * "every slot is taken" and the answer that costs anything happens a handful
- * of times a night.
+ * runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, one per
+ * module unless a second fits beside the first, and starts at most one a
+ * tick. So the ordinary answer is "every slot is taken" and the answer that
+ * costs anything happens a handful of times a night.
  *
  * Three questions, in the order that makes the cheapest refusal first. The
  * row -- is the runner on, is the budget gone, is the clock gone, is it held
@@ -64,9 +65,10 @@ import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/p
  * them are still going -- is `runLiveness` for each and costs one listing of
  * what has been pushed. The plan -- what should go next -- is
  * `chooseOvernightFeature` over the features outside the running ones'
- * modules, and costs the whole tree. Only the last one can fire. The stale-claim sweep runs
- * ahead of both of those reads, so a claim whose session has ended comes back
- * on a tick that ends up waiting as well as on the tick that fires.
+ * modules, then over those that fit beside them, and costs the whole tree.
+ * Only the last one can fire. The stale-claim sweep runs ahead of both of
+ * those reads, so a claim whose session has ended comes back on a tick that
+ * ends up waiting as well as on the tick that fires.
  *
  * The one place this departs from "check liveness first" is a night that is
  * already over on its own terms. A budget that is spent or a stop time that
@@ -458,8 +460,8 @@ export function tickNote(tick: OvernightTick): string | null {
         return `Waiting: ${tick.running} sessions are running, the most it starts at once.`;
       }
       return tick.running === 1
-        ? 'Waiting: one session is running, and nothing else is ready outside its module.'
-        : `Waiting: ${tick.running} sessions are running, and nothing else is ready outside their modules.`;
+        ? 'Waiting: one session is running, and nothing else ready can run beside it.'
+        : `Waiting: ${tick.running} sessions are running, and nothing else ready can run beside them.`;
     case 'nothing-ready':
       return `Waiting until something is ready. ${tick.reason}`;
     case 'fired':
@@ -692,87 +694,107 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   const previousFired = firesWithout(previousFiredAt, released);
 
   const refused: RefusedFeature[] = [];
-  let remaining: readonly PlanSection[] = outsideRunning(sections, runningIds);
-  for (const id of stalls.held) remaining = without(remaining, id);
-  const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
+  const refusedIds: string[] = [];
+  const narrowed = (start: readonly PlanSection[]): readonly PlanSection[] => {
+    let out = start;
+    for (const id of stalls.held) out = without(out, id);
+    for (const id of refusedIds) out = without(out, id);
+    return out;
+  };
 
-  for (let round = 0; round < rounds; round += 1) {
-    const choice = chooseOvernightFire(remaining, run, ports.now, lastFired, previousFired);
-    if (choice.act === 'end') {
-      // The chooser can only say the tree ran out, and once anything has been
-      // refused that is no longer the whole truth: the reason has to name them,
-      // because the row's sentence is all the morning gets.
-      const said =
-        refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
-      // Which features the guard is holding, by name, so the note on the plan
-      // page says what the runner is waiting for rather than only that it is.
-      const held = choice.passedOver ?? [];
-      const reason = held.length > 0 ? `${said} ${passedOverNote(held, ports.now)}` : said;
-      // Nothing ready is a reading of one instant, so the night keeps its
-      // clock and asks again in four minutes. The budget and the stop time are
-      // settled and do end it; this is not.
-      //
-      // Refusals are the same reading. A feature refuses the send because a
-      // re-shape is rewriting it, because a claim beneath it is still live, or
-      // because it is only a proposal -- and the first two clear themselves
-      // while nobody is watching. On 19 September a run with no limit ended
-      // twenty-one minutes in: #669 and #656 both refused for a re-shape that
-      // had been sitting in `started` for nearly two hours, and five other
-      // features were waiting behind that.
-      //
-      // Retrying them costs a few queries a tick. The send refuses before it
-      // starts a routine, so no session is fired and no tokens are spent, and
-      // that is a much smaller price than a night that stops.
-      // The same goes for every feature having been tried without a close. It
-      // is a fact about this run so far, not about the plan: a claim frees, a
-      // step closes under a neighbouring feature, you approve something, and
-      // the tree reads differently four minutes later.
-      //
-      // Which leaves the budget and the stop time as the only two things that
-      // end a run, and that is the whole rule. A run told to go until you stop
-      // it has neither, so it goes until you stop it.
-      if (choice.reason === OVERNIGHT_NOTHING_READY || choice.reason === OVERNIGHT_NO_PROGRESS) {
-        // With sessions going, what is ready may only be in their modules, and
-        // one of them finishing changes that. Said as waiting on them.
-        if (inFlight.length > 0 && refused.length === 0) {
-          return {
-            act: 'waiting',
-            liveness: waitingOn(inFlight),
-            running: inFlight.length,
-            atOnce,
-          };
+  // Two passes. The first offers only modules with no session going, the way
+  // the runner always has. The second runs only when that found nothing and a
+  // slot is still free: a module with a session may take a second one when the
+  // two features' work does not meet (lib/plan/module-share.ts). Every other
+  // module still gets the free slot first.
+  const passes: (readonly PlanSection[])[] = [outsideRunning(sections, runningIds)];
+  if (inFlight.length > 0) passes.push(besideRunning(sections, runningIds));
+
+  for (const [pass, start] of passes.entries()) {
+    let remaining: readonly PlanSection[] = narrowed(start);
+    const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
+
+    for (let round = 0; round < rounds; round += 1) {
+      const choice = chooseOvernightFire(remaining, run, ports.now, lastFired, previousFired);
+      if (choice.act === 'end') {
+        // The chooser can only say the tree ran out, and once anything has been
+        // refused that is no longer the whole truth: the reason has to name them,
+        // because the row's sentence is all the morning gets.
+        const said =
+          refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
+        // Which features the guard is holding, by name, so the note on the plan
+        // page says what the runner is waiting for rather than only that it is.
+        const held = choice.passedOver ?? [];
+        const reason = held.length > 0 ? `${said} ${passedOverNote(held, ports.now)}` : said;
+        // Nothing ready is a reading of one instant, so the night keeps its
+        // clock and asks again in four minutes. The budget and the stop time are
+        // settled and do end it; this is not.
+        //
+        // Refusals are the same reading. A feature refuses the send because a
+        // re-shape is rewriting it, because a claim beneath it is still live, or
+        // because it is only a proposal -- and the first two clear themselves
+        // while nobody is watching. On 19 September a run with no limit ended
+        // twenty-one minutes in: #669 and #656 both refused for a re-shape that
+        // had been sitting in `started` for nearly two hours, and five other
+        // features were waiting behind that.
+        //
+        // Retrying them costs a few queries a tick. The send refuses before it
+        // starts a routine, so no session is fired and no tokens are spent, and
+        // that is a much smaller price than a night that stops.
+        // The same goes for every feature having been tried without a close. It
+        // is a fact about this run so far, not about the plan: a claim frees, a
+        // step closes under a neighbouring feature, you approve something, and
+        // the tree reads differently four minutes later.
+        //
+        // Which leaves the budget and the stop time as the only two things that
+        // end a run, and that is the whole rule. A run told to go until you stop
+        // it has neither, so it goes until you stop it.
+        if (choice.reason === OVERNIGHT_NOTHING_READY || choice.reason === OVERNIGHT_NO_PROGRESS) {
+          // With sessions going, what is ready may only be in their modules, and
+          // one of them finishing changes that. Said as waiting on them.
+          if (inFlight.length > 0 && refused.length === 0) {
+            // Nothing in the free modules; the next pass may still fit one beside them.
+            if (pass < passes.length - 1) break;
+            return {
+              act: 'waiting',
+              liveness: waitingOn(inFlight),
+              running: inFlight.length,
+              atOnce,
+            };
+          }
+          return { act: 'nothing-ready', reason };
         }
-        return { act: 'nothing-ready', reason };
+        await ports.stop(reason);
+        return { act: 'ended', reason };
       }
-      await ports.stop(reason);
-      return { act: 'ended', reason };
+      if (choice.act !== 'fire') return { act: choice.act };
+
+      const sent = await ports.fire(choice.feature, choice.step);
+      if (sent.ok) {
+        // Only after something was actually started. A budget that went down on a
+        // send that never happened is a night that spends itself on nothing.
+        await ports.recordFire(run.featuresLeft);
+        return {
+          act: 'fired',
+          feature: choice.feature.number,
+          step: choice.step.number,
+          featuresLeft: run.featuresLeft === null ? null : Math.max(0, run.featuresLeft - 1),
+          refused: refused.map((one) => one.number),
+          running: inFlight.length + 1,
+        };
+      }
+
+      const error = sent.error ?? 'The feature could not be sent.';
+      // A send that broke rather than refused stops the tick where it stands.
+      // The next feature would be handed to the same routine over the same
+      // connection and fail the same way, and a tick that worked down the whole
+      // tree on a dead API would burn every candidate the night had left.
+      if (!sent.refused) return { act: 'failed', error };
+
+      refused.push({ number: choice.feature.number, error });
+      refusedIds.push(choice.feature.id);
+      remaining = without(remaining, choice.feature.id);
     }
-    if (choice.act !== 'fire') return { act: choice.act };
-
-    const sent = await ports.fire(choice.feature, choice.step);
-    if (sent.ok) {
-      // Only after something was actually started. A budget that went down on a
-      // send that never happened is a night that spends itself on nothing.
-      await ports.recordFire(run.featuresLeft);
-      return {
-        act: 'fired',
-        feature: choice.feature.number,
-        step: choice.step.number,
-        featuresLeft: run.featuresLeft === null ? null : Math.max(0, run.featuresLeft - 1),
-        refused: refused.map((one) => one.number),
-        running: inFlight.length + 1,
-      };
-    }
-
-    const error = sent.error ?? 'The feature could not be sent.';
-    // A send that broke rather than refused stops the tick where it stands.
-    // The next feature would be handed to the same routine over the same
-    // connection and fail the same way, and a tick that worked down the whole
-    // tree on a dead API would burn every candidate the night had left.
-    if (!sent.refused) return { act: 'failed', error };
-
-    refused.push({ number: choice.feature.number, error });
-    remaining = without(remaining, choice.feature.id);
   }
 
   // Unreachable: every turn of the loop either answers or removes one of the

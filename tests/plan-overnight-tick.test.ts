@@ -1,6 +1,6 @@
 /**
- * The clock tick that keeps up to three features going a night, each in a
- * different module.
+ * The clock tick that keeps up to three features going a night, one per
+ * module unless a second fits beside the first.
  *
  * The properties that matter are the ones about restraint: a tick with a
  * session still working must change nothing at all, a tick with the runner off
@@ -616,6 +616,71 @@ describe('overnightTick', () => {
     expect(calls).toMatchObject({ fired: [], recorded: [], stopped: [] });
   });
 
+  it('fires a second feature in a busy module when their work does not meet', async () => {
+    const sections = tree([
+      item({ id: 'running', module: 'learn', detail: 'Changes app/learn/now/reader.tsx.' }),
+      item({
+        id: 'running-step',
+        parentId: 'running',
+        module: 'learn',
+        detail: 'In lib/learn/readings/summary.ts.',
+      }),
+      item({ id: 'neighbour', module: 'learn', detail: 'The map on /learn/space.' }),
+      item({
+        id: 'neighbour-step',
+        parentId: 'neighbour',
+        module: 'learn',
+        detail: 'Edits app/learn/space/idea-plot.tsx and lib/learn/map/view.ts.',
+      }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'running', liveness: 'working' }],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 2 });
+    expect(calls.fired).toEqual([{ feature: 'neighbour', step: 'neighbour-step' }]);
+  });
+
+  it('still prefers a free module to sharing a busy one', async () => {
+    const sections = tree([
+      item({ id: 'running', module: 'learn', detail: 'app/learn/now/reader.tsx' }),
+      item({ id: 'running-step', parentId: 'running', module: 'learn' }),
+      item({ id: 'neighbour', module: 'learn', priority: 1, detail: 'app/learn/space/page.tsx' }),
+      item({ id: 'neighbour-step', parentId: 'neighbour', module: 'learn', priority: 1 }),
+      item({ id: 'todo', module: 'todo', priority: 3 }),
+      item({ id: 'todo-step', parentId: 'todo', module: 'todo', priority: 3 }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'running', liveness: 'working' }],
+    });
+
+    await overnightTick(p);
+    expect(calls.fired).toEqual([{ feature: 'todo', step: 'todo-step' }]);
+  });
+
+  it('does not put a third session in one module', async () => {
+    const sections = tree([
+      item({ id: 'one', module: 'learn', detail: 'app/learn/now/page.tsx' }),
+      item({ id: 'one-step', parentId: 'one', module: 'learn' }),
+      item({ id: 'two', module: 'learn', detail: 'app/learn/space/page.tsx' }),
+      item({ id: 'two-step', parentId: 'two', module: 'learn' }),
+      item({ id: 'three', module: 'learn', detail: 'app/learn/know/page.tsx' }),
+      item({ id: 'three-step', parentId: 'three', module: 'learn' }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [
+        { featureId: 'one', liveness: 'working' },
+        { featureId: 'two', liveness: 'working' },
+      ],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'waiting', running: 2 });
+    expect(calls.fired).toEqual([]);
+  });
+
   it('keeps an unreadable session in its slot and its module, and fires elsewhere', async () => {
     const sections = tree([
       item({ id: 'unread', module: 'vault', priority: 1 }),
@@ -970,7 +1035,7 @@ describe('tickNote', () => {
       'Waiting: 3 sessions are running, the most it starts at once.',
     );
     expect(tickNote({ act: 'waiting', liveness: 'working', running: 1 })).toBe(
-      'Waiting: one session is running, and nothing else is ready outside its module.',
+      'Waiting: one session is running, and nothing else ready can run beside it.',
     );
     expect(tickNote({ act: 'waiting', liveness: 'unknown', running: 2 })).toContain(
       'GitHub could not be asked',
