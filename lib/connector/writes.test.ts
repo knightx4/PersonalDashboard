@@ -24,7 +24,7 @@ function ctx(): ConnectorWriteContext {
 }
 
 describe('runConnectorWrite', () => {
-  it('offers the Learn writes, then the quick note, the idea and the job lead, then the rest of Learn', () => {
+  it('offers the Learn writes, then the quick note, the idea and the job lead, then the rest of Learn, then Todo', () => {
     expect(CONNECTOR_WRITE_TOOLS.map((entry) => entry.definition.name)).toEqual([
       'add_to_reading_list',
       'log_learning',
@@ -38,6 +38,11 @@ describe('runConnectorWrite', () => {
       'reword_concept',
       'add_concept_note',
       'change_video',
+      'edit_todo',
+      'add_todo_item',
+      'link_todo',
+      'add_event',
+      'change_event',
     ]);
   });
 
@@ -120,6 +125,29 @@ describe('the writes shared with Ask Dash', () => {
     const result = await runConnectorWrite(tool('add_quick_note'), context, { text: 'A thought' });
     expect(result).toEqual({ ok: false, error: 'The Vault workspace is switched off, so nothing can be changed there.' });
     expect(tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('changes a todo on the service-role todo client, for the verified person only (plan #1894.9.1)', async () => {
+    const TASK = '00000000-0000-4000-8000-000000000e01';
+    const { tables, context } = await shared({ enabledModules: ['todo'], today: '2026-10-13' });
+    tables['todo.tasks'] = [{ id: TASK, user_id: ME, title: 'Book the dentist', status: 'open', pinned: false }];
+    const result = await runConnectorWrite(tool('edit_todo'), context, { todo_ref: TASK, pinned: true });
+    expect(result).toMatchObject({ ok: true, rows: [{ table: 'todo.tasks', ref: TASK }] });
+    expect(tables['todo.tasks'][0]).toMatchObject({ pinned: true });
+
+    tables['todo.tasks'][0].user_id = 'someone else';
+    expect(await runConnectorWrite(tool('edit_todo'), context, { todo_ref: TASK, pinned: false })).toEqual({
+      ok: false,
+      error: 'There is no todo of theirs with that ref. Look it up first.',
+    });
+  });
+
+  it('refuses a Todo change when Todo is off', async () => {
+    const { context } = await shared({ enabledModules: ['dev'], today: '2026-10-13' });
+    expect(await runConnectorWrite(tool('add_event'), context, { title: 'Lunch', start_day: '2026-10-16', all_day: true })).toEqual({
+      ok: false,
+      error: 'The Todo workspace is switched off, so nothing can be changed there.',
+    });
   });
 
   it('is refused on a context with no service-role clients', async () => {

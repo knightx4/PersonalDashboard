@@ -18,7 +18,7 @@ import {
   type DashChangeStatus,
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
-import { isLearnChange, type LearnChangeKind } from './learn-changes';
+import { isWrittenCard, type WrittenCardKind } from './todo-changes';
 
 /**
  * Confirming, declining and undoing a change Dash proposed in an Ask Dash
@@ -102,7 +102,7 @@ export { changeHref } from './change-view';
 
 /** The pages a change lands on, to revalidate after a confirm or an undo. */
 export function changePaths(change: DashChange): string[] {
-  if (isLearnChange(change)) return change.input.paths;
+  if (isWrittenCard(change)) return change.input.paths;
   switch (change.kind) {
     case 'add_todo':
       return ['/todo', '/todo/all', '/home'];
@@ -158,8 +158,11 @@ export function changePaths(change: DashChange): string[] {
 }
 
 /** The workspace each kind writes into; a watch is the home page's and needs none. */
-/** The kinds with a writer here: Learn's are written by their tools alone (lib/dash/learn-writes.ts). */
-type WrittenKind = Exclude<DashChangeKind, LearnChangeKind>;
+/**
+ * The kinds with a writer here: Learn's and Todo's newer ones are written by
+ * their tools alone (lib/dash/learn-writes.ts, lib/dash/todo-writes.ts).
+ */
+type WrittenKind = Exclude<DashChangeKind, WrittenCardKind>;
 
 const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null> = {
   add_todo: { module: 'todo', label: 'Todo' },
