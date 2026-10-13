@@ -183,6 +183,8 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
+import { Tooltip } from '@/components/ui/tooltip';
+import { Clock, Pin } from 'lucide-react';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
@@ -2823,6 +2825,46 @@ const perReading: CostEstimate = {
   models: [OPUS, 'jev-1.13.0'],
 };
 
+function TooltipRows() {
+  const iconButton =
+    'press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink';
+  return (
+    <div className="space-y-24 pb-24">
+      <div className="flex items-center gap-2">
+        <Tooltip label="Waiting on your reply" defaultOpen>
+          <button type="button" aria-label="Waiting" className={iconButton}>
+            <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
+          </button>
+        </Tooltip>
+        <span className="text-small text-ink-muted">An icon button</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Tooltip
+          label="Dash read this thread and found nothing that needs you, so it was filed without a notification"
+          defaultOpen
+        >
+          <span
+            tabIndex={0}
+            aria-label="Filed quietly"
+            className="rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted"
+          >
+            Filed
+          </span>
+        </Tooltip>
+        <span className="text-small text-ink-muted">A badge with a long tip</span>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-small text-ink-muted">At a row’s right edge</span>
+        <Tooltip label="Pinned to the top" align="end" defaultOpen>
+          <button type="button" aria-label="Pinned" className={iconButton}>
+            <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
+          </button>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
 function CostHintRows() {
   return (
     <div className="space-y-24 pb-24">
@@ -5401,6 +5443,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CostHintRows />,
+  },
+  {
+    /* The shared Tooltip on an icon button, a badge with a long tip and an
+     * icon at a row's right edge. Each starts showing so the shot has the tip
+     * as well as its child; in the app it shows on hover or keyboard focus
+     * after a short delay and hides on blur, Escape or pointer leave. */
+    id: 'core-tooltip',
+    label: 'Tooltip · on an icon and a badge',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TooltipRows />,
   },
   {
     /* /account/spend: every operation's estimate beside its thirty-day median.

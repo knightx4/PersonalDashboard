@@ -203,6 +203,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
+  // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
+  'core-tooltip': ['/dev/ui'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
