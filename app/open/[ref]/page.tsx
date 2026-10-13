@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { requestAskDb } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
 import { readRowsWith, refTitles } from '@/lib/core/refs';
-import { NoLongerThere } from './no-longer-there';
+import { NoLongerThere } from '@/components/shell/no-longer-there';
 
 export const metadata = { title: 'Open' };
 

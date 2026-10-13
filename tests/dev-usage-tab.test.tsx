@@ -95,4 +95,16 @@ describe('UsageScreen', () => {
     expect(html).toContain('No model calls in the last 30 days');
     expect(html).toContain('No page has been opened since recording started');
   });
+
+  it('shows the share of opens from a phone, and nothing before a device is recorded', () => {
+    const report = usageReport(opened);
+    const withShare = renderToStaticMarkup(
+      <UsageScreen report={report} functions={functions} phoneShare={{ phone: 1, total: 4 }} now={now} />,
+    );
+    expect(withShare).toContain('25% of opens in 30 days were on a phone (1 of 4).');
+    const without = renderToStaticMarkup(
+      <UsageScreen report={report} functions={functions} phoneShare={{ phone: 0, total: 0 }} now={now} />,
+    );
+    expect(without).not.toContain('on a phone');
+  });
 });

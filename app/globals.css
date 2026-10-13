@@ -2153,6 +2153,14 @@ body::before {
   box-shadow: var(--sheet-edge);
 }
 
+/* A keycap's corner: half a control's, so it follows the theme (square in
+ * Poster) without turning an 18px key into a coin where controls are rounder
+ * (Aurora's 12px on an 18px key is a circle). The one radius drawn from a
+ * token rather than being one, used by components/ui/kbd.tsx alone. */
+@utility keycap {
+  border-radius: calc(var(--radius-control) / 2);
+}
+
 /* Shortcut hints: invisible until a modifier is held. See components/shell/key-hints.tsx. */
 .keyhint {
   opacity: 0;

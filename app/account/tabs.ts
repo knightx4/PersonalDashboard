@@ -15,8 +15,8 @@ import type { Tab, TabAddress } from '@/lib/tabs';
  */
 export const ACCOUNT_TABS = [
   { id: 'you', label: 'You' },
-  { id: 'workspaces', label: 'Workspaces' },
-  { id: 'notifications', label: 'Notifications' },
+  { id: 'workspaces', label: 'Spaces' },
+  { id: 'notifications', label: 'Alerts' },
   { id: 'activity', label: 'Activity' },
   { id: 'session', label: 'Session' },
 ] as const satisfies readonly Tab[];

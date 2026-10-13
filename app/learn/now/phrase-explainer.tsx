@@ -327,7 +327,7 @@ export function Mentioned({
         title={part.mention.why || undefined}
         aria-label={`Explain ${part.text}`}
         /* ui-ok: a phrase to explain, drawn as text with a dotted underline; not a link */
-        className="inline cursor-pointer select-text rounded p-0 text-left font-[inherit] text-inherit underline decoration-accent decoration-dotted decoration-2 underline-offset-4 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline cursor-pointer select-text rounded-control p-0 text-left font-[inherit] text-inherit underline decoration-accent decoration-dotted decoration-2 underline-offset-4 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {part.text}
       </button>

@@ -297,7 +297,7 @@ export function TimezoneField({
           id={listId}
           role="listbox"
           aria-label="Timezones"
-          className="popover-panel absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-raised py-1 shadow-lg"
+          className="popover-panel absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto rounded-card border border-border bg-raised py-1 shadow-lg"
         >
           {matches.map((match, index) => (
             <li

@@ -30,7 +30,8 @@ const MAYA: TalkAssistant = { name: 'Maya', Mark: OwlIcon };
  *
  * "Copy as note" (plan #1287) puts the thread on the clipboard as Markdown
  * for Obsidian, built here so it carries the summary as it now stands. The
- * vault is read-only: nothing is written to it.
+ * vault is written to elsewhere (note-edit, new-note and quick-note); this
+ * button only reads the thread and writes nothing.
  */
 export function MayaConversation({
   threadId,

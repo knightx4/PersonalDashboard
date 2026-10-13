@@ -313,7 +313,7 @@ export function SelectionCheckbox({
           if (event.shiftKey) event.preventDefault();
         }}
         className={cn(
-          'size-4 rounded border-border text-accent focus:ring-accent/30',
+          'size-4 shrink-0 cursor-pointer accent-accent',
           'transition-opacity duration-quick focus-visible:opacity-100',
           'group-hover/select:opacity-100 group-focus-within/select:opacity-100',
           'pointer-coarse:opacity-100',
@@ -331,7 +331,7 @@ export function SelectionCheckbox({
        * selection for it to clear, which is exactly when it does anything.
        */}
       {focused && (
-        <span className="pointer-events-none absolute left-full top-1/2 ml-1 flex -translate-y-1/2 items-center gap-0.5 rounded bg-surface/90">
+        <span className="pointer-events-none absolute left-full top-1/2 ml-1 flex -translate-y-1/2 items-center gap-0.5 rounded-control bg-surface/90">
           <Kbd>x</Kbd>
           {selection.count > 0 && <Kbd>Esc</Kbd>}
         </span>
