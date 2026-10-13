@@ -116,6 +116,8 @@ const essay: Essay = {
   interview: { status: 'done' },
   wordTarget: 1200,
   publishedAt: null,
+  finishedAt: null,
+  inEvidenceBank: false,
   updatedAt: '2026-10-12T14:20:00Z',
 };
 
@@ -166,6 +168,17 @@ const deeperPassCost: CostEstimate = {
   models: [HAIKU, SONNET],
 };
 
+/** Finishing: one Sonnet call naming the claims, and an embedding for each (plan #1873). */
+const finishCost: CostEstimate = {
+  lowMicros: 9_000,
+  medianMicros: 14_000,
+  highMicros: 24_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [SONNET, 'voyage-4-lite'],
+};
+
 function WithCosts({ children }: { children: React.ReactNode }) {
   return (
     <PaidCostsProvider
@@ -176,6 +189,7 @@ function WithCosts({ children }: { children: React.ReactNode }) {
         'app/learn/e/[id]/actions.ts#findEssayStudy': studyCost,
         'app/learn/e/[id]/actions.ts#researchEssay:first': firstPassCost,
         'app/learn/e/[id]/actions.ts#researchEssay:deeper': deeperPassCost,
+        'app/learn/e/[id]/actions.ts#finishEssay': finishCost,
       }}
     >
       {children}
@@ -370,6 +384,44 @@ export function LearnEssayStudyEmptySurface() {
   );
 }
 
+/**
+ * After Finish (plan #1873): the essay's claims, one of them already held by
+ * a note in the vault, with a note offered for each of the others and a place
+ * in the evidence bank. The last claim is long, as a model's can be.
+ */
+export function LearnEssayFinishSurface() {
+  return (
+    <WithCosts>
+      <EssayView
+        essay={{ ...essay, finishedAt: '2026-10-12T15:00:00Z', unsaved: false }}
+        study={STUDY_WAITING}
+        finishView={{
+          kind: 'offers',
+          inEvidenceBank: false,
+          claims: [
+            {
+              name: 'Money is a shared expectation',
+              claim: 'Money keeps its value in a drawer only because everyone expects others to accept it later.',
+              existing: null,
+            },
+            {
+              name: 'Scarcity alone does not make money',
+              claim: 'Gold and bitcoin are scarce, but what makes them money is that people agree to take them in payment.',
+              existing: { title: 'Medium of exchange', href: '/vault/n/Concepts/Medium%20of%20exchange.md' },
+            },
+            {
+              name: 'Inflation is the price of holding the expectation',
+              claim:
+                'When people stop expecting money to hold its value, they spend it faster, which raises prices and confirms the fear that started it, so the expectation is something a central bank has to keep managing rather than a fact about money.',
+              existing: null,
+            },
+          ],
+        }}
+      />
+    </WithCosts>
+  );
+}
+
 /** Cmd-S after the note was edited in Obsidian (plan #1866): the save stopped and offers a reload. */
 export function LearnEssayChangedSurface() {
   return (
@@ -500,6 +552,8 @@ const blank: Essay = {
   interview: { status: 'asking', field: 'question', ask: openingAsk([goalPin]) },
   wordTarget: null,
   publishedAt: null,
+  finishedAt: null,
+  inEvidenceBank: false,
   updatedAt: '2026-10-12T15:00:00Z',
 };
 

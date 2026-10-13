@@ -14,12 +14,14 @@ import {
 import { essayTitle, readBrief } from './model';
 import {
   ESSAYS_FOLDER,
+  atLeastStage,
   essayNoteBody,
   essayNoteText,
   essaySlug,
   newEssayFrontmatter,
   noteBodyMarks,
   rewriteEssayFile,
+  type EssayStage,
   uniqueSlug,
 } from './note';
 
@@ -87,6 +89,8 @@ export type EssayVaultInput = {
   marks: AuthorMark[];
   /** The name the person's line in the authorship block takes. */
   self: string;
+  /** Raise the note's stage to at least this one (Finish, plan #1873). */
+  stage?: EssayStage;
 };
 
 export type EssayVaultFailure = SaveNoteFailure | 'empty';
@@ -163,8 +167,11 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         const marked = { ...authorship, marks: noteBodyMarks(input.body, input.marks) };
         // A save that changes nothing but the date is no save: the file stays
         // as it is and no commit is made.
-        const same = rewriteEssayFile(raw, next, { title }, fresh, marked);
-        written = same === raw ? raw : rewriteEssayFile(raw, next, { title, updated: input.today }, fresh, marked);
+        const same = rewriteEssayFile(raw, next, { title, stage: input.stage }, fresh, marked);
+        written =
+          same === raw
+            ? raw
+            : rewriteEssayFile(raw, next, { title, updated: input.today, stage: input.stage }, fresh, marked);
         return written;
       },
     });
@@ -192,6 +199,7 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
   // already at that name is never written over; the next number is tried.
   const slug = essay.slug ?? uniqueSlug(essaySlug(title), await ports.takenSlugs(essay.id));
   const fm = newEssayFrontmatter({ title, slug, description: brief.claim, today: input.today });
+  if (input.stage) fm.stage = atLeastStage(fm.stage, input.stage);
   const file = essayNoteText(fm, input.body, authorship);
   const created = await createCapturedNote(ports.create, file, title, ESSAYS_FOLDER);
   if (!created.ok) return { ok: false, reason: created.reason, error: created.error };

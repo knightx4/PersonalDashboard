@@ -466,20 +466,39 @@ export async function logChatSession(
     summary: string;
     ideas: readonly ChatIdea[];
     subject: ChatSubject | null;
+    /**
+     * The essay this records (Finish, plan #1873). One entry is kept for an
+     * essay: finishing it again updates that entry rather than adding another.
+     */
+    essayId?: string;
   },
 ): Promise<LoggedSession> {
-  const { data, error } = await learn
-    .from('learning_log')
-    .insert({
-      user_id: userId,
-      subject_id: input.subject?.id ?? null,
-      topic: input.topic,
-      question: input.question,
-      summary: input.summary,
-      ideas: input.ideas,
-    })
-    .select('id')
-    .single();
+  const row = {
+    user_id: userId,
+    subject_id: input.subject?.id ?? null,
+    topic: input.topic,
+    question: input.question,
+    summary: input.summary,
+    ideas: input.ideas,
+  };
+  let earlier: string | null = null;
+  if (input.essayId) {
+    const { data: found, error: findError } = await learn
+      .from('learning_log')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('essay_id', input.essayId)
+      .maybeSingle();
+    if (findError) throw failed('Recording the session', findError);
+    earlier = (found as { id: string } | null)?.id ?? null;
+  }
+  const { data, error } = earlier
+    ? await learn.from('learning_log').update(row).eq('id', earlier).eq('user_id', userId).select('id').single()
+    : await learn
+        .from('learning_log')
+        .insert({ ...row, essay_id: input.essayId ?? null })
+        .select('id')
+        .single();
   if (error || !data) throw failed('Recording the session', error);
   const id = (data as { id: string }).id;
 

@@ -305,6 +305,15 @@ kept in the note as a folded callout, or not at all.
 4. Offers to add the essay to the evidence bank in Jobs, as something you can
    demonstrate.
 
+One Sonnet call reads the essay (without its footnotes) and names two to eight
+claims. The learning-log entry holds those claims and the essay's id, and
+pressing Finish again updates that entry. A claim counts as already in the
+vault when a note is close enough to it (similarity 0.78 or more), and such a
+claim gets no offer. The notes and the evidence item are made only for what
+you tick: each note is a heading, the claim and a link back to the essay; the
+evidence item is one row in the bank whose story links to the essay, made
+once an essay. A stage a note already has beyond seedling is kept.
+
 "Publish" puts the essay on selveyknight.com:
 
 - The site reads the same Supabase project as the dashboard, as its Ask my AI
@@ -332,7 +341,8 @@ and applied to the live project in the same sitting.
   word target, the authorship ranges as the note has them, the same marks on
   the draft (`draft_authorship`, counted in the draft's own characters, since
   the draft is often ahead of the note), the published snapshot (`published_body`,
-  `published_at`, `slug`), and timestamps. A **source** in the catalogue: it
+  `published_at`, `slug`), when it was finished (`finished_at`), the id of its
+  evidence-bank item (`evidence_item_id`), and timestamps. A **source** in the catalogue: it
   holds what the person wrote.
 - **`learn.essay_notes`**: margin notes. The essay, the check that raised it,
   the rung, the body, what it says at rungs 1 to 3 and why it was raised
