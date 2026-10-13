@@ -17,6 +17,7 @@ import type { SnoozeState } from '@/lib/core/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
 import { planRowRef, raiseRef, snoozedItems, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Inbox' };
 
@@ -96,7 +97,7 @@ export default async function DevInboxPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader title="Inbox" />
       <RaisedView
         queue={queue}
@@ -104,6 +105,6 @@ export default async function DevInboxPage() {
         titles={titles}
         snooze={{ back: [...snoozes.back], snoozed }}
       />
-    </div>
+    </PageColumn>
   );
 }

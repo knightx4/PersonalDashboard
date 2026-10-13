@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
 import { AnalyticsView } from './view';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Analytics' };
 
@@ -19,7 +20,7 @@ export default async function AnalyticsPage() {
 
   if (sent.length === 0) {
     return (
-      <>
+      <PageWide>
         <PageHeader title="Analytics" description={DESCRIPTION} />
         <EmptyState
           icon={BarChart3}
@@ -27,14 +28,14 @@ export default async function AnalyticsPage() {
           description="These numbers need applications with a submission date. They start being useful at about fifteen, and trustworthy at about forty."
           action={{ label: 'Add a role', href: '/jobs/roles/new' }}
         />
-      </>
+      </PageWide>
     );
   }
 
   return (
-    <>
+    <PageWide>
       <PageHeader title="Analytics" description={DESCRIPTION} />
       <AnalyticsView applications={applications} />
-    </>
+    </PageWide>
   );
 }

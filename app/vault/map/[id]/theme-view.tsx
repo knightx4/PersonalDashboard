@@ -6,6 +6,7 @@ import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MapSource, ThemeMap } from '@/lib/vault/map/read';
 import { noteHref } from '@/lib/vault/paths';
 import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One theme on the map, drawn from what the page read (page.tsx), so the
@@ -16,7 +17,8 @@ export function ThemeView({ map }: { map: ThemeMap }) {
   const span = seenSpan(theme.firstSeen, theme.lastSeen);
 
   return (
-    <article className="mx-auto max-w-5xl">
+    <PageColumn>
+    <article>
       <div className="mb-4">
         <Link
           href="/vault/map"
@@ -79,6 +81,7 @@ export function ThemeView({ map }: { map: ThemeMap }) {
         </section>
       )}
     </article>
+    </PageColumn>
   );
 }
 

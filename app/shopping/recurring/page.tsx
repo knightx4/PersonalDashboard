@@ -5,6 +5,7 @@ import { loadRecurringPayments } from '@/lib/recurring/load';
 import { buildRecurringView } from '@/lib/recurring/view';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { RecurringPaymentsView } from './recurring-view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Recurring' };
 
@@ -19,12 +20,12 @@ export default async function RecurringPage() {
   const today = todayIn(settings.timezone);
 
   return (
-    <div className="min-w-0">
+    <PageColumn className="min-w-0">
       <PageHeader
         title="Recurring"
         description="Subscriptions and bills found in your mail, with what they come to each month."
       />
       <RecurringPaymentsView view={buildRecurringView(payments, today)} today={today} />
-    </div>
+    </PageColumn>
   );
 }

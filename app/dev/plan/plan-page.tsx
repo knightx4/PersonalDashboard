@@ -41,6 +41,7 @@ import {
 import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { catalogOf } from './plan-catalog';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -265,7 +266,7 @@ export async function renderPlanPage({
   const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader
         title={project ? project.label : 'Plan'}
         actions={
@@ -336,6 +337,6 @@ export async function renderPlanPage({
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />
-    </div>
+    </PageColumn>
   );
 }

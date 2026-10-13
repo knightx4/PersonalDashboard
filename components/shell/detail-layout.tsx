@@ -1,5 +1,6 @@
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PageWide } from '@/components/shell/page-width';
 import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
@@ -33,7 +34,8 @@ export function DetailLayout({
   className?: string;
 }) {
   return (
-    <div
+    // Two columns, so a wide page (components/shell/page-width.tsx).
+    <PageWide
       className={cn(
         'grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_15rem]',
         className,
@@ -55,7 +57,7 @@ export function DetailLayout({
         {properties}
       </aside>
       <div className="lg:col-start-1 lg:row-start-2">{children}</div>
-    </div>
+    </PageWide>
   );
 }
 

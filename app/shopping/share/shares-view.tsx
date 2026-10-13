@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NewShareButton } from './share-ui';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** One share as the list reads it, with only the counts it shows. */
 export type ShareListRow = {
@@ -62,7 +63,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-5xl [&_a]:press-area">
+      <PageColumn className="[&_a]:press-area">
         {header}
         <EmptyState
           icon={Share2}
@@ -70,7 +71,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
           description="A shared form is a list someone can open and fill in without an account, and their answers land here. Make one with New form, put things on it from your inventory, then send the link."
           action={{ label: 'Open inventory', href: '/shopping/inventory' }}
         />
-      </div>
+      </PageColumn>
     );
   }
 

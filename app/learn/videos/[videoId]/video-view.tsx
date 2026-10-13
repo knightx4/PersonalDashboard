@@ -17,6 +17,7 @@ import { moveVideoAction } from '../actions';
 import { addedLabel } from '../video-rows';
 import { WatchedToggle } from '../watched-toggle';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One video on your list (plan #1069): the player, and beside it the summary,
@@ -47,7 +48,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
   ].filter(Boolean);
 
   return (
-    <div className="max-w-3xl">
+    <PageColumn>
       <p className="mb-3">
         <Link href="/learn/videos" className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
           <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -123,7 +124,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
           ) : null}
         </div>
       </div>
-    </div>
+    </PageColumn>
   );
 }
 

@@ -42,6 +42,7 @@ import { MONTH_DAYS } from './burn-up-surfaces';
 import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
 import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -423,17 +424,17 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
 
 export function GoalsHomeSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Goals" />
       <HomeView {...home} timeZone="Europe/London" canRun />
-    </div>
+    </PageColumn>
   );
 }
 
 /** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
 export function GoalsInboxSurface() {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
         groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
@@ -441,7 +442,7 @@ export function GoalsInboxSurface() {
         preparable={home.preparable ?? []}
         canRun
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -468,7 +469,7 @@ const areas: AreaWithGoals[] = [
 
 export function GoalsAllSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
       <GoalsView
         areas={areas}
@@ -492,7 +493,7 @@ export function GoalsAllSurface() {
         }}
         canRun
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -521,7 +522,7 @@ const moneyArea: AreaWithGoals = {
 /** An area's own page (plan #1619): the Money area alone, two goals open and two Dash proposed. */
 export function GoalsAreaSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <GoalsView
         areas={[moneyArea, ...areas.slice(1)]}
         areaId="a-money"
@@ -550,7 +551,7 @@ export function GoalsAreaSurface() {
           models: [SONNET],
         }}
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -678,7 +679,7 @@ Read from the job search on 26 Sept. No applications or messages were sent.`;
 /** A file as its page shows it: the body in its card. The summary is for lists. */
 export function FileSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Your applications by role family"
         description={
@@ -693,7 +694,7 @@ export function FileSurface() {
           <FileBody markdown={FILE_BODY} />
         </Card>
       </div>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -1152,7 +1153,7 @@ export function InformationListSurface({ seam }: { seam?: InformationSeam }) {
 /** The bare goal's Link line pressed: the picker in a card of its own. */
 export function GoalLinkingSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <GoalLinksSection
         goalId={marathon.id}
         links={{ aims: [], jobSearch: null, jobs: [] }}
@@ -1160,7 +1161,7 @@ export function GoalLinkingSurface() {
         jobsOn
         startAdding
       />
-    </div>
+    </PageColumn>
   );
 }
 

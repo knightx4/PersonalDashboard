@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { TrackProgress } from '@/lib/learn/tracks/load';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The reading lists, which the database and the code still call tracks. They
@@ -81,7 +82,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-5xl">
+      <PageColumn>
         {header}
         <div className="mb-4">{tools}</div>
         {search ? (
@@ -96,7 +97,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
             action={{ label: 'Paste a reading list', href: '/learn/new' }}
           />
         )}
-      </div>
+      </PageColumn>
     );
   }
 

@@ -12,6 +12,7 @@ import type { WatchListSettings } from '@/lib/learn/youtube/watch-list';
 import { VideoRows } from './video-rows';
 import { CLIPS_HREF, ClipsSection } from './clips-section';
 import { LibrarySection, YOUTUBE_HREF } from './library-section';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type VideosViewProps = {
   /** Every video on your list. */
@@ -82,7 +83,7 @@ export function VideosView({
 
   if (all.length === 0) {
     return (
-      <>
+      <PageColumn>
         <PageHeader title="Videos" />
         <EmptyState
           icon={MonitorPlay}
@@ -91,13 +92,13 @@ export function VideosView({
           action={{ label: 'Set your playlist', href: YOUTUBE_HREF }}
         />
         {sections}
-      </>
+      </PageColumn>
     );
   }
 
   const watched = all.filter((video) => video.watchedAt !== null).length;
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Videos"
         description={`${all.length} on your list${watched > 0 ? `, ${watched} watched` : ''}`}
@@ -123,7 +124,7 @@ export function VideosView({
         </p>
       )}
       {sections}
-    </>
+    </PageColumn>
   );
 }
 

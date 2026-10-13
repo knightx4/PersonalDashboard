@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { CheckNow } from './check-now';
 import { PlaylistSetting } from './playlist-setting';
 import { TakeawayRow } from './takeaway-row';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The body of the Inspiration tab (plan #1412): the two arrangements of what
@@ -89,7 +90,7 @@ function VideoHeader({ video }: { video: InspirationVideo }) {
       </a>
       <div className="min-w-0 flex-1">
         <h2 className="text-ui font-semibold text-ink">
-          <a href={watch} target="_blank" rel="noreferrer" className="line-clamp-2 hover:underline">
+          <a href={watch} target="_blank" rel="noreferrer" className="press-area line-clamp-2 hover:underline">
             {video.title}
           </a>
         </h2>
@@ -198,7 +199,7 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
  */
 export function InspirationScreen({ page, view }: { page: InspirationPage; view: InspirationViewName }) {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <div>
         <PageHeader
           title="Inspiration"
@@ -220,6 +221,6 @@ export function InspirationScreen({ page, view }: { page: InspirationPage; view:
         </div>
       </div>
       <InspirationView page={page} view={view} />
-    </div>
+    </PageColumn>
   );
 }

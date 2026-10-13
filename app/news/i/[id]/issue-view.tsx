@@ -27,6 +27,7 @@ import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Tooltip } from '@/components/ui/tooltip';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type IssueViewProps = {
   issueId: string;
@@ -205,7 +206,7 @@ export function IssueView({
     );
   };
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={back.href}
@@ -371,7 +372,7 @@ export function IssueView({
           </CardBody>
         </Card>
       )}
-    </div>
+    </PageColumn>
   );
 }
 

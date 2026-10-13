@@ -94,10 +94,13 @@ const ON_SCALE_TYPE = `export const heading = 'font-display text-title font-semi
 const ARBITRARY_WIDTH = `export const page = 'mx-auto max-w-[1100px] px-6';
 `;
 
-const NAMED_WIDTH = `export const page = 'mx-auto max-w-5xl px-6 max-w-[1400px] max-w-sm';
+const NAMED_WIDTH = `export const page = 'max-w-[1400px] px-6 max-w-sm max-w-prose';
 `;
 
 const OTHER_PAGE_WIDTH = `export const page = 'mx-auto max-w-3xl space-y-6';
+`;
+
+const HAND_WRITTEN_FRAME = `export const page = 'mx-auto max-w-5xl';
 `;
 
 const INNER_WIDTH = `export const video = 'relative mx-auto aspect-video w-full lg:max-w-3xl';
@@ -129,12 +132,13 @@ describe('the design-language rules', () => {
     expect(await lint('app/__design_probe.ts', ARBITRARY_WIDTH)).toMatch(/no-restricted-syntax/);
   });
 
-  it('allows the page width and the named inner sizes', async () => {
+  it('allows the shell width and the named inner sizes', async () => {
     expect(await lint('app/__design_probe.ts', NAMED_WIDTH)).toBe('');
   });
 
-  it('blocks a page frame narrower or wider than the shared one', async () => {
+  it('blocks a page frame written by hand, at any width', async () => {
     expect(await lint('app/__design_probe.ts', OTHER_PAGE_WIDTH)).toMatch(/no-restricted-syntax/);
+    expect(await lint('app/__design_probe.ts', HAND_WRITTEN_FRAME)).toMatch(/no-restricted-syntax/);
   });
 
   it('allows a breakpoint width on something inside a page', async () => {

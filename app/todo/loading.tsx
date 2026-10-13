@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The agenda's shape while it loads: the header, the add-task bar, and two
@@ -8,7 +9,7 @@ import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeaderSkeleton action={false} />
 
       {/* The dial, not forty pixels. The bar this stands in for is a text
@@ -43,6 +44,6 @@ export default function Loading() {
           </div>
         ))}
       </div>
-    </div>
+    </PageColumn>
   );
 }

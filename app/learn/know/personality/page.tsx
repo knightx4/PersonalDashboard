@@ -7,6 +7,7 @@ import { loadPersonalityResults } from '@/lib/learn/personality/store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { BigFiveTest } from './big-five-test';
 import { OtherTests } from './other-tests';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export default async function PersonalityPage() {
   const typed = results.filter((r): r is TypedResult => r.kind !== 'big_five');
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         crumbs={[
           { label: 'Learn', href: '/learn' },
@@ -43,6 +44,6 @@ export default async function PersonalityPage() {
       <div className="mt-10">
         <OtherTests results={typed} today={todayIn(settings.timezone)} />
       </div>
-    </>
+    </PageColumn>
   );
 }

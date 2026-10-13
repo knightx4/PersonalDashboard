@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ContactDetail } from './contact-detail';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Contact' };
 
@@ -51,7 +52,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <Link
         href="/jobs/contacts"
         className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
@@ -98,6 +99,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           })),
         }}
       />
-    </div>
+    </PageColumn>
   );
 }

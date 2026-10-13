@@ -20,6 +20,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { MarkFileRead } from './mark-read';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'File' };
 export const dynamic = 'force-dynamic';
@@ -64,7 +65,7 @@ export default async function FilePage({
   const earlier = versions.filter((version) => version.version !== file.version);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <Link
         href="/goals/files"
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
@@ -189,6 +190,6 @@ export default async function FilePage({
           </p>
         )}
       </div>
-    </div>
+    </PageColumn>
   );
 }

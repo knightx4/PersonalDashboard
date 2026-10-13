@@ -9,6 +9,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { JOB_LABELS, runMeta, type RunListing, type RunOutcome } from '@/lib/goals/runs';
 import { loadRuns } from '@/lib/goals/runs-store';
 import { LinkedText } from '@/components/ui/linked-text';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Runs' };
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export default async function GoalRunsPage() {
   const views = runViews(runs, account.timezone);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Runs" />
       {views.length === 0 ? (
         <EmptyState
@@ -60,7 +61,7 @@ export default async function GoalRunsPage() {
           </ul>
         </Card>
       )}
-    </div>
+    </PageColumn>
   );
 }
 

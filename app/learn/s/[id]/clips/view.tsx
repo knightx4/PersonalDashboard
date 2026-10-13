@@ -10,6 +10,7 @@ import { ClipStream } from '@/app/learn/clips/clip-stream';
 import { CLIPS_HREF } from '@/app/learn/videos/clips-section';
 import { cn } from '@/lib/cn';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One subject's Clips page (plan #1697): the player, holding only the clips
@@ -48,10 +49,10 @@ export function SubjectClipsView({ subject, clips, counts, fixed = false }: Subj
 
   if (clips.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
+      <PageColumn>
         {header}
         <SubjectClipsEmpty />
-      </div>
+      </PageColumn>
     );
   }
 

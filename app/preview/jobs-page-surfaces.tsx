@@ -29,6 +29,7 @@ import {
   type FunnelApplication,
   type RejectionStage,
 } from '@/lib/jobs/pipeline';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Jobs pages that had no picture in the gallery (plan #1601): Activity,
@@ -47,7 +48,7 @@ import {
 /** The instant every fixture is measured from, so the shots do not move. */
 const NOW = new Date('2026-10-06T14:00:00Z');
 
-const page = (children: React.ReactNode) => <div className="mx-auto max-w-5xl">{children}</div>;
+const page = (children: React.ReactNode) => <PageColumn>{children}</PageColumn>;
 
 // ---- Activity ---------------------------------------------------------------
 

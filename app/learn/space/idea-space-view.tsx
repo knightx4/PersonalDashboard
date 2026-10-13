@@ -11,6 +11,7 @@ import { mapHref, similarityText, type MapParams } from '@/lib/learn/map/view';
 import { ChosenIdea } from './chosen-idea';
 import { MapSection } from './map-section';
 import { PickProvider } from './pick';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -54,18 +55,18 @@ export function IdeaSpaceView({
 
   if (!view) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
+      <PageColumn>
         {header}
         <p className="text-body text-ink-muted">
           Your ideas could not be read just now, so the map is missing. Reload to try again.
         </p>
-      </div>
+      </PageColumn>
     );
   }
 
   if (view.ideas.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
+      <PageColumn>
         {header}
         <EmptyState
           icon={Orbit}
@@ -76,7 +77,7 @@ export function IdeaSpaceView({
               : 'Ideas land here as Learn writes them, from subjects, lessons and your notes.'
           }
         />
-      </div>
+      </PageColumn>
     );
   }
 

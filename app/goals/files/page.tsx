@@ -8,6 +8,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { authorLine, isUnread } from '@/lib/files/files';
 import { loadFiles } from '@/lib/files/store';
 import { formatInstant } from '@/lib/goals/dates';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Files' };
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export default async function FilesPage() {
     }));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Files" description="Longer pieces Dash wrote for your goals, kept as pages." />
       {files.length === 0 ? (
         <EmptyState
@@ -65,6 +66,6 @@ export default async function FilesPage() {
           )}
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }

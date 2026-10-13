@@ -28,6 +28,7 @@ import { moduleById } from '@/lib/modules';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { stepRef } from '@/lib/plan/ref';
 import { PostAbout } from './post-about';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The changelog apart from its read, so the surface gallery can draw it: the
@@ -81,7 +82,7 @@ export function ChangelogView({
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       {/* No paragraph under the heading: the rows say what they are, and a
           chevron on each says it opens (plan #1745). */}
       <PageHeader title="Changelog" />
@@ -179,7 +180,7 @@ export function ChangelogView({
           </p>
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }
 

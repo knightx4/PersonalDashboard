@@ -26,6 +26,7 @@ import { visionAnchor } from '@/lib/specs/vision';
 import type { Tab } from '@/lib/tabs';
 import { openedText } from '@/lib/usage/report';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The module index and one module's page in Dev. Server components, so the
@@ -52,7 +53,7 @@ function indexLine(summary: ModuleSummary): string {
 
 export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSummary[] }) {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         crumbs={moduleCrumbs()}
         title="Modules"
@@ -73,7 +74,7 @@ export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSumm
           </li>
         ))}
       </ul>
-    </div>
+    </PageColumn>
   );
 }
 

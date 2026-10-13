@@ -9,6 +9,7 @@ import { SpecSectionCard, SpecOrphan } from './spec-view';
 import { SpecRules } from './spec-rules';
 import { SpecFindings } from '../spec-findings';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One spec's page apart from its reads, so the surface gallery can draw it:
@@ -29,7 +30,7 @@ export function SpecDocView({
   audit: LatestFindings;
 }) {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <p>
         <Link
           href="/dev/specs"
@@ -81,6 +82,6 @@ export function SpecDocView({
           ))}
         </section>
       )}
-    </div>
+    </PageColumn>
   );
 }

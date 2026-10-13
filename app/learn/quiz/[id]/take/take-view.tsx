@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { outstandingCount, type Quiz, type QuizQuestion } from '@/lib/learn/quiz/model';
 import { QuestionForm } from './question-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** The quiz with the question you are on, as the page found it (plan #1602). */
 export function TakeQuizView({ quiz, current }: { quiz: Quiz; current: QuizQuestion }) {
@@ -8,7 +9,7 @@ export function TakeQuizView({ quiz, current }: { quiz: Quiz; current: QuizQuest
   const left = outstandingCount(quiz);
 
   return (
-    <>
+    <PageColumn>
       <PageHeader title={quiz.title} />
 
       <div className="max-w-2xl">
@@ -27,6 +28,6 @@ export function TakeQuizView({ quiz, current }: { quiz: Quiz; current: QuizQuest
           left={left}
         />
       </div>
-    </>
+    </PageColumn>
   );
 }

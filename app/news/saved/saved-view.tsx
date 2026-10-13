@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { SavedList, type SavedListStory } from './saved-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type SavedViewProps = {
   /** Newest saved first, each with its newsletter's arrival formatted. */
@@ -12,12 +13,12 @@ export type SavedViewProps = {
  */
 export function SavedView({ stories }: SavedViewProps) {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Saved"
         description="Stories you saved from your newsletters, the most recently saved first."
       />
       <SavedList stories={stories} />
-    </div>
+    </PageColumn>
   );
 }

@@ -1,6 +1,7 @@
 import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The list-and-detail pattern (docs/UI-QUALITY-SPEC.md, Part 4): a list you
@@ -39,14 +40,14 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-5xl', className)}>
+    <PageColumn className={className}>
       {header}
       {tools && <div className="mb-4">{tools}</div>}
       <Card padding="none">
         <ul className="divide-y divide-border">{children}</ul>
       </Card>
       {foot && <div className="mt-3 text-small text-ink-muted">{foot}</div>}
-    </div>
+    </PageColumn>
   );
 }
 
@@ -110,14 +111,14 @@ export function DetailPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-5xl space-y-6', className)}>
+    <PageColumn className={cn('space-y-6', className)}>
       <div>
         {header}
         <section aria-label="Details">{details}</section>
       </div>
       {text}
       {children}
-    </div>
+    </PageColumn>
   );
 }
 

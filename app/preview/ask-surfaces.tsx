@@ -12,6 +12,7 @@ import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { SONNET } from '@/lib/core/models';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -333,7 +334,7 @@ export function AskChangesSurface() {
   ];
   return (
     <AskDashProvider source={FIXTURES}>
-      <div className="mx-auto max-w-5xl py-4">
+      <PageColumn className="py-4">
         <AskThread
           id="ask-changes-preview"
           conversationRef="00000000-0000-4000-8000-000000000009"
@@ -347,7 +348,7 @@ export function AskChangesSurface() {
           label="Ask a follow-up"
           placeholder="Ask more about this"
         />
-      </div>
+      </PageColumn>
     </AskDashProvider>
   );
 }
@@ -417,7 +418,7 @@ export function AskMadeChangesSurface() {
     },
   };
   return (
-    <div className="mx-auto max-w-5xl py-4">
+    <PageColumn className="py-4">
       <PageHeader title="Questions to Dash" />
       <div className="space-y-6">
         <SectionFold title={<><DashCredit className="text-ink-muted" />Changes Dash made</>} count={changes.length}>
@@ -435,6 +436,6 @@ export function AskMadeChangesSurface() {
           </ul>
         </SectionFold>
       </div>
-    </div>
+    </PageColumn>
   );
 }

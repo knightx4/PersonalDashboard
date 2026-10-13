@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { publicEnv } from '@/lib/env';
 import { SettingsView } from './view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Settings' };
 
@@ -111,7 +112,7 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Settings"
         description="What the job search needs, and what you want from the next job. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."
@@ -162,6 +163,6 @@ export default async function SettingsPage({
               : null,
         }))}
       />
-    </div>
+    </PageColumn>
   );
 }

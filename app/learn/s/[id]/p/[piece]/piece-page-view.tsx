@@ -8,6 +8,7 @@ import type { DueReview } from '@/lib/learn/lessons/review';
 import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -22,7 +23,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
   const { piece, subject, unit, siblings } = page;
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={`/learn/s/${subject.id}`}
@@ -106,6 +107,6 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
           </Card>
         </nav>
       )}
-    </>
+    </PageColumn>
   );
 }

@@ -1,3 +1,5 @@
+import { PageWide } from '@/components/shell/page-width';
+
 /**
  * The main-plus-rail pattern (docs/UI-QUALITY-SPEC.md, Part 4): an overview
  * page with the column you work in and, from laptop width, a narrow column on
@@ -15,9 +17,9 @@
  * width would give its sections two of every id, and an anchor such as
  * /home#watching would land on whichever came first, hidden or not.
  *
- * The pair takes the page width every page in the shell shares, max-w-5xl
- * (1024px), so a page with a rail lines up with the pages either side of it:
- * the main column is what is left beside the 18rem rail.
+ * A page with a rail is a wide page (components/shell/page-width.tsx): the
+ * pair takes the shell's whole box, so the main column keeps about the room a
+ * one-column page has once the 18rem rail is beside it.
  *
  * The rail is not sticky. What goes in it (what Dash is watching, what it did
  * today, the week) is often taller than the screen, and a sticky column
@@ -38,11 +40,11 @@ export function MainRail({
   rail: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-y-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-x-8">
+    <PageWide className="grid grid-cols-1 gap-y-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-x-8">
       <div className="min-w-0">{main}</div>
       <aside aria-label="At a glance" className="flex min-w-0 flex-col gap-4">
         {rail}
       </aside>
-    </div>
+    </PageWide>
   );
 }

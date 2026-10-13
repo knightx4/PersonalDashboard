@@ -19,6 +19,7 @@ import type { Person } from '@/lib/people/load';
 import type { ReturnsTrackerData, ReturnsTrackerRow } from '@/lib/returns/types';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 import type { PendingSuggestion } from '@/lib/share/families-store';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Shopping pages that had no picture (plan #1604), each drawn by the view
@@ -129,9 +130,9 @@ export function ShoppingAddGamesSurface() {
   return (
     <div>
       <AddGamesView mode="search" />
-      <div className="mx-auto mt-4 max-w-5xl">
+      <PageColumn className="mt-4">
         <GamesEditionPickerDemo />
-      </div>
+      </PageColumn>
     </div>
   );
 }

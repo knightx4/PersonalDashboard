@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import type { Subject } from '@/lib/learn/graph/load';
 import { ProbeSession } from './session';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type ProbeViewProps = {
   subject: Pick<Subject, 'id' | 'name'>;
@@ -18,7 +19,7 @@ export type ProbeViewProps = {
 /** Questions on one subject, from what its page read (plan #1602). */
 export function ProbeView({ subject, ideas, percent, namedConcept }: ProbeViewProps) {
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={`/learn/s/${subject.id}`}
@@ -45,6 +46,6 @@ export function ProbeView({ subject, ideas, percent, namedConcept }: ProbeViewPr
           startConceptName={namedConcept?.name ?? null}
         />
       )}
-    </>
+    </PageColumn>
   );
 }

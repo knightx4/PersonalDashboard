@@ -5,6 +5,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { AddItemForm, type CategoryOption } from './add-item-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Add new item' };
 
@@ -46,7 +47,7 @@ export default async function AddItemPage() {
     .order('name');
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Add new item"
         description="Type in anything you own, or use one of the capture flows for the things that have a catalog behind them."
@@ -78,6 +79,6 @@ export default async function AddItemPage() {
 
       <h2 className="mb-3 text-ui font-semibold text-ink">Or add it by hand</h2>
       <AddItemForm categories={(categories ?? []) as CategoryOption[]} />
-    </div>
+    </PageColumn>
   );
 }

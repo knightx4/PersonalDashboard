@@ -7,6 +7,7 @@ import { formatMoneyOrBlank } from '@/lib/money';
 import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
 import { formatClock } from '@/lib/clock';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** One title on the form, as share_page() returns it. */
 export type ShareGroup = {
@@ -57,7 +58,7 @@ export function ShareDetailView({
   const answered = groups.filter((g) => g.keepQty + g.sellQty + g.giveawayQty > 0);
 
   return (
-    <div className="[&_a]:press-area">
+    <PageColumn className="[&_a]:press-area">
       <Link
         href="/shopping/share"
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
@@ -197,6 +198,6 @@ export function ShareDetailView({
           </CardSection>
         </div>
       </div>
-    </div>
+    </PageColumn>
   );
 }

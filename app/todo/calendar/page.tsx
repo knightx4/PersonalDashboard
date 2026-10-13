@@ -29,6 +29,7 @@ import { EventForm, type EventDraft } from '@/components/todo/event-form';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import { CalendarPicker } from '@/components/todo/calendar-picker';
 import { StepLink } from './step-link';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Calendar' };
 
@@ -129,9 +130,9 @@ export default async function TodoCalendarPage({
       : null;
 
   return (
-    // No width of its own: a calendar is a grid, and seven columns want every
-    // bit of the shell's 1400. The other todo pages share the max-w-5xl page width.
-    <div>
+    // A wide page: a calendar is a grid, and seven columns want every bit of
+    // the shell's 1400.
+    <PageWide>
       <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -268,7 +269,7 @@ export default async function TodoCalendarPage({
           </ul>
         </section>
       )}
-    </div>
+    </PageWide>
   );
 }
 

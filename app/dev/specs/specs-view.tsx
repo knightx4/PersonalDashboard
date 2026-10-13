@@ -18,6 +18,7 @@ import type { InterviewCardView } from '@/lib/specs/interview-view';
 import { AgentActionsPanel } from './agent-actions-panel';
 import type { AgentActionSummary } from '@/lib/agent-actions/summary';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The specs page apart from its reads, so the surface gallery can draw it:
@@ -72,7 +73,7 @@ export function SpecsView({
   const groups = groupSpecs(SPECS, counts);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader title="Specs" />
 
       {/* Changes Dash proposes to the specs, above the documents they change
@@ -197,6 +198,6 @@ export function SpecsView({
           </Disclosure>
         ))}
       </div>
-    </div>
+    </PageColumn>
   );
 }

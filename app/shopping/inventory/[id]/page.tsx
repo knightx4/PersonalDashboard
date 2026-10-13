@@ -34,6 +34,7 @@ import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -311,7 +312,7 @@ export default async function InventoryItemPage({
 
   return (
     // The page width every page in the shell shares.
-    <div className="mx-auto max-w-5xl space-y-8">
+    <PageColumn className="space-y-8">
       <PageHeader
         title={title}
         description={[displayVariant(item.variant), category?.name, item.status]
@@ -551,6 +552,6 @@ export default async function InventoryItemPage({
           placeholder="A note on this item, or a question for Dash."
         />
       </section>
-    </div>
+    </PageColumn>
   );
 }

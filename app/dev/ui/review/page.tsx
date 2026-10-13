@@ -6,6 +6,7 @@ import { loadUiReviews } from '@/lib/ui-review/load';
 import { violationsByScope } from '@/lib/ui-review/gate';
 import { isUiScope, type UiScope } from '@/lib/ui-review/scope';
 import { ReviewView, type Standing } from './review-view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Review' };
 
@@ -61,9 +62,9 @@ export default async function DevUiReviewPage({
     }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader title="Review" />
       <ReviewView standings={standings} only={only} />
-    </div>
+    </PageColumn>
   );
 }

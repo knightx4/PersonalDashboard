@@ -7,6 +7,7 @@ import { isModuleId, moduleById } from '@/lib/modules';
 import type { PageOpens, PhoneShare } from '@/lib/usage/opens';
 import { openedText, type FunctionSpend, type UsageGroup, type UsageReport } from '@/lib/usage/report';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Usage tab in Dev (plans #1482, #1693 and #1752). It opens on views per
@@ -198,7 +199,7 @@ export function UsageScreen({
   now: Date;
 }) {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Usage" />
       <OpensByWorkspace report={report} phoneShare={phoneShare} />
       <section aria-labelledby="usage-functions" className="mt-8">
@@ -208,6 +209,6 @@ export function UsageScreen({
         <FunctionList functions={functions} />
       </section>
       <NotOpenedFold report={report} now={now} />
-    </div>
+    </PageColumn>
   );
 }

@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/server';
 import { allGoalsViewOf } from '@/lib/goals/all-goals';
 import { loadAllGoals } from '../../all/data';
 import { GoalsView } from '../../goals-view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Area' };
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,8 @@ export default async function AreaPage({
   if (!data.areas.some((area) => area.id === areaId)) notFound();
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <GoalsView {...data} view={view} areaId={areaId} />
-    </div>
+    </PageColumn>
   );
 }

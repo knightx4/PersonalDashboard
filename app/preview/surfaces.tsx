@@ -349,6 +349,7 @@ import {
   VaultSettingsSurface,
   VaultThemeSurface,
 } from './vault-page-surfaces';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -2593,7 +2594,7 @@ const waitingSenders = new Map(
 function NeedsConfirmingSurface() {
   return (
     // The top of the All newsletters page as it draws now (plan #1774).
-    <div className="mx-auto max-w-5xl space-y-4">
+    <PageColumn className="space-y-4">
       <PageHeader title="Newsletters" />
       <NeedsConfirming
         timezone="Europe/London"
@@ -2604,7 +2605,7 @@ function NeedsConfirmingSurface() {
           { id: 'w3', senderId: 's1', subject: 'One more step', receivedAt: '2026-10-03T09:05:00Z', confirmUrl: 'https://theweekly.example/confirm/9' },
         ]}
       />
-    </div>
+    </PageColumn>
   );
 }
 

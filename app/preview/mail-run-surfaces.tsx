@@ -12,6 +12,7 @@ import type { ChangeLine } from '@/lib/goals/run-changes';
 import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { RunLinesView } from '@/components/runs/run-lines';
 import type { RunActivity } from '@/lib/core/run-activities';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -80,7 +81,7 @@ const ACTIVITY: RunActivity[] = [
 export function GoalRunSurface() {
   const { meta } = runMeta(RUN, NOW, 'America/New_York');
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <PageColumn className="space-y-4">
       <PageHeader
         title={JOB_LABELS[RUN.job]}
         description={
@@ -106,7 +107,7 @@ export function GoalRunSurface() {
       <Card>
         <RunChanges runId={RUN.id} lines={LINES} />
       </Card>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -155,7 +156,7 @@ export function MailMessageSurface() {
   const subject = MESSAGES.find((m) => m.subject)?.subject ?? '(no subject)';
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <BackButton />
       <PageHeader title={subject} description={`${MESSAGES.length} messages`} />
       <div className="mb-4 flex flex-wrap gap-2">
@@ -192,6 +193,6 @@ export function MailMessageSurface() {
           ))}
         </ol>
       </Card>
-    </div>
+    </PageColumn>
   );
 }

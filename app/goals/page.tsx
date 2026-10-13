@@ -16,6 +16,7 @@ import { catchUpSince } from '@/lib/goals/catch-up';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { HomeView } from './home-view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Goals' };
 export const dynamic = 'force-dynamic';
@@ -69,7 +70,7 @@ export default async function GoalsPage() {
   const awayFrom = catchUpSince(visit, today);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Goals" />
       <HomeView
         {...home}
@@ -82,6 +83,6 @@ export default async function GoalsPage() {
         awayFrom={awayFrom}
         filesToRead={filesToRead}
       />
-    </div>
+    </PageColumn>
   );
 }

@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { toggleChipClass } from '@/components/ui/chip';
 import { formatMoney } from '@/lib/money';
 import { SaveForm } from './save-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const STATUSES = [
   { id: 'saved', label: 'Saved' },
@@ -129,7 +130,7 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
   return (
     <div className="max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
       {items.length === 0 ? (
-        <div className="mx-auto max-w-5xl">
+        <PageColumn>
           {header}
           <div className="mb-4">{tools}</div>
           <EmptyState
@@ -144,7 +145,7 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
                 : { label: 'Back to saved', href: '/shopping/saved' }
             }
           />
-        </div>
+        </PageColumn>
       ) : (
         <ListPage header={header} tools={tools} foot={`${items.length} ${status}`}>
           {items.map((item) => (

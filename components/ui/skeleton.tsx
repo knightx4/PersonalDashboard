@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import { cardVariants } from './card';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Skeletons, never spinners.
@@ -81,9 +82,9 @@ export function ListPageSkeleton({ thumb = false }: { thumb?: boolean }) {
 /** A one-column page at the shared page width. */
 export function ReadingPageSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeaderSkeleton action={false} />
       <RowsSkeleton rows={5} />
-    </div>
+    </PageColumn>
   );
 }

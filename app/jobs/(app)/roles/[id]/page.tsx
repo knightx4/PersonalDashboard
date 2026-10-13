@@ -55,6 +55,7 @@ import { RoleCompany } from './role-company';
 import { ExcitementPicker } from './excitement-picker';
 import { ChannelPicker } from './channel-picker';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Role' };
 
@@ -392,7 +393,7 @@ export default async function RoleDetailPage({
   // One column, facts above the tabs: a detail page reads top to bottom, and
   // a rail beside the tabs squeezed them off the edge at laptop width.
   return (
-    <div className="space-y-4">
+    <PageColumn className="space-y-4">
         <>
           <PageHeader
             leading={
@@ -694,7 +695,7 @@ export default async function RoleDetailPage({
           }))}
         />
       </div>
-    </div>
+    </PageColumn>
   );
 }
 

@@ -12,6 +12,7 @@ import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
 import { WriteQuestions } from './write-questions';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One quiz: what it was over, how it went, and every question with what you
@@ -44,7 +45,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
   const answered = quiz.questions.filter((question) => question.outcome !== null).length;
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={QUIZZES_HREF}
@@ -146,6 +147,6 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
           </>
         )}
       </div>
-    </>
+    </PageColumn>
   );
 }

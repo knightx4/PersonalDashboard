@@ -6,6 +6,7 @@ import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Waiting, drawn from what the page read (page.tsx), so the gallery can draw
@@ -15,7 +16,7 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
   const count = waiting.groups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader title="Waiting" />
 
       {waiting.failed.length > 0 && (
@@ -78,6 +79,6 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
           ))}
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }

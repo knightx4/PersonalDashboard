@@ -14,6 +14,7 @@ import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
 import { formatClock } from '@/lib/clock';
 import { Tooltip } from '@/components/ui/tooltip';
+import { PageColumn } from '@/components/shell/page-width';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Connected',
@@ -54,7 +55,7 @@ export function VaultSettingsView({
   progress: SyncProgress | null;
 }) {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Vault settings"
         description="Where your notes come from, and how they get here."
@@ -223,7 +224,7 @@ export function VaultSettingsView({
           </Card>
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }
 

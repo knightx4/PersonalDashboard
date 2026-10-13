@@ -6,6 +6,7 @@ import { XConnection } from '@/app/dev/posts/x-connection';
 import { xConnectNotice } from '@/lib/x/account';
 import { socialPostFromRow } from '@/lib/dev/posts';
 import { buildPostsPage, type XStoredPost } from '@/lib/dev/posts-page';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Dev's Posts tab (plan #1419) in the surface gallery: two drafts waiting,
@@ -173,14 +174,14 @@ export function PostsMatchedSurface() {
         page={{ ...page, posted: [], onX: { posts: [], total: 0 } }}
         x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T12:00:00Z' }}
       />
-      <div className="mx-auto max-w-5xl space-y-6">
+      <PageColumn className="space-y-6">
         <SectionFold title="Posted" count={page.posted.length}>
           <PostList cards={page.posted} />
         </SectionFold>
         <SectionFold title="Posted on X" count={page.onX.total}>
           <XPostList posts={page.onX.posts} total={page.onX.total} />
         </SectionFold>
-      </div>
+      </PageColumn>
     </div>
   );
 }
@@ -225,7 +226,7 @@ export function PostsNoDraftSurface() {
  */
 export function PostsXSurface() {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <XConnection view={{ state: 'unconfigured', setupStep: 1816 }} />
       <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
       <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
@@ -239,15 +240,15 @@ export function PostsXSurface() {
             'X’s rate limit was reached, so the read stopped. The next read picks up where this one stopped.',
         }}
       />
-    </div>
+    </PageColumn>
   );
 }
 
 /** Write your own, opened: the compose box a post the person writes goes in. */
 export function PostsWriteSurface() {
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <WritePost defaultOpen />
-    </div>
+    </PageColumn>
   );
 }

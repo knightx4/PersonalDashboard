@@ -9,6 +9,7 @@ import { RoundsTable, interviewHref, type RoundView } from './rounds-table';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import { roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Interviews' };
 
@@ -111,7 +112,7 @@ export default async function InterviewsPage() {
 
   if (rows.length === 0) {
     return (
-      <>
+      <PageColumn>
         <PageHeader title="Interviews" description="Scheduled and past, with the debrief." />
         <EmptyState
           icon={CalendarClock}
@@ -119,14 +120,14 @@ export default async function InterviewsPage() {
           description="They appear here when a scheduling email arrives — and the app will ask you for the debrief the same evening, because one written three days later is worth very little."
           action={{ label: 'Back to the pipeline', href: '/jobs/pipeline' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
   const { upcoming, past, needDebrief } = splitByTime(rounds);
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Interviews"
         description={
@@ -161,7 +162,7 @@ export default async function InterviewsPage() {
 
       <RoundsTable title="Upcoming" rows={upcoming} timezone={timezone} />
       <RoundsTable title="Past" rows={past} timezone={timezone} />
-    </>
+    </PageColumn>
   );
 }
 
