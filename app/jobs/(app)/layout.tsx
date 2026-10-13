@@ -1,14 +1,11 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import type { NavSection } from '@/components/shell/app-shell';
 import { loadJobsBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
-import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
 import { countReviewItems } from '@/lib/jobs/review/load';
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for every signed-in section.
@@ -60,13 +57,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     settingsLabel: 'Job search settings',
     feedbackHref: '/dev/bugs',
     brief: async () => loadJobsBrief(user.id, await countReviewItems(supabase, core, user.id)),
-    banner: async () => {
-      const { accountIds, initialJob } = await loadInboxBannerState(user.id);
-      return <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />;
-    },
-    // Every paid button's $ hint in Jobs, from one read of the spend ledger
-    // (plan #918, the same as Learn's in #917).
-    paidActions: paidActionsUnder('app/jobs/'),
     children,
   });
 }

@@ -1,4 +1,3 @@
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { shellFor } from '@/lib/shell/shell-for';
 
 /**
@@ -11,8 +10,7 @@ import { shellFor } from '@/lib/shell/shell-for';
  * arrives here from an address this app owns, so nothing it does needs a Gmail
  * grant and nobody should meet a consent screen on the way in.
  *
- * No brief either, yet. The home tile says how many issues are unread, which is
- * the whole of what there is to say before anything has been read.
+ * The brief and the paid-cost hints come from the shell's loader.
  */
 export default async function NewsLayout({ children }: { children: React.ReactNode }) {
   return shellFor({
@@ -38,8 +36,6 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
     ],
     settingsHref: '/news/settings',
     settingsLabel: 'News settings',
-    // The $ hint on Reload in the recommended newsletters (plan #947).
-    paidActions: paidActionsUnder('app/news/'),
     children,
   });
 }

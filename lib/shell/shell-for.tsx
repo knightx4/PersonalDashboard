@@ -9,14 +9,20 @@ import { getUser } from '@/lib/auth/server';
 import type { SessionUser } from '@/lib/auth/session-user';
 import { loadAccountSettings, type AccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { estimatePaidActions, type PaidAction } from '@/lib/core/spend/paid-actions';
+import { loadInboxBannerState } from '@/lib/core/inbox/banner';
+import {
+  estimatePaidActions,
+  paidActionsUnder,
+  type PaidAction,
+} from '@/lib/core/spend/paid-actions';
+import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { isOwner } from '@/lib/dev/owner';
 import type { ModuleId } from '@/lib/modules';
 import { loadModuleCounts, type ModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
-import type { Brief } from '@/lib/shell/brief';
+import { loadGoalsBrief, loadNewsBrief, type Brief } from '@/lib/shell/brief';
 import { loadMainCheck } from '@/lib/shell/main-check';
 
 /**
@@ -48,6 +54,31 @@ export type ShellFrame = {
   raised: Notification[];
 };
 
+/**
+ * The workspaces that sync mail, which draw the sync banner above their pages.
+ * The one list: a workspace added here gets the banner without its layout
+ * passing anything.
+ */
+const MAIL_SYNC_MODULES: readonly ModuleId[] = ['shopping', 'jobs'];
+
+/**
+ * Presses outside a workspace's own folder that it also shows a cost beside.
+ * The inbox import posts to an API route rather than an action.
+ */
+const EXTRA_PAID_ACTIONS: Partial<Record<ModuleId, readonly PaidAction[]>> = {
+  shopping: ['app/api/inbox/sync/route.ts#POST'],
+};
+
+/**
+ * The briefs that read only the frame. Workspaces whose brief needs a count
+ * their layout already reads (shopping and jobs, the review queue) pass their
+ * own.
+ */
+const FRAME_BRIEFS: Partial<Record<ModuleId, (frame: ShellFrame) => Promise<Brief | null>>> = {
+  goals: ({ user, settings }) => loadGoalsBrief(user.id, settings.timezone),
+  news: () => loadNewsBrief(),
+};
+
 /** A value, or one worked out from the frame once it is read. */
 export type FromFrame<T> = T | ((frame: ShellFrame) => T | Promise<T>);
 
@@ -59,14 +90,18 @@ export type ShellOptions = {
   settingsHref?: string;
   settingsLabel?: string;
   feedbackHref?: string;
-  /** The workspace's one-line brief. Omitted, the top bar has none. */
+  /**
+   * The workspace's one-line brief, when it needs more than the frame. Omitted,
+   * the shell uses the workspace's own from FRAME_BRIEFS, if it has one.
+   */
   brief?: (frame: ShellFrame) => Promise<Brief | null>;
   /** Drawn above the page, inside the content column. */
   banner?: FromFrame<ReactNode>;
   /**
-   * The paid presses under this shell. Given, their estimates are read in the
-   * first round and the pages are wrapped in PaidCostsProvider, so every
-   * hint below reads its figure from there.
+   * The paid presses under this shell, when they are not the workspace's own
+   * (everything under app/<module>/ plus EXTRA_PAID_ACTIONS). Their estimates
+   * are read in the first round and the pages are wrapped in
+   * PaidCostsProvider, so every hint below reads its figure from there.
    */
   paidActions?: readonly PaidAction[];
   /**
@@ -89,6 +124,15 @@ export async function shellFor(options: ShellOptions) {
   const user = options.user ?? (await getUser());
   if (!user) redirect('/login');
 
+  const paidActions =
+    options.paidActions ??
+    (options.module
+      ? [
+          ...paidActionsUnder(`app/${options.module}/`),
+          ...(EXTRA_PAID_ACTIONS[options.module] ?? []),
+        ]
+      : undefined);
+
   const [settings, counts, activity, raised, mainCheck, owner, costs] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
@@ -96,9 +140,9 @@ export async function shellFor(options: ShellOptions) {
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
-    options.paidActions
+    paidActions
       ? createCoreClient()
-          .then((core) => estimatePaidActions(core, user.id, options.paidActions ?? []))
+          .then((core) => estimatePaidActions(core, user.id, paidActions))
           .catch(() => ({}))
       : null,
   ]);
@@ -106,8 +150,14 @@ export async function shellFor(options: ShellOptions) {
   const frame: ShellFrame = { user, settings, owner, counts, raised };
   const [sections, brief, banner, page] = await Promise.all([
     resolve(options.sections, frame),
-    options.brief?.(frame),
-    resolve(options.banner, frame),
+    (options.brief ?? (options.module ? FRAME_BRIEFS[options.module] : undefined))?.(frame),
+    options.banner !== undefined
+      ? resolve(options.banner, frame)
+      : options.module && MAIL_SYNC_MODULES.includes(options.module)
+        ? loadInboxBannerState(user.id).then(({ accountIds, initialJob }) => (
+            <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
+          ))
+        : undefined,
     resolve(options.children, frame),
   ]);
 

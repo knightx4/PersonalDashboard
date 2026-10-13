@@ -1,6 +1,5 @@
 import { loadVaultBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for the vault workspace.
@@ -35,9 +34,6 @@ export default async function VaultLayout({ children }: { children: React.ReactN
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',
     brief: () => loadVaultBrief(),
-    // Every paid button's $ hint in the vault, from one read of the spend
-    // ledger (plan #918).
-    paidActions: paidActionsUnder('app/vault/'),
     children,
   });
 }
