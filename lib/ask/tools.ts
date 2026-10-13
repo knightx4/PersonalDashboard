@@ -453,6 +453,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   learn: 'Learn',
   news: 'News',
   goals: 'Goals',
+  you: 'You',
   dev: 'Dev',
 };
 

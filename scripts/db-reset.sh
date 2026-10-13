@@ -15,6 +15,7 @@
 #   supabase/migrations-learn       -> learn,      the learn module
 #   supabase/migrations-news        -> news,       the newsletter module
 #   supabase/migrations-goals       -> goals,      the goals module
+#   supabase/migrations-you         -> you,        the you module
 #
 # They are separate directories rather than one because the sets were numbered
 # independently and each starts at 0001 -- and the job_search versions are
@@ -104,5 +105,10 @@ for f in "$ROOT/supabase/migrations-todo"/*.sql; do apply_file "$f"; done
 # it will hold point into learn and job_search, while nothing points back.
 echo "==> migrations-goals (goals)"
 for f in "$ROOT/supabase/migrations-goals"/*.sql; do apply_file "$f"; done
+
+# you after goals: its 0003 writes core.account_settings, and the tables its
+# later migrations move in come from learn and obsidian.
+echo "==> migrations-you (you)"
+for f in "$ROOT/supabase/migrations-you"/*.sql; do apply_file "$f"; done
 
 echo "==> done"
