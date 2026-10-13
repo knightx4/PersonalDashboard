@@ -123,7 +123,7 @@ export function CardSection({
             <h2 className="flex flex-wrap items-baseline gap-2 text-ui font-semibold text-ink">
               <ChevronRight
                 aria-hidden
-                strokeWidth={2}
+                strokeWidth={1.75}
                 className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-quick group-open/section:rotate-90"
               />
               {title}
