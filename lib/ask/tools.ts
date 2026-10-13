@@ -128,7 +128,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'open_row',
-    description: `Read one row in full: its title and the text columns worth reading, with the link to its page. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
+    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
     input_schema: {
       type: 'object',
       properties: {

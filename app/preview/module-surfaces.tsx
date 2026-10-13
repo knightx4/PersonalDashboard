@@ -168,3 +168,14 @@ export function DevModuleSurface() {
     />
   );
 }
+
+/** The Ideas tab, where each idea carries Shape into a plan (note 2c0d63b2). */
+export function DevModuleIdeasSurface() {
+  return (
+    <ModuleView
+      summary={moduleSummary(moduleById('jobs')!, inputs)}
+      tab="ideas"
+      now={new Date('2026-10-08T12:00:00Z')}
+    />
+  );
+}
