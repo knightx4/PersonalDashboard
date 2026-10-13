@@ -2,6 +2,7 @@ import Link from '@/components/ui/link';
 import { AlertTriangle, BadgeCheck, CircleDashed, CircleSlash, Check } from 'lucide-react';
 import type { ReadingRow, SourceAccess } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * One reading, in a list.
@@ -32,9 +33,9 @@ function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents:
   // marking off, and a fill marks them off without adding a frame to a row
   // that is already inside a card -- law 11's "a shared ground groups".
   return (
-    <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+    <Chip>
       {price ? `${label} · ${price}` : label}
-    </span>
+    </Chip>
   );
 }
 
@@ -144,9 +145,9 @@ export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: str
               // Written down, nothing found for it yet. Said plainly rather
               // than left blank, because a row with no source and no note
               // about it reads as a row that failed.
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-ghost">
+              <Chip className="text-ink-ghost">
                 No source yet
-              </span>
+              </Chip>
             )}
           </span>
 

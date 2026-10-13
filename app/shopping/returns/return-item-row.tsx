@@ -8,6 +8,7 @@ import { returnMove } from '@/lib/returns/move';
 import { MoveLabel } from '@/components/ui/move-label';
 import { rowRef, withRun } from '@/lib/core/move';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { MarkReturnedButton, ReturnRowMenu, UndoReturnedButton } from './plan-return-button';
 
 export function ReturnItemRow({
@@ -61,14 +62,12 @@ export function ReturnItemRow({
               name, so the name has the whole width up to the price. */}
           <p className="flex min-w-0 items-baseline gap-2 text-ui text-ink-muted">
             {row.returnPlanned && !returned && (
-              <span className="shrink-0 text-micro font-semibold uppercase tracking-wide text-accent">
+              <Chip tone="accent" size="sm">
                 To return
-              </span>
+              </Chip>
             )}
             {returned && (
-              <span className="shrink-0 text-micro font-semibold uppercase tracking-wide">
-                Returned
-              </span>
+              <Chip size="sm">Returned</Chip>
             )}
             <span className="min-w-0 truncate">
               {[nested ? null : row.merchantName, displayVariant(row.variant)]

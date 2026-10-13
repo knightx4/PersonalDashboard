@@ -15,7 +15,7 @@ function LineMark({ state }: { state: LookupLine['state'] }) {
   return (
     <Glyph
       aria-hidden
-      strokeWidth={2}
+      strokeWidth={1.75}
       className={state === 'failed' ? 'size-3 shrink-0 translate-y-0.5 text-danger' : 'size-3 shrink-0 translate-y-0.5 text-ink-ghost'}
     />
   );

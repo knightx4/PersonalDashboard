@@ -1,7 +1,7 @@
 'use client';
 
 import { Equal, EqualNot } from 'lucide-react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -120,7 +120,7 @@ export function PersonalityReadPanel({
                   From{' '}
                   <Link
                     href={noteHref(point.note.path)}
-                    className="break-words text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+                    className={cn('break-words', linkVariants({ tone: 'quiet' }))}
                   >
                     {point.note.title}
                   </Link>

@@ -1,4 +1,4 @@
-import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import type { ConceptKind } from '@/lib/learn/graph/model';
 
 /**
@@ -32,14 +32,8 @@ export function KindBadge({ kind, className }: { kind: ConceptKind | null; class
   if (!kind) return null;
 
   return (
-    <span
-      className={cn(
-        'rounded-pill px-1.5 py-0.5 text-small',
-        kind === 'threshold' ? 'bg-accent-soft text-accent' : 'bg-sunken text-ink-muted',
-        className,
-      )}
-    >
+    <Chip tone={kind === 'threshold' ? 'accent' : 'neutral'} className={className}>
       {KIND_LABEL[kind]}
-    </span>
+    </Chip>
   );
 }

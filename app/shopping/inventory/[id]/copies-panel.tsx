@@ -5,7 +5,8 @@ import { useActionState } from 'react';
 import { RotateCcw, Tag } from 'lucide-react';
 import { separateCopy, ungroupItems } from '@/app/shopping/inventory/group-actions';
 import type { ActionState } from '@/app/shopping/inventory/actions';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { CardSection } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
@@ -115,16 +116,16 @@ export function CopiesPanel({
                 <span className="text-ink-muted"> · {copy.merchantName}</span>
               )}
               {copy.forSale && (
-                <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-caution">
-                  <Tag className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Chip tone="caution" size="sm" className="ml-2 align-middle">
+                  <Tag strokeWidth={1.75} aria-hidden />
                   For sale
-                </span>
+                </Chip>
               )}
               {copy.returnPlanned && (
-                <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-accent">
-                  <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Chip tone="accent" size="sm" className="ml-2 align-middle">
+                  <RotateCcw strokeWidth={1.75} aria-hidden />
                   To return
-                </span>
+                </Chip>
               )}
             </span>
 
@@ -137,7 +138,7 @@ export function CopiesPanel({
             ) : (
               <Link
                 href={`/shopping/inventory/${copy.id}`}
-                className="shrink-0 text-ui font-medium text-accent hover:underline"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'shrink-0')}
               >
                 Open
               </Link>

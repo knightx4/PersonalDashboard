@@ -41,10 +41,12 @@ export type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   size?: 'sm' | 'md';
   active?: boolean;
+  /** The action is in flight: disabled and marked busy, as Button's `pending`. */
+  pending?: boolean;
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, size, active, className, children, type = 'button', ...props },
+  { label, size, active, pending, disabled, className, children, type = 'button', ...props },
   ref,
 ) {
   return (
@@ -53,6 +55,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type={type}
       aria-label={label}
       title={label}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
       className={cn(iconButtonVariants({ size, active: active ?? false }), className)}
       {...props}
     >

@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Input, Textarea } from '@/components/ui/field';
+import { Field, Input, Textarea, Checkbox } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 import {
   confirmImport,
@@ -18,6 +18,7 @@ import {
 } from './actions';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Paste, watch it fill in, confirm.
@@ -104,22 +105,21 @@ function ResolvedRow({ row, index }: { row: PreviewRow; index: number }) {
 
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         id={id}
         name="row"
         value={JSON.stringify({ resolved, why: row.why })}
         defaultChecked
-        className="mt-1 size-4 shrink-0 accent-accent"
+        className="mt-1"
       />
       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{resolved.title}</span>
           {resolved.author && <span className="text-ui text-ink-muted">{resolved.author}</span>}
           {access && (
-            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            <Chip>
               {price ? `${access} · ${price}` : access}
-            </span>
+            </Chip>
           )}
         </span>
 

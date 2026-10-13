@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -131,7 +131,7 @@ function CallRow({ call, when }: { call: ConnectedAppCall; when: (at: string) =>
           {call.reads.map((read) => (
             <li key={`${read.table}:${read.ref}`} className="min-w-0">
               {read.href ? (
-                <Link href={read.href} className="text-accent hover:underline">
+                <Link href={read.href} className={linkVariants({ tone: 'inline' })}>
                   {read.title}
                 </Link>
               ) : (

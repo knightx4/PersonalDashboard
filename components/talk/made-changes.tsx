@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { MadeChange } from '@/lib/talk/changes';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -46,7 +46,7 @@ export function MadeChanges({
                   {', from '}
                   <Link
                     href={`/ask/${change.conversationId}`}
-                    className="underline-offset-2 hover:text-ink hover:underline"
+                    className={linkVariants({ tone: 'quiet' })}
                   >
                     {change.question ?? 'a question'}
                   </Link>

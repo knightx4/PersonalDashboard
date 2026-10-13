@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 
@@ -84,7 +84,7 @@ export default function TermsPage() {
       </p>
 
       <p className="!mt-8 !text-ui">
-        <Link href="/privacy" className={cn(PRESS_AREA, 'text-accent hover:underline')}>
+        <Link href="/privacy" className={cn(PRESS_AREA, linkVariants({ tone: 'inline' }))}>
           Privacy Policy
         </Link>
       </p>

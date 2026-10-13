@@ -9,6 +9,7 @@ import {
 } from '@/components/learn/concept-state';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
 import type { Concept } from '@/lib/learn/graph/model';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * A subject's concepts, doors first.
@@ -48,13 +49,13 @@ export function ConceptRow({
           >
             {concept.name}
           </Link>
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             {STATE_LABEL[concept.state]}
-          </span>
+          </Chip>
           {next && (
-            <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
+            <Chip tone="accent">
               Start here
-            </span>
+            </Chip>
           )}
         </p>
 

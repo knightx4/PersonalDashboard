@@ -4,7 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { Popover } from '@/components/ui/popover';
+import { menuItemClass, Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { scopeForModule, scopeLabel, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
@@ -102,7 +102,7 @@ export function SearchScopeChip({
             for everything you own. */}
         <ModuleMark module={scope === 'everything' ? null : scope} size="sm" />
         {/* Which way the choice opens, and that there is one. */}
-        <ChevronDown className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+        <ChevronDown className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
       </button>
 
       {open && (
@@ -130,8 +130,8 @@ export function SearchScopeChip({
                 show(false);
               }}
               className={cn(
-                'press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-ui transition-colors duration-quick hover:bg-sunken',
-                choice === scope ? 'text-ink' : 'text-ink-muted',
+                menuItemClass(),
+                choice !== scope && 'text-ink-muted',
               )}
             >
               <ModuleMark module={choice === 'everything' ? null : choice} size="sm" />
@@ -139,7 +139,7 @@ export function SearchScopeChip({
               {/* The tick rather than a highlighted row: the one you are in is
                   a state, and the row under the pointer is already lit. */}
               {choice === scope && (
-                <Check className="size-3.5 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+                <Check className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
               )}
             </button>
           ))}

@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { EssayClaim, OfferedClaim } from '@/lib/learn/essays/finish';
 import type { EssayStage } from '@/lib/learn/essays/note';
 import { acceptEssayFinish, type AcceptFinishResult, type FinishResult } from './actions';
+import { Checkbox, CheckRow } from '@/components/ui/field';
 
 /**
  * Finish (plan #1873; spec, "Finishing and publishing"). One press saves the
@@ -111,7 +112,7 @@ function Offering({
                     {text}
                     <p className="mt-0.5 text-small text-ink-muted">
                       In your vault:{' '}
-                      <Link href={claim.existing.href} className="text-accent underline underline-offset-2">
+                      <Link href={claim.existing.href} className={linkVariants()}>
                         {claim.existing.title}
                       </Link>
                     </p>
@@ -119,12 +120,11 @@ function Offering({
                 </div>
               ) : (
                 <label className="flex min-h-11 cursor-pointer gap-2 py-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={picked.has(claim.name)}
                     disabled={busy}
                     onChange={() => toggle(claim.name)}
-                    className="mt-0.5 size-4 shrink-0 accent-accent"
+                    className="mt-0.5"
                   />
                   <span className="min-w-0 flex-1">{text}</span>
                 </label>
@@ -144,21 +144,14 @@ function Offering({
           </>
         ) : (
           <>
-            <label className="flex min-h-11 flex-1 cursor-pointer gap-2">
-              <input
-                type="checkbox"
-                checked={evidence}
-                disabled={busy}
-                onChange={() => setEvidence((on) => !on)}
-                className="mt-0.5 size-4 shrink-0 accent-accent"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-ui font-medium text-ink">Add to your evidence bank</span>
-                <span className="block text-small text-ink-muted">
-                  One item in Jobs, something you can show you did, linking to this essay.
-                </span>
-              </span>
-            </label>
+            <CheckRow
+              className="min-h-11 flex-1"
+              title="Add to your evidence bank"
+              hint="One item in Jobs, something you can show you did, linking to this essay."
+              checked={evidence}
+              disabled={busy}
+              onChange={() => setEvidence((on) => !on)}
+            />
           </>
         )}
       </div>
@@ -200,7 +193,7 @@ function MadeList({ made }: { made: Made }) {
           <ul className="mt-1 flex flex-col gap-1">
             {made.created.map((note) => (
               <li key={note.href} className="text-ui">
-                <Link href={note.href} className="text-accent underline underline-offset-2">
+                <Link href={note.href} className={linkVariants()}>
                   {note.name}
                 </Link>
               </li>
@@ -211,7 +204,7 @@ function MadeList({ made }: { made: Made }) {
       {bank && (
         <p className="mt-2 text-ui text-ink">
           {bank}{' '}
-          <Link href="/jobs/material" className="text-accent underline underline-offset-2">
+          <Link href="/jobs/material" className={linkVariants()}>
             Open the bank
           </Link>
         </p>

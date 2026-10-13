@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/shell/page-header';
@@ -7,6 +7,7 @@ import type { PracticeView } from '@/lib/learn/lessons/practice';
 import type { DueReview } from '@/lib/learn/lessons/review';
 import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
+import { cn } from '@/lib/cn';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -93,7 +94,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
                   ) : (
                     <Link
                       href={`/learn/s/${subject.id}/p/${sibling.id}`}
-                      className="press-area text-accent hover:underline"
+                      className={cn('press-area', linkVariants())}
                     >
                       {sibling.title}
                     </Link>

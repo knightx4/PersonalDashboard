@@ -38,7 +38,7 @@ export function AttributeFilterPicker({
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="press flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-ui text-ink-muted hover:bg-surface hover:text-ink"
+        className="press flex w-full items-center gap-1.5 rounded-control px-2.5 py-1.5 text-left text-ui text-ink-muted hover:bg-surface hover:text-ink"
       >
         <Plus className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         Add filter
@@ -82,7 +82,7 @@ export function AttributeFilterPicker({
                     href={href}
                     // A rail row, set exactly like the ones in every other
                     // RailGroup — these are the same thing, revealed later.
-                    className="block truncate rounded-lg px-2.5 py-1.5 text-ui text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+                    className="block truncate rounded-control px-2.5 py-1.5 text-ui text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
                   >
                     {value}
                   </Link>

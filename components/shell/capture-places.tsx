@@ -3,6 +3,7 @@
 import { Paperclip, Plus, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { ToggleChip } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
@@ -47,18 +48,20 @@ export function CaptureHeader({
         {actions
           .filter((other) => other.id !== action.id)
           .map((other) => (
-            <button
+            <Button
               key={other.id}
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => onSwitch(other)}
               title={other.label}
               aria-label={other.label}
-              className="press flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-small text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
+              className="shrink-0"
             >
               <ModuleMark module={other.module} size="sm" />
               {/* The mark alone on a phone, so the panel's own name keeps its room. */}
               <span className="hidden sm:inline">{other.label}</span>
-            </button>
+            </Button>
           ))}
       </span>
       {/* `always`: inside an open panel there is no modifier being held. */}
@@ -75,9 +78,6 @@ export type PlaceGuess =
   | { state: 'reading' }
   /** Answered: a sort, or null when the call failed. */
   | { state: 'answered'; sort: CaptureSort | null };
-
-const chip =
-  'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick';
 
 /**
  * The line under the field. Sure: where Dash will put it. Unsure, or no
@@ -129,34 +129,29 @@ export function PlaceLine({
           {places.map((place) => {
           const on = picked === place;
           return (
-            <button
+            <ToggleChip
               key={place}
-              type="button"
-              aria-pressed={on}
+              on={on}
               onClick={() => onPick(on ? null : place)}
-              className={cn(
-                chip,
-                        'flex items-center gap-1.5 pl-1.5',
-                on
-                  ? 'bg-accent text-fill-ink ring-1 ring-accent'
-                  : 'text-ink-muted ring-1 ring-border hover:bg-accent-tint hover:text-accent',
-              )}
+              className="gap-1.5 pl-1.5 [&_svg]:size-[18px]"
             >
-              <ModuleMark module={CAPTURE_PLACE_MODULE[place]} size="sm" />
+              <ModuleMark module={CAPTURE_PLACE_MODULE[place]} size="xs" />
               {CAPTURE_PLACE_LABELS[place]}
-            </button>
+            </ToggleChip>
           );
           })}
         </span>
       )}
       {sure && sort && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => onPick(sort.parts[0].place)}
-          className="press ml-auto shrink-0 rounded-full px-2 py-1 text-small text-ink-muted hover:bg-accent-tint hover:text-accent"
+          className="ml-auto shrink-0"
         >
           Change
-        </button>
+        </Button>
       )}
     </div>
   );

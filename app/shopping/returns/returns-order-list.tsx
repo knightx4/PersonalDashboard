@@ -1,4 +1,6 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { Disclosure } from '@/components/ui/disclosure';
 import { deadlineLabel } from '@/lib/returns/deadline';
 import type { ReturnsOrderGroup } from '@/lib/returns/grouping';
@@ -84,7 +86,7 @@ export function ReturnsOrderList({
               <div className="row-pad flex items-center justify-end border-t border-border px-4">
                 <Link
                   href={`/shopping/orders/${group.orderId}`}
-                  className="press-area text-small text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
+                  className={cn(PRESS_AREA, 'text-small', linkVariants({ tone: 'quiet' }))}
                 >
                   View full order
                 </Link>

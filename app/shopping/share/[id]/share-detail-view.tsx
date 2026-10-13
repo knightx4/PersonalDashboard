@@ -178,7 +178,7 @@ export function ShareDetailView({
 
           <CardSection title="Recent activity">
             {events.length === 0 ? (
-              <p className="text-ui text-ink-muted">Nothing yet.</p>
+              <EmptyState size="inline" title="Nothing yet." />
             ) : (
               <ul className="space-y-1.5">
                 {events.map((event) => (

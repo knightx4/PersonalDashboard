@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -77,7 +77,7 @@ export function ChannelView({
         title={channel.name}
         description={
           <>
-            <a href={channel.homeUrl} className="press-area hover:underline" target="_blank" rel="noreferrer">
+            <a href={channel.homeUrl} className={cn('press-area', linkVariants({ tone: 'quiet' }))} target="_blank" rel="noreferrer">
               {channel.handle ?? 'Open on YouTube'}
             </a>
           </>

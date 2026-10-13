@@ -1,4 +1,5 @@
 import { Meter } from '@/components/ui/meter';
+import { SectionLabel } from '@/components/ui/section-heading';
 import {
   chartColumns,
   chartValue,
@@ -56,11 +57,11 @@ function Rows({ chart }: { chart: DashChart }) {
     <table className="w-full border-collapse text-ui">
       <thead>
         <tr>
-          <th scope="col" className="pb-1.5 text-left text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            {label || <span className="sr-only">Row</span>}
+          <th scope="col" className="pb-1.5 text-left font-normal">
+            {label ? <SectionLabel as="span">{label}</SectionLabel> : <span className="sr-only">Row</span>}
           </th>
-          <th scope="col" className="pb-1.5 pl-3 text-right text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            {value}
+          <th scope="col" className="pb-1.5 pl-3 text-right font-normal">
+            <SectionLabel as="span">{value}</SectionLabel>
           </th>
         </tr>
       </thead>

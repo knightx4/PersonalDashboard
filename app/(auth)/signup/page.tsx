@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { AuthForm } from '../auth-form';
 
 export const metadata = { title: 'Sign up' };
@@ -23,7 +23,7 @@ export default async function SignupPage({
 
       <p className="mt-5 text-center text-ui text-ink-muted">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-accent hover:underline">
+        <Link href="/login" className={`${linkVariants({ tone: 'inline' })} font-medium`}>
           Sign in
         </Link>
       </p>

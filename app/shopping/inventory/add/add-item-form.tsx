@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Banknote, CalendarDays, Tag } from 'lucide-react';
@@ -88,7 +88,7 @@ export function AddItemForm({ categories }: { categories: readonly CategoryOptio
         <p className="text-body text-accent">
           {state.message}{' '}
           {state.savedId && (
-            <Link className="underline" href={`/shopping/inventory/${state.savedId}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${state.savedId}`}>
               Open it
             </Link>
           )}

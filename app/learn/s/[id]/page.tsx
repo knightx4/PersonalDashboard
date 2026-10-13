@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -42,6 +42,8 @@ import {
   settledCount,
   type Graph,
 } from '@/lib/learn/graph/model';
+import { Chip } from '@/components/ui/chip';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,14 +106,7 @@ function GoalSection({
       <h2 className="mb-2 text-ui font-semibold text-ink-muted">{goalName}</h2>
 
       {chain.length === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-          )}
-        >
-          Nothing left standing between you and this one.
-        </p>
+        <EmptyState size="box" title="Nothing left standing between you and this one." />
       ) : (
         <>
           <p className="mb-2 text-ui text-ink-muted">
@@ -162,9 +157,9 @@ function UnitSection({
         </h3>
         <span className="flex items-baseline gap-2 text-small">
           {row.next && (
-            <span className="rounded-pill bg-accent-tint px-1.5 py-0.5 font-medium text-accent">
+            <Chip tone="accent">
               Next
-            </span>
+            </Chip>
           )}
           <span className="text-ink-muted">
             {row.state === 'in-progress'
@@ -187,7 +182,7 @@ function UnitSection({
           {pieces.map((piece) => (
             <li key={piece.id} className="flex items-baseline gap-2 text-ui">
               <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
-              <Link href={`/learn/s/${subjectId}/p/${piece.id}`} className="text-accent hover:underline">
+              <Link href={`/learn/s/${subjectId}/p/${piece.id}`} className={linkVariants()}>
                 {piece.title}
               </Link>
               {piece.passed && <span className="text-small text-ink-muted">passed</span>}
@@ -468,15 +463,11 @@ export default async function SubjectPage({
           </section>
         )
       ) : counts.total === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-          )}
-        >
-          No ideas in this subject yet. An idea is one thing you can be right or wrong about, not a
-          heading.
-        </p>
+        <EmptyState
+          size="box"
+          title="No ideas in this subject yet."
+          description="An idea is one thing you can be right or wrong about, not a heading."
+        />
       ) : showEverything ? (
         <>
           <p className="mb-2 text-ui text-ink-muted">
@@ -493,15 +484,11 @@ export default async function SubjectPage({
           />
         </>
       ) : live.length === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-          )}
-        >
-          No goals in this subject yet. A goal is what you actually want to understand, and the chain
-          leading to it is what gets shown here.
-        </p>
+        <EmptyState
+          size="box"
+          title="No goals in this subject yet."
+          description="A goal is what you actually want to understand, and the chain leading to it is what gets shown here."
+        />
       ) : (
         live.map((goal) => (
           <GoalSection

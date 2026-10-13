@@ -12,6 +12,8 @@ import { KindBadge } from '@/components/learn/kind-badge';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveBranch, proposeBranch, rewriteClaim, type BranchState } from './actions';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 
 /**
  * The claim, the offer to go deeper on a phrase in it, and the way to write it
@@ -64,13 +66,13 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
     <li className="px-4 py-3">
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-ui font-medium text-ink">{node.name}</span>
-        <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+        <Chip>
           {node.existingId ? 'Already in this subject' : 'New'}
-        </span>
+        </Chip>
         {isGoal && (
-          <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
+          <Chip tone="accent">
             What you selected
-          </span>
+          </Chip>
         )}
         {!node.existingId && <KindBadge kind={node.kind} />}
       </p>
@@ -277,10 +279,10 @@ export function BranchFromClaim({
             nothing else on the page. */}
         <p className="text-small text-ink-muted">{wording}</p>
         {original && (
-          <div className="mt-3 rounded-lg bg-canvas px-3 py-2">
+          <Note className="mt-3">
             <h2 className="text-small font-semibold text-ink-muted">What the app first wrote</h2>
             <p className="mt-1 max-w-prose text-ui text-ink-muted">{original}</p>
-          </div>
+          </Note>
         )}
       </Card>
 
@@ -297,14 +299,10 @@ export function BranchFromClaim({
               by one row rather than two. Nothing selected means nothing to
               branch off, which is when rewriting is the thing on offer. */}
           {selection.length === 0 && !asking && (
-            <button
-              type="button"
-              onClick={() => setRewriting(true)}
-              className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted"
-            >
-              <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
+            <Button type="button" variant="ghost" size="xs" onClick={() => setRewriting(true)}>
+              <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
               Put this in your own words
-            </button>
+            </Button>
           )}
 
           {/* Kept up while the call is in flight: clicking away clears the

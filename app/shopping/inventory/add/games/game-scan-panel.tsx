@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { saveGame, searchGame, type GameActionState } from './actions';
@@ -130,7 +130,7 @@ export function GameScanPanel() {
       {isbnHit && (
         <p className="text-body text-ink">
           That is a book barcode (ISBN {isbnHit}).{' '}
-          <Link href="/shopping/inventory/add/books?mode=scan" className="text-accent underline">
+          <Link href="/shopping/inventory/add/books?mode=scan" className={linkVariants()}>
             Scan it in Add books
           </Link>
           .
@@ -141,7 +141,7 @@ export function GameScanPanel() {
         <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${saveState.savedIds[0]}`}>
               View item
             </Link>
           )}

@@ -15,6 +15,7 @@ import {
 } from '@/lib/learn/tracks/reading-summary';
 import { summarizeReading } from './actions';
 import { READING_TEXT_ANCHOR, ReadingText } from './reading-text';
+import { linkVariants } from '@/components/ui/link';
 
 export type SummaryFailure = { error: string; unreadable?: boolean };
 
@@ -63,7 +64,7 @@ export function ReadingSummary({
   return (
     <>
       <section
-        className={cn(cardVariants({ padding: 'dense' }), 'mb-5', summary ? '' : 'border-dashed')}
+        className={cn(cardVariants({ padding: 'dense' }), 'mb-5', summary ? '' : 'border border-dashed')}
         aria-label="Summary"
         aria-busy={pending}
       >
@@ -79,7 +80,7 @@ export function ReadingSummary({
                       href={summary.label}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-ink underline underline-offset-2 hover:text-accent"
+                      className={linkVariants({ tone: 'quiet' })}
                     >
                       {source.site}
                     </a>
@@ -146,7 +147,7 @@ function Failure({ failure }: { failure: SummaryFailure }) {
       {linked ? (
         <>
           {failure.error.slice(0, -(UNREADABLE_ACTION.length + 1))}
-          <a href={`#${READING_TEXT_ANCHOR}`} className="underline underline-offset-2">
+          <a href={`#${READING_TEXT_ANCHOR}`} className={linkVariants()}>
             {UNREADABLE_ACTION}
           </a>
           .

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { TalkThread } from '@/components/talk/talk-thread';
@@ -98,7 +98,7 @@ export function TeachBackCard({
           {stateLine(card.title, teach.state)}{' '}
           <Link
             href={`/learn/c/${teach.conceptId}`}
-            className="text-ink-muted underline underline-offset-2 hover:text-ink"
+            className={linkVariants({ tone: 'quiet' })}
           >
             See it on its page
           </Link>

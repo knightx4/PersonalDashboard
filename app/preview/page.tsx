@@ -125,20 +125,20 @@ export default async function PreviewPage({
       />
       <div className="mx-auto max-w-2xl space-y-4">
         <div>
-          <h1 className="text-title text-page-ink">Surfaces</h1>
-          <p className="mt-1 text-body text-page-ink-muted">
+          <h1 className="text-title text-ink">Surfaces</h1>
+          <p className="mt-1 text-body text-ink-muted">
             The real components, with typed fixtures. {SURFACES.length} surfaces.
           </p>
         </div>
-        <ul className="divide-y divide-page-border">
+        <ul className="divide-y divide-border">
           {SURFACES.map((entry) => (
             <li key={entry.id}>
               <Link
                 href={`/preview?s=${entry.id}`}
-                className="flex items-baseline justify-between gap-3 py-2 text-body text-page-ink hover:text-accent"
+                className="flex items-baseline justify-between gap-3 py-2 text-body text-ink hover:text-accent"
               >
                 {entry.label}
-                <span className="text-small text-page-ink-ghost">{entry.module}</span>
+                <span className="text-small text-ink-ghost">{entry.module}</span>
               </Link>
             </li>
           ))}

@@ -5,13 +5,14 @@ import { useFormStatus } from 'react-dom';
 import { FileText, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
+import { ChipSelect, ComposeBody, ComposeBox, Checkbox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { KindBadge } from '@/components/learn/kind-badge';
 import { keepTicked, type ChainNode, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveBrief, proposeBrief, type BriefState } from './actions';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Paste the briefing somebody wrote for you.
@@ -73,9 +74,9 @@ function ClaimRow({
           {/* Not tickable: it is already in the subject, this import writes
               nothing for it, and it is here because the edges around it are
               what join the new claims to what you have. */}
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             Already in this subject
-          </span>
+          </Chip>
         </p>
         {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
       </li>
@@ -84,23 +85,22 @@ function ClaimRow({
 
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={ticked}
         onChange={onToggle}
         name="keep"
         value={node.name}
         aria-label={`Keep ${node.name}`}
-        className="mt-1 size-4 shrink-0 rounded border-border text-accent focus:ring-accent/30"
+        className="mt-1"
       />
       <span className="min-w-0">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{node.name}</span>
           <KindBadge kind={node.kind} />
           {unplaced && (
-            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            <Chip>
               Nothing left to hang it on
-            </span>
+            </Chip>
           )}
         </span>
         {/* The claim, because the name says nothing about whether it is worth

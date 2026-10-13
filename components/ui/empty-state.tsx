@@ -31,6 +31,7 @@ export function EmptyState({
   tone = 'empty',
   align = 'center',
   size = 'page',
+  titleAs: TitleTag = 'p',
   seed,
   className,
   children,
@@ -52,6 +53,8 @@ export function EmptyState({
    * without a border width, so their outline never drew.
    */
   size?: 'page' | 'box' | 'inline';
+  /** The title's element at box size, when the empty section is one a heading names. */
+  titleAs?: 'p' | 'h2' | 'h3';
   /** For `finished`: what the sigil is drawn from. Falls back to the title. */
   seed?: string;
   className?: string;
@@ -88,7 +91,7 @@ export function EmptyState({
           className,
         )}
       >
-        <p className="text-ui font-medium text-ink">{title}</p>
+        <TitleTag className="text-ui font-medium text-ink">{title}</TitleTag>
         {description && <p className="mt-1 max-w-sm text-small text-ink-muted">{description}</p>}
         {(action || children) && (
           <div className={cn('mt-3 flex flex-wrap items-center gap-2', start ? 'justify-start' : 'justify-center')}>

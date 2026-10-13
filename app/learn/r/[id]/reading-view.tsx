@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -155,7 +155,7 @@ function ReadingProperties({ reading, origin }: { reading: ReadingDetail; origin
         label="Reading list"
         wide
         value={
-          <Link href={`/learn/t/${reading.trackId}`} className="hover:underline">
+          <Link href={`/learn/t/${reading.trackId}`} className={linkVariants()}>
             {reading.trackTitle}
           </Link>
         }
@@ -168,7 +168,7 @@ function ReadingProperties({ reading, origin }: { reading: ReadingDetail; origin
           wide
           value={
             origin.href ? (
-              <Link href={origin.href} className="hover:underline">
+              <Link href={origin.href} className={linkVariants()}>
                 {origin.senderName}
               </Link>
             ) : (
@@ -228,7 +228,7 @@ function ReadingTabBody({
         // Something you wrote down. There is nothing to open, and saying so is
         // the honest thing -- an empty "Where to read" box would read as a
         // failure rather than as a step you have not taken.
-        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border-dashed')}>
+        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border border-dashed')}>
           <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
           {/* The row's own basis rather than a fixed sentence: a subject can
               get here by being typed or by being proposed for a topic. */}

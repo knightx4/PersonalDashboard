@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Orbit } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import type { DestinationGroup, OpenedPlace } from '@/lib/learn/areas/move';
 import { dayWords } from '@/lib/learn/graph/last-answered';
 import { SPACE_HREF } from '@/lib/learn/map/view';
 import { PlacedThemes, type ThemeRow } from './placed-themes';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * Every field of study, by domain, with what you write about and what you
@@ -145,7 +146,7 @@ function OpenedPanel({ opened }: { opened: OpenedThemes }) {
       {themes === null ? (
         <p className="text-small text-ink-muted">The themes placed here could not be read.</p>
       ) : themes.length === 0 ? (
-        <p className="text-small text-ink-muted">No themes are placed here.</p>
+        <EmptyState size="inline" title="No themes are placed here." />
       ) : (
         <PlacedThemes themes={themes} groups={groups} />
       )}
@@ -205,7 +206,7 @@ export function AreasGrid({
         key="themes"
         href={unplacedOpen ? '/learn/know#areas-heading' : `/learn/know?unplaced=1#${OPENED_ID}`}
         aria-expanded={unplacedOpen}
-        className="text-ink underline decoration-control underline-offset-2 hover:text-accent"
+        className={linkVariants()}
       >
         {plural(grid.unplacedThemes, 'theme is', 'themes are')} about no field of study
       </Link>,
@@ -281,7 +282,7 @@ export function AreasGrid({
                           : `/learn/know?domain=${row.slug}#${OPENED_ID}`
                       }
                       aria-expanded={domainOpen}
-                      className="underline decoration-control underline-offset-2 hover:text-accent"
+                      className={linkVariants()}
                     >
                       {own}
                     </Link>

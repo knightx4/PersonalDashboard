@@ -526,7 +526,7 @@ const RULES: Rule[] = [
         if (
           /\brounded(?:-full|-pill|-md)?\b/.test(value) &&
           /\bpx-(?:1\.5|2|2\.5)\b/.test(value) &&
-          /\bpy-(?:0\.5|1)\b/.test(value) &&
+          /\bpy-(?:0\.5|1)(?![.\d])/.test(value) &&
           /\btext-(?:micro|small)\b/.test(value) &&
           /\bbg-/.test(value)
         )

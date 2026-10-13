@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { buttonVariants } from '@/components/ui/button';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
@@ -20,6 +20,7 @@ import {
 } from '@/lib/learn/personality/model';
 import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
+import { Note } from '@/components/ui/note';
 
 /**
  * Your personality result on the Know page (plan #1634): the latest Big Five
@@ -57,7 +58,7 @@ function ThemeLinks({ themes }: { themes: TraitThemes[BigFiveFactor] }) {
           {i > 0 && ', '}
           <Link
             href={`/vault/map/${theme.id}`}
-            className="text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+            className={linkVariants()}
           >
             {theme.name}
           </Link>
@@ -147,7 +148,7 @@ export function PersonalitySection({
             <p className="text-ui text-ink-muted">
               <Link
                 href={PERSONALITY_HREF}
-                className="text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+                className={linkVariants()}
               >
                 Take the personality test
               </Link>{' '}
@@ -189,13 +190,13 @@ export function PersonalitySection({
 
             {/* Dash's read on its own panel inside the card, so its words
                 stand apart from the scores and the note titles (plan #1764). */}
-            <div className="rounded-md bg-sunken p-3">
+            <Note>
               <PersonalityReadPanel
                 resultId={latest.id}
                 read={latest.read}
                 status={readStatus(latest, at)}
               />
-            </div>
+            </Note>
 
             <OtherTests typed={typed} now={at} />
 

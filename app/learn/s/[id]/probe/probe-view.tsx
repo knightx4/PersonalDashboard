@@ -1,10 +1,9 @@
 import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
 import type { Subject } from '@/lib/learn/graph/load';
 import { ProbeSession } from './session';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export type ProbeViewProps = {
   subject: Pick<Subject, 'id' | 'name'>;
@@ -33,15 +32,11 @@ export function ProbeView({ subject, ideas, percent, namedConcept }: ProbeViewPr
       <PageHeader title={`Questions on ${subject.name}`} />
 
       {ideas === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-          )}
-        >
-          Nothing in this subject to ask about yet. Name a goal first, and the chain leading to it is
-          what gets asked about.
-        </p>
+        <EmptyState
+          size="box"
+          title="Nothing in this subject to ask about yet."
+          description="Name a goal first, and the chain leading to it is what gets asked about."
+        />
       ) : (
         <ProbeSession
           subjectId={subject.id}

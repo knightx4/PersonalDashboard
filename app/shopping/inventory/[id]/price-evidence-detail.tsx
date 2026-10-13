@@ -1,4 +1,5 @@
 import { Disclosure } from '@/components/ui/disclosure';
+import { linkVariants } from '@/components/ui/link';
 import { formatMoney } from '@/lib/money';
 import { formatRange, type PriceEvidence } from '@/lib/sell/price-evidence';
 
@@ -71,7 +72,7 @@ export function PriceEvidenceDetail({ evidence }: { evidence: PriceEvidence }) {
                     href={listing.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent underline underline-offset-2"
+                    className={linkVariants()}
                   >
                     {listing.title ?? listing.url}
                   </a>

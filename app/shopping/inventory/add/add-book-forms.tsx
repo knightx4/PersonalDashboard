@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   previewPasteBookList,
   saveManualBook,
@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
-import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { Checkbox, FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import type { CanonicalBook } from '@/lib/books/types';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -105,7 +105,7 @@ export function AddBookManualForm({
         <p className="text-body text-accent">
           {state.message}{' '}
           {state.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${state.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${state.savedIds[0]}`}>
               View item
             </Link>
           )}
@@ -136,10 +136,10 @@ function BookCard({
         <img
           src={book.coverUrl}
           alt=""
-          className="h-28 w-20 shrink-0 rounded-md object-cover bg-canvas"
+          className="h-28 w-20 shrink-0 rounded-card object-cover bg-canvas"
         />
       ) : (
-        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md bg-canvas text-small text-ink-muted">
+        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-card bg-canvas text-small text-ink-muted">
           No cover
         </div>
       )}
@@ -301,7 +301,7 @@ export function AddBookSearchForm() {
         <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${saveState.savedIds[0]}`}>
               View item
             </Link>
           )}
@@ -386,8 +386,7 @@ export function AddBookPasteForm() {
               const payloadIndex = resolvedBooks.findIndex((e) => e.index === resultIndex);
               return (
                 <li key={resultIndex} className="card-pad-x row-pad flex items-start gap-3">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="selected"
                     value={String(payloadIndex)}
                     defaultChecked={!row.book.needsConfirmation}
@@ -415,8 +414,7 @@ export function AddBookPasteForm() {
                     )}
                     {row.book.needsConfirmation && (
                       <label className="mt-2 flex items-center gap-2 text-ui text-caution">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           name="confirmed"
                           value={String(payloadIndex)}
                         />

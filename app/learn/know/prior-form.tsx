@@ -12,6 +12,7 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { KindBadge } from '@/components/learn/kind-badge';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approvePrior, proposePrior, type PriorState } from './actions';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Tell it what you already know.
@@ -58,13 +59,13 @@ function ClaimRow({ node }: { node: ChainNode }) {
           // Said plainly, because this row is the one exception to what the
           // button does: a concept already in the graph keeps whatever state
           // it arrived at, and approving does not reach it.
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             Already in this subject, left as it is
-          </span>
+          </Chip>
         ) : (
-          <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
+          <Chip tone="accent">
             New, and will be marked known
-          </span>
+          </Chip>
         )}
         {!node.existingId && <KindBadge kind={node.kind} />}
       </p>

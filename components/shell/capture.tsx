@@ -529,7 +529,7 @@ function CapturePanel({
                 value={isCalendarDay(day) ? day : ''}
                 onChange={(event) => setDay(event.target.value)}
                 className={cn(
-                  'tabular rounded-control bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
+                  'tabular h-7 rounded-control bg-transparent px-2 text-small outline-none transition-colors duration-quick',
                   'focus:ring-1 focus:ring-accent/40',
                   isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
                 )}
@@ -1102,6 +1102,7 @@ export function CaptureButton() {
         className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
       >
         <Plus strokeWidth={1.75} aria-hidden />
+        <span className="sr-only">Capture something</span>
       </IconButton>
       <Kbd className="pointer-events-none absolute left-1/2 top-full hidden -translate-x-1/2 bg-raised sm:block">
         ⌥C

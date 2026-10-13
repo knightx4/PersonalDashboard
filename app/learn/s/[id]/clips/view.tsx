@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft, Clapperboard } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MainRail } from '@/components/patterns/main-rail';
@@ -8,6 +8,8 @@ import type { SubjectClipCounts } from '@/lib/learn/clips/subject-counts';
 import type { PlayerClip } from '@/lib/learn/clips/stream';
 import { ClipStream } from '@/app/learn/clips/clip-stream';
 import { CLIPS_HREF } from '@/app/learn/videos/clips-section';
+import { cn } from '@/lib/cn';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 
 /**
  * One subject's Clips page (plan #1697): the player, holding only the clips
@@ -76,15 +78,12 @@ function SubjectClipsCounts({ counts }: { counts: SubjectClipCounts }) {
   return (
     <Card padding="standard">
       <h2 className="text-ui font-semibold text-ink">These clips</h2>
-      <dl className="mt-2 divide-y divide-border">
+      <ValueList className="mt-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-3 py-2">
-            <dt className="text-ui text-ink-muted">{label}</dt>
-            <dd className="text-ui font-medium tabular-nums text-ink">{value}</dd>
-          </div>
+          <ValueRow key={label} label={label} value={value} align="end" />
         ))}
-      </dl>
-      <Link href={CLIPS_HREF} className="press-area mt-2 inline-block text-ui text-accent hover:underline">
+      </ValueList>
+      <Link href={CLIPS_HREF} className={cn('press-area mt-2 inline-block text-ui', linkVariants())}>
         Play all your clips
       </Link>
     </Card>

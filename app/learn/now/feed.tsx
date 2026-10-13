@@ -1004,7 +1004,7 @@ function DeckCard({
 
         {/* The three swipes as buttons, held at the foot of the screen while
             a long card is read, so leaving a card never needs a scroll back. */}
-        <div className="sticky bottom-0 rounded-b-[inherit] border-t border-border bg-surface card-pad-x py-2">
+        <div className="sticky bottom-0 rounded-b-card border-t border-border bg-surface card-pad-x py-2">
           {/* A phrase selected on the card, and its explanation (plan
               #1057), above the swipes so it is on screen wherever the
               phrase was. */}

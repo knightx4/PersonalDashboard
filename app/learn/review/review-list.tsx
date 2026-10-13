@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -90,7 +90,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
         {showPlan && (
           <Link
             href={`/learn/s/${review.subjectId}/p/${review.pieceId}`}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+            className={cn('text-small', linkVariants({ tone: 'quiet' }))}
           >
             {review.trackName ? `${review.trackName} · ` : ''}
             {review.pieceTitle}

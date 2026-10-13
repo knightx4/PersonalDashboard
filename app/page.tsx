@@ -238,7 +238,7 @@ export default function HomePage() {
 
             <div className={cn(s.glass, s.window, 'p-5 sm:p-6')} aria-hidden>
               <div className="flex justify-end">
-                <p className={cn(s.ink, 'max-w-sm rounded-2xl rounded-br-md bg-white/10 px-4 py-2.5 text-ui')}>
+                <p className={cn(s.ink, 'max-w-sm rounded-card rounded-br-control bg-white/10 px-4 py-2.5 text-ui')}>
                   Which applications have gone quiet for more than two weeks?
                 </p>
               </div>

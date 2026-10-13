@@ -129,7 +129,7 @@ export function ReadingText({
         aria-label="Upload a PDF as the text of this reading"
         onChange={upload}
       />
-      <div className={cn(cardVariants({ padding: 'dense' }), given || editing ? '' : 'border-dashed')}>
+      <div className={cn(cardVariants({ padding: 'dense' }), given || editing ? '' : 'border border-dashed')}>
         {editing ? (
           <div className="space-y-2">
             <Textarea

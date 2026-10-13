@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Mail, Package, Shield } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
@@ -96,9 +97,9 @@ export function OnboardingSteps({
       {step === 'welcome' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+            <SectionLabel>
               Welcome
-            </p>
+            </SectionLabel>
             <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               Know what you own before you buy it again
             </h1>
@@ -130,9 +131,9 @@ export function OnboardingSteps({
       {step === 'gmail' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+            <SectionLabel>
               Connect inbox
-            </p>
+            </SectionLabel>
             <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               Before you grant Gmail access
             </h1>
@@ -170,7 +171,7 @@ export function OnboardingSteps({
             </div>
             <p className="text-ui text-ink-muted">
               Full detail in the{' '}
-              <Link href="/privacy" className="text-accent hover:underline">
+              <Link href="/privacy" className={linkVariants({ tone: 'inline' })}>
                 privacy policy
               </Link>
               .
@@ -203,9 +204,9 @@ export function OnboardingSteps({
       {step === 'done' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+            <SectionLabel>
               Ready
-            </p>
+            </SectionLabel>
             <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               {inbox === 'connected' ? 'Inbox connected' : 'You are set'}
             </h1>

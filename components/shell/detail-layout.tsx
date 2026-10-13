@@ -1,5 +1,6 @@
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * A detail page: the thing itself on the left, its properties in a column on
@@ -93,7 +94,7 @@ export function Property({
 }) {
   return (
     <div className={cn('min-w-0', wide && 'col-span-2 lg:col-span-1')}>
-      <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
+      <SectionLabel as="dt">{label}</SectionLabel>
       <dd className="tabular mt-0.5 truncate text-ui text-ink" title={hint}>
         {value}
       </dd>

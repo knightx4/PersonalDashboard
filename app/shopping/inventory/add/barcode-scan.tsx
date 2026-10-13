@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { saveOwnedBook, searchOwnedBook, type BookActionState } from './actions';
@@ -122,7 +122,7 @@ export function BarcodeScanPanel() {
         <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${saveState.savedIds[0]}`}>
               View item
             </Link>
           )}

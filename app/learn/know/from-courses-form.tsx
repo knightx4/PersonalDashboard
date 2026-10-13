@@ -6,7 +6,7 @@ import Link from '@/components/ui/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Network } from 'lucide-react';
-import { ChipSelect } from '@/components/ui/field';
+import { ChipSelect, Checkbox } from '@/components/ui/field';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -21,6 +21,7 @@ import {
   type CourseApproveState,
   type CourseState,
 } from './actions';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Start from your courses (plan #1391, under #1388).
@@ -191,9 +192,9 @@ function IdeaRow({
           <span className="text-body font-medium text-ink">{node.name}</span>
           {/* No tick: approving writes nothing for an idea the track already
               holds, and its state stays whatever it was. */}
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             Already in this subject, left as it is
-          </span>
+          </Chip>
         </p>
         {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
       </li>
@@ -202,23 +203,22 @@ function IdeaRow({
 
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={ticked}
         onChange={onToggle}
         name="keep"
         value={node.name}
         aria-label={`I know ${node.name}`}
-        className="mt-1 size-4 shrink-0 rounded border-border text-accent focus:ring-accent/30"
+        className="mt-1"
       />
       <span className="min-w-0">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{node.name}</span>
           <KindBadge kind={node.kind} />
           {unplaced && (
-            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            <Chip>
               Nothing left to hang it on
-            </span>
+            </Chip>
           )}
         </span>
         {node.claim && <span className="mt-0.5 block text-ui text-ink">{node.claim}</span>}

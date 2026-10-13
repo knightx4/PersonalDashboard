@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ClipPlayer } from '@/components/learn/clip-player';
@@ -16,6 +16,7 @@ import { cardVariants } from '@/components/ui/card';
 import { moveVideoAction } from '../actions';
 import { addedLabel } from '../video-rows';
 import { WatchedToggle } from '../watched-toggle';
+import { cn } from '@/lib/cn';
 
 /**
  * One video on your list (plan #1069): the player, and beside it the summary,
@@ -59,7 +60,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
         description={
           <>
             {meta.join(' · ')} ·{' '}
-            <a href={video.url} className="hover:underline" target="_blank" rel="noreferrer">
+            <a href={video.url} className={linkVariants({ tone: 'quiet' })} target="_blank" rel="noreferrer">
               Open on YouTube
             </a>
           </>
@@ -104,13 +105,13 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
               <ul className="space-y-1">
                 {related.map((idea) => (
                   <li key={idea.conceptId} className="text-ui">
-                    <Link href={`/learn/c/${idea.conceptId}`} className="text-ink hover:underline">
+                    <Link href={`/learn/c/${idea.conceptId}`} className={linkVariants()}>
                       {idea.name}
                     </Link>
                     {idea.subjectName && idea.subjectId && (
                       <>
                         <span className="text-ink-muted"> in </span>
-                        <Link href={`/learn/s/${idea.subjectId}`} className="text-ink-muted hover:underline">
+                        <Link href={`/learn/s/${idea.subjectId}`} className={linkVariants({ tone: 'quiet' })}>
                           {idea.subjectName}
                         </Link>
                       </>
@@ -183,7 +184,7 @@ function Pile({ video, cards }: { video: ListVideoPage; cards: VideoCard[] }) {
             <Link
               href={`/learn/videos/${video.videoId}?t=${video.bestStartSeconds}`}
               scroll={false}
-              className="tabular-nums text-accent hover:underline"
+              className={cn('tabular-nums', linkVariants())}
             >
               Best stretch {clockTime(video.bestStartSeconds)}
               {video.bestEndSeconds !== null && ` to ${clockTime(video.bestEndSeconds)}`}

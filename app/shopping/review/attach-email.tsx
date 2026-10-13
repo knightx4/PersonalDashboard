@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Group } from '@/components/ui/disclosure';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/field';
 import { Kbd } from '@/components/ui/kbd';
 import { useToast } from '@/components/ui/toast';
@@ -67,7 +68,7 @@ export function AttachChoices({
   return (
     <div className="space-y-2 pt-1">
       {row.candidates.length === 0 ? (
-        <p className="text-ui text-ink-muted">No order looks like a match.</p>
+        <EmptyState size="inline" title="No order looks like a match." />
       ) : (
         <ul className="space-y-1.5">
           {row.candidates.map((candidate, index) => (
@@ -144,7 +145,7 @@ function OtherOrderPicker({
       />
 
       {matches.length === 0 ? (
-        <p className="text-small text-ink-muted">No order matches that.</p>
+        <EmptyState size="inline" title="No order matches that." />
       ) : (
         <ul className="space-y-1">
           {matches.map((order) => (

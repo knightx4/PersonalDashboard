@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, RotateCcw, ThumbsDown, Volume2 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -493,7 +493,10 @@ export function ClipStream({
             {(exhausted || fixed) && (
               <p className="max-w-sm text-ui text-white/80">
                 Dash cuts more from your videos a few times a day.{' '}
-                <Link href={nowHref(subjectId)} className="underline underline-offset-2 hover:text-white">
+                <Link
+                  href={nowHref(subjectId)}
+                  className={cn(linkVariants({ tone: 'quiet' }), 'text-white/80 decoration-white/40 hover:text-white')}
+                >
                   Go to Now
                 </Link>
               </p>

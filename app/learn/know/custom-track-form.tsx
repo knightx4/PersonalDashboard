@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Plus } from 'lucide-react';
@@ -84,7 +84,7 @@ export function CustomTrackForm() {
         <p role="alert" className="mt-1 text-small text-danger">
           {state.error}{' '}
           {state.existing && (
-            <Link href={`/learn/s/${state.existing.id}`} className="underline underline-offset-2">
+            <Link href={`/learn/s/${state.existing.id}`} className={linkVariants()}>
               Open {state.existing.name}
             </Link>
           )}

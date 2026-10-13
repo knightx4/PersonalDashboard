@@ -17,6 +17,7 @@ import {
 import type { Aim } from '@/lib/learn/graph/aim';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Turning a subject you wrote down into something you can open.
@@ -135,9 +136,9 @@ function Candidate({
           <span className="text-body font-medium text-ink">{source.title}</span>
           {source.author && <span className="text-ui text-ink-muted">{source.author}</span>}
           {access && (
-            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            <Chip>
               {price ? `${access} · ${price}` : access}
-            </span>
+            </Chip>
           )}
         </span>
 

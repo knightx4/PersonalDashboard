@@ -2,6 +2,8 @@
 
 import { Search, X } from 'lucide-react';
 import Link from '@/components/ui/link';
+import { iconButtonVariants } from '@/components/ui/icon-button';
+import { cn } from '@/lib/cn';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Input, PressLabel } from '@/components/ui/field';
@@ -104,10 +106,10 @@ export function SearchField({
               typing.current = true;
               setValue('');
             }}
-            // Sized to sit inside the field, so smaller than the standard size-8 icon button.
-            className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+            // Sized to sit inside the field, so smaller than the standard icon button.
+            className={cn(iconButtonVariants({ size: 'sm' }), 'absolute right-1 top-1/2 -translate-y-1/2')}
           >
-            <X className="size-3.5" strokeWidth={2} aria-hidden />
+            <X strokeWidth={1.75} aria-hidden />
             <span className="sr-only">Clear search</span>
           </Link>
         )}

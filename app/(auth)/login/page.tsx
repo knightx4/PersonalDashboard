@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Banner } from '@/components/ui/banner';
 import { PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -33,7 +33,7 @@ export default async function LoginPage({
 
       <p className="mt-5 text-center text-ui text-ink-muted">
         No account?{' '}
-        <Link href="/signup" className="font-medium text-accent hover:underline">
+        <Link href="/signup" className={cn(linkVariants({ tone: 'inline' }), 'font-medium')}>
           Sign up
         </Link>
       </p>

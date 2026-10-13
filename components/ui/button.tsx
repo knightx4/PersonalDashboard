@@ -63,7 +63,7 @@ const button = cva(
   },
 );
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
+export type ButtonProps = React.ComponentProps<'button'> &
   Omit<VariantProps<typeof button>, 'pressed'> & {
     /**
      * The button is a toggle and this is its state. Sets aria-pressed and the
