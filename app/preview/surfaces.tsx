@@ -6,6 +6,10 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouTabEmpty } from '@/app/you/you-tabs';
+import { PlacesView } from '@/app/you/places/places-view';
+import { PlaceView } from '@/app/you/places/place-view';
+import { PlaceForm } from '@/app/you/places/place-form';
+import type { Place } from '@/lib/you/places';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -2666,10 +2670,58 @@ const shellSections: NavSection[] = [
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
 ];
 
+/**
+ * Places they have lived, for You's Places tab (plan #1991.5): the home they
+ * live in now, a long name, a year-only stay, and one with nothing but a
+ * name and a date.
+ */
+const youPlaces: Place[] = [
+  {
+    id: 'place-york',
+    name: 'The terraced house on Bishopthorpe Road, by the river',
+    city: 'York',
+    region: 'North Yorkshire',
+    country: 'United Kingdom',
+    movedIn: '2019-08',
+    movedOut: null,
+    note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+  },
+  {
+    id: 'place-leeds',
+    name: 'Flat above the bakery',
+    city: 'Leeds',
+    region: 'West Yorkshire',
+    country: 'United Kingdom',
+    movedIn: '2015',
+    movedOut: '2019-08',
+    note: null,
+  },
+  {
+    id: 'place-lisbon',
+    name: 'Lisbon',
+    city: 'Lisbon',
+    region: null,
+    country: 'Portugal',
+    movedIn: '2014-02',
+    movedOut: '2014-09',
+    note: null,
+  },
+  {
+    id: 'place-childhood',
+    name: 'Mum and Dad’s',
+    city: null,
+    region: null,
+    country: null,
+    movedIn: '1992',
+    movedOut: '2014',
+    note: null,
+  },
+];
+
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
   { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
-  { href: '/you/places', label: 'Places', icon: 'places', exact: true },
+  { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
 ];
@@ -5296,6 +5348,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouTabEmpty tab="insights" />,
+  },
+  {
+    /* Places they have lived, newest first, the home they live in now marked (plan #1991.5). */
+    id: 'you-places',
+    label: 'You · Places, four homes',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} />,
+  },
+  {
+    id: 'you-places-empty',
+    label: 'You · Places, before any are added',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={[]} />,
+  },
+  {
+    id: 'you-place',
+    label: 'You · One place, the home they live in now',
+    module: 'you',
+    width: 'page',
+    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+  },
+  {
+    id: 'you-place-form',
+    label: 'You · Changing a place',
+    module: 'you',
+    width: 'page',
+    render: () => <PlaceForm place={youPlaces[1]} />,
   },
 
   {

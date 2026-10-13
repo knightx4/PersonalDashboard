@@ -8,6 +8,7 @@ import { learnSources } from '@/lib/learn/sources';
 import { newsSources } from '@/lib/news/sources';
 import { todoSources } from '@/lib/todo/sources';
 import { vaultSources } from '@/lib/vault/sources';
+import { youSources } from '@/lib/you/sources';
 import type { ModuleId } from '@/lib/modules';
 import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Source } from './types';
 
@@ -27,6 +28,7 @@ const WORKSPACE_SOURCES: readonly (readonly [ModuleId | null, ModuleSources])[] 
   ['news', newsSources],
   ['shopping', shoppingSources],
   ['goals', goalsSources],
+  ['you', youSources],
   // Files and core belong to no one workspace.
   [null, filesSources],
   [null, coreSources],
@@ -67,6 +69,7 @@ export const SOURCE_SCHEMAS: readonly string[] = [
   'learn',
   'news',
   'goals',
+  'you',
 ];
 
 /**

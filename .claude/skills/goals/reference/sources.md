@@ -484,6 +484,15 @@ Each charge, bill, renewal notice or price change read from their mail, one per 
 - Name a row by `event`; link it by `id`
 - A rise is amount_cents above previous_amount_cents. Read with recurring_payments through payment_id for the payee.
 
+### `you.places` (You)
+
+The places they have lived, with when they moved in and out.
+
+- Search: `name`, `city`, `region`, `country`, `note`
+- Name a row by `name`; link it by `id`
+- Opens at `/you/places/<id>`
+- moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.

@@ -141,6 +141,7 @@ export const SCHEMA_MODULES: Record<AskSchema, ModuleId> = {
   learn: 'learn',
   news: 'news',
   goals: 'goals',
+  you: 'you',
 };
 
 /** Where the catalogue's link is a list page and a row can be pointed at more closely. */

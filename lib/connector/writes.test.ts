@@ -43,6 +43,8 @@ describe('runConnectorWrite', () => {
       'link_todo',
       'add_event',
       'change_event',
+      'add_place',
+      'change_place',
     ]);
   });
 

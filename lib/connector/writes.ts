@@ -21,6 +21,7 @@ import {
 import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subjects';
 import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
+import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -421,6 +422,29 @@ const TODO_TOOLS: readonly ConnectorWriteTool[] = TODO_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * You's places (plan #1991.5, lib/dash/you-writes.ts), the same tools Ask
+ * has, run here on the service-role you client for the verified person and
+ * recorded as Dash's.
+ */
+const YOU_TOOLS: readonly ConnectorWriteTool[] = YOU_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    if (!ctx.account.enabledModules.includes('you')) {
+      throw new AskInputError('The You workspace is switched off, so nothing can be changed there.');
+    }
+    const made = await runYouWrite(write, { userId: ctx.userId, you: await ctx.db('you') }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
 type SharedWrite = 'add_quick_note' | 'add_idea' | 'add_job_lead';
 
@@ -506,6 +530,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addJobLead,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
+  ...YOU_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */
