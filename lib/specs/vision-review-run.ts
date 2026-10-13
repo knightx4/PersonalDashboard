@@ -110,7 +110,10 @@ export function visionRunText(userId: string, opens?: WindowOpens | null): strin
     `Run the weekly vision review for user_id ${userId}. Read ` +
     '.claude/skills/vision-review/SKILL.md first and follow it: one vision_reviews row per ' +
     'workspace under one review_id, a dated "still holds" or a proposed edit citing its ' +
-    'evidence, the likes it read closed, and nothing written to module_visions. You change ' +
+    'evidence, the likes it read closed, and nothing written to module_visions. Then compare ' +
+    "each workspace's changed specs with its vision, drafting a spec change where one " +
+    'contradicts it, and suggest at most five ideas for parts of a vision nothing covers ' +
+    '("Comparing the specs" and "Suggesting ideas" in the skill). You change ' +
     'rows, not code. Do not commit or push. As the last write, mark the run finished as ' +
     'SKILL.md\'s "Ending the run" shows, under job `vision`: nothing else ends it.' +
     (opens === undefined ? '' : `\n\n${opensText(opens)}`)
