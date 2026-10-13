@@ -86,9 +86,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       label: 'Subjects',
       icon: 'know',
       exact: true,
-      // Essays are reached from Subjects rather than a tab of their own,
-      // since Learn keeps its tabs few (docs/CUT-BACK-SPEC.md, R1; plan #1865).
-      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/essays', '/learn/e/'],
+      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz'],
     },
     // Idea Space (plan #1857): every idea on one map, placed by what it says.
     // A tab of its own at the person's ask on 12 October 2026, which made it
@@ -98,6 +96,16 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       label: 'Idea Space',
       icon: 'ideaSpace',
       exact: true,
+    },
+    // Essays (plan #1863): the list, and one essay's editor lights it too. A
+    // tab of its own at the person's ask on 13 October 2026, which made it
+    // Learn's sixth (docs/CUT-BACK-SPEC.md, R1).
+    {
+      href: '/learn/essays',
+      label: 'Essays',
+      icon: 'essays',
+      exact: true,
+      alsoMatches: ['/learn/e/'],
     },
     // No Goals tab (plan #1491): the learning goals are goals in the Learn
     // area on /goals, linked from Subjects, and /learn/goals redirects there.

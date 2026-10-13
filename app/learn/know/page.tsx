@@ -1,5 +1,5 @@
 import Link from '@/components/ui/link';
-import { Network, PenLine, Plus } from 'lucide-react';
+import { Network, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -235,13 +235,7 @@ export default async function KnowPage({
         title="Subjects"
         description="One graph per subject, and it grows every time you use it."
         actions={
-          // Essays has no tab of its own: Learn keeps four (docs/CUT-BACK-SPEC.md,
-          // R1), so it is reached from here and lights the Subjects tab (plan #1865).
           <>
-            <Link href="/learn/essays" className={buttonVariants({ variant: 'secondary' })}>
-              <PenLine className="size-4" strokeWidth={1.75} aria-hidden />
-              Essays
-            </Link>
             {!making && (
               <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
                 <Plus className="size-4" strokeWidth={1.75} aria-hidden />

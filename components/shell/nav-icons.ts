@@ -36,6 +36,7 @@ import {
   Map,
   Network,
   Orbit,
+  PenLine,
   MessageSquareText,
   MonitorPlay,
   Receipt,
@@ -147,6 +148,8 @@ export const NAV_ICONS = {
   know: Network,
   // Idea Space: your ideas as points around what they are about (plan #1857).
   ideaSpace: Orbit,
+  // Essays: what you write about what you learned (plan #1863).
+  essays: PenLine,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
   // Videos: your list, its clips and the YouTube library on one page (plan
