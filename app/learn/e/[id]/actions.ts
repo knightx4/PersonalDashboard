@@ -85,6 +85,14 @@ import {
 } from '@/lib/learn/essays/finish';
 import { nameEssayClaims } from '@/lib/learn/essays/finish-model';
 import { loadFinishRow, markFinished, recordEvidenceItem } from '@/lib/learn/essays/finish-store';
+import { essaySnapshot } from '@/lib/learn/essays/publish';
+import {
+  clearPublished,
+  loadPublishRow,
+  publishedLinkMap,
+  savePublished,
+  unlinkFromPublished,
+} from '@/lib/learn/essays/publish-store';
 import { logChatSession } from '@/lib/learn/chat/readings';
 import { addEvidenceItems } from '@/lib/jobs/evidence/bank';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -193,15 +201,27 @@ export async function saveEssayToVaultAction(
   if (!parsed.success) {
     return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? 'Could not save.' };
   }
-  return writeEssayToVault(user.id, parsed.data);
+  const saved = await writeEssayToVault(user.id, parsed.data);
+  if (!saved.ok) return saved;
+  return { ok: true, savedAt: saved.savedAt, path: saved.path, blobSha: saved.blobSha, stage: saved.stage };
 }
 
-/** The vault save both Save to vault and Finish make; `stage` raises the note's stage (plan #1873). */
+/** A vault save as the server sees it: on success, with the file it wrote. */
+type WrittenEssay =
+  | Extract<VaultSaveResult, { ok: false }>
+  | (Extract<VaultSaveResult, { ok: true }> & { stage: EssayStage; file: string });
+
+/**
+ * The vault save Save to vault, Finish and Publish make; `stage` raises the
+ * note's stage (plan #1873) and `published` marks it published (plan
+ * #1863.11). The written file comes back for Publish to snapshot.
+ */
 async function writeEssayToVault(
   userId: string,
   data: z.infer<typeof VaultInput>,
   stage?: EssayStage,
-): Promise<VaultSaveResult> {
+  published?: string,
+): Promise<WrittenEssay> {
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
   const embed = () => {
     after(async () => {
@@ -236,12 +256,20 @@ async function writeEssayToVault(
         marks: marksOf(data),
         self,
         stage,
+        published,
       },
     );
     if (!result.ok) return result;
     revalidatePath('/learn/essays');
     revalidatePath('/vault');
-    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha, stage: result.stage };
+    return {
+      ok: true,
+      savedAt: now.toISOString(),
+      path: result.path,
+      blobSha: result.blobSha,
+      stage: result.stage,
+      file: result.file,
+    };
   } catch (error) {
     console.error('[essay vault]', error instanceof Error ? error.message : error);
     return { ok: false, reason: 'error', error: 'The essay could not be saved to your vault. Try again in a moment.' };
@@ -1105,5 +1133,107 @@ export async function acceptEssayFinish(
   } catch (error) {
     console.error('[essay finish] accept', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Could not add those just now. Try again in a moment.' };
+  }
+}
+
+export type PublishResult =
+  | {
+      ok: true;
+      savedAt: string;
+      path: string;
+      blobSha: string;
+      /** When this press published it. */
+      publishedAt: string;
+      /** When it was first published, kept across Unpublish. */
+      firstPublishedAt: string;
+      /** Its address on the site, as `/writing/<slug>`. */
+      slug: string;
+    }
+  | {
+      ok: false;
+      error: string;
+      /** Set when the note was written before Publish stopped, so the editor keeps its new blob SHA. */
+      saved?: { savedAt: string; path: string; blobSha: string };
+      reason?: EssayVaultFailure;
+    };
+
+/**
+ * Publish the essay for selveyknight.com (plan #1863.11; spec, "Finishing
+ * and publishing", R4). Only a finished essay is published. The note is
+ * written to the vault first, marked published, and the file as written is
+ * copied into the snapshot the site reads (lib/learn/essays/publish.ts):
+ * the authorship block removed, footnotes kept, and wikilinks to anything
+ * but a published essay turned into their text. Later edits stay private
+ * until the essay is published again.
+ */
+// latency: pending
+export async function publishEssay(
+  id: string,
+  body: string,
+  marks: MarksPayload,
+  blobSha: string | null,
+  timeZone: string | null,
+): Promise<PublishResult> {
+  const user = await requireUser();
+  const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not publish the essay.' };
+
+  const learn = await createLearnClient();
+  const before = await loadPublishRow(learn, parsed.data.id);
+  if (!before) return { ok: false, error: 'That essay is not there any more.' };
+  if (!before.finishedAt) return { ok: false, error: 'Finish the essay before you publish it. A draft is never published.' };
+
+  const now = new Date();
+  const today = essayDay(now, parsed.data.timeZone);
+  const saved = await writeEssayToVault(user.id, parsed.data, 'seedling', today);
+  if (!saved.ok) return { ok: false, error: saved.error, reason: saved.reason };
+  const kept = { savedAt: saved.savedAt, path: saved.path, blobSha: saved.blobSha };
+
+  try {
+    const row = await loadPublishRow(learn, parsed.data.id);
+    if (!row?.slug) return { ok: false, error: 'The essay has no web address yet. Press Publish again.', saved: kept };
+    const links = await publishedLinkMap(learn, { path: saved.path, slug: row.slug });
+    const snapshot = essaySnapshot(saved.file, { path: saved.path, today, published: links });
+    if (snapshot.stage === 'draft') {
+      return { ok: false, error: 'The note is still marked as a draft, so it was not published.', saved: kept };
+    }
+    if (!snapshot.body.trim()) return { ok: false, error: 'There is nothing to publish yet.', saved: kept };
+    const at = new Date().toISOString();
+    const first = row.firstPublishedAt ?? at;
+    await savePublished(learn, parsed.data.id, snapshot, at, first);
+    revalidatePath('/learn/essays');
+    return { ok: true, ...kept, publishedAt: at, firstPublishedAt: first, slug: row.slug };
+  } catch (error) {
+    console.error('[essay publish]', error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      error: 'Your essay is saved to the vault, but it could not be published. Press Publish again in a moment.',
+      saved: kept,
+    };
+  }
+}
+
+export type UnpublishResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Take the essay off the site (plan #1863.11): the snapshot is cleared and
+ * the links other published essays make to it become plain text. The vault
+ * note is left as it is, as the spec says.
+ */
+// latency: pending
+export async function unpublishEssay(id: string): Promise<UnpublishResult> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not unpublish the essay.' };
+  try {
+    const learn = await createLearnClient();
+    const row = await loadPublishRow(learn, id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    await clearPublished(learn, id);
+    if (row.slug) await unlinkFromPublished(learn, row.slug);
+    revalidatePath('/learn/essays');
+    return { ok: true };
+  } catch (error) {
+    console.error('[essay unpublish]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'The essay could not be taken off the site. Try again in a moment.' };
   }
 }

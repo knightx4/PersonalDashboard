@@ -513,7 +513,7 @@ export function LearnReadingTextSurface() {
     <ReadingView
       reading={{
         ...reading,
-        givenText: { label: 'Pasted', addedAt: '2026-10-12T09:30:00Z' },
+        givenText: { label: 'Rodrik-2018-what-do-new-industrial-policies-teach-us-final-draft.pdf', addedAt: '2026-10-12T09:30:00Z' },
       }}
       subjects={[SUBJECT]}
       alreadyRead={null}
