@@ -23,14 +23,18 @@ import {
   MAX_PLACE_NAMES,
   toScreen,
   zoomAbout,
+  MAX_ZOOM,
   type Box,
   type Camera,
   type NameCandidate,
   type PlacedName,
 } from '@/lib/learn/map/sky';
 import { STATE_MARK_LABEL, markOf } from '@/lib/learn/map/view';
+import { graphHeight, paramsFor, type IdeaGraph, type Opened } from '@/lib/learn/map/place-graph';
 import { halvesOn, stateSetAt, type StrengthInput } from '@/lib/learn/strength';
+import { cn } from '@/lib/cn';
 import { usePick } from './pick';
+import { PlaceGraph } from './place-graph';
 
 /**
  * Idea Space as a night sky (plan #1997.6): every idea a star on a canvas.
@@ -52,6 +56,11 @@ import { usePick } from './pick';
  * The canvas is drawn only when something changes, and only the stars in
  * view, which holds 10,000 ideas at a smooth frame rate. Until the browser
  * has drawn it, the server's first paint is a plain picture of the same sky.
+ *
+ * Tapping a place's name flies the camera into the place and opens it as a
+ * graph you can read (plan #1997.7, place-graph.tsx). The address holds the
+ * place, so the back button flies out to the whole map again. While a graph
+ * is open the sky behind it holds still.
  */
 
 export type Star = {
@@ -70,7 +79,7 @@ export type Star = {
 };
 
 /** A name for the zoomed-out sky: a place, or a domain while no place is named. */
-export type SkyName = { id: string; text: string; at: Point; weight: number };
+export type SkyName = { id: string; kind: 'place' | 'domain'; text: string; at: Point; weight: number };
 
 /** How close a pointer has to come to a star to point at it, and a finger to tap it, in pixels. */
 const POINT_REACH = 14;
@@ -85,6 +94,12 @@ const FLY_MS = 420;
 const MOVE_MS = 450;
 /** How far an arrow key moves the sky, in pixels. */
 const KEY_PAN = 80;
+/** The room kept round a place's ideas when the camera flies into it, in pixels. */
+const PLACE_INSET = 60;
+/** What is left of the stars behind an open graph. */
+const BEHIND_GRAPH = 0.12;
+/** How far round a name a tap still lands on it, in pixels. */
+const NAME_REACH = 4;
 
 const PLACE_FONT = '400 11px';
 const IDEA_FONT = '400 11px';
@@ -146,6 +161,7 @@ export function StarSky({
   asOf,
   label,
   pointingAt = null,
+  graph = null,
 }: {
   stars: readonly Star[];
   names: readonly SkyName[];
@@ -157,8 +173,10 @@ export function StarSky({
   label: string;
   /** The gallery draws the card held open over this idea. */
   pointingAt?: string | null;
+  /** The place or neighbourhood opened as a graph, or null for the whole map. */
+  graph?: IdeaGraph | null;
 }) {
-  const { selectedId, pick, params, clearDomain } = usePick();
+  const { selectedId, pick, params, clearDomain, set } = usePick();
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
@@ -182,15 +200,34 @@ export function StarSky({
   const drawRef = useRef<() => void>(() => {});
   const drawnOnce = useRef(false);
   const heldRef = useRef<Point | null>(null);
+  /** The place names drawn last, where a tap opens them. */
+  const nameBoxes = useRef<{ name: SkyName; box: Box }[]>([]);
+  /** The frame's height on the whole map, which a graph grows from. */
+  const baseH = useRef<number | null>(null);
+  const [mapH, setMapH] = useState<number | null>(null);
+  const wasOpen = useRef(false);
 
   const byId = useMemo(() => new Map(stars.map((star, i) => [star.id, i])), [stars]);
-  const focusId = hover?.id ?? pointingAt ?? selectedId;
+  const starOf = useMemo(() => new Map(stars.map((star) => [star.id, star])), [stars]);
+
+  // The graph is drawn once the camera has arrived; until then the sky shows.
+  // A page opened on a graph shows it at once, with nothing to fly in from.
+  const [arrived, setArrived] = useState<{ key: string; from: Map<string, Point> | null } | null>(() =>
+    graph ? { key: graph.key, from: null } : null,
+  );
+  const open = graph !== null;
+  const shownGraph = graph && arrived?.key === graph.key ? arrived : null;
+  const behind = useMemo(
+    () => (shownGraph && graph ? new Set([...graph.core, ...graph.next]) : null),
+    [shownGraph, graph],
+  );
+  const focusId = open ? null : (hover?.id ?? pointingAt ?? selectedId);
   const focusIndex = focusId ? (byId.get(focusId) ?? -1) : -1;
 
   // Kept for the draw, which runs outside React.
-  const latest = useRef({ stars, names, dust, focusIndex, domain: params.domain, size, pointingAt });
+  const latest = useRef({ stars, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
   useEffect(() => {
-    latest.current = { stars, names, dust, focusIndex, domain: params.domain, size, pointingAt };
+    latest.current = { stars, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
   });
 
   // -- Measuring the frame --------------------------------------------------
@@ -200,6 +237,11 @@ export function StarSky({
     const measure = () => {
       const box = element.getBoundingClientRect();
       setSize(box.width > 0 && box.height > 0 ? { w: Math.round(box.width), h: Math.round(box.height) } : null);
+      // The whole map's height, which an open graph grows the frame from.
+      if (box.height > 0 && (!latest.current.open || baseH.current === null)) {
+        baseH.current = Math.round(box.height);
+        setMapH(baseH.current);
+      }
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -211,7 +253,7 @@ export function StarSky({
   const draw = useCallback(() => {
     raf.current = null;
     const el = canvas.current;
-    const { stars, names, dust, focusIndex, domain, size, pointingAt } = latest.current;
+    const { stars, names, dust, focusIndex, domain, size, pointingAt, open, behind } = latest.current;
     if (!el || !size || !camera.current || !shown.current) return;
     const ctx = el.getContext('2d');
     if (!ctx) return;
@@ -280,7 +322,14 @@ export function StarSky({
     const focus = focusIndex >= 0 ? stars[focusIndex] : undefined;
     const near = new Set(focus?.neighbours ?? []);
     const litUp = (star: Star) =>
-      focus ? star.id === focus.id || near.has(star.id) : domain ? star.domainId === domain : true;
+      behind
+        ? false
+        : focus
+          ? star.id === focus.id || near.has(star.id)
+          : domain
+            ? star.domainId === domain
+            : true;
+    const faded = behind ? BEHIND_GRAPH : FADED;
 
     // A crowded view would add up to white, so the glow and haze thin out
     // with how many stars are in view, and come back as you zoom in.
@@ -322,12 +371,13 @@ export function StarSky({
     const squares = new Map<string, number[]>();
     for (let i = 0; i < stars.length; i++) {
       const star = stars[i]!;
+      if (behind?.has(star.id)) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
       const look = starLook(star.strength, star.haze, zoom);
       const reach = Math.max(look.glow, look.haze) / 2 + 2;
       if (x < -reach || y < -reach || x > w + reach || y > h + reach) continue;
-      const dim = litUp(star) ? 1 : FADED;
+      const dim = litUp(star) ? 1 : faded;
       if (look.haze > 0 && hazeSprite.current && look.hazeAlpha * dim * crowd >= FAINTEST_GLOW) {
         glow.globalAlpha = look.hazeAlpha * dim * crowd;
         glow.drawImage(hazeSprite.current, x - look.haze / 2, y - look.haze / 2, look.haze, look.haze);
@@ -374,7 +424,7 @@ export function StarSky({
     ctx.lineWidth = 1;
     const unlitR = starLook(0, 0, zoom).core / 2;
     for (const pass of [true, false]) {
-      ctx.globalAlpha = pass ? 1 : FADED;
+      ctx.globalAlpha = pass ? 1 : faded;
       ctx.beginPath();
       for (const i of unlit) {
         const star = stars[i]!;
@@ -393,11 +443,11 @@ export function StarSky({
     ctx.strokeStyle = SKY.mixedUp;
     ctx.lineWidth = 1;
     for (const pass of [true, false]) {
-      ctx.globalAlpha = Math.max(0.2, crowd) * (pass ? 1 : FADED);
+      ctx.globalAlpha = Math.max(0.2, crowd) * (pass ? 1 : faded);
       ctx.beginPath();
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i]!;
-        if (star.state !== 'misconception' || litUp(star) !== pass) continue;
+        if (star.state !== 'misconception' || litUp(star) !== pass || behind?.has(star.id)) continue;
         const x = sx(px[i]!);
         const y = sy(py[i]!);
         if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
@@ -488,7 +538,11 @@ export function StarSky({
       taken.push(...placed.map((p) => p.box));
       write(placed, FOCUS_FONT, SKY.focusName);
     }
-    if (zoom < IDEA_NAMES_FROM) {
+    nameBoxes.current = [];
+    if (open) {
+      // An open graph names its own ideas; the sky behind it stays unnamed.
+    } else if (zoom < IDEA_NAMES_FROM) {
+      const byName = new Map(names.map((name) => [name.id, name]));
       const candidates: NameCandidate[] = names.map((name) => ({
         id: name.id,
         text: name.text,
@@ -497,11 +551,9 @@ export function StarSky({
         width: measure(PLACE_FONT, name.text),
         gap: 0,
       }));
-      write(
-        placeNames(candidates, w, h, NAME_LINE, taken, MAX_PLACE_NAMES, (box) => marks.covers(box)),
-        PLACE_FONT,
-        SKY.placeName,
-      );
+      const placed = placeNames(candidates, w, h, NAME_LINE, taken, MAX_PLACE_NAMES, (box) => marks.covers(box));
+      nameBoxes.current = placed.map((p) => ({ name: byName.get(p.id)!, box: p.box }));
+      write(placed, PLACE_FONT, SKY.placeName);
     } else {
       const candidates: NameCandidate[] = [];
       for (let i = 0; i < stars.length; i++) {
@@ -596,9 +648,9 @@ export function StarSky({
   // A new frame size keeps the view's middle and refits the scale's floor.
   useEffect(() => {
     if (!size) return;
-    const fit = fitCamera(stars.map((star) => star.at), size.w, size.h);
+    const fit = fitCamera(stars.map((star) => star.at), size.w, baseH.current ?? size.h);
     if (!camera.current) camera.current = fit;
-    else camera.current = { ...camera.current, k: camera.current.k * (fit.k / fitK.current) };
+    else if (!latest.current.open) camera.current = { ...camera.current, k: camera.current.k * (fit.k / fitK.current) };
     fitK.current = fit.k;
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -607,7 +659,7 @@ export function StarSky({
   // Anything else drawn changed: the focus, the domain picked out, the names.
   useEffect(() => {
     redraw();
-  }, [focusIndex, params.domain, names, dust, redraw]);
+  }, [focusIndex, params.domain, names, dust, behind, open, redraw]);
 
   // -- Moving the camera ---------------------------------------------------
   const flyTo = useCallback(
@@ -638,9 +690,58 @@ export function StarSky({
     flyTo(fitCamera(stars.map((star) => star.at), size.w, size.h));
   }, [flyTo, size, stars]);
 
+  // -- Opening a place ---------------------------------------------------------
+  // The camera flies into the place, and once it is there the ideas move from
+  // where the map has them into the graph. Closing it flies back out.
+  const openKey = graph?.key ?? null;
+  const ready = size !== null;
+  useEffect(() => {
+    const frameSize = latest.current.size;
+    if (!ready || !camera.current || !frameSize) return;
+    const w = frameSize.w;
+    const base = baseH.current ?? frameSize.h;
+    if (!graph) {
+      if (wasOpen.current) {
+        wasOpen.current = false;
+        flyTo(fitCamera(stars.map((star) => star.at), w, base));
+      }
+      return;
+    }
+    wasOpen.current = true;
+    const ids = [...graph.core, ...graph.next];
+    const h = graphHeight(w, ids.length, base);
+    const core = graph.core.map((id) => starOf.get(id)?.at).filter((p): p is Point => p !== undefined);
+    const fit = fitCamera(core, w, h, PLACE_INSET);
+    const target = { ...fit, k: Math.min(fit.k, fitK.current * MAX_ZOOM) };
+    const from = new Map<string, Point>();
+    for (const id of ids) {
+      const star = starOf.get(id);
+      if (star) from.set(id, toScreen(target, star.at, w, h));
+    }
+    const key = graph.key;
+    if (!drawnOnce.current || reducedMotion()) {
+      flight.current = null;
+      camera.current = target;
+      redraw();
+      const id = requestAnimationFrame(() => setArrived({ key, from: null }));
+      return () => cancelAnimationFrame(id);
+    }
+    flyTo(target);
+    const timer = setTimeout(() => setArrived({ key, from }), FLY_MS);
+    return () => clearTimeout(timer);
+    // Only opening or closing a graph moves the camera here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openKey, ready]);
+
+  const openGraph = useCallback(
+    (to: Opened) => set(paramsFor(to)),
+    [set],
+  );
+  const closeGraph = useCallback(() => set({ place: null, around: null }), [set]);
+
   // An idea opened from the rail is brought into view if it is off the edge.
   useEffect(() => {
-    if (!selectedId || !camera.current || !size) return;
+    if (!selectedId || !camera.current || !size || latest.current.open) return;
     const i = byId.get(selectedId);
     if (i === undefined) return;
     const s = toScreen(camera.current, stars[i]!.at, size.w, size.h);
@@ -657,7 +758,7 @@ export function StarSky({
     const element = frame.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
-      if (!camera.current || !latest.current.size) return;
+      if (!camera.current || !latest.current.size || latest.current.open) return;
       event.preventDefault();
       const box = element.getBoundingClientRect();
       const rate = event.ctrlKey ? WHEEL_RATE * 6 : WHEEL_RATE;
@@ -709,7 +810,23 @@ export function StarSky({
     return best;
   };
 
+  /** The place or domain name under a point, if any. */
+  const nameAt = (at: Point): SkyName | null => {
+    for (const { name, box } of nameBoxes.current) {
+      if (
+        at.x >= box.x - NAME_REACH &&
+        at.x <= box.x + box.w + NAME_REACH &&
+        at.y >= box.y - NAME_REACH &&
+        at.y <= box.y + box.h + NAME_REACH
+      )
+        return name;
+    }
+    return null;
+  };
+  const [overName, setOverName] = useState(false);
+
   const down = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (open) return;
     if (event.button !== 0 && event.pointerType === 'mouse') return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const at = local(event);
@@ -720,12 +837,15 @@ export function StarSky({
   };
 
   const moveTo = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (open) return;
     const at = local(event);
     const last = pointers.current.get(event.pointerId);
     if (!last) {
-      // A mouse passing over: the star under it is pointed at.
+      // A mouse passing over: the star under it is pointed at, and a name shows it can be pressed.
       if (event.pointerType !== 'mouse') return;
-      const i = nearest(at, POINT_REACH);
+      const onName = nameAt(at) !== null;
+      if (onName !== overName) setOverName(onName);
+      const i = onName ? -1 : nearest(at, POINT_REACH);
       const id = i >= 0 ? stars[i]!.id : null;
       if (id !== (hover?.id ?? null)) setHover(id ? { id, x: at.x, y: at.y } : null);
       return;
@@ -761,6 +881,13 @@ export function StarSky({
     if (!had || pointers.current.size > 0) return;
     if (gesture.current.moved || gesture.current.pinched) return;
     const at = local(event);
+    // A place's name opens it; a domain's picks out its ideas, as the legend does.
+    const name = nameAt(at);
+    if (name) {
+      if (name.kind === 'place') openGraph({ kind: 'place', id: name.id });
+      else set({ domain: params.domain === name.id ? null : name.id, idea: null });
+      return;
+    }
     const i = nearest(at, event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH);
     if (i < 0) {
       // Empty sky lets go of the open idea, then of a domain picked out in the legend.
@@ -776,6 +903,13 @@ export function StarSky({
   };
 
   const key = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (open) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeGraph();
+      }
+      return;
+    }
     if (!camera.current) return;
     const pan: Record<string, [number, number]> = {
       ArrowLeft: [KEY_PAN, 0],
@@ -794,9 +928,18 @@ export function StarSky({
   };
 
   // -- The card for the star pointed at ----------------------------------------
-  const held = pointingAt ? byId.get(pointingAt) : undefined;
-  const cardStar = hover ? stars[byId.get(hover.id) ?? -1] : held !== undefined && heldAt ? stars[held] : undefined;
+  const held = pointingAt && !open ? byId.get(pointingAt) : undefined;
+  const cardStar = open
+    ? undefined
+    : hover
+      ? stars[byId.get(hover.id) ?? -1]
+      : held !== undefined && heldAt
+        ? stars[held]
+        : undefined;
   const cardAt = hover ?? heldAt;
+  // A graph grows the frame so its names keep their room.
+  const graphH =
+    graph && size ? graphHeight(size.w, graph.core.length + graph.next.length, mapH ?? size.h) : null;
 
   return (
     <div
@@ -804,15 +947,24 @@ export function StarSky({
       tabIndex={0}
       role="group"
       aria-roledescription="map"
-      aria-label={`${label}. Arrow keys move it, plus and minus zoom, nought shows the whole map.`}
-      className="relative aspect-square max-h-[75vh] w-full touch-none overflow-hidden rounded-control outline-offset-2 select-none focus-visible:outline-2 sm:aspect-[16/10]"
-      style={{ background: SKY.groundOuter }}
+      aria-label={
+        graph
+          ? `${graph.title}. Escape goes back to the whole map.`
+          : `${label}. Arrow keys move it, plus and minus zoom, nought shows the whole map.`
+      }
+      className={cn(
+        'relative w-full touch-none overflow-hidden rounded-control outline-offset-2 select-none focus-visible:outline-2',
+        graphH === null && 'aspect-square max-h-[75vh] sm:aspect-[16/10]',
+        overName && 'cursor-pointer',
+      )}
+      style={{ background: SKY.groundOuter, ...(graphH !== null ? { height: graphH } : {}) }}
       onPointerDown={down}
       onPointerMove={moveTo}
       onPointerUp={up}
       onPointerCancel={cancel}
       onPointerLeave={() => setHover(null)}
       onDoubleClick={(event) => {
+        if (open) return;
         const box = event.currentTarget.getBoundingClientRect();
         zoomBy(ZOOM_STEP, { x: event.clientX - box.left, y: event.clientY - box.top });
       }}
@@ -823,7 +975,23 @@ export function StarSky({
 
       {cardStar && cardAt && size && <StarCard star={cardStar} at={cardAt} frame={size} asOf={asOf} />}
 
+      {/* Drawn once the frame has grown to the graph, so it is laid out once. */}
+      {graph && shownGraph && size && graphH !== null && Math.abs(size.h - graphH) <= 1 && (
+        <PlaceGraph
+          key={graph.key}
+          graph={graph}
+          stars={starOf}
+          frame={size}
+          from={shownGraph.from}
+          selectedId={selectedId}
+          pointingAt={pointingAt}
+          onPick={pick}
+          onOpen={openGraph}
+        />
+      )}
+
       <div
+        hidden={open}
         className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-control ring-1"
         style={{ background: SKY.panel, color: SKY.panelMuted, ['--tw-ring-color' as string]: SKY.panelRing }}
         onPointerDown={(event) => event.stopPropagation()}

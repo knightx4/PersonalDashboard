@@ -11,6 +11,7 @@ import { countText, mapHref, similarityText, type MapParams } from '@/lib/learn/
 import { ChosenIdea } from './chosen-idea';
 import { MapSection } from './map-section';
 import { PickProvider } from './pick';
+import { PlaceRail } from './place-rail';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -48,7 +49,7 @@ export function IdeaSpaceView({
       crumbs={[
         { label: 'Learn', href: '/learn' },
         { label: 'Know', href: '/learn/know' },
-        { label: 'Idea Space', href: mapHref(params, { idea: null }) },
+        { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null }) },
       ]}
       title="Idea Space"
       description={view && view.ideas.length > 0 ? `${plural(view.ideas.length, 'idea')}.` : undefined}
@@ -96,7 +97,8 @@ export function IdeaSpaceView({
         }
         rail={
           <>
-            <ChosenIdea ideas={view.ideas} />
+            <ChosenIdea ideas={view.ideas} places={view.places} />
+            <PlaceRail view={view} />
             <SameIdeas view={view} nameOf={nameOf} />
             <UntestedNearKnown view={view} nameOf={nameOf} />
           </>

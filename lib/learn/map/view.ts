@@ -28,6 +28,13 @@ export type MapParams = {
    * (Part 10, rule 10).
    */
   domain: string | null;
+  /**
+   * The place opened as a graph of its own (plan #1997.7), by its id. An
+   * idea in no place opens its neighbourhood instead, held in `around` by the
+   * idea's id. At most one of the two is set.
+   */
+  place: string | null;
+  around: string | null;
 };
 
 /**
@@ -39,6 +46,8 @@ export const DEFAULT_PARAMS: MapParams = {
   layout: 'neighbours',
   idea: null,
   domain: null,
+  place: null,
+  around: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -50,10 +59,14 @@ function one(value: string | string[] | undefined): string | undefined {
 export function parseMapParams(search: Search): MapParams {
   const idea = one(search.idea)?.trim();
   const domain = one(search.domain)?.trim();
+  const place = one(search.place)?.trim();
+  const around = one(search.around)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
     idea: idea ? idea : null,
     domain: domain ? domain : null,
+    place: place ? place : null,
+    around: !place && around ? around : null,
   };
 }
 
@@ -64,6 +77,8 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   if (next.layout !== DEFAULT_PARAMS.layout) query.set('layout', next.layout);
   if (next.idea) query.set('idea', next.idea);
   if (next.domain) query.set('domain', next.domain);
+  if (next.place) query.set('place', next.place);
+  else if (next.around) query.set('around', next.around);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }

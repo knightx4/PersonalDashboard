@@ -7,8 +7,11 @@ import { Tooltip } from '@/components/ui/tooltip';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 import { STATE_MARK_LABEL, mapHref, markOf, similarityText } from '@/lib/learn/map/view';
 import { StarSwatch } from './swatch';
-import { pickOnClick, usePick } from './pick';
+import { pickOnClick, usePick, viewOnClick } from './pick';
+import { buttonVariants } from '@/components/ui/button';
 import { iconButtonVariants } from '@/components/ui/icon-button';
+import { cn } from '@/lib/cn';
+import { openFor, paramsFor } from '@/lib/learn/map/place-graph';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
@@ -18,10 +21,23 @@ const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
  * (plan #1857). Drawn from the ideas already on the page, so a tap on the map
  * or on a neighbour here shows at once (plan #1883).
  */
-export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
-  const { selectedId, params, pick } = usePick();
+export function ChosenIdea({
+  ideas,
+  places,
+}: {
+  ideas: readonly IdeaOnMap[];
+  places: readonly { id: string; name: string }[];
+}) {
+  const { selectedId, params, pick, set } = usePick();
   const idea = selectedId ? ideas.find((other) => other.id === selectedId) : undefined;
   if (!idea) return null;
+
+  // Its place opened as a graph, or its neighbourhood when it is in none
+  // (plan #1997.7); not offered while that graph is already open.
+  const to = openFor(idea, new Set(places.map((place) => place.id)));
+  const placeName = to.kind === 'place' ? places.find((place) => place.id === to.id)?.name : null;
+  const openNow = to.kind === 'place' ? params.place === to.id : params.around === to.id;
+  const change = paramsFor(to);
 
   const byId = new Map(ideas.map((other) => [other.id, other]));
   const facts: [string, string | null][] = [
@@ -30,6 +46,7 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
     ['Subject', idea.track?.name ?? null],
     ['Field', idea.field?.name ?? null],
     ['Domain', idea.domain?.name ?? null],
+    ['Place', placeName ?? null],
   ];
 
   return (
@@ -58,6 +75,16 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
           value ? <ValueRow key={label} label={label} value={value} align="end" /> : null,
         )}
       </ValueList>
+      {!openNow && (
+        <Link
+          href={mapHref(params, change)}
+          scroll={false}
+          onClick={viewOnClick(() => set(change))}
+          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mt-3')}
+        >
+          {placeName ? 'Open its place' : 'Open its neighbourhood'}
+        </Link>
+      )}
 
       {idea.neighbours.length > 0 && (
         <>

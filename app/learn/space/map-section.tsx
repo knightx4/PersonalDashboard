@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import Link from '@/components/ui/link';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
+import { ideaGraph, openedFrom, type IdeaGraph } from '@/lib/learn/map/place-graph';
 import { dustAt } from '@/lib/learn/map/sky';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
@@ -53,6 +56,7 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
   );
 
   const names = useMemo(() => skyNames(view, layout), [view, layout]);
+  const graph = useOpenGraph(view);
 
   const dust = useMemo(() => {
     const at = new Map(view.ideas.map((idea) => [idea.id, layout === 'axes' ? idea.pca : idea.neighbourMap]));
@@ -68,31 +72,35 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
 
   return (
     <section aria-label="The map">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span role="group" aria-label="Layout" className={segmentedFrame}>
-          {(
-            [
-              { label: 'Neighbours', value: 'neighbours' },
-              { label: 'Main axes', value: 'axes' },
-            ] as const
-          ).map((option) => (
-            <Link
-              key={option.value}
-              href={mapHref(params, { layout: option.value })}
-              scroll={false}
-              onClick={viewOnClick(() => set({ layout: option.value }))}
-              aria-current={layout === option.value ? 'true' : undefined}
-              className={cn(segmentClass(layout === option.value), 'shrink-0 whitespace-nowrap')}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </span>
-      </div>
+      {graph ? (
+        <GraphBar graph={graph} view={view} params={params} set={set} />
+      ) : (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span role="group" aria-label="Layout" className={segmentedFrame}>
+            {(
+              [
+                { label: 'Neighbours', value: 'neighbours' },
+                { label: 'Main axes', value: 'axes' },
+              ] as const
+            ).map((option) => (
+              <Link
+                key={option.value}
+                href={mapHref(params, { layout: option.value })}
+                scroll={false}
+                onClick={viewOnClick(() => set({ layout: option.value }))}
+                aria-current={layout === option.value ? 'true' : undefined}
+                className={cn(segmentClass(layout === option.value), 'shrink-0 whitespace-nowrap')}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </span>
+        </div>
+      )}
 
       <Card padding="none">
         <div className="p-1 sm:p-2">
-          {axes?.top && <AxisName>↑ {axes.top}</AxisName>}
+          {!graph && axes?.top && <AxisName>↑ {axes.top}</AxisName>}
           <StarSky
             stars={stars}
             names={names}
@@ -100,12 +108,13 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
             asOf={view.asOf}
             label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as you know it`}
             pointingAt={pointingAt}
+            graph={graph}
           />
-          <AxisEndsBelow axes={axes} />
+          {!graph && <AxisEndsBelow axes={axes} />}
         </div>
         <div className="card-pad-x pb-(--card-p)">
           <Legend params={params} set={set} view={view} domains={domains} slots={slots} dust={dust.length} />
-          <MapNotes view={view} params={params} />
+          <MapNotes view={view} params={params} graph={graph} />
         </div>
       </Card>
     </section>
@@ -138,11 +147,23 @@ function AxisEndsBelow({ axes }: { axes: AxisEnds | null }) {
 function skyNames(view: IdeaMapView, layout: MapParams['layout']): SkyName[] {
   const at = (area: { pca: Point; neighbourMap: Point }) => (layout === 'axes' ? area.pca : area.neighbourMap);
   if (view.places.length > 0) {
-    return view.places.map((place) => ({ id: place.id, text: place.name, at: at(place), weight: place.ideaCount }));
+    return view.places.map((place) => ({
+      id: place.id,
+      kind: 'place' as const,
+      text: place.name,
+      at: at(place),
+      weight: place.ideaCount,
+    }));
   }
   return view.areas.domains
     .filter((domain) => domain.ideaCount > 0)
-    .map((domain) => ({ id: domain.id, text: domain.name, at: at(domain), weight: domain.ideaCount }));
+    .map((domain) => ({
+      id: domain.id,
+      kind: 'domain' as const,
+      text: domain.name,
+      at: at(domain),
+      weight: domain.ideaCount,
+    }));
 }
 
 /**
@@ -151,7 +172,21 @@ function skyNames(view: IdeaMapView, layout: MapParams['layout']): SkyName[] {
  * no axis, so the caption says so (rule 5). How to zoom and point is left to
  * the buttons on the map and the card a star shows.
  */
-function MapNotes({ view, params }: { view: IdeaMapView; params: MapParams }) {
+function MapNotes({ view, params, graph }: { view: IdeaMapView; params: MapParams; graph: IdeaGraph | null }) {
+  if (graph) {
+    return (
+      <div className="mt-2 space-y-1 text-ui text-ink-muted">
+        <p>
+          {graph.opened.kind === 'place'
+            ? 'Every idea in this place is named in full'
+            : 'This idea and its six nearest are named in full'}
+          , and lines join the ideas most alike; the thicker the line, the closer the two. Point at or tap an idea
+          to see all its links and their scores.
+        </p>
+        {graph.next.length > 0 && <p>The faint ideas round the edge are next door. Tap one to go there.</p>}
+      </div>
+    );
+  }
   return (
     <div className="mt-2 space-y-1 text-ui text-ink-muted">
       {params.layout === 'axes' ? (
@@ -166,7 +201,11 @@ function MapNotes({ view, params }: { view: IdeaMapView; params: MapParams }) {
           about the same thing.
         </p>
       )}
-      {view.places.length === 0 && <p>Your places are named by the daily run; until then the map names domains.</p>}
+      {view.places.length === 0 ? (
+        <p>Your places are named by the daily run; until then the map names domains.</p>
+      ) : (
+        <p>Tap a place&rsquo;s name on the map, or pick one under Places, to open it as a graph.</p>
+      )}
       {view.missing > 0 && (
         <p>
           {plural(view.missing, 'idea is', 'ideas are')} not on the map yet. The daily run gives{' '}
@@ -304,6 +343,51 @@ function Legend({
           )}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The place or neighbourhood the address opens, worked out from the ideas on the page. */
+export function useOpenGraph(view: IdeaMapView): IdeaGraph | null {
+  const { params } = usePick();
+  return useMemo(() => {
+    const opened = openedFrom(params);
+    return opened ? ideaGraph(view.ideas, view.places, opened) : null;
+  }, [view.ideas, view.places, params]);
+}
+
+/** Above an open graph: the way back to the whole map, and what is open. */
+function GraphBar({
+  graph,
+  view,
+  params,
+  set,
+}: {
+  graph: IdeaGraph;
+  view: IdeaMapView;
+  params: MapParams;
+  set: (change: Partial<MapParams>) => void;
+}) {
+  const back = { place: null, around: null };
+  const strengthOf = new Map(view.ideas.map((idea) => [idea.id, idea.strength]));
+  const known = graph.core.filter((id) => (strengthOf.get(id) ?? 0) > 0).length;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <Link
+        href={mapHref(params, back)}
+        scroll={false}
+        onClick={viewOnClick(() => set(back))}
+        className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'shrink-0')}
+      >
+        <ArrowLeft strokeWidth={1.75} aria-hidden />
+        Whole map
+      </Link>
+      <h2 className="min-w-0 text-body font-medium text-ink">
+        {graph.opened.kind === 'place' ? graph.title : `Around \u201c${graph.title}\u201d`}
+        <span className="tabular ml-2 text-ui font-normal text-ink-muted">
+          {plural(graph.core.length, 'idea')}, {countText(known)} known
+        </span>
+      </h2>
     </div>
   );
 }

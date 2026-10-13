@@ -21,6 +21,8 @@ import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import {
+  IdeaSpaceAroundSurface,
+  IdeaSpacePlaceSurface,
   IdeaSpaceCardSurface,
   IdeaSpaceDenseSurface,
   IdeaSpaceDomainsSurface,
@@ -5072,6 +5074,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceCardSurface />,
+  },
+  {
+    /* One place opened as a graph (plan #1997.7), with one idea pointed at
+     * so its links show their scores, and the ideas next door round the edge. */
+    id: 'learn-idea-space-place',
+    label: 'Learn · Idea Space, a place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpacePlaceSurface />,
+  },
+  {
+    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    id: 'learn-idea-space-around',
+    label: 'Learn · Idea Space, an idea in no place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceAroundSurface />,
   },
   {
     /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
