@@ -80,6 +80,8 @@ build. The critic is given:
 - the before shots, taken from main, and the after shots
 - the design laws and the person's preferences (Part 3)
 - the pattern the step uses (Part 4) and the step's done-when
+- a reference design, when the person has pointed at one they prefer for
+  this surface: its pictures, or a link the builder photographs
 
 It answers with pass, or with fixes. Each fix names what is wrong in the
 picture, at which width and theme, and the law or preference it breaks. The
@@ -89,6 +91,19 @@ itself and closes the step, with the critic's last fixes in its close note
 (decision 1, now answered B). Surfaces a step reaches only through a shared
 file are settled the same way. `npm run ui-stop` prints the fixes and the
 settle command, `npm run ui-guard -- <n> --settle "<why>"`.
+
+A reference is judged alongside the laws. A screen that keeps every law but
+reads worse than its reference fails, and the fixes say what the reference
+does better; where a reference breaks a law, the law wins and the fix says
+so. A reference stays with its surface, kept by surface id in
+`lib/preview/references.ts`, so later steps on that surface are judged
+against it too.
+
+Every round also answers three questions in its verdict. Where does the eye
+go first, and is that what the screen is for? Does anything compete with the
+data, such as a label, outline or heading heavier than what it frames? Are
+the lines lighter than the text? A screen with no clear answer to the first
+fails.
 
 The builder never writes the verdict. Each round is recorded in a table,
 `public.ui_checks`, with the step, the surface, the round, the verdict and the
@@ -475,6 +490,12 @@ Checked by: audit.
 Checked by: audit.
 
 **R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
+Checked by: audit.
+
+**R18.** A surface with a reference design is judged against it as well as the laws.
+Checked by: audit.
+
+**R19.** Every design check verdict answers the three questions of Part 2.
 Checked by: audit.
 
 ## Decisions
