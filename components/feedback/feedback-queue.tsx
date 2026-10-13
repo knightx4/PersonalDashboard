@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
+import { AddNote } from '@/components/feedback/add-note';
 import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionFold } from '@/components/ui/disclosure';
@@ -45,6 +46,7 @@ export function FeedbackQueueView({
           title="Nothing captured yet"
           description="Use the message button in the header to log a bug or an idea the moment you hit it."
         />
+        <AddNote />
         <RunRoutineButton openCount={0} divider="bottom" />
       </div>
     );
@@ -64,6 +66,12 @@ export function FeedbackQueueView({
           divider="bottom"
           hint={false}
         />
+      </div>
+
+      {/* Filing from the queue itself (note 0769242a), above the list it
+          adds to and closed until asked for. */}
+      <div className="mb-4">
+        <AddNote />
       </div>
 
       <div className="mb-6">
