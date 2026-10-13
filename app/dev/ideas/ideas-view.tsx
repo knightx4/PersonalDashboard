@@ -1,5 +1,6 @@
 'use client';
 
+import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
@@ -184,10 +185,12 @@ const HEALTH_TONE: Record<IdeaHealth, DevTone> = {
   dropped: 'ghost',
 };
 
-const HEALTH_TITLE: Partial<Record<IdeaHealth, string>> = {
-  waiting: 'A session wrote it up as a proposal. Nothing happens to it until you approve it.',
-  shaped: 'It is a feature on the plan page now.',
-  done: 'The feature it became has shipped.',
+const HEALTH_TITLE: Record<IdeaHealth, string> = {
+  open: 'Written down and not shaped yet. Shape it when you want it on the plan.',
+  waiting: 'Dash wrote it up as a proposal. Nothing happens to it until you approve it.',
+  shaped: 'It is a feature on the plan page now. Nothing more is needed here.',
+  done: 'The feature it became has shipped. Nothing is left to do.',
+  dropped: 'Put aside. Restore it from its menu if you want it back.',
 };
 
 /**
@@ -218,22 +221,26 @@ function IdeaScoreLabel({ idea }: { idea: IdeaRow }) {
   const view = ideaScoreView(score);
   if (!score || view.state === 'unscored') {
     return (
-      <span title={view.title} className="text-small text-ink-ghost">
-        Unscored
-      </span>
+      <Tooltip label={view.title}>
+        <span tabIndex={0} className="text-small text-ink-ghost">
+          Unscored
+        </span>
+      </Tooltip>
     );
   }
   return (
-    <span
-      title={view.title}
-      className={cn(
-        'tabular text-small',
-        view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted',
-      )}
-    >
-      <span aria-hidden>Score {Math.round(score.value)}</span>
-      <span className="sr-only">{view.title}</span>
-    </span>
+    <Tooltip label={view.title}>
+      <span
+        tabIndex={0}
+        className={cn(
+          'tabular text-small',
+          view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted',
+        )}
+      >
+        <span aria-hidden>Score {Math.round(score.value)}</span>
+        <span className="sr-only">{view.title}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -287,10 +294,15 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
         {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
             label on every row to distinguish the few that need one. */}
         {idea.source === 'claude' && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
-            <DashMark size="2xs" decorative />
-            Suggested
-          </span>
+          <Tooltip label="Dash suggested this one. Shape it if you want it, or put it aside.">
+            <span
+              tabIndex={0}
+              className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted"
+            >
+              <DashMark size="2xs" decorative />
+              Suggested
+            </span>
+          </Tooltip>
         )}
         <IdeaScoreLabel idea={idea} />
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>

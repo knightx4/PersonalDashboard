@@ -12,12 +12,40 @@ import type { StatusGlyph } from '@/lib/status-glyphs';
  * section with a thread under it; this is the reading of them the gate keeps.
  */
 
-const LOOK: Record<RuleStateKind, { glyph: StatusGlyph; word: string; tone: DevTone }> = {
-  holding: { glyph: 'check', word: 'Holding', tone: 'positive' },
-  counting: { glyph: 'half', word: 'Coming down', tone: 'quiet' },
-  failing: { glyph: 'cross', word: 'Failing', tone: 'caution' },
-  pending: { glyph: 'dashed', word: 'Check to build', tone: 'ghost' },
-  audit: { glyph: 'empty', word: 'Audit', tone: 'quiet' },
+const LOOK: Record<
+  RuleStateKind,
+  { glyph: StatusGlyph; word: string; tone: DevTone; title: string }
+> = {
+  holding: {
+    glyph: 'check',
+    word: 'Holding',
+    tone: 'positive',
+    title: 'The code keeps this rule today. Nothing is needed from you.',
+  },
+  counting: {
+    glyph: 'half',
+    word: 'Coming down',
+    tone: 'quiet',
+    title: 'A count the gate holds and lowers as the code is fixed. Nothing is needed from you.',
+  },
+  failing: {
+    glyph: 'cross',
+    word: 'Failing',
+    tone: 'caution',
+    title: 'The code breaks this rule now. The lines below say where.',
+  },
+  pending: {
+    glyph: 'dashed',
+    word: 'Check to build',
+    tone: 'ghost',
+    title: 'No check reads this rule yet, so nothing says whether it holds.',
+  },
+  audit: {
+    glyph: 'empty',
+    word: 'Audit',
+    tone: 'quiet',
+    title: 'Only the weekly spec audit can judge this rule, by reading the code.',
+  },
 };
 
 /** The rule's sentence, with its backticked names set as code. */
@@ -74,7 +102,13 @@ export function SpecRules({ states }: { states: RuleState[] }) {
                 <p className="min-w-0 flex-1 text-ui text-ink-muted tabular-nums">
                   <Summary state={state} />
                 </p>
-                <StateLabel glyph={look.glyph} word={look.word} tone={look.tone} />
+                <StateLabel
+                  glyph={look.glyph}
+                  word={look.word}
+                  tone={look.tone}
+                  title={look.title}
+                  align="end"
+                />
               </div>
               {state.problems.map((problem) => (
                 <p key={problem} className="text-ui text-caution">

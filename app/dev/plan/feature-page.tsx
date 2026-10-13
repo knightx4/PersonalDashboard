@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
@@ -276,6 +277,7 @@ export function FeaturePage({
               glyph={health.glyph}
               word={health.word}
               tone={health.tone}
+              title={health.title}
               className={cn('text-ui', TONE_TEXT[health.tone])}
             />
           }
@@ -398,13 +400,14 @@ export function FeaturePage({
             <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
               <span className="whitespace-nowrap">Feature {ref}</span>
               {parts.addedBy && (
-                <span
-                  className="whitespace-nowrap"
-                  title={parts.addedBy.session ? `Session ${parts.addedBy.session}` : undefined}
+                <Tooltip
+                  label={`Dash wrote this, rather than you.${parts.addedBy.session ? ` Session ${parts.addedBy.session}.` : ''}`}
                 >
-                  <DashCredit />
-                  Added by Dash on {parts.addedBy.date}
-                </span>
+                  <span tabIndex={0} className="whitespace-nowrap">
+                    <DashCredit />
+                    Added by Dash on {parts.addedBy.date}
+                  </span>
+                </Tooltip>
               )}
               {parts.origin && (
                 <span>

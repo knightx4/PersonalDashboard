@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { featureHref } from '@/lib/plan/feature-page';
@@ -56,15 +57,15 @@ export function CheckBacksPanel({
             const how = [
               row.source ? `From ${row.source}` : null,
               row.wokeAt
-                ? 'A session was woken for it'
+                ? 'Dash was woken for it'
                 : row.wake
-                  ? 'Wakes a session an hour after it falls due'
-                  : 'Waits for a session to run',
+                  ? 'Dash is woken an hour after it falls due'
+                  : 'Dash looks at it on its next run',
             ]
               .filter(Boolean)
-              .join(' · ');
+              .join('. ');
             return (
-              <li key={row.id} className="row-pad" title={how}>
+              <li key={row.id} className="row-pad">
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 flex-1 text-body break-words text-ink">{row.title}</p>
                   <form action={dropCheckBack} className="shrink-0">
@@ -74,13 +75,18 @@ export function CheckBacksPanel({
                     </Button>
                   </form>
                 </div>
-                <p
-                  className={cn(
-                    'tabular text-small',
-                    due ? 'font-medium text-caution' : 'text-ink-muted',
-                  )}
-                >
-                  {due ? 'Due' : now > 0 ? dueWords(row.dueAt, now) : dueDay(row.dueAt)}
+                <p>
+                  <Tooltip label={`${how}. Nothing is needed from you unless you drop it.`}>
+                    <span
+                      tabIndex={0}
+                      className={cn(
+                        'tabular text-small',
+                        due ? 'font-medium text-caution' : 'text-ink-muted',
+                      )}
+                    >
+                      {due ? 'Due' : now > 0 ? dueWords(row.dueAt, now) : dueDay(row.dueAt)}
+                    </span>
+                  </Tooltip>
                 </p>
                 {row.step && (
                   <p className="break-words text-small text-ink-muted">

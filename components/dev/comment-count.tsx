@@ -1,4 +1,5 @@
 import { MessageSquare } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * How many comments a row is carrying, on the row.
@@ -11,19 +12,25 @@ import { MessageSquare } from 'lucide-react';
  *
  * Ink and a shape, no tint. Whether a row has been discussed is none of the
  * five things colour is allowed to claim.
+ *
+ * Its Tooltip shows on hover alone: the count sits in rows whose title is
+ * itself the button, and a tab stop inside a button is not one a keyboard
+ * can reach.
  */
 export function CommentCount({ count }: { count: number }) {
   if (count < 1) return null;
 
   const word = count === 1 ? 'comment' : 'comments';
   return (
-    <span
-      title={`${count} ${word}`}
-      className="tabular inline-flex shrink-0 items-center gap-0.5 text-small text-ink-ghost"
+    <Tooltip
+      label={`${count === 1 ? 'One comment' : `${count} comments`} on this. Open it to read ${count === 1 ? 'it' : 'them'}.`}
+      className="shrink-0"
     >
-      <MessageSquare className="size-3" strokeWidth={2} aria-hidden />
-      {count}
-      <span className="sr-only">{word}</span>
-    </span>
+      <span className="tabular inline-flex items-center gap-0.5 text-small text-ink-ghost">
+        <MessageSquare className="size-3" strokeWidth={2} aria-hidden />
+        {count}
+        <span className="sr-only">{word}</span>
+      </span>
+    </Tooltip>
   );
 }

@@ -159,6 +159,11 @@ function FindingRow({ finding }: { finding: UiFinding }) {
             glyph={FINDING_HEALTH_GLYPHS[findingHealth(finding)]}
             word={FINDING_HEALTH_WORD[findingHealth(finding)]}
             tone={findingHealth(finding) === 'ready' ? 'info' : 'ghost'}
+            title={
+              findingHealth(finding) === 'ready'
+                ? 'You agreed this is real, so it waits to be fixed. Nothing more is needed from you.'
+                : 'You turned this down. Nothing more is needed.'
+            }
           />
         )}
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { saveModuleVision, type VisionActionState } from './actions';
@@ -97,15 +98,16 @@ export function ModuleVisionPanel({
         <p className="min-w-0 whitespace-pre-wrap text-body italic text-ink">
           <LinkedText text={vision.body} />
         </p>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          title={`Edit the vision for ${label}`}
-          className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <Pencil className="size-3.5" strokeWidth={2} aria-hidden />
-          <span className="sr-only">Edit the vision for {label}</span>
-        </button>
+        <Tooltip label={`Edit the vision for ${label}.`} align="end" className="shrink-0">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="press flex size-6 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink"
+          >
+            <Pencil className="size-3.5" strokeWidth={2} aria-hidden />
+            <span className="sr-only">Edit the vision for {label}</span>
+          </button>
+        </Tooltip>
       </div>
       {/* When it was last thought about. A vision nobody has touched in a year
           is the one worth re-reading, and nothing else on the row says so. */}

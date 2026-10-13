@@ -521,7 +521,12 @@ export function OvernightControl({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
           {!mark && labelText}
           {resting && (ready > 0 || goalsReady) ? (
-            <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
+            <StateLabel
+              glyph="half"
+              word={DEV_STATE_WORD.ready}
+              tone="accent"
+              title="There is work ready for a night. Start one when you want Dash to work through it."
+            />
           ) : (
             <OvernightState standing={resting ? 'off' : standing} />
           )}

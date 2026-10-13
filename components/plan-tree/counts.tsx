@@ -1,3 +1,4 @@
+import { Tooltip } from '@/components/ui/tooltip';
 import { Bands } from '@/components/ui/meter';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TONE_TEXT, type DevTone } from '@/components/dev/state-label';
@@ -92,25 +93,47 @@ const TALLY_HEALTHS = PLAN_HEALTHS.filter((health) => health !== 'answered');
 export function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   // The steps put down until a check-back are counted apart from the rest of
   // the waiting, under the clock their rows draw (note 5025f689).
-  const counts = TALLY_HEALTHS.flatMap((health): { key: string; glyph: GlyphName; tone: string; word: string; n: number }[] => {
-    const tone = TONE_TEXT[HEALTH[health].tone];
-    const word = HEALTH[health].word;
-    if (health !== 'waiting') return [{ key: health, glyph: PLAN_HEALTH_GLYPHS[health], tone, word, n: tally[health] }];
-    return [
-      { key: health, glyph: PLAN_HEALTH_GLYPHS.waiting, tone, word, n: tally.waiting - tally.checkingBack },
-      { key: 'checking-back', glyph: 'clock', tone, word: 'Waiting on a check-back', n: tally.checkingBack },
-    ];
-  }).filter((count) => count.n > 0);
+  const counts = TALLY_HEALTHS.flatMap(
+    (health): { key: string; glyph: GlyphName; tone: string; word: string; n: number }[] => {
+      const tone = TONE_TEXT[HEALTH[health].tone];
+      const word = HEALTH[health].word;
+      if (health !== 'waiting')
+        return [{ key: health, glyph: PLAN_HEALTH_GLYPHS[health], tone, word, n: tally[health] }];
+      return [
+        {
+          key: health,
+          glyph: PLAN_HEALTH_GLYPHS.waiting,
+          tone,
+          word,
+          n: tally.waiting - tally.checkingBack,
+        },
+        {
+          key: 'checking-back',
+          glyph: 'clock',
+          tone,
+          word: 'Waiting on a check-back',
+          n: tally.checkingBack,
+        },
+      ];
+    },
+  ).filter((count) => count.n > 0);
   if (counts.length === 0) return null;
 
   return (
     <span className="flex items-center gap-2.5" aria-label={`${label} by state`}>
       {counts.map((count) => (
-        <span key={count.key} className="flex items-center gap-1" title={`${count.n} ${count.word.toLowerCase()}`}>
-          <StatusGlyph glyph={count.glyph} className={count.tone} />
-          <span className="tabular text-small text-ink-muted">{count.n}</span>
-          <span className="sr-only">{count.word}</span>
-        </span>
+        <Tooltip
+          key={count.key}
+          label={`${count.n} ${count.n === 1 ? 'step' : 'steps'} here: ${count.word.toLowerCase()}.`}
+        >
+          {/* No tab stop: the tally sits in the section's summary, which is the
+              control, and the sr-only word already names each count. */}
+          <span className="flex items-center gap-1">
+            <StatusGlyph glyph={count.glyph} className={count.tone} />
+            <span className="tabular text-small text-ink-muted">{count.n}</span>
+            <span className="sr-only">{count.word}</span>
+          </span>
+        </Tooltip>
       ))}
     </span>
   );
@@ -138,17 +161,19 @@ export function Breakdown({ rollup }: { rollup: PlanProgress }) {
   const title = shown.map((c) => `${c.n} ${c.word}`).join(', ');
 
   return (
-    <span
-      className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 text-small text-ink-muted"
-      title={`${title} of ${live}`}
-      aria-label={`${title} of ${live} steps`}
-    >
-      {shown.map((c) => (
-        <span key={c.key} className="inline-flex items-center gap-1">
-          <span className={cn('size-1.5 rounded-full', TONE_DOT[c.tone])} aria-hidden />
-          {c.n}
-        </span>
-      ))}
-    </span>
+    <Tooltip label={`Of the ${live} steps beneath this: ${title}.`} align="end">
+      <span
+        tabIndex={0}
+        className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded text-small text-ink-muted"
+        aria-label={`${title} of ${live} steps`}
+      >
+        {shown.map((c) => (
+          <span key={c.key} className="inline-flex items-center gap-1">
+            <span className={cn('size-1.5 rounded-full', TONE_DOT[c.tone])} aria-hidden />
+            {c.n}
+          </span>
+        ))}
+      </span>
+    </Tooltip>
   );
 }

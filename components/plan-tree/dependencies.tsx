@@ -1,5 +1,6 @@
 'use client';
 
+import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import { X } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -107,47 +108,68 @@ export function Dependencies<E extends TreeCatalogEntry>({
                     : 'bg-caution-tint text-caution',
                 )}
               >
-                {stepName(link.item)}
-                {isClosed(link.item.status) &&
-                  ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
-                <button
-                  type="submit"
-                  disabled={removePending}
-                  aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
-                  className="press rounded-full p-0.5 hover:bg-surface/60"
+                <Tooltip
+                  label={
+                    isClosed(link.item.status)
+                      ? 'That step has closed, so it no longer holds this one up.'
+                      : 'This step waits until that one closes, then frees itself. Nothing is needed from you.'
+                  }
                 >
-                  <X className="size-3" strokeWidth={2} aria-hidden />
-                </button>
+                  <span tabIndex={0} className="rounded-full">
+                    {stepName(link.item)}
+                    {isClosed(link.item.status) &&
+                      ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  label="Stop waiting on it, so this step no longer needs it closed first."
+                  align="end"
+                >
+                  <button
+                    type="submit"
+                    disabled={removePending}
+                    aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
+                    className="press rounded-full p-0.5 hover:bg-surface/60"
+                  >
+                    <X className="size-3" strokeWidth={2} aria-hidden />
+                  </button>
+                </Tooltip>
               </span>
             </form>
           ))}
           {inherited.map((ref) => (
-            <span
+            <Tooltip
               key={ref.id}
-              title="Through a step above this one"
-              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
+              label="A step above this one waits on it, so this one waits too. It frees itself when that closes."
             >
-              {stepName(ref)} · above
-            </span>
+              <span
+                tabIndex={0}
+                className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
+              >
+                {stepName(ref)} · above
+              </span>
+            </Tooltip>
           ))}
           {/* A check-back: the step needs something that does not exist yet,
               and a session looks again on the day. */}
           {checks.map((check) => (
-            <span
+            <Tooltip
               key={check.id}
-              title={`${check.title}. A session looks again on ${checkDay(check.dueAt)}, and the step waits until then.`}
-              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution"
+              label={`${check.title.replace(/[.]+$/, '')}. Dash looks again on ${checkDay(check.dueAt)}, and the step waits until then. Nothing is needed from you.`}
             >
-              Check on {checkDay(check.dueAt)}
-            </span>
+              <span
+                tabIndex={0}
+                className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution"
+              >
+                Check on {checkDay(check.dueAt)}
+              </span>
+            </Tooltip>
           ))}
         </div>
       )}
 
       {node.blocks.length > 0 && (
-        <p className="text-small text-ink-muted">
-          Unblocks {node.blocks.map(stepName).join(', ')}
-        </p>
+        <p className="text-small text-ink-muted">Unblocks {node.blocks.map(stepName).join(', ')}</p>
       )}
 
       {offer && picking ? (

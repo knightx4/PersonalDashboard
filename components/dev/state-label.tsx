@@ -1,4 +1,5 @@
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 
@@ -13,6 +14,12 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  * Shape and word together: lib/status-glyphs.ts says which hexagon, and
  * lib/dev/words.ts says which word. This puts them beside each other and tones
  * them, and that is all it does.
+ *
+ * The `title` is what the state means and what, if anything, you need to do,
+ * in a sentence. It shows in the shared Tooltip rather than the browser's own
+ * title (plan #1985.5), and the label takes a tab stop so a keyboard reaches
+ * it too. Inside a link or a button the label cannot hold a tab stop of its
+ * own: pass `focusable={false}` there, and the tip shows on hover alone.
  */
 
 /**
@@ -35,8 +42,14 @@ export function StateLabel({
   glyph,
   word,
   tone,
-  /** The fixed half of the tooltip, where the word alone does not say enough. */
+  /** What the state means and what you need to do, shown in the Tooltip. */
   title,
+  /** False inside a link or a button, which already holds the tab stop. */
+  focusable = true,
+  /** `end` for a label near the right edge, so the tip hangs inward. */
+  align,
+  /** Start with the tip showing. For the preview gallery's shots. */
+  defaultOpen,
   /** What sits between the glyph and the word: the bot on a row a session has. */
   children,
   className,
@@ -47,18 +60,27 @@ export function StateLabel({
   word: string;
   tone: DevTone;
   title?: string;
+  focusable?: boolean;
+  align?: 'start' | 'end';
+  defaultOpen?: boolean;
   children?: React.ReactNode;
   className?: string;
   wordClassName?: string;
 }) {
-  return (
+  const label = (
     <span
       className={cn('inline-flex items-center gap-1.5 text-small', TONE_TEXT[tone], className)}
-      title={title}
+      tabIndex={title && focusable ? 0 : undefined}
     >
       {glyph && <StatusGlyph glyph={glyph} />}
       {children}
       <span className={cn('truncate', wordClassName)}>{word}</span>
     </span>
+  );
+  if (!title) return label;
+  return (
+    <Tooltip label={title} align={align} defaultOpen={defaultOpen} className="min-w-0 max-w-full">
+      {label}
+    </Tooltip>
   );
 }

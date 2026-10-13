@@ -21,7 +21,7 @@ import { FieldError } from '@/components/ui/field';
 import { RefText } from '@/components/dev/ref-text';
 import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
-import { WAITING_WORD } from '@/lib/dev/words';
+import { WAITING_TITLE, WAITING_WORD } from '@/lib/dev/words';
 import type { WaitingEntry, WaitingRow } from '@/lib/plan/waiting';
 import { whereToDoIt } from '@/lib/plan/where';
 import { waitingAnchor } from '@/lib/search/sources/dev-map';
@@ -118,6 +118,8 @@ export function WaitingCard({
             glyph={PLAN_HEALTH_GLYPHS[row.health]}
             word={WAITING_WORD[row.health]}
             tone={TONE[row.health]}
+            title={WAITING_TITLE[row.health]}
+            align="end"
           />
         </span>
       </div>
