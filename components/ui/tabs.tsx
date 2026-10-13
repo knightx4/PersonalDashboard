@@ -2,7 +2,7 @@
 
 import Link from '@/components/ui/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { TAB_PARAM, tabForAnchor, tabFrom, tabSearch, type Tab, type TabAddress } from '@/lib/tabs';
 
@@ -29,6 +29,10 @@ import { TAB_PARAM, tabForAnchor, tabFrom, tabSearch, type Tab, type TabAddress 
  * with the history API instead of asking the server for the page again, and
  * what the page holds in state (a half-written form) survives the switch.
  * The tab is still a real link, so it opens in a new window as any other.
+ *
+ * Without `shallow` the server draws the next tab, and the underline moves to
+ * the pressed tab at once rather than when the server answers, so the press
+ * never looks unheard.
  */
 export function Tabs({
   tabs,
@@ -53,7 +57,16 @@ export function Tabs({
   const searchParams = useSearchParams();
   const search = searchParams.toString();
   const kept: TabAddress = { ...address, param: param ?? address?.param ?? TAB_PARAM };
-  const active = tabFrom(searchParams.get(kept.param!), tabs, kept);
+  const addressed = tabFrom(searchParams.get(kept.param!), tabs, kept);
+  // The tab pressed while the server draws it, dropped as soon as the
+  // address moves, whether to that tab or back to an earlier one.
+  const [pressed, setPressed] = useState<string | null>(null);
+  const [seen, setSeen] = useState(search);
+  if (seen !== search) {
+    setSeen(search);
+    setPressed(null);
+  }
+  const active = pressed ?? addressed;
   const navRef = useRef<HTMLElement>(null);
 
   // At phone width the row scrolls, and a page that opens on a later tab
@@ -111,15 +124,15 @@ export function Tabs({
             key={tab.id}
             href={href}
             scroll={false}
-            onClick={
-              shallow
-                ? (event) => {
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                    event.preventDefault();
-                    if (!on) window.history.pushState(null, '', href);
-                  }
-                : undefined
-            }
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              if (!shallow) {
+                if (!on) setPressed(tab.id);
+                return;
+              }
+              event.preventDefault();
+              if (!on) window.history.pushState(null, '', href);
+            }}
             aria-current={on ? 'page' : undefined}
             className={cn(
               'press-area -mb-px flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 text-ui font-medium transition-colors duration-quick',

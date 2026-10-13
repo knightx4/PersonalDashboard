@@ -222,7 +222,7 @@ export function FeaturePage({
         ...item,
         onSelect: () => {
           row.setEditing(true);
-          if (tab !== 'overview') router.push(overview, { scroll: false });
+          if (tab !== 'overview') window.history.pushState(null, '', overview);
         },
       };
     }
@@ -231,7 +231,7 @@ export function FeaturePage({
         ...item,
         onSelect: () => {
           row.setAddingChild(true);
-          if (tab !== 'steps') router.push(stepsTab, { scroll: false });
+          if (tab !== 'steps') window.history.pushState(null, '', stepsTab);
         },
       };
     }
@@ -430,6 +430,9 @@ export function FeaturePage({
       properties={properties}
       tabs={tabs}
       label="Feature"
+      // Every tab is drawn here from what the page already holds, so a
+      // press writes the address without asking the server again.
+      shallow
       className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
     >
       {notices}

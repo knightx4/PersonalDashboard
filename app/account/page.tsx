@@ -16,8 +16,6 @@ import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { vapidPublicKey } from '@/lib/push/web-push';
-import { tabFrom } from '@/lib/tabs';
-import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 import { loadCaptureTokens, type CaptureTokenListing } from '@/lib/capture/tokens';
 import { AccountView } from './view';
 
@@ -81,14 +79,9 @@ async function loadCapture(
   }
 }
 
-export default async function AccountPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string | string[] }>;
-}) {
-  // One section at a time behind tabs (plan #1628), and only the open tab's
-  // data is read: the connected apps and their calls are Activity's alone.
-  const tab = tabFrom((await searchParams).tab, ACCOUNT_TABS, ACCOUNT_TAB_ADDRESS) as AccountTab;
+export default async function AccountPage() {
+  // One section at a time behind tabs (plan #1628). Every tab's data is read
+  // here, so the row switches tabs in the browser without asking again.
   const user = await requireUser();
   const [settings, counts, raised, mainCheck, owner, connected, capture, origin] = await Promise.all([
     loadAccountSettings(user.id),
@@ -96,8 +89,8 @@ export default async function AccountPage({
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
-    tab === 'activity' ? loadConnectedApps(user.id) : null,
-    tab === 'activity' ? loadCapture(user.id) : null,
+    loadConnectedApps(user.id),
+    loadCapture(user.id),
     requestOrigin(),
   ]);
 
@@ -120,7 +113,6 @@ export default async function AccountPage({
 
           <div>
           <AccountView
-            tab={tab}
             email={user.email ?? ''}
             settings={{
               displayName: settings.displayName ?? '',
@@ -130,14 +122,12 @@ export default async function AccountPage({
             }}
             isOwner={owner}
             vapidPublicKey={vapidPublicKey()}
-            connected={
-              connected && {
-                apps: connected.apps,
-                failed: connected.failed,
-                connectorAddress: `${origin}/api/mcp`,
-              }
-            }
-            capture={capture && { ...capture, address: `${origin}/api/capture` }}
+            connected={{
+              apps: connected.apps,
+              failed: connected.failed,
+              connectorAddress: `${origin}/api/mcp`,
+            }}
+            capture={{ ...capture, address: `${origin}/api/capture` }}
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
+import type { TabPanelSet } from '@/components/patterns/tab-panels';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
 import type { GoalPace } from '@/lib/goals/pace';
@@ -15,8 +16,9 @@ import { GoalGlance, GoalProperties, goalDetailCount, goalLine } from './goal-pr
  * A goal's page frame (plan #1671): the tabbed detail pattern the feature
  * page on /dev/plan is built from. The path, the goal's hexagon and title,
  * the menu that moves or closes it, the Overview, Steps and
- * Activity tabs, and the properties column. The page passes the open tab's
- * content as `children`; the gallery draws the same frame from fixtures.
+ * Activity tabs, and the properties column. The page passes every tab's
+ * content as `panels`, so a press switches tabs in the browser; the gallery
+ * draws the same frame from fixtures with the open tab as `children`.
  */
 export function GoalDetail({
   goal,
@@ -26,6 +28,7 @@ export function GoalDetail({
   progress,
   timeZone,
   pace = null,
+  panels,
   children,
 }: {
   goal: Goal;
@@ -37,8 +40,10 @@ export function GoalDetail({
   timeZone: string;
   /** The goal's usual pace, for the properties (plan #1737). */
   pace?: GoalPace | null;
-  /** The open tab's content. */
-  children: React.ReactNode;
+  /** Every tab's content, by tab id. */
+  panels?: TabPanelSet;
+  /** The open tab's content, when `panels` is not given. */
+  children?: React.ReactNode;
 }) {
   const closed = goal.status === 'done';
   const hexagon = goalGlyph(goal.status, progress);
@@ -84,6 +89,7 @@ export function GoalDetail({
       }
       tabs={tabs}
       label="Goal"
+      panels={panels}
       className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
     >
       {children}

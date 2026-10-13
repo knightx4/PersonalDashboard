@@ -410,42 +410,38 @@ function UsageTab({ summary, now }: { summary: ModuleSummary; now: Date }) {
   );
 }
 
-function OpenTab({ summary, tab, now }: { summary: ModuleSummary; tab: ModuleTab; now: Date }) {
-  switch (tab) {
-    case 'plan':
-      return summary.features.length > 0 ? (
+/** Every tab's content, drawn at once so a press switches tabs in the browser. */
+function tabPanels(summary: ModuleSummary, now: Date): Record<ModuleTab, React.ReactNode> {
+  return {
+    overview: <Overview summary={summary} />,
+    plan:
+      summary.features.length > 0 ? (
         <FeatureRows items={summary.features} />
       ) : (
         <EmptyState size="inline" title="No open features." />
-      );
-    case 'bugs':
-      return summary.bugs.length > 0 ? (
+      ),
+    bugs:
+      summary.bugs.length > 0 ? (
         <BugRows rows={summary.bugs} />
       ) : (
         <EmptyState size="inline" title="Nothing outstanding was filed from this workspace." />
-      );
-    case 'ideas':
-      return summary.ideas.length > 0 ? (
+      ),
+    ideas:
+      summary.ideas.length > 0 ? (
         <IdeaRows ideas={summary.ideas} />
       ) : (
         <EmptyState size="inline" title="No live ideas for this workspace." />
-      );
-    case 'spec':
-      return <SpecTab summary={summary} />;
-    case 'ui':
-      return <UiTab summary={summary} />;
-    case 'usage':
-      return <UsageTab summary={summary} now={now} />;
-    case 'changelog':
-      return summary.shipped.length > 0 ? (
+      ),
+    spec: <SpecTab summary={summary} />,
+    ui: <UiTab summary={summary} />,
+    usage: <UsageTab summary={summary} now={now} />,
+    changelog:
+      summary.shipped.length > 0 ? (
         <ShippedRows items={summary.shipped} />
       ) : (
         <EmptyState size="inline" title="Nothing has shipped here yet." />
-      );
-    case 'overview':
-    default:
-      return <Overview summary={summary} />;
-  }
+      ),
+  };
 }
 
 function spendValue(summary: ModuleSummary): string {
@@ -459,7 +455,8 @@ export function ModuleView({
   now,
 }: {
   summary: ModuleSummary;
-  tab: ModuleTab;
+  /** The gallery's: the tab to show when the address names none. */
+  tab?: ModuleTab;
   now: Date;
 }) {
   // Open steps, bugs and the UI review are read first: one row on a phone,
@@ -490,8 +487,8 @@ export function ModuleView({
       properties={properties}
       tabs={moduleTabs(summary)}
       label="Module"
-    >
-      <OpenTab summary={summary} tab={tab} now={now} />
-    </TabbedDetail>
+      address={tab ? { opensOn: tab } : undefined}
+      panels={tabPanels(summary, now)}
+    />
   );
 }

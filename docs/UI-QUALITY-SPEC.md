@@ -176,7 +176,8 @@ wide screen, and the sixth for pages of peer sections:
   first screen. The actions sit on the title's line, and every tab is as wide
   as the row of tabs (plan 1688). The feature page on the plan and the goal
   page use it (decision 1661, answered B, after Linear's project page). Its
-  text and its properties sit on cards (plan 1686).
+  text and its properties sit on cards (plan 1686). Changing tab is instant,
+  as in tabbed sections below.
 - **Main plus rail**: an overview page such as Home, with the column you work
   in and, from laptop width, a narrow column on the right holding what you
   glance at (counts, what is running, what Dash did, what is due soon). On a
@@ -185,9 +186,12 @@ wide screen, and the sixth for pages of peer sections:
 - **Tabbed sections**: a page of peer sections looked at one at a time, such
   as Account or a company, shows one behind a row of tabs kept in the
   address, so a refresh and a pasted link return to it. Only the open tab is
-  drawn, and folds may sit inside it. A page read top to bottom stays
-  stacked, and two or three modes of one view are a segmented control. The
-  role page uses it (feature 1624).
+  drawn, and folds may sit inside it. Changing tab is instant: the page
+  loads every tab's content once and a press swaps it in the browser,
+  without asking the server again. Where that costs too much, the server
+  draws the next tab and the underline moves on the press. A page read top
+  to bottom stays stacked, and two or three modes of one view are a
+  segmented control. The role page uses it (feature 1624).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

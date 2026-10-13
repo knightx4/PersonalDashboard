@@ -26,12 +26,11 @@ import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 
 /**
  * Account, one section at a time behind tabs (the tabbed sections pattern,
- * plan #1628). The page reads the open tab from the address and passes it
- * in, and only that tab's sections are drawn; app/account/tabs.ts says which
- * sections each tab holds.
+ * plan #1628). Every tab's sections are drawn at once and the row switches
+ * between them in the browser; app/account/tabs.ts says which sections each
+ * tab holds.
  */
 export function AccountView({
-  tab,
   opensOn,
   email,
   settings,
@@ -40,12 +39,7 @@ export function AccountView({
   connected,
   capture,
 }: {
-  /** The open tab, read from the address by the page. */
-  tab: AccountTab;
-  /**
-   * The gallery's: the tab the row marks when the address names none. The
-   * page leaves it out, since its address and `tab` always agree.
-   */
+  /** The gallery's: the tab to show when the address names none. */
   opensOn?: AccountTab;
   email: string;
   settings: {
@@ -59,13 +53,12 @@ export function AccountView({
   /** The key browsers subscribe to push with; null when the server has none. */
   vapidPublicKey: string | null;
   /**
-   * The Connected apps section's data, read on the server (plan #1258), and
-   * only when Activity is the open tab; null on the others.
+   * The Connected apps section's data, read on the server (plan #1258).
    */
   connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string } | null;
   /**
    * The Capture tokens section's data (plan #1705), read with the connected
-   * apps and only on Activity; null on the other tabs. `justMade` is the
+   * apps. `justMade` is the
    * gallery's, for a token as it shows straight after it is made.
    */
   capture: {
@@ -83,23 +76,26 @@ export function AccountView({
         tabs={ACCOUNT_TABS}
         label="Account"
         address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
-      >
-        <div className="space-y-6">
-          {tab === 'you' && <YouSection email={email} settings={settings} />}
-          {tab === 'workspaces' && (
-            <>
+        panels={{
+          you: (
+            <div className="space-y-6">
+              <YouSection email={email} settings={settings} />
+            </div>
+          ),
+          workspaces: (
+            <div className="space-y-6">
               <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
               <ModuleSettingsSection enabled={settings.enabledModules} />
-            </>
-          )}
-          {tab === 'notifications' && (
-            <>
+            </div>
+          ),
+          notifications: (
+            <div className="space-y-6">
               <NotificationsSection publicKey={vapidPublicKey} />
               <FeelSection />
-            </>
-          )}
-          {tab === 'activity' && (
-            <>
+            </div>
+          ),
+          activity: (
+            <div className="space-y-6">
               {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
               {capture && (
                 <>
@@ -112,16 +108,16 @@ export function AccountView({
                   <CaptureShortcutSection address={capture.address} />
                 </>
               )}
-            </>
-          )}
-          {tab === 'session' && (
-            <>
+            </div>
+          ),
+          session: (
+            <div className="space-y-6">
               <SessionSection />
               <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
-            </>
-          )}
-        </div>
-      </TabbedSections>
+            </div>
+          ),
+        }}
+      />
     </>
   );
 }

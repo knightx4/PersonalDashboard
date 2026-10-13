@@ -2,7 +2,6 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { notFound } from 'next/navigation';
-import { tabFrom } from '@/lib/tabs';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
@@ -59,7 +58,7 @@ import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews, loadReviewChange } from '@/lib/goals/reviews-store';
-import { closedSteps, GOAL_TABS, goalStages } from '@/lib/goals/goal-page';
+import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalMatchText } from '@/lib/goals/related-notes';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
@@ -276,15 +275,8 @@ function runRowsOf(history: { runs: RunListing[] }, timeZone: string) {
  * and the done-when (lib/goals/related-notes.ts); the lookup is started and
  * not awaited.
  */
-export default async function GoalMapPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
-}) {
+export default async function GoalMapPage({ params }: { params: Promise<{ goalId: string }> }) {
   const { goalId } = await params;
-  const tab = tabFrom((await searchParams).tab, GOAL_TABS);
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -533,32 +525,33 @@ export default async function GoalMapPage({
       progress={progress}
       timeZone={account.timezone}
       pace={pace}
-    >
-      {tab === 'steps' ? (
-        <GoalStepsFold closed={closed} meta={stepsMeta}>
-          <StepTree
-            map={map}
-            stages={stages}
-            todoOn={moduleEnabled(account, 'todo')}
-            runs={stepRunLines(stepRuns)}
-            files={filesOf}
-            progress={stepProgress}
-            arrivals={arrivals}
-            canRun={owner}
+      panels={{
+        overview,
+        steps: (
+          <GoalStepsFold closed={closed} meta={stepsMeta}>
+            <StepTree
+              map={map}
+              stages={stages}
+              todoOn={moduleEnabled(account, 'todo')}
+              runs={stepRunLines(stepRuns)}
+              files={filesOf}
+              progress={stepProgress}
+              arrivals={arrivals}
+              canRun={owner}
+            />
+          </GoalStepsFold>
+        ),
+        activity: (
+          <GoalActivity
+            goalId={map.goal.id}
+            closed={closedSteps(map.steps)}
+            runs={runs}
+            moreRuns={shapingView?.moreRuns ?? history.more}
+            thread={thread}
+            timeZone={account.timezone}
           />
-        </GoalStepsFold>
-      ) : tab === 'activity' ? (
-        <GoalActivity
-          goalId={map.goal.id}
-          closed={closedSteps(map.steps)}
-          runs={runs}
-          moreRuns={shapingView?.moreRuns ?? history.more}
-          thread={thread}
-          timeZone={account.timezone}
-        />
-      ) : (
-        overview
-      )}
-    </GoalDetail>
+        ),
+      }}
+    />
   );
 }

@@ -4,8 +4,9 @@ import { DetailLayout } from '@/components/shell/detail-layout';
 import { Card } from '@/components/ui/card';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
+import { TabPanels, type TabPanelSet } from '@/components/patterns/tab-panels';
 import { cn } from '@/lib/cn';
-import type { Tab } from '@/lib/tabs';
+import type { Tab, TabAddress } from '@/lib/tabs';
 
 /**
  * The tabbed detail pattern (docs/UI-QUALITY-SPEC.md, Part 4): one thing's
@@ -31,9 +32,12 @@ import type { Tab } from '@/lib/tabs';
  * `DetailCard` holds them, each under a `DetailPart` heading. Headings,
  * breadcrumbs, tab labels and a one-line count may stay on the background.
  *
- * The page decides which tab is open, with `tabFrom(searchParams.tab, tabs)`
- * from lib/tabs.ts, and passes only that tab's content as `children`. The
- * tabs read the same parameter from the address, so the two agree.
+ * Changing tab is instant. A page whose tabs are cheap to draw together
+ * passes every tab's content as `panels`, and the row switches between them
+ * in the browser without asking the server again. A page drawn in the
+ * browser that already holds every tab passes `shallow` and picks the open
+ * tab itself with `tabFrom`, as the feature page does. `children` sits above
+ * the open panel on every tab.
  */
 export function TabbedDetail({
   crumbs,
@@ -45,6 +49,9 @@ export function TabbedDetail({
   properties,
   tabs,
   label,
+  address,
+  panels,
+  shallow = false,
   children,
   className,
 }: {
@@ -70,8 +77,14 @@ export function TabbedDetail({
   tabs: readonly Tab[];
   /** Names the row of tabs for a screen reader, such as "Feature". */
   label: string;
-  /** The open tab's content, and only that tab's. */
-  children: React.ReactNode;
+  /** How the tab is kept in the address; the gallery sets `opensOn` to show a later tab. */
+  address?: TabAddress;
+  /** Every tab's content by tab id, switched in the browser. */
+  panels?: TabPanelSet;
+  /** Switch tabs in the browser; implied by `panels`. */
+  shallow?: boolean;
+  /** Above the open panel; or, with neither `panels` nor `shallow`, the open tab's content. */
+  children?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -109,8 +122,15 @@ export function TabbedDetail({
         )
       }
     >
-      <Tabs tabs={tabs} label={label} className="mb-5" />
+      <Tabs
+        tabs={tabs}
+        label={label}
+        address={address}
+        shallow={shallow || panels !== undefined}
+        className="mb-5"
+      />
       {children}
+      {panels && <TabPanels tabs={tabs} address={address} panels={panels} />}
     </DetailLayout>
   );
 }

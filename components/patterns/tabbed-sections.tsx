@@ -1,4 +1,5 @@
 import { Tabs } from '@/components/ui/tabs';
+import { TabPanels, type TabPanelSet } from '@/components/patterns/tab-panels';
 import type { Tab, TabAddress } from '@/lib/tabs';
 
 /**
@@ -11,9 +12,10 @@ import type { Tab, TabAddress } from '@/lib/tabs';
  * It goes under the page's own header, in the page's one column. The tab is
  * in the address (`?tab=<id>`, lib/tabs.ts), so a reload, the back button and
  * a pasted link all return to it. The page decides which tab is open with
- * `tabFrom(searchParams.tab, tabs, address)`, the same answer the row draws,
- * and passes only that tab's content as `children`, so it loads only that
- * tab's data. Each tab may carry a count, so something waiting is not hidden
+ * `tabFrom(searchParams.tab, tabs, address)`, the same answer the row draws.
+ * A page whose tabs are cheap to draw together passes every tab's content as
+ * `panels` instead, and a press then swaps the panel in the browser without
+ * asking the server again. Each tab may carry a count, so something waiting is not hidden
  * behind a tab nobody has opened.
  *
  * `address` is for a page whose tab is kept more richly than the plain
@@ -31,6 +33,7 @@ export function TabbedSections({
   label,
   address,
   shallow,
+  panels,
   children,
   className,
 }: {
@@ -40,14 +43,23 @@ export function TabbedSections({
   address?: TabAddress;
   /** For a page drawn in the browser that holds every tab's data (components/ui/tabs.tsx). */
   shallow?: boolean;
-  /** The open tab's content, and only that tab's. */
-  children: React.ReactNode;
+  /** Every tab's content by tab id, switched in the browser; implies `shallow`. */
+  panels?: TabPanelSet;
+  /** Above the open panel; or, without `panels`, the open tab's content. */
+  children?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={className}>
-      <Tabs tabs={tabs} label={label} address={address} shallow={shallow} className="mb-5" />
+      <Tabs
+        tabs={tabs}
+        label={label}
+        address={address}
+        shallow={shallow || panels !== undefined}
+        className="mb-5"
+      />
       {children}
+      {panels && <TabPanels tabs={tabs} address={address} panels={panels} />}
     </div>
   );
 }

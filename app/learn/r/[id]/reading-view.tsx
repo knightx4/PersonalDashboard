@@ -58,7 +58,7 @@ export type ReadingViewProps = {
   alreadyRead: { trackTitle: string } | null;
   /** The newsletter a story sent from News came from. */
   origin: StoryOrigin | null;
-  /** The open tab, from the address. */
+  /** The gallery's: the tab to show when the address names none. */
   tab?: ReadingTab;
   /** A failed Summarize press, drawn by the gallery; the page passes none. */
   summaryFailure?: SummaryFailure | null;
@@ -78,7 +78,7 @@ export function ReadingView({
   subjects,
   alreadyRead,
   origin,
-  tab = 'reading',
+  tab,
   summaryFailure = null,
   thread = [],
   chatState,
@@ -106,19 +106,22 @@ export function ReadingView({
       properties={<ReadingProperties reading={reading} origin={origin} />}
       tabs={READING_TABS}
       label="Reading"
-    >
-      {tab === 'summary' ? (
-        <ReadingSummary
-          readingId={reading.id}
-          summary={reading.summary}
-          given={reading.givenText}
-          failure={summaryFailure}
-          chat={<ReadingChat readingId={reading.id} turns={thread} {...chatState} />}
-        />
-      ) : (
-        <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} />
-      )}
-    </TabbedDetail>
+      address={tab ? { opensOn: tab } : undefined}
+      panels={{
+        reading: (
+          <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} />
+        ),
+        summary: (
+          <ReadingSummary
+            readingId={reading.id}
+            summary={reading.summary}
+            given={reading.givenText}
+            failure={summaryFailure}
+            chat={<ReadingChat readingId={reading.id} turns={thread} {...chatState} />}
+          />
+        ),
+      }}
+    />
   );
 }
 

@@ -1040,7 +1040,6 @@ export function AccountSurface({
   return column(
     <>
       <AccountView
-        tab={tab}
         opensOn={tab}
         email="christopher.kloughton@example.com"
         settings={{
