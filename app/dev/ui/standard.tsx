@@ -1697,7 +1697,7 @@ export function UiStandard({
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a solid shape in the workspace's hue behind a pane of frosted glass, tinted on light themes so it holds an edge on white. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a deep shape in the workspace's hue behind a pane in its own colour, solid so it reads on any ground, with a sheen and a lit edge to make it glass. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">
