@@ -174,21 +174,32 @@ export type AreaLabel = {
   raise?: number;
 };
 
-/** Rough text widths in pixels: 13px semibold for a domain or an idea, 12px for a field. */
-const CHAR_PX: Record<AreaLabel['kind'], number> = { domain: 7.4, idea: 7.4, field: 6.4 };
-const LINE_PX: Record<AreaLabel['kind'], number> = { domain: 20, idea: 22, field: 18 };
+/**
+ * Rough text widths in pixels: 13px semibold for the open idea's name, 12px
+ * regular for a domain, 11px for a field (plan #1883 set the names a step
+ * smaller and in the regular weight, so they read as ground under the dots).
+ */
+const CHAR_PX: Record<AreaLabel['kind'], number> = { domain: 6.2, idea: 7.4, field: 5.7 };
+const LINE_PX: Record<AreaLabel['kind'], number> = { domain: 18, idea: 22, field: 16 };
 /** The label's padding, either side. */
 const PAD_PX = 8;
 /** A label is cut short past this, as `max-w-xs` cuts it on the page. */
 const MAX_LABEL_PX = 320;
 
+/**
+ * A dot's reach in pixels, with a little air: the marks are drawn about four
+ * pixels in radius at every width (idea-plot.tsx), and a name is kept this
+ * far off each one's centre.
+ */
+export const DOT_REACH_PX = 5;
+
 type Box = { left: number; right: number; top: number; bottom: number };
 
-function boxOf(label: AreaLabel, width: number): Box {
+function boxOf(label: AreaLabel, width: number, shift = 0): Box {
   const w = Math.min(label.text.length * CHAR_PX[label.kind] + PAD_PX, MAX_LABEL_PX);
   const h = LINE_PX[label.kind];
   const x = (label.left / 100) * width;
-  const y = (label.top / 100) * width - (label.raise ?? 0);
+  const y = (label.top / 100) * width - (label.raise ?? 0) + shift;
   const anchor = anchorAt(label.left);
   const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
   return { left, right: left + w, top: y - h / 2, bottom: y + h / 2 };
@@ -199,30 +210,106 @@ function overlaps(a: Box, b: Box): boolean {
 }
 
 /**
- * The labels that fit a square frame `width` pixels wide without covering
- * one another, highest priority first. A label that would cover one already
- * placed is left off; its point is still marked on the map, and its name is
- * on the point's title.
+ * Where each label that fits goes, as a shift in pixels down from its point
+ * (negative is up), highest priority first.
+ *
+ * A label never covers one already placed, nor any of `dots` (frame
+ * percentages, as the marks are placed). It tries its own point first and
+ * then each of `shifts` line heights above and below, in order; a label with
+ * no clear place is left off, and its point keeps its name in the marks'
+ * titles. The open idea's name (`raise`) is drawn over its own dot on a
+ * ground of its own, so the dots do not move it.
  */
-export function labelsThatFit(labels: readonly AreaLabel[], width: number): Set<string> {
-  const placed: Box[] = [];
-  const kept = new Set<string>();
+export function placeLabels(
+  labels: readonly AreaLabel[],
+  width: number,
+  {
+    dots = [],
+    shifts = [],
+    reach = DOT_REACH_PX,
+  }: {
+    dots?: readonly { left: number; top: number }[];
+    shifts?: readonly number[];
+    /** How far from a dot's centre a name keeps, in pixels. */
+    reach?: number;
+  } = {},
+): Map<string, number> {
+  const placed: Box[] = dots.map((dot) => {
+    const x = (dot.left / 100) * width;
+    const y = (dot.top / 100) * width;
+    return { left: x - reach, right: x + reach, top: y - reach, bottom: y + reach };
+  });
+  const own: Box[] = [];
+  const kept = new Map<string, number>();
   const ordered = [...labels].sort((a, b) => b.priority - a.priority || a.text.localeCompare(b.text));
   for (const label of ordered) {
-    const box = boxOf(label, width);
-    if (placed.some((other) => overlaps(box, other))) continue;
-    placed.push(box);
-    kept.add(label.id);
+    const blocking = label.raise ? own : placed;
+    const tries = label.raise ? [0] : [0, ...shifts];
+    for (const lines of tries) {
+      const shift = lines * LINE_PX[label.kind];
+      const box = boxOf(label, width, shift);
+      if (blocking.some((other) => overlaps(box, other))) continue;
+      placed.push(box);
+      own.push(box);
+      kept.set(label.id, shift);
+      break;
+    }
   }
   return kept;
 }
 
 /**
- * The two frame widths labels are fitted for: a phone's map, and the
- * narrowest the map is from the `sm` breakpoint up. Fitting for the narrow
- * end of each range means a label that fits there fits everywhere in it.
+ * The labels that fit a square frame `width` pixels wide without covering
+ * one another, each on its own point.
  */
-export const LABEL_FRAMES = { phone: 340, wide: 600 } as const;
+export function labelsThatFit(labels: readonly AreaLabel[], width: number): Set<string> {
+  return new Set(placeLabels(labels, width).keys());
+}
+
+/** The shifts a name tries after its own point: half a line, then one, up and down. */
+export const LABEL_SHIFTS: readonly number[] = [-0.75, 0.75, -1.5, 1.5];
+
+// -- Axis ends -----------------------------------------------------------------
+
+/** What the ideas at each end of the main axes are about, or null where nothing says. */
+export type AxisEnds = { left: string | null; right: string | null; top: string | null; bottom: string | null };
+
+/** How many ideas at each end of an axis name it. */
+export const AXIS_END_IDEAS = 10;
+
+/**
+ * Names for the four ends of the main-axes layout (plan #1883), worked out
+ * from the ten ideas furthest along each end: the two fields (or, for an idea
+ * with no field, domains) most of them are in, most first, ties by name, in
+ * lower case. A catalogue name with a comma in it ("Economics, business and
+ * finance") is cut at the comma, so the two names stay two.
+ */
+type PlacedIdea = { pca: Point; field: { name: string } | null; domain: { name: string } | null };
+
+export function axisEnds(ideas: readonly PlacedIdea[], per = AXIS_END_IDEAS): AxisEnds {
+  const name = (end: readonly PlacedIdea[]): string | null => {
+    const counts = new Map<string, number>();
+    for (const idea of end) {
+      const full = idea.field?.name ?? idea.domain?.name;
+      if (!full) continue;
+      const short = full.split(',')[0]!.trim().toLowerCase();
+      if (short) counts.set(short, (counts.get(short) ?? 0) + 1);
+    }
+    const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return ranked.length > 0 ? ranked.slice(0, 2).map(([text]) => text).join(', ') : null;
+  };
+  // Too few for two tens: halves, so the two ends never share an idea.
+  const take = Math.min(per, Math.floor(ideas.length / 2));
+  if (take === 0) return { left: null, right: null, top: null, bottom: null };
+  const byX = [...ideas].sort((a, b) => a.pca.x - b.pca.x);
+  const byY = [...ideas].sort((a, b) => a.pca.y - b.pca.y);
+  return {
+    left: name(byX.slice(0, take)),
+    right: name(byX.slice(-take)),
+    top: name(byY.slice(-take)),
+    bottom: name(byY.slice(0, take)),
+  };
+}
 
 /**
  * A cosine similarity to two places, as the duplicate threshold is written

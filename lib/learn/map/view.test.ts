@@ -5,6 +5,9 @@ import {
   domainSlots,
   framePosition,
   labelsThatFit,
+  placeLabels,
+  axisEnds,
+  LABEL_SHIFTS,
   mapHref,
   markOf,
   parseMapParams,
@@ -110,5 +113,48 @@ describe('labels', () => {
     const labels = [label('a', 45, 50, 1), label('b', 55, 50, 2)];
     expect(labelsThatFit(labels, 340).size).toBe(1);
     expect(labelsThatFit(labels, 1200).size).toBe(2);
+  });
+
+  it('moves a name off a dot, or leaves it off when there is nowhere clear', () => {
+    const name = label('econ', 50, 50, 1);
+    const onIt = [{ left: 50, top: 50 }];
+    expect(placeLabels([name], 400, { dots: onIt }).size).toBe(0);
+    const moved = placeLabels([name], 400, { dots: onIt, shifts: LABEL_SHIFTS });
+    expect(moved.get('econ')).toBeLessThan(0);
+  });
+
+  it('keeps the open idea over its own dot', () => {
+    const idea: AreaLabel = { id: 'idea', text: 'Opportunity cost', kind: 'idea', left: 50, top: 50, priority: 99, raise: 23 };
+    const kept = placeLabels([idea], 400, { dots: [{ left: 50, top: 44 }] });
+    expect(kept.get('idea')).toBe(0);
+  });
+});
+
+describe('axis ends', () => {
+  const at = (x: number, y: number, field: string | null, domain: string | null = null) => ({
+    pca: { x, y },
+    field: field ? { name: field } : null,
+    domain: domain ? { name: domain } : null,
+  });
+
+  it('names each end from the two fields most of its ideas are in', () => {
+    const ideas = [
+      ...Array.from({ length: 6 }, (_, i) => at(-1 + i * 0.01, 0, 'Economics, business and finance')),
+      ...Array.from({ length: 4 }, (_, i) => at(-0.9 + i * 0.01, 0, 'Psychology')),
+      ...Array.from({ length: 10 }, (_, i) => at(0.9 + i * 0.01, 0, 'The modern era')),
+    ];
+    const ends = axisEnds(ideas);
+    expect(ends.left).toBe('economics, psychology');
+    expect(ends.right).toBe('the modern era');
+  });
+
+  it('falls back to the domain, and says nothing for ideas with neither', () => {
+    expect(axisEnds([at(-1, 1, null, 'History'), at(1, -1, null)], 10)).toEqual({
+      left: 'history',
+      right: null,
+      top: 'history',
+      bottom: null,
+    });
+    expect(axisEnds([])).toEqual({ left: null, right: null, top: null, bottom: null });
   });
 });
