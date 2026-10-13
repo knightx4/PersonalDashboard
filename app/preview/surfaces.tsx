@@ -57,7 +57,7 @@ import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/mate
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
-import { RecommendedRoles } from '@/app/jobs/(app)/recommend/sections';
+import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
@@ -69,6 +69,12 @@ import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { summariseSearch } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
+import {
+  closestToOffer,
+  withoutClosestDebriefs,
+  type ClosestApplication,
+  type ClosestInterview,
+} from '@/lib/jobs/today/closest';
 import { liveByMove } from '@/lib/jobs/today/live';
 import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
@@ -218,6 +224,7 @@ import {
   AskMadeChangesSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
+  WRITING_QUESTION,
 } from './ask-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
@@ -971,6 +978,20 @@ const settings = {
     { id: 'x1', domain: 'jobalerts.linkedin.com' },
     { id: 'x2', domain: 'hi.wellfound.com' },
   ],
+  careerGoals: [
+    {
+      id: 'th-3',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      written: '28 Sep 2026',
+      edited: '2 Oct 2026',
+    },
+    {
+      id: 'th-1',
+      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      written: '6 Jul 2026',
+      edited: null,
+    },
+  ],
 };
 
 
@@ -1272,16 +1293,79 @@ const todayBoard: TodayBoard = {
 
 /**
  * Today with something in every section (plan #1591): five imports waiting,
- * the week above with a round owing a debrief, the live applications split
- * by whose move it is, and two changes since the last visit. Larkspur Vane
- * and Halloran-Achterberg have interviews booked, so the move is yours; Tallow's mail
+ * the two applications closest to an offer, the week, the live applications
+ * split by whose move it is, and two changes since the last visit.
+ * Halloran-Achterberg is at final round with nothing prepped and yesterday's
+ * round owing a debrief, which it asks for in place of This week; Larkspur
+ * Vane is in process, prepped for its technical, with the screen's questions
+ * on record. Both have interviews booked, so the move is yours; Tallow's mail
  * asked a question, which makes it yours too.
  */
 const todayPageNow = new Date('2026-09-09T12:00:00.000Z');
 const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
-  row.applicationId === 'p1' || row.applicationId === 'p2'
+  row.applicationId === 'p1'
     ? { ...row, lastTurnEvent: 'interview_scheduled' }
-    : row,
+    : row.applicationId === 'p2'
+      ? { ...row, status: 'final_round', lastTurnEvent: 'interview_scheduled' }
+      : row,
+);
+const closestInterview = (
+  id: string,
+  applicationId: string,
+  scheduledAt: string,
+  extra: Partial<ClosestInterview> = {},
+): ClosestInterview => ({
+  id,
+  applicationId,
+  scheduledAt,
+  timeKnown: true,
+  status: 'scheduled',
+  groupId: null,
+  prepNotes: null,
+  hasPrepNote: false,
+  notes: null,
+  questionsAsked: null,
+  group: null,
+  ...extra,
+});
+const todayPageClosest: ClosestApplication[] = closestToOffer(
+  todayPageRows,
+  [
+    closestInterview('ti-screen', 'p1', '2026-09-02T15:00:00.000Z', {
+      groupId: 'tg-screen',
+      group: { id: 'tg-screen', label: 'Recruiter screen', roundNumber: 1, notes: null },
+      notes: 'Team of six under the head of systematic. They want someone who has shipped a backtester.',
+      questionsAsked: [
+        'Walk me through the last model you put into production',
+        'How do you test a signal for lookahead bias?',
+        'Why leave your current team now?',
+      ],
+    }),
+    closestInterview('ti1', 'p1', '2026-09-11T13:30:00.000Z', {
+      groupId: 'tg1',
+      group: { id: 'tg1', label: 'Technical', roundNumber: 2, notes: null },
+      prepNotes: 'Revise the event-driven backtester and the slippage model.',
+    }),
+    closestInterview('ti-hm', 'p2', '2026-08-28T10:00:00.000Z', {
+      groupId: 'tg-hm',
+      group: { id: 'tg-hm', label: 'Hiring manager', roundNumber: 1, notes: 'Talked through the ledger migration.' },
+    }),
+    closestInterview('ti0', 'p2', '2026-09-08T15:00:00.000Z', {
+      groupId: 'tg0',
+      group: { id: 'tg0', label: 'Technical', roundNumber: 2, notes: null },
+    }),
+    closestInterview('ti2', 'p2', '2026-09-16T08:00:00.000Z', {
+      timeKnown: false,
+      groupId: 'tg2',
+      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
+    }),
+    closestInterview('ti3', 'p2', '2026-09-16T10:00:00.000Z', {
+      timeKnown: false,
+      groupId: 'tg2',
+      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
+    }),
+  ],
+  todayPageNow,
 );
 const todayPageBoard: TodayBoard = {
   ...todayBoard,
@@ -3095,56 +3179,6 @@ const findView = {
     },
   },
   people: recommendedPeople,
-  tracks: {
-    suggested: [
-      {
-        id: 'tr-2',
-        name: 'SQL for finance analysts',
-        about: 'Window functions, cohort tables and the joins a finance team asks for.',
-        depth: 'solid' as const,
-        why: 'Most of the strategic finance postings you saved ask for SQL, and none of your entries mention it.',
-      },
-      {
-        id: 'tr-3',
-        name: 'How AI deployment teams run a pilot',
-        about: null,
-        depth: 'familiar' as const,
-        why: 'The deployment roles describe scoping and running pilots with customers, which your latest entry says you want to do.',
-      },
-    ],
-    started: [
-      {
-        id: 'tr-1',
-        name: 'Three-statement modelling',
-        about: 'Linking the income statement, balance sheet and cash flow in one model.',
-        depth: 'deep' as const,
-        why: 'Every FP&A role asks for it.',
-        subjectId: 'sub-1',
-        units: 6,
-        gone: false,
-      },
-    ],
-  },
-  thoughts: [
-    {
-      id: 'th-3',
-      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
-      written: '28 Sep 2026',
-      edited: '2 Oct 2026',
-    },
-    {
-      id: 'th-2',
-      body: 'Strategic finance or FP&A at a company that is still small enough that finance sits near the founders.',
-      written: '30 Aug 2026',
-      edited: null,
-    },
-    {
-      id: 'th-1',
-      body: 'Leaving EY. Not sure yet whether to stay in finance.',
-      written: '6 Jul 2026',
-      edited: null,
-    },
-  ],
 };
 
 /** Jobs Today drawn from the sample rows, with the review queue given. */
@@ -3152,7 +3186,8 @@ function JobsTodaySurface({ review }: { review: ReviewPeek }) {
   return (
     <TodayPage
       review={review}
-      board={todayPageBoard}
+      closest={todayPageClosest}
+      board={withoutClosestDebriefs(todayPageBoard, todayPageClosest)}
       summary={summariseSearch(
         todayPageRows,
         todayPageBoard.interviews.map((interview) => ({
@@ -4178,8 +4213,8 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Today, where Jobs opens (plan #1591): the review strip, This week, the
-     * live applications by whose move it is, and what came in since. */
+    /* Today, where Jobs opens (plan #1591): the review strip, the
+     * applications closest to an offer, This week, the live applications by whose move it is, and what came in since. */
     id: 'jobs-today',
     label: 'Today',
     module: 'jobs',
@@ -4690,6 +4725,20 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <AskDashSurface open question="What did I spend on eBay flips this quarter?">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* An answer being written (plan #1902): the lookup that ran sits under
+     * Dash's name, and the answer's first sentences follow it as they arrive,
+     * the mark showing Dash writing. The fixture holds it there. */
+    id: 'ask-dash-writing',
+    label: 'Ask Dash · An answer being written',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open question={WRITING_QUESTION}>
         <PreviewShell />
       </AskDashSurface>
     ),

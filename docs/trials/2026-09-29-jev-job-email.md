@@ -20,7 +20,8 @@ whatever Jev's confidence.
 
 ## How it was run
 
-The job is `inngest/jobs/cron/jev-trial.ts`, behind `/api/cron/jev-trial`. The
+The job was `inngest/jobs/cron/jev-trial.ts`, behind `/api/cron/jev-trial`; both
+were removed once Tier B shipped, and the answers stay in the table. The
 ledger never stores an email's body, so the job fetched each body from Gmail
 again. It then asked Jev the question in `lib/jobs/email/jev-question.ts`: the
 eleven classifications, each with a one-line meaning, plus `other`. Jev saw the

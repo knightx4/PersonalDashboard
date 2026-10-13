@@ -169,9 +169,26 @@ export const TRIP_GOAL = '/goals/00000000-0000-4000-8000-0000000000a1';
  */
 export const FAILING_QUESTION = 'How much did I spend on flights this year?';
 
+/**
+ * The question the gallery's fixture is caught answering (plan #1902): its
+ * lookups are done and the answer has got a few words into its second
+ * sentence, where it stays, so the sheet shows an answer being written.
+ */
+export const WRITING_QUESTION = 'What did I spend on eBay flips this quarter, and what is still unsold?';
+
+/** Hands `body` to `onText` a few words at a time, as the route's text lines arrive. */
+async function writeOut(body: string, onText: ((piece: string) => void) | undefined, wait: (ms: number) => Promise<unknown>) {
+  if (!onText) return;
+  const pieces = body.match(/\S+\s*/g) ?? [];
+  for (let i = 0; i < pieces.length; i += 3) {
+    onText(pieces.slice(i, i + 3).join(''));
+    await wait(40);
+  }
+}
+
 const FIXTURES: AskSource = {
-  ask: async (question, _ref, _page, onLookup) => {
-    // The lookups appear one by one while the answer is written (plan #1438).
+  ask: async (question, _ref, _page, onLookup, _files, _list, onText) => {
+    // The lookups appear one by one, then the answer as it is written (plans #1438, #1902).
     const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const search = { id: 'l1', index: 0, name: 'search', input: { query: question.slice(0, 40) } };
     onLookup?.({ phase: 'started', ...search });
@@ -186,10 +203,20 @@ const FIXTURES: AskSource = {
         error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.',
       };
     }
-    if (/^(add|remind)/i.test(question)) {
-      return { conversation, ...proposalTo(question), stop: 'answered' };
+    if (question === WRITING_QUESTION) {
+      const body = answerTo(question)[1].body;
+      await writeOut(`${body.split('. ')[0]}. Two of them are still`, onText, wait);
+      // Held here, mid-answer, for the gallery's photograph.
+      return new Promise(() => {});
     }
-    return { conversation, turns: answerTo(question), stop: 'answered' };
+    if (/^(add|remind)/i.test(question)) {
+      const proposal = proposalTo(question);
+      await writeOut(proposal.turns[1].body, onText, wait);
+      return { conversation, ...proposal, stop: 'answered' };
+    }
+    const turns = answerTo(question);
+    await writeOut(turns[1].body, onText, wait);
+    return { conversation, turns, stop: 'answered' };
   },
   recent: async () => ({ conversations: RECENT }),
   // A goal's page names the goal; every other page keeps the sheet's own
@@ -220,7 +247,11 @@ const FIXTURES: AskSource = {
 function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }) {
   const handle = useAskDash();
   useEffect(() => {
-    handle?.open(question, rows);
+    // A tick after hydration, as a press would: a question sent from inside
+    // the hydrating render showed nothing until its answer landed, so the
+    // lookups and the answer being written never drew (plan #1902).
+    const timer = setTimeout(() => handle?.open(question, rows), 0);
+    return () => clearTimeout(timer);
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -142,12 +142,9 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
   'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
-  'app/jobs/(app)/find/actions.ts#suggestTracks': ['suggest-learning-tracks'],
   'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],
-  // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
-  'app/jobs/(app)/find/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
-  'app/jobs/(app)/recommend/actions.ts#suggestPeople': ['suggest-outreach'],
-  'app/jobs/(app)/recommend/actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
+  'app/jobs/(app)/find/recommend-actions.ts#suggestPeople': ['suggest-outreach'],
+  'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
   // Shopping
   'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],
@@ -279,17 +276,17 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/api/cron/youtube-library/route.ts#POST':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/job-suggestions/route.ts#GET':
-    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/find/recommend-actions.ts.',
   'app/api/cron/job-suggestions/route.ts#POST':
-    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/find/recommend-actions.ts.',
   'app/api/cron/job-openings/route.ts#GET':
     'Fired daily by pg_cron to read each open recommended role from its link and score the new ones with Jev; no press starts it.',
   'app/api/cron/job-openings/route.ts#POST':
     'Fired daily by pg_cron to read each open recommended role from its link and score the new ones with Jev; no press starts it.',
   'app/api/cron/job-search-batches/route.ts#GET':
-    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/find/recommend-actions.ts.',
   'app/api/cron/job-search-batches/route.ts#POST':
-    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/find/recommend-actions.ts.',
   'app/learn/now/actions.ts#loadMoreCards':
     'Called by the Learn now deck on its own while four cards are still ahead, to load the next few; no press starts it. The paid part is matching a card with no stored concept vector to your vault notes (plan #1113), one short embedding per card, paid once, since the vector is kept by the text\'s hash.',
 };

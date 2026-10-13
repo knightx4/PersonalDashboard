@@ -186,6 +186,8 @@ export async function answerQuestion(input: {
   now?: () => number;
   /** Hears each lookup start and finish. Whatever it throws is ignored. */
   onLookup?: (event: AskLookupEvent) => void;
+  /** Hears the answer's text as it is written (plan #1902); present, the calls stream. */
+  onText?: (piece: string) => void;
 }): Promise<AskAnswer> {
   const { page, ...rest } = input;
   return runDash({ ...rest, voice: ASK_VOICE, context: { surface: 'ask', subject: null, page: page ?? null } });
@@ -307,6 +309,8 @@ export async function askDash(
     now?: () => number;
     /** Hears each lookup start and finish (AskLookupEvent). */
     onLookup?: (event: AskLookupEvent) => void;
+    /** Hears the answer's text as it is written (plan #1902). */
+    onText?: (piece: string) => void;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -437,6 +441,7 @@ export async function askDash(
     client: input.client,
     now: input.now,
     onLookup: input.onLookup,
+    onText: input.onText,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);

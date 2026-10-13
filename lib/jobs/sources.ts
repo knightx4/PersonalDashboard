@@ -13,7 +13,7 @@ export const jobsSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
-      href: () => '/jobs/find',
+      href: () => '/jobs/settings#career-goals',
       note: 'A newer entry supersedes an older one where they disagree; read them newest first.',
     },
     {
@@ -160,7 +160,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.interview_groups', reason: 'Groups the interviews of one loop; the interviews hold the notes.' },
     { table: 'job_search.interview_group_messages', reason: 'Join rows between groups and mail.' },
     { table: 'job_search.suggestions', reason: 'What Dash suggested doing next (people to contact, postings to apply for); what was acted on is in contact_touches and roles.' },
-    { table: 'job_search.learning_tracks', reason: 'Tracks Claude suggested from the career goals; the ones started are Learn goals in learn.aims.' },
+    { table: 'job_search.learning_tracks', reason: 'Tracks once suggested from the career goals, kept as history; the ones started are Learn goals in learn.aims.' },
     { table: 'job_search.interview_participants', reason: 'Join rows between interviews and contacts.' },
     { table: 'job_search.jev_trial_answers', reason: 'A classifier trial\'s answers on mail already labelled; the labels are in ingested_messages.' },
     { table: 'job_search.message_link_dismissals', reason: 'Dismissed suggestions in the inbox.' },

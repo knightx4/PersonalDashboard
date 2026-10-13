@@ -1,4 +1,5 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { formatDate } from '@/lib/jobs/applications/load';
 import { readPreferences } from '@/lib/jobs/suggest/preferences';
 import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -51,11 +52,12 @@ export default async function SettingsPage({
     { data: profile },
     { data: accounts },
     { data: excludedSenders },
+    { data: thoughts },
   ] = await Promise.all([
       supabase
         .from('profiles')
         .select(
-          'search_started_on, ghost_threshold_days, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
+          'search_started_on, timezone, ghost_threshold_days, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
         )
         .eq('id', user.id)
         .single(),
@@ -69,6 +71,11 @@ export default async function SettingsPage({
       supabase
         .from('excluded_senders')
         .select('id, domain')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('thoughts')
+        .select('id, body, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
     ]);
@@ -96,6 +103,8 @@ export default async function SettingsPage({
       ).data ?? []) as BackfillRow[])
     : [];
 
+  const timezone = (profile?.timezone as string | null) ?? 'UTC';
+
   const latestBackfill = new Map<string, BackfillRow>();
   for (const row of backfills) {
     if (!latestBackfill.has(row.email_account_id)) latestBackfill.set(row.email_account_id, row);
@@ -105,7 +114,7 @@ export default async function SettingsPage({
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Settings"
-        description="What the job search needs. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."
+        description="What the job search needs, and what you want from the next job. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."
       />
       <SettingsView
         email={user.email ?? ''}
@@ -140,6 +149,17 @@ export default async function SettingsPage({
         excludedSenders={(excludedSenders ?? []).map((entry) => ({
           id: entry.id as string,
           domain: entry.domain as string,
+        }))}
+        careerGoals={(thoughts ?? []).map((row) => ({
+          id: row.id as string,
+          body: row.body as string,
+          written: formatDate(row.created_at as string, timezone),
+          // A minute's grace, because the insert and its trigger stamp both
+          // columns a few microseconds apart.
+          edited:
+            new Date(row.updated_at as string).getTime() - new Date(row.created_at as string).getTime() > 60_000
+              ? formatDate(row.updated_at as string, timezone)
+              : null,
         }))}
       />
     </div>

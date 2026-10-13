@@ -69,18 +69,17 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/material/actions.ts': {
     updateWritingVoice: none('setting'),
   },
-  'app/jobs/(app)/find/actions.ts': {
+  'app/jobs/(app)/settings/career-goal-actions.ts': {
     addThought: GAP,
     updateThought: GAP,
     deleteThought: none('deletes'),
-    suggestTracks: none('spends'),
-    startTrack: none('theirs'),
-    dismissTrack: none('theirs'),
+  },
+  'app/jobs/(app)/find/actions.ts': {
     saveAim: none('setting'),
     findStartups: none('spends'),
     addDiscoveredCompany: GAP,
   },
-  'app/jobs/(app)/recommend/actions.ts': {
+  'app/jobs/(app)/find/recommend-actions.ts': {
     suggestPeople: none('spends'),
     suggestOpenings: none('spends'),
     dismissSuggestion: none('theirs'),

@@ -19,6 +19,12 @@ export type MapParams = {
   colour: MapColour;
   labels: boolean;
   idea: string | null;
+  /**
+   * The domain whose ideas stand out while the map is coloured by domain:
+   * pressing a legend entry fades the rest, so a domain that shares the gray
+   * can still be found (Part 10, rule 10).
+   */
+  domain: string | null;
 };
 
 /**
@@ -26,7 +32,13 @@ export type MapParams = {
  * nearest, so groups read as groups. The axes layout is the honest flat
  * projection, and the page says how little of the spread two axes keep.
  */
-export const DEFAULT_PARAMS: MapParams = { layout: 'neighbours', colour: 'state', labels: false, idea: null };
+export const DEFAULT_PARAMS: MapParams = {
+  layout: 'neighbours',
+  colour: 'state',
+  labels: false,
+  idea: null,
+  domain: null,
+};
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -36,11 +48,13 @@ function one(value: string | string[] | undefined): string | undefined {
 
 export function parseMapParams(search: Search): MapParams {
   const idea = one(search.idea)?.trim();
+  const domain = one(search.domain)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
     colour: one(search.colour) === 'domain' ? 'domain' : 'state',
     labels: one(search.labels) === 'on',
     idea: idea ? idea : null,
+    domain: domain ? domain : null,
   };
 }
 
@@ -52,6 +66,7 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   if (next.colour !== DEFAULT_PARAMS.colour) query.set('colour', next.colour);
   if (next.labels) query.set('labels', 'on');
   if (next.idea) query.set('idea', next.idea);
+  if (next.domain) query.set('domain', next.domain);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }

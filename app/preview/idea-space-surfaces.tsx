@@ -383,7 +383,8 @@ export function IdeaSpaceSurface() {
 
 /**
  * The map as it is live today: the fields not placed yet, so there are no
- * names to turn on, drawn on the axes layout and coloured by domain.
+ * names to turn on, drawn on the axes layout and coloured by domain, with
+ * one of the domains that share the gray pressed in the legend.
  */
 export function IdeaSpaceDomainsSurface() {
   const view: IdeaMapView = {
@@ -391,5 +392,5 @@ export function IdeaSpaceDomainsSurface() {
     areas: { fields: [], domains: [], fieldsMissing: 47 },
     missing: 0,
   };
-  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, layout: 'axes', colour: 'domain' }} />;
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, layout: 'axes', colour: 'domain', domain: 'life' }} />;
 }

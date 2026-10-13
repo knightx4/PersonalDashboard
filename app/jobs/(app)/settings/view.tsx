@@ -24,6 +24,7 @@ import {
   type JobPreferences,
 } from '@/lib/jobs/suggest/preferences';
 import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
+import { ThoughtList, type ThoughtView } from './career-goals';
 
 /** The page's own three tones, in the four the Banner primitive names. */
 const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
@@ -42,6 +43,8 @@ export function SettingsView(props: {
   };
   accounts: InboxAccount[];
   excludedSenders: Array<{ id: string; domain: string }>;
+  /** The career goals entries, newest first, which the searches read. */
+  careerGoals: ThoughtView[];
 }) {
   return (
     <div className="space-y-6">
@@ -55,6 +58,9 @@ export function SettingsView(props: {
       {props.banner && <Banner tone={BANNER_TONE[props.banner.tone]}>{props.banner.text}</Banner>}
 
       <ProfileSection profile={props.profile} email={props.email} />
+      <div id="career-goals" className="scroll-mt-4">
+        <ThoughtList thoughts={props.careerGoals} />
+      </div>
       <InboxSection accounts={props.accounts} gmailConfigured={props.gmailConfigured} />
       <BookmarkletSection appOrigin={props.appOrigin} />
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />

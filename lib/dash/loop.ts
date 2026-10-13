@@ -42,7 +42,9 @@ import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } fro
  * finished. Only a run whose lookups found nothing ends in an error.
  *
  * `onLookup` hears each call as it starts and as it finishes, which is what
- * a page showing the lookups while they run listens to.
+ * a page showing the lookups while they run listens to. `onText` hears the
+ * answer's words as the model writes them (plan #1902), which streams the
+ * calls; without it each call is one request.
  */
 
 /** The most lookups and proposals one answer may make. */
@@ -474,6 +476,142 @@ export function citedSearchText(content: readonly { type: string; citations?: un
   return out;
 }
 
+/** What a JSON escape stands for, beyond the characters that stand for themselves. */
+const JSON_ESCAPES: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
+
+/**
+ * The `answer` field of an answer call's input as far as it has been written
+ * (plan #1902): `partial` is the input's JSON as it streams, cut anywhere.
+ * Walks the object's top level, so an `answer` key inside `cited` is never
+ * read, and decodes the string up to its closing quote or the end of what has
+ * arrived. An escape cut in half is left for the next piece, so what this
+ * returns only ever grows. Empty until the field's opening quote arrives.
+ */
+export function answerSoFar(partial: string): string {
+  let i = 0;
+  const n = partial.length;
+  const space = () => {
+    while (i < n && /\s/.test(partial[i])) i++;
+  };
+  /** Reads a string starting at its opening quote; `whole` false when cut off. */
+  const string = (): { text: string; whole: boolean } => {
+    let text = '';
+    i++; // the opening quote
+    while (i < n) {
+      const c = partial[i];
+      if (c === '"') {
+        i++;
+        return { text, whole: true };
+      }
+      if (c !== '\\') {
+        text += c;
+        i++;
+        continue;
+      }
+      if (i + 1 >= n) return { text, whole: false };
+      const e = partial[i + 1];
+      if (e === 'u') {
+        const hex = partial.slice(i + 2, i + 6);
+        if (hex.length < 4) return { text, whole: false };
+        text += String.fromCharCode(parseInt(hex, 16));
+        i += 6;
+        continue;
+      }
+      text += JSON_ESCAPES[e] ?? e;
+      i += 2;
+    }
+    return { text, whole: false };
+  };
+  /** Steps over any value; false when the input ends inside it. */
+  const skip = (): boolean => {
+    space();
+    if (i >= n) return false;
+    if (partial[i] === '"') return string().whole;
+    if (partial[i] === '{' || partial[i] === '[') {
+      let depth = 0;
+      while (i < n) {
+        const c = partial[i];
+        if (c === '"') {
+          if (!string().whole) return false;
+          continue;
+        }
+        if (c === '{' || c === '[') depth++;
+        if (c === '}' || c === ']') depth--;
+        i++;
+        if (depth === 0) return true;
+      }
+      return false;
+    }
+    while (i < n && !/[,}\]\s]/.test(partial[i])) i++;
+    return i < n;
+  };
+
+  space();
+  if (partial[i] !== '{') return '';
+  i++;
+  for (;;) {
+    space();
+    if (i >= n || partial[i] !== '"') return '';
+    const key = string();
+    if (!key.whole) return '';
+    space();
+    if (partial[i] !== ':') return '';
+    i++;
+    space();
+    if (key.text === 'answer') return partial[i] === '"' ? string().text : '';
+    if (!skip()) return '';
+    space();
+    if (partial[i] !== ',') return '';
+    i++;
+  }
+}
+
+/**
+ * One call to the model. With `onText`, streamed: the answer's text is handed
+ * out as the model writes it, from the `answer` call's input or, on the last
+ * call that may not use a tool, from its prose (plan #1902). The answer tool
+ * is sent with eager input streaming, since otherwise the API holds its
+ * whole `answer` field back until it is written. Without `onText`, one
+ * request, as before.
+ */
+async function callModel(
+  client: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  onText: ((piece: string) => void) | undefined,
+  finishName: string,
+): Promise<Anthropic.Message> {
+  if (!onText) return client.messages.create(params);
+  const tools = params.tools?.map((tool) =>
+    'name' in tool && tool.name === finishName && !('type' in tool && tool.type)
+      ? ({ ...tool, eager_input_streaming: true } as Anthropic.Tool)
+      : tool,
+  );
+  const stream = client.messages.stream({ ...params, ...(tools ? { tools } : {}) });
+  // The answer call's input as it arrives, by content block index.
+  const answering = new Map<number, string>();
+  let told = '';
+  const tell = (text: string) => {
+    if (text.length <= told.length || !text.startsWith(told)) return;
+    const piece = text.slice(told.length);
+    told = text;
+    onText(piece);
+  };
+  stream.on('streamEvent', (event) => {
+    if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
+      if (event.content_block.name === finishName) answering.set(event.index, '');
+    } else if (event.type === 'content_block_delta') {
+      if (event.delta.type === 'input_json_delta' && answering.has(event.index)) {
+        const json = answering.get(event.index)! + event.delta.partial_json;
+        answering.set(event.index, json);
+        tell(answerSoFar(json));
+      } else if (event.delta.type === 'text_delta' && params.tool_choice?.type === 'none') {
+        tell(told + event.delta.text);
+      }
+    }
+  });
+  return stream.finalMessage();
+}
+
 /** What runDash is handed. */
 export type DashRun = {
   voice: DashVoice;
@@ -511,6 +649,14 @@ export type DashRun = {
   now?: () => number;
   /** Hears each call start and finish. Whatever it throws is ignored. */
   onLookup?: (event: DashLookupEvent) => void;
+  /**
+   * Hears the answer's text as it is written, one piece at a time, each
+   * following the last (plan #1902). Present, the calls are streamed. What it
+   * hears is a draft: the answer returned is the one to keep, and can differ
+   * (a limit's note added, or an answer built from the lookups when the
+   * written one failed). Whatever it throws is ignored.
+   */
+  onText?: (piece: string) => void;
 };
 
 /**
@@ -544,6 +690,15 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       console.error('ask lookup listener failed', error);
     }
   };
+  const onText = input.onText
+    ? (piece: string) => {
+        try {
+          input.onText?.(piece);
+        } catch (error) {
+          console.error('ask text listener failed', error);
+        }
+      }
+    : undefined;
   const fail = (detail: string): DashAnswer => {
     const built = answerFromLookups(found);
     if (!built) return { ok: false, detail, toolCalls };
@@ -631,14 +786,19 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     let response: Anthropic.Message;
     try {
-      response = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        system,
-        tools,
-        tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
-        messages: withRollingBreakpoint(messages),
-      });
+      response = await callModel(
+        client,
+        {
+          model,
+          max_tokens: maxTokens,
+          system,
+          tools,
+          tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
+          messages: withRollingBreakpoint(messages),
+        },
+        onText,
+        finishName,
+      );
     } catch (error) {
       return fail(error instanceof Error ? error.message : 'The answer failed.');
     }
@@ -792,14 +952,19 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         );
         let prose: Anthropic.Message;
         try {
-          prose = await client.messages.create({
-            model,
-            max_tokens: maxTokens,
-            system,
-            tools,
-            tool_choice: { type: 'none' },
-            messages: withRollingBreakpoint(messages),
-          });
+          prose = await callModel(
+            client,
+            {
+              model,
+              max_tokens: maxTokens,
+              system,
+              tools,
+              tool_choice: { type: 'none' },
+              messages: withRollingBreakpoint(messages),
+            },
+            onText,
+            finishName,
+          );
         } catch (error) {
           return fail(error instanceof Error ? error.message : 'The answer failed.');
         }

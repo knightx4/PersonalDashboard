@@ -26,7 +26,7 @@ import { sendToPerson } from '@/lib/push/send';
  * accounts cost nothing. One person's failure is noted and the rest go on.
  *
  * Each search that runs is logged in job_search.search_runs with its stage,
- * so Roles can say how the last one went (lib/jobs/suggest/search-runs.ts).
+ * so Find can say how the last one went (lib/jobs/suggest/search-runs.ts).
  *
  * Reading the postings and scoring them is a separate daily call
  * (runOpeningUpkeep below, /api/cron/job-openings): the searches alone can
