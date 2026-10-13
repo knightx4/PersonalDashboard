@@ -168,6 +168,36 @@ pixel of spacing, a shade you would have picked differently, or a wording you
 would have written another way is below that bar. Mention it in `notes` if it
 is worth mentioning at all.
 
+## Surfaces with a chart
+
+Do this section only when a shot contains a chart, a map or a diagram: marks
+plotted on an area or along axes, nodes joined by lines. A table, a list, a
+form or a row of figures is not one, and a surface with none of these is
+judged as above and nothing here applies.
+
+For a surface that has one, also read Part 10 of `docs/UI-QUALITY-SPEC.md`
+and judge the chart against its ten rules. Three of them are numbered rules
+in the spec's Rules section, and these are the faults to look for first:
+
+- **R12**: the accent marks only what the chart's question is about. A fix
+  when the accent sits on marks the caption or heading does not make the
+  subject, or when everything is in the accent.
+- **R13**: missing, unknown or unvisited items are drawn as hollow marks near
+  the size of filled ones, and no label covers a mark. A fix when they are
+  left out, shrunk to specks, or a label sits on top of a mark.
+- **R14**: picking a mark fades the marks unrelated to it. A fix when a shot
+  shows a mark picked and nothing faded.
+
+The other rules in Part 10 (quiet labels, axes in words, dashed structure
+under the marks, a caption, marks at least 4 pixels, help past three
+categories) are not numbered rules. Cite them by their number in Part 10.
+
+Cite these as spec rules, not laws, in `breaks`: `"spec R12"`, `"spec R13"`,
+`"spec R14"`, and `"spec part 10 rule <n>"` for the rest. A chart's accent is
+the one place law 4 gives way to Part 10, so do not cite law 4 against an
+accent that rule 1 allows. The same bar applies as everywhere else: a fix
+names a shot where you can see the fault.
+
 ## The verdict
 
 Pass when no shot and no strip has a fix in it. A pass is a real finding: a clean screen
@@ -234,8 +264,9 @@ block, so it must parse, and nothing after it.
 - `where` names the part of the screen as a person would point at it.
 - `problem` says what is wrong in the picture, not in the code.
 - `breaks` is `"law <n>"`, `"taste:<id>"`, `"pattern"`, `"done-when"`,
-  `"regression"`, or one of the four craft checks: `"craft:press"`,
-  `"craft:motion"`, `"craft:moment"` or `"craft:wording"`.
+  `"regression"`, `"spec R<n>"` (chart surfaces only, see above), or one of
+  the four craft checks: `"craft:press"`, `"craft:motion"`, `"craft:moment"`
+  or `"craft:wording"`.
   One per fix; if two apply, cite the narrower one, which is usually the
   preference.
 - `change` says what the picture should show instead. It names no file and no
