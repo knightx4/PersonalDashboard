@@ -2,6 +2,7 @@ import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
 import { stepHref } from '@/lib/goals/all-goals';
 import { statusLabel } from '@/lib/jobs/status-label';
+import { noteHref } from '@/lib/vault/paths';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -41,6 +42,8 @@ export function changeHref(change: DashChange): string {
       return change.input.change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
     case 'move_roles':
       return '/jobs/pipeline';
+    case 'add_quick_note':
+      return noteHref(change.input.path);
   }
 }
 
@@ -210,6 +213,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return itemWords(change.input, done);
     case 'move_roles':
       return roleWords(change.input, done);
+    case 'add_quick_note':
+      return {
+        verb: done ? 'Saved the quick note' : 'Save the quick note',
+        what: quoted(change.input.body),
+        rest: " in your vault's Inbox",
+      };
   }
 }
 
@@ -256,5 +265,7 @@ export function changeWhere(change: DashChange): string {
       return change.input.change === 'for_sale' ? 'Open the sell page' : 'Open the inventory';
     case 'move_roles':
       return 'Open the pipeline';
+    case 'add_quick_note':
+      return 'Open the note';
   }
 }

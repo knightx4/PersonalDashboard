@@ -16,8 +16,8 @@ export const devActions: ModuleActions = {
     flipFiled: GAP,
   },
   'app/dev/ideas/actions.ts': {
-    addIdea: tool('file_idea'),
-    submitIdea: tool('file_idea'),
+    addIdea: tool('file_idea', 'add_idea'),
+    submitIdea: tool('file_idea', 'add_idea'),
     updateIdea: tool('reword'),
     dismissIdea: none('theirs'),
     restoreIdea: none('theirs'),
