@@ -544,6 +544,25 @@ function dense(count: number): IdeaMapView {
   };
 }
 
+/**
+ * One place opened as a graph (plan #1997.7): every idea in it named in
+ * full, its links drawn, the ideas next door round the edge, and one idea
+ * pointed at so all its links show with their scores.
+ */
+export function IdeaSpacePlaceSurface() {
+  const place = VIEW.places.find((p) => p.name === 'How memory holds on')!;
+  const pointed = VIEW.ideas.find((idea) => idea.name === 'Retrieval practice beats rereading')!.id;
+  return (
+    <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: place.id }} pointingAt={pointed} />
+  );
+}
+
+/** An idea in no place opened as its neighbourhood: itself and its six nearest. */
+export function IdeaSpaceAroundSurface() {
+  const loose = VIEW.ideas.find((idea) => idea.name === 'Write the summary before the detail')!.id;
+  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, around: loose }} />;
+}
+
 export function IdeaSpaceDenseSurface() {
   const view = useMemo(() => dense(10_000), []);
   return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} />;
