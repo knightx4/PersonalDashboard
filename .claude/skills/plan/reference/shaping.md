@@ -160,6 +160,15 @@ not held.
    gives the rule to the design critic, which judges the screen against it.
    A step that changes no screen has no pattern line.
 
+   **A step that adds a screen lists its hidden parts.** The hidden-parts rule
+   in `docs/UI-QUALITY-SPEC.md` asks for every screen to list what only
+   shows on some visits: hover controls, popovers, drawers, the empty,
+   loading and error states, and comment indicators. When you shape a
+   feature that adds a screen, put that list in the step's `--detail`, after
+   the pattern line, one part per line with what triggers it. A screen with
+   none of a kind says so ("no drawer") instead of leaving the kind out.
+   The same holds when you draft a spec change that describes a screen.
+
    **A screen that fits none of them is a decision for the person.** Every
    later screen of that kind would follow it, so do not invent the layout in
    a step's detail. Write the decision under the feature and make the step
