@@ -486,7 +486,7 @@ Checked by: count `shell-mounts`, baseline 15, target 1, pending #1928.
 Checked by: test `tests/route-states.test.ts`, pending #1923.
 
 **R11.** Opening `/` while signed in is one redirect, to Home.
-Checked by: test `tests/proxy-launch.test.ts`, pending #1920.
+Checked by: test `tests/proxy-launch.test.ts`.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.

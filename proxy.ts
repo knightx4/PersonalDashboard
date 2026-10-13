@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { sessionUser } from '@/lib/auth/session-user';
 import { signInRedirect } from '@/lib/paths';
 import { pageView } from '@/lib/usage/page-view';
+import { ONBOARDED_COOKIE } from '@/lib/onboarded-cookie';
 
 /**
  * Session refresh and route protection (Next 16 proxy convention; this file
@@ -121,12 +122,15 @@ export default async function proxy(request: NextRequest, event?: NextFetchEvent
   // in showed a homepage inviting you to sign in -- on a phone, where the app
   // is opened from a bookmark, that is every visit.
   //
-  // Sent to /onboarding rather than straight to the dashboard because that is
-  // the page that knows which it should be: it forwards a finished account to
-  // /shopping/dashboard and keeps an unfinished one where it belongs.
+  // Opening the app from its icon is one redirect (plan #1920, R11): to Home
+  // when the pt_onboarded cookie says the account has finished onboarding.
+  // Without it the visit goes to /onboarding, the page that knows whether the
+  // account is finished; that page sends a finished one through
+  // /api/onboarding/launch, which sets the cookie. This early return records
+  // no page view for the hop.
   if (user && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone();
-    url.pathname = '/onboarding';
+    url.pathname = request.cookies.get(ONBOARDED_COOKIE)?.value ? '/home' : '/onboarding';
     url.search = '';
     return NextResponse.redirect(url);
   }
