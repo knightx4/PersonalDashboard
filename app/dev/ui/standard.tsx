@@ -515,19 +515,22 @@ const DENSITY_IDS = ['comfortable', 'snug', 'dense'] as const;
 /** The page in order, for the contents row. */
 /** What each state of the Dash mark looks like, for the Marks section. */
 const DASH_STATE_NOTES: Record<DashState, string> = {
-  idle: 'The visor standing level, blinking now and then. The default.',
+  idle: 'The visor level, the core breathing and the eyes glancing round and blinking. The default.',
   asleep:
-    'Eyes shut, breathing slowly, with a z drifting up. For a Dash that has to be woken: the tag button on a comment, until it is pressed.',
+    'Eyes shut and the core down to a smouldering ember, with a z drifting up. For a Dash that has to be woken: the tag button on a comment, until it is pressed.',
   working:
-    'The visor leans forward and rattles, with speed lines streaming off the back. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion it keeps the lean.',
-  done: 'Happy eyes under a chequered flag, with one flash as it settles and the flag waving three times.',
-  failed: 'The visor hollow with flat eyes, under a plain flag hanging limp. Nothing moves. Always beside the error text.',
+    'The visor leans forward with speed lines streaming off the back and the core pulsing. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion it keeps the lean.',
+  asking:
+    'A question is waiting on you: the eyes look straight out and a question mark pulses beside the visor until you answer.',
+  done: 'The core turns green and the eyes smile, with a gentle bob.',
+  failed: 'No core, just clear glass and flat eyes, flickering now and then. Always beside the error text.',
 };
 
 /** The kinds of work a working mark can show, for the Marks section. */
 const DASH_ACTIVITY_NOTES: Record<DashActivity, string> = {
   reading: 'Eyes lowered and jumping along a line, over two lines of text.',
   searching: 'Eyes sweeping wide while a ring pings out from the visor.',
+  testing: 'Eyes running down a short checklist below the visor, each row ticking in turn.',
   writing: 'Eyes lowered to a line drawing out under the visor towards a blinking caret.',
   thinking: 'Eyes glancing up to one corner, then the other. At rest they look up into the corner.',
 };
@@ -1695,7 +1698,7 @@ export function UiStandard({
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Dash's mark is a visor cut from the app icon's dash. It is drawn in currentColor, so it takes the colour of where it sits, and each of its four states, and each kind of work it can show, has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a solid shape in the workspace's hue behind a pane of frosted glass, tinted on light themes so it holds an edge on white. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">

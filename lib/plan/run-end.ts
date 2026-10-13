@@ -433,3 +433,31 @@ export function staleLine(run: Pick<LastRun, 'createdAt' | 'lastLineAt'>, now: n
   if (now === 0) return 'Gone quiet.';
   return `Gone quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
 }
+
+/**
+ * The statuses of a run the overnight tick still counts as going.
+ *
+ * A run marked `stale` or waiting on an answer has not ended: its claims
+ * stand (`claimHeldByRun`) and the tick keeps its slot and its workspace
+ * (`featureRunsInFlight`). The runner card read only `started`, so on
+ * 13 October #1927's quiet session vanished from the card while it still held
+ * the app-wide workspace, and the card showed one session beside eight ready
+ * features with no sign of what they were waiting on.
+ */
+export const RUN_GOING_STATUSES = ['started', 'awaiting_input', 'stale'] as const;
+
+export function holdsSlot(status: string): boolean {
+  return (RUN_GOING_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * How far back a feature run still marked going is read as possibly going.
+ *
+ * `sweepQuietRuns` writes runs back on every tick, but only on the clock and on
+ * what their jobs left behind, so a run can still say `started` for up to two
+ * hours after its session went. Each one read costs a few queries, and
+ * `runLiveness` calls a run ended after two hours without a push, so a run
+ * older than this is not worth the reads. The runner card drops a quiet run
+ * fired before it for the same reason: the tick no longer counts it.
+ */
+export const IN_FLIGHT_LOOKBACK_MS = 6 * 60 * 60 * 1000;

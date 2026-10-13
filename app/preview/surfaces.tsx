@@ -22,7 +22,7 @@ import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
-import { DashMarkLooks } from './dash-mark-surface';
+import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
@@ -5633,15 +5633,14 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
 
-  /* Dash's mark wearing each of the four hats that tell the runner card's
-   * slots apart (plan #1702): idle, working and asleep, at 44 and 24 pixels,
-   * with bareheaded Dash first to show the plain mark is unchanged. */
+  /* Dash's mark in every state, and the runner card's four Dashes, each in
+   * its own visor and colour: every state at 44 and 24 pixels. */
   {
     id: 'dash-mark',
-    label: 'Dash · Hats for the runner’s four Dashes',
+    label: 'Dash · Dash and the runner’s four Dashes',
     module: 'dev',
     width: 'narrow',
-    render: () => <DashMarkLooks />,
+    render: () => <DashMarkRunners />,
   },
 
   /* Every shared component in components/ui, in each state it has. A change
