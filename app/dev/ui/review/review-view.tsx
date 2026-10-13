@@ -58,7 +58,7 @@ function StartReview({ scope }: { scope: UiScope }) {
     <form action={action} className="space-y-1">
       <input type="hidden" name="module" value={scope} />
       <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Play className="size-3.5" aria-hidden />
+        <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
         Review it
       </Button>
       {/* Said out loud, both ways. A pass that could not start looks exactly

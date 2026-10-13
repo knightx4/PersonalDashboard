@@ -436,7 +436,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
       triggerClassName={cn(
         list
           ? 'size-7 px-0 text-small font-medium'
-          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+          : 'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
         TONE_TEXT[health.tone],
       )}
       trigger={
@@ -777,6 +777,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {/* No "Who" column. It was a column of dashes with the occasional
                 name in it -- one fact, on a plan whose every approved step the
                 runner takes unless you keep it, and keeping it is a button. */}
+            {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
             <span className="hidden sm:flex sm:h-7 sm:items-center">
               <Breakdown rollup={node.rollup} />
             </span>

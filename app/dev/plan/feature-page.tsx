@@ -261,7 +261,7 @@ export function FeaturePage({
             align="start"
             // Pulled up by the room the press target adds, so its word sits on
             // the same line as Health's and Progress's beside it.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{statusWord}</span>}
           />
         }
@@ -316,7 +316,7 @@ export function FeaturePage({
             items={parts.priorityMenu}
             align="start"
             // Pulled up as Status is, so the gap above it matches the others.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           />
         }

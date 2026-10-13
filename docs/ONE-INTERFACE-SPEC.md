@@ -499,7 +499,7 @@ Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
 Checked by: count `off-token-radius`, baseline 199, target 0.
 
 **R15.** Lucide icons are drawn at one stroke weight.
-Checked by: count `icon-stroke-off`, baseline 184, target 0, pending #1926.
+Checked by: count `icon-stroke-off`, baseline 31, target 0.
 
 **R16.** The phone top bar holds at most four controls.
 Checked by: audit.

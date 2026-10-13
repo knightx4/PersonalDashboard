@@ -416,7 +416,7 @@ function RoundMail({
             aria-label="Add an email to this round"
             defaultValue=""
             disabled={pending}
-            className="mt-1.5 h-7 w-full max-w-96 py-0 text-small"
+            className="mt-1.5 w-full max-w-96 py-0 text-small"
             onChange={(event) => {
               const messageId = event.target.value;
               if (!messageId) return;

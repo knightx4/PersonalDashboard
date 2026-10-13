@@ -158,7 +158,7 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
         href="/dev/plan?view=all"
         className={cn('press-area inline-flex items-center gap-1.5 text-small', linkVariants())}
       >
-        <Sparkles className="size-3.5" aria-hidden />
+        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}
       </Link>
     );
@@ -168,7 +168,7 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={idea.id} />
       <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Sparkles className="size-3.5" aria-hidden />
+        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
         {pending ? 'Sending…' : 'Shape into a plan'}
       </Button>
       {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"

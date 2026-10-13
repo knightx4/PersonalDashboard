@@ -13,6 +13,7 @@ export default function Loading() {
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <div className="border-b border-border-strong pb-6 pt-2">
           <Skeleton className="h-3.5 w-28" />
+          {/* ui-ok: fixed-control-height -- stands in for the page title, not a control */}
           <Skeleton className="mt-3 h-12 w-80 max-w-full" />
         </div>
         <div className="mt-2 divide-y divide-border">

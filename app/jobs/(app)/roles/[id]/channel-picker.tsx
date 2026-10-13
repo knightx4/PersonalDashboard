@@ -71,7 +71,7 @@ export function ChannelPicker({
           // A referral still has a name to pick; anything else is settled.
           if (next !== 'referral') setEditing(false);
         }}
-        className="h-8 w-full px-1.5 text-ui max-sm:min-h-11"
+        className="w-full px-1.5 text-ui max-sm:min-h-11"
       >
         {APPLICATION_SOURCES.map((option) => (
           <option key={option} value={option}>
@@ -89,7 +89,7 @@ export function ChannelPicker({
             run({ source: 'referral', referralContactId: event.target.value || null });
             setEditing(false);
           }}
-          className="h-8 w-full px-1.5 text-ui max-sm:min-h-11"
+          className="w-full px-1.5 text-ui max-sm:min-h-11"
         >
           <option value="">Who referred you?</option>
           {contacts.map((contact) => (

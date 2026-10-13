@@ -535,6 +535,7 @@ function CapturePanel({
                 value={isCalendarDay(day) ? day : ''}
                 onChange={(event) => setDay(event.target.value)}
                 className={cn(
+                  // ui-ok: fixed-control-height -- sits in a row of Chips, which are h-7, and matches them
                   'tabular h-7 rounded-control bg-transparent px-2 text-small outline-none transition-colors duration-quick',
                   'focus:ring-1 focus:ring-accent/40',
                   isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
