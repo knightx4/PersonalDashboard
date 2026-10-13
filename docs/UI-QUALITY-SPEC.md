@@ -407,6 +407,21 @@ that has one.
 The Idea Space sketch the person preferred, at
 https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.
 
+## Part 11: Quiet outlines on controls
+
+A button's words and fill already say it is a button, so its outline does
+not have to. Today every control is outlined in `--c-border-control`, a mid
+gray picked to meet the 3:1 contrast floor for control edges, and on a busy
+page those outlines are the darkest lines after the text. Buttons and
+segmented controls are outlined in `--c-border-strong` instead, the light
+border colour. The chosen segment of a segmented control is filled in the
+accent tint with accent text, so which one is on still stands apart at 3:1.
+Text inputs keep the stronger outline, since an empty box has no words to
+identify it, and so does the keyboard focus ring.
+
+The person asked for this on 12 October 2026, comparing the app's buttons
+with the thinner outlines on the Idea Space sketch.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -457,6 +472,9 @@ Checked by: audit.
 Checked by: audit.
 
 **R14.** Picking a mark in a chart fades the marks unrelated to it.
+Checked by: audit.
+
+**R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
 Checked by: audit.
 
 ## Decisions
