@@ -1,4 +1,4 @@
-import { GAP, none, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * What the You pages let the person do, and the tool that does each
@@ -24,5 +24,9 @@ export const youActions: ModuleActions = {
     updateCourseAction: GAP,
     removeCourseAction: none('deletes'),
     removeTranscriptAction: none('deletes'),
+  },
+  'app/you/places/actions.ts': {
+    savePlace: tool('add_place', 'change_place'),
+    removePlace: none('deletes'),
   },
 };

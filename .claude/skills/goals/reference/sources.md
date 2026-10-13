@@ -484,6 +484,15 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 - Opens at `/you/personality`
 - kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
 
+### `you.places` (You)
+
+The places they have lived, with when they moved in and out.
+
+- Search: `name`, `city`, `region`, `country`, `note`
+- Name a row by `name`; link it by `id`
+- Opens at `/you/places/<id>`
+- moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
