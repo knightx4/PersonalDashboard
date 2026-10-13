@@ -20,6 +20,7 @@ export type ModuleId =
   | 'learn'
   | 'news'
   | 'goals'
+  | 'you'
   | 'dev';
 
 export type AppModule = {
@@ -107,6 +108,7 @@ export type MarkShape =
   | 'book'
   | 'envelope'
   | 'summit'
+  | 'person'
   | 'terminal';
 
 export interface MarkKey {
@@ -214,6 +216,21 @@ export const MODULES: readonly AppModule[] = [
     // colour, which means money came back, so it is checked against it in
     // scripts/check-contrast.ts like every accent.
     key: { shape: 'summit', from: '#5eeab0', to: '#05734e' },
+  },
+  {
+    id: 'you',
+    prefix: '/you',
+    // Personality, the first tab. /you redirects there too, but naming it
+    // here saves the switcher a redirect (plan #1991.1).
+    home: '/you/personality',
+    label: 'You',
+    description: 'Personality, places, work and school',
+    accent: '--color-w-you',
+    // Lime, in the widest gap left on the circle: OKLCH hue 128, midway
+    // between News' gold at 92 and Goals' emerald at 162, and nearly eighty
+    // degrees clear of the caution amber. Every cool hue from teal to violet
+    // is already taken, and the warm side is rose, delete red and caution.
+    key: { shape: 'person', from: '#b2e172', to: '#4d6f0b' },
   },
   {
     id: 'dev',
