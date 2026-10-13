@@ -143,7 +143,33 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-export type MarkFinish = 'solid' | 'glow';
+export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim';
+
+/**
+ * How each finish lights the pane. `top` and `bottom` are how much of the
+ * light end of the hue each end of the pane keeps (the rest is the deep end).
+ */
+const FINISHES: Record<
+  MarkFinish,
+  {
+    top: number;
+    bottom: number;
+    sheen: number;
+    halo: number;
+    core: number;
+    highlight: number;
+    back: number;
+    rim: number;
+    shadow: boolean;
+  }
+> = {
+  solid: { top: 78, bottom: 30, sheen: 0.42, halo: 0, core: 0, highlight: 0, back: 0.35, rim: 0, shadow: false },
+  glow: { top: 100, bottom: 55, sheen: 0.55, halo: 0.55, core: 0.85, highlight: 0.28, back: 0.5, rim: 0, shadow: false },
+  // Light kept inside the pane and low in it, under the detail rather than behind it.
+  soft: { top: 88, bottom: 42, sheen: 0.45, halo: 0, core: 0.5, highlight: 0.2, back: 0.42, rim: 0, shadow: true },
+  // An even pane with the light caught round its inside edge, like thick glass.
+  rim: { top: 72, bottom: 38, sheen: 0.32, halo: 0, core: 0, highlight: 0.14, back: 0.4, rim: 0.75, shadow: true },
+};
 
 function GlassObject({
   id,
@@ -162,13 +188,22 @@ function GlassObject({
 }) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
+  const look = FINISHES[finish];
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
   // The pane runs from the light end of the hue down towards the deep end, so
   // white detail holds on it even for the paler hues (Vault, News).
-  const glow = finish === 'glow';
-  const paneTop = glow ? from : `color-mix(in srgb, ${from} 78%, ${to})`;
-  const paneBottom = glow ? `color-mix(in srgb, ${from} 55%, ${to})` : `color-mix(in srgb, ${from} 30%, ${to})`;
+  const paneTop = `color-mix(in srgb, ${from} ${look.top}%, ${to})`;
+  const paneBottom = `color-mix(in srgb, ${from} ${look.bottom}%, ${to})`;
+  const light = `color-mix(in srgb, ${from} 55%, #fff)`;
+  const detail = (colour: string) => (
+    <>
+      <g fill="none" stroke={colour} strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
+        {lines}
+      </g>
+      {dots && <g fill={colour}>{dots}</g>}
+    </>
+  );
 
   return (
     <>
@@ -187,55 +222,67 @@ function GlassObject({
         <filter id={`${id}-halo`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={2.2} />
         </filter>
+        <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={0.45} />
+        </filter>
         <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
         <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
           <GlassEdgeStops />
         </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <stop offset="0" stopColor="#fff" stopOpacity={glow ? 0.55 : 0.42} />
-          <stop offset="0.5" stopColor="#fff" stopOpacity={glow ? 0.1 : 0.06} />
+          <stop offset="0" stopColor="#fff" stopOpacity={look.sheen} />
+          <stop offset="0.5" stopColor="#fff" stopOpacity={look.sheen * 0.18} />
           <stop offset="1" stopColor="#fff" stopOpacity={0} />
         </linearGradient>
       </defs>
 
-      {/* A soft shadow in the hue, under the whole object; with the glow
-          finish, a halo of light round it as well. */}
+      {/* A soft shadow in the hue, under the whole object. */}
       <g opacity={0.35} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill={to}>
         {back}
         {pane({})}
       </g>
-      {glow && <g opacity={0.55} filter={`url(#${id}-halo)`}>{pane({ fill: from })}</g>}
+      {look.halo > 0 && <g opacity={look.halo} filter={`url(#${id}-halo)`}>{pane({ fill: from })}</g>}
       <g fill={`url(#${id}-back)`}>{back}</g>
       {onBack && (
         <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
           {onBack}
         </g>
       )}
-      {/* The pane is solid colour, with just enough glass to it: the back
-          piece showing faintly through, a sheen across the top and a lit edge. */}
       {pane({ fill: `url(#${id}-pane)` })}
       <g clipPath={`url(#${id}-clip)`}>
-        <g fill={to} filter={`url(#${id}-blur)`} opacity={glow ? 0.5 : 0.35} transform="translate(-.5 .7)">
+        {/* The back piece, seen faintly through the glass. */}
+        <g fill={to} filter={`url(#${id}-blur)`} opacity={look.back} transform="translate(-.5 .7)">
           {back}
         </g>
-        {glow && (
-          <>
-            {/* Light from inside: a bright core in the middle of the pane. */}
-            <g filter={`url(#${id}-halo)`} transform="translate(12 13) scale(.55) translate(-12 -13)" opacity={0.85}>
-              {pane({ style: { fill: `color-mix(in srgb, ${from} 55%, #fff)` } })}
-            </g>
-            {/* And a highlight in the top-left corner, where the light catches. */}
-            <ellipse cx={7.5} cy={7.5} rx={4.5} ry={2.4} fill="#fff" opacity={0.28} filter={`url(#${id}-blur)`} />
-          </>
+        {look.core > 0 && (
+          <g
+            filter={`url(#${id}-halo)`}
+            transform={finish === 'soft' ? 'translate(12 18) scale(.6 .4) translate(-12 -18)' : 'translate(12 13) scale(.55) translate(-12 -13)'}
+            opacity={look.core}
+          >
+            {pane({ style: { fill: light } })}
+          </g>
+        )}
+        {look.rim > 0 && (
+          // The light caught round the inside edge.
+          <g filter={`url(#${id}-blur)`} opacity={look.rim}>
+            {pane({ fill: 'none', strokeWidth: 2.6, style: { stroke: light } })}
+          </g>
+        )}
+        {look.highlight > 0 && (
+          <ellipse cx={7.5} cy={7.5} rx={4.5} ry={2.4} fill="#fff" opacity={look.highlight} filter={`url(#${id}-blur)`} />
         )}
       </g>
       {pane({ fill: `url(#${id}-sheen)` })}
       {pane({ strokeWidth: 0.5, style: { stroke: `color-mix(in srgb, ${to} 55%, transparent)` } })}
-      {pane({ stroke: `url(#${id}-edge)`, strokeWidth: glow ? 0.65 : 0.55, opacity: glow ? 1 : 0.8 })}
-      <g fill="none" stroke="#fff" strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
-        {lines}
-      </g>
-      {dots && <g fill="#fff">{dots}</g>}
+      {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55, opacity: 0.85 })}
+      {/* A faint shadow under the white, so the detail separates from the colour. */}
+      {look.shadow && (
+        <g opacity={0.45} filter={`url(#${id}-soft)`} transform="translate(0 .5)">
+          {detail(`color-mix(in srgb, ${to} 75%, #000)`)}
+        </g>
+      )}
+      {detail('#fff')}
     </>
   );
 }
