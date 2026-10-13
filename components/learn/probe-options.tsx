@@ -3,6 +3,7 @@
 import { useFormStatus } from 'react-dom';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The options of one probe question, and the marks after it is answered.
@@ -63,18 +64,18 @@ export function ProbeOptions({
         <div key={option} className="relative">
           <AnswerButton index={index} label={option} disabled={Boolean(answered)} />
           {answered && index === answered.correctIndex && (
-            <Check
-              className="absolute right-3 top-3.5 size-4 text-ink-muted"
-              strokeWidth={2}
-              aria-label="The correct answer"
-            />
+            <Tooltip label="The correct answer" align="end" className="absolute right-3 top-3.5">
+              <span tabIndex={0} role="img" aria-label="The correct answer" className="inline-flex">
+                <Check className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+              </span>
+            </Tooltip>
           )}
           {answered && index === answered.chosenIndex && index !== answered.correctIndex && (
-            <X
-              className="absolute right-3 top-3.5 size-4 text-danger"
-              strokeWidth={2}
-              aria-label="What you picked"
-            />
+            <Tooltip label="What you picked" align="end" className="absolute right-3 top-3.5">
+              <span tabIndex={0} role="img" aria-label="What you picked" className="inline-flex">
+                <X className="size-4 text-danger" strokeWidth={2} aria-hidden />
+              </span>
+            </Tooltip>
           )}
         </div>
       ))}

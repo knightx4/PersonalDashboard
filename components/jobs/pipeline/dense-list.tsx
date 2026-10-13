@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -121,32 +122,35 @@ function PipelineLine({ row }: { row: PipelineRow }) {
           <span className="ml-2 text-ink-muted">{row.companyName}</span>
         </span>
 
+        {/* Inside the row's link, so the tip is for the mouse and the
+          * label reaches a screen reader through the link's name. */}
         {row.needsReview && (
-          <AlertTriangle
-            className="size-3.5 shrink-0 text-caution"
-            strokeWidth={2}
-            aria-label="Needs review"
-          />
+          <Tooltip label="Something on this role needs you to look at it" align="end" className="shrink-0">
+            <span role="img" aria-label="Needs review" className="inline-flex">
+              <AlertTriangle className="size-3.5 text-caution" strokeWidth={2} aria-hidden />
+            </span>
+          </Tooltip>
         )}
 
         {/* Excitement as a count rather than five glyphs: at this height the
           * stars were most of the row's ink for one number. */}
         {(row.excitement ?? 0) > 0 && (
-          <span className="tabular shrink-0 text-micro text-ink-ghost" title="Excitement">
-            {'★'.repeat(row.excitement ?? 0)}
-          </span>
+          <Tooltip label={`How excited you are about this role, ${row.excitement ?? 0} of 5`} align="end" className="shrink-0">
+            <span className="tabular text-micro text-ink-ghost">{'★'.repeat(row.excitement ?? 0)}</span>
+          </Tooltip>
         )}
 
         {row.coverage.total > 0 && (
-          <span
-            className={cn(
-              'tabular w-10 shrink-0 text-right text-micro',
-              row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-ghost',
-            )}
-            title="Requirements covered by your evidence"
-          >
-            {row.coverage.covered}/{row.coverage.total}
-          </span>
+          <Tooltip label="Requirements covered by your evidence" align="end" className="w-10 shrink-0 justify-end">
+            <span
+              className={cn(
+                'tabular text-right text-micro',
+                row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-ghost',
+              )}
+            >
+              {row.coverage.covered}/{row.coverage.total}
+            </span>
+          </Tooltip>
         )}
 
         <span

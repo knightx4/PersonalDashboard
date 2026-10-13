@@ -11,6 +11,7 @@ import { PROJECT_ANSWER_MAX, type ProjectView } from '@/lib/learn/lessons/projec
 import { PracticeData } from './p/[piece]/piece-view';
 import { handInPlanProject, writePlanProject, type ProjectResult } from './project-actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The final project at the foot of a goal's plan (plan #1146,
@@ -133,9 +134,17 @@ export function ProjectCard({
                 {latest.marks.map((mark, index) => (
                   <li key={index} className="flex items-start gap-1.5 text-ui">
                     {mark.met ? (
-                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={2} aria-label="Right" />
+                      <Tooltip label="This part of your answer is right" className="mt-0.5 shrink-0">
+                        <span tabIndex={0} role="img" aria-label="Right" className="inline-flex">
+                          <Check className="size-4 text-ink" strokeWidth={2} aria-hidden />
+                        </span>
+                      </Tooltip>
                     ) : (
-                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Missing" />
+                      <Tooltip label="This part is missing from your answer" className="mt-0.5 shrink-0">
+                        <span tabIndex={0} role="img" aria-label="Missing" className="inline-flex">
+                          <X className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+                        </span>
+                      </Tooltip>
                     )}
                     <span className={mark.met ? 'text-ink' : 'text-ink-muted'}>{mark.note}</span>
                   </li>

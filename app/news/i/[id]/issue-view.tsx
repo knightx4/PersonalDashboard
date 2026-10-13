@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -25,6 +26,7 @@ import type { StorySent } from '@/lib/news/saved/sent';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type IssueViewProps = {
   issueId: string;
@@ -112,6 +114,15 @@ export function IssueView({
   const actions = (compact: boolean) => {
     const label = compact ? 'sr-only' : undefined;
     const iconOnly = compact ? 'w-7 px-0' : undefined;
+    // Only the icon row names its buttons in a tip; the wide row says it in words.
+    const tip = (text: string, control: ReactElement<{ 'aria-describedby'?: string }>, end = false) =>
+      compact ? (
+        <Tooltip label={text} align={end ? 'end' : 'start'}>
+          {control}
+        </Tooltip>
+      ) : (
+        control
+      );
     const showPictures =
       showDigest || blockedImages === 0
         ? 'Show pictures'
@@ -139,25 +150,30 @@ export function IssueView({
             </Link>
           ))}
         {pictureCount > 0 && (
-          <Link
-            href={picturesHref}
-            title={pictures ? 'Hide pictures' : showPictures}
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
-          >
-            {pictures ? (
-              <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-            ) : (
-              <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-            )}
-            <span className={label}>{pictures ? 'Hide pictures' : showPictures}</span>
-          </Link>
+          tip(
+            pictures ? 'Hide pictures' : showPictures,
+            <Link
+              href={picturesHref}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+            >
+              {pictures ? (
+                <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
+              ) : (
+                <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+              )}
+              <span className={label}>{pictures ? 'Hide pictures' : showPictures}</span>
+            </Link>,
+          )
         )}
         <form action={markIssueUnread}>
           <input type="hidden" name="issueId" value={issueId} />
-          <Button type="submit" size="sm" variant="secondary" title="Mark unread" className={iconOnly}>
-            <CircleDot className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className={label}>Mark unread</span>
-          </Button>
+          {tip(
+            'Mark unread',
+            <Button type="submit" size="sm" variant="secondary" className={iconOnly}>
+              <CircleDot className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className={label}>Mark unread</span>
+            </Button>,
+          )}
         </form>
         {/*
           A plain link rather than a form, because nothing is sent on your
@@ -172,16 +188,19 @@ export function IssueView({
           header at all.
         */}
         {unsubscribeUrl && (
-          <a
-            href={unsubscribeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Unsubscribe"
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
-          >
-            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className={label}>Unsubscribe</span>
-          </a>
+          tip(
+            'Unsubscribe on the publisher’s page',
+            <a
+              href={unsubscribeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+            >
+              <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className={label}>Unsubscribe</span>
+            </a>,
+            true,
+          )
         )}
       </>
     );
@@ -299,7 +318,7 @@ export function IssueView({
                         <h3 className="break-words text-body font-semibold text-ink">
                           {story.headline}
                         </h3>
-                        <StoryRating rating={story.rating} className="mt-0.5 block" />
+                        <StoryRating rating={story.rating} className="mt-0.5 flex w-fit" />
                         <p className="mt-1 text-body leading-relaxed text-ink-muted">
                           {story.summary}
                         </p>
@@ -394,7 +413,7 @@ function LeadStory({
         <h2 className="break-words text-title font-semibold tracking-tight text-ink">
           {story.headline}
         </h2>
-        <StoryRating rating={story.rating} className="mt-1 block" />
+        <StoryRating rating={story.rating} className="mt-1 flex w-fit" />
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
         <AlsoInLine alsoIn={alsoIn} pictures={pictures} className="mt-1.5" />
         <StoryText text={story.text} summary={story.summary} />

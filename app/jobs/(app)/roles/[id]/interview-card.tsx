@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { Input, Label, Select } from '@/components/ui/field';
+import { Tooltip } from '@/components/ui/tooltip';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { RoundPrep } from './prep-note';
 import {
@@ -506,23 +507,25 @@ function Interviewers({
           {participant.role !== 'interviewer' && (
             <span className="text-ink-muted">{participant.role}</span>
           )}
-          <button
-            type="button"
-            disabled={pending}
-            aria-label={`Remove ${participant.name}`}
-            onClick={() =>
-              startTransition(
-                () =>
-                  void removeInterviewer({
-                    interviewId: interview.id,
-                    contactId: participant.contactId,
-                  }),
-              )
-            }
-            className="text-ink-muted hover:text-danger"
-          >
-            ×
-          </button>
+          <Tooltip label="Take this person off the interview">
+            <button
+              type="button"
+              disabled={pending}
+              aria-label={`Remove ${participant.name}`}
+              onClick={() =>
+                startTransition(
+                  () =>
+                    void removeInterviewer({
+                      interviewId: interview.id,
+                      contactId: participant.contactId,
+                    }),
+                )
+              }
+              className="text-ink-muted hover:text-danger"
+            >
+              ×
+            </button>
+          </Tooltip>
         </span>
       ))}
 

@@ -20,6 +20,7 @@ import {
   type FoldPress,
   subscribeToColumnFolded,
 } from '@/lib/vault/open-folders';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Folding the note list away on a laptop, so the note has the width (#1379).
@@ -183,18 +184,19 @@ export function FoldNoteListButton() {
   const ref = useTakesFocus('fold', hydrated && !folded);
   if (!hydrated) return null;
   return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={() => setFolded(true)}
-      title="Hide the note list"
-      aria-expanded={!folded}
-      aria-controls={NOTE_LIST_ID}
-      className="press hidden size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink lg:flex"
-    >
-      <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Hide the note list</span>
-    </button>
+    <Tooltip label="Hide the note list" className="hidden shrink-0 lg:inline-flex">
+      <button
+        ref={ref}
+        type="button"
+        onClick={() => setFolded(true)}
+        aria-expanded={!folded}
+        aria-controls={NOTE_LIST_ID}
+        className="press hidden size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink lg:flex"
+      >
+        <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+        <span className="sr-only">Hide the note list</span>
+      </button>
+    </Tooltip>
   );
 }
 

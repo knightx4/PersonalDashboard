@@ -7,6 +7,7 @@ import { StatusGlyph, StatusRing } from '@/components/ui/status-glyph';
 import { cn } from '@/lib/cn';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { MOTION_MS } from '@/lib/motion';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * A goal closing on its page (plan #1341): its hexagon completes with one
@@ -40,12 +41,14 @@ export function GoalGlyph({
   const reduceMotion = useReducedMotion();
   const ring = closed && changed && !reduceMotion;
   return (
-    <span className="relative inline-flex shrink-0">
-      <StatusGlyph glyph={glyph} label={label} size={size} className={closed ? 'text-ink' : 'text-ink-muted'} />
-      {/* Mounted with the close, so the keyframes play once; unmounted on a
-          reopen, so closing again plays it again. */}
-      {ring && <StatusRing size={size} className="goal-ring absolute inset-0 text-accent" />}
-    </span>
+    <Tooltip label={label} className="shrink-0">
+      <span tabIndex={0} className="relative inline-flex">
+        <StatusGlyph glyph={glyph} label={label} size={size} className={closed ? 'text-ink' : 'text-ink-muted'} />
+        {/* Mounted with the close, so the keyframes play once; unmounted on a
+            reopen, so closing again plays it again. */}
+        {ring && <StatusRing size={size} className="goal-ring absolute inset-0 text-accent" />}
+      </span>
+    </Tooltip>
   );
 }
 

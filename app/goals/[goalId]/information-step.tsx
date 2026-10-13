@@ -44,6 +44,7 @@ import { FieldInput } from './field-input';
 import { DocumentKinds } from './document-kinds';
 import { FillFromDocument } from './fill-from-document';
 import { RecordValue } from './record-value';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The record or table on an information step (plan #954; docs/GOALS-SPEC.md,
@@ -770,32 +771,35 @@ function ConfirmButton({
     },
     initial,
   );
+  const source = SOURCE_LABELS[record.source].toLowerCase();
+  const button = (
+    <Button
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={confirming}
+      aria-label={
+        updates
+          ? `Update the saved row with this draft ${source}`
+          : compact
+            ? `Confirm draft ${source}`
+            : undefined
+      }
+    >
+      {updates ? 'Update row' : 'Confirm'}
+    </Button>
+  );
+  // Where the draft came from, which the compact row and the update leave unsaid.
+  const tip = updates
+    ? `Draft, ${source}. Confirming puts these figures on the saved row with the same ID.`
+    : compact
+      ? `Draft, ${source}`
+      : null;
   return (
     <form action={confirm}>
       <input type="hidden" name="stepId" value={stepId} />
       <input type="hidden" name="recordId" value={record.id} />
-      <Button
-        type="submit"
-        size="sm"
-        variant="secondary"
-        pending={confirming}
-        aria-label={
-          updates
-            ? `Update the saved row with this draft ${SOURCE_LABELS[record.source].toLowerCase()}`
-            : compact
-              ? `Confirm draft ${SOURCE_LABELS[record.source].toLowerCase()}`
-              : undefined
-        }
-        title={
-          updates
-            ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}. Confirming puts these figures on the saved row with the same ID.`
-            : compact
-              ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}`
-              : undefined
-        }
-      >
-        {updates ? 'Update row' : 'Confirm'}
-      </Button>
+      {tip ? <Tooltip label={tip}>{button}</Tooltip> : button}
     </form>
   );
 }

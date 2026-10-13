@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import type { WeekConnection } from '@/lib/vault/notes/connections-load';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
@@ -52,16 +53,17 @@ export function NoteConnections({ connections }: { connections: readonly WeekCon
                 <NoteLink note={connection.older} />
               </p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label="Hide this connection"
-              title="Hide this connection"
-              onClick={() => run(connection.id)}
-            >
-              <X className="size-3.5" strokeWidth={2} aria-hidden />
-            </Button>
+            <Tooltip label="Hide this connection from the list" align="end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Hide this connection"
+                onClick={() => run(connection.id)}
+              >
+                <X className="size-3.5" strokeWidth={2} aria-hidden />
+              </Button>
+            </Tooltip>
           </li>
         ))}
       </ul>

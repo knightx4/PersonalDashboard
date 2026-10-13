@@ -24,6 +24,7 @@ import {
   type PracticeResult,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -321,9 +322,17 @@ function PracticeCard({
                 {latest.marks.map((mark, index) => (
                   <li key={index} className="flex items-start gap-1.5 text-ui">
                     {mark.met ? (
-                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={2} aria-label="Right" />
+                      <Tooltip label="This part of your answer is right" className="mt-0.5 shrink-0">
+                        <span tabIndex={0} role="img" aria-label="Right" className="inline-flex">
+                          <Check className="size-4 text-ink" strokeWidth={2} aria-hidden />
+                        </span>
+                      </Tooltip>
                     ) : (
-                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Missing" />
+                      <Tooltip label="This part is missing from your answer" className="mt-0.5 shrink-0">
+                        <span tabIndex={0} role="img" aria-label="Missing" className="inline-flex">
+                          <X className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+                        </span>
+                      </Tooltip>
                     )}
                     <span className={mark.met ? 'text-ink' : 'text-ink-muted'}>{mark.note}</span>
                   </li>

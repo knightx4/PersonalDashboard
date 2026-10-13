@@ -10,6 +10,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import {
@@ -127,16 +128,18 @@ export function OtherTests({
                   <p className="mt-1 break-words text-small text-ink">{row.note}</p>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="shrink-0"
-                onClick={() => remove(row)}
-                aria-label={`Delete ${row.typedValue} from ${row.testName}`}
-              >
-                <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
-              </Button>
+              <Tooltip label="Delete this result" align="end" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => remove(row)}
+                  aria-label={`Delete ${row.typedValue} from ${row.testName}`}
+                >
+                  <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
+                </Button>
+              </Tooltip>
             </li>
           ))}
         </ul>

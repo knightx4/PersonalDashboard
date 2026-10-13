@@ -6,6 +6,7 @@ import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, RotateCcw, Th
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { nowHref } from '@/lib/learn/flow/href';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
@@ -505,16 +506,17 @@ export function ClipStream({
       {current && (
         <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
           <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
-            <button
-              type="button"
-              onClick={() => nudge(-BACK_SECONDS)}
-              disabled={!begun}
-              aria-label={`Back ${BACK_SECONDS} seconds`}
-              title={`Back ${BACK_SECONDS} seconds`}
-              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2.5 size-11 shrink-0 px-0')}
-            >
-              <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
-            </button>
+            <Tooltip label={`Go back ${BACK_SECONDS} seconds`} className="-ml-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => nudge(-BACK_SECONDS)}
+                disabled={!begun}
+                aria-label={`Back ${BACK_SECONDS} seconds`}
+                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'size-11 shrink-0 px-0')}
+              >
+                <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+              </button>
+            </Tooltip>
             <span>{clockTime(elapsed)}</span>
             <input
               type="range"

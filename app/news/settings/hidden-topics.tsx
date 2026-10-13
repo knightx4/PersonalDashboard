@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import type { NewsTopic } from '@/lib/news/issues/topics';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { setTopicShown } from './actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Every topic, each pressed while Quick read shows it (note ee75aef9). Press
@@ -37,17 +38,18 @@ function TopicChip({ topic, shown }: { topic: NewsTopic; shown: boolean }) {
     write: (next) => setTopicShown(topic, next),
   });
   return (
-    <Button
-      type="button"
-      variant={on ? 'secondary' : 'ghost'}
-      size="sm"
-      aria-pressed={on}
-      title={on ? `Hide ${topic} from Quick read` : `Show ${topic} in Quick read`}
-      onClick={() => run(!on)}
-      className={cn(!on && 'line-through', failed && 'text-danger')}
-    >
-      {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
-      {topic}
-    </Button>
+    <Tooltip label={on ? `Hide ${topic} from Quick read` : `Show ${topic} in Quick read`}>
+      <Button
+        type="button"
+        variant={on ? 'secondary' : 'ghost'}
+        size="sm"
+        aria-pressed={on}
+        onClick={() => run(!on)}
+        className={cn(!on && 'line-through', failed && 'text-danger')}
+      >
+        {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+        {topic}
+      </Button>
+    </Tooltip>
   );
 }

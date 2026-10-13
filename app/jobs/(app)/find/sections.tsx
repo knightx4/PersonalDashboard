@@ -11,7 +11,8 @@ import { ChipSelect } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { ScoreReasons } from '@/components/jobs/ui/score-figures';
+import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
+import { Tooltip } from '@/components/ui/tooltip';
 import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
 import { OPENING_SOURCE_LABELS, OPENING_SOURCES, sourceText } from '@/lib/jobs/suggest/source';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
@@ -546,17 +547,19 @@ function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Dash's answers about this opening">
       {chips.map((chip) => (
-        <li
-          key={chip.key}
-          title={chip.unsure ? 'Dash is not sure of this one' : undefined}
-          className={cn(
-            'rounded-control px-1.5 py-0.5 text-small',
-            chip.tone === 'warn' ? 'bg-caution-tint text-caution' : 'bg-sunken text-ink-muted',
-            chip.unsure && 'opacity-70',
-          )}
-        >
-          {chip.label}
-          {chip.unsure ? '?' : ''}
+        <li key={chip.key} className="flex">
+          <Unsure unsure={chip.unsure}>
+            <span
+              className={cn(
+                'rounded-control px-1.5 py-0.5 text-small',
+                chip.tone === 'warn' ? 'bg-caution-tint text-caution' : 'bg-sunken text-ink-muted',
+                chip.unsure && 'opacity-70',
+              )}
+            >
+              {chip.label}
+              {chip.unsure ? '?' : ''}
+            </span>
+          </Unsure>
         </li>
       ))}
     </ul>
@@ -780,7 +783,7 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
     facts.push({
       key: 'fit',
       text: fitFact(suggestion, note.fit),
-      title: note.fit.reason ?? undefined,
+      title: note.fit.reason ?? 'How well the role fits your evidence, out of 100',
       figure: true,
     });
   }
@@ -803,15 +806,15 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
       {facts.map((fact, index) => (
         <span key={fact.key}>
           <span className="whitespace-nowrap">
-            <span
-              title={fact.title}
-              className={cn(
-                fact.figure && 'tabular',
-                fact.warn && 'text-caution',
-              )}
-            >
-              {fact.text}
-            </span>
+            {fact.title ? (
+              <Tooltip label={fact.title}>
+                <span tabIndex={0} className={cn(fact.figure && 'tabular', fact.warn && 'text-caution')}>
+                  {fact.text}
+                </span>
+              </Tooltip>
+            ) : (
+              <span className={cn(fact.figure && 'tabular', fact.warn && 'text-caution')}>{fact.text}</span>
+            )}
             {index < facts.length - 1 && <span aria-hidden> ·</span>}
           </span>{' '}
         </span>

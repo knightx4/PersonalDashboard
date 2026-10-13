@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Tooltip } from '@/components/ui/tooltip';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { TopicChips } from '@/components/news/topic-chips';
 import { topicHrefs } from '@/lib/news/topic-hrefs';
@@ -295,17 +296,19 @@ function NewsletterList({
             <form action={setSenderMuted} className="shrink-0 pr-2 pl-1">
               <input type="hidden" name="senderId" value={sender.id} />
               <input type="hidden" name="muted" value={sender.muted ? 'false' : 'true'} />
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                aria-label={sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`}
-              >
-                <BellOff
-                  className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
-                  strokeWidth={1.75}
-                />
-              </Button>
+              <Tooltip label={sender.muted ? 'Bring this newsletter back into Latest' : 'Keep this newsletter out of Latest'} align="end">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  aria-label={sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`}
+                >
+                  <BellOff
+                    className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
+                    strokeWidth={1.75}
+                  />
+                </Button>
+              </Tooltip>
             </form>
           </li>
         ))}

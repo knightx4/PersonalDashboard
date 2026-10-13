@@ -26,6 +26,7 @@ import {
 } from '@/lib/jobs/board-moment';
 import { completionMoment } from '@/components/motion/complete';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   CARD_ATTR,
   LANE_ATTR,
@@ -551,9 +552,16 @@ function PipelineCard({
               {row.roleTitle}
             </Link>
             {row.excitement !== null && (
-              <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
-                {'★'.repeat(row.excitement)}
-              </span>
+              <Tooltip label={`How excited you are about this role, ${row.excitement} of 5`} align="end" className="shrink-0">
+                <span
+                  tabIndex={0}
+                  role="img"
+                  aria-label={`Excitement ${row.excitement} of 5`}
+                  className="tabular text-small text-ink-muted"
+                >
+                  {'★'.repeat(row.excitement)}
+                </span>
+              </Tooltip>
             )}
           </div>
           {/*
@@ -575,29 +583,33 @@ function PipelineCard({
             </p>
             <div className="flex shrink-0 items-center gap-1.5">
               {coverage && (
-                <span
-                  className={cn(
-                    'tabular text-micro',
-                    row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
-                  )}
-                  title={`${coverage} covered by your evidence`}
-                >
-                  {row.coverage.covered}/{row.coverage.total}
-                </span>
+                <Tooltip label={`${coverage} covered by your evidence`} align="end">
+                  <span
+                    tabIndex={0}
+                    className={cn(
+                      'tabular text-micro',
+                      row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
+                    )}
+                  >
+                    {row.coverage.covered}/{row.coverage.total}
+                  </span>
+                </Tooltip>
               )}
               {row.needsReview && (
-                <AlertTriangle
-                  className="size-3.5 text-caution"
-                  strokeWidth={1.75}
-                  aria-label="Needs review"
-                />
+                <Tooltip label="Something on this role needs you to look at it" align="end">
+                  <span tabIndex={0} role="img" aria-label="Needs review" className="inline-flex">
+                    <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-hidden />
+                  </span>
+                </Tooltip>
               )}
-              <span
-                className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
-                title="Time since the last thing that happened"
-              >
-                {age}
-              </span>
+              <Tooltip label="Time since the last thing that happened" align="end">
+                <span
+                  tabIndex={0}
+                  className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
+                >
+                  {age}
+                </span>
+              </Tooltip>
             </div>
           </div>
           <ScoreLine note={row.scoreNote} />
@@ -684,15 +696,16 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
   }
 
   return (
-    <button
-      type="button"
-      title="Send straight to rejected"
-      onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
-    >
-      <Ban className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Send straight to rejected</span>
-    </button>
+    <Tooltip label="Send straight to rejected" align="end">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Ban className="size-4" strokeWidth={1.75} aria-hidden />
+        <span className="sr-only">Send straight to rejected</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -735,14 +748,15 @@ function Dismiss({ row }: { row: PipelineRow }) {
   }
 
   return (
-    <button
-      type="button"
-      title="Not a real pursuit — remove it"
-      onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
-    >
-      <X className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Not a real pursuit — remove it</span>
-    </button>
+    <Tooltip label="Not a real pursuit, so take it off the board" align="end">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <X className="size-4" strokeWidth={1.75} aria-hidden />
+        <span className="sr-only">Not a real pursuit — remove it</span>
+      </button>
+    </Tooltip>
   );
 }

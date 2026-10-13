@@ -44,6 +44,7 @@ import {
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
@@ -212,15 +213,21 @@ export function PastPeriods({
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-small text-ink-muted">
       <span>{summary}</span>
       <span className="inline-flex items-center gap-0.5">
-        {past.map((row) => (
-          <StatusGlyph
-            key={row.id}
-            glyph={row.kept ? 'check' : 'cross'}
-            label={`${period === 'day' ? formatDate(row.startsOn) : `From ${formatDate(row.startsOn)}`}: ${row.kept ? 'kept' : 'missed'}, ${row.count} of ${row.target}`}
-            size={14}
-            className={row.kept ? 'text-ink' : 'text-ink-muted'}
-          />
-        ))}
+        {past.map((row) => {
+          const said = `${period === 'day' ? formatDate(row.startsOn) : `From ${formatDate(row.startsOn)}`}: ${row.kept ? 'kept' : 'missed'}, ${row.count} of ${row.target}`;
+          return (
+            <Tooltip key={row.id} label={said}>
+              <span className="inline-flex">
+                <StatusGlyph
+                  glyph={row.kept ? 'check' : 'cross'}
+                  label={said}
+                  size={14}
+                  className={row.kept ? 'text-ink' : 'text-ink-muted'}
+                />
+              </span>
+            </Tooltip>
+          );
+        })}
       </span>
     </div>
   );

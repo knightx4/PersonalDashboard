@@ -13,6 +13,7 @@ import {
   unlinkRoundMessage,
 } from './interview-actions';
 import { InlineInput, Select } from '@/components/ui/field';
+import { Tooltip } from '@/components/ui/tooltip';
 import { GmailLink, NoteKindButton, CollapsibleField } from './shared';
 import { InterviewCard } from './interview-card';
 import { AddInterview } from './add-interview';
@@ -136,19 +137,21 @@ export function InterviewGroupCard({
     // interviews belong to which round without indenting them.
     <Card padding="dense" className="border-accent/40 bg-accent-tint/30">
       <header className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          aria-label={open ? 'Fold this round away' : 'Open this round'}
-          className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-accent"
-        >
-          <ChevronDown
-            className={cn('size-4 transition-transform duration-quick', !open && '-rotate-90')}
-            strokeWidth={1.75}
-            aria-hidden
-          />
-        </button>
+        <Tooltip label={open ? 'Hide this round' : 'Show this round'} className="shrink-0">
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-label={open ? 'Fold this round away' : 'Open this round'}
+            className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-accent"
+          >
+            <ChevronDown
+              className={cn('size-4 transition-transform duration-quick', !open && '-rotate-90')}
+              strokeWidth={1.75}
+              aria-hidden
+            />
+          </button>
+        </Tooltip>
         <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
         {/* The number is the round's, not the interviews'. Four conversations
             on one afternoon are all the second round; numbering each of them
@@ -399,20 +402,22 @@ function RoundMail({
               ) : (
                 <span className="text-ink">{message.subject ?? '(no subject)'}</span>
               )}
-              <button
-                type="button"
-                disabled={pending}
-                aria-label={`Take ${message.subject ?? 'this email'} off this round`}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await unlinkRoundMessage({ groupId, messageId: message.id });
-                    setError(result.error);
-                  })
-                }
-                className="text-ink-muted hover:text-danger"
-              >
-                ×
-              </button>
+              <Tooltip label="Take this email off the round">
+                <button
+                  type="button"
+                  disabled={pending}
+                  aria-label={`Take ${message.subject ?? 'this email'} off this round`}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await unlinkRoundMessage({ groupId, messageId: message.id });
+                      setError(result.error);
+                    })
+                  }
+                  className="text-ink-muted hover:text-danger"
+                >
+                  ×
+                </button>
+              </Tooltip>
             </li>
           ))}
         </ul>

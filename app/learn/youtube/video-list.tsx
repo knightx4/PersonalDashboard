@@ -7,6 +7,7 @@ import type { VideoRow } from '@/lib/learn/youtube/load';
 import type { TranscriptState } from '@/lib/learn/youtube/transcripts';
 import { transcribeVideoAction } from './actions';
 import { Press } from './press';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * A list of videos with each one's transcript state, as one surface.
@@ -52,13 +53,19 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
                   {video.title}
                 </span>
               </Link>
-              <span
-                className="flex items-center gap-1.5 text-small text-ink-muted"
-                title={video.note && video.state === 'failed' ? video.note : undefined}
-              >
-                {state && <StatusGlyph glyph={state.glyph} size={12} />}
-                <span className="min-w-0 truncate">{[state?.word, ...meta].filter(Boolean).join(' · ')}</span>
-              </span>
+              {video.note && video.state === 'failed' ? (
+                <Tooltip label={video.note} className="flex min-w-0">
+                  <span tabIndex={0} className="flex min-w-0 items-center gap-1.5 text-small text-ink-muted">
+                    {state && <StatusGlyph glyph={state.glyph} size={12} />}
+                    <span className="min-w-0 truncate">{[state?.word, ...meta].filter(Boolean).join(' · ')}</span>
+                  </span>
+                </Tooltip>
+              ) : (
+                <span className="flex items-center gap-1.5 text-small text-ink-muted">
+                  {state && <StatusGlyph glyph={state.glyph} size={12} />}
+                  <span className="min-w-0 truncate">{[state?.word, ...meta].filter(Boolean).join(' · ')}</span>
+                </span>
+              )}
             </span>
             {video.state !== 'fetched' && video.state !== 'queued' && (
               <Press

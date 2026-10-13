@@ -1,3 +1,5 @@
+import { cloneElement, type ReactElement } from 'react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { chanceText, type ScoreFigure, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -11,6 +13,11 @@ import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
  */
 
 const UNSURE_TITLE = 'Dash is not sure of this one';
+
+/** A reason as it ends in the tooltip, with its full stop. */
+function sentence(text: string): string {
+  return /[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`;
+}
 
 function mark(figure: ScoreFigure): string {
   return figure.unsure ? '?' : '';
@@ -29,26 +36,37 @@ export function chanceFigureText(note: ScoreNote): string | null {
 /** Both figures as chips, for beside a title. */
 export function ScoreChips({ note, className }: { note: ScoreNote | null | undefined; className?: string }) {
   if (!note) return null;
+  const chip = 'rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted';
   return (
     <span className={cn('inline-flex flex-wrap gap-1.5', className)}>
       {note.fit && (
-        <span
-          title={note.fit.unsure ? UNSURE_TITLE : undefined}
-          className={cn('tabular rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted', note.fit.unsure && 'opacity-70')}
-        >
-          {FIT_SCORE_LABEL} {fitText(note)}
-        </span>
+        <Unsure unsure={note.fit.unsure}>
+          <span className={cn('tabular', chip, note.fit.unsure && 'opacity-70')}>
+            {FIT_SCORE_LABEL} {fitText(note)}
+          </span>
+        </Unsure>
       )}
       {note.chance && (
-        <span
-          title={note.chance.unsure ? UNSURE_TITLE : undefined}
-          className={cn('rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted', note.chance.unsure && 'opacity-70')}
-        >
-          {CHANCE_LABEL}: {chanceFigureText(note)?.toLowerCase()}
-        </span>
+        <Unsure unsure={note.chance.unsure}>
+          <span className={cn(chip, note.chance.unsure && 'opacity-70')}>
+            {CHANCE_LABEL}: {chanceFigureText(note)?.toLowerCase()}
+          </span>
+        </Unsure>
       )}
     </span>
   );
+}
+
+/** What the question mark means, on hover and focus, for a figure Dash is unsure of. */
+export function Unsure({
+  unsure,
+  children,
+}: {
+  unsure?: boolean;
+  children: ReactElement<{ tabIndex?: number; 'aria-describedby'?: string }>;
+}) {
+  if (!unsure) return children;
+  return <Tooltip label={UNSURE_TITLE}>{cloneElement(children, { tabIndex: 0 })}</Tooltip>;
 }
 
 /**
@@ -82,17 +100,26 @@ export function ScoreLine({ note }: { note: ScoreNote | null | undefined }) {
   const fit = fitText(note);
   const chance = chanceFigureText(note);
   const reasons = [
-    note.fit?.reason ? `${FIT_SCORE_LABEL}: ${note.fit.reason}` : null,
-    note.chance?.reason ? `${CHANCE_LABEL}: ${note.chance.reason}` : null,
+    note.fit?.reason ? `${FIT_SCORE_LABEL}: ${sentence(note.fit.reason)}` : null,
+    note.chance?.reason ? `${CHANCE_LABEL}: ${sentence(note.chance.reason)}` : null,
   ].filter(Boolean);
-  return (
-    <p className="flex flex-wrap gap-x-2 text-micro text-ink-muted" title={reasons.join('\n') || undefined}>
+  const figures = (
+    <span
+      tabIndex={reasons.length > 0 ? 0 : undefined}
+      className="flex flex-wrap gap-x-2 text-micro text-ink-muted"
+    >
       {fit && <span className="tabular">{FIT_SCORE_LABEL} {fit}</span>}
       {chance && (
         <span>
           {CHANCE_LABEL}: {chance.toLowerCase()}
         </span>
       )}
-    </p>
+    </span>
+  );
+  if (reasons.length === 0) return figures;
+  return (
+    <Tooltip label={reasons.join(' ')} className="flex">
+      {figures}
+    </Tooltip>
   );
 }

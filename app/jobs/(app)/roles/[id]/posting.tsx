@@ -16,6 +16,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { LinkedText } from '@/components/ui/linked-text';
 import type { PanelProps } from './types';
 import { VERDICT_STYLE } from './verdict';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export function Posting({
   roleId,
@@ -333,15 +334,16 @@ function RoleDetailsCard({
                 {looking ? 'Looking…' : 'Look it up'}
               </Button>
             )}
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              title="Edit posting details"
-              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-            >
-              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Edit posting details</span>
-            </button>
+            <Tooltip label="Edit posting details" align="end">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+              >
+                <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Edit posting details</span>
+              </button>
+            </Tooltip>
           </div>
         }
       >

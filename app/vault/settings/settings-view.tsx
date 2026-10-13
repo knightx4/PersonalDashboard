@@ -9,12 +9,20 @@ import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Connected',
   needs_reauth: 'Needs reconnection',
   disconnected: 'Disconnected',
   error: 'Error',
+};
+
+/** What each status beside the vault's name means, on hover and focus. */
+const STATUS_HINT: Record<string, string> = {
+  needs_reauth: 'GitHub access has lapsed, so reconnect to keep syncing',
+  disconnected: 'The vault is no longer syncing from GitHub',
+  error: 'The last sync failed, and the reason is written below',
 };
 
 const WRITE_ACCESS_LABEL: Record<Exclude<WriteAccess, 'reconnect'>, string> = {
@@ -75,10 +83,19 @@ export function VaultSettingsView({
                   {STATUS_LABEL[connection.status]}
                 </span>
               ) : (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-caution-tint px-2 py-0.5 text-small font-medium text-caution">
-                  <AlertTriangle className="size-3" strokeWidth={2} aria-hidden />
-                  {STATUS_LABEL[connection.status] ?? connection.status}
-                </span>
+                <Tooltip
+                  label={STATUS_HINT[connection.status] ?? 'The vault is not syncing'}
+                  align="end"
+                  className="shrink-0"
+                >
+                  <span
+                    tabIndex={0}
+                    className="inline-flex items-center gap-1 rounded-full bg-caution-tint px-2 py-0.5 text-small font-medium text-caution"
+                  >
+                    <AlertTriangle className="size-3" strokeWidth={2} aria-hidden />
+                    {STATUS_LABEL[connection.status] ?? connection.status}
+                  </span>
+                </Tooltip>
               )}
             </CardHeader>
             <CardBody className="space-y-3">
