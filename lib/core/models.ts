@@ -202,6 +202,8 @@ export const MODELS = {
   vaultConnections: HAIKU,
   /** lib/you/transcript-model.ts */
   vaultTranscript: HAIKU,
+  /** lib/you/work-history-model.ts */
+  youWorkHistory: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
 } as const;

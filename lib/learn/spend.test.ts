@@ -89,6 +89,7 @@ describe('the operation names', () => {
       'gate-maya-note',
       'reply-to-maya',
       'read-transcript',
+      'read-work-history',
       'propose-theme-merges',
       'propose-position-merges',
       'link-positions',

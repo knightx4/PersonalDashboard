@@ -484,6 +484,15 @@ The academic transcripts they have uploaded, one per school record, with the ori
 - Opens at `/you/work#transcript-<id>`
 - The courses on each are in you.courses. The file is in the private vault-transcripts bucket at storage_path.
 
+### `you.work_history` (You)
+
+The jobs they have held: employer, title, place and dates, read from their résumé or added by hand.
+
+- Search: `employer`, `title`, `place`, `note`
+- Name a row by `employer`; link it by `id`
+- Opens at `/you/work#job-<id>`
+- started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.

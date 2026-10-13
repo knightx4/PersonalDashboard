@@ -170,6 +170,7 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],
