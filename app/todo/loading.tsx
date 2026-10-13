@@ -32,7 +32,7 @@ export default function Loading() {
             <Card padding="none" className="mt-2 divide-y divide-border px-3">
               {Array.from({ length: rows }).map((_, index) => (
                 <div key={index} className="row-pad flex items-start gap-3">
-                  <Skeleton className="mt-0.5 size-[18px] shrink-0 rounded" />
+                  <Skeleton className="mt-0.5 size-[18px] shrink-0 rounded-control" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <Skeleton className="h-3.5" style={{ width: `${62 - index * 9}%` }} />
                     <Skeleton className="h-3 w-1/4" />

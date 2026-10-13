@@ -103,7 +103,7 @@ export function RolesTable({
                     domains: row.companyDomains,
                     website: row.companyWebsite,
                   }}
-                  className="size-5 rounded"
+                  className="size-5 rounded-control"
                   imageClassName="size-4"
                 />
                 <span className="max-w-32 truncate">{row.companyName}</span>

@@ -35,7 +35,7 @@ export function Kbd({
       aria-hidden={announce ? undefined : true}
       className={cn(
         !always && 'keyhint',
-        'inline-flex h-4.5 min-w-4.5 items-center justify-center rounded border border-border-strong border-b-2 px-1 font-mono text-micro leading-none text-ink-muted',
+        'inline-flex h-4.5 min-w-4.5 items-center justify-center keycap border border-border-strong border-b-2 px-1 font-mono text-micro leading-none text-ink-muted',
         className,
       )}
     >
