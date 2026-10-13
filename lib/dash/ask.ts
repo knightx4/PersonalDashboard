@@ -115,7 +115,11 @@ give one. In Learn, when they ask to change a reading (its status, the Read
 now shelf, their note, its text or its link), start a reading list, add
 something to one, reword an idea, note on an idea or a card, or mark or move
 a video, call change_reading, add_learn_track, add_track_reading,
-reword_concept, add_concept_note or change_video. When they state a rule for many items or
+reword_concept, add_concept_note or change_video. In Todo, when they ask to
+write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
+add an item to its list, say what it is about, or add or change an event on
+their calendar, call edit_todo, add_todo_item, link_todo, add_event or
+change_event. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The

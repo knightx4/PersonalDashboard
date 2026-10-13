@@ -22,6 +22,7 @@ import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
+import { TODO_WRITE_TOOLS } from './todo-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -53,6 +54,9 @@ import { LEARN_WRITE_TOOLS } from './learn-writes';
  *                    page's quick note box writes (plan #1894.2).
  *   Learn's six      a reading, a reading list, an idea or a video changed
  *                    or added (lib/dash/learn-writes.ts, plan #1894.8).
+ *   Todo's five      a todo's notes, pin, snooze or state, an item on its
+ *                    list, what it is about, and a calendar event added or
+ *                    changed (lib/dash/todo-writes.ts, plan #1894.9.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1070,6 +1074,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   // Learn's, which the connector offers too (plan #1894.8).
   ...LEARN_WRITE_TOOLS,
+  // Todo's, which the connector offers too (plan #1894.9.1).
+  ...TODO_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

@@ -1,30 +1,30 @@
-import { GAP, gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What Todo's pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const todoActions: ModuleActions = {
   'app/todo/actions.ts': {
     addTask: tool('add_todo'),
-    editTask: gap('change_todo renames and moves; it does not change the notes.'),
+    editTask: tool('change_todo', 'edit_todo'),
     renameTaskAction: tool('change_todo'),
     rescheduleTaskAction: tool('change_todo'),
-    pointTaskAt: GAP,
-    unpointTask: GAP,
+    pointTaskAt: tool('link_todo'),
+    unpointTask: none('deletes', 'Takes the link off the todo.'),
     completeTask: tool('close_todo'),
-    reopenTask: GAP,
-    addItem: GAP,
-    dropTask: GAP,
-    pinTask: GAP,
-    laterTask: GAP,
-    bringBackTask: GAP,
-    moveTask: GAP,
-    placeTask: GAP,
+    reopenTask: tool('edit_todo'),
+    addItem: tool('add_todo_item'),
+    dropTask: tool('edit_todo'),
+    pinTask: tool('edit_todo'),
+    laterTask: tool('edit_todo'),
+    bringBackTask: tool('edit_todo'),
+    moveTask: none('setting', 'The order of a pile is how the person arranges their own list.'),
+    placeTask: none('setting', 'The order of a pile is how the person arranges their own list.'),
     removeTask: none('deletes'),
     errandAreas: none('page'),
     handTaskToDash: none('spends', 'Hands the task to a Dash routine as an errand.'),
   },
   'app/todo/calendar/actions.ts': {
-    addEvent: GAP,
-    editEvent: GAP,
+    addEvent: tool('add_event'),
+    editEvent: tool('change_event'),
     removeEvent: none('deletes'),
     toggleCalendar: none('setting'),
   },
@@ -41,7 +41,7 @@ export const todoActions: ModuleActions = {
     answerItem: none('theirs'),
   },
   'app/todo/link-actions.ts': {
-    addLinkedTask: GAP,
-    detachTask: GAP,
+    addLinkedTask: tool('add_todo', 'link_todo'),
+    detachTask: none('deletes', 'Takes the link off the todo.'),
   },
 };
