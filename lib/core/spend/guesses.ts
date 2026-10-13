@@ -221,6 +221,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // 50,000 tokens); a typical article or chapter is a fifth of that. Two
   // short paragraphs out.
   'summarize-reading': run(SONNET, 12_000, 300),
+  // The rules and up to twelve ideas from each place to be named in; a short
+  // name for each out. Daily, a few places a run.
+  'name-places': background(run(HAIKU, 3_000, 300)),
   // The rules, the brief and an essay of about 1,200 words (read from the
   // cache after a run's first call), and one paragraph in; at most one
   // finding out. Per paragraph the check reads.

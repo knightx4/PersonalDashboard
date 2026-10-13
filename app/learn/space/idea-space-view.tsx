@@ -7,10 +7,11 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NEIGHBOURS_PER_IDEA } from '@/lib/learn/map/idea-map';
 import type { IdeaMapView } from '@/lib/learn/map/load';
-import { mapHref, similarityText, type MapParams } from '@/lib/learn/map/view';
+import { countText, mapHref, similarityText, type MapParams } from '@/lib/learn/map/view';
 import { ChosenIdea } from './chosen-idea';
 import { MapSection } from './map-section';
 import { PickProvider } from './pick';
+import { PlaceRail } from './place-rail';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -22,7 +23,7 @@ import { PickProvider } from './pick';
  * map turns up, ideas that are probably one idea twice and untested ideas
  * surrounded by ones you know.
  *
- * The view (layout, colour, names, the open idea) is held by `PickProvider`
+ * The view (layout, the open idea, the domain picked out) is held by `PickProvider`
  * in the browser and changes at once; the address follows, so a reload and a
  * pasted link still open the same view (law 5).
  */
@@ -35,17 +36,20 @@ const LIST_SHOWN = 5;
 export function IdeaSpaceView({
   view,
   params,
+  pointingAt,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
   params: MapParams;
+  /** The gallery holds the card open over this idea, as a pointer would. */
+  pointingAt?: string | null;
 }) {
   const header = (
     <PageHeader
       crumbs={[
         { label: 'Learn', href: '/learn' },
         { label: 'Know', href: '/learn/know' },
-        { label: 'Idea Space', href: mapHref(params, { idea: null }) },
+        { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null }) },
       ]}
       title="Idea Space"
       description={view && view.ideas.length > 0 ? `${plural(view.ideas.length, 'idea')}.` : undefined}
@@ -88,12 +92,13 @@ export function IdeaSpaceView({
         main={
           <>
             {header}
-            <MapSection view={view} />
+            <MapSection view={view} pointingAt={pointingAt} />
           </>
         }
         rail={
           <>
-            <ChosenIdea ideas={view.ideas} />
+            <ChosenIdea ideas={view.ideas} places={view.places} />
+            <PlaceRail view={view} />
             <SameIdeas view={view} nameOf={nameOf} />
             <UntestedNearKnown view={view} nameOf={nameOf} />
           </>
@@ -104,7 +109,7 @@ export function IdeaSpaceView({
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`;
+  return `${countText(n)} ${n === 1 ? one : many}`;
 }
 
 // -- The rail ----------------------------------------------------------------
