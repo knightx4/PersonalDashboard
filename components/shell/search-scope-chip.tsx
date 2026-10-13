@@ -8,6 +8,7 @@ import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { scopeForModule, scopeLabel, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The chip at the right end of a search field, naming what is being searched.
@@ -72,38 +73,39 @@ export function SearchScopeChip({
 
   return (
     <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-controls={open ? panelId : undefined}
-        onClick={() => show(!open)}
-        // Named by what it is searching and by what pressing it does. The word
-        // on it is a state, and what the press does now is offer the choice
-        // rather than make it.
-        aria-label={`Searching ${scopeLabel(scope)}. Choose what to search`}
-        // The mark alone on the chip, and the name on hover and in the menu
-        // (note 0679c2fa): the word took a third of a field that is only so
-        // wide, and every workspace's mark is already its name at a glance.
-        title={`Searching ${scopeLabel(scope)}`}
-        // ui-ok: hand-rolled-box -- the pill is the button, so its edge is the
-        // control rather than a frame around a group. It stands on the field's
-        // own ground, so neither a shared ground nor space can say that it is
-        // something you press. No primitive draws this shape: Button is
-        // rounded-control and its smallest size is the height of the box this
-        // sits inside, and ChipSelect and ChipInput wrap a select and an input.
-        // The edge is drawn only on hover, focus and while the menu is open:
-        // at rest the mark and the chevron already say what it is,
-        // and a ring inside the field's own ring read as a second box.
-        className="press flex shrink-0 items-center gap-1.5 rounded-full border border-transparent py-0 pl-0.5 pr-1.5 text-small text-ink-muted transition-colors hover:border-border hover:bg-sunken hover:text-ink focus-visible:border-border aria-expanded:border-border aria-expanded:bg-sunken"
-      >
-        {/* The mark of what is being searched: a workspace's own, or the app's
-            for everything you own. */}
-        <ModuleMark module={scope === 'everything' ? null : scope} size="sm" />
-        {/* Which way the choice opens, and that there is one. */}
-        <ChevronDown className="size-3 shrink-0" strokeWidth={2} aria-hidden />
-      </button>
+      <Tooltip label={`Searching ${scopeLabel(scope)}`} align="end" className="flex">
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-controls={open ? panelId : undefined}
+          onClick={() => show(!open)}
+          // Named by what it is searching and by what pressing it does. The word
+          // on it is a state, and what the press does now is offer the choice
+          // rather than make it.
+          aria-label={`Searching ${scopeLabel(scope)}. Choose what to search`}
+          // The mark alone on the chip, and the name in the tooltip and in the
+          // menu (note 0679c2fa): the word took a third of a field that is only
+          // so wide, and every workspace's mark is already its name at a glance.
+          // ui-ok: hand-rolled-box -- the pill is the button, so its edge is the
+          // control rather than a frame around a group. It stands on the field's
+          // own ground, so neither a shared ground nor space can say that it is
+          // something you press. No primitive draws this shape: Button is
+          // rounded-control and its smallest size is the height of the box this
+          // sits inside, and ChipSelect and ChipInput wrap a select and an input.
+          // The edge is drawn only on hover, focus and while the menu is open:
+          // at rest the mark and the chevron already say what it is,
+          // and a ring inside the field's own ring read as a second box.
+          className="press flex shrink-0 items-center gap-1.5 rounded-full border border-transparent py-0 pl-0.5 pr-1.5 text-small text-ink-muted transition-colors hover:border-border hover:bg-sunken hover:text-ink focus-visible:border-border aria-expanded:border-border aria-expanded:bg-sunken"
+        >
+          {/* The mark of what is being searched: a workspace's own, or the app's
+              for everything you own. */}
+          <ModuleMark module={scope === 'everything' ? null : scope} size="sm" />
+          {/* Which way the choice opens, and that there is one. */}
+          <ChevronDown className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover

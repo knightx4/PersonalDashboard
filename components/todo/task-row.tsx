@@ -57,6 +57,7 @@ import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { TaskFiles, TaskFilesCount, type TaskFile } from '@/components/attachments/task-files';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -485,24 +486,26 @@ export function TaskRow({
           is the same claim twice. A dropped task gets the struck hexagon here
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
-        <button
-          ref={glyph}
-          type="button"
-          aria-label={done ? 'Reopen' : 'Mark done'}
-          onClick={() =>
-            done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
-          }
-          className={cn(
-            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
-            done
-              ? 'text-status-offer'
-              : dropped
-                ? 'text-ink-muted'
-                : 'text-ink-muted hover:text-accent',
-          )}
-        >
-          <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
-        </button>
+        <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+          <button
+            ref={glyph}
+            type="button"
+            aria-label={done ? 'Reopen' : 'Mark done'}
+            onClick={() =>
+              done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
+            }
+            className={cn(
+              'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
+              done
+                ? 'text-status-offer'
+                : dropped
+                  ? 'text-ink-muted'
+                  : 'text-ink-muted hover:text-accent',
+            )}
+          >
+            <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
+          </button>
+        </Tooltip>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -902,17 +905,19 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
 
   return (
     <li className="group/item flex items-start gap-2">
-      <button
-        type="button"
-        aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={onTick}
-        className={cn(
-          'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
-          done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
-        )}
-      >
-        <StatusGlyph glyph={TASK_STATUS_GLYPHS[item.status]} size={14} />
-      </button>
+      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+        <button
+          type="button"
+          aria-label={done ? 'Reopen' : 'Mark done'}
+          onClick={onTick}
+          className={cn(
+            'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
+            done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
+          )}
+        >
+          <StatusGlyph glyph={TASK_STATUS_GLYPHS[item.status]} size={14} />
+        </button>
+      </Tooltip>
 
       <span
         className={cn(
@@ -923,15 +928,16 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         {item.title}
       </span>
 
-      <button
-        type="button"
-        title="Remove"
-        onClick={onDrop}
-        className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
-      >
-        <X className="size-3" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Remove</span>
-      </button>
+      <Tooltip label="Remove" align="end" className="shrink-0">
+        <button
+          type="button"
+          onClick={onDrop}
+          className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
+        >
+          <X className="size-3" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">Remove</span>
+        </button>
+      </Tooltip>
     </li>
   );
 }
@@ -1003,15 +1009,16 @@ function IconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      onClick={onClick}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-    >
-      {children}
-      <span className="sr-only">{label}</span>
-    </button>
+    <Tooltip label={label} align="end">
+      <button
+        type="button"
+        onClick={onClick}
+        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+      >
+        {children}
+        <span className="sr-only">{label}</span>
+      </button>
+    </Tooltip>
   );
 }
 

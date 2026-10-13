@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { askListLabel, type AskListFilter } from '@/lib/ask/list-filter';
 import { useAskDash } from './ask-dash';
@@ -32,17 +33,36 @@ export function AskDashRowsButton({
   const handle = useAskDash();
   if (!handle || !filter || count === 0) return null;
   const label = askListLabel(filter.list, count);
+  const tip = `Ask Dash about ${label}`;
+  if (compact) {
+    // The mark alone, so the tooltip carries the words. The page's classes go
+    // on the tooltip's wrapper, which is what sits in the row.
+    return (
+      <Tooltip label={tip} className={cn('shrink-0', className)}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-7 shrink-0 px-0"
+          onClick={() => handle.open(undefined, { ...filter, label })}
+        >
+          <DashMark size="2xs" tone="brand" decorative />
+          <span className="sr-only">Ask Dash about these</span>
+        </Button>
+      </Tooltip>
+    );
+  }
   return (
     <Button
       type="button"
       variant="secondary"
       size="sm"
-      className={cn(compact && 'w-7 shrink-0 px-0', className)}
+      className={className}
       onClick={() => handle.open(undefined, { ...filter, label })}
-      title={`Ask Dash about ${label}`}
+      title={tip}
     >
       <DashMark size="2xs" tone="brand" decorative />
-      <span className={compact ? 'sr-only' : undefined}>Ask Dash about these</span>
+      <span>Ask Dash about these</span>
     </Button>
   );
 }

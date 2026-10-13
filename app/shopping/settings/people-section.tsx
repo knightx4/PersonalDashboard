@@ -18,6 +18,7 @@ import {
   updatePerson,
   type PeopleState,
 } from './people-actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Who this account shops for.
@@ -233,18 +234,19 @@ function ColourPicker({
   return (
     <span className="flex shrink-0 items-center gap-1" role="group" aria-label="Colour">
       {PERSON_COLOURS.map((entry) => (
-        <button
-          key={entry}
-          type="button"
-          onClick={() => onChange(entry)}
-          aria-label={entry}
-          aria-pressed={value === entry}
-          className={cn(
-            'size-4 rounded-full ring-offset-1 transition-shadow',
-            PERSON_DOT_CLASS[entry],
-            value === entry ? 'ring-2 ring-ink' : 'hover:ring-2 hover:ring-border-strong',
-          )}
-        />
+        <Tooltip key={entry} label={entry}>
+          <button
+            type="button"
+            onClick={() => onChange(entry)}
+            aria-label={entry}
+            aria-pressed={value === entry}
+            className={cn(
+              'size-4 rounded-full ring-offset-1 transition-shadow',
+              PERSON_DOT_CLASS[entry],
+              value === entry ? 'ring-2 ring-ink' : 'hover:ring-2 hover:ring-border-strong',
+            )}
+          />
+        </Tooltip>
       ))}
     </span>
   );

@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type Notification = {
   id: string;
@@ -48,26 +49,27 @@ export function NotificationsButton({
 
   return (
     <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={`${count} notification${count === 1 ? '' : 's'}`}
-        className={cn(
-          'press relative flex size-8 items-center justify-center rounded-full transition-colors',
-          open
-            ? 'bg-accent-tint text-accent'
-            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-        )}
-      >
-        <Bell className="size-4" aria-hidden />
-        <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
-          {count > 9 ? '9+' : count}
-        </span>
-        <span className="sr-only">Notifications, {count} unread</span>
-      </button>
+      <Tooltip label={`${count} notification${count === 1 ? '' : 's'}`} align="end">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className={cn(
+            'press relative flex size-8 items-center justify-center rounded-full transition-colors',
+            open
+              ? 'bg-accent-tint text-accent'
+              : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
+          )}
+        >
+          <Bell className="size-4" aria-hidden />
+          <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
+            {count > 9 ? '9+' : count}
+          </span>
+          <span className="sr-only">Notifications, {count} unread</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover

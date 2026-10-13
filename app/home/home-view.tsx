@@ -12,6 +12,7 @@ import { whenLabel, type Update } from '@/lib/shell/home-model';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
 import { HomeArrival } from './arrival';
 import { WatchMark } from './watching';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * What Home draws, without what it reads (plan #1627). The page
@@ -106,7 +107,7 @@ export interface HomeWorkspace {
 
 /**
  * The doors, as marks, right under the date: for when you came to get to one
- * particular workspace. Marks only, named for a screen reader and on hover.
+ * particular workspace. Marks only, named for a screen reader and in a tooltip.
  * The rail's list is the considered version, with what is waiting in each.
  */
 export function WorkspaceMarks({ workspaces }: { workspaces: readonly HomeWorkspace[] }) {
@@ -114,15 +115,15 @@ export function WorkspaceMarks({ workspaces }: { workspaces: readonly HomeWorksp
   return (
     <nav aria-label="Jump to a workspace" className="mt-4 flex flex-wrap items-center gap-2">
       {workspaces.map((workspace) => (
-        <Link
-          key={workspace.id}
-          href={workspace.href}
-          title={workspace.label}
-          className="press press-area rounded-[8px] transition-opacity duration-quick hover:opacity-75"
-        >
-          <ModuleMark module={workspace.id} size="md" />
-          <span className="sr-only">{workspace.label}</span>
-        </Link>
+        <Tooltip key={workspace.id} label={workspace.label}>
+          <Link
+            href={workspace.href}
+            className="press press-area rounded-[8px] transition-opacity duration-quick hover:opacity-75"
+          >
+            <ModuleMark module={workspace.id} size="md" />
+            <span className="sr-only">{workspace.label}</span>
+          </Link>
+        </Tooltip>
       ))}
     </nav>
   );

@@ -23,6 +23,7 @@ import type { FeedbackKind } from '@/lib/feedback/load';
 import type { FiledAs } from '@/lib/feedback/move';
 import type { TriageView } from '@/lib/feedback/triage';
 import { usePopover } from '@/lib/use-popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Always-available capture for bugs, requests and ideas.
@@ -176,23 +177,24 @@ export function FeedbackButton({
 
   return (
     <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title="Report a bug, request a feature, or note an idea"
-        className={cn(
-          'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open
-            ? 'bg-accent-tint text-accent'
-            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-        )}
-      >
-        <MessageSquarePlus className="size-4" aria-hidden />
-        <span className="sr-only">Report a bug, request a feature, or note an idea</span>
-      </button>
+      <Tooltip label="Report a bug, request a feature, or note an idea" align="end">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className={cn(
+            'press flex size-8 items-center justify-center rounded-full transition-colors',
+            open
+              ? 'bg-accent-tint text-accent'
+              : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
+          )}
+        >
+          <MessageSquarePlus className="size-4" aria-hidden />
+          <span className="sr-only">Report a bug, request a feature, or note an idea</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover

@@ -2916,6 +2916,15 @@ function TooltipRows() {
           </button>
         </Tooltip>
       </div>
+      {/* Its tip stands above it, so the row leaves the room above. */}
+      <div className="flex items-center justify-end gap-2 pt-16">
+        <span className="text-small text-ink-muted">In the bar at the foot of the window</span>
+        <Tooltip label="CI on main passed 4 minutes ago" above defaultOpen>
+          <button type="button" aria-label="CI on main" className={iconButton}>
+            <span className="size-2 rounded-full bg-positive" aria-hidden />
+          </button>
+        </Tooltip>
+      </div>
     </div>
   );
 }
