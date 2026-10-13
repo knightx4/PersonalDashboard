@@ -12,6 +12,7 @@
  */
 import { useMemo } from 'react';
 import { CircleAlert } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useClockNow } from '@/lib/use-clock-now';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { type ClaimLiveness } from '@/lib/plan/liveness';
@@ -58,7 +59,13 @@ export function Elapsed({ startedAt }: { startedAt: string }) {
  * clock here, so this line and the health column beside it cannot differ about
  * the same claim.
  */
-export function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
+export function RunningFor({
+  startedAt,
+  claim,
+}: {
+  startedAt: string;
+  claim: ClaimLiveness | undefined;
+}) {
   if (claim === 'abandoned') {
     return (
       <span className="text-caution">
@@ -107,20 +114,22 @@ export function CheckMark({ check }: { check: CommitCheck | undefined }) {
   const alarming = failed || check?.conclusion === 'unmerged';
   const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
   const title = failed
-    ? `The checks failed on ${merge}, the merge that put this on main.`
+    ? `The checks failed on ${merge}, the merge that put this on main. Look at what broke before building on it.`
     : merge
       ? `${checkLine(check)} on ${merge}, the merge that put this on main.`
       : `${checkLine(check)}.`;
 
-  return alarming ? (
-    <Chip tone="caution" title={title}>
-      <CircleAlert strokeWidth={1.75} aria-hidden />
-      {word}
-    </Chip>
-  ) : (
-    <span title={title} className="inline-flex shrink-0 items-center text-small text-ink-ghost">
-      {word}
-    </span>
+  return (
+    <Tooltip label={title} className="shrink-0">
+      {alarming ? (
+        <Chip tone="caution">
+          <CircleAlert strokeWidth={1.75} aria-hidden />
+          {word}
+        </Chip>
+      ) : (
+        <span className="inline-flex items-center text-small text-ink-ghost">{word}</span>
+      )}
+    </Tooltip>
   );
 }
 
@@ -258,8 +267,9 @@ export function Underway({
   const silent = stopped || claim === 'quiet';
 
   return (
-    <Chip
-      title={
+    <Tooltip
+      className="shrink-0"
+      label={
         stopped
           ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
           : claim === 'quiet'
@@ -267,14 +277,15 @@ export function Underway({
             : // A session can start on anything approved, so an underway step
               // is a session's unless you kept it back. The column used to be
               // read the other way, when only a step handed over was Dash's.
-              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}`
+              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}. Nothing is needed from you.`
       }
-      tone={silent ? 'caution' : 'accent'}
     >
-      <LiveDot tone={silent ? 'caution' : 'accent'} still={silent} />
-      <Elapsed startedAt={startedAt} />
-      {stopped && <span className="sr-only"> with no session on it</span>}
-      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
-    </Chip>
+      <Chip tone={silent ? 'caution' : 'accent'}>
+        <LiveDot tone={silent ? 'caution' : 'accent'} still={silent} />
+        <Elapsed startedAt={startedAt} />
+        {stopped && <span className="sr-only"> with no session on it</span>}
+        {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
+      </Chip>
+    </Tooltip>
   );
 }

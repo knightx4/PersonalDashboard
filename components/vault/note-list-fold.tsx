@@ -21,6 +21,7 @@ import {
   type FoldPress,
   subscribeToColumnFolded,
 } from '@/lib/vault/open-folders';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Folding the note list away on a laptop, so the note has the width (#1379).
@@ -184,16 +185,17 @@ export function FoldNoteListButton() {
   const ref = useTakesFocus('fold', hydrated && !folded);
   if (!hydrated) return null;
   return (
-    <IconButton
-      ref={ref}
-      label="Hide the note list"
-      onClick={() => setFolded(true)}
-      aria-expanded={!folded}
-      aria-controls={NOTE_LIST_ID}
-      className="hidden lg:inline-flex"
-    >
-      <PanelLeftClose strokeWidth={1.75} aria-hidden />
-    </IconButton>
+    <Tooltip label="Hide the note list" className="hidden shrink-0 lg:inline-flex">
+      <IconButton
+        ref={ref}
+        label="Hide the note list"
+        onClick={() => setFolded(true)}
+        aria-expanded={!folded}
+        aria-controls={NOTE_LIST_ID}
+      >
+        <PanelLeftClose strokeWidth={1.75} aria-hidden />
+      </IconButton>
+    </Tooltip>
   );
 }
 

@@ -46,6 +46,7 @@ import {
   recentAskQuestions,
   undoDashChange,
 } from '@/app/ask/actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Ask Dash, from any page (plan #1090).
@@ -245,13 +246,15 @@ export function AskDashButton() {
   const handle = useAskDash();
   if (!handle) return null;
   return (
-    <IconButton
-      label="Ask Dash"
-      onClick={() => handle.open()}
-      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
-    >
-      <DashMark size="icon" tone="brand" decorative />
-    </IconButton>
+    <Tooltip label="Ask Dash" className="shrink-0">
+      <IconButton
+        label="Ask Dash"
+        onClick={() => handle.open()}
+        className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+      >
+        <DashMark size="icon" tone="brand" decorative />
+      </IconButton>
+    </Tooltip>
   );
 }
 
@@ -610,13 +613,17 @@ export function AskDashPanel({
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               {started && (
-                <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
-                  <SquarePen strokeWidth={1.75} aria-hidden />
-                </IconButton>
+                <Tooltip label="New question" align="end">
+                  <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
+                    <SquarePen strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                </Tooltip>
               )}
-              <IconButton label="Close Dash" onClick={onClose}>
-                <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              <Tooltip label="Close Dash" align="end">
+                <IconButton label="Close Dash" onClick={onClose}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
             </div>
           </div>
 
@@ -850,9 +857,11 @@ export function LookingAt({
       <span className="min-w-0 truncate">
         Looking at: <span className="text-ink">{label}</span>
       </span>
-      <IconButton label={dropTitle} size="sm" onClick={onDrop} className="hover:bg-surface">
-        <X strokeWidth={1.75} aria-hidden />
-      </IconButton>
+      <Tooltip label={dropTitle} align="end" className="shrink-0">
+        <IconButton label={dropTitle} size="sm" onClick={onDrop} className="hover:bg-surface">
+          <X strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </Tooltip>
     </p>
   );
 }

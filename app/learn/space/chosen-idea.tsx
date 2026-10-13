@@ -3,13 +3,13 @@
 import Link from '@/components/ui/link';
 import { X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 import { STATE_MARK_LABEL, mapHref, markOf, similarityText } from '@/lib/learn/map/view';
 import { Mark } from './idea-plot';
 import { pickOnClick, usePick } from './pick';
 import { iconButtonVariants } from '@/components/ui/icon-button';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { cn } from '@/lib/cn';
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 
@@ -39,16 +39,17 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
             {idea.name}
           </Link>
         </h2>
-        <Link
-          href={mapHref(params, { idea: null })}
-          scroll={false}
-          onClick={pickOnClick(pick, null)}
-          aria-label="Close this idea"
-          title="Close this idea"
-          className={cn(iconButtonVariants({ size: 'md' }), '-mr-1')}
-        >
-          <X strokeWidth={1.75} aria-hidden />
-        </Link>
+        <Tooltip label="Close this idea" align="end" className="-mr-1 shrink-0">
+          <Link
+            href={mapHref(params, { idea: null })}
+            scroll={false}
+            onClick={pickOnClick(pick, null)}
+            aria-label="Close this idea"
+            className={iconButtonVariants({ size: 'md' })}
+          >
+            <X strokeWidth={1.75} aria-hidden />
+          </Link>
+        </Tooltip>
       </div>
       <p className="mt-1 line-clamp-4 text-ui text-ink-muted">{idea.claim}</p>
       <ValueList className="mt-3">

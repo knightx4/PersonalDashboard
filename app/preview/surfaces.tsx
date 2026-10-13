@@ -185,6 +185,14 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
+import { Tooltip } from '@/components/ui/tooltip';
+import { IconButton } from '@/components/ui/icon-button';
+import { Chip } from '@/components/ui/chip';
+import { StateLabel } from '@/components/dev/state-label';
+import { healthOf as planHealthWords } from '@/lib/plan/health-words';
+import { IDEA_HEALTH_WORD, WAITING_TITLE, WAITING_WORD } from '@/lib/dev/words';
+import { IDEA_HEALTH_GLYPHS, PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { Clock, Pin } from 'lucide-react';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
@@ -2825,6 +2833,100 @@ const perReading: CostEstimate = {
   models: [OPUS, 'jev-1.13.0'],
 };
 
+/**
+ * The dev pages' status words with their tips showing (plan #1985.5): a step
+ * stopped on you, a step waiting on another, an idea nobody has shaped, and
+ * an inbox row at the right edge. Spaced so each open tip has room.
+ */
+function DevStatusTips() {
+  const facts = {
+    closed: false,
+    openBeneath: [],
+    resolution: null,
+    blockAsk: null,
+    comment: null,
+    waitingOn: [{ number: 1412, outline: '1985.2', title: 'Fail the UI check on unlabelled icon buttons' }],
+  };
+  const blocked = planHealthWords('blocked', { ...facts, blockAsk: 'Which account should the runner post from?' });
+  const waiting = planHealthWords('waiting', facts);
+  return (
+    <div className="space-y-28 pb-28">
+      <div className="flex items-center gap-3">
+        <span className="tabular text-small text-ink-ghost">#1985.4</span>
+        <StateLabel glyph={blocked.glyph} word={blocked.word} tone={blocked.tone} title={blocked.title} defaultOpen />
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="tabular text-small text-ink-ghost">#1985.5</span>
+        <StateLabel glyph={waiting.glyph} word={waiting.word} tone={waiting.tone} title={waiting.title} defaultOpen />
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-small text-ink-muted">An idea</span>
+        <StateLabel
+          glyph={IDEA_HEALTH_GLYPHS.open}
+          word={IDEA_HEALTH_WORD.open}
+          tone="quiet"
+          title="Written down and not shaped yet. Shape it when you want it on the plan."
+          defaultOpen
+        />
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-small text-ink-muted">On the inbox</span>
+        <StateLabel
+          glyph={PLAN_HEALTH_GLYPHS.proposed}
+          word={WAITING_WORD.proposed}
+          tone="caution"
+          title={WAITING_TITLE.proposed}
+          align="end"
+          defaultOpen
+        />
+      </div>
+    </div>
+  );
+}
+
+function TooltipRows() {
+  return (
+    <div className="space-y-24 pb-24">
+      <div className="flex items-center gap-2">
+        <Tooltip label="Waiting on your reply" defaultOpen>
+          <IconButton label="Waiting">
+            <Clock strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
+        <span className="text-small text-ink-muted">An icon button</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Tooltip
+          label="Dash read this thread and found nothing that needs you, so it was filed without a notification"
+          defaultOpen
+        >
+          <Chip tabIndex={0} aria-label="Filed quietly">
+            Filed
+          </Chip>
+        </Tooltip>
+        <span className="text-small text-ink-muted">A badge with a long tip</span>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-small text-ink-muted">At a row’s right edge</span>
+        <Tooltip label="Pinned to the top" align="end" defaultOpen>
+          <IconButton label="Pinned">
+            <Pin strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
+      </div>
+      {/* Its tip stands above it, so the row leaves the room above. */}
+      <div className="flex items-center justify-end gap-2 pt-16">
+        <span className="text-small text-ink-muted">In the bar at the foot of the window</span>
+        <Tooltip label="CI on main passed 4 minutes ago" above defaultOpen>
+          <IconButton label="CI on main">
+            <span className="size-2 rounded-full bg-positive" aria-hidden />
+          </IconButton>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
 function CostHintRows() {
   return (
     <div className="space-y-24 pb-24">
@@ -5419,6 +5521,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CostHintRows />,
   },
   {
+    /* The shared Tooltip on an icon button, a badge with a long tip and an
+     * icon at a row's right edge. Each starts showing so the shot has the tip
+     * as well as its child; in the app it shows on hover or keyboard focus
+     * after a short delay and hides on blur, Escape or pointer leave. */
+    id: 'core-tooltip',
+    label: 'Tooltip · on an icon and a badge',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TooltipRows />,
+  },
+  {
     /* /account/spend: every operation's estimate beside its thirty-day median.
      * At phone width the rows stack into label/value pairs. */
     id: 'core-spend-estimates',
@@ -5820,6 +5933,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevChangelogScreensSurface />,
+  },
+  {
+    /* The status words on the plan, ideas and inbox pages, with the
+     * sentence each one's Tooltip says (plan #1985.5). */
+    id: 'dev-status-tips',
+    label: 'Dev · Status words and their tips',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <DevStatusTips />,
   },
   {
     id: 'dev-ideas',

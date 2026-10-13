@@ -1,6 +1,7 @@
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { formatDay } from '@/lib/goals/dates';
 import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * A goal's status from Dash's daily check, as the goal board's cards
@@ -27,13 +28,16 @@ export function VerdictLabel({ review, current }: { review: GoalReview; current:
   const checked = formatDay(review.createdAt.slice(0, 10));
   return (
     <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-      <StateLabel
-        glyph={null}
-        word={VERDICT_LABELS[review.verdict]}
-        tone={VERDICT_TONES[review.verdict]}
-        title={`Dash’s check, ${checked}: ${review.reason}`}
-        className="text-small font-semibold"
-      />
+      <Tooltip label={`Dash’s check, ${checked}: ${review.reason}`}>
+        <span className="inline-flex">
+          <StateLabel
+            glyph={null}
+            word={VERDICT_LABELS[review.verdict]}
+            tone={VERDICT_TONES[review.verdict]}
+            className="text-small font-semibold"
+          />
+        </span>
+      </Tooltip>
       {!current && <span className="text-small text-ink-ghost">as of {checked}</span>}
     </span>
   );

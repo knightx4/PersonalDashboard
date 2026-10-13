@@ -7,6 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One product on the shared form.
@@ -224,25 +225,29 @@ export function DispositionGroup({
                 >
                   <span className="pl-1 text-ui font-medium">{choice.label}</span>
                   <span className="flex items-center gap-1">
-                    <IconButton
-                      onClick={() => step(choice.id, -1)}
-                      disabled={counts[choice.id] === 0}
-                      label={`One fewer to ${choice.label.toLowerCase()}`}
-                      className={STEP}
-                    >
-                      <Minus strokeWidth={1.75} aria-hidden />
-                    </IconButton>
+                    <Tooltip label={`One fewer to ${choice.label.toLowerCase()}`}>
+                      <IconButton
+                        onClick={() => step(choice.id, -1)}
+                        disabled={counts[choice.id] === 0}
+                        label={`One fewer to ${choice.label.toLowerCase()}`}
+                        className={STEP}
+                      >
+                        <Minus strokeWidth={1.75} aria-hidden />
+                      </IconButton>
+                    </Tooltip>
                     <span className="w-4 text-center text-body tabular-nums">
                       {counts[choice.id]}
                     </span>
-                    <IconButton
-                      onClick={() => step(choice.id, 1)}
-                      disabled={undecided === 0}
-                      label={`One more to ${choice.label.toLowerCase()}`}
-                      className={STEP}
-                    >
-                      <Plus strokeWidth={1.75} aria-hidden />
-                    </IconButton>
+                    <Tooltip label={`One more to ${choice.label.toLowerCase()}`} align="end">
+                      <IconButton
+                        onClick={() => step(choice.id, 1)}
+                        disabled={undecided === 0}
+                        label={`One more to ${choice.label.toLowerCase()}`}
+                        className={STEP}
+                      >
+                        <Plus strokeWidth={1.75} aria-hidden />
+                      </IconButton>
+                    </Tooltip>
                   </span>
                 </div>
               ))}

@@ -523,6 +523,29 @@ Checked by: audit.
 **R19.** Every design check verdict answers the three questions of Part 2.
 Checked by: audit.
 
+**R20.** A button or link whose only child is an icon has an `aria-label`
+(or `title`) and sits inside a `<Tooltip>`, so a mouse and a screen reader
+both get its name. The `check:ui` rule `icon-button-without-label` fails the
+gate on a new one, with baseline 0 when the rule was added; the valve is
+`ui-ok:` on the line, as for the other rules.
+Checked by: audit.
+
+**R21.** Any spec that describes a screen lists the parts of it that cannot
+be seen at first, under a heading named "Hidden parts" or in a line that
+starts "Hidden:". The kinds to look for are:
+
+- controls that appear on hover or focus
+- popovers, menus and tooltips
+- drawers, sheets and dialogs
+- the empty, loading and error states
+- comment indicators and unread marks
+- anything collapsed or scrolled out of view at 390 pixels
+
+A screen with none of a kind says so in a few words, so a missing entry is
+a gap and not an omission. A script cannot judge whether the list is
+complete.
+Checked by: audit.
+
 ## Decisions
 
 **1. What happens when a screen fails its third round with the critic?**

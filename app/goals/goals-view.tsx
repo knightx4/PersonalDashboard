@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   ALL_GOALS_VIEWS,
   areaInView,
@@ -386,19 +387,23 @@ function AreaSection({
         />
       ) : (
         <div className="flex items-center gap-2">
-          <IconButton
-            label={open ? `Fold ${area.name}` : `Open ${area.name}`}
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            aria-controls={`area-body-${area.id}`}
-            className="-mr-1"
+          <Tooltip
+            label={open ? 'Hide the goals in this area' : 'Show the goals in this area'}
+            className="-mr-1 shrink-0"
           >
-            <ChevronRight
-              className={cn('transition-transform duration-quick', open && 'rotate-90')}
-              strokeWidth={1.75}
-              aria-hidden
-            />
-          </IconButton>
+            <IconButton
+              label={open ? `Fold ${area.name}` : `Open ${area.name}`}
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              aria-controls={`area-body-${area.id}`}
+            >
+              <ChevronRight
+                className={cn('transition-transform duration-quick', open && 'rotate-90')}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </IconButton>
+          </Tooltip>
           <Link
             href={goalViewHref(`/goals/area/${area.id}`, view)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.
