@@ -7,8 +7,8 @@ import { cardVariants } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Rating } from '@/components/ui/rating';
 import { cn } from '@/lib/cn';
-import { IPIP_ITEMS, IPIP_ITEM_COUNT, IPIP_SCALE } from '@/lib/learn/personality/ipip';
-import type { BigFiveResult } from '@/lib/learn/personality/model';
+import { IPIP_ITEMS, IPIP_ITEM_COUNT, IPIP_SCALE } from '@/lib/you/personality/ipip';
+import type { BigFiveResult } from '@/lib/you/personality/model';
 import { saveBigFiveAction } from './actions';
 import { BigFiveScoreList } from './scores';
 
@@ -85,10 +85,10 @@ export function BigFiveTest({
           <p className="mt-3 text-small text-ink-muted">
             Dash is reading this against your notes. The read will be under your traits on the{' '}
             <Link
-              href="/learn/know#personality"
+              href="/you/personality"
               className={linkVariants()}
             >
-              Know page
+              Personality tab
             </Link>
             .
           </p>
@@ -104,7 +104,7 @@ export function BigFiveTest({
 
   return (
     <div className="max-w-2xl">
-      <p className="text-body text-ink">
+      <p className={cn(cardVariants({ padding: 'standard' }), 'text-body text-ink')}>
         Fifty statements about how you usually are now, not how you wish to be. It takes about ten
         minutes, and nothing is saved until you finish. Already have a type from another test?{' '}
         <a href="#other-tests" className={linkVariants()}>
@@ -166,7 +166,7 @@ export function BigFiveTest({
             {pending ? 'Scoring…' : 'See my scores'}
           </Button>
           <PaidHint
-            action="app/learn/know/personality/actions.ts#saveBigFiveAction"
+            action="app/you/personality/actions.ts#saveBigFiveAction"
             what="Cost of Dash reading your result against your notes"
           />
         </span>

@@ -70,16 +70,6 @@ export const learnActions: ModuleActions = {
       'Making a subject writes its curriculum and places it among the areas with a model. A reading list with no model run is add_learn_track.',
     ),
   },
-  'app/learn/know/personality/actions.ts': {
-    saveBigFiveAction: none('own'),
-    saveTypedAction: none(
-      'own',
-      "A type from another test is the person's own result, entered by them as their Big Five scores are, and saving it starts a read of it.",
-    ),
-    deleteTypedAction: none('deletes'),
-    restoreTypedAction: none('theirs'),
-    readAgainAction: none('spends'),
-  },
   'app/learn/know/move-actions.ts': {
     moveTheme: none('setting', 'Where a theme sits on the areas grid is how the person arranges their own map.'),
   },

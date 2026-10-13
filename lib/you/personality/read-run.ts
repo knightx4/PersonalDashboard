@@ -4,11 +4,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { after } from 'next/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { MODELS } from '@/lib/core/models';
-import { usageFrom } from '@/lib/core/spend/pricing';
+import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
-import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { relatedNotesStore, vectorForText } from '@/lib/vault/notes/related';
@@ -33,7 +33,7 @@ import { loadTraitThemes } from './trait-themes-load';
  * Dash's read of one personality result against your notes (plan #1635).
  *
  * Runs once when a result is saved, after the page has answered
- * (`readPersonalityAfterResponse`), and again when the Know page's button
+ * (`readPersonalityAfterResponse`), and again when the Personality tab's button
  * asks for a fresh read (`runPersonalityRead`, awaited). Never on a note
  * changing.
  *
@@ -50,7 +50,7 @@ import { loadTraitThemes } from './trait-themes-load';
  * page can say the read did not run. Never throws.
  */
 
-const MODEL = MODELS.learnPersonalityRead;
+const MODEL = MODELS.youPersonalityRead;
 
 type RawNote = { id: string; path: string; title: string | null; body: string | null };
 
@@ -86,9 +86,9 @@ async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<
   return ((data ?? []) as RawNote[]).map(toCandidate);
 }
 
-async function loadResults(learn: LearnSupabaseClient): Promise<PersonalityResult[]> {
-  const { data, error } = await learn.from('personality_results').select(RESULT_COLUMNS);
-  assertSchemaExposed(error, LEARN_SCHEMA);
+async function loadResults(you: YouSupabaseClient): Promise<PersonalityResult[]> {
+  const { data, error } = await you.from('personality_results').select(RESULT_COLUMNS);
+  assertSchemaExposed(error, YOU_SCHEMA);
   if (error) throw new Error(`Reading your results failed: ${error.message}`);
   return ((data ?? []) as unknown as ResultRow[])
     .map(fromRow)
@@ -96,30 +96,30 @@ async function loadResults(learn: LearnSupabaseClient): Promise<PersonalityResul
 }
 
 async function writeRead(
-  learn: LearnSupabaseClient,
+  you: YouSupabaseClient,
   id: string,
   points: ReadPoint[],
   model: string,
 ): Promise<void> {
-  const { error } = await learn
+  const { error } = await you
     .from('personality_results')
     .update({ read_points: points, read_model: model, read_at: new Date().toISOString(), read_failed_at: null })
     .eq('id', id);
   if (error) throw new Error(`Keeping the read failed: ${error.message}`);
 }
 
-async function markFailed(learn: LearnSupabaseClient, id: string): Promise<void> {
-  const { error } = await learn
+async function markFailed(you: YouSupabaseClient, id: string): Promise<void> {
+  const { error } = await you
     .from('personality_results')
     .update({ read_failed_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) console.error('[learn personality read] marking the failure', error.message);
+  if (error) console.error('[you personality read] marking the failure', error.message);
 }
 
 export type ReadOutcome = { ok: true; points: number } | { ok: false; detail: string };
 
 async function read(
-  learn: LearnSupabaseClient,
+  you: YouSupabaseClient,
   userId: string,
   resultId: string,
   client?: Anthropic,
@@ -127,7 +127,7 @@ async function read(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey && !client) return { ok: false, detail: 'ANTHROPIC_API_KEY is not set.' };
 
-  const results = await loadResults(learn);
+  const results = await loadResults(you);
   const result = results.find((r) => r.id === resultId);
   if (!result) return { ok: false, detail: 'The result is not there any more.' };
 
@@ -158,12 +158,12 @@ async function read(
 
   // Nothing of yours to compare with: a read with no points, and no call.
   if (notes.length === 0) {
-    await writeRead(learn, result.id, [], 'none');
+    await writeRead(you, result.id, [], 'none');
     return { ok: true, points: 0 };
   }
 
   const anthropic = client ?? new Anthropic({ apiKey });
-  const spend = collectSpend();
+  const reports: SpendReport[] = [];
   let response;
   try {
     response = await anthropic.messages.create({
@@ -185,9 +185,9 @@ async function read(
         },
       ],
     });
-    spend.sink({ model: MODEL, usage: usageFrom(response.usage) });
+    reports.push({ model: MODEL, usage: usageFrom(response.usage) });
   } finally {
-    await recordLearnSpend(userId, 'read-personality', spend.reports);
+    await recordSpendReports(core, userId, { module: 'you', operation: 'read-personality' }, reports);
   }
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === READ_TOOL);
@@ -195,26 +195,26 @@ async function read(
   const points = pointsFrom(block.input, notes);
   if (!points) return { ok: false, detail: 'The read came back in the wrong shape.' };
 
-  await writeRead(learn, result.id, points, MODEL);
+  await writeRead(you, result.id, points, MODEL);
   return { ok: true, points: points.length };
 }
 
 /** Read one result now and keep the read, or mark that it failed. */
 export async function runPersonalityRead(
-  learn: LearnSupabaseClient,
+  you: YouSupabaseClient,
   userId: string,
   resultId: string,
   options: { client?: Anthropic } = {},
 ): Promise<ReadOutcome> {
   let outcome: ReadOutcome;
   try {
-    outcome = await read(learn, userId, resultId, options.client);
+    outcome = await read(you, userId, resultId, options.client);
   } catch (error) {
     outcome = { ok: false, detail: error instanceof Error ? error.message : 'The read failed.' };
   }
   if (!outcome.ok) {
-    console.error('[learn personality read]', outcome.detail);
-    await markFailed(learn, resultId);
+    console.error('[you personality read]', outcome.detail);
+    await markFailed(you, resultId);
   }
   return outcome;
 }
@@ -225,9 +225,9 @@ export async function runPersonalityRead(
  * session's cookies for the clients and the spend record.
  */
 export function readPersonalityAfterResponse(
-  learn: LearnSupabaseClient,
+  you: YouSupabaseClient,
   userId: string,
   resultId: string,
 ): void {
-  after(() => runPersonalityRead(learn, userId, resultId).then(() => undefined));
+  after(() => runPersonalityRead(you, userId, resultId).then(() => undefined));
 }

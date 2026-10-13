@@ -4,6 +4,7 @@ import type {
   JobsOperation,
   NewsOperation,
   ShoppingOperation,
+  YouOperation,
 } from '@/lib/core/spend/operations';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
@@ -35,7 +36,8 @@ export type OperationName =
   | ShoppingOperation
   | CoreOperation
   | NewsOperation
-  | GoalsOperation;
+  | GoalsOperation
+  | YouOperation;
 
 export type OperationGuess = {
   model: string;
@@ -204,7 +206,6 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A card's idea and up to 6,000 characters of lecture transcript in; two
   // sentences out. Written by the hourly top-up, a few cards a run.
   'describe-card-clip': background(unit(HAIKU, 2_000, 120)),
-  'read-personality': run(SONNET, 7_000, 1_200),
   // Every subject's name and up to three names from a chat in; a match each out.
   'match-subjects': background(run(HAIKU, 2_000, 200)),
   // A few ideas' claims at about 65 tokens each. Counted as background
@@ -409,4 +410,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A closed step's title and result, about three hundred tokens with the
   // question, for the two or three Claude steps a run closes.
   'check-run-acts': background(run(JEV, 3 * 300, 0)),
+
+  // You: a personality result, its trait themes and up to fifteen cut notes
+  // in, a few points out.
+  'read-personality': run(SONNET, 7_000, 1_200),
 };

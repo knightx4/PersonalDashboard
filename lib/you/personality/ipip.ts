@@ -3,7 +3,7 @@
  *
  * The items are Goldberg's (1992) markers from the International Personality
  * Item Pool, which is in the public domain, in the IPIP's own order. That
- * order is what `learn.personality_results.answers` is stored in, so it never
+ * order is what `you.personality_results.answers` is stored in, so it never
  * changes: a correction to the key rescores the stored answers, and a
  * reordered list would rescore them against the wrong statements.
  *

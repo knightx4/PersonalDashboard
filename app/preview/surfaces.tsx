@@ -107,9 +107,9 @@ import {
   PersonalityAddTypeSurface,
   PersonalityScoresSurface,
   PersonalityTestSurface,
-  KnowPersonalitySurface,
-  KnowPersonalityEmptySurface,
-  KnowPersonalityReadingSurface,
+  YouPersonalitySurface,
+  YouPersonalityEmptySurface,
+  YouPersonalityReadingSurface,
 } from './personality-surfaces';
 import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
@@ -2668,7 +2668,7 @@ const shellSections: NavSection[] = [
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
-  { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
+  { href: '/you/personality', label: 'Personality', icon: 'personality' },
   { href: '/you/places', label: 'Places', icon: 'places', exact: true },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
@@ -4995,57 +4995,58 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The Big Five test (plan #1632): fifty statements, the first seven
      * answered. Fixtures in personality-surfaces.tsx. */
-    id: 'learn-personality-test',
-    label: 'Learn · Personality test',
-    module: 'learn',
+    id: 'you-personality-test',
+    label: 'You · Personality test',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityTestSurface />,
   },
   {
     /* The same page opened with a result kept: the five scores. */
-    id: 'learn-personality-scores',
-    label: 'Learn · Personality scores',
-    module: 'learn',
+    id: 'you-personality-scores',
+    label: 'You · Personality scores',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityScoresSurface />,
   },
   {
     /* Typing in a type from another test (plan #1633): the compose form
      * open beneath the scores, one type already kept. */
-    id: 'learn-personality-add-type',
-    label: 'Learn · Personality, adding a type',
-    module: 'learn',
+    id: 'you-personality-add-type',
+    label: 'You · Personality, adding a type',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityAddTypeSurface />,
   },
   {
-    /* The Big Five result on the Know page (plan #1634): the five traits,
+    /* The Big Five result on You's Personality tab (plan #1634, moved from
+     * Learn's Know page by #1991.2): the five traits,
      * the vault themes nearest each, Dash's read against the notes (#1635)
      * with two clashes and two agreements, two typed-in types with their
      * reads folded, and one earlier result folded. Intellect has no theme
      * near it. */
-    id: 'learn-know-personality',
-    label: 'Learn · Know, personality result',
-    module: 'learn',
+    id: 'you-personality',
+    label: 'You · Personality, a result read',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalitySurface />,
+    render: () => <YouPersonalitySurface />,
   },
   {
     /* Straight after a save (plan #1635): Dash's read of the result is
-     * still running, so the section says so where the read will be. */
-    id: 'learn-know-personality-reading',
-    label: 'Learn · Know, personality being read',
-    module: 'learn',
+     * still running, so the tab says so where the read will be. */
+    id: 'you-personality-reading',
+    label: 'You · Personality, being read',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalityReadingSurface />,
+    render: () => <YouPersonalityReadingSurface />,
   },
   {
-    /* The same section before any test is taken: one line offering it. */
-    id: 'learn-know-personality-empty',
-    label: 'Learn · Know, personality not taken',
-    module: 'learn',
+    /* The same tab before any test is taken: one line offering it. */
+    id: 'you-personality-empty',
+    label: 'You · Personality, no test taken',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalityEmptySurface />,
+    render: () => <YouPersonalityEmptySurface />,
   },
   {
     /* Idea Space (plan #1857): the neighbour map coloured by what you know,
@@ -5267,7 +5268,8 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* The You workspace in its shell, on Personality, its first tab (plan
-     * #1991.1): the four tabs in the sidebar and the tab's empty state. */
+     * #1991.1): the four tabs in the sidebar and, since #1991.2, the tab
+     * with a result taken and read. */
     id: 'you-shell',
     label: 'You · The workspace on its first tab',
     module: 'you',
@@ -5285,7 +5287,7 @@ export const SURFACES: readonly Surface[] = [
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
       >
-        <YouTabEmpty tab="personality" />
+        <YouPersonalitySurface />
       </AppShell>
     ),
   },

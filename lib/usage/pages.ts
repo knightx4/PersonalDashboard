@@ -157,6 +157,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/you',
   '/you/insights',
   '/you/personality',
+  '/you/personality/test',
   '/you/places',
   '/you/work',
 ];

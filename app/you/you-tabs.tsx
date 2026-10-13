@@ -1,4 +1,4 @@
-import { Fingerprint, MapPin, Sparkles } from 'lucide-react';
+import { MapPin, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
  * entry show the same words. Each later step under #1991 replaces one tab's
  * page with the real thing and its row here goes.
  */
-export type YouTab = 'personality' | 'places' | 'insights';
+export type YouTab = 'places' | 'insights';
 
 type TabCopy = {
   title: string;
@@ -21,14 +21,6 @@ type TabCopy = {
 };
 
 export const YOU_TABS: Record<YouTab, TabCopy> = {
-  personality: {
-    title: 'Personality',
-    icon: Fingerprint,
-    emptyTitle: 'Your results are still in Learn',
-    emptyDescription:
-      'Your Big Five test, the types you got elsewhere and Dash’s read of each are moving here. Until then they are on Learn’s Know page.',
-    action: { label: 'Open them in Learn', href: '/learn/know/personality' },
-  },
   places: {
     title: 'Places',
     icon: MapPin,
