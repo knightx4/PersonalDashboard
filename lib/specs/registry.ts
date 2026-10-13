@@ -45,6 +45,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: null,
   },
   {
+    slug: 'one-interface',
+    title: 'One interface',
+    blurb:
+      'The four rooms every workspace has (Now, Inbox, the lists, Settings) and the six mechanisms that are the same in all of them: a path and a way back, capture as the add, four closing words, one clock, one shell mount and one presence for Dash.',
+    file: 'ONE-INTERFACE-SPEC.md',
+    module: null,
+  },
+  {
     slug: 'spec-layer',
     title: 'Specs as the layer you work at',
     blurb:
