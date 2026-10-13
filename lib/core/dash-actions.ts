@@ -1,5 +1,7 @@
 import type { AskDb, AskSchema, SchemaClient } from '@/lib/ask/db';
 import { parseRef } from '@/lib/core/refs';
+import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
+import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -165,6 +167,9 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   'add_idea',
   'change_items',
   'move_roles',
+  'add_quick_note',
+  ...LEARN_CHANGE_KINDS,
+  ...TODO_CHANGE_KINDS,
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
@@ -179,18 +184,21 @@ export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boole
  * or a note on a job filed from the one capture box (plan #1581) touches one
  * row, keeps no capture id, and is undone by the generic rule here.
  */
-export function undoneByCapture(action: Pick<DashAction, 'surface' | 'undo'>): boolean {
-  return action.surface === 'capture' && (typeof action.undo?.capture_id === 'string' || undoneByVault(action));
+export function undoneByCapture(action: Pick<DashAction, 'surface' | 'kind' | 'undo'>): boolean {
+  return (action.surface === 'capture' && typeof action.undo?.capture_id === 'string') || undoneByVault(action);
 }
 
 /**
- * Whether this is a note capture wrote into the vault (plan #1582): undoing
- * it commits the file's removal to the notes repository before the row goes,
- * so the generic rule, which only sees the row, leaves it to capture. The
+ * Whether this is a note written into the vault (plan #1582): undoing it
+ * commits the file's removal to the notes repository before the row goes, so
+ * the generic rule, which only sees the row, leaves it to capture's. The
  * record keeps the blob SHA the note was written at in `undo.vault_blob_sha`.
+ * Capture writes these, and so does the connector's add_quick_note (plan
+ * #1894.2), recorded as a routine's; Ask's and a thread's go to Ask's own
+ * undo, which takes the file out the same way.
  */
-export function undoneByVault(action: Pick<DashAction, 'surface' | 'undo'>): boolean {
-  return action.surface === 'capture' && typeof action.undo?.vault_blob_sha === 'string';
+export function undoneByVault(action: Pick<DashAction, 'surface' | 'kind' | 'undo'>): boolean {
+  return typeof action.undo?.vault_blob_sha === 'string' && !undoneByAsk(action);
 }
 
 /**

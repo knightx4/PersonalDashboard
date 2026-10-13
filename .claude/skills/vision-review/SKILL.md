@@ -1,6 +1,6 @@
 ---
 name: vision-review
-description: Review each workspace's vision against what the person filed and did since the last review, and record the finding in vision_reviews. For every workspace the run writes either a dated "still holds" or a proposed edit citing the notes and likes that argue for it, closes the likes it read, and dismisses session-filed ideas that serve no part of the vision, each with a comment. The first run also drafts fuller visions for workspaces whose vision is one sentence. Use when the weekly tick fires it, or when the user says "review the visions", "run the vision review", or asks whether a workspace's vision still fits.
+description: Review each workspace's vision against what the person filed and did since the last review, and record the finding in vision_reviews. For every workspace the run writes either a dated "still holds" or a proposed edit citing the notes and likes that argue for it, closes the likes it read, and dismisses session-filed ideas that serve no part of the vision, each with a comment. It also reads each workspace's specs against its vision and drafts a spec change where one contradicts it, and suggests up to five ideas for parts of a vision nothing covers yet. The first run also drafts fuller visions for workspaces whose vision is one sentence. Use when the weekly tick fires it, or when the user says "review the visions", "run the vision review", or asks whether a workspace's vision still fits.
 ---
 
 # Reviewing the visions
@@ -11,7 +11,10 @@ week whether it still describes what the person is actually doing there. The
 evidence is what they filed and what got built since the last review.
 
 The output is rows in `vision_reviews`, one per workspace per run, which the
-specs page reads (plan #1106). A holds row is dated and says why. An edit
+specs page reads (plan #1106). Two more kinds of row come out of it since
+plan #1969: a spec change in `spec_changes` where a spec contradicts its
+vision ("Comparing the specs"), and a few ideas for parts of a vision that
+nothing covers yet ("Suggesting ideas"). A holds row is dated and says why. An edit
 waits beside the vision as `pending` until the person accepts or dismisses
 it. The review never writes `module_visions` itself: the vision stays in the
 person's words until they accept an edit.
@@ -229,8 +232,9 @@ where id = '<the pending edit>' and user_id = '…' and status = 'pending';
 #1109 settled that, and the run it starts follows "After a vision edit" in
 `.claude/skills/plan/reference/reshaping.md`, writing only proposals and
 questions. The app starts that run when the person accepts; this review does
-not. The review proposes edits to the vision and nothing else, and it does
-not touch plan features.
+not. The review proposes edits to the vision, and it does
+not touch plan features. Beside the edit it may draft spec changes and file
+ideas, as the two sections after the dismissals say.
 
 ## The first run: drafting fuller visions
 
@@ -334,6 +338,105 @@ Keep the opening words exactly. The next run finds its own dismissals by
 them, so it does not count them as the person's. The comment is written after
 the record call: it hangs off the idea and does not change the idea's row.
 
+## Comparing the specs
+
+The spec audit holds the code to the specs and never reads a vision. This
+section checks whether the specs still say what the vision wants. A spec is
+the person's approved word on how a workspace works and the vision is their
+word on what it is for, so the two can drift apart without any code being
+wrong.
+
+**Which specs.** The registry (`lib/specs/registry.ts`) names each spec's
+workspace in `module`; a spec with `module: null` is read against the `app`
+vision. Read a spec when it or its vision changed since the workspace's last
+review, and every spec on the first run:
+
+```bash
+git log --since='<window start>' --format=%h -- docs/<FILE>.md   # any line: it changed
+```
+
+The vision changed when `module_visions.updated_at` is after the window
+start. A workspace with no vision has nothing to compare: skip its specs.
+
+**What to look for.** Read the vision sentence by sentence, then the spec.
+Two things count:
+
+- **A contradiction.** The spec states a rule, a limit or a behaviour the
+  vision rules out ("Learn keeps no history" against a vision that says it
+  remembers what you studied). Quote both.
+- **A promise no spec describes.** The vision says the workspace does
+  something and no spec for it mentions it. This is a gap. It goes to
+  "Suggesting ideas" below and drafts no spec change.
+
+A spec that is narrower than the vision, or silent on something the vision
+mentions in passing, holds. Most weeks most specs hold.
+
+**What to write.** Every workspace's note gains one line on its specs, so
+the person can see the comparison happened: `Specs: read <slugs>; <holds, or
+what conflicts>.`, or `Specs: none changed since <date>.` when nothing was
+read.
+
+A contradiction drafts a spec change for the person to approve or decline on
+`/dev/specs`. The vision is the higher layer, so the change brings the spec
+to the vision. When the spec looks right and the vision looks out of date,
+draft no change: say so in the note, and let the edit or the next review
+take it up. Draft exactly as `.claude/skills/spec-audit/SKILL.md` says under
+"Drafting spec changes" and "Writing the result": a diff of 1 to 60 changed
+lines checked with `apply-spec-diff.ts`, a title saying what will be true,
+and the five-waiting limit in the insert itself. Its why opens with
+`From the vision review of <D Mon YYYY>:` and quotes the vision sentence and
+the spec line. Skip any section an open change already covers, and do not
+redraft one the person declined unless the vision changed since.
+
+## Suggesting ideas
+
+The ideas page holds what the person and sessions have thought of, but
+nothing reads a vision to ask what it promises that nobody is building. The
+review does, after the dismissals above, so it never dismisses its own
+suggestions.
+
+For each workspace with a vision, list what the vision promises in a few
+short phrases. For each, look for something that already serves it:
+
+```sql
+-- open plan features in the workspace (no module for the app)
+select o.outline, p.title from plan_items p join plan_item_outlines o on o.id = p.id
+where p.user_id = '…' and p.parent_id is null and p.module = '<workspace>'
+  and p.status not in ('done', 'dropped') and p.dismissed_at is null;
+
+-- live ideas, and every idea dismissed, whoever dismissed it
+select id, body, dismissed_at from ideas
+where user_id = '…' and module = '<workspace>';
+```
+
+Read the code too, briefly: a promise the app already keeps needs nothing. A
+promise that no open feature, live idea or shipped code serves is a gap.
+Leave alone a gap that an idea the person dismissed was about: they have
+already said no to it.
+
+**At most five ideas a run**, and at most two per workspace. When there are
+more gaps, file the ones the window's page opens and notes say matter most,
+and name the rest in the report. Each is one idea in the form the ideas page
+reads: a title line, a blank line, then two to four sentences saying what
+the person would get. Write it to `docs/WRITING-GUIDE.md`, with Dash for the
+assistant.
+
+```sql
+insert into ideas (user_id, module, body, source)
+values ('…', '<workspace, or null for the app>', $b$<title>
+
+<what the person would get>$b$, 'claude')
+returning id;
+select core.record_dash_action('…', 'public.ideas:<id>', 'insert', 'file_idea',
+  $s$Dash suggested the idea "<title>" in the vision review.$s$);
+select core.add_thread_turn('…', 'public.ideas:<id>', 'claude',
+  'Suggested by the vision review of <D Mon YYYY>: serves "<the vision sentence, quoted>".');
+```
+
+Keep the comment's opening words exactly, as with the dismissals: a later
+review finds its own suggestions by them. The idea is scored like any other
+session idea once it lands.
+
 ## Before stopping
 
 Check that the run landed:
@@ -370,6 +473,9 @@ Then report:
 - The edits proposed, with how many notes and likes each rests on.
 - The likes closed.
 - The ideas dismissed, with the reason for each.
+- The specs compared, and any spec change drafted, by title.
+- The ideas suggested, with the vision sentence each serves, and any gap left
+  for a later run.
 - Anything skipped, such as `app` with no vision.
 
 Write every note, draft and comment to `docs/WRITING-GUIDE.md`. The person

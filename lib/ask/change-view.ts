@@ -2,6 +2,9 @@ import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
 import { stepHref } from '@/lib/goals/all-goals';
 import { statusLabel } from '@/lib/jobs/status-label';
+import { noteHref } from '@/lib/vault/paths';
+import { learnChangeWords } from './learn-changes';
+import { isWrittenCard } from './todo-changes';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -11,6 +14,7 @@ import { statusLabel } from '@/lib/jobs/status-label';
 
 /** Where each kind's row is shown, for the card and the list to link to. */
 export function changeHref(change: DashChange): string {
+  if (isWrittenCard(change)) return change.input.href;
   switch (change.kind) {
     case 'add_todo':
       return change.writtenRef ? `/todo/all?status=all&focus=${change.writtenRef}` : '/todo';
@@ -41,6 +45,8 @@ export function changeHref(change: DashChange): string {
       return change.input.change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
     case 'move_roles':
       return '/jobs/pipeline';
+    case 'add_quick_note':
+      return noteHref(change.input.path);
   }
 }
 
@@ -119,6 +125,7 @@ export function dueDay(day: string, today?: string): string {
 export type ChangeWords = { verb: string; what: string; rest: string };
 
 export function changeWords(change: DashChange, done: boolean, today?: string): ChangeWords {
+  if (isWrittenCard(change)) return learnChangeWords(change.input);
   switch (change.kind) {
     case 'add_todo':
       return {
@@ -210,6 +217,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return itemWords(change.input, done);
     case 'move_roles':
       return roleWords(change.input, done);
+    case 'add_quick_note':
+      return {
+        verb: done ? 'Saved the quick note' : 'Save the quick note',
+        what: quoted(change.input.body),
+        rest: " in your vault's Inbox",
+      };
   }
 }
 
@@ -229,6 +242,7 @@ export const CHANGE_STATUS_LABEL: Record<DashChangeStatus, string> = {
 
 /** Where a written change's row is, as the link's words. */
 export function changeWhere(change: DashChange): string {
+  if (isWrittenCard(change)) return change.input.where;
   switch (change.kind) {
     case 'add_todo':
       return 'Open in Todo';
@@ -256,5 +270,7 @@ export function changeWhere(change: DashChange): string {
       return change.input.change === 'for_sale' ? 'Open the sell page' : 'Open the inventory';
     case 'move_roles':
       return 'Open the pipeline';
+    case 'add_quick_note':
+      return 'Open the note';
   }
 }

@@ -3,7 +3,7 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
-import { readSubject, undoDashAction } from '@/lib/core/dash-actions';
+import { readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { toRef } from '@/lib/core/refs';
@@ -18,6 +18,7 @@ import {
   type DashChangeStatus,
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
+import { isWrittenCard, type WrittenCardKind } from './todo-changes';
 
 /**
  * Confirming, declining and undoing a change Dash proposed in an Ask Dash
@@ -81,6 +82,14 @@ export type ChangeDeps = {
   createTask: (userId: string, input: TaskInput, timezone: string) => Promise<{ id: string | null; error: string | null }>;
   /** Now, as an ISO timestamp. */
   now?: () => string;
+  /**
+   * Takes a quick note Dash wrote back out of the vault and marks its record
+   * undone (undoVaultCapture in lib/capture/vault.ts, bound to the person).
+   * Absent where there is no vault to reach, and then the Undo is refused.
+   */
+  undoVaultNote?: (
+    action: Pick<DashAction, 'id' | 'status' | 'subjectRef' | 'undo'>,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
 /** What the card or the list shows after a press: the change as it now is, or why not. */
@@ -93,6 +102,7 @@ export { changeHref } from './change-view';
 
 /** The pages a change lands on, to revalidate after a confirm or an undo. */
 export function changePaths(change: DashChange): string[] {
+  if (isWrittenCard(change)) return change.input.paths;
   switch (change.kind) {
     case 'add_todo':
       return ['/todo', '/todo/all', '/home'];
@@ -142,11 +152,19 @@ export function changePaths(change: DashChange): string[] {
         ...rows.flatMap((row) => (typeof row.role_id === 'string' ? [`/jobs/roles/${row.role_id}`] : [])),
       ];
     }
+    case 'add_quick_note':
+      return ['/vault', '/vault/triage'];
   }
 }
 
 /** The workspace each kind writes into; a watch is the home page's and needs none. */
-const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | null> = {
+/**
+ * The kinds with a writer here: Learn's and Todo's newer ones are written by
+ * their tools alone (lib/dash/learn-writes.ts, lib/dash/todo-writes.ts).
+ */
+type WrittenKind = Exclude<DashChangeKind, WrittenCardKind>;
+
+const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null> = {
   add_todo: { module: 'todo', label: 'Todo' },
   add_goal_step: { module: 'goals', label: 'Goals' },
   mark_returned: { module: 'shopping', label: 'Shopping' },
@@ -161,9 +179,10 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   change_items: { module: 'shopping', label: 'Shopping' },
   move_roles: { module: 'jobs', label: 'Jobs' },
   set_goal_done_when: { module: 'goals', label: 'Goals' },
+  add_quick_note: { module: 'vault', label: 'Vault' },
 };
 
-const WRITTEN_TABLE: Record<DashChangeKind, string> = {
+const WRITTEN_TABLE: Record<WrittenKind, string> = {
   add_todo: 'todo.tasks',
   add_goal_step: 'goals.items',
   mark_returned: 'public.inventory_items',
@@ -178,10 +197,11 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   change_items: 'public.inventory_items',
   move_roles: 'job_search.applications',
   set_goal_done_when: 'goals.items',
+  add_quick_note: 'obsidian.notes',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
-const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
+const WRITTEN_OP: Record<WrittenKind, 'insert' | 'update'> = {
   add_todo: 'insert',
   add_goal_step: 'insert',
   mark_returned: 'update',
@@ -196,6 +216,7 @@ const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
   change_items: 'update',
   move_roles: 'update',
   set_goal_done_when: 'update',
+  add_quick_note: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -741,6 +762,7 @@ export async function writeChange(
  * where they are still ticked. The record is marked undone by the rule.
  */
 async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
+  if (change.kind === 'add_quick_note') return undoQuickNote(deps, change, surface);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
   const result = await undoDashAction(
@@ -763,6 +785,24 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 
       .eq('status', 'done');
     if (error) console.error(`ask change ${change.id}: reopening the todo's items failed`, error);
   }
+  const now = await loadOne(deps, change.id, surface);
+  return now ? { ok: true, change: now } : { ok: false, error: GONE, change: null };
+}
+
+/**
+ * Undo a quick note written to the vault (plan #1894.2): its file comes out of
+ * the notes repository as well as its row, the way capture's Undo takes a note
+ * back, so the generic rule, which only sees the row, cannot do it.
+ */
+async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
+  if (!deps.undoVaultNote) return { ok: false, error: 'The vault cannot be reached from here, so the note was left.', change };
+  const undone = await deps.undoVaultNote({
+    id: change.id,
+    status: 'done',
+    subjectRef: change.writtenRef ? toRef(WRITTEN_TABLE.add_quick_note, change.writtenRef) : null,
+    undo: change.undo ?? null,
+  });
+  if (!undone.ok) return { ok: false, error: undone.error, change };
   const now = await loadOne(deps, change.id, surface);
   return now ? { ok: true, change: now } : { ok: false, error: GONE, change: null };
 }

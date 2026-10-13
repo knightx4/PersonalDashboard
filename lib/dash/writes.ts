@@ -20,6 +20,9 @@ import { companyFromBoardToken } from '@/lib/jobs/ats/company';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { noteHref } from '@/lib/vault/paths';
+import { LEARN_WRITE_TOOLS } from './learn-writes';
+import { TODO_WRITE_TOOLS } from './todo-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -47,6 +50,13 @@ import { moveRoles, ROLE_STAGES } from './bulk-roles';
  *   move_roles       many job roles moved to one stage or archived, each
  *                    through the board's own move, with one Undo
  *                    (lib/dash/bulk-roles.ts, plan #1657).
+ *   add_quick_note   a quick note in the vault's Inbox, the one the Vault
+ *                    page's quick note box writes (plan #1894.2).
+ *   Learn's six      a reading, a reading list, an idea or a video changed
+ *                    or added (lib/dash/learn-writes.ts, plan #1894.8).
+ *   Todo's five      a todo's notes, pin, snooze or state, an item on its
+ *                    list, what it is about, and a calendar event added or
+ *                    changed (lib/dash/todo-writes.ts, plan #1894.9.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -70,8 +80,9 @@ const TABLE = {
   role: 'job_search.roles',
   application: 'job_search.applications',
   idea: 'public.ideas',
+  note: 'obsidian.notes',
   // A note on a role is a turn in the role's thread (plan #1470).
-  note: 'core.conversation_turns',
+  roleNote: 'core.conversation_turns',
 } as const;
 
 const WORKSPACE_LABELS: Partial<Record<ModuleId, string>> = {
@@ -79,6 +90,7 @@ const WORKSPACE_LABELS: Partial<Record<ModuleId, string>> = {
   goals: 'Goals',
   shopping: 'Shopping',
   jobs: 'Jobs',
+  vault: 'Vault',
 };
 
 /** A refusal Dash reads and says in words. */
@@ -601,7 +613,7 @@ async function noteOnRole(
     author: 'me',
     body,
   });
-  const ref = toRef(TABLE.note, noteId);
+  const ref = toRef(TABLE.roleNote, noteId);
   return made(
     'add_role_note',
     { roleId, roleTitle, body },
@@ -761,6 +773,48 @@ async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
       after: await readSubject(ctx.db, ref),
       summary: `Dash filed your idea "${short}" on the ideas page.`,
       row: { table: TABLE.idea, ref: idea.id, title: short, href: '/dev/ideas' },
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Vault
+// ---------------------------------------------------------------------------
+
+/** Longest quick note Dash saves, the capture box's own limit. */
+const QUICK_NOTE_MAX = 4000;
+
+/**
+ * Save a quick thought as a quick note: a new note in the vault's Inbox,
+ * committed to the notes repository as the Vault page's quick note box and
+ * the capture box write it (fileVaultNote), and left there to be sorted in
+ * Quick note triage. Undo takes the file back out of the repository while it
+ * is still as written (undoVaultCapture), which is why the blob SHA it was
+ * written at is kept.
+ */
+async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  requireWorkspace(ctx, 'vault');
+  const body = text(args, 'text');
+  if (body.length < 2) throw new Refused('text is missing: write the thought as they said it.');
+  if (body.length > QUICK_NOTE_MAX) throw new Refused(`Keep the note under ${QUICK_NOTE_MAX} characters.`);
+  if (!ctx.fileQuickNote) throw new Refused('Quick notes cannot be saved from here.');
+
+  const filed = await ctx.fileQuickNote(body);
+  if (!filed.ok) throw new Refused(filed.error);
+  const ref = toRef(TABLE.note, filed.noteId);
+  const line = body.split('\n')[0].trim();
+  const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
+  return made(
+    'add_quick_note',
+    { noteId: filed.noteId, title: filed.title, path: filed.path, body },
+    {
+      subjectRef: ref,
+      op: 'insert',
+      before: null,
+      after: await readSubject(ctx.db, ref),
+      summary: `Dash saved the quick note "${short}" to your vault's Inbox.`,
+      undo: { vault_blob_sha: filed.blobSha },
+      row: { table: TABLE.note, ref: filed.noteId, title: filed.title, href: noteHref(filed.path) },
     },
   );
 }
@@ -1005,6 +1059,23 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
     },
     moveRoles,
   ),
+  tool(
+    'add_quick_note',
+    'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in the vault\'s Inbox, where Quick note triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
+    {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The thought, in their words, word for word when they dictated it.' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    addQuickNote,
+  ),
+  // Learn's, which the connector offers too (plan #1894.8).
+  ...LEARN_WRITE_TOOLS,
+  // Todo's, which the connector offers too (plan #1894.9.1).
+  ...TODO_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

@@ -6,6 +6,8 @@ import { ASK_DASH_TOOLS, DASH_TOOLS, captureDashTools, dashTool, dashToolsOf, th
 import { CAPTURE_TOOL_NAMES } from './capture-tools';
 import { DEV_THREAD_TABLES, GOAL_THREAD_TABLE, ROLE_THREAD_TABLE, THREAD_TOOL_NAMES } from './thread-tools';
 import { WRITE_TOOL_NAMES } from './writes';
+import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
+import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
@@ -43,6 +45,9 @@ describe('DASH_TOOLS', () => {
       'add_idea',
       'change_items',
       'move_roles',
+      'add_quick_note',
+      ...LEARN_CHANGE_KINDS,
+      ...TODO_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,

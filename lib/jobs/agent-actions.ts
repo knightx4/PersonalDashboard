@@ -1,4 +1,4 @@
-import { GAP, gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the job search pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const jobsActions: ModuleActions = {
@@ -88,7 +88,7 @@ export const jobsActions: ModuleActions = {
     saveOpening: none('theirs'),
   },
   'app/jobs/(app)/roles/actions.ts': {
-    createRole: gap('Add a job lead from a posting link (plan #1896).'),
+    createRole: tool('add_job_lead'),
     fetchJobDescription: none('page'),
     updateRole: GAP,
     addQuestions: GAP,

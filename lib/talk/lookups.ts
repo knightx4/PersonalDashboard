@@ -1,6 +1,8 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import type { TalkToolCall } from './talk';
 import { CHART_TOOL } from './chart';
+import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
+import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -63,6 +65,9 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_idea',
   'change_items',
   'move_roles',
+  'add_quick_note',
+  ...LEARN_CHANGE_KINDS,
+  ...TODO_CHANGE_KINDS,
 ];
 
 /**
