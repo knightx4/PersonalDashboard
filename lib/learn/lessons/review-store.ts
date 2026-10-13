@@ -4,15 +4,17 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import {
   addDays,
+  firstReviewDays,
   nextInterval,
   pickDue,
-  REVIEW_STEPS,
+  REVIEWABLE_STATES,
   reviewedState,
   reviewToday,
   toReviewQuestion,
   type DueReview,
   type IdeaForReview,
   type ReviewQuestionRow,
+  type ScheduleBasis,
 } from './review';
 
 /**
@@ -27,23 +29,30 @@ type PassedPieceRow = { id: string; subject_id: string; title: string; concept_i
 export const REVIEW_QUESTION_COLUMNS = 'id, concept_id, question, expected, response, correct, marked_why';
 
 /**
- * Put a passed piece's ideas on the schedule, first due the day after. An
- * idea already on it, from an earlier piece, keeps the gap it has earned.
+ * Put ideas on the review schedule the first time they are tested or
+ * declared. Every writer of concept_state that rests a state on an answer or
+ * on your word calls this after its write, so this is the one place the rule
+ * lives. Only ideas in a reviewable state are scheduled (`REVIEWABLE_STATES`),
+ * and an idea already on the schedule keeps the gap it has earned. A tested
+ * idea is first due the next day and a declared one three days on
+ * (`firstReviewDays`).
  */
 export async function scheduleIdeas(
   learn: LearnSupabaseClient,
   userId: string,
   conceptIds: readonly string[],
-  now: Date = new Date(),
+  options: { basis?: ScheduleBasis; now?: Date } = {},
 ): Promise<void> {
   if (conceptIds.length === 0) return;
+  const days = firstReviewDays(options.basis ?? 'tested');
   const { error } = await learn
     .from('concept_state')
-    .update({ review_interval_days: REVIEW_STEPS[0], review_due_on: addDays(reviewToday(now), REVIEW_STEPS[0]) })
+    .update({ review_interval_days: days, review_due_on: addDays(reviewToday(options.now), days) })
     .eq('user_id', userId)
     .in('concept_id', [...conceptIds])
+    .in('state', [...REVIEWABLE_STATES])
     .is('review_due_on', null);
-  if (error) throw new Error(`Scheduling the piece's ideas for review failed: ${error.message}`);
+  if (error) throw new Error(`Scheduling the ideas for review failed: ${error.message}`);
 }
 
 async function loadPassedPieces(learn: LearnSupabaseClient, userId: string): Promise<PassedPieceRow[]> {
@@ -64,10 +73,32 @@ const toPassed = (row: PassedPieceRow) => ({
   passedAt: row.passed_at,
 });
 
+/** The ideas' names and tracks, read in chunks so a long list stays inside a request URL. */
+async function loadConceptLabels(
+  learn: LearnSupabaseClient,
+  userId: string,
+  conceptIds: readonly string[],
+): Promise<Map<string, { name: string; subjectId: string }>> {
+  const labels = new Map<string, { name: string; subjectId: string }>();
+  for (let start = 0; start < conceptIds.length; start += 100) {
+    const { data, error } = await learn
+      .from('concepts')
+      .select('id, name, subject_id')
+      .eq('user_id', userId)
+      .in('id', conceptIds.slice(start, start + 100));
+    if (error) throw new Error(`Reading the ideas due failed: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; name: string; subject_id: string }[]) {
+      labels.set(row.id, { name: row.name, subjectId: row.subject_id });
+    }
+  }
+  return labels;
+}
+
 /**
- * The ideas due by today, most overdue first, each with the piece that taught
- * it and any question already asked on it and not answered. `subjectId` keeps
- * one plan's, and `skip` leaves out ideas the page is teaching already.
+ * The ideas due by today, most overdue first, each with its track, the first
+ * passed piece that taught it when one did, and any question already asked
+ * on it and not answered. `subjectId` keeps one track's, and `skip` leaves
+ * out ideas the page is teaching already.
  */
 export async function loadDueReviews(
   learn: LearnSupabaseClient,
@@ -83,14 +114,22 @@ export async function loadDueReviews(
     .order('review_due_on')
     .limit(200);
   if (error) throw new Error(`Reading what is due for review failed: ${error.message}`);
-  const due = ((dueRows ?? []) as { concept_id: string; review_due_on: string }[]).map((row) => ({
-    conceptId: row.concept_id,
-    dueOn: row.review_due_on,
-  }));
-  if (due.length === 0) return [];
+  const dueList = (dueRows ?? []) as { concept_id: string; review_due_on: string }[];
+  if (dueList.length === 0) return [];
 
-  const pieces = (await loadPassedPieces(learn, userId)).map(toPassed);
-  const picked = pickDue(due, pieces, {
+  const [labels, passed] = await Promise.all([
+    loadConceptLabels(
+      learn,
+      userId,
+      dueList.map((row) => row.concept_id),
+    ),
+    loadPassedPieces(learn, userId),
+  ]);
+  const due = dueList.flatMap((row) => {
+    const label = labels.get(row.concept_id);
+    return label ? [{ conceptId: row.concept_id, dueOn: row.review_due_on, subjectId: label.subjectId }] : [];
+  });
+  const picked = pickDue(due, passed.map(toPassed), {
     limit: options.limit,
     subjectId: options.subjectId,
     skip: options.skip ? new Set(options.skip) : undefined,
@@ -98,9 +137,8 @@ export async function loadDueReviews(
   if (picked.length === 0) return [];
 
   const conceptIds = picked.map((entry) => entry.conceptId);
-  const subjectIds = [...new Set(picked.map((entry) => entry.piece.subjectId))];
-  const [concepts, subjects, open] = await Promise.all([
-    learn.from('concepts').select('id, name').eq('user_id', userId).in('id', conceptIds),
+  const subjectIds = [...new Set(picked.map((entry) => entry.subjectId))];
+  const [subjects, open] = await Promise.all([
     learn.from('subjects').select('id, name').eq('user_id', userId).in('id', subjectIds),
     learn
       .from('review_questions')
@@ -110,11 +148,9 @@ export async function loadDueReviews(
       .is('response', null)
       .order('created_at', { ascending: false }),
   ]);
-  if (concepts.error) throw new Error(`Reading the ideas due failed: ${concepts.error.message}`);
-  if (subjects.error) throw new Error(`Reading the plans failed: ${subjects.error.message}`);
+  if (subjects.error) throw new Error(`Reading the tracks failed: ${subjects.error.message}`);
   if (open.error) throw new Error(`Reading the review questions failed: ${open.error.message}`);
 
-  const names = new Map(((concepts.data ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name]));
   const tracks = new Map(((subjects.data ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name]));
   const openByConcept = new Map<string, ReviewQuestionRow>();
   for (const row of (open.data ?? []) as ReviewQuestionRow[]) {
@@ -122,17 +158,17 @@ export async function loadDueReviews(
   }
 
   return picked.flatMap((entry) => {
-    const name = names.get(entry.conceptId);
+    const name = labels.get(entry.conceptId)?.name;
     if (!name) return [];
     const question = openByConcept.get(entry.conceptId);
     return [
       {
         conceptId: entry.conceptId,
         name,
-        subjectId: entry.piece.subjectId,
-        trackName: tracks.get(entry.piece.subjectId) ?? '',
-        pieceId: entry.piece.id,
-        pieceTitle: entry.piece.title,
+        subjectId: entry.subjectId,
+        trackName: tracks.get(entry.subjectId) ?? '',
+        pieceId: entry.piece?.id ?? null,
+        pieceTitle: entry.piece?.title ?? null,
         dueOn: entry.dueOn,
         open: question ? toReviewQuestion(question) : null,
       },
@@ -148,7 +184,7 @@ export type ReviewTarget = {
   state: KnowledgeState;
 };
 
-/** The idea with its schedule, or null when it is not on the schedule or in no passed piece. */
+/** The idea with its schedule, or null when it is not on the schedule. */
 export async function loadReviewTarget(
   learn: LearnSupabaseClient,
   userId: string,
@@ -161,29 +197,32 @@ export async function loadReviewTarget(
       .eq('user_id', userId)
       .eq('concept_id', conceptId)
       .maybeSingle(),
-    learn.from('concepts').select('name, claim').eq('user_id', userId).eq('id', conceptId).maybeSingle(),
+    learn.from('concepts').select('name, claim, subject_id').eq('user_id', userId).eq('id', conceptId).maybeSingle(),
     loadPassedPieces(learn, userId),
   ]);
   if (state.error) throw new Error(`Reading the idea's schedule failed: ${state.error.message}`);
   if (concept.error) throw new Error(`Reading the idea failed: ${concept.error.message}`);
   const row = state.data as { state: KnowledgeState; review_interval_days: number | null; review_due_on: string | null } | null;
-  const idea = concept.data as { name: string; claim: string } | null;
+  const idea = concept.data as { name: string; claim: string; subject_id: string } | null;
   if (!row || row.review_interval_days === null || row.review_due_on === null || !idea) return null;
 
-  const piece = pickDue([{ conceptId, dueOn: row.review_due_on }], pieces.map(toPassed), { limit: 1 })[0]?.piece;
-  if (!piece) return null;
+  const piece = pickDue(
+    [{ conceptId, dueOn: row.review_due_on, subjectId: idea.subject_id }],
+    pieces.map(toPassed),
+    { limit: 1 },
+  )[0]?.piece;
   const { data: subject, error } = await learn
     .from('subjects')
     .select('name')
     .eq('user_id', userId)
-    .eq('id', piece.subjectId)
+    .eq('id', idea.subject_id)
     .maybeSingle();
-  if (error) throw new Error(`Reading the plan failed: ${error.message}`);
+  if (error) throw new Error(`Reading the track failed: ${error.message}`);
 
   return {
     idea: {
       trackName: (subject as { name: string } | null)?.name ?? '',
-      pieceTitle: piece.title,
+      pieceTitle: piece?.title ?? null,
       name: idea.name,
       claim: idea.claim,
     },

@@ -1,18 +1,45 @@
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 
 /**
- * Spaced review of the ideas in passed pieces (plan #1145, LEARN-LESSONS-SPEC
- * "Passed pieces come back as review questions"). Pure, so the schedule, the
- * prompt and the rules are tested without a model or a database.
+ * Spaced review of the ideas you have shown or said you know (plan #1145,
+ * LEARN-LESSONS-SPEC "Passed pieces come back as review questions"). Pure, so
+ * the schedule, the prompt and the rules are tested without a model or a
+ * database.
  *
- * Passing a piece puts each of its ideas on the schedule, first due the next
- * day. A right answer moves the idea one step along the ladder, and past its
+ * An idea goes on the schedule the first time it is tested or declared in a
+ * state worth reviewing: first due the next day when an answer put it there,
+ * three days on when it rests on your word. A right answer moves the idea one step along the ladder, and past its
  * end the gap doubles up to a ceiling; a miss puts it back on the first step.
  * Days are UTC dates, stored in `concept_state.review_due_on`.
  */
 
 /** The gaps in days a right answer climbs through, first to last. */
 export const REVIEW_STEPS = [1, 3, 7, 16, 35] as const;
+
+/**
+ * The states that put an idea on the schedule. Unknown has nothing to recall
+ * and a misconception is fixed by teaching, not asked about as if it were
+ * known; both join once a later answer moves them into one of these.
+ */
+export const REVIEWABLE_STATES = ['shaky', 'recognised', 'known', 'sharp'] as const satisfies readonly KnowledgeState[];
+
+/** How the state came to be, as it decides the first gap. */
+export type ScheduleBasis = 'tested' | 'declared';
+
+/**
+ * The first gap for an idea newly on the schedule. A tested idea comes back
+ * the next day; a declared one is given the second step, since nothing was
+ * learned on the day to forget, and its first question is the first check on
+ * the claim.
+ */
+export function firstReviewDays(basis: ScheduleBasis): number {
+  return basis === 'declared' ? REVIEW_STEPS[1] : REVIEW_STEPS[0];
+}
+
+/** Whether a state puts an idea on the schedule. */
+export function isReviewable(state: KnowledgeState | null | undefined): boolean {
+  return (REVIEWABLE_STATES as readonly string[]).includes(state ?? '');
+}
 
 /** The longest gap, once doubling past the last step reaches it. */
 export const REVIEW_MAX_DAYS = 180;
@@ -51,7 +78,7 @@ export function nextDueLine(days: number): string {
 /**
  * The state an idea is left in by a review answer. A right one keeps sharp
  * sharp and makes anything else known, as a piece's check does; a miss makes
- * it shaky, since it was known when the piece passed and is not now.
+ * it shaky.
  */
 export function reviewedState(current: KnowledgeState | null, correct: boolean): KnowledgeState {
   if (!correct) return 'shaky';
@@ -61,7 +88,8 @@ export function reviewedState(current: KnowledgeState | null, correct: boolean):
 /** The idea as the question's writer and marker are given it. */
 export type IdeaForReview = {
   trackName: string;
-  pieceTitle: string;
+  /** The first passed piece that taught it, or null when no piece did. */
+  pieceTitle: string | null;
   name: string;
   claim: string;
 };
@@ -71,9 +99,10 @@ export const EARLIER_REVIEWS_NAMED = 5;
 
 /** The lines about the idea that both the writer and the marker are given. */
 export function reviewLines(idea: IdeaForReview): string[] {
+  const piece = idea.pieceTitle?.trim();
   return [
     `Track: ${idea.trackName.trim()}`,
-    `Piece it was learned in: ${idea.pieceTitle.trim()}`,
+    ...(piece ? [`Piece it was learned in: ${piece}`] : []),
     '',
     `The idea: ${idea.name.trim()}`,
     `What it says: ${idea.claim.trim()}`,
@@ -135,43 +164,41 @@ export function toReviewQuestion(row: ReviewQuestionRow): ReviewQuestion {
 export type DueReview = {
   conceptId: string;
   name: string;
+  /** The track the idea belongs to. */
   subjectId: string;
   trackName: string;
-  pieceId: string;
-  pieceTitle: string;
+  /** The first passed piece that taught it; null for an idea no piece has taught. */
+  pieceId: string | null;
+  pieceTitle: string | null;
   dueOn: string;
   /** A question asked and not answered yet, shown again rather than paid for twice. */
   open: ReviewQuestion | null;
 };
 
-/** A due idea and the passed piece that put it on the schedule. */
-type Candidate = { conceptId: string; dueOn: string };
+/** A due idea and the track it belongs to. */
+type Candidate = { conceptId: string; dueOn: string; subjectId: string };
 type PassedPiece = { id: string; subjectId: string; title: string; conceptIds: readonly string[]; passedAt: string };
 
 /**
  * Which due ideas to show, most overdue first, each with the first passed
- * piece that taught it. An idea in no passed piece is left out: it is on the
- * schedule from a piece that has since been changed, and there is nothing to
- * say where it came from. `subjectId` keeps only that plan's ideas, and
- * `skip` leaves out ideas the page is teaching already.
+ * piece that taught it when one did. An idea goes on the schedule when it is
+ * tested or declared anywhere in Learn, so most have no piece, and the piece
+ * is only a label. `subjectId` keeps only that track's ideas, and `skip`
+ * leaves out ideas the page is teaching already.
  */
 export function pickDue(
   due: readonly Candidate[],
   pieces: readonly PassedPiece[],
   options: { limit: number; subjectId?: string; skip?: ReadonlySet<string> },
-): { conceptId: string; dueOn: string; piece: PassedPiece }[] {
+): { conceptId: string; dueOn: string; subjectId: string; piece: PassedPiece | null }[] {
   const firstPiece = new Map<string, PassedPiece>();
   for (const piece of [...pieces].sort((a, b) => a.passedAt.localeCompare(b.passedAt))) {
     for (const conceptId of piece.conceptIds) if (!firstPiece.has(conceptId)) firstPiece.set(conceptId, piece);
   }
   return [...due]
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.conceptId.localeCompare(b.conceptId))
-    .flatMap((candidate) => {
-      const piece = firstPiece.get(candidate.conceptId);
-      if (!piece) return [];
-      if (options.subjectId && piece.subjectId !== options.subjectId) return [];
-      if (options.skip?.has(candidate.conceptId)) return [];
-      return [{ ...candidate, piece }];
-    })
-    .slice(0, options.limit);
+    .filter((candidate) => !options.subjectId || candidate.subjectId === options.subjectId)
+    .filter((candidate) => !options.skip?.has(candidate.conceptId))
+    .slice(0, options.limit)
+    .map((candidate) => ({ ...candidate, piece: firstPiece.get(candidate.conceptId) ?? null }));
 }

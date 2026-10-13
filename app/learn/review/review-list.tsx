@@ -12,7 +12,7 @@ import { nextDueLine, type DueReview, type ReviewQuestion } from '@/lib/learn/le
 import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult } from './actions';
 
 /**
- * Ideas from passed pieces that are due for review (plan #1145), in Learn now
+ * Ideas you have shown or said you know that are due for review (plan #1145), in Learn now
  * and at the top of a piece's page. One surface with a row an idea: Ask me
  * writes the question, Check my answer marks it and says when the idea comes
  * back. An answered row stays on the page until it is next opened.
@@ -26,7 +26,7 @@ export function ReviewList({
   reviews: readonly DueReview[];
   title: string;
   description: string;
-  /** Whether each row names the plan and piece it came from, for Learn now. */
+  /** Whether each row names its track, and the piece that taught it when one did, for Learn now. */
   showPlan: boolean;
 }) {
   if (reviews.length === 0) return null;
@@ -87,13 +87,12 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-body font-medium text-ink">{review.name}</h3>
-        {showPlan && (
+        {showPlan && (review.pieceId || review.trackName) && (
           <Link
-            href={`/learn/s/${review.subjectId}/p/${review.pieceId}`}
+            href={review.pieceId ? `/learn/s/${review.subjectId}/p/${review.pieceId}` : `/learn/s/${review.subjectId}`}
             className={cn('text-small', linkVariants({ tone: 'quiet' }))}
           >
-            {review.trackName ? `${review.trackName} · ` : ''}
-            {review.pieceTitle}
+            {[review.trackName, review.pieceTitle].filter(Boolean).join(' · ')}
           </Link>
         )}
       </div>

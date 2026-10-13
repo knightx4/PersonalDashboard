@@ -34,7 +34,9 @@ function entry(n: number, over: Partial<DashTodayEntry> = {}): DashTodayEntry {
 const undo = vi.fn(async () => ({ ok: true as const }));
 
 function render(groups: DashTodayGroup[]) {
-  return renderToStaticMarkup(<DashTodaySection groups={groups} timezone="Europe/London" undo={undo} />);
+  return renderToStaticMarkup(
+    <DashTodaySection groups={groups} timezone="Europe/London" undo={undo} />,
+  );
 }
 
 describe('DashTodaySection', () => {
@@ -44,7 +46,9 @@ describe('DashTodaySection', () => {
       {
         workspace: 'todo',
         label: 'Todo',
-        entries: [entry(3, { surface: 'ask', workspace: 'todo', sentence: 'Added the todo Buy stamps.' })],
+        entries: [
+          entry(3, { surface: 'ask', workspace: 'todo', sentence: 'Added the todo Buy stamps.' }),
+        ],
       },
     ]);
     expect(html).toContain('What Dash did today');
@@ -63,13 +67,22 @@ describe('DashTodaySection', () => {
         workspace: 'todo',
         label: 'Todo',
         entries: [
-          entry(1, { surface: 'thread', workspace: 'todo', sentence: 'Added the todo Follow up.', from: '/jobs/roles/r1' }),
-          entry(2, { surface: 'thread', workspace: 'todo', sentence: 'Added the todo Buy stamps.' }),
+          entry(1, {
+            surface: 'thread',
+            workspace: 'todo',
+            sentence: 'Added the todo Follow up.',
+            from: '/jobs/roles/r1',
+          }),
+          entry(2, {
+            surface: 'thread',
+            workspace: 'todo',
+            sentence: 'Added the todo Buy stamps.',
+          }),
         ],
       },
     ]);
     expect(html).toContain('href="/jobs/roles/r1"');
-    expect(html.match(/From your comment/g)).toHaveLength(1);
+    expect(html.match(/Your comment/g)).toHaveLength(1);
   });
 
   it('says an undone change was undone, with no button', () => {
@@ -81,7 +94,8 @@ describe('DashTodaySection', () => {
   });
 
   it('says why a change has no Undo in place of the button (plan #1571)', () => {
-    const why = 'Its amount is worked out from every charge on it, so correct it on the Recurring page.';
+    const why =
+      'Its amount is worked out from every charge on it, so correct it on the Recurring page.';
     const html = render([
       {
         workspace: 'shopping',
@@ -100,6 +114,17 @@ describe('DashTodaySection', () => {
     expect(html.match(/>Undo</g)).toHaveLength(GROUP_SHOWN);
     expect(html).toContain('Show 3 more');
     expect(html).toContain(`${GROUP_SHOWN + 3} changes`);
+  });
+
+  it('draws two or more changes as a timeline with times, and one as a plain list', () => {
+    const two = render([{ workspace: 'dev', label: 'Dev', entries: [entry(1), entry(2)] }]);
+    expect(two).toContain('<ol');
+    expect(two).toMatch(/<time[^>]*>\d{1,2}:\d{2} [AP]M</);
+    expect(two.match(/>Undo</g)).toHaveLength(2);
+    const one = render([{ workspace: 'dev', label: 'Dev', entries: [entry(1)] }]);
+    expect(one).toContain('<ul');
+    expect(one).not.toContain('<ol');
+    expect(one.match(/>Undo</g)).toHaveLength(1);
   });
 
   it('is absent on a day with none', () => {

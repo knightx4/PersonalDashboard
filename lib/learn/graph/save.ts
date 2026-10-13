@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { placeTrackAfterResponse, type TrackTheme } from '@/lib/learn/areas/place-track';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedIdeaClaims } from '@/lib/learn/embed/idea-embedding';
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 
 /**
@@ -352,6 +353,7 @@ export async function declareKnown(
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Marking those as known', error);
+  await scheduleIdeas(supabase, userId, conceptIds, { basis: 'declared' });
 }
 
 /**
@@ -393,6 +395,7 @@ export async function declareConceptKnown(
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Marking that as known', error);
+  await scheduleIdeas(supabase, userId, [conceptId], { basis: 'declared' });
 }
 
 /** The names a subject already holds, which is all the generator needs of it. */
