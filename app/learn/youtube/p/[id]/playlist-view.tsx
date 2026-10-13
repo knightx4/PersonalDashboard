@@ -5,6 +5,7 @@ import type { PlaylistPage } from '@/lib/learn/youtube/load';
 import { transcribePlaylistAction } from '../../actions';
 import { Press } from '../../press';
 import { VideoList } from '../../video-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One playlist, in the order the channel published it, with one button for
@@ -22,7 +23,7 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
   const stored = videos.length - missing;
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={`/learn/youtube/${channel.slug}`}
@@ -59,6 +60,6 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
       )}
 
       {videos.length > 0 && <VideoList videos={videos} numbered />}
-    </>
+    </PageColumn>
   );
 }

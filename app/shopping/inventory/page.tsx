@@ -46,6 +46,7 @@ import { loadShareOptions } from '@/lib/share/load-options';
 import { SendToShare } from '@/components/share/send-to-share';
 import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { askListFilter } from '@/lib/ask/list-filter';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Inventory' };
 
@@ -577,7 +578,7 @@ export default async function InventoryPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <PageWide className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Acquired">
           {RANGES.map((entry) => (
@@ -772,6 +773,6 @@ export default async function InventoryPage({
           )}
         </SelectionProvider>
       </div>
-    </div>
+    </PageWide>
   );
 }

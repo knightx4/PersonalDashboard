@@ -44,6 +44,7 @@ import {
 } from '@/lib/learn/graph/model';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -304,7 +305,7 @@ export default async function SubjectPage({
       : goals.filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null);
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href="/learn/know"
@@ -512,6 +513,6 @@ export default async function SubjectPage({
 
       <PullArticles />
       <PullCourse />
-    </>
+    </PageColumn>
   );
 }

@@ -21,6 +21,7 @@ import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
 import { formatClock } from '@/lib/clock';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Agenda' };
 
@@ -71,7 +72,7 @@ export default async function TodoPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader
         title="Agenda"
         description={empty ? 'Nothing on the list.' : 'What needs you, in the order it runs out.'}
@@ -209,6 +210,6 @@ export default async function TodoPage() {
           </div>
         )}
       </QueueCleared>
-    </div>
+    </PageColumn>
   );
 }

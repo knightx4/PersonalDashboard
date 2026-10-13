@@ -13,6 +13,7 @@ import { AddForm } from './add-form';
 import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
   );
 
   return (
-    <>
+    <PageColumn>
       {/* A track that came out of another one points back at it rather than at
           the list: you got here from economics, and that is where you are
           going next. */}
@@ -119,6 +120,6 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       )}
 
       <AddForm trackId={track.id} />
-    </>
+    </PageColumn>
   );
 }

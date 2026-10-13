@@ -21,6 +21,7 @@ import { MutedMerchantsSection, MutedMerchantsTitle, type MutedMerchant } from '
 import { PeopleSection, PeopleTitle } from './people-section';
 import { ReturnPoliciesSection } from './return-policies-section';
 import { TagsSection, type SettingsTag } from './tags-section';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** Stripe Payment Link — customers choose what to pay. Override via env if needed. */
 const DONATE_URL =
@@ -59,7 +60,7 @@ export function ShoppingSettingsView({
   returnPolicies: MerchantPolicyRow[];
 }) {
   return (
-    <div className="mx-auto max-w-3xl [&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
+    <PageColumn className="[&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
       <PageHeader title="Settings" />
 
       <div className="space-y-4">
@@ -235,6 +236,6 @@ export function ShoppingSettingsView({
           </CardBody>
         </Card>
       </div>
-    </div>
+    </PageColumn>
   );
 }

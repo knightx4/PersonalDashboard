@@ -51,7 +51,7 @@ export const PATTERN_RULES: readonly PatternRule[] = [
   {
     name: 'main plus rail',
     label: 'Main plus rail',
-    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
+    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left, and the two take the whole width of the shell. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
     component: 'components/patterns/main-rail.tsx',
   },
   {

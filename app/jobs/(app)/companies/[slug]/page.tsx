@@ -9,6 +9,7 @@ import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { CompanyRoles } from './company-roles';
 import { loadTasksFor } from '@/lib/todo/links/load';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Company' };
 
@@ -122,7 +123,7 @@ export default async function CompanyDetailPage({
   }));
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         leading={
           <CompanyAvatar
@@ -229,6 +230,6 @@ export default async function CompanyDetailPage({
           createdAt: note.created_at as string,
         }))}
       />
-    </>
+    </PageColumn>
   );
 }

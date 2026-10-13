@@ -47,6 +47,7 @@ import {
 } from '@/lib/orders/search';
 import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Orders' };
 
@@ -313,7 +314,7 @@ export default async function OrdersPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <PageWide className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Time range">
           {RANGES.map((entry) => (
@@ -540,6 +541,6 @@ export default async function OrdersPage({
           </div>
         )}
       </div>
-    </div>
+    </PageWide>
   );
 }

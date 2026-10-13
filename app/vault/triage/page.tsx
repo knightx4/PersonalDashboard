@@ -9,6 +9,7 @@ import { loadConnection, loadInboxNotes } from '@/lib/vault/notes/load';
 import { suggestedNotesForInbox } from '@/lib/vault/notes/related';
 import { noteHref } from '@/lib/vault/paths';
 import { QuickNoteTriage, type TriageNote } from './triage';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export default async function QuickNoteTriagePage() {
 
   if (!connection) {
     return (
-      <>
+      <PageColumn>
         <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
         <EmptyState
           icon={FolderTree}
@@ -41,7 +42,7 @@ export default async function QuickNoteTriagePage() {
           description="Quick notes are kept in your vault's Inbox folder, so triage needs a vault to read them from."
           action={{ label: 'Connect a vault', href: '/vault/settings' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -70,10 +71,10 @@ export default async function QuickNoteTriagePage() {
   }));
 
   return (
-    <>
+    <PageColumn>
       <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
       <QuickNoteTriage notes={notes} writable={writable} />
-    </>
+    </PageColumn>
   );
 }
 

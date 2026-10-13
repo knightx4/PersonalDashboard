@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { MAX_PASTE_CHARS } from '@/lib/learn/quiz/model';
 import { QuizForm } from './quiz-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +14,12 @@ export const dynamic = 'force-dynamic';
  */
 export default function NewQuizPage() {
   return (
-    <>
+    <PageColumn>
       <PageHeader title="New quiz" />
 
       <div className="max-w-2xl">
         <QuizForm maxPasteChars={MAX_PASTE_CHARS} />
       </div>
-    </>
+    </PageColumn>
   );
 }

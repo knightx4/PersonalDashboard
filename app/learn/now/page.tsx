@@ -28,6 +28,7 @@ import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
@@ -113,7 +114,7 @@ export default async function NowPage({
     after(() => topUpFeedAfterResponse(user.id, subject.id));
     const related = relatedNotesForCards(supabase, user.id, cards);
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header()}
         <LearnNowFeed
           first={cards}
@@ -124,7 +125,7 @@ export default async function NowPage({
           low={READY_LOW}
           subjectId={subject.id}
         />
-      </div>
+      </PageColumn>
     );
   }
 
@@ -154,11 +155,11 @@ export default async function NowPage({
 
   if (practice) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
         {strip}
         <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
-      </div>
+      </PageColumn>
     );
   }
 
@@ -173,7 +174,7 @@ export default async function NowPage({
   const queued = readings ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       {header(
         queued.length === 0
           ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
@@ -264,6 +265,6 @@ export default async function NowPage({
       </div>
 
       <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
-    </div>
+    </PageColumn>
   );
 }

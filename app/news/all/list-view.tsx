@@ -29,6 +29,7 @@ import type { NewsTopic } from '@/lib/news/issues/topics';
 import type { DeliveryGap } from '@/lib/news/inbound/readiness';
 import { setSenderMuted } from '../actions';
 import { NeedsConfirming } from './needs-confirming';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The newsletter list, drawn from what the page read (app/news/all/page.tsx),
@@ -84,7 +85,7 @@ export function NewsListView({
      * test message get lost before anyone looks at a log.
      */
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <PageColumn className="space-y-6">
         <PageHeader title="Newsletters" />
         <EmptyState
           icon={Mail}
@@ -103,14 +104,14 @@ export function NewsListView({
             href: listHref({ from: null, topic: null, view: 'recommended' }),
           }}
         />
-      </div>
+      </PageColumn>
     );
   }
 
   const header = <PageHeader title="Newsletters" />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       {header}
 
       <NeedsConfirming signups={waiting} senders={byId} timezone={timezone} />
@@ -215,7 +216,7 @@ export function NewsListView({
           <p className="mt-3 text-small text-ink-muted">{countLabel(shown.length)}</p>
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }
 

@@ -120,7 +120,8 @@ write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
 change_event. When they tell you about a place they have lived, or ask to
-change one, call add_place or change_place. When they state a rule for many items or
+change one, call add_place or change_place; when they tell you about a job
+or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The

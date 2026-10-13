@@ -40,6 +40,7 @@ import { QuizzesSection } from './quizzes';
 import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -199,7 +200,7 @@ export default async function KnowPage({
   const making = params.make === 'track';
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Subjects"
         description="One graph per subject, and it grows every time you use it."
@@ -350,6 +351,6 @@ export default async function KnowPage({
           notes={vaultNotes}
         />
       </SectionFold>
-    </>
+    </PageColumn>
   );
 }

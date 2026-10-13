@@ -2,6 +2,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { YouChangeInput, YouChangeKind } from '@/lib/ask/you-changes';
 import { toRef } from '@/lib/core/refs';
+import { EDUCATION_HREF } from '@/lib/you/education';
+import { jobDates, jobHref, parseJob, type Job } from '@/lib/you/work-history';
 import {
   checkPlace,
   draftOf,
@@ -19,6 +21,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   add_place     a place they have lived, with rough dates.
  *   change_place  one of those places changed: its name, where it is, the
  *                 dates or the note.
+ *   save_job      a job on Work & school added, or one corrected by its ref
+ *                 (plan #1991.4.1). Either way the row is marked as theirs,
+ *                 as the page's form does, so a later read of the résumé
+ *                 leaves it alone.
  *
  * Each is one row, inserted or updated, so the one undo rule in
  * lib/core/dash-actions.ts puts it back from the values kept. Removing a
@@ -27,7 +33,8 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * Both Ask and the connector run them, as Todo's (lib/dash/todo-writes.ts):
  * Ask on the person's own you client, the connector on a service-role one
  * for the verified person, so every read and write names the user id itself.
- * The checks are the form's (checkPlace in lib/you/places.ts), so Dash and
+ * The checks are the form's (checkPlace in lib/you/places.ts, parseJob in
+ * lib/you/work-history.ts), so Dash and
  * the page refuse the same things in the same words.
  */
 
@@ -163,6 +170,85 @@ async function changePlace(env: YouWriteEnv, args: Args): Promise<YouMade> {
   return made('change_place', 'Changed the place', data as Row, before, `: ${changed.join(', ')}`);
 }
 
+const JOB_PATHS = [EDUCATION_HREF, '/home'];
+
+/** The job fields, which are also the tool's argument names. */
+const JOB_FIELDS = ['employer', 'title', 'place', 'started', 'ended', 'note'] as const;
+
+function madeJob(after: Row, before: Row | null, verb: string, rest: string): YouMade {
+  const job = after as unknown as Job;
+  const href = jobHref(job.id);
+  return {
+    kind: 'save_job',
+    input: { verb, what: job.employer, rest, href, where: 'Open the job', paths: [...JOB_PATHS, href] },
+    subjectRef: toRef('you.work_history', job.id),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    summary: `Dash ${verb.toLowerCase()} "${job.employer}"${rest}.`,
+    row: {
+      table: 'you.work_history',
+      ref: job.id,
+      title: job.employer,
+      href,
+      detail: { title: job.title, dates: jobDates(job) },
+    },
+  };
+}
+
+async function saveJob(env: YouWriteEnv, args: Args): Promise<YouMade> {
+  const ref = textArg(args, 'job_ref')?.trim() ?? '';
+  if (ref && !isUuid(ref)) throw new YouRefused('job_ref must be a job’s ref, as a lookup returned it.');
+
+  let before: Row | null = null;
+  if (ref) {
+    const { data: found, error: readError } = await env.you
+      .from('work_history')
+      .select('*')
+      .eq('id', ref)
+      .eq('user_id', env.userId)
+      .maybeSingle();
+    if (readError) throw new Error(`Reading the job failed: ${readError.message}`);
+    if (!found) throw new YouRefused('There is no job of theirs with that ref. Look it up first.');
+    before = found as Row;
+  }
+
+  // A correction starts from the job as it is, so a field left out keeps its value.
+  const values: Record<string, string> = {};
+  const changed: string[] = [];
+  for (const field of JOB_FIELDS) {
+    const given = textArg(args, field);
+    if (given !== undefined) changed.push(field);
+    values[field] = given ?? (before ? String(before[field] ?? '') : '');
+  }
+  if (before && changed.length === 0) {
+    throw new YouRefused('Say what to change: employer, title, place, started, ended or note.');
+  }
+  const checked = parseJob((field) => values[field] ?? '');
+  if (!checked.ok) throw new YouRefused(`${checked.field}: ${checked.error}`);
+
+  if (before) {
+    const { data, error } = await env.you
+      .from('work_history')
+      .update({ ...checked.job, edited: true })
+      .eq('id', ref)
+      .eq('user_id', env.userId)
+      .select('*')
+      .single();
+    if (error || !data) throw new Error(`Changing the job failed: ${error?.message ?? 'no row'}`);
+    return madeJob(data as Row, before, 'Changed the job at', `: ${changed.join(', ')}`);
+  }
+
+  const { data, error } = await env.you
+    .from('work_history')
+    .insert({ ...checked.job, user_id: env.userId, edited: true })
+    .select('*')
+    .single();
+  if (error || !data) throw new Error(`Adding the job failed: ${error?.message ?? 'no row'}`);
+  const dates = jobDates(data as unknown as Job);
+  return madeJob(data as Row, null, 'Added the job at', dates ? `, ${dates}` : '');
+}
+
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
 
 const FIELDS = {
@@ -205,6 +291,31 @@ export const YOU_WRITES: readonly YouWrite[] = [
       additionalProperties: false,
     },
     run: changePlace,
+  },
+  {
+    name: 'save_job',
+    description:
+      "Add a job to the person's Work & school tab, or correct one, when they tell you (\"I worked at the corner bookshop from 2014 to 2016\"). Leave job_ref out to add a job, which needs an employer; give the you.work_history ref list_rows returned to correct one, sending only what changes. A year is enough for the dates; an empty ended means they work there now. A job you save is theirs, so reading their résumé again will not replace it.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_ref: {
+          type: 'string',
+          description: 'The you.work_history ref a lookup returned for the job to correct. Leave out to add a new job.',
+        },
+        employer: { type: 'string', description: 'Where they worked.' },
+        title: { type: 'string', description: 'What they were called there.' },
+        place: { type: 'string', description: 'Where the job was, such as a city.' },
+        started: { type: 'string', description: `When they started. ${DATE_HINT}` },
+        ended: {
+          type: 'string',
+          description: `When they left. ${DATE_HINT} Empty or left out on a new job: they work there now.`,
+        },
+        note: { type: 'string', description: 'Anything else they said about it.' },
+      },
+      additionalProperties: false,
+    },
+    run: saveJob,
   },
 ];
 

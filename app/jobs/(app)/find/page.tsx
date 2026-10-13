@@ -18,6 +18,7 @@ import { setupGaps } from '@/lib/jobs/suggest/gaps';
 import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { FindView } from './view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Find' };
 
@@ -98,7 +99,7 @@ export default async function FindPage({
   );
 
   return (
-    <>
+    <PageColumn>
       <PageHeader title="Find" />
       <FindView
         aim={{
@@ -125,6 +126,6 @@ export default async function FindPage({
         companies={{ companies: discovered, status: describeDiscovery(discoveryRun) }}
         people={people}
       />
-    </>
+    </PageColumn>
   );
 }

@@ -8,6 +8,7 @@ import type { StorySent } from '@/lib/news/saved/sent';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { ArticleLink } from '@/app/news/quick/quick-controls';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One story on its own page, drawn from what the page read (page.tsx), so
@@ -34,7 +35,7 @@ export function StoryView({
   const paragraphs = storyParagraphs(story.text);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <Link
         href={back.href}
         className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
@@ -85,6 +86,6 @@ export function StoryView({
           </div>
         </div>
       </Card>
-    </div>
+    </PageColumn>
   );
 }

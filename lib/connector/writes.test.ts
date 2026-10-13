@@ -45,6 +45,7 @@ describe('runConnectorWrite', () => {
       'change_event',
       'add_place',
       'change_place',
+      'save_job',
     ]);
   });
 

@@ -49,6 +49,7 @@ import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
 import type { AgentActionSummary } from '@/lib/agent-actions/summary';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Dev pages and the account page in the surface gallery (plan #1600),
@@ -56,7 +57,7 @@ import type { AgentActionSummary } from '@/lib/agent-actions/summary';
  * like the live rows. Each sits in the 3xl column its page draws.
  */
 
-const column = (children: React.ReactNode) => <div className="mx-auto max-w-3xl space-y-6">{children}</div>;
+const column = (children: React.ReactNode) => <PageColumn className="space-y-6">{children}</PageColumn>;
 
 // ---- Bugs and requests ----------------------------------------------------
 

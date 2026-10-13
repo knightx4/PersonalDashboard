@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { nextQuestion, outstandingCount, type OpeningSweep } from '@/lib/learn/graph/opening';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { QuestionForm } from './question-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The questions asked before anything is laid out for you.
@@ -34,7 +35,7 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
 
   if (current) {
     return (
-      <>
+      <PageColumn>
         <PageHeader
           title={`Before we start on ${sweep.subjectName}`}
           description="Ten questions across the subject, answered from memory. Most people get most of them wrong, which is what makes this worth doing."
@@ -48,7 +49,7 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
           total={total}
           left={left}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -56,7 +57,7 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
   const answered = sweep.questions.filter((q) => q.outcome !== 'skipped').length;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title={`What you already had on ${sweep.subjectName}`}
         description={
@@ -107,6 +108,6 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
       <div className="[&_input[name=goal]]:-my-2.5 [&_input[name=goal]]:py-2.5">
         <GoalForm goal={sweep.asked} sweepId={sweep.id} />
       </div>
-    </>
+    </PageColumn>
   );
 }

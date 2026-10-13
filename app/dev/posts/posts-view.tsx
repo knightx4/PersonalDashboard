@@ -11,6 +11,7 @@ import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
 import { WritePost } from './write-post';
 import { XConnection } from './x-connection';
 import { XPostList } from './x-posts';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
@@ -73,7 +74,7 @@ export function PostsScreen({
 }) {
   const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageColumn className="space-y-6">
       <div>
         <PageHeader
           title="Posts"
@@ -122,6 +123,6 @@ export function PostsScreen({
           <PostList cards={page.dropped} />
         </SectionFold>
       )}
-    </div>
+    </PageColumn>
   );
 }

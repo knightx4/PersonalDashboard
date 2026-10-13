@@ -12,6 +12,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { MayaConversation } from './conversation';
 import { QuestionField } from './question-field';
 import { LinkedText } from '@/components/ui/linked-text';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One thread with Maya, drawn from what the page read (page.tsx), so the
@@ -36,7 +37,8 @@ export function MayaThreadView({
     }));
 
   return (
-    <article className="mx-auto max-w-3xl">
+    <PageColumn>
+    <article>
       <div className="mb-4">
         <Link
           href="/vault/maya"
@@ -105,6 +107,7 @@ export function MayaThreadView({
         </section>
       </MayaConversation>
     </article>
+    </PageColumn>
   );
 }
 

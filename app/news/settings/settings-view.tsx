@@ -7,6 +7,7 @@ import { AddressCard } from './address-card';
 import { TopicPicker } from './hidden-topics';
 import { LocalAreaField } from './local-area';
 import { replaceAddress } from './actions';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * News settings, drawn from what the page read (page.tsx), so the gallery
@@ -25,7 +26,7 @@ export function NewsSettingsView({
   localArea: string | null;
 }) {
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageColumn>
       <PageHeader title="News settings" />
 
       <div className="space-y-5">
@@ -76,6 +77,6 @@ export function NewsSettingsView({
           </CardBody>
         </Card>
       </div>
-    </div>
+    </PageColumn>
   );
 }

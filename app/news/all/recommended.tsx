@@ -13,6 +13,7 @@ import { formatArrival } from '@/lib/news/issues/list';
 import { groupPicks, type NewsletterPick } from '@/lib/news/recommend/picks';
 import { AddressCard } from '../settings/address-card';
 import { remakeRecommendations, type RecommendState } from './actions';
+import { PageColumn } from '@/components/shell/page-width';
 
 const ACTION = 'app/news/all/actions.ts#remakeRecommendations';
 
@@ -70,7 +71,7 @@ export function RecommendedNewsletters({
   );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       {failed && (
         <Banner tone="bad">
           {list
@@ -150,6 +151,6 @@ export function RecommendedNewsletters({
           <EmptyState size="inline" title="No list has been made yet." />
         )}
       </Card>
-    </div>
+    </PageColumn>
   );
 }

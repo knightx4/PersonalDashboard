@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ImportForm } from './import-form';
 import { StartForm } from './start-form';
 import { SectionLabel, SectionHeading } from '@/components/ui/section-heading';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 export default function NewTrackPage() {
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href="/learn/lists"
@@ -47,6 +48,6 @@ export default function NewTrackPage() {
           <ImportForm />
         </section>
       </div>
-    </>
+    </PageColumn>
   );
 }

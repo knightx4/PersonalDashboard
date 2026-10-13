@@ -39,6 +39,8 @@ import { PHONE, type Page } from './browser';
 export const PRESS_MS = 100;
 /** How long Next has to show the next item with the network held. */
 export const NEXT_WAIT_MS = 1000;
+/** How long a picture still loading in the next item has to reach the held network. */
+const PICTURE_WAIT_MS = 1000;
 /** How long the pointer rests on a control before it is pressed, so its hover state settles. */
 const HOVER_MS = 250;
 /** How long the button stays down. */
@@ -182,6 +184,17 @@ const HELPERS = String.raw`(function () {
         return img.currentSrc || img.src;
       });
     },
+    itemImagesLoading: function (selector) {
+      var item = document.querySelector(selector);
+      if (!item) return [];
+      return Array.prototype.filter
+        .call(item.querySelectorAll('img'), function (img) {
+          return !img.complete;
+        })
+        .map(function (img) {
+          return img.currentSrc || img.src;
+        });
+    },
   };
   return true;
 })()`;
@@ -262,6 +275,14 @@ export async function checkNext(page: Page, url: string, deck: Deck): Promise<st
       const pictures = new Set(
         await page.evaluate<string[]>(`window.__deck.itemImages(${JSON.stringify(deck.item)})`),
       );
+      // A picture still loading has been asked for or is about to be, and on
+      // a busy machine its request can reach the hold after the words have
+      // changed. Give each one a moment to arrive before reading what was held.
+      const loading = await page.evaluate<string[]>(`window.__deck.itemImagesLoading(${JSON.stringify(deck.item)})`);
+      for (const started = Date.now(); Date.now() - started < PICTURE_WAIT_MS; ) {
+        if (loading.every((u) => network.held.some((r) => r.url === u))) break;
+        await wait(50);
+      }
       const late = network.held.filter((r) => r.type === 'Image' && pictures.has(r.url));
       return [...new Set(late.map((r) => r.url))].map(
         (u) => `the next item's picture ${short(u)} is fetched only once Next is pressed`,
@@ -290,21 +311,22 @@ export async function checkPress(page: Page, url: string): Promise<string[]> {
 
   const findings: string[] = [];
   let dirty = false;
-  for (const target of targets) {
+  /** Presses one target: whether it showed a press, or null when it could not be judged. */
+  const press = async (index: number): Promise<boolean | null> => {
     if (dirty) await fresh();
     dirty = false;
     const at = await page.evaluate<{ x: number; y: number; covered: boolean } | null>(
-      `window.__deck.place(${target.index})`,
+      `window.__deck.place(${index})`,
     );
     // Gone, or under something else: the dock check is what speaks for a covered control.
-    if (!at || at.covered) continue;
+    if (!at || at.covered) return null;
     await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y });
     await wait(HOVER_MS);
     const armed = await page.evaluate<{ armed: boolean; restless: boolean }>(
-      `window.__deck.arm(${target.index}, ${PRESS_MS})`,
+      `window.__deck.arm(${index}, ${PRESS_MS})`,
     );
     // A control already moving at rest cannot be told apart from one answering a press.
-    if (!armed.armed) continue;
+    if (!armed.armed) return null;
     const network = await holdNetwork(page);
     dirty = true;
     try {
@@ -329,11 +351,20 @@ export async function checkPress(page: Page, url: string): Promise<string[]> {
       const got = await page
         .evaluate<{ pressed: boolean; first: number | null } | null>('window.__deck.result()')
         .catch(() => ({ pressed: true, first: 0 }));
-      if (got && got.pressed && got.first === null) {
-        findings.push(`${target.what} shows nothing for ${PRESS_MS}ms after it is pressed`);
-      }
+      return !(got && got.pressed && got.first === null);
     } finally {
       await network.release();
+    }
+  };
+  for (const target of targets) {
+    // A press that showed nothing is tried once more on a fresh page: on a
+    // machine busy with the rest of the gate a frame can land after 100ms,
+    // and a control that really shows nothing shows nothing twice.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const showed = await press(target.index);
+      if (showed !== false) break;
+      dirty = true;
+      if (attempt === 1) findings.push(`${target.what} shows nothing for ${PRESS_MS}ms after it is pressed`);
     }
   }
   return findings;

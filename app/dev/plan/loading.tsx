@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The plan's shape while it loads: the header, the overnight card, the summary
@@ -9,7 +10,7 @@ import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeaderSkeleton action={false} />
 
       <Card padding="dense" className="flex items-center gap-3">
@@ -46,6 +47,6 @@ export default function Loading() {
           </Card>
         ))}
       </div>
-    </div>
+    </PageColumn>
   );
 }

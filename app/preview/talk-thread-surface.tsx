@@ -8,6 +8,7 @@ import { sumEstimates, type CostEstimate } from '@/lib/core/spend/estimate-types
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
 import type { TalkToolCall, TalkTurn } from '@/lib/talk/talk';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Ask Dash thread on its own (plan #1708): components/talk/talk-thread.tsx
@@ -186,7 +187,7 @@ const send: TalkSend = async (body) => {
 
 export function TalkThreadSurface() {
   return (
-    <div className="mx-auto max-w-3xl py-4">
+    <PageColumn className="py-4">
       <Card padding="standard">
         <TalkThread
           id="talk-thread-preview"
@@ -198,7 +199,7 @@ export function TalkThreadSurface() {
           withFiles
         />
       </Card>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -238,7 +239,7 @@ const ANSWER_COST: CostEstimate = {
  */
 export function TalkThreadFilesSurface() {
   return (
-    <div className="mx-auto max-w-3xl py-4">
+    <PageColumn className="py-4">
       <Card padding="standard">
         <TalkThread
           id="talk-thread-files-preview"
@@ -265,6 +266,6 @@ export function TalkThreadFilesSurface() {
           }}
         />
       </Card>
-    </div>
+    </PageColumn>
   );
 }

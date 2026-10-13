@@ -9,6 +9,7 @@ import {
   type ReviewView,
 } from '@/lib/review/load';
 import { ReviewQueue } from './review-list';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Review' };
 
@@ -39,7 +40,7 @@ export default async function ReviewPage({
   const rows = filterReviewRows(allRows, view);
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <PageWide className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Queue">
           {REVIEW_VIEWS.map((entry) => (
@@ -61,6 +62,6 @@ export default async function ReviewPage({
           seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:review`}
         />
       </div>
-    </div>
+    </PageWide>
   );
 }

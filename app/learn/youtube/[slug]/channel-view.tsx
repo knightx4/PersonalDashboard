@@ -12,6 +12,7 @@ import { relistChannelAction, removeChannelAction, setAutoTranscribeAction } fro
 import type { ChannelPage } from '@/lib/learn/youtube/load';
 import { Press } from '../press';
 import { VideoList } from '../video-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One channel: its playlists, then its videos newest first.
@@ -65,7 +66,7 @@ export function ChannelView({
   );
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link href={YOUTUBE_HREF} className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
           <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -163,6 +164,6 @@ export function ChannelView({
           )}
         </section>
       </div>
-    </>
+    </PageColumn>
   );
 }

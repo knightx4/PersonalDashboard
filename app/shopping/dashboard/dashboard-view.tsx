@@ -10,6 +10,7 @@ import { PersonBreakdown } from '@/components/dashboard/person-breakdown';
 import type { Person } from '@/lib/people/load';
 import type { PresetRange } from '@/lib/money';
 import { DASHBOARD_RANGES, dashboardHref, type DashboardData } from '@/lib/dashboard/load';
+import { PageWide } from '@/components/shell/page-width';
 
 /**
  * The spending dashboard, drawn from what the page read (page.tsx), so the
@@ -29,7 +30,7 @@ export function DashboardView({
   const showPeople = people.length > 1;
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row [&_a]:press-area">
+    <PageWide className="flex flex-col gap-6 xl:flex-row [&_a]:press-area">
       <LeftRail>
         <RailGroup label="Time range">
           {DASHBOARD_RANGES.map((entry) => (
@@ -104,6 +105,6 @@ export function DashboardView({
           </div>
         )}
       </div>
-    </div>
+    </PageWide>
   );
 }

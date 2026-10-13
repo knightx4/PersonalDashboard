@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { wordCountLabel, type EssaySummary } from '@/lib/learn/essays/model';
 import { NewEssayButton } from './new-essay-button';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** "12 Oct", or "12 Oct 2025" when it is not this year. */
 function shortDate(iso: string, now: Date): string {
@@ -28,7 +29,7 @@ export function EssaysView({ essays, now = new Date() }: { essays: EssaySummary[
   if (essays.length === 0) {
     // The empty state carries the one button, so the header does not repeat it.
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         <PageHeader title="Essays" />
         <EmptyState
           icon={PenLine}
@@ -37,7 +38,7 @@ export function EssaysView({ essays, now = new Date() }: { essays: EssaySummary[
         >
           <NewEssayButton />
         </EmptyState>
-      </div>
+      </PageColumn>
     );
   }
 

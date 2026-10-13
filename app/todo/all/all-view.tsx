@@ -15,6 +15,7 @@ import type { TaskFile } from '@/components/attachments/task-files';
 import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const FILTERS = [
   { id: 'open', label: 'Open' },
@@ -97,7 +98,7 @@ export function AllTasksView({
     // clear.
     <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
       {tasks.length === 0 ? (
-        <div className="mx-auto max-w-3xl">
+        <PageColumn>
           {header}
           {tools}
           {search ? (
@@ -105,7 +106,7 @@ export function AllTasksView({
           ) : (
             <AllTasksEmpty status={status} seed={seed} />
           )}
-        </div>
+        </PageColumn>
       ) : (
         <ListPage header={header} tools={tools} foot={countLine(tasks.length, status, search)}>
           {tasks.map((task) => (

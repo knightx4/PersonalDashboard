@@ -16,6 +16,7 @@ import {
   type PaidAction,
 } from '@/lib/core/spend/paid-actions';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
+import { PageColumn } from '@/components/shell/page-width';
 import { isOwner } from '@/lib/dev/owner';
 import type { ModuleId } from '@/lib/modules';
 import { loadModuleCounts, type ModuleCounts } from '@/lib/modules/counts';
@@ -105,8 +106,9 @@ export type ShellOptions = {
    */
   paidActions?: readonly PaidAction[];
   /**
-   * The account's chrome centres its pages in a 3xl column. True for every
-   * moduleless caller today, and the default where `module` is null.
+   * The account's chrome draws its pages in PageColumn, the one-column page
+   * width (components/shell/page-width.tsx). True for every moduleless
+   * caller today, and the default where `module` is null.
    */
   narrow?: boolean;
   /** The signed-in user, when the caller has read it already for a gate. */
@@ -162,7 +164,7 @@ export async function shellFor(options: ShellOptions) {
   ]);
 
   const narrow = options.narrow ?? options.module === null;
-  const column = narrow ? <div className="mx-auto max-w-3xl">{page}</div> : page;
+  const column = narrow ? <PageColumn>{page}</PageColumn> : page;
 
   return (
     <div

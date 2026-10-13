@@ -1,4 +1,4 @@
-import { GAP, gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * What the You pages let the person do, and the tool that does each
@@ -32,7 +32,7 @@ export const youActions: ModuleActions = {
   // Jobs read from the default résumé, on the same tab (plan #1991.4).
   'app/you/work/job-actions.ts': {
     readResumeAction: none('spends'),
-    saveJobAction: gap('save_job, which #1991.4.1 adds beside the You writes #1991.5 brings (lib/dash/you-writes.ts).'),
+    saveJobAction: tool('save_job'),
     removeJobAction: none('deletes'),
   },
 };
