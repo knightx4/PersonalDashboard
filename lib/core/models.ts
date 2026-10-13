@@ -144,6 +144,8 @@ export const MODELS = {
   learnEssayRephrase: SONNET,
   /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */
   learnEssayCheck: SONNET,
+  /** lib/learn/essays/finish-model.ts, the claims a finished essay argues */
+  learnEssayClaims: SONNET,
   /**
    * lib/learn/essays/research-model.ts, an essay's first research pass and
    * the deeper pass's gathering: Haiku with the basic web search and fetch

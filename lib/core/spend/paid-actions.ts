@@ -61,6 +61,10 @@ export const PAID_ACTIONS = {
   // marks the draft's claims against them.
   'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
   'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
+  // Learn: Finish on an essay names the claims it argues and looks for the
+  // notes that already hold each (plan #1873). Accepting the offers writes
+  // notes and an evidence item and calls no model.
+  'app/learn/e/[id]/actions.ts#finishEssay': ['name-essay-claims', 'embed-note-match'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
   'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],

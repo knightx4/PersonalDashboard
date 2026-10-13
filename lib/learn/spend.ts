@@ -338,6 +338,10 @@ export const LEARN_OPERATIONS = [
   'research-essay-question',
   'gather-essay-sources',
   'judge-essay-claims',
+  // Finishing an essay (plan #1873): one Sonnet call naming the claims it
+  // argues, then one embedding per claim to find the notes that already hold
+  // it, under 'embed-note-match'.
+  'name-essay-claims',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

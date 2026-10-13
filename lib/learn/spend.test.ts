@@ -134,6 +134,7 @@ describe('the operation names', () => {
       'research-essay-question',
       'gather-essay-sources',
       'judge-essay-claims',
+      'name-essay-claims',
     ]);
   });
 });

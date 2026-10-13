@@ -135,6 +135,7 @@ import {
   LearnEssayRephraseSurface,
   LearnEssayStudyEmptySurface,
   LearnEssayResearchSurface,
+  LearnEssayFinishSurface,
   LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
   LearnEssaySurface,
@@ -6054,6 +6055,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssaySurface />,
+  },
+  {
+    id: 'learn-essay-finish',
+    label: 'Essay · Finished, with notes and the evidence bank offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayFinishSurface />,
   },
   {
     id: 'learn-essay-research',
