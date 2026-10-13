@@ -100,3 +100,29 @@ export async function readPathOpens30(
   }
   return (data as { opens_30: number } | null)?.opens_30 ?? 0;
 }
+
+/** Opens in the last 30 days that have a device recorded, and how many were on a phone. */
+export type PhoneShare = { phone: number; total: number };
+
+/**
+ * How much of the app is opened on a phone: page views of the last 30 days
+ * whose device is recorded (plan #1919.6). Rows from before the device was
+ * recorded are not counted either way. Null when the read fails.
+ */
+export async function readPhoneShare(client: SupabaseClient, now: Date = new Date()): Promise<PhoneShare | null> {
+  const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const count = (device: 'phone' | 'laptop') =>
+    client
+      .schema('core')
+      .from('page_views')
+      .select('id', { count: 'exact', head: true })
+      .eq('device', device)
+      .gte('viewed_at', since);
+  const [phone, laptop] = await Promise.all([count('phone'), count('laptop')]);
+  if (phone.error || laptop.error) {
+    console.warn(`[opens] could not read the phone share: ${(phone.error ?? laptop.error)?.message}`);
+    return null;
+  }
+  const phones = phone.count ?? 0;
+  return { phone: phones, total: phones + (laptop.count ?? 0) };
+}

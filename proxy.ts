@@ -143,7 +143,13 @@ export default async function proxy(request: NextRequest, event?: NextFetchEvent
           const { error } = await supabase
             .schema('core')
             .from('page_views')
-            .insert({ user_id: user.id, route: view.route, workspace: view.workspace, via: view.via });
+            .insert({
+              user_id: user.id,
+              route: view.route,
+              workspace: view.workspace,
+              via: view.via,
+              device: view.device,
+            });
           if (error) console.warn(`page view not recorded for ${view.route}: ${error.message}`);
         })().catch(() => {}),
       );
