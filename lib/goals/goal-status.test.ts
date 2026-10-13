@@ -8,7 +8,6 @@ const GOAL: Goal = {
   areaId: 'area',
   title: 'Land a finance role',
   acceptance: null,
-  fog: null,
   status: 'open',
   position: 10,
   unit: null,

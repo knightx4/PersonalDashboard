@@ -23,7 +23,6 @@ function goal(id: string, title: string, areaName: string, extra: Partial<Goal> 
       areaId: areaName,
       title,
       acceptance: null,
-      fog: null,
       status: 'open' as const,
       position: 10,
       unit: null,

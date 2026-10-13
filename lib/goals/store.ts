@@ -29,7 +29,6 @@ type GoalRow = {
   area_id: string;
   title: string;
   acceptance: string | null;
-  fog: string | null;
   status: GoalStatus;
   position: number;
   unit: string | null;
@@ -53,7 +52,6 @@ const toGoal = (row: GoalRow): Goal => ({
   areaId: row.area_id,
   title: row.title,
   acceptance: row.acceptance,
-  fog: row.fog,
   status: row.status,
   position: row.position,
   unit: row.unit,
@@ -87,7 +85,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, due_precision, errand, archived_at')
+    .select('id, area_id, title, acceptance, status, position, unit, target, due_on, due_precision, errand, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');
@@ -270,7 +268,6 @@ export async function insertGoal(
       area_id: areaId,
       title: fields.title,
       acceptance: fields.acceptance ?? null,
-      fog: fields.fog ?? null,
       detail: fields.detail ?? null,
       errand: fields.errand ?? false,
       due_on: fields.dueOn ?? null,

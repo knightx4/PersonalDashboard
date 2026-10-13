@@ -67,7 +67,6 @@ function line(id: string, areaId: string, extra: Partial<HomeGoal> = {}): HomeGo
       areaId,
       title: id,
       acceptance: null,
-      fog: null,
       status: 'open',
       position: 10,
       unit: null,

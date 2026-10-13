@@ -238,7 +238,7 @@ describe('read_dev_row', () => {
     ],
     plan_items: [
       { id: FEATURE, user_id: ME, number: 1319, title: 'Let Dash read your Dev pages in full', kind: 'build', status: 'not_started', parent_id: null, position: 1, dismissed_at: null },
-      { id: STEP, user_id: ME, number: 1248, title: 'Read a row', kind: 'build', status: 'in_progress', detail: 'Read one row.', acceptance: 'It reads.', comment: 'Added by a session.', resolution: null, fog: 'Unclear', fog_dismissed_at: at, block_ask: null, parent_id: FEATURE, position: 2, dismissed_at: null },
+      { id: STEP, user_id: ME, number: 1248, title: 'Read a row', kind: 'build', status: 'in_progress', detail: 'Read one row.', acceptance: 'It reads.', comment: 'Added by a session.', resolution: null, block_ask: null, parent_id: FEATURE, position: 2, dismissed_at: null },
       { id: QUESTION, user_id: ME, number: 1250, title: 'Which shape?', kind: 'decision', status: 'done', resolution: 'B, JSON.', parent_id: STEP, position: 1, dismissed_at: null },
       { id: OPEN_QUESTION, user_id: ME, number: 1251, title: 'Which name?', kind: 'decision', status: 'not_started', resolution: null, detail: 'A — one.\nB — two.', parent_id: STEP, position: 2, dismissed_at: null },
       { id: DISMISSED_STEP, user_id: ME, number: 1252, title: 'Put aside', kind: 'build', status: 'not_started', parent_id: FEATURE, position: 3, dismissed_at: at },
@@ -310,7 +310,6 @@ describe('read_dev_row', () => {
         detail: 'Read one row.',
         done_when: 'It reads.',
         history: 'Added by a session.',
-        fog: null,
         comments: '[2026-09-01, me] Keep it small.',
       });
       expect(row.detail?.decisions).toBe('#1250 Which shape? Answered: B, JSON.\n#1251 Which name? Not answered yet.');

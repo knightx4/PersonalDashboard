@@ -17,7 +17,6 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { CommentCount } from '@/components/dev/comment-count';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
-import { FogNote } from '@/components/dev/fog-note';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
@@ -54,7 +53,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * passed in by the page rather than written here. What is left is what any
  * page of steps shares: the tree guides and the fold, the number and title,
  * the health word you press to change, whose move it is, the count of what
- * is beneath, the fog, and the opened panel with the detail, Done when,
+ * is beneath, and the opened panel with the detail, Done when,
  * Needs, the note, the questions, what it waits on and the thread.
  *
  * A page fills it in three steps: `useTreeRow` for the row's own state, which
@@ -72,8 +71,6 @@ export type TreeRowNode = TreeQuestion &
     blockAsk: string | null;
     /** The step's history note. */
     comment: string | null;
-    fog: string | null;
-    fogDismissedAt: string | null;
     /** Under a filter: whether this row matched or is only here for what is beneath it. */
     matches: boolean;
     rollup: PlanProgress;
@@ -136,17 +133,7 @@ export function useTreeRow(
   // A search is the exception, and the same one as before: the row is only on
   // the page because something inside it matched, and folding that away would
   // be answering the search with a closed drawer.
-  //
-  // Fog folds too, and that is the whole of what the arrow is for on a row
-  // with no steps under it. #386 is fog and nothing else -- a feature real
-  // enough to name and not yet real enough to break up -- so gating the arrow
-  // on sub-steps alone left its one block of text pinned open with no control
-  // anywhere on the row. A leaf still starts unfolded, so scanning the plan
-  // shows the fog exactly as it did; what is new is being able to put it away.
-  const foldableFog = Boolean(node.fog) && (node.fogDismissedAt === null || showDismissed);
-  const [showChildren, setShowChildren] = useState(
-    () => searching || unfolded || (!hasChildren && foldableFog),
-  );
+  const [showChildren, setShowChildren] = useState(() => searching || unfolded);
 
   return {
     open,
@@ -161,7 +148,6 @@ export function useTreeRow(
     setShowChildren,
     substeps,
     hasChildren,
-    foldableFog,
     /** Show the sub-steps and open the add form beneath them. */
     addChild: () => {
       setShowChildren(true);
@@ -334,11 +320,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   /** Draws one sub-step, one level further in. */
   renderChild: (child: TreeRowNode, trail: readonly boolean[]) => ReactNode;
 }) {
-  const [fogState, fogAction, fogPending] = useActionState(
-    actions.dismissFog,
-    {} as TreeActionState,
-  );
-  const { open, setOpen, showChildren, setShowChildren, substeps, hasChildren, foldableFog } = row;
+  const { open, setOpen, showChildren, setShowChildren, substeps, hasChildren } = row;
 
   // A question beneath a step is that step's question, and it is read and
   // answered in the step's own questions section. It is deliberately not also a
@@ -386,7 +368,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // and a step read in full meant pressing both. Either now unfolds both, or
   // folds everything when anything is showing; the arrow at the top of the
   // panel condenses the panel and leaves the sub-steps.
-  const foldable = hasChildren || foldableFog;
+  const foldable = hasChildren;
   const expanded = open || (foldable && showChildren);
   // A leaf has nothing to fold, so its chevron (drawn when the title links
   // away) opens and closes the panel, and says so.
@@ -816,34 +798,6 @@ export function TreeRow<E extends TreeCatalogEntry>({
       </li>
 
       {notices}
-
-      {/* In the tree rather than behind the fold, because fog on a feature is
-          the thing you most want to see while scanning a plan: it is the part
-          that is admittedly not a plan yet, and one that only showed on a step
-          you thought to open would be a gap nobody found. Quiet and dashed, so
-          it does not read as detail. Nothing at all when there is none, which
-          is most steps most of the time.
-
-          It does fold with the group, though. Fog belongs to what is beneath
-          the row -- it is the part of it that is not a plan yet -- so a
-          collapsed feature leaving its fog behind was one block outliving the
-          thing it described. The arrow appears for fog as well as for
-          sub-steps, so the fold is a control everywhere it is a state. */}
-      {foldableFog && showChildren && (
-        <li style={inset} className="pb-1.5 pr-3">
-          {/* Putting the patch aside stops it being raised: off the page,
-              out of the Not specified view, out of every turn, and no
-              longer holding the step open when you close it. */}
-          <FogNote
-            id={node.id}
-            fog={readable(node.fog ?? '')}
-            aside={node.fogDismissedAt !== null}
-            action={fogAction}
-            pending={fogPending}
-            error={fogState.error}
-          />
-        </li>
-      )}
 
       {row.editing && !titleEditor ? (
         <li style={inset} className="pr-3">

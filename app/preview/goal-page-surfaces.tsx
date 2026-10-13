@@ -17,7 +17,7 @@ import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
 import { GoalSuggestions } from '@/app/goals/[goalId]/goal-suggestions';
 import type { Suggestion } from '@/lib/goals/suggestions';
-import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
+import { GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
 import type { StepAnswer } from '@/lib/goals/answers';
@@ -62,7 +62,6 @@ function goal(id: string, areaId: string, title: string, extra: Partial<Goal> = 
     areaId,
     title,
     acceptance: null,
-    fog: null,
     status: 'open',
     position: 10,
     unit: null,
@@ -101,7 +100,6 @@ const job = goal('g-job', 'a-career', 'Move into a quant research role', {
   acceptance: 'An offer from a fund or a bank for a research seat.',
 });
 const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
-  fog: 'Whether to aim for a time or just to finish.',
   createdAt: '2026-09-25T07:30:00Z',
 });
 
@@ -855,8 +853,8 @@ export function GoalTopSurface() {
 
 /**
  * A goal just added: not approved, nothing measured, no help asked for and
- * nothing linked, so the page has its fog, the Claude card and one row of
- * add lines.
+ * nothing linked, so the page has its done-when, the Claude card and one row
+ * of add lines.
  */
 export function GoalBareSurface() {
   const number = { goalId: marathon.id, unit: null, target: null, readings: [], today: TODAY };
@@ -874,9 +872,7 @@ export function GoalBareSurface() {
       pace={{ known: false, activeDays: 1, lastOn: '2026-10-08', daysSince: 3 }}
     >
       <div className="space-y-6">
-        <GoalDoneWhen goal={marathon}>
-          <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
-        </GoalDoneWhen>
+        <GoalDoneWhen goal={marathon} />
         <GoalShaping
           goalId={marathon.id}
           approval={approvalLine({

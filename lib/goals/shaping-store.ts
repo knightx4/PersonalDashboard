@@ -349,24 +349,3 @@ export async function settleProposal(
   return data === null ? null : Number(data);
 }
 
-/**
- * Put a goal's fog aside with Not now, or bring it back (plan #960). The fog
- * itself is untouched, and rewriting it brings it back on its own. False when
- * it is not a live goal of yours with fog on it.
- */
-export async function setFogAside(
-  client: GoalsSupabaseClient,
-  goalId: string,
-  aside: boolean,
-): Promise<boolean> {
-  const { data, error } = await client
-    .from('items')
-    .update({ fog_dismissed_at: aside ? new Date().toISOString() : null })
-    .eq('id', goalId)
-    .eq('level', 'goal')
-    .not('fog', 'is', null)
-    .is('archived_at', null)
-    .select('id');
-  if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
-}

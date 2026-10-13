@@ -14,7 +14,6 @@ import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
-import { FogNote } from '@/components/dev/fog-note';
 import { Thread } from '@/components/thread/thread';
 import { ColumnHeader } from '@/components/plan-tree/grid';
 import { ViewChips } from '@/components/plan-tree/view-chips';
@@ -62,7 +61,7 @@ import {
   type HeldBy,
 } from '@/lib/plan/split';
 import { TAB_PARAM, tabFrom } from '@/lib/tabs';
-import { dismissPlanFog, deletePlanItem, type PlanActionState } from './actions';
+import { deletePlanItem, type PlanActionState } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
@@ -183,7 +182,6 @@ export function FeaturePage({
   const outlines = useMemo(() => outlinesOf(parts.refTitles), [parts.refTitles]);
   const readable = (text: string) => readableRefs(text, outlines);
   const ref = stepRef(node);
-  const [fogState, fogAction, fogPending] = useActionState(dismissPlanFog, {} as PlanActionState);
 
   const crumbs = featureCrumbs(node, module, moduleLabel);
   const steps = node.children.filter((child) => child.kind !== 'decision');
@@ -461,7 +459,7 @@ export function FeaturePage({
         />
       ) : row.editing ? (
         // The compose surface it can be written in from /dev/plan, filled in
-        // (plan #1670). Fog, the note and the commit stay on the row's own
+        // (plan #1670). The note and the commit stay on the row's own
         // Edit on /dev/plan, which is the whole row at once.
         <FeatureCompose node={node} onDone={() => row.setEditing(false)} />
       ) : (
@@ -469,21 +467,11 @@ export function FeaturePage({
         <div className="space-y-5">
           {overdueDays !== null && <UpdateOverdue days={overdueDays} />}
           {updates[0] && <FeatureUpdate update={updates[0]} earlier={updates[1]} />}
-          {/* The summary, the fog, the feature's own words, what it is done
+          {/* The summary, the feature's own words, what it is done
               when, what it needs and what it waits on, on one card (plan
               #1686): none of it sits bare on the page. */}
           <DetailCard>
             {node.summary && <p className="text-body font-medium text-ink">{node.summary}</p>}
-            {node.fog && node.fogDismissedAt === null && (
-              <FogNote
-                id={node.id}
-                fog={readable(node.fog)}
-                aside={false}
-                action={fogAction}
-                pending={fogPending}
-                error={fogState.error}
-              />
-            )}
             {node.detail && node.kind !== 'decision' && (
               <DetailPart>
                 <p className="whitespace-pre-wrap text-body text-ink">

@@ -7,11 +7,9 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { Card } from '@/components/ui/card';
-import { FogNote } from '@/components/dev/fog-note';
 import type { GoalRunRow } from '@/lib/goals/runs';
 import {
   approveGoalAction,
-  setFogAsideAction,
   workOnGoalAction,
   type ShapingActionState,
 } from './shaping-actions';
@@ -177,43 +175,6 @@ export function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }
           All runs
         </Link>
       )}
-    </div>
-  );
-}
-
-/**
- * What is not known yet about the goal, under its title (plan #960), drawn
- * as fog is on a dev plan feature, with Not now. Put aside, it folds to one
- * quiet button that brings it back.
- */
-export function GoalFog({ goalId, fog, aside }: { goalId: string; fog: string; aside: boolean }) {
-  const [state, action, pending] = useActionState(setFogAsideAction, initial);
-  if (aside) {
-    return (
-      <form action={action} className="mb-6">
-        <input type="hidden" name="id" value={goalId} />
-        <input type="hidden" name="dismissed" value="0" />
-        <Button type="submit" size="sm" variant="ghost" pending={pending}>
-          Show what is not known yet
-        </Button>
-        {state.error && (
-          <p role="alert" className="text-small text-danger">
-            {state.error}
-          </p>
-        )}
-      </form>
-    );
-  }
-  return (
-    <div className="mb-6">
-      <FogNote
-        id={goalId}
-        fog={fog}
-        aside={false}
-        action={action}
-        pending={pending}
-        error={state.error}
-      />
     </div>
   );
 }

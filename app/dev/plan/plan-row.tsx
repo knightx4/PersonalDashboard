@@ -13,7 +13,6 @@ import {
   sendPlanFeatureToClaude,
   workPlanOverhaul,
   dismissPlanDecision,
-  dismissPlanFog,
   sendPlanItemToClaude,
   setPlanItemAssignee,
   setPlanItemPriority,
@@ -109,7 +108,6 @@ export const PLAN_TREE_ACTIONS: TreeActions = {
   ask: addPlanItem,
   addDependency: addPlanDependency,
   removeDependency: removePlanDependency,
-  dismissFog: dismissPlanFog,
 };
 
 /**

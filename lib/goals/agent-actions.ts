@@ -99,7 +99,6 @@ export const goalsActions: ModuleActions = {
     answerQuestionAction: none('theirs'),
     setQuestionAsideAction: none('theirs'),
     settleProposalAction: none('theirs'),
-    setFogAsideAction: none('theirs'),
   },
   'app/goals/[goalId]/help-actions.ts': {
     setHelpKindsAction: none('setting'),

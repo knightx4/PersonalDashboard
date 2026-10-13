@@ -63,8 +63,6 @@ type ItemRow = {
   title: string;
   detail: string | null;
   acceptance: string | null;
-  fog: string | null;
-  fog_dismissed_at: string | null;
   resolution: string | null;
   dismissed_at: string | null;
   due_on: string | null;
@@ -123,7 +121,7 @@ async function loadDependencies(
 }
 
 const ITEM_COLUMNS =
-  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
+  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, ' +
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
@@ -175,8 +173,6 @@ const toGoal = (row: ItemRow): Goal => ({
   areaId: row.area_id as string,
   title: row.title,
   acceptance: row.acceptance,
-  fog: row.fog,
-  fogDismissedAt: row.fog_dismissed_at,
   // Only a step can be blocked; the database refuses it on a goal.
   status: row.status as GoalStatus,
   position: row.position,

@@ -338,27 +338,6 @@ export function EditStep({
     <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
       <StepFields prefix={prefix} node={node} status={node.status} />
-      {/* Not part of StepFields, because a step being added has nothing to be
-       * foggy about yet: fog is what you find once a feature is real and one
-       * half of it will not resolve into steps. */}
-      <div>
-        <Label htmlFor={`${prefix}-fog`}>Not yet specified</Label>
-        {/* ui-ok: composer-always-open -- EditStep only renders when a step is
-         * being edited, and the gate is at the call site rather than above
-         * this line, so the rule cannot see it. Law 14 is obeyed. */}
-        <Textarea
-          id={`${prefix}-fog`}
-          name="fog"
-          rows={2}
-          className="min-h-12"
-          defaultValue={node.fog ?? ''}
-          placeholder="The part nobody can see far enough into to write steps for yet."
-        />
-        <FieldHint>
-          Said plainly here rather than filled with plausible steps. Clear it once the steps beneath
-          say it.
-        </FieldHint>
-      </div>
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
         {/* ui-ok: composer-always-open -- same edit form as the field above. */}

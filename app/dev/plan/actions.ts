@@ -14,7 +14,7 @@ import {
 import { overhaulRefusal, overhaulTurn } from '@/lib/plan/overhaul-run';
 import {
   DISMISSAL_RULE,
-  FOG_RULE,
+  FOLLOW_ON_RULE,
   PLAIN_ENGLISH_RULE,
   QUESTION_RULE,
   dismissedUnder,
@@ -272,7 +272,6 @@ const updateSchema = z.object({
   title: titleField,
   detail: text(4000).optional(),
   acceptance: text(4000).optional(),
-  fog: text(4000).optional(),
   comment: text(4000).optional(),
   commit: text(64).optional(),
   status: statusField,
@@ -303,7 +302,6 @@ export async function updatePlanItem(
     title: field(formData, 'title'),
     detail: field(formData, 'detail'),
     acceptance: field(formData, 'acceptance'),
-    fog: field(formData, 'fog'),
     comment: field(formData, 'comment'),
     commit: field(formData, 'commit'),
     status: field(formData, 'status', 'not_started'),
@@ -315,7 +313,7 @@ export async function updatePlanItem(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('parent_id, module, fog, block_kind')
+    .select('parent_id, module, block_kind')
     .eq('user_id', user.id)
     .eq('id', parsed.data.id)
     .maybeSingle();
@@ -332,10 +330,6 @@ export async function updatePlanItem(
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
-    // Emptied is cleared, not blanked: fog is meant to disappear the moment
-    // the steps that dispel it exist, and null is what "there is none" reads
-    // as everywhere else it is asked about.
-    fog: parsed.data.fog || null,
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
@@ -346,13 +340,6 @@ export async function updatePlanItem(
     size: parsed.data.size,
     assignee: parsed.data.assignee,
   };
-
-  // A rewritten patch of fog is a new admission, and nobody has put that one
-  // aside. Leaving the dismissal on it would hide the new text the moment it
-  // was written.
-  if ((parsed.data.fog || null) !== ((current.fog as string | null) ?? null)) {
-    patch.fog_dismissed_at = null;
-  }
 
   const currentParent = (current.parent_id as string | null) ?? null;
   if (parsed.data.parent !== currentParent) {
@@ -461,7 +448,7 @@ export async function addFeature(
 
 /**
  * A feature's title, summary, properties and description, from the same
- * compose surface opened on its page. Only those: its status, fog, note and
+ * compose surface opened on its page. Only those: its status, note and
  * place keep their own controls, so a save here never rewrites them.
  */
 // latency: pending
@@ -517,29 +504,17 @@ export async function setPlanItemStatus(
   const status = statusField.safeParse(formData.get('status'));
   if (!id.success || !status.success) return { error: 'Missing step or status.' };
 
-  // Two of the statuses need the row as it stands: done reads its fog, and
-  // in progress reads who has it. The rest are one write and no read.
-  const needsCurrent = status.data === 'done' || status.data === 'in_progress';
+  // In progress needs the row as it stands, to read who has it. The rest are
+  // one write and no read.
+  const needsCurrent = status.data === 'in_progress';
   const { data: current } = needsCurrent
     ? await supabase
         .from('plan_items')
-        .select('number, fog, fog_dismissed_at, assignee')
+        .select('number, assignee')
         .eq('user_id', user.id)
         .eq('id', id.data)
         .maybeSingle()
     : { data: null };
-
-  // Fog says part of this step was never specified. Closing it as done
-  // leaves that admission sitting on finished work, where nothing looks at
-  // it again -- which is how three features shipped still carrying theirs.
-  // Graduate it into steps, or clear it, then close.
-  // Unless you have put that patch aside, which is the other way out: "not
-  // right now" said about the gap itself, recorded and findable.
-  if (status.data === 'done' && current?.fog && !current.fog_dismissed_at) {
-    return {
-      error: `${await refOfStep(supabase, user.id, id.data, current.number)} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
-    };
-  }
 
   // Blocking from here records the kind of block as well, because the
   // database will not take a blocked row without one. It is `outside` — the
@@ -654,55 +629,6 @@ export async function dismissPlanDecision(
     message: aside
       ? `${ref} put aside. It is under Dismissed when you want it.`
       : `${ref} is back.`,
-  };
-}
-
-/**
- * The same, said about a patch of fog.
- *
- * Its own column rather than the row's, because a feature whose fog you have
- * put aside is otherwise a live feature with live steps: dismissing the row
- * would take the work with it. What it stops is the asking -- the patch leaves
- * the page, leaves the Not specified view, is not written into any turn, and
- * no longer holds the step open when you close it.
- *
- * Rewriting the patch brings it back, in `updatePlanItem` and in the CLI. A
- * new admission is not one anybody has put aside yet.
- */
-// latency: pending
-export async function dismissPlanFog(
-  _prev: PlanActionState,
-  formData: FormData,
-): Promise<PlanActionState> {
-  const supabase = await createClient();
-  const user = await requireOwner({ supabase });
-
-  const id = z.string().uuid().safeParse(formData.get('id'));
-  if (!id.success) return { error: 'Missing step.' };
-  const aside = dismissing(formData);
-
-  const { data: current } = await supabase
-    .from('plan_items')
-    .select('number, fog')
-    .eq('user_id', user.id)
-    .eq('id', id.data)
-    .maybeSingle();
-  if (!current) return { error: 'That step no longer exists.' };
-  const ref = await refOfStep(supabase, user.id, id.data, current.number);
-  if (!current.fog) return { error: `${ref} says nothing is unspecified.` };
-
-  const { error } = await supabase
-    .from('plan_items')
-    .update({ fog_dismissed_at: aside ? new Date().toISOString() : null })
-    .eq('id', id.data)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
-
-  revalidatePlan();
-  return {
-    message: aside
-      ? `${ref}'s fog put aside. It is under Dismissed when you want it.`
-      : `${ref}'s fog is back.`,
   };
 }
 
@@ -1571,8 +1497,8 @@ export async function sendPlanFeatureToClaude(
  * Re-shape a feature against what has been decided since it was written.
  *
  * The return trip. Shaping runs once, before anything is built, and from then
- * on the feature is a fixed drawing of a thing that is still moving: fog is
- * written and never read again, and an answer that makes half the plan wrong
+ * on the feature is a fixed drawing of a thing that is still moving: an
+ * answer that makes half the plan wrong
  * changes nothing but its own row. This is the press that re-reads the feature
  * against everything settled beneath it.
  *
@@ -1626,17 +1552,15 @@ async function startReshape(
     'and write what has changed.\n\n' +
     (closed
       ? `${ref} is ${node.status}. It is finished, and nothing new may be added ` +
-        'inside it -- not a step, not a decision, not a graduated fog step. Anything this ' +
+        'inside it -- not a step and not a decision. Anything this ' +
         're-shape turns up is new work: raise it as its own top-level feature whose detail ' +
         `opens by saying it came out of ${ref}, and put the steps and questions ` +
-        'under that. The only write this re-shape makes to the closed feature itself is ' +
-        `clearing its fog patch (plan.ts fog ${node.number} --clear), and only once the new ` +
-        'feature that dispels it exists. If nothing has changed, say so and write nothing.\n\n'
+        'under that, and write nothing to the closed feature itself. If nothing has changed, ' +
+        'say so and write nothing.\n\n'
       : '') +
     'Three moves, and nothing else:\n' +
-    `- Fog the answers have made specifiable becomes steps ${where}, ` +
-    'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
-    '(plan.ts fog <n> --clear).\n' +
+    `- Work an answer has made specifiable becomes steps ${where}, ` +
+    'each with a done-when and a size.\n' +
     '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
     'that did it. A re-shape may drop, and must say why.\n' +
     `- A question an answer surfaced is written as a fresh decision ${where}, ` +
@@ -1650,8 +1574,8 @@ async function startReshape(
         'still goes in with --proposed. ') +
     'Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not add again something the ' +
-    'feature already holds. Report what you added and which of it is proposed, what you dropped and why, and what ' +
-    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
+    'feature already holds. Report what you added and which of it is proposed, and what you dropped and why.' +
+    `\n\n${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
     planBrief(sections, node, {
@@ -1724,8 +1648,8 @@ export async function reshapePlanFeature(
   return {
     message:
       `Re-shaping ${ref} against ` +
-      `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
-      `${node.fog ? ' and its fog' : ''}. ${result.detail}`,
+      `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}. ` +
+      result.detail,
   };
 }
 

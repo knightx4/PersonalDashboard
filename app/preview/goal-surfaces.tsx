@@ -167,7 +167,6 @@ const map: GoalMap = {
     areaId: 'money',
     title: 'Pay off the credit cards',
     acceptance: 'Every card at a zero balance.',
-    fog: null,
     status: 'open',
     position: 10,
     unit: null,

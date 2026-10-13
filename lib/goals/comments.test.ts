@@ -62,7 +62,6 @@ function context(itemId = 'step-2'): GoalReplyContext {
       areaId: 'area-1',
       title: 'Pay off student debt',
       acceptance: 'Every loan at zero',
-      fog: null,
       status: 'open',
       position: 10,
       unit: '$',

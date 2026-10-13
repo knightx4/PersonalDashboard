@@ -38,7 +38,6 @@ export type TreeAction = (state: TreeActionState, formData: FormData) => Promise
  * - `ask`: `module`, `parent`, `kind` ("decision"), `title`
  * - `addDependency`: `item`, `depends_on`
  * - `removeDependency`: `id`, the dependency row's own id
- * - `dismissFog`: `id`, `dismissed` ("1" or "0")
  */
 export type TreeActions = {
   answer: TreeAction;
@@ -47,7 +46,6 @@ export type TreeActions = {
   ask: TreeAction;
   addDependency: TreeAction;
   removeDependency: TreeAction;
-  dismissFog: TreeAction;
 };
 
 /** What a row's thread is under. The dev plan's are steps; a goal page's are goals. */

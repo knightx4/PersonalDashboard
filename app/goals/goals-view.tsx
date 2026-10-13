@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
-import { Archive, ChevronRight, CloudFog, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { Archive, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -32,7 +32,6 @@ import {
   AREA_NAME_MAX,
   AREA_NOTE_MAX,
   GOAL_ACCEPTANCE_MAX,
-  GOAL_FOG_MAX,
   GOAL_TITLE_MAX,
   type AreaWithGoals,
   type Goal,
@@ -72,8 +71,8 @@ import { areaCrumbs } from '@/lib/goals/crumbs';
  * An area's name opens its own page (plan #1619), which draws the same
  * section alone with the area's name as its heading, and is where the area
  * is renamed, as a goal's title opens its tree, where it is renamed.
- * Everything else is edited where it stands (law 12): a note, a done-when or
- * a note of fog is an inline input saved on blur. Reordering and archiving sit in each
+ * Everything else is edited where it stands (law 12): a note or a done-when
+ * is an inline input saved on blur. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
  *
@@ -447,7 +446,13 @@ function AreaSection({
           </form>
           {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
           {goalCount === 0 && (
-            <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} cost={planCost} />
+            <AreaPlanner
+              areaId={area.id}
+              hasGoals={liveCount > 0}
+              run={run}
+              canRun={canRun}
+              cost={planCost}
+            />
           )}
         </div>
         {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
@@ -478,7 +483,13 @@ function AreaSection({
         )}
         {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
         {goalCount > 0 && (
-          <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} cost={planCost} />
+          <AreaPlanner
+            areaId={area.id}
+            hasGoals={liveCount > 0}
+            run={run}
+            canRun={canRun}
+            cost={planCost}
+          />
         )}
         <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
       </div>
@@ -508,10 +519,7 @@ function GoalRow({
   });
   const moveSelf = useMoveSelf(served.id, writeGoalMove);
   const [editState, edit, editing] = useActionState(editGoal, initial);
-  // Fog is shown when the goal has some, or once you choose to add it.
-  const [addingFog, setAddingFog] = useState(false);
   const toast = useToast();
-  const showFog = goal.fog !== null || addingFog;
 
   async function archive(form: FormData) {
     const result = await archiveGoalAction(form);
@@ -556,11 +564,6 @@ function GoalRow({
           disabled: index === count - 1,
           onSelect: () => moveSelf('down'),
         },
-        ...(showFog
-          ? []
-          : [
-              { id: 'fog', label: 'Say what is not known yet', onSelect: () => setAddingFog(true) },
-            ]),
         ...moveToItems,
         {
           id: 'archive',
@@ -592,32 +595,6 @@ function GoalRow({
           >
             {goal.acceptance}
           </Link>
-        )}
-        {showFog && (
-          <form action={edit} className="flex items-start gap-1">
-            <input type="hidden" name="id" value={goal.id} />
-            <CloudFog
-              className="mt-1.5 ml-1 size-3.5 shrink-0 text-ink-muted"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <InlineTextarea
-              name="fog"
-              maxLength={GOAL_FOG_MAX}
-              defaultValue={goal.fog ?? ''}
-              key={`fog-${goal.fog ?? ''}`}
-              autoFocus={addingFog && goal.fog === null}
-              placeholder="What is not known yet"
-              aria-label={`What is not known yet about ${goal.title}`}
-              disabled={editing}
-              onBlur={(event) => {
-                if (event.target.value.trim() === '' && goal.fog === null) setAddingFog(false);
-                commitOnBlur(goal.fog ?? '')(event);
-              }}
-              onKeyDown={revertOnEscape(goal.fog ?? '')}
-              className="text-ink-muted"
-            />
-          </form>
         )}
         {/* The bar first and the way into the tree after it, on one line
             that wraps, rather than a line for each. */}
@@ -693,13 +670,7 @@ function SettleProposedGoal({
  * (plan #1084). Taking it back up opens it again and counts as keeping it
  * open, so it is not offered for parking again for three weeks.
  */
-function TakeBackUp({
-  status,
-  onReopen,
-}: {
-  status: 'parked' | 'done';
-  onReopen: () => void;
-}) {
+function TakeBackUp({ status, onReopen }: { status: 'parked' | 'done'; onReopen: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
       <span className="text-small text-ink-muted">{status === 'parked' ? 'Parked' : 'Closed'}</span>
@@ -733,7 +704,11 @@ function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[
                 href={stepHref(rhythm.goalId, rhythm.id)}
                 className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
               >
-                <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                <Repeat
+                  className="mt-0.5 size-4 shrink-0 text-ink-muted"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block text-ui break-words text-ink">{rhythm.title}</span>
                   <span className="block text-small break-words text-ink-muted">{rhythm.line}</span>
@@ -769,9 +744,8 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
 }
 
 /**
- * A new goal: a title, and either a done-when or a note of what is not known
- * yet. A goal you cannot describe yet still goes in, with fog in place of the
- * done-when.
+ * A new goal: a title, and a done-when if you know it. A goal you cannot
+ * describe yet still goes in with the title alone.
  */
 function GoalComposer({
   areaId,
@@ -784,13 +758,9 @@ function GoalComposer({
   learn: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [vague, setVague] = useState(false);
   const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
     const next = await addGoal(prev, form);
-    if (next.done) {
-      setOpen(false);
-      setVague(false);
-    }
+    if (next.done) setOpen(false);
     return next;
   }, initial);
 
@@ -814,30 +784,16 @@ function GoalComposer({
             placeholder="A goal: an outcome that ends, such as pay off the credit cards"
             aria-label={`New goal in ${areaName}`}
           />
-          {vague ? (
-            <ComposeBody
-              key="fog"
-              name="fog"
-              rows={1}
-              maxLength={GOAL_FOG_MAX}
-              placeholder="What is not known yet, such as whether this means strength or endurance"
-              aria-label="What is not known yet"
-            />
-          ) : (
-            <ComposeBody
-              key="acceptance"
-              name="acceptance"
-              rows={1}
-              maxLength={GOAL_ACCEPTANCE_MAX}
-              placeholder="Done when… (optional)"
-              aria-label="When it is done"
-            />
-          )}
+          <ComposeBody
+            key="acceptance"
+            name="acceptance"
+            rows={1}
+            maxLength={GOAL_ACCEPTANCE_MAX}
+            placeholder="Done when… (optional)"
+            aria-label="When it is done"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          <Button type="button" size="sm" variant="ghost" onClick={() => setVague(!vague)}>
-            {vague ? 'I know when it is done' : 'Not sure yet'}
-          </Button>
           {state.error && <span className="text-small text-danger">{state.error}</span>}
           <span className="ml-auto flex items-center gap-1">
             <Button

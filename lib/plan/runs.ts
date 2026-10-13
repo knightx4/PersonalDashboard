@@ -469,11 +469,12 @@ export async function readRunWork(
       completed_at: string | null;
       blocked_at: string | null;
       position: number;
+      commit_sha: string | null;
     };
     const rows = await readAll<Row>((from, to) =>
       supabase
         .from('plan_items')
-        .select('id, parent_id, number, position, status, created_at, updated_at, completed_at, blocked_at')
+        .select('id, parent_id, number, position, status, created_at, updated_at, completed_at, blocked_at, commit_sha')
         .eq('user_id', userId)
         .order('id', { ascending: true })
         .range(from, to),
@@ -488,6 +489,7 @@ export async function readRunWork(
       completedAt: row.completed_at,
       blockedAt: row.blocked_at,
       position: row.position,
+      built: row.status === 'in_progress' && row.commit_sha !== null,
     }));
   }
 

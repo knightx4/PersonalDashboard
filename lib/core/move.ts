@@ -110,7 +110,6 @@ export const VIEW_LABEL = {
   proposed: 'Proposed',
   claude: "Dash's",
   blocked: MOVE_WORD.waiting,
-  fog: 'Not specified',
   dismissed: 'Dismissed',
   read: 'To read',
 } as const satisfies Record<string, string>;

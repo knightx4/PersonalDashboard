@@ -34,7 +34,6 @@ vi.mock('@/app/dev/plan/actions', () => {
     approvePlanItem: noop,
     deletePlanItem: noop,
     dismissPlanDecision: noop,
-    dismissPlanFog: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
     reshapePlanFeature: noop,
@@ -66,10 +65,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -695,115 +692,6 @@ describe('PlanView', () => {
     // behind a fold.
     expect(html).toContain('unanswered questions');
     expect(html).toMatch(/2<span class="sr-only">\s*unanswered questions/);
-  });
-
-  it('shows what a feature admits it cannot see yet, and nothing when it can', () => {
-    const foggy = buildPlanTree({
-      items: [
-        item({
-          id: 'export',
-          title: 'Export',
-          fog: 'How the second half is shaped is not yet known.',
-        }),
-        item({ id: 'writer', title: 'The writer', parentId: 'export' }),
-      ],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(foggy, 'all')}
-        finished={[]}
-        summary={summarize(foggy)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-        unfolded
-      />,
-    );
-
-    // In the tree, not behind a fold: a plan's own admission that part of it
-    // is missing is no use if you have to open a step to find it.
-    expect(html).toContain('Not yet specified');
-    expect(html).toContain('How the second half is shaped is not yet known.');
-    // Exactly once -- the step beneath it has no fog and shows no block.
-    expect((html.match(/Not yet specified/g) ?? []).length).toBe(1);
-    // And a plan with none of it anywhere says nothing at all.
-    expect(render('all')).not.toContain('Not yet specified');
-  });
-
-  it('gives a feature that is only fog an arrow to fold it away', () => {
-    // #386's shape: real enough to name, not yet real enough to break into
-    // steps. The fold used to be drawn off the sub-steps alone, so a row like
-    // this one had its fog pinned open with no control anywhere on it.
-    const stepless = buildPlanTree({
-      items: [
-        item({
-          id: 'defence',
-          title: 'Test each concept at three rungs',
-          fog: 'The defence rung still cannot be written as steps.',
-        }),
-        item({ id: 'plain', title: 'A feature with neither steps nor fog' }),
-      ],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(stepless, 'all')}
-        finished={[]}
-        summary={summarize(stepless)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-      />,
-    );
-
-    // Unfolded to start, so scanning the plan still reads the fog without a
-    // press -- the arrow is what is new, not the hiding.
-    expect(html).toContain('The defence rung still cannot be written as steps.');
-    // Exactly one arrow: the row with nothing under it gets none, and the
-    // fog row gets one, which folds the row (title and aria-label).
-    expect((html.match(/aria-label="Fold #/g) ?? []).length).toBe(1);
-    expect((html.match(/aria-label="Unfold #/g) ?? []).length).toBe(0);
-  });
-
-  it('says nothing about a patch of fog that has been put aside', () => {
-    const aside = buildPlanTree({
-      items: [
-        item({
-          id: 'export',
-          title: 'Export',
-          fog: 'How the second half is shaped is not yet known.',
-          fogDismissedAt: '2026-09-13T00:00:00Z',
-        }),
-      ],
-      dependencies: [],
-    });
-    const at = (view: 'all' | 'dismissed') =>
-      renderToStaticMarkup(
-        <PlanView
-          sections={applyView(aside, view)}
-          finished={[]}
-          summary={summarize(aside)}
-          view={view}
-          catalog={[]}
-          empty={false}
-          canSend={false}
-          lastRuns={{}}
-          commitChecks={{}}
-          unfolded
-        />,
-      );
-
-    expect(at('all')).not.toContain('How the second half is shaped is not yet known.');
-    // Under Dismissed it is shown again, with the one move back.
-    expect(at('dismissed')).toContain('How the second half is shaped is not yet known.');
-    expect(at('dismissed')).toContain('Bring back');
   });
 
   it('finds a question put aside, with the way back, under Dismissed', () => {

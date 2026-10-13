@@ -165,7 +165,6 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
     `Status: ${goal.status === 'parked' ? 'parked' : STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
   ];
   if (goal.acceptance) out.push(`Done when: ${goal.acceptance}`);
-  if (goal.fog) out.push(`Not known yet: ${goal.fog}`);
   if (goal.unit) {
     out.push(
       `Measured in: ${goal.unit}${goal.target !== null ? `, aiming for ${goal.target}` : ''}`,

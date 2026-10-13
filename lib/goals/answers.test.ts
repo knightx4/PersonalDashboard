@@ -83,7 +83,6 @@ function goal(id: string, status: Goal['status'] = 'open'): Goal {
     areaId: 'area',
     title: `Goal ${id}`,
     acceptance: null,
-    fog: null,
     status,
     position: 10,
     unit: null,

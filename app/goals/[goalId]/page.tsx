@@ -78,7 +78,7 @@ import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
-import { GoalFog, GoalShaping } from './goal-shaping';
+import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
 import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
@@ -467,15 +467,7 @@ export default async function GoalMapPage({
   const burnUpDays = await scopeDays;
   const overview = (
     <div className="space-y-6">
-      <GoalDoneWhen goal={map.goal}>
-        {map.goal.fog && (
-          <GoalFog
-            goalId={map.goal.id}
-            fog={map.goal.fog}
-            aside={Boolean(map.goal.fogDismissedAt)}
-          />
-        )}
-      </GoalDoneWhen>
+      <GoalDoneWhen goal={map.goal} />
       <div className="space-y-4">
         <GoalStatusCard
           line={line}

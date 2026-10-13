@@ -97,20 +97,12 @@ export function GoalDetail({
  * the tabbed detail pattern no longer allows, and it is the Overview's to say
  * what the goal is for. Editable where it stands, as it was in the header.
  */
-export function GoalDoneWhen({
-  goal,
-  children,
-}: {
-  goal: Pick<Goal, 'id' | 'acceptance'>;
-  /** What is not settled yet about the goal, its fog, on the same card. */
-  children?: React.ReactNode;
-}) {
+export function GoalDoneWhen({ goal }: { goal: Pick<Goal, 'id' | 'acceptance'> }) {
   return (
     <DetailCard>
       <DetailPart label="Done when">
         <GoalHeadingField goalId={goal.id} field="acceptance" value={goal.acceptance} />
       </DetailPart>
-      {children}
     </DetailCard>
   );
 }

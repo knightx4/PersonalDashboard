@@ -45,8 +45,8 @@ The documents remain the record of *why* each step is where it is. They are
 not read at runtime and are not kept in sync: the app is the working copy,
 and the two are expected to drift. Migration 0052 made the flat list a tree
 and gave a step the rest of what is described here. Migration 0054 added
-`kind`, `fog` and `resolution`, borrowed from the wayfinder planning skill —
-see *Decisions, setup and fog*. Migration 0084 added the third kind.
+`kind` and `resolution`, borrowed from the wayfinder planning skill (see
+*Decisions and setup*). Migration 0084 added the third kind.
 
 ## The model
 
@@ -63,10 +63,9 @@ beside them.
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step is waiting on the person's approve: a feature a session shaped, the steps shaped under it, or a step that acts outside the repository. See *Proposals* below. |
-| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions, setup and fog* below. |
+| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions and setup* below. |
 | `track` | `feature` or `overhaul`, read on the feature at the top. An overhaul replaces how something works and is built in its own order by its own routine ([SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md), Part 4). Default `feature`. |
-| `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
-| `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
+| `dismissed_at` | Put aside as not right now. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
 | `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
@@ -320,8 +319,9 @@ person's own job from the start and is never proposed.
 
 ### Suggestions
 
-The other direction. Once fog stopped being the place to park a follow-on,
-those follow-ons needed somewhere to go, and `/dev/ideas` is it: a session
+The other direction. A follow-on a session finds while shaping or building
+a feature, something the feature can be finished without, goes on
+`/dev/ideas`: a session
 writes one with `scripts/plan.ts idea`, which stamps `source = 'claude'` and
 `from_plan_item_id` with the step it came from.
 
@@ -337,7 +337,7 @@ bottom of the page, out of every count above it and out of `plan.ts ideas`,
 which is what stops the next session offering it again. Bring back returns it
 to the list. Delete is still there for a row that should not exist at all.
 
-## Decisions, setup and fog
+## Decisions and setup
 
 ### When a re-shape starts
 
@@ -355,25 +355,14 @@ A re-shape that will not start costs nothing. The answer is recorded by its
 own action first, so a routine that is unreachable loses an answer only from
 the run, never from the plan.
 
-### Fog and finishing
+### Decisions
 
-`done` refuses a step that still carries fog, on the page and in the CLI.
-Fog says part of the step was never specified; a finished step carrying that
-admission is work nobody will look at again. Write the steps the patch covers,
-or clear it, then close. `blocked` and `dropped` are unaffected: neither
-claims the step is complete. Nor is a patch that has been dismissed — see
-*Not right now* below, which is the other way out.
-
-The plan page counts fog in the strip at the top and has a **Not specified**
-view. Closed steps are in it, because a shipped feature still carrying fog is
-the case worth seeing; dismissed patches are not, which is what dismissing one
-did.
-
-Two things a proposal could not say until migration 0054, both borrowed from
-the wayfinder planning skill. They exist because of what a shaping session
-does when it hits the edge of what it knows: it picks an answer and writes
-steps as though the question were settled, or it invents a plausible second
-half. Both read, afterwards, exactly like a plan somebody made.
+Migration 0054 gave a proposal a way to say it does not know something yet,
+borrowed from the wayfinder planning skill. It exists because of what a
+shaping session does when it hits the edge of what it knows: it picks an
+answer and writes steps as though the question were settled, or it invents a
+plausible second half. Both read, afterwards, exactly like a plan somebody
+made.
 
 **A decision** is a step whose resolution is an answer rather than a commit.
 The session that shapes the feature writes the question, the two or three
@@ -400,41 +389,21 @@ that can answer its own questions has no questions, only guesses with a paper
 trail. The cost is real and accepted — a decision nobody answers stalls
 everything that depends on it until the person looks at the page.
 
-**Fog** is the other half. Where a decision is a question sharp enough to
-phrase, fog is the admission that a question cannot even be phrased yet: one
-paragraph on the feature saying what is not known and what would have to be
-found out. The test between them is not whether the question can be
-*answered* — it is whether it can be *asked*.
+**What the feature cannot specify yet.** A shaping session that reaches the
+edge of what it knows sorts what is left by one test first: if this is never
+settled, is the feature still finished? Yes means it is a follow-on, and it
+goes on the ideas page with `scripts/plan.ts idea`, where it can be shaped
+into its own feature later. What the feature does need goes in as one of two
+steps. A question that can be phrased sharply now is a decision. One that
+cannot be decided until part of the feature exists is a step that waits on
+that part (`plan.ts depends <n> --on <m>`) and says in its detail what it
+will decide.
+`FOLLOW_ON_RULE` in `lib/plan/brief.ts` carries the test into both turns that
+write steps, the shaping one and the re-shaping one, and
+`.claude/skills/plan/reference/shaping.md` says it at length.
 
-**What may be written as fog** is a second test, and it comes first: if this
-is never resolved, is the feature still finished? Yes means it is a follow-on
-rather than a gap, and it goes on the ideas page, where it can be shaped into
-its own feature later. Fog is what cannot be decided until part of *this*
-feature exists. Nine of the fourteen patches on the plan when the test was
-written failed it — whether ten interview questions should be asked again
-months later, whether the five-minute unit should exist for reading too — and
-none of them stopped their own feature being finished. They sat where nothing
-reads them again: the feature ships, the patch stays, and the thought is lost
-more thoroughly than if it had been dropped. `FOG_RULE` in
-`lib/plan/brief.ts` carries the test into both turns that write fog, the
-shaping one and the re-shaping one, and `.claude/skills/plan/reference/shaping.md` says it
-at length.
-
-**One patch per feature**, because it is one column: a second `fog --note`
-replaces the first rather than joining it, and the CLI prints what it replaced
-so that losing one is never silent.
-
-Fog is a column rather than a table because it has no life beyond its step:
-it graduates into sub-steps and is cleared once they exist. Two things do
-that graduating, and until they were built the sentence you just read
-described a person doing it by hand: **Re-shape** (below), and a build
-session that learns enough while working a step beneath the feature to
-specify what the fog admitted it could not. Both write the steps and clear
-the patch. Under an approved feature the steps go in ready to build (see
-*Approval stops at the feature*); neither ever approves a proposal. It shows in the tree under the step it belongs to
-rather than behind the fold, because a plan's own admission that part of it
-is missing is no use if you have to open a step to find it. Empty fog
-renders nothing.
+Migration 0209 removed the *not yet specified* note (`fog`) that used to hold
+this on the feature; decisions and waiting steps replace it.
 
 **Carried forward.** Every answered decision beneath a feature appears in the
 brief of every step under it, as *Decided so far*, one line with its answer;
@@ -500,7 +469,7 @@ the turn a re-shape is fired with. The **Dismissed** view lists what was put
 aside and brings it back in one press. Nothing surfaces on its own, and nothing
 is deleted.
 
-Three things can be dismissed, and each has its own column because each is a
+Two things can be dismissed, and each has its own column because each is a
 different thing to stop asking about:
 
 - **A question.** `plan_items.dismissed_at`. Only an open decision: one that is
@@ -508,13 +477,6 @@ different thing to stop asking about:
   either would hide the record rather than the ask. It stops counting toward
   its feature's progress and stops holding its feature open, so a feature whose
   last open row is a dismissed question can still be closed.
-- **A patch of fog.** `plan_items.fog_dismissed_at`, separate from the row,
-  because a feature whose fog you have put aside is otherwise a live feature
-  with live steps. It leaves the *Not specified* view and the count beside it,
-  and it no longer makes `done` refuse the step — the refusal is a way of
-  raising the gap, and dismissing it is saying not now to exactly that.
-  Rewriting the patch clears the dismissal: the new sentence is not one
-  anybody has put aside.
 - **A suggestion.** `ideas.dismissed_at`, which shipped with the ideas page
   above and works on any idea. What it adds here is the other half: a
   suggestion you turned down is named in the re-shape of the feature it came
@@ -522,10 +484,10 @@ different thing to stop asking about:
 
 **A session never dismisses and never un-dismisses**, the same rule as never
 answering its own decision. What it does read is a list: a re-shape turn ends
-with *Already dismissed*, naming the questions, the fog and the suggestions put
-aside under that feature, and the instruction not to write any of them back —
-not as a proposal, not as the same question in different words, not as fog, not
-as an idea. Without that list the next re-shape reads the same code, reaches
+with *Already dismissed*, naming the questions and the suggestions put aside
+under that feature, and the instruction not to write any of them back: not as
+a proposal, not as the same question in different words, not as a waiting
+step, not as an idea. Without that list the next re-shape reads the same code, reaches
 the same thought and writes it again, which is the loop dismissal exists to
 end. `.claude/skills/plan/reference/dismissed.md` says the same thing at length.
 
@@ -559,10 +521,11 @@ says what this firing is for, and wins:
 
 - ***Send to Claude*** on a step — build that one step, then stop.
 - ***Send all n beneath*** on a feature — one session works every open step
-  under it in plan order, each verified, committed and closed before the next
-  is claimed. It stops at the first step that needs a decision, blocking it
-  with the question rather than skipping to a later one. Push and merge happen
-  once, at the end. The press writes no row: it starts the session and nothing
+  under it in plan order, each verified, committed and marked built on the
+  feature's branch before the next is claimed. It stops at the first step that
+  needs a decision, blocking it with the question rather than skipping to a
+  later one. The merge to main happens once, at the end, and the steps close
+  then. The press writes no row: it starts the session and nothing
   else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
 - ***Suggest posts*** on the Posts tab — draft X posts into `social_posts`
@@ -706,7 +669,7 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(approved steps you did not keep for yourself), `fog`, `dismissed` or `all`. A step that does
+(approved steps you did not keep for yourself), `dismissed` or `all`. A step that does
 not match stays, dimmed, when something beneath it does, so a ready sub-step is
 seen in its place. A dismissed step is the one thing `all` does not show:
 `dismissed` is where it is, and hiding it everywhere else is what dismissing it
@@ -807,8 +770,7 @@ as handled for a day while the collision it described was still possible.
 comment on the raise once the action has run.
 
 Editing a step includes moving it: *Part of* lists the module's other steps,
-less the step's own subtree. A moved step goes last under its new parent. The
-editor also holds the *not yet specified* box; emptying it clears the column.
+less the step's own subtree. A moved step goes last under its new parent.
 
 ### The Table view
 
@@ -885,7 +847,7 @@ header's press is a link to `?new=feature`, so it works before the page's
 script has loaded. The summary is kept in `plan_items.summary`, one line of
 at most 200 characters, and shows under the title on the feature's page.
 *Edit* on that page opens the same surface filled in, without the module
-chip; the status, fog, note and commit stay on the row's own Edit on the
+chip; the status, note and commit stay on the row's own Edit on the
 plan.
 
 ## The changelog
@@ -948,7 +910,7 @@ show <n>            the brief
 ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--proposed] [--idea <id>]
-                    [--fog "…"] [--kind decision|setup]
+                    [--kind decision|setup]
                     ready under an approved feature, proposed under a proposed
                     one; --proposed for a new feature or an outside step
 needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
@@ -960,12 +922,11 @@ start | done | block | drop | reopen | assign | priority | depends | undepend
 `done` records the HEAD commit and names the steps that became ready;
 `answer` does the same without a commit. `start` refuses a proposal, and
 refuses a decision or a setup step, naming where each is closed instead. `next` and `list` mark a decision `(?)` rather than with
-a checkbox, and print a step's fog beneath it.
+a checkbox.
 
 **The brief.** `lib/plan/brief.ts` writes a step out for whoever is about
 to build it: where it sits, the feature's *destination* and the decisions
-already settled beneath it, what it involves, done when, anything *not yet
-specified*, what it waits on (its own and inherited), its sub-steps as a
+already settled beneath it, what it involves, done when, what it waits on (its own and inherited), its sub-steps as a
 checklist, what it unblocks, the note. A decision leads with its question
 instead. It is what `show` prints and what *Send to Claude* sends.
 
@@ -980,11 +941,11 @@ moment anything is learned. Shaping runs once, before anything is built;
 from then on the feature is a fixed drawing of a thing still moving —
 answering a decision recorded the answer and changed nothing else. The
 button on a feature fires the same routine with a *re-shape* turn instead
-of a build one, carrying the feature, its fog, its open steps and every
-answer settled beneath it. The session graduates fog that the answers made
-specifiable into steps and clears the patch, drops a step an answer made
-pointless with the reason, and writes any question an answer surfaced as a
-fresh decision.
+of a build one, carrying the feature, its open steps and every answer
+settled beneath it. The session reads the feature against those answers and
+the code, writes the work an answer made specifiable as steps, drops a step
+an answer made pointless with the reason, and writes any question an answer
+surfaced as a fresh decision.
 
 On request rather than on every answer: several questions are usually
 settled in one sitting, and one session that has read all of them writes
@@ -1017,6 +978,16 @@ halfway: a session that builds nine steps itself carries everything it read for
 the first through every turn of the last, and runs out of room around the
 third. The subagents also skip the full test suite and `next build` — the
 orchestrator runs both once before it pushes, and CI runs them again on main.
+
+The steps of one feature reach main together. Each merges into a feature
+branch, `plan/<number>`, which is pushed after every step, and is marked built
+with `plan.ts built`: it stays in progress with its commit and a dated Built
+line. Once the feature's steps are built, the orchestrator merges main into the
+branch, runs the gate once, merges the branch into main as one commit, and
+`plan.ts land <feature>` closes every built step with the same checks `done`
+makes. A step sent on its own still goes to main by itself. Merging a feature
+one step at a time left the live app half-changed between steps and ran the
+gate once a step.
 
 An approved step you did not keep is Claude's to pick up; a step named by the
 user is Claude's whoever holds it; anything else, ask. The plan must always tell the
