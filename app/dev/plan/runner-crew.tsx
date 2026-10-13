@@ -1,14 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { DashMark, type DashLook } from '@/components/ui/dash-mark';
+import { DashMark, type DashRunner } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Meter } from '@/components/ui/meter';
-import { SectionLabel } from '@/components/ui/section-heading';
-import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
+import { Tooltip } from '@/components/ui/tooltip';
+import {
+  SLOT_ASLEEP_DEFAULT,
+  SLOT_NOTHING_READY,
+  type RunnerSlot,
+  type SlotId,
+} from '@/lib/plan/overnight-slots';
 import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
+import { useRunPose } from '@/components/runs/use-run-pose';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
-import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
+import { type RunActivity } from '@/lib/core/run-activities';
 import { answerPlanRunAction } from './run-actions';
 
 /**
@@ -16,11 +22,14 @@ import { answerPlanRunAction } from './run-actions';
  * #1704): three feature sessions and the goals seat, which a fourth feature
  * takes while goals has nothing to start.
  *
- * They sit in a strip, one pill each. A pill wears its Dash's hat, so the eye
- * can follow one from glance to glance, and says in one line what the slot is
- * doing: the feature and its meter with the run's newest line while it
- * works, the tick's reason while it sleeps, "Held" or "Not running" while the
- * runner is held or off.
+ * They sit in a strip, one pill each. A pill shows its own Dash, with its own
+ * visor shape and colour, so the eye can follow one from glance to glance, and
+ * says what the slot is doing: the workspace and feature with its meter while
+ * it works, the tick's reason while it sleeps, "Held" or "Not running" while
+ * the runner is held or off. While a slot works, its Dash takes the shape of
+ * the run's newest line: reading, searching, testing, writing or thinking,
+ * asking while a question waits on you, with a wince for an error and a hop
+ * for a step finished (lib/core/run-pose.ts).
  *
  * Pressing a pill opens the slot below the strip: the whole of what its run
  * has written, live, with any question it is waiting on to answer there.
@@ -30,23 +39,49 @@ import { answerPlanRunAction } from './run-actions';
  * Which session takes which slot is `runnerSlots`' call; this only draws it.
  */
 
-/** Decision #1701: the hats, in slot order. */
-const LOOKS: Record<SlotId, DashLook> = {
-  'feature-1': 'top-hat',
-  'feature-2': 'ball-cap',
-  'feature-3': 'cowboy-hat',
-  // The fourth feature sits in the goals seat, so it wears the goals hat.
-  'feature-4': 'newsboy-cap',
-  goals: 'newsboy-cap',
+/** Each slot's Dash: its own visor shape and colour, in slot order. */
+const RUNNERS: Record<SlotId, DashRunner> = {
+  'feature-1': 'feature-1',
+  'feature-2': 'feature-2',
+  'feature-3': 'feature-3',
+  // The fourth feature sits in the goals seat, so it takes the goals Dash.
+  'feature-4': 'goals',
+  goals: 'goals',
 };
 
-/** What the slot's pill says under its heading. */
-function pillLine(slot: RunnerSlot, held: boolean, newest: RunActivity | null): string {
+/**
+ * The pill's second line, in a word or two. The full reason, and the run's
+ * lines, are in the panel the pill opens: four quarter-width pills cut any
+ * sentence off, so a pill says only what fits.
+ */
+function pillStatus(slot: RunnerSlot, held: boolean, progress: FeatureProgress | null): string {
   if (slot.state === 'working') {
-    return newest ? `${RUN_ACTIVITY_LABEL[newest.kind]}: ${newest.body}` : '';
+    return [slot.work.elapsed, progress ? `${progress.done} of ${progress.total} steps` : null]
+      .filter(Boolean)
+      .join(' · ');
   }
-  if (slot.state === 'asleep') return slot.line;
+  if (slot.state === 'asleep') return slot.line === SLOT_NOTHING_READY ? 'Nothing ready' : 'Free';
   return held ? 'Held' : 'Not running';
+}
+
+/** The pill's first line: the workspace and the feature's number, or the seat's name. */
+function PillName({ slot }: { slot: RunnerSlot }) {
+  if (slot.state !== 'working') return <>{slot.slot === 'goals' ? 'Goals' : slot.label}</>;
+  const { work } = slot;
+  const name = slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App');
+  const title = work.title ?? 'A run with no step recorded';
+  return (
+    <>
+      <span className="sr-only">Working on </span>
+      {name}{' '}
+      {/* The title is long and the pill is a quarter of the card, so it
+          waits in a tip on the number, and in the panel the pill opens. */}
+      <Tooltip label={title}>
+        <span className="tabular font-medium">{work.ref ?? title}</span>
+      </Tooltip>
+      <span className="sr-only">, {title}</span>
+    </>
+  );
 }
 
 function Pill({
@@ -67,43 +102,37 @@ function Pill({
   onPress: () => void;
 }) {
   const working = slot.state === 'working';
-  const line = pillLine(slot, held, newest);
-  const meta = working
-    ? [slot.slot === 'goals' ? null : slot.work.module, slot.work.doing, slot.work.elapsed]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
+  // While it works, the Dash takes the shape of its newest line (lib/core/run-pose.ts).
+  const { pose, moment } = useRunPose(working ? newest : null);
   return (
     <button
       type="button"
       aria-expanded={open}
       aria-controls={panel}
       onClick={onPress}
-      className={`flex min-h-11 w-full min-w-0 items-start gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors ${
+      className={`flex w-full min-w-0 items-center gap-3 rounded-control border px-3 py-2.5 text-left transition-colors ${
         open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
       }`}
     >
       <DashMark
-        state={slot.state}
-        look={LOOKS[slot.slot]}
-        tone={working ? 'brand' : 'current'}
+        state={working ? pose.state : slot.state}
+        activity={working ? pose.activity : undefined}
+        moment={working ? (moment ?? undefined) : undefined}
+        runner={RUNNERS[slot.slot]}
         size="md"
         decorative
-        className={working ? undefined : 'text-ink-muted'}
       />
+      {/* Every pill has the same three rows, a meter track included, so the
+          four stand the same height whatever their slots are doing. */}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <SectionLabel as="span" className="block truncate">
-          {slot.label}
-        </SectionLabel>
-        {working && (
-          <span className="block truncate text-ui text-ink">
-            <span className="sr-only">Working on </span>
-            {slot.work.ref && <span className="tabular font-medium">{slot.work.ref} </span>}
-            {slot.work.title ?? 'a run with no step recorded'}
-          </span>
-        )}
-        {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
-        {progress && (
+        <span className={`block truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
+          <span className="sr-only">{slot.label}: </span>
+          <PillName slot={slot} />
+        </span>
+        <span className="block truncate text-small text-ink-muted tabular">
+          {pillStatus(slot, held, progress)}
+        </span>
+        {progress ? (
           <Meter
             value={progress.done}
             max={progress.total}
@@ -111,18 +140,8 @@ function Pill({
             minFraction={0.04}
             moves
           />
-        )}
-        {line && (
-          <span
-            // Keyed by the line, so a new one replaces the old rather than
-            // the text changing under the reader.
-            key={newest?.id}
-            className={`block truncate text-small ${
-              newest?.kind === 'error' ? 'text-danger' : working ? 'text-ink' : 'text-ink-muted'
-            }`}
-          >
-            {line}
-          </span>
+        ) : (
+          <span aria-hidden className="block h-1.5 rounded-full bg-canvas" />
         )}
       </span>
     </button>

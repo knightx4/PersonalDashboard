@@ -27,7 +27,7 @@ import {
 } from '@/lib/plan/overnight';
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import { remainingUntil } from '@/lib/plan/elapsed';
-import { endsRun } from '@/lib/plan/run-end';
+import { endsRun, holdsSlot, IN_FLIGHT_LOOKBACK_MS } from '@/lib/plan/run-end';
 import {
   featureSteps,
   isStalled,
@@ -1139,17 +1139,6 @@ export async function fileStalls(input: {
   return verdict;
 }
 
-/**
- * How far back a feature run marked started is still read as possibly going.
- *
- * `sweepQuietRuns` writes runs back on every tick, but only on the clock and on
- * what their jobs left behind, so a run can still say `started` for up to two
- * hours after its session went. Each one read costs a few
- * queries, and `runLiveness` calls a run ended after two hours without a push,
- * so a run older than this is not worth the reads.
- */
-const IN_FLIGHT_LOOKBACK_MS = 6 * 60 * 60 * 1000;
-
 type FeatureRunRow = { plan_item_id: string | null; status: string; created_at: string };
 
 /**
@@ -1202,7 +1191,7 @@ export async function featureRunsInFlight(input: {
     }
   }
 
-  const started = rows.filter((row) => row.status !== 'finished' && row.status !== 'failed');
+  const started = rows.filter((row) => holdsSlot(row.status));
   if (started.length === 0) return out;
 
   // One listing of pushes for all of them, from the oldest start: the listing

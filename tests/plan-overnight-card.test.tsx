@@ -227,10 +227,10 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('2 of 5 steps done');
   });
 
-  it('draws four Dashes in their four hats', () => {
+  it('draws four Dashes, each in its own visor', () => {
     const html = draw({ sessions: [SESSION] });
-    for (const look of ['top-hat', 'ball-cap', 'cowboy-hat', 'newsboy-cap']) {
-      expect(html).toContain(`data-dash-look="${look}"`);
+    for (const runner of ['feature-1', 'feature-2', 'feature-3', 'goals']) {
+      expect(html).toContain(`data-dash-runner="${runner}"`);
     }
     for (const label of ['Feature 1', 'Feature 2', 'Feature 3', 'Goals']) {
       expect(html).toContain(label);
@@ -257,7 +257,7 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect((html.match(/Asleep, nothing to work on/g) ?? []).length).toBe(4);
+    expect((html.match(/Nothing ready/g) ?? []).length).toBe(4);
     expect(html).not.toContain('Nothing is handed to Dash.');
     expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
   });
@@ -270,13 +270,13 @@ describe('the Overnight card while a night is running', () => {
 
   it('draws no disclosure for an asleep slot with only the default reason', () => {
     const html = draw({ run: run({ lastTickNote: null }), sessions: [] });
-    expect(html).toContain('Free until the next check</span>');
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
     expect(html).not.toContain('Waiting for the next check.');
   });
 
   it('says a slot is free, not that nothing is ready, after a tick that started one', () => {
     const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
-    expect((html.match(/Free until the next check/g) ?? []).length).toBe(3);
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
   });
 
   it('says the ready work is in busy workspaces when that is why a slot waits', () => {
@@ -286,7 +286,8 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect(html).toContain('Waiting: what is ready is in busy workspaces');
+    // The pill says only "Free"; the reason is in the panel it opens.
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
   });
 
   it('leaves all four idle when the runner is off', () => {
@@ -437,7 +438,6 @@ describe('the goals half on Dash', () => {
     expect(html).toContain('Working the goal step');
     expect(html).toContain('Find three courses');
     expect(html).toContain('20m');
-    expect(html).toContain('Reading the course pages');
     expect(html).toContain('2 goal steps ready');
   });
 

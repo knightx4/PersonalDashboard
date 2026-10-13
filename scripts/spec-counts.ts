@@ -367,6 +367,21 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     measure: routesWithoutSurface,
   },
   {
+    // docs/ONE-INTERFACE-SPEC.md, R9 (plan #1927.1): every layout and page
+    // gets its shell from shellFor in lib/shell/shell-for.tsx, the one file
+    // left. The gallery draws the shell from fixtures and is not counted.
+    name: 'shell-mounts',
+    counts: 'files outside the gallery that render <AppShell',
+    target: 1,
+    measure: (root) =>
+      filesMatching(root, {
+        dirs: ['app', 'components', 'lib'],
+        exts: ['.tsx'],
+        pattern: /<AppShell\b/,
+        exclude: /^app\/preview\/|\.test\.tsx$/,
+      }),
+  },
+  {
     // Plan #1895: the actions a page lets the person do that an agent should
     // be able to do and has no Dash tool for. Read from the catalogue the
     // modules declare (lib/agent-actions), which its own test holds to the

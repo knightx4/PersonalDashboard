@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
-import { ThemePicker } from '@/components/shell/theme-picker';
+import { ThemeRepair } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
@@ -868,7 +868,6 @@ export function AppShell({
                   anything in the app, answered with links to what it used. */}
                   <AskDashButton />
                   <CaptureButton />
-                  <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
                   <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
 
@@ -948,6 +947,8 @@ export function AppShell({
             open={switcher}
             onClose={() => setSwitcher(false)}
           />
+
+          <ThemeRepair value={theme} />
 
           <CommandPalette
             account={account}

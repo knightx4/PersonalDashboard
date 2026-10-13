@@ -1048,6 +1048,7 @@ export function AccountSurface({
           timezone: 'America/New_York',
           displayCurrency: 'USD',
           enabledModules: ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'],
+          theme: { kind: 'generated', mode: 'light', hue: 330, way: 'ember' },
         }}
         isOwner
         vapidPublicKey={null}
@@ -1123,7 +1124,7 @@ export function DevRunnerCrewSurface() {
             step: {
               number: 1700,
               ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own hat',
+              title: 'Show the four Dashes on the runner card, each in its own visor',
             },
             module: 'Dev',
             doing: null,
