@@ -190,7 +190,7 @@ export function Timeline({
                 {entry.body && (
                   <p
                     className={cn(
-                      'mt-1.5 whitespace-pre-line rounded-md px-3 py-2 text-small text-ink-muted',
+                      'mt-1.5 whitespace-pre-line rounded-control px-3 py-2 text-small text-ink-muted',
                       entry.voice === 'you'
                         ? 'border border-border bg-raised'
                         : entry.voice === 'dash'

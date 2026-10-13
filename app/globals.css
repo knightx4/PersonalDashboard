@@ -2880,6 +2880,10 @@ button[aria-busy='true'] {
     animation: none;
   }
 
+  .timeline-in {
+    animation: none;
+  }
+
   .puff {
     display: none;
     animation: none;
