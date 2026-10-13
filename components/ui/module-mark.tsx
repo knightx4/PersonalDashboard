@@ -143,7 +143,7 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim';
+export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim' | 'lens' | 'lens-crisp';
 
 /**
  * How each finish lights the pane. `top` and `bottom` are how much of the
@@ -169,7 +169,110 @@ const FINISHES: Record<
   soft: { top: 88, bottom: 42, sheen: 0.45, halo: 0, core: 0.5, highlight: 0.2, back: 0.42, rim: 0, shadow: true },
   // An even pane with the light caught round its inside edge, like thick glass.
   rim: { top: 72, bottom: 38, sheen: 0.32, halo: 0, core: 0, highlight: 0.14, back: 0.4, rim: 0.75, shadow: true },
+  // The lens finishes are drawn by LensObject; these values are unused.
+  lens: { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
+  'lens-crisp': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
 };
+
+/**
+ * Built the way Dash's capsule is: the colour is a core sitting inside the
+ * pane, with a band of glass between it and the edge and a bright rim round
+ * the outside. `lens` blurs the core so it glows into the band, as the
+ * capsule's does; `lens-crisp` keeps its edge sharp.
+ */
+function LensObject({
+  id,
+  drawing,
+  from,
+  to,
+  px,
+  crisp,
+}: {
+  id: string;
+  drawing: Drawing;
+  from: string;
+  to: string;
+  px: number;
+  crisp: boolean;
+}) {
+  const { back, front, frontTransform, lines, dots, onBack } = drawing;
+  const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
+  const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
+  // The core, drawn smaller than the pane so a band of glass shows round it.
+  const inset = 'translate(12 12.4) scale(.74) translate(-12 -12.4)';
+  const detail = (colour: string) => (
+    <>
+      <g fill="none" stroke={colour} strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
+        {lines}
+      </g>
+      {dots && <g fill={colour}>{dots}</g>}
+    </>
+  );
+
+  return (
+    <>
+      <defs>
+        <linearGradient id={`${id}-back`} gradientUnits="userSpaceOnUse" x1={4} y1={2} x2={20} y2={22}>
+          <stop offset="0" stopColor={to} />
+          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} 70%, #000)` }} />
+        </linearGradient>
+        <linearGradient id={`${id}-core`} gradientUnits="userSpaceOnUse" x1={4} y1={4} x2={20} y2={20}>
+          <stop offset="0" stopColor={from} />
+          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${from} 45%, ${to})` }} />
+        </linearGradient>
+        <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={1.25} />
+        </filter>
+        <filter id={`${id}-glow`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={crisp ? 0.35 : 1.1} />
+        </filter>
+        <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={0.45} />
+        </filter>
+        <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
+        <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <GlassEdgeStops />
+        </linearGradient>
+        <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" stopColor="#fff" stopOpacity={0.34} />
+          <stop offset="0.55" stopColor="#fff" stopOpacity={0.06} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.14} />
+        </linearGradient>
+      </defs>
+
+      <g opacity={0.35} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill={to}>
+        {back}
+        {pane({})}
+      </g>
+      <g fill={`url(#${id}-back)`}>{back}</g>
+      {onBack && (
+        <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
+          {onBack}
+        </g>
+      )}
+      {/* The glass itself: smoked dark on dark grounds, tinted on light ones, so the band reads on both. */}
+      {pane({ style: { fill: `light-dark(color-mix(in srgb, ${from} 30%, #fff), color-mix(in srgb, ${to} 35%, #0b0c12))` } })}
+      <g clipPath={`url(#${id}-clip)`}>
+        <g fill={to} filter={`url(#${id}-blur)`} opacity={0.45} transform="translate(-.5 .7)">
+          {back}
+        </g>
+        {/* The core, glowing into the band round it. */}
+        <g filter={`url(#${id}-glow)`}>
+          <g transform={inset}>{pane({ fill: `url(#${id}-core)` })}</g>
+          {!crisp && <g transform={inset}>{pane({ fill: `url(#${id}-core)`, opacity: 0.6 })}</g>}
+        </g>
+      </g>
+      {pane({ fill: `url(#${id}-sheen)` })}
+      {pane({ strokeWidth: 0.6, style: { stroke: `color-mix(in srgb, ${to} 60%, transparent)` } })}
+      {/* The bright glass rim, the capsule's most distinct feature. */}
+      {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 1.15 })}
+      <g opacity={0.45} filter={`url(#${id}-soft)`} transform="translate(0 .5)">
+        {detail(`color-mix(in srgb, ${to} 75%, #000)`)}
+      </g>
+      {detail('#fff')}
+    </>
+  );
+}
 
 function GlassObject({
   id,
@@ -337,7 +440,18 @@ export function ModuleMark({
         {key.shape === 'dash' ? (
           <HomePlate id={id} />
         ) : (
-          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} finish={finish} />
+          finish === 'lens' || finish === 'lens-crisp' ? (
+            <LensObject
+              id={id}
+              drawing={DRAWINGS[key.shape]}
+              from={key.from}
+              to={key.to}
+              px={sizing.px}
+              crisp={finish === 'lens-crisp'}
+            />
+          ) : (
+            <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} finish={finish} />
+          )
         )}
       </svg>
     </span>
