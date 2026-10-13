@@ -102,6 +102,34 @@ describe('runnerCard', () => {
     expect(card.on).toEqual([]);
   });
 
+  it('keeps a quiet run on its Dash while the tick still counts it', () => {
+    // Gone quiet at 23:20 and marked stale, its claim still standing: the tick
+    // holds its slot and its workspace, so the card shows it working.
+    const card = read({
+      fires: [
+        {
+          planItemId: 'busy',
+          at: '2026-09-17T23:05:00.000Z',
+          id: '11111111-1111-4111-8111-111111111111',
+          writtenBackAt: null,
+        },
+      ],
+      started: [{ planItemId: 'busy', at: '2026-09-17T23:05:00.000Z', status: 'stale' }],
+      now: Date.parse('2026-09-18T01:30:00.000Z'),
+    });
+    expect(card.on.map((line) => line.ref)).toEqual([`#${busy.number}`]);
+    expect(card.sessions).toHaveLength(1);
+    expect(card.sessions[0].endedAt).toBeNull();
+  });
+
+  it('drops a quiet run once it is older than the tick looks back', () => {
+    const card = read({
+      started: [{ planItemId: 'busy', at: '2026-09-17T23:05:00.000Z', status: 'stale' }],
+      now: Date.parse('2026-09-18T05:30:00.000Z'),
+    });
+    expect(card.on).toEqual([]);
+  });
+
   it('names what would be fired next, leaving out what a session is already on', () => {
     const card = read();
     expect(card.next.map((feature) => feature.title)).toEqual(['Waiting feature']);
