@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
 import type { RoleStage } from '@/lib/dash/bulk-roles';
+import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -42,6 +43,8 @@ export const DASH_CHANGE_KINDS = [
   'move_roles',
   'set_goal_done_when',
   'add_quick_note',
+  // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
+  ...LEARN_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -93,6 +96,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  its title, its path and the text as given. Undo takes the
  *                  file back out of the notes repository, by the blob SHA
  *                  kept in `undo.vault_blob_sha`, as capture's Undo does.
+ * Learn's six     a reading changed, a reading list started, a reading added
+ *                  to one, an idea reworded, a note on an idea and a video
+ *                  marked or moved (plan #1894.8): the sentence and link the
+ *                  tool wrote, in one shape (lib/ask/learn-changes.ts).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -140,7 +147,7 @@ export type DashChangeInput = {
   };
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
   add_quick_note: { noteId: string; title: string; path: string; body: string };
-};
+} & Record<LearnChangeKind, LearnChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];
