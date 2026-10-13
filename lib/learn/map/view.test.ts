@@ -83,19 +83,21 @@ describe('marks', () => {
     expect(markOf('unknown')).toBe('unseen');
   });
 
-  it('gives the three colours to the domains with most ideas, and none to an empty one', () => {
+  it('gives every domain its own colour, the same whatever its idea count', () => {
     const slots = domainSlots([
-      { id: 'a', name: 'Arts', ideaCount: 4 },
+      { id: 'a', name: 'Arts and culture', ideaCount: 4 },
       { id: 'h', name: 'History', ideaCount: 39 },
       { id: 's', name: 'Social sciences', ideaCount: 273 },
-      { id: 't', name: 'Technology', ideaCount: 4 },
-      { id: 'm', name: 'Maths', ideaCount: 0 },
+      { id: 'm', name: 'Mathematics and logic', ideaCount: 0 },
     ]);
     expect([...slots]).toEqual([
-      ['s', 0],
-      ['h', 1],
-      ['a', 2],
+      ['a', 9],
+      ['h', 6],
+      ['s', 5],
+      ['m', 0],
     ]);
+    const later = domainSlots([{ id: 's', name: 'Social sciences', ideaCount: 1 }]);
+    expect(later.get('s')).toBe(5);
   });
 
   it('writes a similarity to two places', () => {
