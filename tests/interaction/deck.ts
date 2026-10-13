@@ -39,6 +39,8 @@ import { PHONE, type Page } from './browser';
 export const PRESS_MS = 100;
 /** How long Next has to show the next item with the network held. */
 export const NEXT_WAIT_MS = 1000;
+/** How long a picture still loading in the next item has to reach the held network. */
+const PICTURE_WAIT_MS = 1000;
 /** How long the pointer rests on a control before it is pressed, so its hover state settles. */
 const HOVER_MS = 250;
 /** How long the button stays down. */
@@ -182,6 +184,17 @@ const HELPERS = String.raw`(function () {
         return img.currentSrc || img.src;
       });
     },
+    itemImagesLoading: function (selector) {
+      var item = document.querySelector(selector);
+      if (!item) return [];
+      return Array.prototype.filter
+        .call(item.querySelectorAll('img'), function (img) {
+          return !img.complete;
+        })
+        .map(function (img) {
+          return img.currentSrc || img.src;
+        });
+    },
   };
   return true;
 })()`;
@@ -262,6 +275,14 @@ export async function checkNext(page: Page, url: string, deck: Deck): Promise<st
       const pictures = new Set(
         await page.evaluate<string[]>(`window.__deck.itemImages(${JSON.stringify(deck.item)})`),
       );
+      // A picture still loading has been asked for or is about to be, and on
+      // a busy machine its request can reach the hold after the words have
+      // changed. Give each one a moment to arrive before reading what was held.
+      const loading = await page.evaluate<string[]>(`window.__deck.itemImagesLoading(${JSON.stringify(deck.item)})`);
+      for (const started = Date.now(); Date.now() - started < PICTURE_WAIT_MS; ) {
+        if (loading.every((u) => network.held.some((r) => r.url === u))) break;
+        await wait(50);
+      }
       const late = network.held.filter((r) => r.type === 'Image' && pictures.has(r.url));
       return [...new Set(late.map((r) => r.url))].map(
         (u) => `the next item's picture ${short(u)} is fetched only once Next is pressed`,
