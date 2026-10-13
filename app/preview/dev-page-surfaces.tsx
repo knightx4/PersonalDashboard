@@ -48,6 +48,7 @@ import type { WaitingGroup, WaitingRow } from '@/lib/plan/waiting';
 import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
+import type { AgentActionSummary } from '@/lib/agent-actions/summary';
 
 /**
  * The Dev pages and the account page in the surface gallery (plan #1600),
@@ -371,6 +372,81 @@ export function DevUiReviewSurface() {
 
 // ---- Specs ----------------------------------------------------------------
 
+type AgentActionFixtureRow = AgentActionSummary['groups'][number]['rows'][number];
+
+/** One catalogue row, for the fixture below. */
+function actionRow(name: string, file: string, rest: Partial<AgentActionFixtureRow>): AgentActionFixtureRow {
+  return { name, file, kind: 'gap', tools: [], reason: null, note: null, ...rest };
+}
+
+/**
+ * The catalogue of actions as the specs page draws it, at the size the real
+ * one has: a row with a long name, one with three tools, one with a note.
+ */
+const agentActions: AgentActionSummary = {
+  total: 622,
+  tool: 27,
+  none: 360,
+  gap: 235,
+  reasons: [
+    {
+      reason: 'theirs',
+      label: 'Their word',
+      count: 98,
+      sentence:
+        "The person's word to Dash: an answer, an approval, a verdict on a suggestion, a comment in a thread, or taking back what Dash did.",
+    },
+    {
+      reason: 'spends',
+      label: 'Spends',
+      count: 85,
+      sentence: 'Starts a model run or a Dash routine on the account, which spends money the person chooses to spend.',
+    },
+    {
+      reason: 'page',
+      label: 'Page only',
+      count: 41,
+      sentence: 'Serves the page itself, such as a poll, a count, a search for a picker or a preview before saving.',
+    },
+    { reason: 'deletes', label: 'Deletes', count: 32, sentence: 'Deletes, and Dash never deletes.' },
+  ],
+  groups: [
+    {
+      workspace: 'todo',
+      label: 'Todo',
+      tool: 2,
+      none: 1,
+      gap: 1,
+      rows: [
+        actionRow('addTask', 'app/todo/actions.ts', { kind: 'tool', tools: [{ name: 'add_todo', where: 'ask' }] }),
+        actionRow('editTask', 'app/todo/actions.ts', {
+          note: 'change_todo renames and moves; it does not change the notes.',
+        }),
+        actionRow('removeTask', 'app/todo/actions.ts', { kind: 'none', reason: 'deletes' }),
+        actionRow('completeTask', 'app/todo/actions.ts', { kind: 'tool', tools: [{ name: 'close_todo', where: 'ask' }] }),
+      ],
+    },
+    {
+      workspace: 'goals',
+      label: 'Goals',
+      tool: 1,
+      none: 0,
+      gap: 1,
+      rows: [
+        actionRow('fileGoalCapture', 'app/goals/capture-actions.ts', {
+          kind: 'tool',
+          tools: [
+            { name: 'file_close', where: 'capture' },
+            { name: 'file_progress', where: 'capture' },
+            { name: 'file_reading', where: 'capture' },
+          ],
+        }),
+        actionRow('removeGoalStepDependency', 'app/goals/[goalId]/block-actions.ts', {}),
+      ],
+    },
+  ],
+};
+
 export function DevSpecsSurface() {
   return (
     <SpecsView
@@ -390,6 +466,7 @@ export function DevSpecsSurface() {
       edits={{}}
       changes={[]}
       audit={{ auditAt: null, findings: [] }}
+      agentActions={agentActions}
     />
   );
 }
@@ -455,6 +532,7 @@ function SpecsWithInterview({
       audit={{ auditAt: null, findings: [] }}
       interviews={{ jobs: view }}
       openInterviews
+      agentActions={agentActions}
     />
   );
 }
