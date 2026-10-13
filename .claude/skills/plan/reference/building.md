@@ -156,8 +156,8 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    **Building a screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
-   sent you runs both when it merges your step to main, which is as soon as you
-   report the commit; CI runs them again on main. Running them here first would only run
+   sent you runs both before the feature goes to main, and CI runs them again
+   on main. Running them here first would only run
    them twice. The exception is a step whose done-when is about the build or
    about a test that the narrow run cannot reach: run what the done-when needs
    and say so in your report.
@@ -165,8 +165,8 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    the step's outline: `Add the anonymous share page (plan #1073.4)`. A step that changed a
    screen has each critic round recorded in `public.ui_checks` before it
    commits (see **Building a screen**). **Do not push and do
-   not merge.** The session that sent you puts your commit on main and closes
-   your step from there, so stop at the commit and say in your report that you
+   not merge.** The session that sent you merges your commit into the
+   feature's branch and puts the feature on main, so stop at the commit and say in your report that you
    made it. If nobody sent you and this step is the whole job, the merge is
    yours: the procedure is step 4 of the Building section in `SKILL.md`, and
    the merge comes before the close.
@@ -194,7 +194,7 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    disagree with, and never an approve.
 9. **Hand the close over.** `done` refuses a commit that is not on main, and
    yours is on a branch nobody has merged yet, so the session that sent you
-   closes the step once it has merged. Write the note it should close with —
+   marks the step built and closes it when the feature lands on main. Write the note it should close with —
    what changed, in one sentence — and put it in your report. If nobody sent
    you, merge first and then close it yourself: `done <n> --note "…"`, which
    records the commit from HEAD and names any steps that became ready. Then

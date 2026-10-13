@@ -47,6 +47,13 @@
  *                                # main, and refused if GitHub cannot be asked;
  *                                # refused while a screen it changed has no
  *                                # passing design check (plan #1534)
+ *   npx tsx scripts/plan.ts built <n> --note "what it built" [--commit <sha>]
+ *                                # a step merged into its feature's branch: it
+ *                                # stays in progress, carrying the commit, until
+ *                                # the feature lands on main
+ *   npx tsx scripts/plan.ts land <feature>   # after the feature's branch is on
+ *                                # main: closes every step marked built under it,
+ *                                # with the same checks done makes
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
  *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
  *                                [--on-steps]   # waiting on the steps it names,
@@ -281,6 +288,62 @@ function currentCommit(): string | null {
   } catch {
     return null;
   }
+}
+
+function currentBranch(): string | null {
+  try {
+    const name = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+    return name && name !== 'HEAD' ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The dated line `built` writes, which `land` looks for as the step's last. */
+const BUILT_LINE = /^Built \d{4}-\d{2}-\d{2}\b/;
+
+/**
+ * Why a step may not close as done against this commit, or null when it may.
+ *
+ * The commit a closed step carries is the record of where the work went,
+ * and everything downstream trusts it: the page draws it, the CI mark
+ * reads its checks, and a person reading back through the plan takes it
+ * for shipped. A close against a commit that only ever existed on a
+ * branch makes all of that false, so it is refused here rather than
+ * noticed later. An answer GitHub would not give is refused too --
+ * `closeRefusal` says why -- because a check that passes when it could
+ * not ask is the check that let this through.
+ *
+ * A step that changed a screen closes only once each surface it touched
+ * has passed the design critic (plan #1534). Git that cannot read the
+ * step's files refuses too: a guard that cannot look does not wave the
+ * close through. Shared by `done` and `land`.
+ */
+async function doneRefusal(
+  sql: Sql,
+  userId: string,
+  number: number,
+  commit: string,
+): Promise<string | null> {
+  const landing = await commitOnMain({ sha: commit });
+  const refusal = closeRefusal({ sha: commit, landing, branches: branchesContaining(commit) });
+  if (refusal) return refusal;
+
+  let inputs: { files: string[]; surfaces: string[] };
+  try {
+    inputs = stepScreenInputs(number, commit, outlines.get(number));
+  } catch (error) {
+    return (
+      `Could not read what ${ref(number)} changed at ${commit} to check its screens ` +
+      `(${error instanceof Error ? error.message : String(error)}). Run git fetch origin and try again.`
+    );
+  }
+  const checks = inputs.surfaces.length
+    ? await sql<CheckRound[]>`
+        select surface, round, verdict from ui_checks
+        where user_id = ${userId} and step = ${number}`
+    : [];
+  return uiCheckRefusal({ step: number, ...inputs, checks });
 }
 
 /**
@@ -1496,6 +1559,92 @@ async function main(): Promise<void> {
       return;
     }
 
+    /**
+     * A step built inside a feature batch, merged into the feature's branch
+     * rather than main (the plan skill, "A feature, or more than one step").
+     *
+     * It cannot close yet: `done` refuses a commit that is not on main, and
+     * that guard stays. So the step stays in progress and carries its commit
+     * and a dated Built line saying which branch holds it. The branch is
+     * pushed after every step, so the work outlives the session, and `land`
+     * closes every built step once the feature's one merge reaches main.
+     */
+    if (command === 'built') {
+      const note = arg('--note')?.trim();
+      if (!note) fail(`built ${typed(item.number)} --note "what it built" [--commit <sha>]`);
+      if (item.kind === 'decision' || item.kind === 'setup') {
+        fail(`${ref(item.number)} is a ${item.kind === 'decision' ? 'decision' : 'setup job'}, not work a branch can hold.`);
+      }
+      if (item.status !== 'in_progress' && item.status !== 'not_started') {
+        fail(`${ref(item.number)} is ${STATUS_WORD[item.status]}. Only a step being built can be marked built.`);
+      }
+      const commit = arg('--commit') ?? currentCommit();
+      if (!commit) fail('No commit to record: pass --commit <sha>.');
+      const branch = arg('--branch') ?? currentBranch();
+      if (!branch || branch === 'main') {
+        fail('built is for a step on its feature branch. A step on main closes with done.');
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      const line = `Built ${stamp} on ${branch} (${commit}): ${note}`;
+      await sql`
+        update plan_items
+        set status = 'in_progress', commit_sha = ${commit},
+            comment = ${item.comment ? `${item.comment}\n\n${line}` : line}
+        where id = ${item.id} and user_id = ${userId}`;
+      console.log(`${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`);
+      await checkRowWriting(sql, userId, item, { note });
+      return;
+    }
+
+    /**
+     * Close every step marked built under a feature, once the feature's
+     * branch is on main. Each close runs the same checks as `done`, against
+     * the commit `built` recorded, so a step whose commit did not land, or
+     * whose screen has no passing design check, stays open and is named.
+     */
+    if (command === 'land') {
+      const rows = await sql<Record<string, unknown>[]>`
+        with recursive tree as (
+          select id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id from plan_items p join tree on p.parent_id = tree.id
+        )
+        select id, number, comment, commit_sha from plan_items
+        where id in (select id from tree) and user_id = ${userId}
+          and status = 'in_progress' and commit_sha is not null
+        order by position, created_at`;
+      const built = rows.filter((row) => {
+        const paragraphs = String(row.comment ?? '').split(/\n\n/);
+        return BUILT_LINE.test(paragraphs[paragraphs.length - 1]?.trim() ?? '');
+      });
+      if (built.length === 0) fail(`Nothing under ${ref(item.number)} is marked built.`);
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const closed: number[] = [];
+      const refused: string[] = [];
+      for (const row of built) {
+        const number = row.number as number;
+        const commit = row.commit_sha as string;
+        const refusal = await doneRefusal(sql, userId, number, commit);
+        if (refusal) {
+          refused.push(`${ref(number)}: ${refusal}`);
+          continue;
+        }
+        const line = `Done ${stamp}: on main with ${ref(item.number)}.`;
+        await sql`
+          update plan_items
+          set status = 'done', comment = coalesce(comment || E'\n\n', '') || ${line}
+          where id = ${row.id as string} and user_id = ${userId}`;
+        closed.push(number);
+      }
+      if (closed.length > 0) console.log(`Closed ${closed.map((n) => ref(n)).join(', ')}.`);
+      if (refused.length > 0) {
+        console.error(readable(`Still open:\n${refused.join('\n')}`));
+        process.exit(1);
+      }
+      return;
+    }
+
     // Closing or parking a step always records why. A status with no reason
     // is how a plan becomes something nobody trusts.
     if (command === 'done' || command === 'block' || command === 'drop') {
@@ -1534,43 +1683,9 @@ async function main(): Promise<void> {
       const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
 
-      // The commit a closed step carries is the record of where the work went,
-      // and everything downstream trusts it: the page draws it, the CI mark
-      // reads its checks, and a person reading back through the plan takes it
-      // for shipped. A close against a commit that only ever existed on a
-      // branch makes all of that false, so it is refused here rather than
-      // noticed later. An answer GitHub would not give is refused too --
-      // `closeRefusal` says why -- because a check that passes when it could
-      // not ask is the check that let this through.
       if (command === 'done' && commit) {
-        const landing = await commitOnMain({ sha: commit });
-        const refusal = closeRefusal({
-          sha: commit,
-          landing,
-          branches: branchesContaining(commit),
-        });
+        const refusal = await doneRefusal(sql, userId, item.number, commit);
         if (refusal) fail(refusal);
-
-        // A step that changed a screen closes only once each surface it
-        // touched has passed the design critic (plan #1534). Git that cannot
-        // read the step's files refuses too: a guard that cannot look does
-        // not wave the close through.
-        let inputs: { files: string[]; surfaces: string[] };
-        try {
-          inputs = stepScreenInputs(item.number, commit, outlines.get(item.number));
-        } catch (error) {
-          fail(
-            `Could not read what ${ref(item.number)} changed at ${commit} to check its screens ` +
-              `(${error instanceof Error ? error.message : String(error)}). Run git fetch origin and try again.`,
-          );
-        }
-        const checks = inputs.surfaces.length
-          ? await sql<CheckRound[]>`
-              select surface, round, verdict from ui_checks
-              where user_id = ${userId} and step = ${item.number}`
-          : [];
-        const screenRefusal = uiCheckRefusal({ step: item.number, ...inputs, checks });
-        if (screenRefusal) fail(screenRefusal);
       }
 
       const stamp = new Date().toISOString().slice(0, 10);

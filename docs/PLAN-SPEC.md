@@ -521,10 +521,11 @@ says what this firing is for, and wins:
 
 - ***Send to Claude*** on a step — build that one step, then stop.
 - ***Send all n beneath*** on a feature — one session works every open step
-  under it in plan order, each verified, committed and closed before the next
-  is claimed. It stops at the first step that needs a decision, blocking it
-  with the question rather than skipping to a later one. Push and merge happen
-  once, at the end. The press writes no row: it starts the session and nothing
+  under it in plan order, each verified, committed and marked built on the
+  feature's branch before the next is claimed. It stops at the first step that
+  needs a decision, blocking it with the question rather than skipping to a
+  later one. The merge to main happens once, at the end, and the steps close
+  then. The press writes no row: it starts the session and nothing
   else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
 - ***Suggest posts*** on the Posts tab — draft X posts into `social_posts`
@@ -977,6 +978,16 @@ halfway: a session that builds nine steps itself carries everything it read for
 the first through every turn of the last, and runs out of room around the
 third. The subagents also skip the full test suite and `next build` — the
 orchestrator runs both once before it pushes, and CI runs them again on main.
+
+The steps of one feature reach main together. Each merges into a feature
+branch, `plan/<number>`, which is pushed after every step, and is marked built
+with `plan.ts built`: it stays in progress with its commit and a dated Built
+line. Once the feature's steps are built, the orchestrator merges main into the
+branch, runs the gate once, merges the branch into main as one commit, and
+`plan.ts land <feature>` closes every built step with the same checks `done`
+makes. A step sent on its own still goes to main by itself. Merging a feature
+one step at a time left the live app half-changed between steps and ran the
+gate once a step.
 
 An approved step you did not keep is Claude's to pick up; a step named by the
 user is Claude's whoever holds it; anything else, ask. The plan must always tell the
