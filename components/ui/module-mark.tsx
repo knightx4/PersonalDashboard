@@ -143,7 +143,7 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim' | 'lens' | 'lens-crisp';
+export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim' | 'lens' | 'lens-crisp' | 'glint' | 'glint-tint';
 
 /**
  * How each finish lights the pane. `top` and `bottom` are how much of the
@@ -172,7 +172,131 @@ const FINISHES: Record<
   // The lens finishes are drawn by LensObject; these values are unused.
   lens: { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
   'lens-crisp': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
+  glint: { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
+  'glint-tint': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
 };
+
+/**
+ * Smoked glass with a hairline edge, and light catching the edge in a few
+ * bright glints that bloom softly. The module's colour is the light behind
+ * the glass (`glint`), or the glass itself (`glint-tint`).
+ */
+function GlintObject({
+  id,
+  drawing,
+  from,
+  to,
+  px,
+  tint,
+}: {
+  id: string;
+  drawing: Drawing;
+  from: string;
+  to: string;
+  px: number;
+  tint: boolean;
+}) {
+  const { back, front, frontTransform, lines, dots, onBack } = drawing;
+  const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
+  const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
+  const spark = `color-mix(in srgb, ${from} 35%, #fff)`;
+  const detail = (colour: string) => (
+    <>
+      <g fill="none" stroke={colour} strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
+        {lines}
+      </g>
+      {dots && <g fill={colour}>{dots}</g>}
+    </>
+  );
+  const glassTop = tint ? `color-mix(in srgb, ${to} 62%, #0d0f18)` : `color-mix(in srgb, ${to} 22%, #10121b)`;
+  const glassBottom = tint ? `color-mix(in srgb, ${to} 38%, #07080d)` : `color-mix(in srgb, ${to} 10%, #07080c)`;
+
+  return (
+    <>
+      <defs>
+        <linearGradient id={`${id}-glass`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" style={{ stopColor: glassTop }} />
+          <stop offset="1" style={{ stopColor: glassBottom }} />
+        </linearGradient>
+        <linearGradient id={`${id}-back`} gradientUnits="userSpaceOnUse" x1={4} y1={2} x2={20} y2={22}>
+          <stop offset="0" stopColor={from} />
+          <stop offset="1" stopColor={to} />
+        </linearGradient>
+        <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={1.4} />
+        </filter>
+        <filter id={`${id}-bloom`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={0.9} />
+        </filter>
+        <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={0.5} />
+        </filter>
+        <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
+        {/* Where the light catches the edge: the top, the lower right, and faintly the left. */}
+        <radialGradient id={`${id}-g1`} gradientUnits="userSpaceOnUse" cx={13} cy={3.5} r={6}>
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="1" stopColor="#fff" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={`${id}-g2`} gradientUnits="userSpaceOnUse" cx={20.5} cy={19.5} r={4.5}>
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="1" stopColor="#fff" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={`${id}-g3`} gradientUnits="userSpaceOnUse" cx={2.8} cy={12} r={3.5}>
+          <stop offset="0" stopColor="#fff" stopOpacity={0.6} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0} />
+        </radialGradient>
+        <mask id={`${id}-glints`} maskUnits="userSpaceOnUse" x={-4} y={-4} width={32} height={32}>
+          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g1)`} />
+          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g2)`} />
+          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g3)`} />
+        </mask>
+        <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" stopColor="#fff" stopOpacity={0.16} />
+          <stop offset="0.45" stopColor="#fff" stopOpacity={0.02} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+
+      {/* A soft shadow under the whole object. */}
+      <g opacity={0.4} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill="#000">
+        {pane({})}
+      </g>
+      {/* The colour behind the glass. */}
+      <g fill={`url(#${id}-back)`}>{back}</g>
+      {onBack && (
+        <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
+          {onBack}
+        </g>
+      )}
+      {pane({ fill: `url(#${id}-glass)`, opacity: 0.94 })}
+      <g clipPath={`url(#${id}-clip)`}>
+        {/* The colour seen through the smoked glass, softened. */}
+        <g fill={`url(#${id}-back)`} filter={`url(#${id}-blur)`} opacity={tint ? 0.55 : 0.8} transform="translate(-.5 .7)">
+          {back}
+        </g>
+        {!tint && (
+          <g filter={`url(#${id}-blur)`} opacity={0.35} transform="translate(12 16) scale(.6 .45) translate(-12 -16)">
+            {pane({ fill: from })}
+          </g>
+        )}
+      </g>
+      {pane({ fill: `url(#${id}-sheen)` })}
+      {/* The hairline edge. */}
+      {pane({ stroke: '#fff', strokeOpacity: 0.32, strokeWidth: 0.4 })}
+      {/* The glints, and their bloom. */}
+      <g mask={`url(#${id}-glints)`}>
+        <g filter={`url(#${id}-bloom)`} opacity={0.9}>
+          {pane({ strokeWidth: 1.8, style: { stroke: spark } })}
+        </g>
+        {pane({ stroke: '#fff', strokeWidth: 0.6 })}
+      </g>
+      <g opacity={0.5} filter={`url(#${id}-soft)`} transform="translate(0 .4)">
+        {detail('#000')}
+      </g>
+      {detail('#fff')}
+    </>
+  );
+}
 
 /**
  * Built the way Dash's capsule is: the colour is a core sitting inside the
@@ -440,7 +564,16 @@ export function ModuleMark({
         {key.shape === 'dash' ? (
           <HomePlate id={id} />
         ) : (
-          finish === 'lens' || finish === 'lens-crisp' ? (
+          finish === 'glint' || finish === 'glint-tint' ? (
+            <GlintObject
+              id={id}
+              drawing={DRAWINGS[key.shape]}
+              from={key.from}
+              to={key.to}
+              px={sizing.px}
+              tint={finish === 'glint-tint'}
+            />
+          ) : finish === 'lens' || finish === 'lens-crisp' ? (
             <LensObject
               id={id}
               drawing={DRAWINGS[key.shape]}
