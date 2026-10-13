@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import type { CaptureAction } from '@/lib/capture/actions';
 import { capturePartLabel, filedMessage, type FiledCapture } from '@/lib/capture/place';
 import {

@@ -24,8 +24,17 @@ const button = cva(
         primary: 'bg-accent text-fill-ink hover:bg-accent-hover',
         secondary:
           'bg-surface text-ink border border-control hover:bg-sunken',
-        ghost: 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+        // Quiet on hover: sunken ground, full ink. Accent on a hover claims
+        // the button is selected (law 4); it is kept for `pressed` and for
+        // the primary action.
+        ghost: 'text-ink-muted hover:bg-sunken hover:text-ink',
         danger: 'bg-surface text-danger border border-danger hover:bg-danger-tint',
+        // An underlined text action ("Not a match", "Regenerate"): no ground,
+        // no fixed height, a quiet underline that darkens on hover. The
+        // underline is what says "press me" on a phone, which has no hover.
+        link:
+          'rounded-none font-normal text-ink-muted underline decoration-border-strong underline-offset-2 ' +
+          'hover:text-ink hover:decoration-current',
       },
       /**
        * `md` reads the same variable the inputs and selects do, so a button
@@ -34,17 +43,33 @@ const button = cva(
        * a button inside a table row, and the one button a page is about.
        */
       size: {
+        // A button inside a row ("Keep", "Undo"), beside text it must not outweigh.
+        xs: 'h-6 px-1.5 text-small',
         sm: 'h-7 px-2.5 text-ui',
         md: 'h-(--control-h) px-3 text-ui',
         lg: 'h-9 px-4 text-body',
       },
+      /** A button that is a toggle, when it is on. */
+      pressed: {
+        true: 'border-accent bg-accent-tint text-accent hover:border-accent hover:bg-accent-tint hover:text-accent',
+        false: '',
+      },
     },
-    defaultVariants: { variant: 'primary', size: 'md' },
+    compoundVariants: [
+      // A link-shaped action takes the size of the text it sits in, at any size.
+      { variant: 'link', className: 'h-auto px-0 text-small' },
+    ],
+    defaultVariants: { variant: 'primary', size: 'md', pressed: false },
   },
 );
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof button> & {
+  Omit<VariantProps<typeof button>, 'pressed'> & {
+    /**
+     * The button is a toggle and this is its state. Sets aria-pressed and the
+     * accent-tint on look; leave it out for a button that is not a toggle.
+     */
+    pressed?: boolean;
     /**
      * The action is in flight. Disables the button and marks it busy, and
      * makes it a live region so the label it changes to -- "Saving…" -- is
@@ -54,10 +79,11 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
     pending?: boolean;
   };
 
-export function Button({ className, variant, size, pending, disabled, ...props }: ButtonProps) {
+export function Button({ className, variant, size, pressed, pending, disabled, ...props }: ButtonProps) {
   return (
     <button
-      className={cn(button({ variant, size }), className)}
+      className={cn(button({ variant, size, pressed: pressed ?? false }), className)}
+      aria-pressed={pressed}
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       aria-live={pending === undefined ? undefined : 'polite'}

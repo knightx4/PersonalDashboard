@@ -1733,6 +1733,9 @@ body,
   --radius-pane: 1rem;
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
+  /* Chips, toggle chips and dots: fully round, except where a theme squares
+   * everything (Poster), so a chip keeps the corners of the card it sits on. */
+  --radius-pill: 9999px;
 
   /* The easings (plan #1549), mirrored in lib/motion.ts. Soft ease-out for
    * everything that is not a spring; the spring for things arriving in their
@@ -3855,6 +3858,7 @@ form[data-auto-submit] [data-fallback-submit] {
   --radius-pane: 0;
   --radius-card: 0;
   --radius-control: 0;
+  --radius-pill: 0;
 }
 
 :is([data-theme='poster'], [data-theme='poster-dark']) .sheet {

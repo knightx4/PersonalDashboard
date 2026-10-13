@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { AddFile } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {

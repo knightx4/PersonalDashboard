@@ -2,6 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FoldDetails } from '@/components/ui/fold-details';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 /**
  * The container.
@@ -154,15 +155,7 @@ export function CardSection({
 
   return (
     <Card id={id} padding={padding} className={className} data-slot="section">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">
-          {title}
-          {meta !== undefined && meta !== null && (
-            <span className="tabular ml-2 text-small font-normal text-ink-muted">{meta}</span>
-          )}
-        </h2>
-        {action}
-      </div>
+      <SectionHeading title={title} count={meta} action={action} className="mb-2" />
       {hint && <p className="mb-2 text-small text-ink-muted">{hint}</p>}
       {children}
     </Card>
