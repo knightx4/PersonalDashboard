@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryImageFallback } from '@/components/inventory/inventory-row';
@@ -6,8 +6,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { SendToShare } from '@/components/share/send-to-share';
 import { loadShareOptions } from '@/lib/share/load-options';
 import { buttonVariants } from '@/components/ui/button';
-import { Card, CardSection, cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
+import { Card, CardSection } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
@@ -358,74 +360,59 @@ export default async function InventoryItemPage({
         )}
       </Card>
 
-      <dl className={cn(cardVariants({ padding: 'dense' }), 'grid gap-3 text-body sm:grid-cols-2')}>
-        <div>
-          <dt className="text-ink-muted">Landed cost</dt>
-          <dd className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Acquired</dt>
-          <dd className="text-ink">{item.acquired_at ?? '—'}</dd>
-        </div>
-        {item.source && (
-          <div>
-            <dt className="text-ink-muted">Source</dt>
-            <dd className="text-ink">{String(item.source).replace('_', ' ')}</dd>
-          </div>
-        )}
-        {returnDueCopy && (
-          <div className="sm:col-span-2">
-            <dt className="text-ink-muted">Return due</dt>
-            <dd
-              className={
-                daysLeft != null && daysLeft <= 7
-                  ? 'font-medium text-caution'
-                  : 'text-ink'
+      <Card padding="dense">
+        <ValueList>
+          <ValueRow label="Landed cost" value={formatMoney(item.cost_cents)} />
+          <ValueRow label="Acquired" value={item.acquired_at} />
+          {item.source && (
+            <ValueRow label="Source" value={String(item.source).replace('_', ' ')} />
+          )}
+          {returnDueCopy && (
+            <ValueRow
+              label="Return due"
+              value={
+                <>
+                  <span
+                    className={
+                      daysLeft != null && daysLeft <= 7 ? 'font-medium text-caution' : undefined
+                    }
+                  >
+                    {returnDueCopy}
+                  </span>
+                  {returnDeadline ? (
+                    <span className="ml-2 text-ink-muted">({returnDeadline})</span>
+                  ) : null}
+                  {item.return_planned ? (
+                    <Chip tone="accent" size="sm" className="ml-2 align-middle">
+                      To return
+                    </Chip>
+                  ) : null}
+                </>
               }
-            >
-              {returnDueCopy}
-              {returnDeadline ? (
-                <span className="ml-2 text-ink-muted">({returnDeadline})</span>
-              ) : null}
-              {item.return_planned ? (
-                <span className="ml-2 text-micro font-semibold uppercase tracking-wide text-accent">
-                  To return
-                </span>
-              ) : null}
-            </dd>
-          </div>
-        )}
-        {order && (
-          <div className="sm:col-span-2">
-            <dt className="text-ink-muted">From order</dt>
-            <dd>
-              <Link href={`/shopping/orders/${order.id}`} className="text-accent hover:underline">
-                {merchant?.name ?? 'Order'}
-                {order.external_order_number ? ` · #${order.external_order_number}` : ''}
-              </Link>
-            </dd>
-          </div>
-        )}
-        {item.disposed_at && (
-          <>
-            <div>
-              <dt className="text-ink-muted">Disposed</dt>
-              <dd className="text-ink">
-                {item.disposed_at}
-                {item.disposal_method ? ` · ${item.disposal_method}` : ''}
-              </dd>
-            </div>
-            {item.disposal_proceeds_cents != null && (
-              <div>
-                <dt className="text-ink-muted">Proceeds</dt>
-                <dd className="tabular text-ink">
-                  {formatMoney(item.disposal_proceeds_cents)}
-                </dd>
-              </div>
-            )}
-          </>
-        )}
-      </dl>
+            />
+          )}
+          {order && (
+            <ValueRow
+              label="From order"
+              value={
+                <Link href={`/shopping/orders/${order.id}`} className={linkVariants()}>
+                  {merchant?.name ?? 'Order'}
+                  {order.external_order_number ? ` · #${order.external_order_number}` : ''}
+                </Link>
+              }
+            />
+          )}
+          {item.disposed_at && (
+            <ValueRow
+              label="Disposed"
+              value={`${item.disposed_at}${item.disposal_method ? ` · ${item.disposal_method}` : ''}`}
+            />
+          )}
+          {item.disposed_at && item.disposal_proceeds_cents != null && (
+            <ValueRow label="Proceeds" value={formatMoney(item.disposal_proceeds_cents)} />
+          )}
+        </ValueList>
+      </Card>
 
       <ItemDetailsPanel
         itemId={item.id}
@@ -513,7 +500,7 @@ export default async function InventoryItemPage({
         >
           <p className="text-ui text-ink-muted">
             Puts it on the{' '}
-            <Link href="/shopping/sell" className="text-accent hover:underline">
+            <Link href="/shopping/sell" className={linkVariants()}>
               sell page
             </Link>
             , whether or not it is something the assistant can price.
@@ -528,7 +515,7 @@ export default async function InventoryItemPage({
         >
           <p className="text-ui text-ink-muted">
             Marks this unit on the{' '}
-            <Link href="/shopping/returns?view=marked" className="text-accent hover:underline">
+            <Link href="/shopping/returns?view=marked" className={linkVariants()}>
               returns tracker
             </Link>{' '}
             without recording a refund yet.
@@ -547,9 +534,11 @@ export default async function InventoryItemPage({
           {item.order_item_id ? (
             <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
           ) : (
-            <Card padding="dense" className="border-dashed text-body text-ink-muted">
-              This owned item is not linked to an order, so it cannot be marked returned.
-            </Card>
+            <EmptyState
+              size="box"
+              title="Not linked to an order"
+              description="This owned item is not linked to an order, so it cannot be marked returned."
+            />
           )}
           <DisposeForm itemId={item.id} />
         </div>

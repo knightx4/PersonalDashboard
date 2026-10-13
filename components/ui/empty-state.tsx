@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from './button';
 import { Sigil } from './sigil';
@@ -30,18 +30,31 @@ export function EmptyState({
   secondaryAction,
   tone = 'empty',
   align = 'center',
+  size = 'page',
+  titleAs: TitleTag = 'p',
   seed,
   className,
   children,
 }: {
   icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title: string;
-  description: string;
+  /** Required at page size; a box or an inline line can go without. */
+  description?: string;
   action?: { label: string; href: string };
   secondaryAction?: { label: string; href: string };
   tone?: 'empty' | 'finished';
   /** `start` for an explanation long enough to be read: a shared left edge. */
   align?: 'center' | 'start';
+  /**
+   * `page` is the whole page or panel empty. `box` is one empty section of a
+   * page: the same dashed placeholder, smaller, at ui size. `inline` is an
+   * empty list inside a card: one muted line with its action beside it.
+   * The hand-written dashed cards these replaced mostly set `border-dashed`
+   * without a border width, so their outline never drew.
+   */
+  size?: 'page' | 'box' | 'inline';
+  /** The title's element at box size, when the empty section is one a heading names. */
+  titleAs?: 'p' | 'h2' | 'h3';
   /** For `finished`: what the sigil is drawn from. Falls back to the title. */
   seed?: string;
   className?: string;
@@ -54,6 +67,45 @@ export function EmptyState({
 }) {
   const finished = tone === 'finished';
   const start = align === 'start';
+
+  if (size === 'inline') {
+    return (
+      <div className={cn('flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1 text-ui text-ink-muted', className)}>
+        <p>{title}</p>
+        {action && (
+          <Link href={action.href} className={buttonVariants({ variant: 'link', size: 'sm' })}>
+            {action.label}
+          </Link>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  if (size === 'box') {
+    return (
+      <div
+        className={cn(
+          'sheet flex flex-col rounded-card border border-dashed bg-surface px-4 py-8',
+          start ? 'items-start text-left' : 'items-center text-center',
+          className,
+        )}
+      >
+        <TitleTag className="text-ui font-medium text-ink">{title}</TitleTag>
+        {description && <p className="mt-1 max-w-sm text-small text-ink-muted">{description}</p>}
+        {(action || children) && (
+          <div className={cn('mt-3 flex flex-wrap items-center gap-2', start ? 'justify-start' : 'justify-center')}>
+            {action && (
+              <Link href={action.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                {action.label}
+              </Link>
+            )}
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -81,7 +133,7 @@ export function EmptyState({
       >
         {title}
       </h3>
-      <p className="mt-1.5 max-w-sm text-body leading-relaxed text-ink-muted">{description}</p>
+      {description && <p className="mt-1.5 max-w-sm text-body leading-relaxed text-ink-muted">{description}</p>}
       {(action || secondaryAction) && (
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {action && (

@@ -1,6 +1,7 @@
 import type { SharePage } from '@/lib/share/read/load-disposition';
 import { formatMoneyOrBlank } from '@/lib/money';
 import { cardVariants } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { DispositionGroup } from './disposition-group';
 
@@ -48,9 +49,9 @@ export function ShareForm({ token, page }: { token: string; page: SharePage }) {
           {/* The loose things get a heading too once anything above them has
               one, so they do not read as part of the last family. */}
           {(family.label || page.families.length > 1) && (
-            <h2 className="mb-3 text-ui font-semibold tracking-wide text-ink-muted uppercase">
+            <SectionLabel as="h2" className="mb-3">
               {family.label ?? 'Everything else'}
-            </h2>
+            </SectionLabel>
           )}
           {/* One surface with hairlines between the rows rather than a card
               each, so a phone holds more of the list. */}

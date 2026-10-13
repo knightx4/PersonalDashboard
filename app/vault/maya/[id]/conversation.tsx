@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { OwlIcon } from '@/components/shell/owl-icon';
@@ -56,9 +57,7 @@ export function MayaConversation({
 
       <Card padding="standard" className="mb-6">
         <section aria-labelledby="summary-heading">
-          <h2 id="summary-heading" className="text-body font-semibold text-ink">
-            Where you have got to
-          </h2>
+          <SectionHeading id="summary-heading" title="Where you have got to" />
           <p className="mt-1 whitespace-pre-line text-body text-ink">
             {summary !== null ? (
               <LinkedText text={summary} />
@@ -78,9 +77,7 @@ export function MayaConversation({
         <hr className="my-5 border-border" />
 
         <section aria-labelledby="replies-heading">
-          <h2 id="replies-heading" className="mb-2 text-body font-semibold text-ink">
-            Replies
-          </h2>
+          <SectionHeading id="replies-heading" title="Replies" className="mb-2" />
           <TalkThread
             id={`maya-${threadId}`}
             turns={turns}

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { Select } from '@/components/ui/field';
 import { PERSON_DOT_CLASS, type Person } from '@/lib/people/load';
 import { assignInboxToPerson } from './people-actions';
@@ -99,9 +100,9 @@ export function InboxPerson({
           // skipping it means everything that inbox imports arrives
           // unlabelled -- which reads as the feature not working rather than
           // as a setting not set.
-          <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-caution">
+          <Chip tone="caution" size="sm">
             Not assigned
-          </span>
+          </Chip>
         )}
         <ChevronDown className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       </button>

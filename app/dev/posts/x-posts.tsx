@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cardVariants } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';
 import { cn } from '@/lib/cn';
@@ -30,7 +30,7 @@ export function XPostList({ posts, total }: { posts: XPostView[]; total: number 
                 href={post.url}
                 target="_blank"
                 rel="noreferrer"
-                className="press-area font-medium text-accent hover:underline"
+                className={cn('press-area font-medium', linkVariants())}
               >
                 Open on X
               </a>
@@ -46,7 +46,7 @@ export function XPostList({ posts, total }: { posts: XPostView[]; total: number 
           <Link
             href={`?onx=${posts.length + more}#posted-on-x`}
             scroll={false}
-            className="press-area font-medium text-accent hover:underline"
+            className={cn('press-area font-medium', linkVariants())}
           >
             Show {more} more
           </Link>

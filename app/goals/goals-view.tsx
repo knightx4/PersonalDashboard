@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
 import { Archive, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
@@ -385,25 +386,24 @@ function AreaSection({
         />
       ) : (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <IconButton
+            label={open ? `Fold ${area.name}` : `Open ${area.name}`}
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             aria-controls={`area-body-${area.id}`}
-            aria-label={open ? `Fold ${area.name}` : `Open ${area.name}`}
-            className="press -mr-1 flex size-7 shrink-0 items-center justify-center rounded-control text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted max-sm:size-11"
+            className="-mr-1"
           >
             <ChevronRight
-              className={cn('size-4 transition-transform duration-quick', open && 'rotate-90')}
+              className={cn('transition-transform duration-quick', open && 'rotate-90')}
               strokeWidth={1.75}
               aria-hidden
             />
-          </button>
+          </IconButton>
           <Link
             href={goalViewHref(`/goals/area/${area.id}`, view)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.
             // eslint-disable-next-line no-restricted-syntax -- text-base matches InlineInput's phone size.
-            className="press-area min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink underline-offset-2 [overflow-wrap:anywhere] hover:underline sm:text-ui"
+            className="press-area min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink [overflow-wrap:anywhere] hover:underline sm:text-ui"
           >
             {area.name}
           </Link>
@@ -581,7 +581,7 @@ function GoalRow({
             took the click meant for opening the goal. */}
         <Link
           href={`/goals/${goal.id}`}
-          className="press-area flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
+          className="press-area flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink hover:underline"
         >
           {goal.title}
         </Link>
@@ -604,9 +604,9 @@ function GoalRow({
           {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}
-            className="press-area inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className={cn('press-area inline-flex items-center gap-1 text-small', linkVariants({ tone: 'quiet' }))}
           >
-            <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
+            <ListTree className="size-3.5" strokeWidth={1.75} aria-hidden />
             {goal.status === 'proposed'
               ? 'See what Dash proposed'
               : steps
@@ -616,7 +616,7 @@ function GoalRow({
         </div>
         {archived && (
           <p className="flex items-center gap-1 px-1 pt-0.5 text-small text-ink-muted">
-            <Archive className="size-3" strokeWidth={1.75} aria-hidden />
+            <Archive className="size-3.5" strokeWidth={1.75} aria-hidden />
             Archived. Restore it from its menu to work on it again.
           </p>
         )}

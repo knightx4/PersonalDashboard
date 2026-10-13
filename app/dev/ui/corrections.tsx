@@ -79,7 +79,7 @@ export function CorrectionsChart({ weeks }: { weeks: readonly CorrectionWeek[] |
                   {share === null ? '–' : `${share}%`}
                 </span>
                 <span
-                  className="mt-1 block w-full max-w-6 rounded-t bg-accent"
+                  className="mt-1 block w-full max-w-6 rounded-t-control bg-accent"
                   style={{ height }}
                 />
               </div>

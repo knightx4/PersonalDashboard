@@ -1,10 +1,12 @@
 'use client';
 
 import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
-import Link from 'next/link';
-import { ListChecks, Plus, Unlink } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Plus, Unlink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { cardVariants } from '@/components/ui/card';
@@ -77,21 +79,17 @@ export function LinkedTasks({
 
   return (
     <section className={cn(!compact && cardVariants({ padding: 'dense' }))}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
-          <ListChecks className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
-          {title}
-          {tasks.length + extraCount > 0 && (
-            <span className="tabular text-small font-normal text-ink-muted">
-              {tasks.length + extraCount}
-            </span>
-          )}
-        </h3>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
-          <Plus className="size-3.5" strokeWidth={2} aria-hidden />
-          {adding ? 'Cancel' : addLabel}
-        </Button>
-      </div>
+      <SectionHeading
+        as="h3"
+        title={title}
+        count={tasks.length + extraCount > 0 ? tasks.length + extraCount : undefined}
+        action={
+          <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
+            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+            {adding ? 'Cancel' : addLabel}
+          </Button>
+        }
+      />
 
       {adding && (
         <form ref={formRef} action={action} className="mt-3 space-y-2">
@@ -211,15 +209,13 @@ function LinkedRow({
 
       {/* Detach, not delete. The task is yours and may well belong somewhere
           else; unlinking it from this page must not destroy it. */}
-      <button
-        type="button"
-        title="Detach from this"
+      <IconButton
+        label="Detach from this"
         onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
-        className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+        className="opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
       >
-        <Unlink className="size-3.5" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Detach from this</span>
-      </button>
+        <Unlink strokeWidth={1.75} aria-hidden />
+      </IconButton>
     </li>
   );
 }
@@ -238,7 +234,7 @@ function formatDue(task: Task, timezone: string): string {
 /** A link to the agenda, for a section that has more than it can show. */
 export function AllTasksLink() {
   return (
-    <Link href="/todo" className="text-ui font-medium text-accent hover:underline">
+    <Link href="/todo" className={cn('text-ui', linkVariants())}>
       All tasks
     </Link>
   );

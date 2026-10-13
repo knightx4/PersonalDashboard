@@ -6,6 +6,7 @@ import { formatMicroDollars } from '@/lib/money';
 import { isModuleId, moduleById } from '@/lib/modules';
 import type { PageOpens, PhoneShare } from '@/lib/usage/opens';
 import { openedText, type FunctionSpend, type UsageGroup, type UsageReport } from '@/lib/usage/report';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * The Usage tab in Dev (plans #1482, #1693 and #1752). It opens on views per
@@ -63,9 +64,11 @@ function FunctionRow({ row }: { row: FunctionSpend }) {
 function FunctionList({ functions }: { functions: readonly FunctionSpend[] }) {
   if (functions.length === 0) {
     return (
-      <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-        No model calls in the last 30 days. Each function appears here, with what it cost, from its first call.
-      </p>
+      <EmptyState
+        size="box"
+        title="No model calls in the last 30 days."
+        description="Each function appears here, with what it cost, from its first call."
+      />
     );
   }
   const total30 = functions.reduce((sum, row) => sum + row.spend30, 0);
@@ -152,9 +155,11 @@ function OpensByWorkspace({ report, phoneShare }: { report: UsageReport; phoneSh
           ))}
         </ul>
       ) : (
-        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-          No page has been opened since recording started. Opens appear here from the next page you load.
-        </p>
+        <EmptyState
+          size="box"
+          title="No page has been opened since recording started."
+          description="Opens appear here from the next page you load."
+        />
       )}
       {phoneText && <p className="mt-2 text-small text-ink-muted tabular-nums">{phoneText}</p>}
     </section>

@@ -1,7 +1,9 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { CalendarClock, Clock, MailQuestion, NotebookPen, PenLine, Video } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { cn } from '@/lib/cn';
 import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
 import { roundDetail, roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
@@ -96,16 +98,16 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                       href={joinable.meetingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="press-area inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
+                      className={cn(linkVariants(), 'press-area inline-flex items-center gap-1 text-small font-medium')}
                     >
                       <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
                       Join
                     </a>
                   )}
                   {!hasPrep && (
-                    <span className="rounded-full bg-caution-tint px-1.5 py-0.5 text-micro text-ink">
+                    <Chip tone="caution" size="sm">
                       no prep notes
-                    </span>
+                    </Chip>
                   )}
                 </li>
               );

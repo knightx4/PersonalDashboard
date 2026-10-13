@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -103,7 +103,7 @@ export function RolesTable({
                     domains: row.companyDomains,
                     website: row.companyWebsite,
                   }}
-                  className="size-5 rounded"
+                  className="size-5 rounded-control"
                   imageClassName="size-4"
                 />
                 <span className="max-w-32 truncate">{row.companyName}</span>

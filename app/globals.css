@@ -1733,6 +1733,9 @@ body,
   --radius-pane: 1rem;
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
+  /* Chips, toggle chips and dots: fully round, except where a theme squares
+   * everything (Poster), so a chip keeps the corners of the card it sits on. */
+  --radius-pill: 9999px;
 
   /* The easings (plan #1549), mirrored in lib/motion.ts. Soft ease-out for
    * everything that is not a spring; the spring for things arriving in their
@@ -2148,6 +2151,14 @@ body::before {
 @utility sheet {
   border-color: var(--c-sheet-outline);
   box-shadow: var(--sheet-edge);
+}
+
+/* A keycap's corner: half a control's, so it follows the theme (square in
+ * Poster) without turning an 18px key into a coin where controls are rounder
+ * (Aurora's 12px on an 18px key is a circle). The one radius drawn from a
+ * token rather than being one, used by components/ui/kbd.tsx alone. */
+@utility keycap {
+  border-radius: calc(var(--radius-control) / 2);
 }
 
 /* Shortcut hints: invisible until a modifier is held. See components/shell/key-hints.tsx. */
@@ -3855,6 +3866,7 @@ form[data-auto-submit] [data-fallback-submit] {
   --radius-pane: 0;
   --radius-card: 0;
   --radius-control: 0;
+  --radius-pill: 0;
 }
 
 :is([data-theme='poster'], [data-theme='poster-dark']) .sheet {

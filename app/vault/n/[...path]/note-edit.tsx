@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
@@ -92,7 +92,7 @@ export function NoteEdit({
             <p className="mb-4 text-ui text-ink-muted">
               The app has not fetched the version from Obsidian yet. It arrives with the next
               sync, or you can sync now from{' '}
-              <Link href={SETTINGS_HREF} className="font-medium text-accent hover:underline">
+              <Link href={SETTINGS_HREF} className={linkVariants()}>
                 vault settings
               </Link>
               .
@@ -210,10 +210,10 @@ export function SaveError({ state, onReload }: { state: SaveNoteState; onReload:
         </p>
         <Link
           href={SETTINGS_HREF}
-          className="inline-flex items-center gap-1 text-ui font-medium text-accent hover:underline"
+          className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
         >
           Open vault settings
-          <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
         </Link>
       </div>
     );

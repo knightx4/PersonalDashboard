@@ -13,6 +13,20 @@ export const segmentedFrame =
   '*:first:rounded-l-control *:last:rounded-r-control';
 
 /**
+ * One segment's classes, for a set whose segments are links: a view switch
+ * or a scope switch that is an address. Inside `segmentedFrame`. Nine files
+ * used to copy this string, and one had drifted to h-7, off the dial.
+ */
+export function segmentClass(on: boolean): string {
+  return cn(
+    'press inline-flex h-(--control-h) items-center gap-1.5 px-2.5 text-ui font-medium',
+    'transition-colors duration-quick disabled:pointer-events-none disabled:opacity-50',
+    'focus-visible:outline-2 focus-visible:-outline-offset-2',
+    on ? 'bg-accent-tint text-accent' : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
+  );
+}
+
+/**
  * One of a few mutually exclusive modes, as a joined control.
  *
  * This exists because the app had two spellings of the same idea and neither
@@ -68,14 +82,7 @@ export function Segmented<T extends string>({
             disabled={disabled}
             aria-pressed={on}
             onClick={() => onChange(option.value)}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center gap-1.5 px-2.5 text-ui font-medium',
-              'transition-colors duration-quick disabled:pointer-events-none disabled:opacity-50',
-              'focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on
-                ? 'bg-accent-tint text-accent'
-                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(on)}
           >
             {option.icon}
             {option.label}

@@ -1,3 +1,4 @@
+import Link, { linkVariants } from '@/components/ui/link';
 import { CardSection } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
@@ -90,12 +91,9 @@ export function TranscriptCredits({ usage, now = new Date() }: { usage: Usage; n
                 className="flex items-baseline justify-between gap-3 py-1.5 text-small"
               >
                 <span className="min-w-0 truncate">
-                  <a
-                    href={`/learn/youtube/v/${call.videoId}`}
-                    className="text-ink hover:underline"
-                  >
+                  <Link href={`/learn/youtube/v/${call.videoId}`} className={linkVariants()}>
                     {call.videoId}
-                  </a>
+                  </Link>
                   <span className="text-ink-muted">
                     {' '}
                     · {OUTCOME_WORDS[call.outcome] ?? call.outcome} · {call.trigger}

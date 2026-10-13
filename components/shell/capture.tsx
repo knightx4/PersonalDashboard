@@ -13,10 +13,12 @@ import {
 import { Plus, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { ToggleChip, toggleChipClass } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { AddFile } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
@@ -527,7 +529,7 @@ function CapturePanel({
                 value={isCalendarDay(day) ? day : ''}
                 onChange={(event) => setDay(event.target.value)}
                 className={cn(
-                  'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
+                  'tabular h-7 rounded-control bg-transparent px-2 text-small outline-none transition-colors duration-quick',
                   'focus:ring-1 focus:ring-accent/40',
                   isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
                 )}
@@ -902,30 +904,15 @@ function MoveGuess({
         CAPTURE_MOVES.map((move) => {
           const on = picked === move;
           return (
-            <button
-              key={move}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onPick(on ? null : move)}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-                on
-                  ? 'bg-accent text-fill-ink'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
-            >
+            <ToggleChip key={move} on={on} onClick={() => onPick(on ? null : move)}>
               {CAPTURE_MOVE_LABELS[move]}
-            </button>
+            </ToggleChip>
           );
         })}
       {guess?.sure && !picked && (
-        <button
-          type="button"
-          onClick={() => onPick(guess.move)}
-          className="press ml-auto rounded-full px-2 py-1 text-small text-ink-muted hover:bg-accent-tint hover:text-accent"
-        >
+        <Button type="button" variant="ghost" size="xs" onClick={() => onPick(guess.move)} className="ml-auto">
           Change
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1036,7 +1023,7 @@ export function FiledLines({
                     type="button"
                     disabled={answering !== null}
                     onClick={() => answer(index, estimate)}
-                    className="press rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent disabled:opacity-50"
+                    className={cn(toggleChipClass(false), 'disabled:opacity-50')}
                   >
                     {ESTIMATE_CHIPS[estimate]}
                   </button>
@@ -1082,17 +1069,9 @@ function DayChip({
   const on = picked === day;
 
   return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={() => onPick(on ? '' : day)}
-      className={cn(
-        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-        on ? 'bg-accent text-fill-ink' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-      )}
-    >
+    <ToggleChip on={on} onClick={() => onPick(on ? '' : day)}>
       {label}
-    </button>
+    </ToggleChip>
   );
 }
 
@@ -1116,15 +1095,15 @@ export function CaptureButton() {
   const { open } = useCapture();
   return (
     <span className="relative block shrink-0">
-      <button
-        type="button"
-        onClick={() => open()}
+      <IconButton
+        label="Capture something"
         title="Capture something (⌥C)"
-        className="press flex size-8 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
+        onClick={() => open()}
+        className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
       >
-        <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+        <Plus strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Capture something</span>
-      </button>
+      </IconButton>
       <Kbd className="pointer-events-none absolute left-1/2 top-full hidden -translate-x-1/2 bg-raised sm:block">
         ⌥C
       </Kbd>

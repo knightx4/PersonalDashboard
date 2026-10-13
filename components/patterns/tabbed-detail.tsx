@@ -2,6 +2,7 @@ import { Breadcrumb, type Crumb } from '@/components/shell/breadcrumb';
 import { PropertiesFold } from '@/components/patterns/properties-fold';
 import { DetailLayout } from '@/components/shell/detail-layout';
 import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/cn';
 import type { Tab } from '@/lib/tabs';
@@ -138,7 +139,7 @@ export function DetailPart({ label, children }: { label?: string; children: Reac
   return (
     <section className="space-y-1">
       {label && (
-        <h2 className="text-small font-semibold uppercase tracking-wide text-ink-muted">{label}</h2>
+        <SectionLabel as="h2">{label}</SectionLabel>
       )}
       {children}
     </section>

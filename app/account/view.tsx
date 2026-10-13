@@ -7,7 +7,7 @@ import { Banner as UiBanner } from '@/components/ui/banner';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { signOut } from '@/app/(auth)/actions';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select } from '@/components/ui/field';
+import { Checkbox, Input, Label, Select } from '@/components/ui/field';
 import { TimezoneField, detectTimeZone } from '@/components/ui/timezone-field';
 import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
 import { MODULES, modulesFor, type ModuleId } from '@/lib/modules';
@@ -200,13 +200,14 @@ function YouSection({
           display={values.timezone.replace(/_/g, ' ')}
           aside={
             detected && detected !== values.timezone ? (
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={() => commit('timezone', detected)}
-                className="text-micro text-accent hover:underline"
+                className="text-micro"
               >
                 Use {detected.replace(/_/g, ' ')}
-              </button>
+              </Button>
             ) : null
           }
         >
@@ -347,11 +348,10 @@ function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: bo
         <div className="divide-y divide-border border-y border-border">
           {modules.map((module) => (
             <label key={module.id} className="row-pad flex items-start gap-3">
-              <input
-                type="checkbox"
+              <Checkbox
                 name={`module:${module.id}`}
                 defaultChecked={enabled.includes(module.id)}
-                className="mt-1 size-4 accent-accent"
+                className="mt-1"
               />
               <ModuleMark module={module.id} size="sm" className="mt-0.5" />
               <span className="min-w-0 flex-1">

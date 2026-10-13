@@ -1,8 +1,10 @@
 'use client';
 
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { MapPosition } from '@/components/vault/map-position';
 import { cn } from '@/lib/cn';
@@ -52,9 +54,7 @@ export function MapReview({ notePath }: { notePath: string }) {
 
   return (
     <section aria-labelledby="map-heading" className="mt-10">
-      <h2 id="map-heading" className="text-body font-semibold text-ink">
-        Map
-      </h2>
+      <SectionHeading id="map-heading" title="Map" />
 
       {proposal ? (
         <Review
@@ -267,15 +267,14 @@ function TickRow({
 }) {
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         name="keep"
         value={value}
         checked={ticked}
         disabled={disabled}
         onChange={onToggle}
         aria-label={label}
-        className="mt-1 size-4 shrink-0 rounded border-border text-accent focus:ring-accent/30"
+        className="mt-1"
       />
       <span className="min-w-0 flex-1">{children}</span>
     </li>

@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useCallback, useMemo } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
 import {
@@ -261,9 +262,7 @@ function OrderRow({ row }: { row: ReviewOrderRow }) {
             >
               {row.merchantName}
             </Link>
-            <span className="text-small font-medium uppercase tracking-wide text-caution">
-              Order to confirm
-            </span>
+            <Chip tone="caution">Order to confirm</Chip>
           </div>
           <p className="text-body text-ink-muted">
             {row.orderDate}
@@ -321,9 +320,7 @@ function EmailRow({
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <p className="font-medium text-ink">{subject}</p>
-            <span className="text-small font-medium uppercase tracking-wide text-ink-muted">
-              {classificationLabel(row.classification)}
-            </span>
+            <Chip>{classificationLabel(row.classification)}</Chip>
           </div>
           <p className="text-body text-ink-muted">
             {row.receivedAt

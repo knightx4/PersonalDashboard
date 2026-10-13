@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Input } from '@/components/ui/field';
 import { playlistUrl } from '@/lib/dev/inspiration/view';
 import { setInspirationPlaylist, type InspirationActionState } from './actions';
+import { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 
 /**
  * Which playlist the tab reads, as a link, and the one move that changes it.
@@ -36,7 +38,7 @@ export function PlaylistSetting({ playlistId }: { playlistId: string | null }) {
             href={playlistUrl(playlistId)}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-ink underline decoration-ink-ghost underline-offset-2 hover:decoration-ink"
+            className={cn('font-medium', linkVariants())}
           >
             your playlist ({playlistId})
           </a>

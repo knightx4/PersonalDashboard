@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -539,25 +540,21 @@ async function ObservationsSection({
   if (rows.length === 0) return null;
   return (
     <Card padding="standard" className="mt-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">What Dash noticed this week</h2>
-        <span className="flex items-baseline gap-3">
-          {/* The Sunday review (plan #1233) sits beside these rather than
-              repeating them. */}
-          <Link
-            href="/home/week"
-            className="text-small font-medium text-accent underline underline-offset-2"
-          >
-            Week in review
-          </Link>
-          <Link
-            href="/timeline"
-            className="text-small font-medium text-accent underline underline-offset-2"
-          >
-            Timeline
-          </Link>
-        </span>
-      </div>
+      {/* The Sunday review (plan #1233) sits beside these rather than
+          repeating them. */}
+      <SectionHeading
+        title="What Dash noticed this week"
+        action={
+          <>
+            <Link href="/home/week" className={`text-small ${linkVariants()}`}>
+              Week in review
+            </Link>
+            <Link href="/timeline" className={`text-small ${linkVariants()}`}>
+              Timeline
+            </Link>
+          </>
+        }
+      />
       <div className="mt-2">
         <ObservationList observations={rows} timezone={timezone} />
       </div>
@@ -734,13 +731,13 @@ async function ReviewLinks({ observations }: { observations: Promise<ShownObserv
   return (
     <div className="mt-4 space-y-1 text-small text-ink-muted">
       <p>
-        <Link href="/home/week" className="font-medium text-accent hover:underline">
+        <Link href="/home/week" className={linkVariants()}>
           Week in review
         </Link>
         {': what Dash wrote on Sunday about the week before.'}
       </p>
       <p>
-        <Link href="/timeline" className="font-medium text-accent hover:underline">
+        <Link href="/timeline" className={linkVariants()}>
           Timeline
         </Link>
         {': what you did across the app, month by month.'}

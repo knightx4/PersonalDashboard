@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
@@ -27,6 +27,7 @@ import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
+import { cn } from '@/lib/cn';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
@@ -199,7 +200,7 @@ export default async function NowPage({
                     <h3 className="text-body font-medium text-ink">{reading.subject}</h3>
                     <Link
                       href={`/learn/t/${reading.trackId}`}
-                      className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className={cn('text-small', linkVariants({ tone: 'quiet' }))}
                     >
                       {reading.trackTitle}
                     </Link>
@@ -214,7 +215,7 @@ export default async function NowPage({
                       <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
                         <Button type="submit" variant="primary" size="sm">
-                          <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden />
+                          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
                           Open
                         </Button>
                         <PaidHint
@@ -225,7 +226,7 @@ export default async function NowPage({
                     ) : (
                       <Link
                         href={`/learn/r/${reading.id}`}
-                        className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
+                        className={cn('text-ui', linkVariants({ tone: 'quiet' }))}
                       >
                         No source yet — find one
                       </Link>
@@ -241,7 +242,7 @@ export default async function NowPage({
 
                     <Link
                       href={`/learn/r/${reading.id}`}
-                      className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className={cn('ml-auto text-small', linkVariants({ tone: 'quiet' }))}
                     >
                       Everything about it
                     </Link>

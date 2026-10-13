@@ -1,9 +1,9 @@
 import { Bookmark } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/cn';
+import { toggleChipClass } from '@/components/ui/chip';
 import { formatMoney } from '@/lib/money';
 import { SaveForm } from './save-form';
 
@@ -68,7 +68,7 @@ function SavedRow({ item, withPicture }: { item: SavedQueueItem; withPicture: bo
         className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
       >
         {withPicture && (
-          <span className="block size-10 shrink-0 overflow-hidden rounded-md bg-sunken">
+          <span className="block size-10 shrink-0 overflow-hidden rounded-control bg-sunken">
             {item.image_url && (
               // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
               <img src={item.image_url} alt="" className="size-full object-cover" />
@@ -114,12 +114,7 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
           key={entry.id}
           href={savedHref(entry.id)}
           aria-current={entry.id === status ? 'page' : undefined}
-          className={cn(
-            'press-area rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-quick',
-            entry.id === status
-              ? 'bg-accent-tint text-accent'
-              : 'text-ink-muted hover:bg-canvas hover:text-ink',
-          )}
+          className={toggleChipClass(entry.id === status)}
         >
           {entry.label}
         </Link>

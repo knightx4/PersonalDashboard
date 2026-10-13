@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 /**
  * One email's HTML, drawn in a sandboxed frame.
@@ -78,12 +79,14 @@ export function EmailFrame({ html, title }: { html: string; title: string }) {
 export function BackButton() {
   const router = useRouter();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={() => (window.history.length > 1 ? router.back() : router.push('/home'))}
-      className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
+      className="mb-3 -ml-2.5"
     >
       <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Back
-    </button>
+    </Button>
   );
 }

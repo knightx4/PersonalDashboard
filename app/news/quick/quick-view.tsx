@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
 import { StoryRating } from '@/components/news/story-rating';
@@ -428,7 +428,7 @@ function PhoneCard({
                 />
               )}
               {issueHref && (
-                <Link href={issueHref} className="text-ui text-accent hover:underline">
+                <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
                   {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
                 </Link>
               )}
@@ -490,7 +490,7 @@ function gridStory(
       from,
       actions: (
         <>
-          <Link href={issueHref} className="text-ui text-accent hover:underline">
+          <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
             Read the newsletter
           </Link>
           <ReactionButtons

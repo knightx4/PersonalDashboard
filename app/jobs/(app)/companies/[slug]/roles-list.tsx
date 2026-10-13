@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Briefcase, GitMerge } from 'lucide-react';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError, Label, Select } from '@/components/ui/field';
+import { Checkbox, FieldError, Label, Select } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { mergeRoles } from '../actions';
@@ -123,12 +123,10 @@ export function RolesList({
           >
             <span className="flex min-w-0 items-center gap-2 sm:flex-1">
               {picking && (
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selected.has(role.id)}
                   onChange={() => toggle(role.id)}
                   aria-label={`Select ${role.title} to merge`}
-                  className="size-4 shrink-0"
                 />
               )}
               <Link

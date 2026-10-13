@@ -1,12 +1,14 @@
 'use client';
 
 import Form from 'next/form';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react';
 import { Copy, ExternalLink, Mail, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
+import { chipVariants } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 import { ChipSelect } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -454,7 +456,7 @@ function OpeningControls({
               href={cleared}
               replace
               scroll={false}
-              className="ml-1 font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
+              className={cn(linkVariants({ tone: 'quiet' }), 'ml-1 font-medium')}
             >
               Clear
             </Link>
@@ -475,12 +477,9 @@ function OpeningControls({
         ))}
       </PressChip>
       <noscript>
-        <button
-          type="submit"
-          className="px-2 py-1 font-medium text-ink underline underline-offset-2"
-        >
+        <Button type="submit" variant="link">
           Apply
-        </button>
+        </Button>
       </noscript>
     </Form>
   );
@@ -550,8 +549,7 @@ function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
           key={chip.key}
           title={chip.unsure ? 'Dash is not sure of this one' : undefined}
           className={cn(
-            'rounded-control px-1.5 py-0.5 text-small',
-            chip.tone === 'warn' ? 'bg-caution-tint text-caution' : 'bg-sunken text-ink-muted',
+            chipVariants({ tone: chip.tone === 'warn' ? 'caution' : 'neutral' }),
             chip.unsure && 'opacity-70',
           )}
         >
@@ -621,14 +619,14 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
         <LinkedText text={suggestion.move} />
       </p>
       {message && (
-        <div className="rounded-card bg-canvas p-3">
+        <Note className="p-3">
           {email?.subject && (
             <p className="mb-1 text-small font-medium text-ink">Subject: {email.subject}</p>
           )}
           <p className="whitespace-pre-wrap text-ui leading-relaxed text-ink">
             <LinkedText text={email ? email.body : message} />
           </p>
-        </div>
+        </Note>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={() => void copy()}>
@@ -935,15 +933,16 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         >
           <span className="text-ink-muted">Why not?</span>
           {DISMISS_REASONS.map((reason) => (
-            <button
+            <Button
               key={reason}
               type="button"
+              variant="link"
               disabled={busy}
               onClick={() => act(() => dismissOpening(suggestion.id, reason))}
-              className="press rounded-control text-ink underline decoration-border underline-offset-2 hover:decoration-ink disabled:opacity-50"
+              className="text-ink"
             >
               {DISMISS_REASON_LABELS[reason]}
-            </button>
+            </Button>
           ))}
         </div>
       )}

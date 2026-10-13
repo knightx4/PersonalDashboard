@@ -123,7 +123,7 @@ function MadeToken({ made }: { made: { label: string; token: string } }) {
         show it again.
       </Banner>
       <div className="flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 rounded-md bg-sunken px-2.5 py-1.5 font-mono text-small text-ink select-all [overflow-wrap:anywhere]">
+        <code className="min-w-0 flex-1 rounded-control bg-sunken px-3 py-2 font-mono text-small text-ink select-all [overflow-wrap:anywhere]">
           {made.token}
         </code>
         <Button

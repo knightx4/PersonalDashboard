@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { folderOf, noteHref } from '@/lib/vault/paths';
@@ -97,7 +97,7 @@ export function VaultTree({
                       aria-current={open ? 'page' : undefined}
                       title={note.title}
                       className={cn(
-                        'block truncate rounded-lg px-2 py-1 text-ui transition-colors duration-quick',
+                        'block truncate rounded-control px-2 py-1 text-ui transition-colors duration-quick',
                         open
                           ? 'bg-accent-tint font-medium text-accent'
                           : 'text-ink-muted hover:bg-sunken hover:text-ink',

@@ -49,12 +49,12 @@ export function PropertiesFold({
         aria-expanded={open}
         aria-controls={restId}
         onClick={() => setOpen((was) => !was)}
-        className="press -mx-1.5 -mb-1.5 mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm px-1.5 text-small text-ink-muted hover:bg-sunken hover:text-ink lg:hidden"
+        className="press -mx-1.5 -mb-1.5 mt-1 inline-flex min-h-11 items-center gap-1 rounded-control px-1.5 text-small text-ink-muted hover:bg-sunken hover:text-ink lg:hidden"
       >
         {open ? 'Fewer details' : count ? `All details · ${count}` : 'All details'}
         <ChevronDown
           className={cn('size-3.5 transition-transform', open && 'rotate-180')}
-          strokeWidth={2}
+          strokeWidth={1.75}
           aria-hidden
         />
       </button>

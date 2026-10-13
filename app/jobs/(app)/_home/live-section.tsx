@@ -1,5 +1,8 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Stat } from '@/components/ui/stat';
 import { MOVE_WORD } from '@/lib/core/move';
 import {
   INTERVIEW_HORIZON_DAYS,
@@ -57,33 +60,37 @@ export function LiveSection({ summary, live }: { summary: SearchSummary; live: L
       more={{ href: PIPELINE_PATH, label: 'Open Pipeline' }}
     >
       <Card padding="standard">
-        <dl className="grid grid-cols-4 gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-x-8">
+        <div className="grid grid-cols-4 gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-x-8">
           {stats.map((stat) => (
-            <div key={stat.label} className="flex min-w-0 flex-col-reverse">
-              <dt className="text-small whitespace-nowrap text-ink-muted">
-                <span className="sm:hidden" aria-hidden={stat.short !== stat.label || undefined}>
-                  {stat.short}
-                </span>
-                {stat.short !== stat.label && <span className="max-sm:sr-only">{stat.label}</span>}
-                {stat.short === stat.label && <span className="max-sm:hidden">{stat.label}</span>}
-              </dt>
-              <dd className="tabular text-body font-semibold tracking-tight text-ink">
-                <Link
-                  href={stat.href}
-                  className="press-area transition-colors duration-quick hover:text-accent"
-                >
-                  {stat.value}
-                </Link>
-              </dd>
-            </div>
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="press-area min-w-0 whitespace-nowrap transition-colors duration-quick hover:[&_p:first-child]:text-accent"
+            >
+              <Stat
+                size="sm"
+                value={stat.value}
+                label={
+                  <>
+                    <span className="sm:hidden" aria-hidden={stat.short !== stat.label || undefined}>
+                      {stat.short}
+                    </span>
+                    {stat.short !== stat.label && <span className="max-sm:sr-only">{stat.label}</span>}
+                    {stat.short === stat.label && <span className="max-sm:hidden">{stat.label}</span>}
+                  </>
+                }
+              />
+            </Link>
           ))}
-        </dl>
+        </div>
       </Card>
 
       {live.total === 0 ? (
-        <p className="px-1 text-small text-ink-muted">
-          Nothing live: every application has closed, and there are no leads.
-        </p>
+        <EmptyState
+          size="inline"
+          title="Nothing live: every application has closed, and there are no leads."
+          className="px-1"
+        />
       ) : (
         <>
           <MoveGroup title={MOVE_WORD.on_you} rows={live.onYou} />
@@ -99,9 +106,7 @@ function MoveGroup({ title, rows }: { title: string; rows: readonly LiveApplicat
   if (rows.length === 0) return null;
   return (
     <Card padding="dense">
-      <h3 className="mb-1 text-ui font-semibold text-ink">
-        {title} <span className="tabular font-normal text-ink-muted">· {rows.length}</span>
-      </h3>
+      <SectionHeading as="h3" title={title} count={rows.length} className="mb-1" />
       <ul className="divide-y divide-border">
         {rows.map((row) => (
           // On a phone, the name on one line and the stage under it, with the

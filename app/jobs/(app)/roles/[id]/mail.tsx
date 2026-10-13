@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -26,14 +27,7 @@ export function LinkedMail(props: PanelProps & { onAddInterview: (seed: Intervie
       />
 
       {messages.length === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-10 text-center text-ui text-ink-muted',
-          )}
-        >
-          No mail has been linked to this pursuit yet.
-        </p>
+        <EmptyState size="box" title="No mail has been linked to this pursuit yet." />
       ) : (
         <div>
           <Table>
@@ -74,18 +68,18 @@ export function LinkedMail(props: PanelProps & { onAddInterview: (seed: Intervie
                   <TD className="text-right">
                     <span className="inline-flex items-center gap-3">
                       {INTERVIEW_MAIL.has(message.classification) && (
-                        <button
+                        <Button
                           type="button"
+                          variant="link"
                           onClick={() =>
                             onAddInterview({
                               kind: 'recruiter_screen',
                               fromSubject: message.subject,
                             })
                           }
-                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-accent"
                         >
                           Add interview
-                        </button>
+                        </Button>
                       )}
                       <UnlinkMessage messageId={message.id} applicationId={applicationId} />
                     </span>
@@ -214,13 +208,9 @@ function MatchCandidates({
           onClose={() => setSearching(false)}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setSearching(true)}
-          className="text-small font-medium text-accent underline underline-offset-2"
-        >
+        <Button type="button" variant="link" onClick={() => setSearching(true)}>
           Add other
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -258,14 +248,9 @@ function MatchRow({
       <span className="truncate text-small text-ink-muted">{message.fromAddress ?? ''}</span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {onDecline && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onDecline}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
-          >
+          <Button type="button" variant="link" disabled={busy} onClick={onDecline}>
             Not a match
-          </button>
+          </Button>
         )}
         <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={onLink}>
           Link
@@ -312,7 +297,7 @@ function AddOtherSearch({
   }
 
   return (
-    <div className={cn(cardVariants(), 'border-dashed p-3')}>
+    <div className={cn(cardVariants(), 'p-3')}>
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <Label htmlFor="mail-search">Search unlinked mail</Label>
@@ -331,13 +316,9 @@ function AddOtherSearch({
         >
           Search
         </Button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
-        >
+        <Button type="button" variant="link" onClick={onClose} className="self-center">
           Close
-        </button>
+        </Button>
       </div>
       {error && <p className="mt-2 text-small text-danger">{error}</p>}
       {results !== null && (

@@ -12,6 +12,7 @@ import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
@@ -142,15 +143,15 @@ function DeleteComment({
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="target" value={target} />
       <FieldError>{state.error}</FieldError>
-      <button
+      <IconButton
         type="submit"
-        title="Delete this comment"
+        size="sm"
+        label="Delete this comment"
         disabled={pending}
-        className="press flex size-6 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
+        className="text-ink-ghost disabled:opacity-50"
       >
-        <X className="size-3.5" strokeWidth={2} aria-hidden />
-        <span className="sr-only">Delete this comment</span>
-      </button>
+        <X strokeWidth={1.75} aria-hidden />
+      </IconButton>
     </form>
   );
 }
@@ -173,7 +174,7 @@ function AuthorMark({ author }: { author: CommentAuthor }) {
   if (author === 'claude') {
     return <DashMark size="2xs" decorative className="text-ink-ghost" />;
   }
-  return <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
+  return <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />;
 }
 
 /**
@@ -224,7 +225,7 @@ function Message({
     <li
       className={cn(
         'group flex gap-2',
-        onCard && comment.author === 'claude' && '-mx-2 rounded-lg bg-canvas px-2 py-1.5',
+        onCard && comment.author === 'claude' && '-mx-2 rounded-control bg-canvas px-2 py-1.5',
       )}
     >
       {/* The strip the author mark stands in, and where a grouped message says
@@ -275,7 +276,7 @@ function Message({
             <DashMark size="2xs" decorative className="text-ink-ghost" />
             <Check
               className={cn('size-4 shrink-0', arrivedSeen && 'dash-seen-in')}
-              strokeWidth={2}
+              strokeWidth={1.75}
               aria-hidden
             />
             <span>Seen by Dash</span>
@@ -497,7 +498,7 @@ export function Thread({
             <li
               // On the pattern's card the answer still being written takes
               // the same recessed ground as Dash's written turns.
-              className={cn('flex gap-2', onCard && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}
+              className={cn('flex gap-2', onCard && '-mx-2 rounded-control bg-canvas px-2 py-1.5')}
               aria-live="polite"
             >
               <div className="flex w-4 shrink-0 justify-center pt-1">
@@ -712,7 +713,7 @@ export function Thread({
                 disabled={!draft.trim()}
                 title={sendLabel}
               >
-                <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
                 <span className="sr-only">{sendLabel}</span>
               </Button>
             </div>
@@ -751,7 +752,7 @@ export function Thread({
   // last turn are the panel's heading instead of a line floating above it.
   return (
     <Disclosure
-      className={onCard ? 'mt-1' : 'mt-1 rounded-lg bg-canvas card-pad-dense'}
+      className={onCard ? 'mt-1' : 'mt-1 rounded-control bg-canvas card-pad-dense'}
       defaultOpen
       title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
       meta={

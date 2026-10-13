@@ -21,6 +21,8 @@ import {
   type TypedResult,
 } from '@/lib/learn/personality/model';
 import { deleteTypedAction, restoreTypedAction, saveTypedAction } from './actions';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { IconButton } from '@/components/ui/icon-button';
 
 /**
  * Types from other tests (plan #1633): a Myers-Briggs type, an Enneagram
@@ -91,9 +93,7 @@ export function OtherTests({
         aria-labelledby="other-tests-title"
         className="max-w-2xl scroll-mt-24"
       >
-        <h2 id="other-tests-title" className="text-body font-semibold text-ink">
-          From other tests
-        </h2>
+        <SectionHeading id="other-tests-title" title="From other tests" />
         <p className="mt-0.5 text-small text-ink-muted">
           A Myers-Briggs type, an Enneagram number or another test&rsquo;s result, kept as you write
           it.
@@ -127,16 +127,12 @@ export function OtherTests({
                   <p className="mt-1 break-words text-small text-ink">{row.note}</p>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="shrink-0"
+              <IconButton
+                label={`Delete ${row.typedValue} from ${row.testName}`}
                 onClick={() => remove(row)}
-                aria-label={`Delete ${row.typedValue} from ${row.testName}`}
               >
-                <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
-              </Button>
+                <Trash2 strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </li>
           ))}
         </ul>

@@ -275,7 +275,7 @@ function Expanded({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+            className="press flex size-8 items-center justify-center rounded-control text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
           >
             <X className="size-4" strokeWidth={1.75} aria-hidden />
           </button>

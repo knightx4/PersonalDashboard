@@ -2,6 +2,7 @@ import { DashMark, type DashLook } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
 
 /**
@@ -117,9 +118,9 @@ export function RunnerCrew({
             className={slot.state === 'working' ? undefined : 'text-ink-muted'}
           />
           <span className="min-w-0 flex-1">
-            <span className="block text-micro font-semibold uppercase tracking-wider text-ink-muted">
+            <SectionLabel as="span" className="block">
               {slot.label}
-            </span>
+            </SectionLabel>
             <SlotText
               slot={slot}
               held={held}

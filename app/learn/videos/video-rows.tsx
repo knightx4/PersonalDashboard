@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -90,7 +90,7 @@ export function VideoRows({
                 loading="lazy"
                 width={96}
                 height={54}
-                className="h-[36px] w-16 rounded-sm bg-sunken object-cover sm:h-[54px] sm:w-24"
+                className="h-[36px] w-16 rounded-card bg-sunken object-cover sm:h-[54px] sm:w-24"
               />
             </Link>
             <span className="min-w-0">
@@ -104,7 +104,7 @@ export function VideoRows({
                   {detail && video.verdict === 'card' && cards > 0 ? (
                     <>
                       {' · '}
-                      <Link href={`/learn/videos/${video.videoId}#cards`} className="tabular-nums hover:underline">
+                      <Link href={`/learn/videos/${video.videoId}#cards`} className={cn('tabular-nums', linkVariants({ tone: 'quiet' }))}>
                         {detail}
                       </Link>
                     </>

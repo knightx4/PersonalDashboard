@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PlaylistPage } from '@/lib/learn/youtube/load';
@@ -28,7 +28,7 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
           href={`/learn/youtube/${channel.slug}`}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           {channel.name}
         </Link>
       </p>
@@ -39,7 +39,7 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
           <>
             {videos.length} {videos.length === 1 ? 'video' : 'videos'}
             {stored > 0 ? ` · ${stored} with a transcript` : ''} ·{' '}
-            <a href={playlist.url} className="hover:underline" target="_blank" rel="noreferrer">
+            <a href={playlist.url} className={linkVariants({ tone: 'quiet' })} target="_blank" rel="noreferrer">
               Open on YouTube
             </a>
           </>

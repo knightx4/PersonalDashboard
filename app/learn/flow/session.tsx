@@ -2,11 +2,11 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import Link from 'next/link';
 import { Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
@@ -117,15 +117,15 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
 function DontKnowButton() {
   const { pending } = useFormStatus();
   return (
-    <button
+    <Button
+      variant="link"
       type="submit"
       name="dontKnow"
       value="1"
-      disabled={pending}
-      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-70"
+      pending={pending}
     >
       I don&rsquo;t know
-    </button>
+    </Button>
   );
 }
 
@@ -137,15 +137,15 @@ function DontKnowButton() {
 function NotNowButton() {
   const { pending } = useFormStatus();
   return (
-    <button
+    <Button
+      variant="link"
       type="submit"
       name="notNow"
       value="1"
-      disabled={pending}
-      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-70"
+      pending={pending}
     >
       Not now
-    </button>
+    </Button>
   );
 }
 
@@ -189,8 +189,8 @@ function TrackOfferCard({
   };
 
   return (
-    <div className="mt-4 flex gap-3 text-left">
-      <Sprout className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+    <div className="flex w-full gap-3 text-left">
+      <Sprout className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-ui font-medium text-ink">New subject: {offer.name}</p>
         <p className="mt-0.5 text-small text-ink-muted">
@@ -218,12 +218,9 @@ function TrackOfferCard({
             <form key={outcome} action={setAside}>
               <input type="hidden" name="themeId" value={offer.themeId} />
               <input type="hidden" name="outcome" value={outcome} />
-              <button
-                type="submit"
-                className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline"
-              >
+              <Button variant="link" type="submit">
                 {outcome === 'never' ? 'Never' : 'Not now'}
-              </button>
+              </Button>
             </form>
           ))}
         </div>
@@ -279,8 +276,7 @@ export function FlowSession({
     // is the way on, so it is the whole card rather than a line under it.
     if (live.nothing && live.offer) {
       return (
-        <div className={cn(cardVariants(), 'border-dashed px-4 py-6')}>
-          <p className="text-ui text-ink-muted">{NOTHING_TO_ASK[live.nothing]}</p>
+        <EmptyState size="box" align="start" title={NOTHING_TO_ASK[live.nothing]}>
           <TrackOfferCard
             key={live.offer.themeId}
             offer={live.offer}
@@ -289,36 +285,34 @@ export function FlowSession({
             track={track}
             only={only}
           />
-        </div>
+        </EmptyState>
       );
     }
+    const nothingText = live.nothing
+      ? track
+        ? `Nothing left to ask about ${track.name}.`
+        : aboutGoals
+          ? nothingAboutGoals(goal)
+          : NOTHING_TO_ASK[live.nothing]
+      : null;
     return (
-      <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
+      <form action={step}>
         <input type="hidden" name="intent" value="ask" />
         <TrackField track={track} only={only} goal={goal} />
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <EmptyState
+          size="box"
+          title={nothingText ?? live.error ?? ''}
+          action={
+            live.nothing && track
+              ? { label: 'Ask across all subjects', href: practiceHref() }
+              : live.nothing && aboutGoals
+                ? { label: 'Ask about everything', href: practiceHref() }
+                : undefined
+          }
+        >
           {live.error && <AskButton label="Try again" />}
-          {live.nothing && (
-            <span className="text-ui text-ink-muted">
-              {track
-                ? `Nothing left to ask about ${track.name}.`
-                : aboutGoals
-                  ? nothingAboutGoals(goal)
-                  : NOTHING_TO_ASK[live.nothing]}
-            </span>
-          )}
-          {live.nothing && track && (
-            <Link href={practiceHref()} className="text-ui text-accent hover:underline">
-              Ask across all subjects
-            </Link>
-          )}
-          {live.nothing && aboutGoals && (
-            <Link href={practiceHref()} className="text-ui text-accent hover:underline">
-              Ask about everything
-            </Link>
-          )}
-          {live.error && <span className="text-ui text-danger">{live.error}</span>}
-        </div>
+          {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
+        </EmptyState>
       </form>
     );
   }

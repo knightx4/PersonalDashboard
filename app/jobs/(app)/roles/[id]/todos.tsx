@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Mail, MoreHorizontal, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { completeReminder } from '@/app/jobs/(app)/_home/actions';
@@ -145,27 +146,24 @@ function TodoLine({
        * line under the words. */
       <div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Mark done"
+          <IconButton
+            size="sm"
+            label="Mark done"
             disabled={finishing}
             onClick={() => finish(() => void completeReminder(todo.id))}
-            className="press flex size-4 shrink-0 items-center justify-center text-ink-muted transition-colors duration-quick hover:text-accent"
+            className="-m-1 hover:text-accent"
           >
             <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
-          </button>
+          </IconButton>
           <span className="min-w-0 flex-1 truncate text-ui text-ink">{todo.body}</span>
           <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt)}</span>
-          <button
-            type="button"
+          <IconButton
+            label={answering ? 'Close' : 'Edit, push back or finish it'}
             aria-expanded={answering}
-            title={answering ? 'Close' : 'Edit, push back or finish it'}
             onClick={() => setAnswering((value) => !value)}
-            className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
           >
-            <MoreHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">{answering ? 'Close' : 'Edit, push back or finish it'}</span>
-          </button>
+            <MoreHorizontal strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </div>
         <TodoMail todo={todo} messages={messages} timezone={timezone} offer={false} />
         {answering && (
@@ -278,16 +276,9 @@ function TodoMail({
         )}
         {/* No confirm: re-linking is one pick away, so this is reversible.
             The same unlink glyph the task rows use for detaching. */}
-        <button
-          type="button"
-          title="Unlink the email"
-          disabled={pending}
-          onClick={() => save(null)}
-          className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <Unlink className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Unlink the email</span>
-        </button>
+        <IconButton label="Unlink the email" disabled={pending} onClick={() => save(null)}>
+          <Unlink strokeWidth={1.75} aria-hidden />
+        </IconButton>
         {error && <span className="text-danger">{error}</span>}
       </p>
     );

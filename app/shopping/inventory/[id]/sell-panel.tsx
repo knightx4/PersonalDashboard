@@ -11,6 +11,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { FieldError, Input } from '@/components/ui/field';
+import { linkVariants } from '@/components/ui/link';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { cn } from '@/lib/cn';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { ItemSellQuote } from '@/lib/sell/item-quote';
 import { formatRange } from '@/lib/sell/price-evidence';
@@ -152,69 +155,81 @@ export function ItemSellPanel({
         </p>
       ) : null}
 
-      <dl className="grid gap-3 text-body sm:grid-cols-2">
-        <div>
-          <dt className="text-ink-muted">Expected price</dt>
-          <dd className="tabular font-medium text-ink">
-            {price != null ? formatMoney(price) : 'Not priced yet'}
-            {price != null && (
-              <span className="ml-2 text-small font-normal text-ink-muted">
-                {quote.priceIsManual
-                  ? 'your price'
-                  : quote.priceSource === 'web_estimate'
-                    ? 'web estimate'
-                    : 'eBay asks'}
-                {quote.quoteIsStale ? ' · out of date' : ''}
+      <ValueList>
+        <ValueRow
+          label="Expected price"
+          value={
+            <>
+              <span className="tabular font-medium">
+                {price != null ? formatMoney(price) : 'Not priced yet'}
               </span>
-            )}
-            {quote.evidence && (
-              <span className="ml-2 tabular text-small font-normal text-ink-muted">
-                {formatRange(quote.evidence.lowCents, quote.evidence.highCents, formatMoney)}
-              </span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Net if you list it</dt>
-          <dd className="tabular font-medium text-ink">
-            {quote.netSelfCents != null ? formatMoney(quote.netSelfCents) : '—'}
-          </dd>
-        </div>
-        {quote.buyback && (
-          <div>
-            <dt className="text-ink-muted">Buyback</dt>
-            <dd className="tabular text-ink">
-              {formatMoney(quote.netBuybackCents ?? quote.buyback.cents)}
-              {quote.buyback.url ? (
-                <a
-                  href={quote.buyback.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-2 text-small text-accent underline"
-                >
-                  {quote.buyback.vendor}
-                </a>
-              ) : (
-                <span className="ml-2 text-small text-ink-muted">{quote.buyback.vendor}</span>
-              )}
-            </dd>
-          </div>
-        )}
-        {quote.path && (
-          <div className="sm:col-span-2">
-            <dt className="text-ink-muted">Suggested</dt>
-            <dd className="text-ink">
-              <span className="font-medium">{PATH_LABEL[quote.path]}</span>{' '}
-              <span className="text-ink-muted">{quote.reason}</span>
-              {quote.path === 'donate' && quote.donateFmvCents > 0 && (
+              {price != null && (
                 <span className="ml-2 text-small text-ink-muted">
-                  FMV hint {formatMoney(quote.donateFmvCents)} (not tax advice)
+                  {quote.priceIsManual
+                    ? 'your price'
+                    : quote.priceSource === 'web_estimate'
+                      ? 'web estimate'
+                      : 'eBay asks'}
+                  {quote.quoteIsStale ? ' · out of date' : ''}
                 </span>
               )}
-            </dd>
-          </div>
+              {quote.evidence && (
+                <span className="ml-2 tabular text-small text-ink-muted">
+                  {formatRange(quote.evidence.lowCents, quote.evidence.highCents, formatMoney)}
+                </span>
+              )}
+            </>
+          }
+        />
+        <ValueRow
+          label="Net if you list it"
+          value={
+            quote.netSelfCents != null ? (
+              <span className="tabular font-medium">{formatMoney(quote.netSelfCents)}</span>
+            ) : null
+          }
+        />
+        {quote.buyback && (
+          <ValueRow
+            label="Buyback"
+            value={
+              <>
+                <span className="tabular">
+                  {formatMoney(quote.netBuybackCents ?? quote.buyback.cents)}
+                </span>
+                {quote.buyback.url ? (
+                  <a
+                    href={quote.buyback.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn('ml-2 text-small', linkVariants())}
+                  >
+                    {quote.buyback.vendor}
+                  </a>
+                ) : (
+                  <span className="ml-2 text-small text-ink-muted">{quote.buyback.vendor}</span>
+                )}
+              </>
+            }
+          />
         )}
-      </dl>
+        {quote.path && (
+          <ValueRow
+            label="Suggested"
+            value={
+              <>
+                <span className="font-medium">{PATH_LABEL[quote.path]}</span>{' '}
+                <span className="text-ink-muted">{quote.reason}</span>
+                {quote.path === 'donate' && quote.donateFmvCents > 0 && (
+                  <span className="ml-2 text-small text-ink-muted">
+                    FMV hint {formatMoney(quote.donateFmvCents)} (not tax advice)
+                  </span>
+                )}
+              </>
+            }
+          />
+        )}
+      </ValueList>
 
       {quote.evidence && <PriceEvidenceDetail evidence={quote.evidence} />}
 

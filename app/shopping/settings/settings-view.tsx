@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -106,7 +107,7 @@ export function ShoppingSettingsView({
             <p className="pt-1">
               <Link
                 href="/account"
-                className="text-ui font-medium text-accent underline underline-offset-2"
+                className={cn('text-ui', linkVariants())}
               >
                 Change these under Account
               </Link>

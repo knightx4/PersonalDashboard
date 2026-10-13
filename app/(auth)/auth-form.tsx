@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { signIn, signInWithGoogle, signUp, type AuthState } from './actions';
 
 function Submit({ label }: { label: string }) {
@@ -56,7 +57,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-border" />
-        <span className="text-micro uppercase tracking-wider text-ink-muted">or</span>
+        <SectionLabel as="span">or</SectionLabel>
         <span className="h-px flex-1 bg-border" />
       </div>
 

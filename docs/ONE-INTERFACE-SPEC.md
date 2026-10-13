@@ -495,8 +495,8 @@ Checked by: count `ai-on-controls`, baseline 1, target 0, pending #1965.
 **R13.** There is one thread component.
 Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
 
-**R14.** A radius class is one of the three tokens or `rounded-full`.
-Checked by: count `off-token-radius`, baseline 199, target 0, pending #1922.
+**R14.** A radius class is one of the four tokens (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`), `rounded-full` or `rounded-none`.
+Checked by: count `off-token-radius`, baseline 199, target 0.
 
 **R15.** Lucide icons are drawn at one stroke weight.
 Checked by: count `icon-stroke-off`, baseline 184, target 0, pending #1926.

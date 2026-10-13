@@ -46,7 +46,7 @@ function TopicChip({ topic, shown }: { topic: NewsTopic; shown: boolean }) {
       onClick={() => run(!on)}
       className={cn(!on && 'line-through', failed && 'text-danger')}
     >
-      {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+      {on && <Check className="size-3.5" strokeWidth={1.75} aria-hidden />}
       {topic}
     </Button>
   );
