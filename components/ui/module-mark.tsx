@@ -143,15 +143,32 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawing; from: string; to: string; px: number }) {
+export type MarkFinish = 'solid' | 'glow';
+
+function GlassObject({
+  id,
+  drawing,
+  from,
+  to,
+  px,
+  finish = 'solid',
+}: {
+  id: string;
+  drawing: Drawing;
+  from: string;
+  to: string;
+  px: number;
+  finish?: MarkFinish;
+}) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
   // The pane runs from the light end of the hue down towards the deep end, so
   // white detail holds on it even for the paler hues (Vault, News).
-  const paneTop = `color-mix(in srgb, ${from} 78%, ${to})`;
-  const paneBottom = `color-mix(in srgb, ${from} 30%, ${to})`;
+  const glow = finish === 'glow';
+  const paneTop = glow ? from : `color-mix(in srgb, ${from} 78%, ${to})`;
+  const paneBottom = glow ? `color-mix(in srgb, ${from} 55%, ${to})` : `color-mix(in srgb, ${from} 30%, ${to})`;
 
   return (
     <>
@@ -167,22 +184,27 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
         <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={1.25} />
         </filter>
+        <filter id={`${id}-halo`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+          <feGaussianBlur stdDeviation={2.2} />
+        </filter>
         <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
         <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
           <GlassEdgeStops />
         </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <stop offset="0" stopColor="#fff" stopOpacity={0.42} />
-          <stop offset="0.5" stopColor="#fff" stopOpacity={0.06} />
+          <stop offset="0" stopColor="#fff" stopOpacity={glow ? 0.55 : 0.42} />
+          <stop offset="0.5" stopColor="#fff" stopOpacity={glow ? 0.1 : 0.06} />
           <stop offset="1" stopColor="#fff" stopOpacity={0} />
         </linearGradient>
       </defs>
 
-      {/* A soft shadow in the hue, under the whole object. */}
+      {/* A soft shadow in the hue, under the whole object; with the glow
+          finish, a halo of light round it as well. */}
       <g opacity={0.35} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill={to}>
         {back}
         {pane({})}
       </g>
+      {glow && <g opacity={0.55} filter={`url(#${id}-halo)`}>{pane({ fill: from })}</g>}
       <g fill={`url(#${id}-back)`}>{back}</g>
       {onBack && (
         <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
@@ -193,13 +215,23 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
           piece showing faintly through, a sheen across the top and a lit edge. */}
       {pane({ fill: `url(#${id}-pane)` })}
       <g clipPath={`url(#${id}-clip)`}>
-        <g fill={to} filter={`url(#${id}-blur)`} opacity={0.35} transform="translate(-.5 .7)">
+        <g fill={to} filter={`url(#${id}-blur)`} opacity={glow ? 0.5 : 0.35} transform="translate(-.5 .7)">
           {back}
         </g>
+        {glow && (
+          <>
+            {/* Light from inside: a bright core in the middle of the pane. */}
+            <g filter={`url(#${id}-halo)`} transform="translate(12 13) scale(.55) translate(-12 -13)" opacity={0.85}>
+              {pane({ style: { fill: `color-mix(in srgb, ${from} 55%, #fff)` } })}
+            </g>
+            {/* And a highlight in the top-left corner, where the light catches. */}
+            <ellipse cx={7.5} cy={7.5} rx={4.5} ry={2.4} fill="#fff" opacity={0.28} filter={`url(#${id}-blur)`} />
+          </>
+        )}
       </g>
       {pane({ fill: `url(#${id}-sheen)` })}
       {pane({ strokeWidth: 0.5, style: { stroke: `color-mix(in srgb, ${to} 55%, transparent)` } })}
-      {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55, opacity: 0.8 })}
+      {pane({ stroke: `url(#${id}-edge)`, strokeWidth: glow ? 0.65 : 0.55, opacity: glow ? 1 : 0.8 })}
       <g fill="none" stroke="#fff" strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
         {lines}
       </g>
@@ -237,10 +269,13 @@ function HomePlate({ id }: { id: string }) {
 export function ModuleMark({
   module,
   size = 'md',
+  finish,
   className,
 }: {
   /** null means the app itself. */
   module: ModuleId | null;
+  /** How the pane is lit: solid colour (the default), or brighter with light glowing from inside. */
+  finish?: MarkFinish;
   size?: keyof typeof SIZES;
   className?: string;
 }) {
@@ -255,7 +290,7 @@ export function ModuleMark({
         {key.shape === 'dash' ? (
           <HomePlate id={id} />
         ) : (
-          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} />
+          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} finish={finish} />
         )}
       </svg>
     </span>
