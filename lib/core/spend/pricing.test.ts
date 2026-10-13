@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  asBatch,
   costMicrosFor,
   EMPTY_USAGE,
   MODEL_PRICES,
@@ -83,6 +84,14 @@ describe('what a call cost', () => {
     expect(costMicrosFor('claude-sonnet-5', usage({ inputTokens: 1000, outputTokens: 100, webSearchRequests: 3 }))).toBe(
       tokens + 30_000,
     );
+  });
+
+  it('halves the tokens of a Message Batches call and keeps the search fee whole', () => {
+    // 10,000×2 + 1,000×10 = 30,000 live; half is 15,000, plus two searches.
+    const tokens = usage({ inputTokens: 10_000, outputTokens: 1000 });
+    expect(costMicrosFor('claude-sonnet-5-5', tokens)).toBe(30_000);
+    expect(costMicrosFor('claude-sonnet-5-5', asBatch(tokens))).toBe(15_000);
+    expect(costMicrosFor('claude-sonnet-5-5', asBatch({ ...tokens, webSearchRequests: 2 }))).toBe(35_000);
   });
 
   it('has a rate for every model this app calls, and for the older ones already in the ledger', () => {
@@ -185,5 +194,17 @@ describe('one report per model', () => {
       { model: 'claude-sonnet-5', usage: usage({ inputTokens: 10, webSearchRequests: 1 }) },
     ]);
     expect(sonnet.usage).toMatchObject({ inputTokens: 160, webSearchRequests: 3 });
+  });
+
+  it('keeps batch and live calls on the same model apart', () => {
+    const reports = sumByModel([
+      { model: 'claude-sonnet-5', usage: usage({ inputTokens: 100 }) },
+      { model: 'claude-sonnet-5', usage: asBatch(usage({ inputTokens: 40 })) },
+      { model: 'claude-sonnet-5', usage: usage({ inputTokens: 20 }) },
+    ]);
+    expect(reports.map((r) => [r.usage.inputTokens, r.usage.batch ?? false])).toEqual([
+      [120, false],
+      [40, true],
+    ]);
   });
 });
