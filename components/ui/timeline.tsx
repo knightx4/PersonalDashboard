@@ -28,7 +28,14 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  * draw the same text). Pass the person's own zone wherever the page has it.
  */
 
-export type TimelineKind = 'done' | 'started' | 'waiting' | 'blocked' | 'dropped' | 'question' | 'note';
+export type TimelineKind =
+  | 'done'
+  | 'started'
+  | 'waiting'
+  | 'blocked'
+  | 'dropped'
+  | 'question'
+  | 'note';
 
 const KINDS: Record<TimelineKind, { glyph: GlyphName; tone: string; word: string }> = {
   done: { glyph: 'check', tone: 'text-positive', word: 'Done' },
@@ -131,43 +138,45 @@ export function Timeline({
               </div>
               <div className={cn('min-w-0 flex-1', gap ? 'pb-2' : isLast ? '' : 'pb-4')}>
                 <p className="text-ui font-medium text-ink">{entry.title}</p>
-                <time
-                  dateTime={(entry.time instanceof Date ? entry.time : new Date(entry.time)).toISOString()}
-                  className="tabular block text-small text-ink-muted"
-                >
-                  {when}
-                </time>
-                {entry.body && <p className="mt-1 text-small text-ink-muted">{entry.body}</p>}
-                {(entry.link || entry.action) && (
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-small">
-                    {entry.link &&
-                      (external ? (
-                        <a
-                          href={entry.link.href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={linkVariants({ tone: 'quiet' })}
-                        >
-                          {entry.link.label}
-                        </a>
-                      ) : (
-                        <Link href={entry.link.href} className={linkVariants({ tone: 'quiet' })}>
-                          {entry.link.label}
-                        </Link>
-                      ))}
-                    {entry.action && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="xs"
-                        disabled={entry.action.disabled}
-                        onClick={entry.action.onSelect}
+                {/* The time shares a line with the link and the action, so a short entry is two lines, not three. */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-small">
+                  <time
+                    dateTime={(entry.time instanceof Date
+                      ? entry.time
+                      : new Date(entry.time)
+                    ).toISOString()}
+                    className="tabular text-small text-ink-muted"
+                  >
+                    {when}
+                  </time>
+                  {entry.link &&
+                    (external ? (
+                      <a
+                        href={entry.link.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={linkVariants({ tone: 'quiet' })}
                       >
-                        {entry.action.label}
-                      </Button>
-                    )}
-                  </div>
-                )}
+                        {entry.link.label}
+                      </a>
+                    ) : (
+                      <Link href={entry.link.href} className={linkVariants({ tone: 'quiet' })}>
+                        {entry.link.label}
+                      </Link>
+                    ))}
+                  {entry.action && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="xs"
+                      disabled={entry.action.disabled}
+                      onClick={entry.action.onSelect}
+                    >
+                      {entry.action.label}
+                    </Button>
+                  )}
+                </div>
+                {entry.body && <p className="mt-1 text-small text-ink-muted">{entry.body}</p>}
               </div>
             </div>
             {gap && (
