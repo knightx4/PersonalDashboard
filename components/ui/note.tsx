@@ -52,7 +52,6 @@ export function Note({ tone, title, glyph = true, className, children, ...props 
   const mark = glyph && (tone === 'accent' || tone === 'caution' || tone === 'positive') ? GLYPHS[tone] : null;
   return (
     <div
-      role={tone === 'caution' ? 'status' : undefined}
       className={cn(note({ tone }), mark && 'flex items-start gap-2', className)}
       {...props}
     >
