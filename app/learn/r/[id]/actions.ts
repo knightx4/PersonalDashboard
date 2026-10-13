@@ -23,8 +23,10 @@ import {
   setReadNow,
   setReadingLocation,
   setReadingNote,
+  setReadingText,
   setReadingStatus,
 } from '@/lib/learn/tracks/save';
+import { cleanReadingText, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
 import { recordOutcome } from '@/lib/learn/next/record';
 
 /**
@@ -303,6 +305,70 @@ export async function updateNote(
   }
 
   revalidatePath(`/learn/r/${parsed.data.readingId}`);
+  return {};
+}
+
+const TextInput = z.object({
+  readingId: z.string().uuid(),
+  text: z.string().max(2_000_000),
+});
+
+/**
+ * Keep pasted text on the reading, replacing any it had.
+ *
+ * Dash reads this text instead of the link from then on. The row is found
+ * through the session client, so a reading that is not yours is not there.
+ */
+// latency: pending
+export async function saveReadingText(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  await requireUser();
+
+  const parsed = TextInput.safeParse({
+    readingId: formData.get('readingId'),
+    text: formData.get('text') ?? '',
+  });
+  if (!parsed.success) return { error: 'That text is far too long to keep. Paste the part you want Dash to read.' };
+
+  const cleaned = cleanReadingText(parsed.data.text);
+  if (!cleaned.ok) return { error: cleaned.error };
+
+  const supabase = await createLearnClient();
+  try {
+    const found = await setReadingText(supabase, parsed.data.readingId, {
+      text: cleaned.text,
+      label: PASTED_LABEL,
+    });
+    if (!found) return { error: 'That reading is not there any more.' };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not keep that text.' };
+  }
+
+  revalidatePath(`/learn/r/${parsed.data.readingId}`);
+  return {};
+}
+
+/** Take the text off the reading; Dash goes back to the link. */
+// latency: pending
+export async function clearReadingText(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  if (!readingId.success) return { error: 'Could not work out which reading that was.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await setReadingText(supabase, readingId.data, null);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not clear the text.' };
+  }
+
+  revalidatePath(`/learn/r/${readingId.data}`);
   return {};
 }
 

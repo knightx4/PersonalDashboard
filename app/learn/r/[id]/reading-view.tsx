@@ -11,6 +11,7 @@ import { FindSources } from './find-sources';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeFromTrack } from '../../t/[id]/actions';
 import { NoteForm } from './note-form';
+import { ReadingText } from './reading-text';
 import { NoteToGraph } from './note-to-graph';
 import { StatusButtons } from './status-buttons';
 import { ReadNowButton } from './read-now-button';
@@ -89,7 +90,12 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
         </p>
       )}
 
-      {reading.why && <p className="mb-5 text-body text-ink">{reading.why}</p>}
+      {reading.why && (
+        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
+          <h2 className="mb-1 text-ui font-semibold text-ink-muted">Why it is here</h2>
+          <p className="text-body text-ink">{reading.why}</p>
+        </section>
+      )}
 
       {videoId && (
         <ClipPlayer
@@ -182,6 +188,8 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
       </section>
       )}
 
+      <ReadingText readingId={reading.id} given={reading.givenText} />
+
       {/* Where you are, then the two next steps side by side. Each button's
           name says what it does, so neither needs a heading or a sentence:
           "On Now" puts it on Now, where it comes first until it is finished;
@@ -204,7 +212,9 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
 
       <section>
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">What you took from it</h2>
-        <NoteForm readingId={reading.id} note={reading.note} />
+        <div className={cn(cardVariants({ padding: 'dense' }), 'border-l-2 border-l-accent')}>
+          <NoteForm readingId={reading.id} note={reading.note} />
+        </div>
 
         {/* The note is written anyway, so this asks nothing new of you: it is
             where a reading gets to change what the graph thinks you know. */}
