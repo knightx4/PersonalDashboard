@@ -34,6 +34,7 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
+import { openingOffset, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
@@ -61,7 +62,9 @@ export type NavSection = {
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
    * wrong -- and Raised has, because an unread question is a session that
-   * guessed and built on the guess. Nothing else in this app has.
+   * guessed and built on the guess. Goals' Inbox and Learn's Now carry one
+   * too, for the same reason: an unanswered question or a due item left
+   * unseen goes stale quietly.
    */
   badge?: number;
 };
@@ -209,15 +212,58 @@ export function AppShell({
   }, []);
 
   /**
-   * A new page starts at the top of the page.
+   * A new page starts at the top of the pane, and Back returns to where you
+   * were (plan #1919.2).
    *
    * The router scrolls `window` on navigation, and from lg up the window is
    * not the thing that scrolls -- the pane is. Without this, opening a role
    * from halfway down the pipeline lands you halfway down the role. Below lg
    * the pane is not a scroll container and this is a no-op.
+   *
+   * Next gives no event for the kind of navigation, but a Back or Forward
+   * press fires `popstate` before the new path renders, so that sets a flag
+   * the path change reads. The offset is saved as the pane scrolls and again
+   * at the moment of leaving, before the old content is replaced.
    */
+  const poppedRef = useRef(false);
+  const pathRef = useRef(pathname);
   useEffect(() => {
-    paneRef.current?.scrollTo({ top: 0 });
+    const pane = paneRef.current;
+    if (!pane) return;
+    const save = () => savePaneScroll(pathRef.current, pane.scrollTop);
+    const onPop = () => {
+      save();
+      poppedRef.current = true;
+    };
+    pane.addEventListener('scroll', save, { passive: true });
+    document.addEventListener('click', save, true);
+    window.addEventListener('popstate', onPop, true);
+    return () => {
+      pane.removeEventListener('scroll', save);
+      document.removeEventListener('click', save, true);
+      window.removeEventListener('popstate', onPop, true);
+    };
+  }, []);
+  useEffect(() => {
+    const pane = paneRef.current;
+    pathRef.current = pathname;
+    const popped = poppedRef.current;
+    poppedRef.current = false;
+    if (!pane) return;
+    const top = openingOffset(pathname, popped);
+    pane.scrollTo({ top });
+    if (!top) return;
+    // The page may still be filling in; keep asking for a moment until the
+    // pane is long enough to hold the offset.
+    let tries = 0;
+    let frame = 0;
+    const settle = () => {
+      if (Math.abs(pane.scrollTop - top) < 2 || ++tries > 30) return;
+      pane.scrollTo({ top });
+      frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
   }, [pathname]);
 
   function toggleCollapsed() {
