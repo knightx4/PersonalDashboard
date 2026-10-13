@@ -160,7 +160,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                     {row.summary}
                   </span>
                 )}
-                <WaitingActions eventId={row.eventId} />
+                <WaitingActions row={row} />
               </li>
             ))}
           </ul>

@@ -140,6 +140,8 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/[id]/prep-actions.ts#writeRoundPrepNote': ['write-interview-prep'],
   // Dash's reply to a comment on a role that tags it, and the letter it writes
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
+  // Asks on the role's thread, as a comment tagged @dash does.
+  'app/jobs/(app)/_home/prepare-actions.ts#prepareWithDash': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
   'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],

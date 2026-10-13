@@ -9,6 +9,7 @@ import { notesRoutine } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
   NOTES_WORK_KINDS,
+  NOT_MOVED_TO_IDEAS,
   OUTSTANDING_STATUSES,
   type FeedbackKind,
 } from '@/lib/feedback/load';
@@ -34,6 +35,19 @@ import { noteFilesBrief, noteRef, outstandingNoteFiles } from '@/lib/feedback/fi
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
   revalidatePath('/dev/bugs');
+}
+
+/**
+ * Refresh `path` only when the header panel was used on it. Any revalidation
+ * in a server action makes the action render the page you are on again before
+ * it answers, so a note filed from a heavy page waited on that whole page
+ * (notes a78502b0, 3abf5f41). The pages are rendered per request, so the
+ * queue and the ideas page are read fresh when you next open them anyway.
+ */
+function revalidateIfOn(pagePath: string | null | undefined, path: string): void {
+  if (pagePath == null || pagePath === path || pagePath.startsWith(`${path}?`)) {
+    revalidatePath(path);
+  }
 }
 
 export type FeedbackActionState = {
@@ -110,7 +124,7 @@ export async function submitFeedback(
     }
   }
 
-  revalidateFeedback();
+  revalidateIfOn(parsed.data.pagePath, '/dev/bugs');
   return {
     message: filesError ?? SAVED[parsed.data.kind],
     filed: data?.id ? { table: 'feedback_items', id: String(data.id) } : undefined,
@@ -120,6 +134,7 @@ export async function submitFeedback(
 const triageSchema = z.object({
   table: z.enum(['feedback_items', 'ideas']),
   id: z.string().uuid(),
+  pagePath: z.string().max(300).nullable().optional(),
 });
 
 /** What triage made of a row the header just saved, and where it now is. */
@@ -155,17 +170,20 @@ export type FiledTriage = {
 export async function triageFiled(input: {
   table: TriageTable;
   id: string;
+  /** The page the panel was opened on, so only that page is refreshed. */
+  pagePath?: string | null;
 }): Promise<FiledTriage | null> {
   const user = await requireUser();
   const parsed = triageSchema.safeParse(input);
   if (!parsed.success) return null;
+  const { table, id, pagePath } = parsed.data;
 
   const core = await createCoreClient();
   if (!(await jevEnabledFor(core, user.id))) return null;
 
   const supabase = await createClient();
   const spend: SpendReport[] = [];
-  const triage = await triageRow(supabase, { userId: user.id, ...parsed.data, spend });
+  const triage = await triageRow(supabase, { userId: user.id, table, id, spend });
   await recordSessionSpend(user.id, { module: 'core', operation: 'triage-note' }, spend);
 
   let ideaId: string | null = null;
@@ -194,8 +212,8 @@ export async function triageFiled(input: {
   }
   if (!triage) return null;
 
-  if (parsed.data.table === 'ideas' || ideaId) revalidatePath('/dev/ideas');
-  if (parsed.data.table === 'feedback_items') revalidateFeedback();
+  if (parsed.data.table === 'ideas' || ideaId) revalidateIfOn(pagePath, '/dev/ideas');
+  if (parsed.data.table === 'feedback_items') revalidateIfOn(pagePath, '/dev/bugs');
   return { view: triageView(triage), ideaId };
 }
 
@@ -466,6 +484,7 @@ export async function runFeatureRoutine(
     .select('id')
     .eq('user_id', user.id)
     .in('status', [...OUTSTANDING_STATUSES])
+    .or(NOT_MOVED_TO_IDEAS)
     .in('kind', [...NOTES_WORK_KINDS]);
   const files = await outstandingNoteFiles(
     await createCoreClient(),
@@ -554,6 +573,7 @@ export async function openFeedbackCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
     .in('status', [...OUTSTANDING_STATUSES])
+    .or(NOT_MOVED_TO_IDEAS)
     .in('kind', [...NOTES_WORK_KINDS]);
   return count ?? 0;
 }

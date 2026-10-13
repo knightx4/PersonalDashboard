@@ -3,10 +3,12 @@ import {
   FEEDBACK_COLUMNS,
   feedbackRowFrom,
   isNotesWork,
+  isOutstanding,
   parseFeedbackKind,
   queueOfKind,
   type FeedbackQueue,
 } from '@/lib/feedback/load';
+import { movedResolution } from '@/lib/feedback/move';
 
 /** A row as PostgREST hands it back, before the app shape. */
 function row(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -88,5 +90,27 @@ describe('isNotesWork', () => {
     expect(isNotesWork({ kind: 'bug' })).toBe(true);
     expect(isNotesWork({ kind: 'feature' })).toBe(true);
     expect(isNotesWork({ kind: 'like' })).toBe(false);
+  });
+});
+
+describe('a note moved to the ideas page (note 43f91515)', () => {
+  it('is not outstanding, so the queue does not list it as a request', () => {
+    const moved = feedbackRowFrom(
+      row({ kind: 'feature', status: 'planned', resolution_note: movedResolution('A you module') }),
+    );
+    expect(isOutstanding(moved)).toBe(false);
+  });
+
+  it('counts the same way when a notes run moved it', () => {
+    const moved = feedbackRowFrom(
+      row({ status: 'planned', resolution_note: 'Moved to the ideas page as 3f9c1a2b: needs a table.' }),
+    );
+    expect(isOutstanding(moved)).toBe(false);
+  });
+
+  it('leaves a note planned for any other reason outstanding', () => {
+    const waiting = feedbackRowFrom(row({ status: 'planned', resolution_note: 'Waits on a rule.' }));
+    expect(isOutstanding(waiting)).toBe(true);
+    expect(isOutstanding(feedbackRowFrom(row()))).toBe(true);
   });
 });
