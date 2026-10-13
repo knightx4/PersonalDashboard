@@ -2,8 +2,8 @@
  * One person's suggestion run: read, ask, store.
  *
  * Called by the daily cron for every account (inngest/jobs/suggestions.ts)
- * with a service client, and by the search buttons on Roles and Contacts with the person's
- * own. Every read names the person, so the service client's missing RLS
+ * with a service client, and by the two search buttons on Find with the
+ * person's own. Every read names the person, so the service client's missing RLS
  * changes nothing.
  *
  * The spend is handed back rather than written here, so each caller records it
