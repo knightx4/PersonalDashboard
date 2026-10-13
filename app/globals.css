@@ -86,6 +86,8 @@
   --c-w-news-tint: #f6f1e2;
   --c-w-goals: #4a6f0c;
   --c-w-goals-tint: #eef5e1;
+  --c-w-you: #006b7c;
+  --c-w-you-tint: #e4f4f6;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -240,6 +242,7 @@
   --c-w-learn-lit: var(--c-w-learn);
   --c-w-news-lit: var(--c-w-news);
   --c-w-goals-lit: var(--c-w-goals);
+  --c-w-you-lit: var(--c-w-you);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -319,6 +322,8 @@
   --c-w-news-tint: #281e03;
   --c-w-goals: #a3d65a;
   --c-w-goals-tint: #1a2408;
+  --c-w-you: #3dcbdd;
+  --c-w-you-tint: #052329;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -510,6 +515,7 @@
   --c-w-learn-lit: #6fdcd2;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #b0dc6e;
+  --c-w-you-lit: #65d6e5;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -618,6 +624,8 @@
   --c-w-news-tint: #ece4cf;
   --c-w-goals: #41610a;
   --c-w-goals-tint: #e3ecd2;
+  --c-w-you: #005d67;
+  --c-w-you-tint: #d7eaed;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -714,6 +722,8 @@
   --c-w-news-tint: #2c2205;
   --c-w-goals: #b2dd70;
   --c-w-goals-tint: #1d2a0b;
+  --c-w-you: #6ad6e2;
+  --c-w-you-tint: #0f2a2f;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -816,6 +826,7 @@
   --c-w-learn-lit: #6fdcd2;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #b0dc6e;
+  --c-w-you-lit: #65d6e5;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets: smoked glass ----
@@ -883,6 +894,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #b0dc6e;
   --c-w-goals-tint: #1f2a10;
+  --c-w-you: #65d6e5;
+  --c-w-you-tint: #0d2a34;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -977,6 +990,7 @@
   --c-w-learn-lit: #6fdcd2;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #b0dc6e;
+  --c-w-you-lit: #65d6e5;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The glass ----
@@ -1034,6 +1048,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #b0dc6e;
   --c-w-goals-tint: #1f2a10;
+  --c-w-you: #65d6e5;
+  --c-w-you-tint: #0d2a34;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -1115,6 +1131,7 @@
   --c-w-learn-lit: #0a5d54;
   --c-w-news-lit: #6e5600;
   --c-w-goals-lit: #41610a;
+  --c-w-you-lit: #005d67;
   --c-w-dev-lit: #434e5f;
 
   /* ---- The glass: frosted white ---- */
@@ -1166,6 +1183,8 @@
   --c-w-news-tint: #ece4cf;
   --c-w-goals: #41610a;
   --c-w-goals-tint: #e3ecd2;
+  --c-w-you: #005d67;
+  --c-w-you-tint: #d7eaed;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -1337,6 +1356,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #b0dc6e;
   --c-w-goals-tint: #1f2a10;
+  --c-w-you: #65d6e5;
+  --c-w-you-tint: #0d2a34;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
   --c-positive: #6fe0b0;
@@ -1416,6 +1437,8 @@
     --c-w-news-tint: #281e03;
     --c-w-goals: #a3d65a;
     --c-w-goals-tint: #1a2408;
+    --c-w-you: #3dcbdd;
+    --c-w-you-tint: #052329;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -1494,6 +1517,11 @@
   --c-sheet-accent: var(--c-w-goals);
   --c-page-accent: var(--c-w-goals-lit);
   --c-accent-tint: var(--c-w-goals-tint);
+}
+[data-workspace='you'] {
+  --c-sheet-accent: var(--c-w-you);
+  --c-page-accent: var(--c-w-you-lit);
+  --c-accent-tint: var(--c-w-you-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -1662,6 +1690,8 @@ body,
   --color-w-news-tint: var(--c-w-news-tint);
   --color-w-goals: var(--c-w-goals);
   --color-w-goals-tint: var(--c-w-goals-tint);
+  --color-w-you: var(--c-w-you);
+  --color-w-you-tint: var(--c-w-you-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 

@@ -119,6 +119,7 @@ function Solid({ shape }: { shape: MarkShape }) {
     case 'book':
     case 'envelope':
     case 'flag':
+    case 'person':
     case 'terminal':
     case 'dash':
     default:
@@ -177,6 +178,18 @@ function SolidRest({ shape }: { shape: MarkShape }) {
         <>
           <rect x="3.4" y="2.4" width="2.8" height="19.4" rx="1.4" />
           <path d="M5 3.6h14.6a1.3 1.3 0 0 1 1.06 2.05L17.6 10l3.06 4.35A1.3 1.3 0 0 1 19.6 16.4H5Z" />
+        </>
+      );
+
+    case 'person':
+      // A head over a pair of shoulders, two separate pieces. It is the only
+      // shape in the set that is round on top and broad at the foot, which is
+      // what keeps it clear of the lock: that one is an open arch over a
+      // block, and this is a solid disc over a dome.
+      return (
+        <>
+          <circle cx="12" cy="7.1" r="4.6" />
+          <path d="M4 21.6a1.4 1.4 0 0 1-1.4-1.4v-.5c0-3.5 3.3-6.2 7.3-6.2h4.2c4 0 7.3 2.7 7.3 6.2v.5a1.4 1.4 0 0 1-1.4 1.4Z" />
         </>
       );
 
@@ -280,6 +293,14 @@ function Detail({ shape }: { shape: MarkShape }) {
       // The gap between pole and cloth. Without it the two merge into one
       // block at 18px and the pole stops reading as something you plant.
       return <rect x="6.2" y="3" width="1.5" height="14" rx="0.75" />;
+
+    case 'person':
+      // The open neck of a collar. A disc over a dome is a person to most
+      // eyes, but also a pawn, a keyhole and a mushroom; the V where a shirt
+      // opens is the one mark that settles it. It runs into the gap under the
+      // head rather than sitting inside the shoulders, so at 18px it reads as
+      // a notch in the silhouette instead of a speck that has closed up.
+      return <path d="M9.2 12.6h5.6l-2.1 4.4a.78.78 0 0 1-1.4 0Z" />;
 
     case 'envelope':
       // The fold the letter goes behind, drawn as one wide V. It runs the full

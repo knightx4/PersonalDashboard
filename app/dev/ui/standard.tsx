@@ -288,6 +288,7 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   learn: 'bg-w-learn',
   news: 'bg-w-news',
   goals: 'bg-w-goals',
+  you: 'bg-w-you',
   dev: 'bg-w-dev',
 };
 

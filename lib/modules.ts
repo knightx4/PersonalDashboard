@@ -20,6 +20,7 @@ export type ModuleId =
   | 'learn'
   | 'news'
   | 'goals'
+  | 'you'
   | 'dev';
 
 export type AppModule = {
@@ -115,6 +116,7 @@ export type MarkShape =
   | 'book'
   | 'envelope'
   | 'flag'
+  | 'person'
   | 'terminal';
 
 export interface MarkKey {
@@ -226,6 +228,23 @@ export const MODULES: readonly AppModule[] = [
     // so a goal's accent is never read as a refund. A flag rather than a
     // target, because Learn's own Goals tab already draws the target.
     key: { shape: 'flag', from: '#a3e635', to: '#4d7c0f' },
+  },
+  {
+    id: 'you',
+    prefix: '/you',
+    // Personality, the first tab. /you redirects there too, but naming it
+    // here saves the switcher a redirect (plan #1991.1).
+    home: '/you/personality',
+    label: 'You',
+    description: 'Personality, places, work and school',
+    accent: '--color-w-you',
+    // Cyan, halfway between learn's teal and todo's sky. Measured in OKLCH
+    // that is the widest gap left on the wheel, about 27 degrees from each
+    // neighbour, which is more room than rose has from the delete red. The
+    // obvious warm choice for a person, terracotta, was ruled out because
+    // it is Paper's caution colour to within a few degrees, and a pink would
+    // have been the third pink in the switcher beside the brand's own.
+    key: { shape: 'person', from: '#22d3ee', to: '#007889' },
   },
   {
     id: 'dev',

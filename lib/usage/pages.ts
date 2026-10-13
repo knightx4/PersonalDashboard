@@ -154,4 +154,9 @@ export const PAGE_ROUTES: readonly string[] = [
   '/vault/n/[...path]',
   '/vault/settings',
   '/vault/triage',
+  '/you',
+  '/you/insights',
+  '/you/personality',
+  '/you/places',
+  '/you/work',
 ];

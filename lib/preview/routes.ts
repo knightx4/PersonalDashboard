@@ -154,6 +154,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
   'learn-subject-clips-empty': ['/learn/s/[id]/clips'],
+  'you-shell': ['/you/personality', '/you/places', '/you/work'],
+  'you-insights': ['/you/insights'],
   'learn-personality-test': ['/learn/know/personality'],
   'learn-personality-scores': ['/learn/know/personality'],
   'learn-personality-add-type': ['/learn/know/personality'],

@@ -5,6 +5,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
+import { YouTabEmpty } from '@/app/you/you-tabs';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -2665,6 +2666,14 @@ const shellSections: NavSection[] = [
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
 ];
 
+/** The sections app/you/layout.tsx passes, copied for the same reason. */
+const youSections: NavSection[] = [
+  { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
+  { href: '/you/places', label: 'Places', icon: 'places', exact: true },
+  { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
+  { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+];
+
 const triageCrumbs = [
   { label: 'Vault', href: '/vault' },
   { label: 'Quick note triage', href: '/vault/triage' },
@@ -5255,6 +5264,38 @@ export const SURFACES: readonly Surface[] = [
         <TodayLists board={todayBoard} timezone="Europe/London" />
       </AppShell>
     ),
+  },
+
+  {
+    /* The You workspace in its shell, on Personality, its first tab (plan
+     * #1991.1): the four tabs in the sidebar and the tab's empty state. */
+    id: 'you-shell',
+    label: 'You · The workspace on its first tab',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <AppShell
+        account="preview"
+        module="you"
+        sections={youSections}
+        feedbackHref="/dev/bugs"
+        displayName="Chris"
+        email="chris@example.com"
+        isOwner
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <YouTabEmpty tab="personality" />
+      </AppShell>
+    ),
+  },
+  {
+    id: 'you-insights',
+    label: 'You · Insights, before Dash has noticed anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouTabEmpty tab="insights" />,
   },
 
   {
