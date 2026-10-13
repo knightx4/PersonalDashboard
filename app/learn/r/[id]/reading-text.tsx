@@ -12,6 +12,9 @@ import { readingPdfPath, readingPdfProblem } from '@/lib/learn/tracks/reading-pd
 import { MAX_READING_TEXT } from '@/lib/learn/tracks/reading-text';
 import { clearReadingText, saveReadingPdf, saveReadingText } from './actions';
 
+/** Where this section sits, for the link under a summary that could not read the link. */
+export const READING_TEXT_ANCHOR = 'reading-text';
+
 /**
  * The text of a reading, when the link will not do (plan #1876.1).
  *
@@ -23,9 +26,12 @@ import { clearReadingText, saveReadingPdf, saveReadingText } from './actions';
 export function ReadingText({
   readingId,
   given,
+  unreadable = false,
 }: {
   readingId: string;
   given: { label: string; addedAt: string } | null;
+  /** Summarize has just said the link cannot be read, so the buttons need no sentence of their own. */
+  unreadable?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -112,7 +118,7 @@ export function ReadingText({
   const over = draft.length > MAX_READING_TEXT;
 
   return (
-    <section className="mb-5">
+    <section id={READING_TEXT_ANCHOR} className="mb-5 scroll-mt-4">
       <h2 className="mb-2 text-ui font-semibold text-ink-muted">Text of this reading</h2>
       <input
         ref={fileRef}
@@ -179,9 +185,11 @@ export function ReadingText({
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-body text-ink-muted">
-              If Dash cannot open the link, paste the text of the reading or upload it as a PDF, and Dash reads that instead.
-            </p>
+            {!unreadable && (
+              <p className="text-body text-ink-muted">
+                If Dash cannot open the link, paste the text of the reading or upload it as a PDF, and Dash reads that instead.
+              </p>
+            )}
             {error && <FieldError>{error}</FieldError>}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="secondary" size="md" onClick={open} disabled={pending}>
