@@ -1,20 +1,20 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
 import { HOME_MARK, moduleById, type MarkShape, type ModuleId } from '@/lib/modules';
-import { DashGlyph, GlassEdgeStops, GlassSheenStops, glassOutline, glassTint } from './dash-mark';
+import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
 
 /**
  * One mark per module, all drawn the same way: two layers of one object.
  *
  * At the back is a solid shape in the module's hue, peeking out from the top
- * right. In front is a pane of frosted glass, and through it the back layer
- * shows blurred and a little displaced, which is what makes it read as glass.
- * The detail that names the object (the eyelet, the tick, the dial) is
- * drawn on the pane in white.
+ * right. In front is a pane of glass tinted in the same hue, and through it
+ * the back layer shows blurred and a little displaced, which is what makes it
+ * read as glass. The detail that names the object (the eyelet, the tick, the
+ * dial) is drawn on the pane in white.
  *
- * On a light page the pane would vanish into the ground, so there it carries a
- * tint of the module's hue, a coloured edge, and the detail drawn in the deep
- * hue instead of white. CSS light-dark() makes that switch from the
+ * The tint is the same on every page, so on a light page the ground shows
+ * through and the pane reads paler. There the pane takes a coloured edge and
+ * the detail is drawn in the deep hue instead of white. CSS light-dark() makes that switch from the
  * color-scheme of wherever the mark sits, so one drawing serves every theme,
  * and the light sheets inside Lightbox get the light version on their own.
  *
@@ -36,6 +36,9 @@ const SIZES = {
   md: { box: 'size-8', px: 32 },
   lg: { box: 'size-11', px: 44 },
 } as const;
+
+/** How strongly the pane is tinted its hue, as a percentage of the colour over what is behind it. */
+const TINT = 48;
 
 /** The price tag, pointing left; drawn turned 45 degrees so it points up and left. */
 const TAG =
@@ -155,26 +158,11 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-function GlassObject({
-  id,
-  drawing,
-  from,
-  to,
-  px,
-  tint,
-}: {
-  id: string;
-  drawing: Drawing;
-  from: string;
-  to: string;
-  px: number;
-  tint?: number;
-}) {
+function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawing; from: string; to: string; px: number }) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
-  // White on dark, the deep hue on light, where white would vanish into the tint.
-  // Glass tinted deep enough carries white in both.
-  const ink = tint && tint >= 55 ? '#fff' : `light-dark(${to}, #fff)`;
+  // White on dark, the deep hue on light, where white would not hold against the tint.
+  const ink = `light-dark(${to}, #fff)`;
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
 
@@ -193,24 +181,15 @@ function GlassObject({
           <GlassEdgeStops />
         </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          {tint ? (
-            // Tinted glass keeps the dark page's gentler sheen everywhere; the light one washes the colour out.
-            <>
-              <stop offset="0" stopColor="#fff" stopOpacity={0.28} />
-              <stop offset="1" stopColor="#fff" stopOpacity={0.06} />
-            </>
-          ) : (
-            <GlassSheenStops />
-          )}
+          {/* The dark page's gentle sheen on every page: the light page's would wash the tint out. */}
+          <stop offset="0" stopColor="#fff" stopOpacity={0.28} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.06} />
         </linearGradient>
-        {tint && (
-          // The glass itself in the hue, from the middle of the ramp down to the deep end, on
-          // every page, so white detail holds even on the paler hues.
-          <linearGradient id={`${id}-tint`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-            <stop offset="0" style={{ stopColor: `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${tint}%, transparent)` }} />
-            <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} ${tint}%, transparent)` }} />
-          </linearGradient>
-        )}
+        {/* The glass itself in the hue, from the middle of the ramp down to the deep end. */}
+        <linearGradient id={`${id}-tint`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" style={{ stopColor: `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)` }} />
+          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} ${TINT}%, transparent)` }} />
+        </linearGradient>
       </defs>
 
       {/* A soft shadow in the hue, under the whole object. */}
@@ -230,7 +209,7 @@ function GlassObject({
           {back}
         </g>
       </g>
-      {tint ? pane({ fill: `url(#${id}-tint)` }) : pane({ style: { fill: glassTint(from, 30) } })}
+      {pane({ fill: `url(#${id}-tint)` })}
       {pane({ fill: `url(#${id}-sheen)` })}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
       {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55 })}
@@ -278,14 +257,11 @@ export function ModuleMark({
   module,
   size = 'md',
   className,
-  tint,
 }: {
   /** null means the app itself. */
   module: ModuleId | null;
   size?: keyof typeof SIZES;
   className?: string;
-  /** How strongly the glass is tinted its hue, 0 to 100; unset is the clear glass. */
-  tint?: number;
 }) {
   const entry = moduleById(module);
   const sizing = SIZES[size];
@@ -298,7 +274,7 @@ export function ModuleMark({
         {key.shape === 'dash' ? (
           <HomePlate id={id} />
         ) : (
-          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} tint={tint} />
+          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} />
         )}
       </svg>
     </span>

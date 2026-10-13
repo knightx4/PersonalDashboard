@@ -122,7 +122,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          {/* What came from Goals carries the Goals mark, the lime flag, so a
+          {/* What came from Goals carries the Goals mark, the emerald flag, so a
               step towards a goal is told apart from a task at a glance (note
               134ec065). The mark rather than a green row: green on this app
               means money came back (law 4), and the mark is the colour the
