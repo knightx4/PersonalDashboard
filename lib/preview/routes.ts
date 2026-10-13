@@ -168,6 +168,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-dense': ['/learn/space'],
   'learn-idea-space-place': ['/learn/space'],
   'learn-idea-space-replay': ['/learn/space'],
+  'learn-idea-space-lights': ['/learn/space'],
   'learn-idea-space-around': ['/learn/space'],
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],

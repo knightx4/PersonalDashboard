@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Clapperboard, Square } from 'lucide-react';
 import Link from '@/components/ui/link';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import type { Point } from '@/lib/learn/map/layout';
 import { ideaGraph, openedFrom, paramsFor, type IdeaGraph } from '@/lib/learn/map/place-graph';
 import { TOUR_DWELL_MS, tourScript, type TourScript } from '@/lib/learn/map/tour';
 import { dustAt } from '@/lib/learn/map/sky';
+import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/learn/map/lights-up';
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
@@ -103,6 +104,7 @@ export function MapSection({
     [replay, view.ideas, domains],
   );
   const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
+  const lighting = useLightsUp(view, !!graph);
 
 
   const axes = layout === 'axes' ? axisEnds(view.ideas) : null;
@@ -153,7 +155,7 @@ export function MapSection({
             names={names}
             dust={dust}
             asOf={replay ? momentOf(span, shownDay, today).toISOString() : view.asOf}
-            replay={replay}
+            replay={replay ?? lighting.replay}
             label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as you know it`}
             pointingAt={pointingAt}
             graph={graph}
@@ -165,7 +167,7 @@ export function MapSection({
             <MapTimeline start={span.start} days={span.days} day={shownDay} counts={countsOf(lights)} onDay={onDay} touring={tour.running} />
           )}
           <Legend params={params} set={set} lights={lights} domains={domainsThen} slots={slots} dust={dust.length} />
-          <MapNotes view={view} params={params} graph={graph} past={past} />
+          <MapNotes view={view} params={params} graph={graph} past={past} litNames={lighting.names} />
         </div>
       </Card>
     </section>
@@ -228,12 +230,15 @@ function MapNotes({
   params,
   graph,
   past,
+  litNames,
 }: {
   view: IdeaMapView;
   params: MapParams;
   graph: IdeaGraph | null;
   /** The timeline shows a day before today. */
   past: boolean;
+  /** The ideas that lit in the last two days, named under the map. */
+  litNames: readonly string[];
 }) {
   const bright = past
     ? 'A star is as bright as you knew the idea on the day shown.'
@@ -266,6 +271,7 @@ function MapNotes({
           about the same thing.
         </p>
       )}
+      {!past && litLine(litNames) && <p className="text-ink">{litLine(litNames)}</p>}
       {view.places.length === 0 ? (
         <p>Your places are named by the daily run; until then the map names domains.</p>
       ) : (
@@ -459,6 +465,44 @@ function GraphBar({
       <TourButton tour={tour} />
     </div>
   );
+}
+
+// -- An idea lights up (plan #1997.10) -----------------------------------------
+
+/**
+ * The moment on arrival: the ideas whose state was set in the last two days
+ * brighten together from dark to their strength while the rest of the sky
+ * holds still. Played once when the map opens on the
+ * whole sky. With reduced motion nothing plays: the sky is lit as it stands,
+ * and the line under the map still names what lit.
+ */
+function useLightsUp(view: IdeaMapView, graphOpen: boolean): { replay: Map<string, LightThen> | null; names: string[] } {
+  const found = useMemo(() => recentlyLit(view.ideas, new Date(view.asOf)), [view.ideas, view.asOf]);
+  const ids = useMemo(() => new Set(found.map((idea) => idea.id)), [found]);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [startedOpen] = useState(graphOpen);
+
+  useLayoutEffect(() => {
+    if (found.length === 0 || startedOpen || reducedMotion()) return;
+    // The first frame holds the stars dark and the wait runs from it, so
+    // the sky never shows them lit before they go dark.
+    const began = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const done = Math.min(Math.max(now - began - LIT_DELAY_MS, 0) / LIT_MS, 1);
+      setProgress(done >= 1 ? null : done);
+      if (done < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+    // Played once for the ideas the page opened with.
+  }, [found, startedOpen]);
+
+  const replay = useMemo(
+    () => (progress === null || graphOpen ? null : lightingUp(view.ideas, ids, progress)),
+    [progress, graphOpen, view.ideas, ids],
+  );
+  return { replay, names: found.map((idea) => idea.name) };
 }
 
 // -- The scripted tour (plan #1997.9) ------------------------------------------

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { IdeaSpaceView } from '@/app/learn/space/idea-space-view';
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 import type { IdeaMapView, IdeaOnMap, PlaceOnMap } from '@/lib/learn/map/load';
@@ -617,5 +618,49 @@ export function IdeaSpaceRecordingChooseSurface() {
   const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
   return (
     <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} recording={{ on: false, hidden: hidden.map((p) => p.id) }} chooseOpen />
+  );
+}
+
+/**
+ * An idea lights up (plan #1997.10): three ideas set in the last two days, one
+ * tested a few hours ago, one said to be known yesterday morning, one tested
+ * the day before, and the rest of the map as it stands. The view is mounted
+ * afresh on each press, so the recorder sees the stars brighten from dark.
+ */
+const LIT_FIXTURE = (() => {
+  const set: [string, StateBasis, number][] = [
+    ['Opportunity cost', 'tested', 3],
+    ['Spacing effect in memory', 'declared', 30],
+    ['Annual recurring revenue', 'tested', 40],
+  ];
+  const rows = new Map(
+    set.map(([name, established, hours]) => {
+      const at = new Date(AS_OF.getTime() - hours * 3_600_000).toISOString();
+      const row: StrengthInput = {
+        state: 'known',
+        established,
+        tested_at: established === 'tested' ? at : null,
+        declared_at: established === 'declared' ? at : null,
+        review_interval_days: null,
+      };
+      return [VIEW.ideas.find((idea) => idea.name === name)!.id, row] as const;
+    }),
+  );
+  const ideas = VIEW.ideas.map((idea) => {
+    const row = rows.get(idea.id);
+    return row ? { ...idea, state: row.state, stateRow: row } : idea;
+  });
+  return { ...VIEW, ideas: lit(ideas.map((idea) => ({ ...idea, createdAt: idea.createdAt }))).map((idea, i) => ({ ...idea, placeId: VIEW.ideas[i]!.placeId })) };
+})();
+
+export function IdeaSpaceLightsSurface() {
+  const [visit, setVisit] = useState(0);
+  return (
+    <div className="space-y-4">
+      <Button variant="secondary" size="sm" data-motion-demo="lights-up" onClick={() => setVisit((n) => n + 1)}>
+        Open the map again
+      </Button>
+      <IdeaSpaceView key={visit} view={LIT_FIXTURE} params={DEFAULT_PARAMS} />
+    </div>
   );
 }

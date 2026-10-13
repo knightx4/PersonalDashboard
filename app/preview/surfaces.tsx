@@ -30,6 +30,7 @@ import {
   IdeaSpaceCardSurface,
   IdeaSpaceDenseSurface,
   IdeaSpaceDomainsSurface,
+  IdeaSpaceLightsSurface,
   IdeaSpaceSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
@@ -5114,6 +5115,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* The moment An idea lights up (plan #1997.10): three ideas set in the
+     * last two days brighten from dark to their strength when the map opens.
+     * The button opens it again, which the recorder presses. */
+    id: 'learn-idea-space-lights',
+    label: 'Learn · Idea Space, an idea lighting up',
+    module: 'learn',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="lights-up"]',
+      shows:
+        'The map opens again with three stars dark, and after a beat they brighten together to the strength each is known at, while every other star and the camera hold still.',
+    },
+    render: () => <IdeaSpaceLightsSurface />,
   },
   {
     /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
