@@ -16,6 +16,7 @@ const ENTRIES: TimelineEntry[] = [
     kind: 'done',
     title: 'Sent the cover letter to the research platform team',
     body: 'Attached the revised CV and the two-page project summary.',
+    children: <p className="font-mono text-micro text-ink-ghost">3f9c2e1</p>,
     link: { href: '/jobs', label: 'Open the role' },
     action: { label: 'Undo', onSelect: () => {} },
   },
@@ -34,9 +35,24 @@ const ENTRIES: TimelineEntry[] = [
     title: 'Reference form needs a signature',
     link: { href: 'https://example.com/form', label: 'Open the form' },
   },
-  { id: 'e', time: '2026-09-18T10:00:00Z', kind: 'waiting', title: 'Waiting on the portfolio review' },
-  { id: 'f', time: '2026-06-02T10:00:00Z', kind: 'dropped', title: 'Dropped the second role at the same company' },
-  { id: 'g', time: '2026-06-01T10:00:00Z', kind: 'note', title: 'Found the role on the careers page' },
+  {
+    id: 'e',
+    time: '2026-09-18T10:00:00Z',
+    kind: 'waiting',
+    title: 'Waiting on the portfolio review',
+  },
+  {
+    id: 'f',
+    time: '2026-06-02T10:00:00Z',
+    kind: 'dropped',
+    title: 'Dropped the second role at the same company',
+  },
+  {
+    id: 'g',
+    time: '2026-06-01T10:00:00Z',
+    kind: 'note',
+    title: 'Found the role on the careers page',
+  },
 ];
 
 export function TimelineDemo() {

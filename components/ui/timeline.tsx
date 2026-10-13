@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -11,7 +12,7 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  *
  * Each entry is a mark on a thin line with its time, a title, and optionally a
  * body, a link and one action such as Undo. Where more than a day separates two
- * entries the line carries a label saying how long ("3 days later"), so a quiet
+ * entries the line carries a label saying how long ("3 days earlier"), so a quiet
  * week reads as a quiet week instead of two rows that look adjacent.
  *
  * The marks are the status hexagons (components/ui/status-glyph.tsx) in the
@@ -59,6 +60,8 @@ export type TimelineEntry = {
   body?: string;
   /** Whose words the body is, so the person's and Dash's panels look different. */
   voice?: 'you' | 'dash';
+  /** Anything else the row carries, drawn under the body and above the link: a mark, a picture, a button. */
+  children?: ReactNode;
   link?: { href: string; label: string };
   /** One press on the row, such as Undo. */
   action?: { label: string; onSelect: () => void; disabled?: boolean };
@@ -78,11 +81,11 @@ export function gapLabel(newer: Date | string, older: Date | string): string | n
   const span = ms(newer) - ms(older);
   if (!(span > DAY_MS)) return null;
   const days = Math.floor(span / DAY_MS);
-  if (days < 14) return `${days} ${days === 1 ? 'day' : 'days'} later`;
+  if (days < 14) return `${days} ${days === 1 ? 'day' : 'days'} earlier`;
   const weeks = Math.floor(days / 7);
-  if (days < 60) return `${weeks} weeks later`;
+  if (days < 60) return `${weeks} weeks earlier`;
   const months = Math.floor(days / 30);
-  return `${months} months later`;
+  return `${months} months earlier`;
 }
 
 function parts(time: Date | string, timeZone: string) {
@@ -160,12 +163,15 @@ export function Timeline({
                         href={entry.link.href}
                         target="_blank"
                         rel="noreferrer"
-                        className={linkVariants({ tone: 'quiet' })}
+                        className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}
                       >
                         {entry.link.label}
                       </a>
                     ) : (
-                      <Link href={entry.link.href} className={linkVariants({ tone: 'quiet' })}>
+                      <Link
+                        href={entry.link.href}
+                        className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}
+                      >
                         {entry.link.label}
                       </Link>
                     ))}
@@ -195,6 +201,7 @@ export function Timeline({
                     {entry.body}
                   </p>
                 )}
+                {entry.children && <div className="mt-1">{entry.children}</div>}
               </div>
             </div>
             {gap && (
