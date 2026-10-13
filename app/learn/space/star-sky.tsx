@@ -824,23 +824,24 @@ export function StarSky({
       {cardStar && cardAt && size && <StarCard star={cardStar} at={cardAt} frame={size} asOf={asOf} />}
 
       <div
-        className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-control bg-raised ring-1 ring-border"
+        className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-control ring-1"
+        style={{ background: SKY.panel, color: SKY.panelMuted, ['--tw-ring-color' as string]: SKY.panelRing }}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
         <Tooltip label="Zoom in" align="end">
-          <IconButton label="Zoom in" onClick={() => zoomBy(ZOOM_STEP)}>
+          <IconButton className={ZOOM_BUTTON} label="Zoom in" onClick={() => zoomBy(ZOOM_STEP)}>
             <Plus strokeWidth={1.75} aria-hidden />
           </IconButton>
         </Tooltip>
         <Tooltip label="Zoom out" align="end">
-          <IconButton label="Zoom out" onClick={() => zoomBy(1 / ZOOM_STEP)}>
+          <IconButton className={ZOOM_BUTTON} label="Zoom out" onClick={() => zoomBy(1 / ZOOM_STEP)}>
             <Minus strokeWidth={1.75} aria-hidden />
           </IconButton>
         </Tooltip>
         <Tooltip label="Show the whole map" align="end">
-          <IconButton label="Show the whole map" onClick={showAll}>
+          <IconButton className={ZOOM_BUTTON} label="Show the whole map" onClick={showAll}>
             <Maximize2 strokeWidth={1.75} aria-hidden />
           </IconButton>
         </Tooltip>
@@ -848,6 +849,9 @@ export function StarSky({
     </div>
   );
 }
+
+/** Zoom buttons keep the sky's light-on-dark colours whatever the theme's tokens say. */
+const ZOOM_BUTTON = 'text-inherit hover:bg-white/10 hover:text-white focus-visible:outline-white';
 
 function byIdOf(stars: readonly Star[], id: string): number {
   for (let i = 0; i < stars.length; i++) if (stars[i]!.id === id) return i;
@@ -927,16 +931,22 @@ function StarCard({
 
   return (
     <div
-      className="pointer-events-none absolute rounded-control bg-raised p-3 text-small shadow-md ring-1 ring-border"
-      style={{ left, width, ...(below ? { top: at.y + 12 } : { bottom: frame.h - at.y + 12 }) }}
+      className="pointer-events-none absolute rounded-control p-3 text-small shadow-md ring-1"
+      style={{
+        background: SKY.panel,
+        color: SKY.panelText,
+        ['--tw-ring-color' as string]: SKY.panelRing,
+        left,
+        width, ...(below ? { top: at.y + 12 } : { bottom: frame.h - at.y + 12 }),
+      }}
       role="status"
     >
-      <p className="text-ui font-medium text-ink">{star.name}</p>
+      <p className="text-ui font-medium">{star.name}</p>
       <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
         {facts.map(([term, value]) => (
           <div key={term} className="contents">
-            <dt className="text-ink-muted">{term}</dt>
-            <dd className="tabular text-right text-ink">{value}</dd>
+            <dt style={{ color: SKY.panelMuted }}>{term}</dt>
+            <dd className="tabular text-right">{value}</dd>
           </div>
         ))}
       </dl>

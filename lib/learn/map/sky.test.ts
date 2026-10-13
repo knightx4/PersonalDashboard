@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   between,
+  SKY,
   crowding,
   dustAt,
   DUST_SPREAD,
@@ -203,5 +204,22 @@ describe('a crowded sky', () => {
     expect(crowding(10)).toBe(1);
     expect(crowding(400)).toBe(1);
     expect(crowding(10_000)).toBeCloseTo(0.2, 9);
+  });
+});
+
+describe('the panels on the sky', () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = rgbOf(hex).map((c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  it('is dark and fixed, so the card and zoom buttons read the same in a light theme', () => {
+    expect(SKY.panel).toMatch(/^rgba\(\d+, \d+, \d+, 0\.9/);
+    const ground = lum(SKY.groundInner);
+    expect(ground).toBeLessThan(0.02);
+    expect((lum(SKY.panelText) + 0.05) / (ground + 0.05)).toBeGreaterThan(7);
   });
 });

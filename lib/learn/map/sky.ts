@@ -48,6 +48,11 @@ export const SKY = {
   ring: 'rgba(255, 255, 255, 0.8)',
   /** A star with no domain colour. */
   plain: '#c9cfe6',
+  /** The zoom buttons and the hover card, which sit on the sky in every theme. */
+  panel: 'rgba(14, 20, 42, 0.92)',
+  panelRing: 'rgba(255, 255, 255, 0.16)',
+  panelText: '#e8ecff',
+  panelMuted: 'rgba(196, 203, 232, 0.78)',
 } as const;
 
 /** A star's core colour: its domain's, so hue still says where an idea is. */
