@@ -1,14 +1,7 @@
 import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
-import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
-import { AppShell } from '@/components/shell/app-shell';
+import { shellFor, type ShellFrame } from '@/lib/shell/shell-for';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -121,15 +114,10 @@ function CallRow({ row, timezone }: { row: SpendRow; timezone: string }) {
 }
 
 export default async function SpendPage() {
-  const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadRaisedNotifications(user.id),
-    loadMainCheck(),
-    isOwner({ user }),
-  ]);
+  return shellFor({ module: null, children: spendContent });
+}
 
+async function spendContent({ user, settings, owner }: ShellFrame) {
   const supabase = await createCoreClient();
   const [rows, ranges] = await Promise.all([
     loadSpend(supabase),
@@ -161,80 +149,64 @@ export default async function SpendPage() {
   const recent = rows.slice(0, 50);
 
   return (
-    <div className="min-h-full">
-      <AppShell
-        account={user.id}
-        module={null}
-        sections={[]}
-        displayName={settings.displayName}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        mainCheck={mainCheck}
-      >
-        <div className="mx-auto max-w-3xl">
-          <p className="mb-3">
-            <Link
-              href="/account"
-              className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-            >
-              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              Account
-            </Link>
-          </p>
+    <>
+      <p className="mb-3">
+        <Link
+          href="/account"
+          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+        >
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+          Account
+        </Link>
+      </p>
 
-          <PageHeader
-            title="Spend"
-            description="What the models have cost, per call, since this was switched on."
-          />
+      <PageHeader
+        title="Spend"
+        description="What the models have cost, per call, since this was switched on."
+      />
 
-          {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
-            <div className="mb-6">
-              <TranscriptCredits usage={transcripts} />
-            </div>
-          )}
-
-          {rows.length === 0 && (
-            <>
-              <EmptyState
-                size="box"
-                title="Nothing has been spent yet."
-                description="Every model call this app makes lands here — what it was doing, which model ran, and what it cost."
-              />
-              {estimates}
-            </>
-          )}
-          {rows.length > 0 && (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Total label="This month" total={totalOf(thisMonth)} />
-                <Total label="All time" total={totalOf(rows)} />
-              </div>
-
-              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
-              <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                {groups.map((group) => (
-                  <GroupRow key={`${group.module}-${group.operation}`} group={group} />
-                ))}
-              </ul>
-
-              {estimates}
-
-              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
-                The last {recent.length === 1 ? 'call' : `${recent.length} calls`}
-              </h2>
-              <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                {recent.map((row) => (
-                  <CallRow key={row.id} row={row} timezone={timezone} />
-                ))}
-              </ul>
-            </>
-          )}
+      {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
+        <div className="mb-6">
+          <TranscriptCredits usage={transcripts} />
         </div>
-      </AppShell>
-    </div>
+      )}
+
+      {rows.length === 0 && (
+        <>
+          <EmptyState
+            size="box"
+            title="Nothing has been spent yet."
+            description="Every model call this app makes lands here — what it was doing, which model ran, and what it cost."
+          />
+          {estimates}
+        </>
+      )}
+      {rows.length > 0 && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Total label="This month" total={totalOf(thisMonth)} />
+            <Total label="All time" total={totalOf(rows)} />
+          </div>
+
+          <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {groups.map((group) => (
+              <GroupRow key={`${group.module}-${group.operation}`} group={group} />
+            ))}
+          </ul>
+
+          {estimates}
+
+          <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
+            The last {recent.length === 1 ? 'call' : `${recent.length} calls`}
+          </h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {recent.map((row) => (
+              <CallRow key={row.id} row={row} timezone={timezone} />
+            ))}
+          </ul>
+        </>
+      )}
+    </>
   );
 }

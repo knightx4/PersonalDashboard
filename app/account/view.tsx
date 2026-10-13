@@ -20,6 +20,8 @@ import { CaptureTokensSection } from './capture-tokens';
 import { CaptureShortcutSection } from './capture-shortcut';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
+import { ThemePicker } from '@/components/shell/theme-picker';
+import type { Theme } from '@/lib/theme';
 import { PageHeader } from '@/components/shell/page-header';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
@@ -53,6 +55,7 @@ export function AccountView({
     timezone: string;
     displayCurrency: string;
     enabledModules: ModuleId[];
+    theme: Theme;
   };
   /** Whether this account owns the app. Read on the server; see lib/dev/owner. */
   isOwner: boolean;
@@ -85,7 +88,12 @@ export function AccountView({
         address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
       >
         <div className="space-y-6">
-          {tab === 'you' && <YouSection email={email} settings={settings} />}
+          {tab === 'you' && (
+            <>
+              <YouSection email={email} settings={settings} />
+              <ThemeSection theme={settings.theme} />
+            </>
+          )}
           {tab === 'workspaces' && (
             <>
               <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
@@ -123,6 +131,21 @@ export function AccountView({
         </div>
       </TabbedSections>
     </>
+  );
+}
+
+/**
+ * The theme and the density, where the setting lives. They were an icon in
+ * the top bar; ⌘K still switches the theme from anywhere.
+ */
+function ThemeSection({ theme }: { theme: Theme }) {
+  return (
+    <section className={cardVariants({ padding: 'standard' })}>
+      <h2 className="text-body font-semibold text-ink">Theme</h2>
+      <div className="mt-3">
+        <ThemePicker value={theme} />
+      </div>
+    </section>
   );
 }
 
