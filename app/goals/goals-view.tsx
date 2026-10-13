@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   ALL_GOALS_VIEWS,
   areaInView,
@@ -385,20 +386,25 @@ function AreaSection({
         />
       ) : (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            aria-controls={`area-body-${area.id}`}
-            aria-label={open ? `Fold ${area.name}` : `Open ${area.name}`}
-            className="press -mr-1 flex size-7 shrink-0 items-center justify-center rounded-control text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted max-sm:size-11"
+          <Tooltip
+            label={open ? 'Hide the goals in this area' : 'Show the goals in this area'}
+            className="-mr-1 shrink-0"
           >
-            <ChevronRight
-              className={cn('size-4 transition-transform duration-quick', open && 'rotate-90')}
-              strokeWidth={1.75}
-              aria-hidden
-            />
-          </button>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              aria-controls={`area-body-${area.id}`}
+              aria-label={open ? `Fold ${area.name}` : `Open ${area.name}`}
+              className="press flex size-7 shrink-0 items-center justify-center rounded-control text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted max-sm:size-11"
+            >
+              <ChevronRight
+                className={cn('size-4 transition-transform duration-quick', open && 'rotate-90')}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </button>
+          </Tooltip>
           <Link
             href={goalViewHref(`/goals/area/${area.id}`, view)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.

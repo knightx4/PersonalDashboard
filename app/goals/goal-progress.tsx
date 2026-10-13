@@ -10,6 +10,7 @@ import {
   goalMoveLabel,
   type GoalProgress as Progress,
 } from '@/lib/goals/status';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * A goal at a glance (plan #958): whose move it is, a bar of its steps by
@@ -76,13 +77,12 @@ export function QuestionMark({ count }: { count: number }) {
   if (count === 0) return null;
   const words = `${count} ${count === 1 ? 'question' : 'questions'} waiting on your answer`;
   return (
-    <span
-      title={words}
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
-    >
-      <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-      {count}
-      <span className="sr-only">{words}</span>
-    </span>
+    <Tooltip label={words} className="shrink-0">
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution">
+        <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+        {count}
+        <span className="sr-only">{words}</span>
+      </span>
+    </Tooltip>
   );
 }

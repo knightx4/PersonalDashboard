@@ -14,6 +14,7 @@ import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run'
 import { disconnectInbox, savePreference, updateProfile, type SettingsState } from './actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { cardVariants } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useCloseOnSuccess } from '@/lib/jobs/use-close-on-success';
 import {
   COMPANY_STAGE_LABELS,
@@ -623,18 +624,20 @@ function ExcludedSendersSection({
           {excludedSenders.map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 text-ui">
               <span className="tabular text-ink">{entry.domain}</span>
-              <button
-                type="button"
-                className="ml-auto text-ink-muted hover:text-danger"
-                onClick={() =>
-                  startTransition(async () => {
-                    await removeExcludedSender(entry.id);
-                  })
-                }
-                aria-label={`Stop excluding ${entry.domain}`}
-              >
-                <Trash2 className="size-3.5" strokeWidth={1.75} />
-              </button>
+              <Tooltip label="Stop excluding this sender" align="end" className="ml-auto">
+                <button
+                  type="button"
+                  className="text-ink-muted hover:text-danger"
+                  onClick={() =>
+                    startTransition(async () => {
+                      await removeExcludedSender(entry.id);
+                    })
+                  }
+                  aria-label={`Stop excluding ${entry.domain}`}
+                >
+                  <Trash2 className="size-3.5" strokeWidth={1.75} />
+                </button>
+              </Tooltip>
             </li>
           ))}
         </ul>

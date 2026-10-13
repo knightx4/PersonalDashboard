@@ -11,6 +11,7 @@ import {
 import { PIPELINE_PATH } from '@/lib/jobs/pipeline-view';
 import type { LiveApplication, LiveByMove } from '@/lib/jobs/today/live';
 import { HomeSection } from './home-section';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Every live application, grouped by whose move it is, under the numbers
@@ -116,19 +117,23 @@ function MoveGroup({ title, rows }: { title: string; rows: readonly LiveApplicat
                 <span className="absolute inset-0" aria-hidden />
                 {row.companyName} · {row.roleTitle}
               </Link>
-              <span
-                className="block truncate text-small text-ink-muted sm:shrink-0"
-                title={row.why}
-              >
-                {row.todo ? `${row.stage} · ${row.todo}` : row.stage}
-              </span>
+              {row.why ? (
+                <Tooltip label={row.why} className="flex min-w-0 sm:shrink-0">
+                  <span tabIndex={0} className="block min-w-0 truncate text-small text-ink-muted">
+                    {row.todo ? `${row.stage} · ${row.todo}` : row.stage}
+                  </span>
+                </Tooltip>
+              ) : (
+                <span className="block truncate text-small text-ink-muted sm:shrink-0">
+                  {row.todo ? `${row.stage} · ${row.todo}` : row.stage}
+                </span>
+              )}
             </div>
-            <span
-              className="tabular shrink-0 text-small text-ink-muted"
-              title="Days since anything happened on it"
-            >
-              {ageOf(row.daysSinceActivity)}
-            </span>
+            <Tooltip label="Days since anything happened on it" align="end" className="shrink-0">
+              <span tabIndex={0} className="tabular text-small text-ink-muted">
+                {ageOf(row.daysSinceActivity)}
+              </span>
+            </Tooltip>
           </li>
         ))}
       </ul>

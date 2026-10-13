@@ -8,6 +8,7 @@ import { VaultPanel } from '@/components/vault/vault-panel';
 import type { VaultFolderGroup } from '@/components/vault/vault-tree';
 import { cn } from '@/lib/cn';
 import { noteHref } from '@/lib/vault/paths';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Whether following this link should close the sheet.
@@ -107,14 +108,16 @@ export function VaultSheet({
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Vault</h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-              >
-                <X className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Close the vault</span>
-              </button>
+              <Tooltip label="Close the vault" align="end">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+                >
+                  <X className="size-4" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Close the vault</span>
+                </button>
+              </Tooltip>
             </div>
 
             <VaultPanel

@@ -79,6 +79,7 @@ import {
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One goal step, drawn through the dev plan's shared row (plan #982) in its
@@ -736,7 +737,15 @@ export function GoalRow({
       // 6d242e62). That is a different fact from the move, so it keeps its own
       // words rather than MoveLabel's; the goal's move is on GoalProgress.
       move={
-        <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
+        node.who.title ? (
+          <Tooltip label={node.who.title}>
+            <span className="inline-flex">
+              <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
+            </span>
+          </Tooltip>
+        ) : (
+          <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
+        )
       }
       layout="list"
       heading={page}
@@ -758,25 +767,28 @@ export function GoalRow({
       marks={
         <>
           {dashes && (
-            <span
-              ref={markRef}
-              title={
+            <Tooltip
+              label={
                 step.kind === 'claude'
                   ? STEP_KIND_LABELS.claude
                   : arrived
                     ? 'Finished by Dash'
-                    : node.who.title
+                    : node.who.title || 'Dash is on this step'
               }
-              className="inline-flex shrink-0 text-ink-muted"
+              className="shrink-0"
             >
-              <DashMark size="2xs" label="Dash's" />
-            </span>
+              <span ref={markRef} className="inline-flex text-ink-muted">
+                <DashMark size="2xs" label="Dash's" />
+              </span>
+            </Tooltip>
           )}
           {step.kind === 'rhythm' && (
-            <span title={STEP_KIND_LABELS.rhythm} className="inline-flex shrink-0 text-ink-muted">
-              <Repeat className="size-3" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
-            </span>
+            <Tooltip label={STEP_KIND_LABELS.rhythm} className="shrink-0">
+              <span className="inline-flex text-ink-muted">
+                <Repeat className="size-3" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
+              </span>
+            </Tooltip>
           )}
         </>
       }

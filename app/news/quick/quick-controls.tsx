@@ -15,6 +15,7 @@ import {
 import { useFormStatus } from 'react-dom';
 import { ArrowLeft, ArrowRight, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { BACK_PAGES, parseBack, passKey, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeBackFarEnough, swipeFarEnough } from '@/lib/news/quick/swipe';
@@ -393,40 +394,42 @@ export function ReactionButtons({
   const press = (thumb: Reaction) => run(shown === thumb ? null : thumb);
   return (
     <div className="flex items-center" role="group" aria-label="How was this story?">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-pressed={shown === 'up'}
-        aria-label="Thumbs up"
-        title={shown === 'up' ? 'Take back your thumbs up' : 'More stories like this'}
-        onClick={() => press('up')}
-        className={cn(shown === 'up' && 'text-accent', failed && 'text-danger')}
-      >
-        <ThumbsUp
-          className="size-4"
-          strokeWidth={1.75}
-          fill={shown === 'up' ? 'currentColor' : 'none'}
-          aria-hidden
-        />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-pressed={shown === 'down'}
-        aria-label="Thumbs down"
-        title={shown === 'down' ? 'Take back your thumbs down' : 'Fewer stories like this'}
-        onClick={() => press('down')}
-        className={cn(shown === 'down' && 'text-accent', failed && 'text-danger')}
-      >
-        <ThumbsDown
-          className="size-4"
-          strokeWidth={1.75}
-          fill={shown === 'down' ? 'currentColor' : 'none'}
-          aria-hidden
-        />
-      </Button>
+      <Tooltip label={shown === 'up' ? 'Take back your thumbs up' : 'More stories like this'}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown === 'up'}
+          aria-label="Thumbs up"
+          onClick={() => press('up')}
+          className={cn(shown === 'up' && 'text-accent', failed && 'text-danger')}
+        >
+          <ThumbsUp
+            className="size-4"
+            strokeWidth={1.75}
+            fill={shown === 'up' ? 'currentColor' : 'none'}
+            aria-hidden
+          />
+        </Button>
+      </Tooltip>
+      <Tooltip label={shown === 'down' ? 'Take back your thumbs down' : 'Fewer stories like this'} align="end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown === 'down'}
+          aria-label="Thumbs down"
+          onClick={() => press('down')}
+          className={cn(shown === 'down' && 'text-accent', failed && 'text-danger')}
+        >
+          <ThumbsDown
+            className="size-4"
+            strokeWidth={1.75}
+            fill={shown === 'down' ? 'currentColor' : 'none'}
+            aria-hidden
+          />
+        </Button>
+      </Tooltip>
     </div>
   );
 }

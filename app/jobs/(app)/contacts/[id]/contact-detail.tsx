@@ -8,6 +8,7 @@ import { ChipSelect, Field, FieldError, InlineTextarea, Input, Textarea } from '
 import { formatDate } from '@/lib/jobs/applications/load';
 import { logTouch, markTouchAnswered, updateContact, updateTouch } from '../actions';
 import type { ContactRow } from '../view';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
 type Channel = (typeof CHANNELS)[number];
@@ -52,15 +53,16 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
           {contact.status.replace(/_/g, ' ')}
         </span>
         {!editing && (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-            title="Edit their details"
-          >
-            <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">Edit their details</span>
-          </button>
+          <Tooltip label="Edit their details" align="end">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+            >
+              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Edit their details</span>
+            </button>
+          </Tooltip>
         )}
       </header>
 

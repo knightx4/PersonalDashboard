@@ -7,6 +7,7 @@ import {
   type BigFiveFactor,
   type BigFiveScores,
 } from '@/lib/learn/personality/ipip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The five Big Five scores (plan #1632), each as a share of its range with
@@ -44,10 +45,12 @@ export function BigFiveScoreList({
             <li key={factor}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-body font-medium text-ink">{name}</span>
-                <span className="text-body tabular-nums text-ink">
-                  {percent}
-                  <span className="text-small text-ink-muted"> / 100</span>
-                </span>
+                <Tooltip label={`${sum} on the IPIP scale, which runs from 10 to 50`} align="end">
+                  <span tabIndex={0} className="text-body tabular-nums text-ink">
+                    {percent}
+                    <span className="text-small text-ink-muted"> / 100</span>
+                  </span>
+                </Tooltip>
               </div>
               <Meter
                 className="mt-1.5"
@@ -56,7 +59,6 @@ export function BigFiveScoreList({
                 height="md"
                 minFraction={0.02}
                 label={`${name}: ${percent} of 100`}
-                title={`${sum} on the IPIP scale of 10 to 50`}
               />
               <p className="mt-1.5 text-small text-ink-muted">{leaning(factor, percent)}</p>
             </li>

@@ -3,6 +3,7 @@
 import { Select } from '@/components/ui/field';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { setExcitement } from '@/app/jobs/(app)/pipeline/actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * How much you want this one, set where you are reading about it.
@@ -27,21 +28,22 @@ export function ExcitementPicker({
   });
 
   return (
-    <Select
-      value={shown === null ? '' : String(shown)}
-      disabled={pending}
-      aria-label="Excitement"
-      aria-invalid={failed}
-      title="How much you want this one"
-      onChange={(event) => run(event.target.value === '' ? null : Number(event.target.value))}
-      className="h-7 min-h-11 w-auto px-1.5 text-small sm:min-h-0"
-    >
-      <option value="">Not rated</option>
-      {[5, 4, 3, 2, 1].map((level) => (
-        <option key={level} value={level}>
-          {'★'.repeat(level)}
-        </option>
-      ))}
-    </Select>
+    <Tooltip label="How much you want this one">
+      <Select
+        value={shown === null ? '' : String(shown)}
+        disabled={pending}
+        aria-label="Excitement"
+        aria-invalid={failed}
+        onChange={(event) => run(event.target.value === '' ? null : Number(event.target.value))}
+        className="h-7 min-h-11 w-auto px-1.5 text-small sm:min-h-0"
+      >
+        <option value="">Not rated</option>
+        {[5, 4, 3, 2, 1].map((level) => (
+          <option key={level} value={level}>
+            {'★'.repeat(level)}
+          </option>
+        ))}
+      </Select>
+    </Tooltip>
   );
 }
