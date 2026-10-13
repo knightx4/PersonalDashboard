@@ -406,6 +406,14 @@ export async function openReading(formData: FormData): Promise<void> {
   const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
   if (!url) redirect(`/learn/r/${readingId.data}`);
 
+  // Text you gave this reading is what Dash reads; its link is never fetched.
+  if (reading.givenText) {
+    if (reading.status === 'queued') {
+      await setReadingStatus(supabase, reading.id, 'reading').catch(() => {});
+    }
+    redirect(url);
+  }
+
   // Already narrowed and checked: nothing to do but go.
   if (reading.locatorConfidence === 'verified' && reading.textAnchor) {
     if (reading.status === 'queued') {
