@@ -99,7 +99,9 @@ describe('loadIdeaMap', () => {
     const narrowed = new Set(
       calls.filter((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === USER).map((c) => c.table),
     );
-    expect(narrowed).toEqual(new Set(['concepts', 'concept_state', 'subjects']));
+    expect(narrowed).toEqual(
+      new Set(['concepts', 'concept_state', 'subjects', 'idea_places', 'idea_place_members', 'vault_dust']),
+    );
   });
 
   it('draws an empty map when nothing is embedded', async () => {

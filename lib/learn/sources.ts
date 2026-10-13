@@ -230,6 +230,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
+    { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },
     { table: 'learn.concept_mentions', reason: 'Graph structure; read through concepts.' },
     {
       table: 'learn.course_reads',

@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 import { STATE_MARK_LABEL, mapHref, markOf, similarityText } from '@/lib/learn/map/view';
-import { Mark } from './idea-plot';
+import { StarSwatch } from './swatch';
 import { pickOnClick, usePick } from './pick';
 import { iconButtonVariants } from '@/components/ui/icon-button';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
@@ -26,6 +26,7 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
   const byId = new Map(ideas.map((other) => [other.id, other]));
   const facts: [string, string | null][] = [
     ['State', STATE_MARK_LABEL[markOf(idea.state)]],
+    ['Strength', idea.strength > 0 ? `${Math.round(idea.strength * 100)}%` : null],
     ['Subject', idea.track?.name ?? null],
     ['Field', idea.field?.name ?? null],
     ['Domain', idea.domain?.name ?? null],
@@ -72,14 +73,11 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
                     onClick={pickOnClick(pick, neighbour.id)}
                     className="flex min-h-11 items-center gap-2 py-1.5 text-ui text-ink hover:text-accent"
                   >
-                    <svg viewBox="-2 -2 4 4" className="size-3 shrink-0" aria-hidden>
-                      <g transform="scale(1.4)">
-                        <Mark
-                          dot={{ mark: markOf(other?.state ?? 'unknown'), slot: 'none' }}
-                          colour="state"
-                        />
-                      </g>
-                    </svg>
+                    <StarSwatch
+                      strength={other?.strength ?? 0}
+                      haze={other?.haze ?? 0}
+                      mixedUp={other?.state === 'misconception'}
+                    />
                     <span className="min-w-0 flex-1">{other?.name ?? 'An idea'}</span>
                     <span className="tabular shrink-0 text-small text-ink-muted">
                       {similarityText(neighbour.similarity)}

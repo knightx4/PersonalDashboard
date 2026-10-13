@@ -162,6 +162,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-know-personality-empty': ['/learn/know'],
   'learn-idea-space': ['/learn/space'],
   'learn-idea-space-domains': ['/learn/space'],
+  'learn-idea-space-card': ['/learn/space'],
+  'learn-idea-space-dense': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
