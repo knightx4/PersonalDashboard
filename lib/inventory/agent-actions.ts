@@ -72,7 +72,7 @@ export const shoppingActions: ModuleActions = {
     quickDisposeInventoryItem: GAP,
     toggleInventoryItemList: GAP,
     deleteInventoryItem: none('deletes'),
-    setItemsForSale: GAP,
+    setItemsForSale: tool('change_items'),
     deleteInventoryItems: none('deletes'),
     toggleItemForSaleForm: GAP,
   },

@@ -113,6 +113,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
   'vault-note-editing': ['/vault/n/[...path]'],
+  'vault-note-rename': ['/vault/n/[...path]'],
   'vault-note-attachments': ['/vault/n/[...path]'],
   'vault-education-empty': ['/vault/education'],
   'vault-education-upload': ['/vault/education'],

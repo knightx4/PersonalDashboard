@@ -63,6 +63,7 @@ import {
 } from '@/lib/goals/capture-sort';
 import type { ModuleId } from '@/lib/modules';
 import { addTask, type TaskFormState } from '@/app/todo/actions';
+import { addQuickNote } from '@/app/vault/actions';
 import {
   fileGoalCapture,
   goalCaptureCosts,
@@ -274,6 +275,11 @@ async function file(
               : `Filed as ${entries.length} changes.`,
         filed: { captureId: result.captureId, entries },
       };
+    }
+    case 'vault': {
+      // The Vault page's own write, so the note waits in Quick note triage.
+      const result = await addQuickNote(text);
+      return result.error ? { error: result.error } : { message: 'Added to Quick note triage.' };
     }
     case 'anything':
       // The one box files through fileCaptureBox, in AnythingPanel.
