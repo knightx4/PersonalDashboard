@@ -51,7 +51,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
 
       <ReviewList
         reviews={reviews}
-        title="First, from earlier pieces"
+        title="First, from earlier in this track"
         description="Due for review today. A right answer brings the next question later; a miss brings it back tomorrow."
         showPlan={false}
       />

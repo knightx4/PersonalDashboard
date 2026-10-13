@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  firstReviewDays,
+  isReviewable,
   nextDueLine,
   nextInterval,
   pickDue,
   REVIEW_MAX_DAYS,
   reviewedState,
+  reviewLines,
   reviewPrompt,
   reviewToday,
   toReviewQuestion,
@@ -91,6 +94,28 @@ describe('toReviewQuestion', () => {
   });
 });
 
+describe('the first review', () => {
+  it('brings a tested idea back the next day and a declared one in three', () => {
+    expect(firstReviewDays('tested')).toBe(1);
+    expect(firstReviewDays('declared')).toBe(3);
+  });
+
+  it('schedules what is held in some measure, and not what is unknown or mixed up', () => {
+    for (const state of ['shaky', 'recognised', 'known', 'sharp'] as const) expect(isReviewable(state)).toBe(true);
+    expect(isReviewable('unknown')).toBe(false);
+    expect(isReviewable('misconception')).toBe(false);
+    expect(isReviewable(null)).toBe(false);
+  });
+});
+
+describe('reviewLines', () => {
+  it('names the piece when one taught the idea, and leaves the line out when none did', () => {
+    const idea = { trackName: 'SaaS metrics', pieceTitle: 'Churn', name: 'Churn compounds', claim: 'x' };
+    expect(reviewLines(idea)).toContain('Piece it was learned in: Churn');
+    expect(reviewLines({ ...idea, pieceTitle: null }).join('\n')).not.toContain('Piece it was learned in');
+  });
+});
+
 describe('pickDue', () => {
   const pieces = [
     { id: 'p2', subjectId: 's1', title: 'Later', conceptIds: ['a', 'b'], passedAt: '2026-09-20T00:00:00Z' },
@@ -98,26 +123,35 @@ describe('pickDue', () => {
     { id: 'p3', subjectId: 's2', title: 'Other plan', conceptIds: ['c'], passedAt: '2026-09-15T00:00:00Z' },
   ];
   const due = [
-    { conceptId: 'c', dueOn: '2026-09-25' },
-    { conceptId: 'a', dueOn: '2026-09-26' },
-    { conceptId: 'b', dueOn: '2026-09-21' },
-    { conceptId: 'z', dueOn: '2026-09-01' },
+    { conceptId: 'c', dueOn: '2026-09-25', subjectId: 's2' },
+    { conceptId: 'a', dueOn: '2026-09-26', subjectId: 's1' },
+    { conceptId: 'b', dueOn: '2026-09-21', subjectId: 's1' },
+    { conceptId: 'z', dueOn: '2026-09-01', subjectId: 's1' },
   ];
 
-  it('orders the most overdue first, names the first piece that taught each, and drops ideas in no passed piece', () => {
+  it('orders the most overdue first, names the first piece that taught each, and keeps ideas no piece taught', () => {
     const picked = pickDue(due, pieces, { limit: 5 });
-    expect(picked.map((entry) => [entry.conceptId, entry.piece.id])).toEqual([
+    expect(picked.map((entry) => [entry.conceptId, entry.piece?.id ?? null])).toEqual([
+      ['z', null],
       ['b', 'p2'],
       ['c', 'p3'],
       ['a', 'p1'],
     ]);
   });
 
-  it('keeps one plan, skips what the page teaches, and stops at the limit', () => {
-    expect(pickDue(due, pieces, { limit: 5, subjectId: 's1' }).map((entry) => entry.conceptId)).toEqual(['b', 'a']);
+  it("keeps one track by the idea's own track, skips what the page teaches, and stops at the limit", () => {
+    expect(pickDue(due, pieces, { limit: 5, subjectId: 's1' }).map((entry) => entry.conceptId)).toEqual(['z', 'b', 'a']);
     expect(pickDue(due, pieces, { limit: 5, subjectId: 's1', skip: new Set(['b']) }).map((e) => e.conceptId)).toEqual([
+      'z',
       'a',
     ]);
     expect(pickDue(due, pieces, { limit: 1 })).toHaveLength(1);
+  });
+
+  it('shows due ideas when no piece has been passed at all', () => {
+    expect(pickDue(due, [], { limit: 2 }).map((entry) => [entry.conceptId, entry.piece])).toEqual([
+      ['z', null],
+      ['b', null],
+    ]);
   });
 });

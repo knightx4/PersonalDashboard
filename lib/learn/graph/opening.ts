@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 
 /**
  * The ten questions asked before a subject is built, and what you answered.
@@ -373,6 +374,12 @@ export async function seedFromSweep(
 
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Writing what you already knew', error);
+    await scheduleIdeas(
+      supabase,
+      userId,
+      states.map((seeded) => seeded.conceptId),
+      { now: new Date(testedAt) },
+    );
   }
 
   return {
