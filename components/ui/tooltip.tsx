@@ -38,6 +38,7 @@ export function Tooltip({
   label,
   children,
   align = 'start',
+  above = false,
   defaultOpen = false,
   className,
 }: {
@@ -46,6 +47,12 @@ export function Tooltip({
   children: ReactElement<{ 'aria-describedby'?: string }>;
   /** Which edge of the child the tip hangs from; `end` near a row's right edge. */
   align?: 'start' | 'end';
+  /**
+   * Stand on top of the child, hung from its right edge, instead of below
+   * it. For a control in the bar at the foot of the window, where there is
+   * no room below.
+   */
+  above?: boolean;
   /** Start showing. For the preview gallery's shots. */
   defaultOpen?: boolean;
   className?: string;
@@ -54,7 +61,8 @@ export function Tooltip({
   const panelRef = useRef<HTMLDivElement>(null);
   const tipId = useId();
 
-  const [controller] = useState(() => createTooltipController({ onChange: setOpen, initiallyOpen: defaultOpen }),
+  const [controller] = useState(() =>
+    createTooltipController({ onChange: setOpen, initiallyOpen: defaultOpen }),
   );
   useEffect(() => () => controller.hide(), [controller]);
 
@@ -89,6 +97,9 @@ export function Tooltip({
         if ((event.target as HTMLElement).matches(':focus-visible')) ask();
       }}
       onBlur={hide}
+      // A press is the person using the control, and what it opens (a menu, a
+      // panel) hangs where the tip does. The tip comes back on the next hover.
+      onPointerDown={hide}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && controller.isOpen()) {
           event.stopPropagation();
@@ -102,7 +113,9 @@ export function Tooltip({
           ref={panelRef}
           id={tipId}
           role="tooltip"
-          anchor={align === 'end' ? 'trigger-below-end' : 'trigger-below'}
+          anchor={
+            above ? 'trigger-above-end' : align === 'end' ? 'trigger-below-end' : 'trigger-below'
+          }
           className="w-max max-w-64 px-3 py-2 text-small text-ink"
         >
           {label}

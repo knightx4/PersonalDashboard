@@ -10,6 +10,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import { addDays, type Task } from '@/lib/todo/tasks/model';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One line, and the rest only when you want it.
@@ -130,19 +131,20 @@ export function AddTask({ today }: { today: string }) {
             with a second control inside it is the shape #137 decided against. */}
         <LinkPicker value={about} onChange={setAbout} />
 
-        <button
-          type="button"
-          aria-pressed={pinned}
-          onClick={() => setPinned((on) => !on)}
-          title={pinned ? 'Pinned to the top' : 'Pin to the top'}
-          className={cn(
-            'press flex size-7 items-center justify-center rounded-full transition-colors duration-quick',
-            pinned ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-          )}
-        >
-          <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
-        </button>
+        <Tooltip label={pinned ? 'Pinned to the top' : 'Pin to the top'}>
+          <button
+            type="button"
+            aria-pressed={pinned}
+            onClick={() => setPinned((on) => !on)}
+            className={cn(
+              'press flex size-7 items-center justify-center rounded-full transition-colors duration-quick',
+              pinned ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+            )}
+          >
+            <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
+          </button>
+        </Tooltip>
         <input type="hidden" name="pinned" value={pinned ? 'on' : ''} />
 
         {/* One button for the one thing that genuinely needs its own room,

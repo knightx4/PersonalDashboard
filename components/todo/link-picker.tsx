@@ -10,6 +10,7 @@ import type { LinkTarget } from '@/lib/todo/links/model';
 import type { ModuleId } from '@/lib/modules';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface } from '@/components/ui/popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * What a task is about, found by typing.
@@ -78,15 +79,16 @@ export function LinkPicker({
             <ModuleMark module={value.module} size="sm" />
             <span className="min-w-0 truncate">{value.label}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            title="Not about this"
-            className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
-          >
-            <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">Not about this</span>
-          </button>
+          <Tooltip label="Not about this" className="shrink-0">
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
+            >
+              <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Not about this</span>
+            </button>
+          </Tooltip>
         </span>
       ) : (
         <button

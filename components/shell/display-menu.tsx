@@ -21,6 +21,7 @@ import type {
   DisplayView,
   ListDisplayMenu,
 } from '@/lib/list-display';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The Display button and its panel: how a list is sorted, how it is grouped,
@@ -294,28 +295,32 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
         <input type="hidden" name="list" value={list} />
         <input type="hidden" name="id" value={view.id} />
         {view.isDefault && <input type="hidden" name="clear" value="1" />}
-        <button
-          type="submit"
-          aria-label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
-          className={cn(
-            'rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100',
-            view.isDefault && 'text-accent opacity-100',
-          )}
-        >
-          <Pin className="size-3.5" strokeWidth={2} aria-hidden />
-        </button>
+        <Tooltip label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`} align="end">
+          <button
+            type="submit"
+            aria-label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
+            className={cn(
+              'rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100',
+              view.isDefault && 'text-accent opacity-100',
+            )}
+          >
+            <Pin className="size-3.5" strokeWidth={2} aria-hidden />
+          </button>
+        </Tooltip>
       </form>
 
       <form action={remove} className="shrink-0">
         <input type="hidden" name="list" value={list} />
         <input type="hidden" name="id" value={view.id} />
-        <button
-          type="submit"
-          aria-label={`Delete ${view.name}`}
-          className="rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
-        >
-          <Trash2 className="size-3.5" strokeWidth={2} aria-hidden />
-        </button>
+        <Tooltip label={`Delete ${view.name}`} align="end">
+          <button
+            type="submit"
+            aria-label={`Delete ${view.name}`}
+            className="rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
+          >
+            <Trash2 className="size-3.5" strokeWidth={2} aria-hidden />
+          </button>
+        </Tooltip>
       </form>
 
       <button

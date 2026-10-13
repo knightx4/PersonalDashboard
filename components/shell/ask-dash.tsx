@@ -43,6 +43,7 @@ import {
   recentAskQuestions,
   undoDashChange,
 } from '@/app/ask/actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Ask Dash, from any page (plan #1090).
@@ -242,15 +243,16 @@ export function AskDashButton() {
   const handle = useAskDash();
   if (!handle) return null;
   return (
-    <button
-      type="button"
-      onClick={() => handle.open()}
-      title="Ask Dash"
-      className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
-    >
-      <DashMark size="icon" tone="brand" decorative />
-      <span className="sr-only">Ask Dash</span>
-    </button>
+    <Tooltip label="Ask Dash" className="shrink-0">
+      <button
+        type="button"
+        onClick={() => handle.open()}
+        className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
+      >
+        <DashMark size="icon" tone="brand" decorative />
+        <span className="sr-only">Ask Dash</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -609,24 +611,27 @@ export function AskDashPanel({
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               {started && (
+                <Tooltip label="New question" align="end">
+                  <button
+                    type="button"
+                    onClick={() => show({ kind: 'new' })}
+                    className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+                  >
+                    <SquarePen className="size-4" strokeWidth={2} aria-hidden />
+                    <span className="sr-only">New question</span>
+                  </button>
+                </Tooltip>
+              )}
+              <Tooltip label="Close Dash" align="end">
                 <button
                   type="button"
-                  onClick={() => show({ kind: 'new' })}
-                  title="New question"
+                  onClick={onClose}
                   className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
                 >
-                  <SquarePen className="size-4" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">New question</span>
+                  <X className="size-4" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Close Dash</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-              >
-                <X className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Close Dash</span>
-              </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -858,15 +863,16 @@ export function LookingAt({
       <span className="min-w-0 truncate">
         Looking at: <span className="text-ink">{label}</span>
       </span>
-      <button
-        type="button"
-        onClick={onDrop}
-        title={dropTitle}
-        className="press flex size-6 shrink-0 items-center justify-center rounded-control hover:bg-surface hover:text-ink"
-      >
-        <X className="size-3.5" strokeWidth={2} aria-hidden />
-        <span className="sr-only">{dropTitle}</span>
-      </button>
+      <Tooltip label={dropTitle} align="end" className="shrink-0">
+        <button
+          type="button"
+          onClick={onDrop}
+          className="press flex size-6 shrink-0 items-center justify-center rounded-control hover:bg-surface hover:text-ink"
+        >
+          <X className="size-3.5" strokeWidth={2} aria-hidden />
+          <span className="sr-only">{dropTitle}</span>
+        </button>
+      </Tooltip>
     </p>
   );
 }

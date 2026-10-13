@@ -76,6 +76,7 @@ import {
   sortCaptureBox,
   undoCaptureBox,
 } from '@/app/capture-actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Write it down here, wherever you are.
@@ -1116,15 +1117,16 @@ export function CaptureButton() {
   const { open } = useCapture();
   return (
     <span className="relative block shrink-0">
-      <button
-        type="button"
-        onClick={() => open()}
-        title="Capture something (⌥C)"
-        className="press flex size-8 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
-      >
-        <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Capture something</span>
-      </button>
+      <Tooltip label="Capture something, or press ⌥C">
+        <button
+          type="button"
+          onClick={() => open()}
+          className="press flex size-8 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
+        >
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">Capture something</span>
+        </button>
+      </Tooltip>
       <Kbd className="pointer-events-none absolute left-1/2 top-full hidden -translate-x-1/2 bg-raised sm:block">
         ⌥C
       </Kbd>

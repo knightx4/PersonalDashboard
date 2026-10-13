@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { PRESS_AREA, buttonVariants } from '@/components/ui/button';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One product on the shared form.
@@ -220,27 +221,31 @@ export function DispositionGroup({
                 >
                   <span className="pl-1 text-ui font-medium">{choice.label}</span>
                   <span className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => step(choice.id, -1)}
-                      disabled={counts[choice.id] === 0}
-                      aria-label={`One fewer to ${choice.label.toLowerCase()}`}
-                      className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
-                    >
-                      <Minus className="size-3.5" aria-hidden />
-                    </button>
+                    <Tooltip label={`One fewer to ${choice.label.toLowerCase()}`}>
+                      <button
+                        type="button"
+                        onClick={() => step(choice.id, -1)}
+                        disabled={counts[choice.id] === 0}
+                        aria-label={`One fewer to ${choice.label.toLowerCase()}`}
+                        className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
+                      >
+                        <Minus className="size-3.5" aria-hidden />
+                      </button>
+                    </Tooltip>
                     <span className="w-4 text-center text-body tabular-nums">
                       {counts[choice.id]}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => step(choice.id, 1)}
-                      disabled={undecided === 0}
-                      aria-label={`One more to ${choice.label.toLowerCase()}`}
-                      className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
-                    >
-                      <Plus className="size-3.5" aria-hidden />
-                    </button>
+                    <Tooltip label={`One more to ${choice.label.toLowerCase()}`} align="end">
+                      <button
+                        type="button"
+                        onClick={() => step(choice.id, 1)}
+                        disabled={undecided === 0}
+                        aria-label={`One more to ${choice.label.toLowerCase()}`}
+                        className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
+                      >
+                        <Plus className="size-3.5" aria-hidden />
+                      </button>
+                    </Tooltip>
                   </span>
                 </div>
               ))}

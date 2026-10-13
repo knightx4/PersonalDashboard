@@ -23,6 +23,7 @@ import {
 } from '@/lib/money';
 import { MerchantField } from './merchant-field';
 import type { MerchantOption } from '@/lib/merchants/suggest';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface CategoryOption {
   id: string;
@@ -265,17 +266,19 @@ export function OrderForm({
                 value={line.unitPrice}
                 onChange={(event) => setLine(index, { unitPrice: event.target.value })}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="col-start-5 row-start-1 justify-self-end px-1.5 sm:col-start-7"
-                disabled={lines.length === 1}
-                onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
-                aria-label="Remove line"
-              >
-                <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
-              </Button>
+              <Tooltip label="Remove line" align="end" className="col-start-5 row-start-1 justify-self-end sm:col-start-7">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-1.5"
+                  disabled={lines.length === 1}
+                  onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
+                  aria-label="Remove line"
+                >
+                  <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
+                </Button>
+              </Tooltip>
             </li>
           ))}
         </ul>

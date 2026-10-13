@@ -22,6 +22,7 @@ import { Group } from '@/components/ui/disclosure';
 import { popoverSurface } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const initial: ActionState = {};
 
@@ -147,14 +148,16 @@ function AddMerchantForm({
     <Group
       title="Add a retailer"
       action={
-        <button
-          type="button"
-          onClick={onCancel}
-          className="press rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
-          aria-label="Cancel"
-        >
-          <X className="size-4" strokeWidth={1.75} />
-        </button>
+        <Tooltip label="Cancel" align="end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="press rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
+            aria-label="Cancel"
+          >
+            <X className="size-4" strokeWidth={1.75} />
+          </button>
+        </Tooltip>
       }
     >
       <form action={action} className="flex flex-wrap items-end gap-(--field-gap)">

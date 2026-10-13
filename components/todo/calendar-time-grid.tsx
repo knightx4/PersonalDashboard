@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Pill, WorkweekOutline, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
 import { hourLabel } from '@/lib/clock';
+import { NewEventLink } from '@/components/todo/new-event-link';
 
 /**
  * A day or a week, on the clock.
@@ -216,14 +216,13 @@ function DayHeading({
         </span>
       </Link>
 
-      <Link
+      <NewEventLink
         href={newEventHref(day.day)}
-        aria-label={`New event on ${day.day}`}
-        title="New event"
-        className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
-      >
-        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-      </Link>
+        day={day.day}
+        align="end"
+        className="shrink-0"
+        linkClassName="transition-colors duration-quick"
+      />
     </div>
   );
 }

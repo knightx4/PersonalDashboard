@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
 import { isMonth } from '@/lib/todo/calendar/month';
@@ -27,6 +27,7 @@ import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
 import { EventForm, type EventDraft } from '@/components/todo/event-form';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import { CalendarPicker } from '@/components/todo/calendar-picker';
+import { StepLink } from './step-link';
 
 export const metadata = { title: 'Calendar' };
 
@@ -144,20 +145,16 @@ export default async function TodoCalendarPage({
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, -1)}
-            label={`Previous ${calendar.view}`}
-          >
-            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          </StepLink>
+            direction="previous"
+          />
           <h2 className="px-1 text-body font-semibold whitespace-nowrap text-ink">
             {title(calendar.view, calendar.days)}
           </h2>
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, 1)}
-            label={`Next ${calendar.view}`}
-          >
-            <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
-          </StepLink>
+            direction="next"
+          />
         </div>
 
         {/* Its own control, not the middle of the stepper. It is a jump rather
@@ -319,27 +316,4 @@ function title(view: CalendarView, days: readonly { day: string }[]): string {
   const to = format(last, { day: 'numeric', month: 'long', year: 'numeric' });
 
   return `${from} – ${to}`;
-}
-
-function StepLink({
-  view,
-  date,
-  label,
-  children,
-}: {
-  view: CalendarView;
-  date: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={{ pathname: '/todo/calendar', query: { view, date } }}
-      aria-label={label}
-      title={label}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-    >
-      {children}
-    </Link>
-  );
 }

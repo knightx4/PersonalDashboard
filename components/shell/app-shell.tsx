@@ -38,6 +38,7 @@ import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
 import type { Brief } from '@/lib/shell/brief';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const NAV_COLLAPSED_KEY = 'pt_nav_collapsed';
 
@@ -325,69 +326,78 @@ export function AppShell({
     narrow?: boolean;
     /** The shortcut that opens it, shown while a modifier is held. */
     hint?: string;
-  }) => (
-    <Link
-      key={href}
-      href={href}
-      // Opening a section is exactly when the drawer should close.
-      onClick={() => setDrawer(false)}
-      aria-current={on ? 'page' : undefined}
-      // Where capture flies an item filed into this workspace (landed.ts).
-      data-capture-nav={href}
-      title={narrow ? label : undefined}
-      className={cn(
-        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
-        narrow ? 'justify-center px-2' : 'pl-3 pr-2',
-        on
-          ? 'bg-shell-hover text-shell-ink'
-          : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
-      )}
-    >
-      {/* The workspace's own colour, as a bar rather than a tint. A tint
-          would have to be legible on five different shells; a 2px bar in
-          the mark key's fixed hue is vivid on all of them. */}
-      <span
+  }) => {
+    const row = (
+      <Link
+        key={href}
+        href={href}
+        // Opening a section is exactly when the drawer should close.
+        onClick={() => setDrawer(false)}
+        aria-current={on ? 'page' : undefined}
+        // Where capture flies an item filed into this workspace (landed.ts).
+        data-capture-nav={href}
         className={cn(
-          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
-          on ? 'opacity-100' : 'opacity-0',
+          'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
+          narrow ? 'justify-center px-2' : 'pl-3 pr-2',
+          on
+            ? 'bg-shell-hover text-shell-ink'
+            : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
         )}
-        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
-        aria-hidden
-      />
-      {/* Muted until the row is current, so the column reads as a list
-          of names with marks beside them rather than a wall of icons
-          competing with the one that says where you are. */}
-      {Icon && (
-        <Icon
-          className={cn(
-            'size-4 shrink-0 transition-colors duration-quick',
-            on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
-          )}
-          strokeWidth={1.75}
-          aria-hidden
-        />
-      )}
-      {/* The name is a tooltip in the narrow column, but it stays in the
-          accessibility tree either way: a rail of unlabelled icons is not a
-          navigation a screen reader can use. */}
-      <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
-      {hint && !narrow && <Kbd>{hint}</Kbd>}
-      {badge !== undefined && badge > 0 && (
+      >
+        {/* The workspace's own colour, as a bar rather than a tint. A tint
+            would have to be legible on five different shells; a 2px bar in
+            the mark key's fixed hue is vivid on all of them. */}
         <span
           className={cn(
-            'tabular bg-caution-fill font-bold text-caution-fill-ink',
-            narrow
-              ? // No room for a number beside a centred icon, so it becomes a
-                // dot in the corner -- still "something is waiting here".
-                'absolute right-1.5 top-1 size-1.5 rounded-full'
-              : 'rounded-full px-1.5 py-0.5 text-micro',
+            'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
+            on ? 'opacity-100' : 'opacity-0',
           )}
-        >
-          <span className={cn(narrow && 'sr-only')}>{badge}</span>
-        </span>
-      )}
-    </Link>
-  );
+          style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+          aria-hidden
+        />
+        {/* Muted until the row is current, so the column reads as a list
+            of names with marks beside them rather than a wall of icons
+            competing with the one that says where you are. */}
+        {Icon && (
+          <Icon
+            className={cn(
+              'size-4 shrink-0 transition-colors duration-quick',
+              on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
+            )}
+            strokeWidth={1.75}
+            aria-hidden
+          />
+        )}
+        {/* The name is a tooltip in the narrow column, but it stays in the
+            accessibility tree either way: a rail of unlabelled icons is not a
+            navigation a screen reader can use. */}
+        <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
+        {hint && !narrow && <Kbd>{hint}</Kbd>}
+        {badge !== undefined && badge > 0 && (
+          <span
+            className={cn(
+              'tabular bg-caution-fill font-bold text-caution-fill-ink',
+              narrow
+                ? // No room for a number beside a centred icon, so it becomes a
+                  // dot in the corner -- still "something is waiting here".
+                  'absolute right-1.5 top-1 size-1.5 rounded-full'
+                : 'rounded-full px-1.5 py-0.5 text-micro',
+            )}
+          >
+            <span className={cn(narrow && 'sr-only')}>{badge}</span>
+          </span>
+        )}
+      </Link>
+    );
+    // The icon alone in the narrow column, so its name comes up beside it.
+    return narrow ? (
+      <Tooltip key={href} label={label} className="flex">
+        {row}
+      </Tooltip>
+    ) : (
+      row
+    );
+  };
 
   const nav = (narrow: boolean) => (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
@@ -604,25 +614,27 @@ export function AppShell({
             settings rule, because it is a thing you do to the column rather
             than a place you can go. */}
             <div className="border-t border-shell-border px-2 py-2">
-              <button
-                type="button"
-                onClick={toggleCollapsed}
-                title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
-                aria-pressed={collapsed}
-                className={cn(
-                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
-                  collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
-                )}
-              >
-                {collapsed ? (
-                  <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-                ) : (
-                  <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-                )}
-                <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
-                  {collapsed ? 'Expand' : 'Collapse'}
-                </span>
-              </button>
+              <Tooltip label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'} className="flex">
+                <button
+                  type="button"
+                  onClick={toggleCollapsed}
+                  aria-label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
+                  aria-pressed={collapsed}
+                  className={cn(
+                    'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
+                    collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
+                  )}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  ) : (
+                    <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  )}
+                  <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
+                    {collapsed ? 'Expand' : 'Collapse'}
+                  </span>
+                </button>
+              </Tooltip>
             </div>
           </aside>
 
@@ -637,14 +649,16 @@ export function AppShell({
               />
               <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
                 <div className="flex justify-end px-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setDrawer(false)}
-                    className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
-                  >
-                    <X className="size-4" strokeWidth={2} aria-hidden />
-                    <span className="sr-only">Close navigation</span>
-                  </button>
+                  <Tooltip label="Close navigation" align="end">
+                    <button
+                      type="button"
+                      onClick={() => setDrawer(false)}
+                      className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                    >
+                      <X className="size-4" strokeWidth={2} aria-hidden />
+                      <span className="sr-only">Close navigation</span>
+                    </button>
+                  </Tooltip>
                 </div>
                 {/* Never narrow: a drawer you opened on purpose has no width to
                 save, and it closes the moment you pick something. */}
@@ -671,14 +685,16 @@ export function AppShell({
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
               <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
-                <button
-                  type="button"
-                  onClick={() => setDrawer(true)}
-                  className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                  aria-label="Open navigation"
-                >
-                  <Menu className="size-4" strokeWidth={1.75} aria-hidden />
-                </button>
+                <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setDrawer(true)}
+                    className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                    aria-label="Open navigation"
+                  >
+                    <Menu className="size-4" strokeWidth={1.75} aria-hidden />
+                  </button>
+                </Tooltip>
 
                 {/* The mark in the bar is the switcher, not a picture of one.
                 From lg up the column carries it -- and still does when the
@@ -791,15 +807,16 @@ export function AppShell({
                   with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
                   the left and a second way in beside it would be two controls
                   for one thing. */}
-                  <button
-                    type="button"
-                    onClick={() => openSearch()}
-                    title="Search"
-                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                  >
-                    <SearchMark />
-                    <span className="sr-only">Search</span>
-                  </button>
+                  <Tooltip label="Search" className="shrink-0 lg:hidden">
+                    <button
+                      type="button"
+                      onClick={() => openSearch()}
+                      className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                    >
+                      <SearchMark />
+                      <span className="sr-only">Search</span>
+                    </button>
+                  </Tooltip>
 
                   {/* Dash, from any page (plan #1090): a question about
                   anything in the app, answered with links to what it used. */}
@@ -809,14 +826,15 @@ export function AppShell({
                   <NotificationsButton notifications={notifications} />
                   <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
 
-                  <Link
-                    href="/account"
-                    className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
-                    title={displayName ?? email}
-                  >
-                    {initial}
-                    <span className="sr-only">Account</span>
-                  </Link>
+                  <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
+                    <Link
+                      href="/account"
+                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                    >
+                      {initial}
+                      <span className="sr-only">Account</span>
+                    </Link>
+                  </Tooltip>
                 </div>
               </div>
             </header>
