@@ -16,7 +16,10 @@ import { describe, expect, it } from 'vitest';
 const ROOT = join(__dirname, '..');
 const APP = join(ROOT, 'app');
 
-/** Every folder under app/ whose layout.tsx mounts the AppShell. */
+/**
+ * Every folder under app/ whose layout.tsx mounts the AppShell, which since
+ * plan #1927.1 it does by calling shellFor (lib/shell/shell-for.tsx).
+ */
 function shellGroups(dir = APP): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -24,7 +27,7 @@ function shellGroups(dir = APP): string[] {
     const folder = join(dir, entry.name);
     if (relative(APP, folder) === 'preview' || relative(APP, folder) === 'api') continue;
     const layout = join(folder, 'layout.tsx');
-    if (existsSync(layout) && readFileSync(layout, 'utf8').includes('<AppShell')) {
+    if (existsSync(layout) && /<AppShell\b|\bshellFor\(/.test(readFileSync(layout, 'utf8'))) {
       found.push(relative(ROOT, folder));
     }
     found.push(...shellGroups(folder));
