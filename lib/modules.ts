@@ -230,7 +230,7 @@ export const MODULES: readonly AppModule[] = [
     // between News' gold at 92 and Goals' emerald at 162, and nearly eighty
     // degrees clear of the caution amber. Every cool hue from teal to violet
     // is already taken, and the warm side is rose, delete red and caution.
-    key: { shape: 'person', from: '#b2e172', to: '#4d6f0b' },
+    key: { shape: 'person', from: '#fdba74', to: '#c2410c' },
   },
   {
     id: 'dev',
