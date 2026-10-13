@@ -22,6 +22,9 @@ export const jobsActions: ModuleActions = {
     completeWaiting: GAP,
     snoozeWaiting: GAP,
   },
+  'app/jobs/(app)/_home/prepare-actions.ts': {
+    prepareWithDash: none('spends'),
+  },
   'app/jobs/(app)/review/actions.ts': {
     linkMessage: GAP,
     createRoleFromMessage: GAP,
