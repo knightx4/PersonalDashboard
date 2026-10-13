@@ -90,7 +90,7 @@ const RUNNERS: Record<DashRunner, { visor: Visor; core: readonly [string, string
 
 /** Each runner's visor, as a sentence would name it. */
 export const DASH_RUNNER_VISORS: Record<DashRunner, string> = {
-  'feature-1': 'rounded square',
+  'feature-1': 'soft square',
   'feature-2': 'orb',
   'feature-3': 'shield',
   goals: 'hexagon',
