@@ -57,7 +57,7 @@ import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/mate
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
-import { RecommendedRoles } from '@/app/jobs/(app)/recommend/sections';
+import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
@@ -970,6 +970,20 @@ const settings = {
   excludedSenders: [
     { id: 'x1', domain: 'jobalerts.linkedin.com' },
     { id: 'x2', domain: 'hi.wellfound.com' },
+  ],
+  careerGoals: [
+    {
+      id: 'th-3',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      written: '28 Sep 2026',
+      edited: '2 Oct 2026',
+    },
+    {
+      id: 'th-1',
+      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      written: '6 Jul 2026',
+      edited: null,
+    },
   ],
 };
 
@@ -3095,56 +3109,6 @@ const findView = {
     },
   },
   people: recommendedPeople,
-  tracks: {
-    suggested: [
-      {
-        id: 'tr-2',
-        name: 'SQL for finance analysts',
-        about: 'Window functions, cohort tables and the joins a finance team asks for.',
-        depth: 'solid' as const,
-        why: 'Most of the strategic finance postings you saved ask for SQL, and none of your entries mention it.',
-      },
-      {
-        id: 'tr-3',
-        name: 'How AI deployment teams run a pilot',
-        about: null,
-        depth: 'familiar' as const,
-        why: 'The deployment roles describe scoping and running pilots with customers, which your latest entry says you want to do.',
-      },
-    ],
-    started: [
-      {
-        id: 'tr-1',
-        name: 'Three-statement modelling',
-        about: 'Linking the income statement, balance sheet and cash flow in one model.',
-        depth: 'deep' as const,
-        why: 'Every FP&A role asks for it.',
-        subjectId: 'sub-1',
-        units: 6,
-        gone: false,
-      },
-    ],
-  },
-  thoughts: [
-    {
-      id: 'th-3',
-      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
-      written: '28 Sep 2026',
-      edited: '2 Oct 2026',
-    },
-    {
-      id: 'th-2',
-      body: 'Strategic finance or FP&A at a company that is still small enough that finance sits near the founders.',
-      written: '30 Aug 2026',
-      edited: null,
-    },
-    {
-      id: 'th-1',
-      body: 'Leaving EY. Not sure yet whether to stay in finance.',
-      written: '6 Jul 2026',
-      edited: null,
-    },
-  ],
 };
 
 /** Jobs Today drawn from the sample rows, with the review queue given. */

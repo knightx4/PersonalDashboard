@@ -8,7 +8,7 @@ import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ComposeBody } from '@/components/ui/field';
 import { THOUGHT_MAX } from '@/lib/jobs/thoughts';
-import { addThought, deleteThought, updateThought, type ThoughtState } from './actions';
+import { addThought, deleteThought, updateThought, type ThoughtState } from './career-goal-actions';
 
 export type ThoughtView = {
   id: string;
@@ -24,7 +24,8 @@ const initial: ThoughtState = { error: null };
 /**
  * The career goals entries as one folding section: a composer, then the
  * entries newest first as rows in one panel (law 13). Folded, its heading
- * still says when the latest entry was written.
+ * still says when the latest entry was written. It sits on Settings; the
+ * roles and people searches on Find read the entries.
  */
 export function ThoughtList({ thoughts }: { thoughts: ThoughtView[] }) {
   return (
