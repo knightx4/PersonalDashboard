@@ -26,7 +26,11 @@ import {
   setReadingText,
   setReadingStatus,
 } from '@/lib/learn/tracks/save';
-import { cleanReadingText, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
+import { cleanReadingText, MAX_READING_TEXT, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
+import { extractPdfText, ownsReadingPdfPath } from '@/lib/learn/tracks/reading-pdf';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
+import { RESUME_MAX_BYTES } from '@/lib/jobs/resume-file';
 import { recordOutcome } from '@/lib/learn/next/record';
 
 /**
@@ -406,6 +410,14 @@ export async function openReading(formData: FormData): Promise<void> {
   const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
   if (!url) redirect(`/learn/r/${readingId.data}`);
 
+  // Text you gave this reading is what Dash reads; its link is never fetched.
+  if (reading.givenText) {
+    if (reading.status === 'queued') {
+      await setReadingStatus(supabase, reading.id, 'reading').catch(() => {});
+    }
+    redirect(url);
+  }
+
   // Already narrowed and checked: nothing to do but go.
   if (reading.locatorConfidence === 'verified' && reading.textAnchor) {
     if (reading.status === 'queued') {
@@ -600,4 +612,68 @@ export async function goDeeper(formData: FormData): Promise<void> {
   revalidatePath('/learn/lists');
   revalidatePath(`/learn/t/${reading.trackId}`);
   redirect(`/learn/t/${trackId}`);
+}
+
+export type ReadingPdfState = { error?: string; notice?: string };
+
+const PdfInput = z.object({
+  readingId: z.string().uuid(),
+  path: z.string().min(1).max(300),
+  name: z.string().max(500),
+});
+
+/**
+ * Keep the text of an uploaded PDF on the reading (plan #1876.2).
+ *
+ * The browser has already put the file in the person's own folder of the
+ * job-search bucket. This reads it, takes the text out, saves it the way
+ * pasting does, and deletes the file whatever happened, so only the text is
+ * kept. A scan, a file that is not a PDF, or a file over 10 MB is refused
+ * with a message saying which; text over the cap is cut there and says so.
+ */
+// latency: pending
+export async function saveReadingPdf(
+  _prev: ReadingPdfState,
+  formData: FormData,
+): Promise<ReadingPdfState> {
+  const user = await requireUser();
+
+  const parsed = PdfInput.safeParse({
+    readingId: formData.get('readingId'),
+    path: formData.get('path'),
+    name: formData.get('name') ?? '',
+  });
+  if (!parsed.success || !ownsReadingPdfPath(user.id, parsed.data.path)) {
+    return { error: 'Could not work out which file that was. Try the upload again.' };
+  }
+  const { readingId, path } = parsed.data;
+  const label = parsed.data.name.replace(/[\r\n]+/g, ' ').trim().slice(0, 120) || 'PDF';
+
+  const storage = (await createJobsClient()).storage.from(APP_STORAGE_BUCKET);
+  try {
+    const { data, error } = await storage.download(path);
+    if (error || !data) return { error: 'That PDF could not be read. Try the upload again.' };
+    if (data.size > RESUME_MAX_BYTES) return { error: 'That PDF is over 10 MB.' };
+    if (data.size === 0) return { error: 'That file is empty.' };
+
+    const extracted = await extractPdfText(new Uint8Array(await data.arrayBuffer()));
+    if (!extracted.ok) return { error: extracted.error };
+
+    const supabase = await createLearnClient();
+    try {
+      const found = await setReadingText(supabase, readingId, { text: extracted.text, label });
+      if (!found) return { error: 'That reading is not there any more.' };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Could not keep that text.' };
+    }
+
+    revalidatePath(`/learn/r/${readingId}`);
+    return extracted.cut
+      ? {
+          notice: `That PDF has more text than a reading keeps. Dash kept the first ${MAX_READING_TEXT.toLocaleString('en-GB')} characters and will read only those.`,
+        }
+      : {};
+  } finally {
+    await storage.remove([path]);
+  }
 }
