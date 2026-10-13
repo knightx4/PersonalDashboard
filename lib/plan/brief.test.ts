@@ -547,6 +547,57 @@ describe('the page pattern in a brief', () => {
   });
 });
 
+describe('the reference design in a brief', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'named',
+        title: 'Lay out /news/saved like the reading list I liked',
+        module: 'news',
+        detail: 'Each saved story is a row.\n\nReference: https://example.com/reading-list',
+      }),
+      item({
+        id: 'later',
+        title: 'Say when a story was saved',
+        module: 'news',
+        detail: 'On /news/saved, each story shows the day it was saved.',
+      }),
+      item({ id: 'plain', title: 'Store the saved day', module: 'news' }),
+    ],
+    dependencies: [],
+  });
+  const references = {
+    'news-saved': {
+      pictures: ['docs/references/news-saved/reading-list.png'],
+      link: 'https://example.com/reading-list',
+      why: 'One line per story, with the source in grey after the title.',
+      from: '900.1',
+    },
+  };
+
+  it('asks the builder to register the reference a step names', () => {
+    const brief = planBrief(sections, findNode(sections, 'named')!, { references: {} });
+    expect(brief).toContain('## Reference');
+    expect(brief).toContain('The step names a reference design: https://example.com/reading-list.');
+    expect(brief).toContain('lib/preview/references.ts');
+  });
+
+  it('sends a registered reference to the critic on a later step on the same surface', () => {
+    const brief = planBrief(sections, findNode(sections, 'later')!, { references });
+    expect(brief).toContain('Send these to the critic with every round on their surface.');
+    expect(brief).toContain('the law wins');
+    expect(brief).toContain(
+      '- news-saved, registered by #900.1: One line per story, with the source in grey after the title. Pictures: docs/references/news-saved/reading-list.png.',
+    );
+    expect(brief).not.toContain('The step names a reference design');
+  });
+
+  it('says nothing for a step with no reference and no surface that has one', () => {
+    expect(planBrief(sections, findNode(sections, 'later')!, { references: {} })).not.toContain('## Reference');
+    expect(planBrief(sections, findNode(sections, 'plain')!, { references })).not.toContain('## Reference');
+  });
+});
+
 describe('a brief names steps the way the page does', () => {
   it('reads a stored number in the notes as the outline it has now', () => {
     const sections = buildPlanTree({

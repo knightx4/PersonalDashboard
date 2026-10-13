@@ -13,6 +13,14 @@ import {
 import { isAppScope, planScopeLabel } from '@/lib/plan/projects';
 import { SURFACE_ROUTES, surfacesInText } from '@/lib/preview/routes';
 import { PATTERN_RULES, patternNamed, patternRule } from './patterns';
+import {
+  REFERENCE_DIR,
+  REFERENCES,
+  referenceFor,
+  referenceForCritic,
+  referenceNamed,
+  type Reference,
+} from '@/lib/preview/references';
 
 /**
  * A step written out for whoever is about to build it.
@@ -271,6 +279,11 @@ export type BriefOptions = {
    * brief adds these to the surfaces the step's own words name.
    */
   surfaces?: readonly string[];
+  /**
+   * The registered reference designs, by surface. Defaults to `REFERENCES`
+   * in lib/preview/references.ts; tests pass their own.
+   */
+  references?: Readonly<Record<string, Reference>>;
 };
 
 /** More than this and the list is cut, since a change to the shell reaches every surface. */
@@ -341,6 +354,42 @@ function patternLines(node: PlanNode, hasSurfaces: boolean): string[] {
     '',
     pattern.rule,
   ];
+}
+
+/**
+ * The reference designs a build step is judged against (Part 2 of
+ * docs/UI-QUALITY-SPEC.md, rule R18): one its own `Reference:` line names,
+ * which the builder registers, and those already registered for the surfaces
+ * it photographs, which go to the critic with every round on that surface.
+ */
+function referenceLines(
+  node: PlanNode,
+  surfaces: readonly string[],
+  references: Readonly<Record<string, Reference>>,
+): string[] {
+  if (node.kind !== 'build') return [];
+  const named = referenceNamed(node.detail ?? '');
+  const registered = surfaces.flatMap((id) => {
+    const reference = referenceFor(id, references);
+    return reference ? [`- ${referenceForCritic(id, reference)}`] : [];
+  });
+  if (!named && registered.length === 0) return [];
+  const lines = ['', '## Reference', ''];
+  if (named) {
+    const listed = [...named.pictures, ...named.links].join(', ');
+    lines.push(
+      `The step names a reference design: ${listed}. Register it in lib/preview/references.ts under the surface it is for, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link the first time), before round 1.`,
+    );
+  }
+  if (registered.length > 0) {
+    if (named) lines.push('');
+    lines.push(
+      'Send these to the critic with every round on their surface. A screen that keeps every law but reads worse than its reference fails; where the reference breaks a law, the law wins.',
+      '',
+      ...registered,
+    );
+  }
+  return lines;
 }
 
 /**
@@ -506,6 +555,7 @@ export function planBrief(
   const surfaces = surfaceIds(node, options.surfaces);
   out.push(...surfaceLines(surfaces));
   out.push(...patternLines(node, surfaces.length > 0));
+  out.push(...referenceLines(node, surfaces, options.references ?? REFERENCES));
 
   // What nobody can see yet. Said plainly, because the alternative a proposal
   // reaches for is plausible steps invented to fill the gap. A patch that has
