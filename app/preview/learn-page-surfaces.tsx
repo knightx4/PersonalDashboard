@@ -560,6 +560,56 @@ export function LearnReadingSummarySurface() {
   );
 }
 
+/**
+ * The Summary tab with a chat about the reading (plan #1876.5): an answered
+ * question, its answer opening with the line saying Dash read only the first
+ * 200,000 characters, and a second question Dash is answering.
+ */
+export function LearnReadingChatSurface() {
+  return (
+    <>
+      <SetTab tab="summary" />
+      <ReadingView
+        tab="summary"
+        reading={{
+          ...reading,
+          summary: {
+            text: 'The chapter explains price elasticity of demand: how far the quantity people buy changes when the price changes, measured as the percentage change in quantity over the percentage change in price. Where that figure is below one, demand is inelastic, and a price rise brings in more money because buyers cut back by less than the price went up.',
+            writtenAt: '2026-10-13T08:15:00Z',
+            from: 'link',
+            label: 'https://openstax.org/books/principles-economics-3e/pages/5-1-price-elasticity-of-demand-and-price-elasticity-of-supply',
+            truncated: true,
+          },
+        }}
+        subjects={[SUBJECT]}
+        alreadyRead={null}
+        origin={null}
+        thread={[
+          {
+            id: 'rc1',
+            author: 'me',
+            body: 'Why does the chapter use percentage changes rather than the change in units sold?',
+            createdAt: '2026-10-13T08:20:00Z',
+          },
+          {
+            id: 'rc2',
+            author: 'claude',
+            body: 'I read only the first 200,000 characters of this reading, so I cannot speak to anything after that.\n\nThe section on measuring elasticity gives the reason: a change in units depends on what you count in. Selling 10 more cups of coffee means a lot to a café and nothing to a chain. Percentages put both on the same scale, so the figure for petrol can be compared with the figure for restaurant meals.',
+            createdAt: '2026-10-13T08:20:20Z',
+          },
+          {
+            id: 'rc3',
+            author: 'me',
+            body: 'So if a government taxes cigarettes because demand is inelastic, who ends up paying most of the tax, the smokers or the companies selling them?',
+            createdAt: '2026-10-13T08:24:00Z',
+          },
+        ]}
+        chatState={{ awaitingReply: true }}
+      />
+    </>
+  );
+}
+
 /** The Summary tab after Summarize could not read a paywalled link. */
 export function LearnReadingUnreadableSurface() {
   return (
