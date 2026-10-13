@@ -401,7 +401,9 @@ this one.
 
 A shared component that has a surface drawing it in every state belongs on
 `COMPONENT_SURFACES` in `lib/preview/routes.ts`, so the guard stops at that
-surface rather than every page under it.
+surface rather than every page under it. Every file in `components/ui` is
+already there: a change to Button or Card is checked once, on `ui-kit`
+(`app/preview/ui-kit-surface.tsx`), and a new primitive is drawn there too.
 
 `block` refuses an ask that puts a design check to the person
 (`lib/plan/block-ask.ts`). Older steps blocked on one before the change: when
