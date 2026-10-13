@@ -9,6 +9,7 @@ import { notesRoutine } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
   NOTES_WORK_KINDS,
+  NOT_MOVED_TO_IDEAS,
   OUTSTANDING_STATUSES,
   type FeedbackKind,
 } from '@/lib/feedback/load';
@@ -466,6 +467,7 @@ export async function runFeatureRoutine(
     .select('id')
     .eq('user_id', user.id)
     .in('status', [...OUTSTANDING_STATUSES])
+    .or(NOT_MOVED_TO_IDEAS)
     .in('kind', [...NOTES_WORK_KINDS]);
   const files = await outstandingNoteFiles(
     await createCoreClient(),
@@ -554,6 +556,7 @@ export async function openFeedbackCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
     .in('status', [...OUTSTANDING_STATUSES])
+    .or(NOT_MOVED_TO_IDEAS)
     .in('kind', [...NOTES_WORK_KINDS]);
   return count ?? 0;
 }
