@@ -68,6 +68,13 @@ describe('visionRunText', () => {
     expect(text).toContain('.claude/skills/vision-review/SKILL.md');
   });
 
+  it('asks for the specs comparison and the suggested ideas (plan #1969)', () => {
+    const text = visionRunText('u');
+    expect(text).toContain('Comparing the specs');
+    expect(text).toContain('Suggesting ideas');
+    expect(text).toContain('at most five ideas');
+  });
+
   it('tells the run to end itself, since nothing else does', () => {
     expect(visionRunText('u')).toContain('mark the run finished');
   });

@@ -32,6 +32,8 @@ export const NO_TOOL_REASONS = {
   spends:
     'Starts a model run or a Dash routine on the account, which spends money the person chooses to spend.',
   outside: 'Acts outside the app or changes who can see something, which waits for the person.',
+  session:
+    'A build session does it with the plan or notes command as it works a step or a note, so the agent that should do it already can.',
 } as const;
 
 export type NoToolReason = keyof typeof NO_TOOL_REASONS;
@@ -45,6 +47,7 @@ export const NO_TOOL_REASON_LABELS: Readonly<Record<NoToolReason, string>> = {
   own: 'Their own work',
   spends: 'Spends',
   outside: 'Outside the app',
+  session: 'Session',
 };
 
 export type ActionEntry =
