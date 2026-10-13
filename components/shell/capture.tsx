@@ -63,6 +63,7 @@ import {
 } from '@/lib/goals/capture-sort';
 import type { ModuleId } from '@/lib/modules';
 import { addTask, type TaskFormState } from '@/app/todo/actions';
+import { addQuickNote } from '@/app/vault/actions';
 import {
   fileGoalCapture,
   goalCaptureCosts,
@@ -274,6 +275,11 @@ async function file(
               : `Filed as ${entries.length} changes.`,
         filed: { captureId: result.captureId, entries },
       };
+    }
+    case 'vault': {
+      // The Vault page's own write, so the note waits in Quick note triage.
+      const result = await addQuickNote(text);
+      return result.error ? { error: result.error } : { message: 'Added to Quick note triage.' };
     }
     case 'anything':
       // The one box files through fileCaptureBox, in AnythingPanel.
@@ -529,6 +535,7 @@ function CapturePanel({
                 value={isCalendarDay(day) ? day : ''}
                 onChange={(event) => setDay(event.target.value)}
                 className={cn(
+                  // ui-ok: fixed-control-height -- sits in a row of Chips, which are h-7, and matches them
                   'tabular h-7 rounded-control bg-transparent px-2 text-small outline-none transition-colors duration-quick',
                   'focus:ring-1 focus:ring-accent/40',
                   isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',

@@ -350,7 +350,7 @@ function SendToClaude({
           title={held ?? quietAsk}
           onClick={onAskQuiet}
         >
-          <Play className="size-3.5" aria-hidden />
+          <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
           {sendLabel(node)}
         </Button>
       ) : (
@@ -364,7 +364,7 @@ function SendToClaude({
             disabled={resolving}
             title={held}
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {pending ? 'Sending…' : sendLabel(node)}
           </Button>
         </form>
@@ -388,7 +388,7 @@ function SendToClaude({
                 : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
             }
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {overhaulPending ? 'Starting…' : 'Work this overhaul'}
           </Button>
         </form>

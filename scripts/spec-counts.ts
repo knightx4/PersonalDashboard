@@ -209,6 +209,54 @@ function offTokenRadius(root: string): string[] {
   return out;
 }
 
+/**
+ * Rule R15: Lucide icons are drawn at one stroke weight, ICON_STROKE (1.75,
+ * app/dev/ui/measurements.ts). One item per Lucide element under app/ or
+ * components/ drawn at any other weight, as `file:line: <Name strokeWidth>`.
+ * An element with no strokeWidth counts too: Lucide's own default is 2.
+ *
+ * A Lucide element is a tag named by an import from `lucide-react` (an alias
+ * included), or, in a file that imports from it, a tag named `Icon` or
+ * `…Icon` that the file does not define itself: the `Icon` a row is handed as
+ * a `LucideIcon`. The one weight allowed besides 1.75 is the phone dock's
+ * current tab, drawn at 2 on purpose so the tab you are on reads heavier.
+ * The overhaul records are not read, as for R14.
+ */
+const LUCIDE_IMPORT = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g;
+const JSX_OPEN = /<([A-Z][\w.]*)(\s[^<>]*?)?\/?>/g;
+const STROKE_PROP = /\bstrokeWidth=(?:\{([^}]*)\}|"([^"]*)")/;
+const ON_STROKE = /^(?:1\.75|(?:\w+\.)?ICON_STROKE)$/;
+const DOCK_CURRENT = { file: 'components/shell/app-shell.tsx', value: 'on ? 2 : 1.75' };
+
+function iconStrokeOff(root: string): string[] {
+  const out: string[] = [];
+  for (const file of listFiles(root, ['app', 'components'], ['.tsx'])) {
+    if (/\.test\.tsx$/.test(file) || RADIUS_RECORDS.has(file)) continue;
+    const code = withoutComments(readFileSync(join(root, file), 'utf8'));
+    if (!code.includes('lucide-react')) continue;
+    const names = new Set<string>();
+    for (const m of code.matchAll(LUCIDE_IMPORT)) {
+      for (const part of m[1].split(',')) {
+        const name = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim() ?? '';
+        if (/^[A-Z]/.test(name) && !/^Lucide(?:Icon|Props)$/.test(name)) names.add(name);
+      }
+    }
+    for (const m of code.matchAll(JSX_OPEN)) {
+      const name = m[1];
+      const handed =
+        /(?:^|\.)\w*Icon$/.test(name) &&
+        !new RegExp(`\\b(?:function|const)\\s+${name.replace('.', '\\.')}\\b`).test(code);
+      if (!names.has(name) && !handed) continue;
+      const prop = (m[2] ?? '').match(STROKE_PROP);
+      const value = prop ? (prop[1] ?? prop[2]).trim() : null;
+      if (value !== null && ON_STROKE.test(value)) continue;
+      if (file === DOCK_CURRENT.file && value === DOCK_CURRENT.value) continue;
+      out.push(`${file}:${lineAt(code, m.index)}: <${name} strokeWidth=${value ?? '(Lucide default 2)'}>`);
+    }
+  }
+  return out;
+}
+
 // -- docs/UI-QUALITY-SPEC.md ------------------------------------------------
 
 /** A page that returns nothing and calls `redirect`: a moved address, not a screen. */
@@ -305,6 +353,12 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'radius classes under app/ and components/ that the themes do not move',
     target: 0,
     measure: offTokenRadius,
+  },
+  {
+    name: 'icon-stroke-off',
+    counts: 'Lucide icons under app/ and components/ drawn at a stroke other than 1.75',
+    target: 0,
+    measure: iconStrokeOff,
   },
   {
     name: 'routes-without-surface',

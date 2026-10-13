@@ -15,8 +15,8 @@ import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/ov
  *   idle     the runner is off or held. "Not running", or "Held".
  *   working  a session is going in that slot: the feature it is on, the
  *            workspace and how long, and a meter of the feature's steps done.
- *   asleep   the runner is on and the slot has nothing ready: the tick's
- *            reason.
+ *   asleep   the runner is on and nothing is going in the slot: a line read
+ *            from the tick's reason (`asleepLine`), the reason folded under.
  *
  * Which session takes which slot is `runnerSlots`' call; this only draws it.
  */
@@ -73,7 +73,7 @@ function SlotText({
     );
   }
   if (slot.state === 'asleep') {
-    const line = 'Asleep, nothing to work on';
+    const { line } = slot;
     // The default reason says nothing the line has not, so there is nothing to open.
     if (slot.reason === SLOT_ASLEEP_DEFAULT) {
       return <span className="block text-ui text-ink-muted">{line}</span>;
@@ -106,7 +106,10 @@ export function RunnerCrew({
   held?: boolean;
 }) {
   return (
-    <ul aria-label="What each of the runner's four sessions is doing" className="flex flex-col gap-3">
+    <ul
+      aria-label="What each of the runner's four sessions is doing"
+      className="flex flex-col gap-3"
+    >
       {slots.map((slot) => (
         <li key={slot.slot} className="flex min-w-0 items-start gap-3">
           <DashMark

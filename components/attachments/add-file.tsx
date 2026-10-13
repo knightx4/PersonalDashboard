@@ -136,7 +136,7 @@ export function AddFile({
         aria-describedby={errors.length > 0 ? errorId : undefined}
         onClick={() => input.current?.click()}
       >
-        <Paperclip aria-hidden className="size-4" />
+        <Paperclip strokeWidth={1.75} aria-hidden className="size-4" />
         {uploading ? 'Adding…' : 'Add a file'}
       </Button>
       {value.length > 0 && (

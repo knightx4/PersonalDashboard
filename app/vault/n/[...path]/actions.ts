@@ -17,8 +17,9 @@ import { loadNoteThread, saveThought } from '@/lib/vault/maya/store';
 import { MAYA_THOUGHT_OPERATION, writeThought } from '@/lib/vault/maya/thought';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
-import { noteSavePorts } from '@/lib/vault/db/ports';
+import { noteRenamePorts, noteSavePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
+import { RENAME_ERRORS, renameNote, type RenameNoteFailure } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { mayaThreadHref, noteHref } from '@/lib/vault/paths';
 
@@ -332,4 +333,56 @@ export async function saveNoteEdit(
   revalidatePath(noteHref(input.data.notePath));
   revalidatePath('/vault');
   return { savedBlobSha: result.blobSha };
+}
+
+export type RenameNoteState = {
+  /** Where the note is now, once the rename has gone through. */
+  renamedPath?: string;
+  reason?: RenameNoteFailure;
+  error?: string;
+};
+
+const RenameInput = z.object({
+  notePath,
+  name: z.string().max(1024),
+  blobSha: z.string().trim().min(1),
+});
+
+/**
+ * Rename a note (note 69c302f1): its file moves to the new name in the same
+ * folder, as two commits, and the stored note follows it keeping its id. The
+ * order and the refusals are in lib/vault/notes/rename.ts.
+ *
+ * Takes `notePath`, `name` (the new file name, without `.md`) and `blobSha`
+ * (the version the page showed).
+ */
+// latency: pending
+export async function renameNoteAction(
+  _prev: RenameNoteState,
+  formData: FormData,
+): Promise<RenameNoteState> {
+  await requireUser();
+  const input = RenameInput.safeParse({
+    notePath: formData.get('notePath') ?? '',
+    name: formData.get('name') ?? '',
+    blobSha: formData.get('blobSha') ?? '',
+  });
+  if (!input.success) return { reason: 'error', error: RENAME_ERRORS.error };
+
+  const vault = await createVaultClient();
+  let result;
+  try {
+    result = await renameNote(noteRenamePorts(vault), {
+      path: input.data.notePath,
+      name: input.data.name,
+      expectedBlobSha: input.data.blobSha,
+    });
+  } catch (error) {
+    console.error('[vault rename]', error instanceof Error ? error.message : error);
+    return { reason: 'error', error: RENAME_ERRORS.error };
+  }
+  if (!result.ok) return { reason: result.reason, error: result.error };
+
+  revalidatePath('/vault', 'layout');
+  return { renamedPath: result.path };
 }

@@ -19,7 +19,7 @@
 import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
 
-export type CaptureActionId = 'anything' | 'todo' | 'goals';
+export type CaptureActionId = 'anything' | 'todo' | 'goals' | 'vault';
 
 export type CaptureAction = {
   id: CaptureActionId;
@@ -89,6 +89,18 @@ export const CAPTURE_ACTIONS: readonly CaptureAction[] = [
     field: 'prose',
     dated: false,
     keywords: ['log', 'what happened', 'log progress', 'goal progress', 'capture goal'],
+  },
+  {
+    // A quick note in the vault's Inbox, the one the Vault page's Add a quick
+    // note writes (note 4a7935d3), so it can be set down from any page and
+    // sorted later in Quick note triage. Dash chooses nothing for it.
+    id: 'vault',
+    label: 'Add a quick note',
+    module: 'vault',
+    placeholder: 'Whatever is on your mind. It waits in Quick note triage.',
+    field: 'prose',
+    dated: false,
+    keywords: ['quick note', 'vault note', 'new note', 'inbox', 'capture note'],
   },
 ];
 

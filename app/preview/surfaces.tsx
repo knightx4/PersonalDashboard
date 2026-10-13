@@ -96,7 +96,7 @@ import { TriagePreview } from './triage-surfaces';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteEdit } from '@/app/vault/n/[...path]/note-edit';
-import { NoteEditingPreview } from './note-edit-surfaces';
+import { NoteEditingPreview, NoteRenamePreview } from './note-edit-surfaces';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
@@ -4460,6 +4460,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'narrow',
     render: () => <NoteEditingPreview body={noteMarkdown} />,
+  },
+  {
+    /* Renaming a note (note 69c302f1): the file's name in a box where the
+     * title was, with Rename and Cancel under it. */
+    id: 'vault-note-rename',
+    label: 'Note · Renaming',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <NoteRenamePreview>
+        <NoteProperties frontmatter={noteFrontmatter} />
+        <NoteBody markdown={noteMarkdown} />
+      </NoteRenamePreview>
+    ),
   },
   {
     /* A note's embedded files (plan #1302): an image, a sized one, a PDF, a

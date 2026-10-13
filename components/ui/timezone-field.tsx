@@ -283,10 +283,11 @@ export function TimezoneField({
           if (open) close();
           else setOpen(true);
         }}
-        className="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-ink-muted hover:text-ink"
+        className="absolute right-0 top-0 flex h-(--control-h) w-9 items-center justify-center text-ink-muted hover:text-ink"
       >
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
+          strokeWidth={1.75}
           aria-hidden
         />
       </button>

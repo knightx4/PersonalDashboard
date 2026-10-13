@@ -1,4 +1,5 @@
 import { cardVariants } from '@/components/ui/card';
+import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 
@@ -27,9 +28,19 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
   return (
     <ValueList className={cn(cardVariants({ padding: 'dense' }), 'mb-6')}>
       {entries.map(([key, value]) => (
-        <ValueRow key={key} label={key} value={formatValue(value)} />
+        <ValueRow key={key} label={key} value={<PropertyValue text={formatValue(value)} />} />
       ))}
     </ValueList>
+  );
+}
+
+/** An address is a link, opened in a new tab; anything else stays text. */
+function PropertyValue({ text }: { text: string }) {
+  if (!/^https?:\/\/\S+$/.test(text)) return <>{text}</>;
+  return (
+    <a href={text} target="_blank" rel="noreferrer" className={cn(linkVariants(), 'inline-flex min-h-11 items-center')}>
+      {text}
+    </a>
   );
 }
 

@@ -34,6 +34,7 @@ export const vaultActions: ModuleActions = {
     acceptMap: none('theirs'),
     askMaya: none('spends'),
     saveNoteEdit: GAP,
+    renameNoteAction: GAP,
   },
   'app/vault/settings/actions.ts': {
     connectVault: none('account'),
