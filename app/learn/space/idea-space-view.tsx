@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Orbit, X } from 'lucide-react';
+import { Orbit } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
@@ -10,21 +10,21 @@ import { cn } from '@/lib/cn';
 import { NEIGHBOURS_PER_IDEA } from '@/lib/learn/map/idea-map';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import {
-  LABEL_FRAMES,
   STATE_MARKS,
   STATE_MARK_LABEL,
+  axisEnds,
   domainSlots,
   framePosition,
   hueFill,
-  labelsThatFit,
   mapHref,
   markOf,
   similarityText,
-  type AreaLabel,
   type MapParams,
   type StateMark,
 } from '@/lib/learn/map/view';
+import { ChosenIdea } from './chosen-idea';
 import { IdeaPlot, Mark, type PlotArea, type PlotDot } from './idea-plot';
+import { PickProvider, TapHint } from './pick';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -36,12 +36,12 @@ import { IdeaPlot, Mark, type PlotArea, type PlotDot } from './idea-plot';
  * map turns up, ideas that are probably one idea twice and untested ideas
  * surrounded by ones you know. The switches are links, so a layout or a
  * colouring survives a reload and a pasted address (law 5).
+ *
+ * The open idea is shared by the map and the rail through `PickProvider`, so
+ * a tap shows in both before the address catches up (plan #1883).
  */
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
-
-/** How far above its dot the open idea's name sits: half its height and the gap (idea-plot.tsx). */
-const SELECTED_RAISE_PX = 23;
 
 /** How many rows a rail list shows before the rest fold away. */
 const LIST_SHOWN = 5;
@@ -101,26 +101,25 @@ export function IdeaSpaceView({
   }
 
   const nameOf = new Map(view.ideas.map((idea) => [idea.id, idea.name]));
-  const selected = params.idea
-    ? (view.ideas.find((idea) => idea.id === params.idea) ?? null)
-    : null;
 
   return (
-    <MainRail
-      main={
-        <>
-          {header}
-          <MapSection view={view} params={params} hasSelection={selected !== null} />
-        </>
-      }
-      rail={
-        <>
-          {selected && <ChosenIdea idea={selected} view={view} params={params} nameOf={nameOf} />}
-          <SameIdeas view={view} nameOf={nameOf} />
-          <UntestedNearKnown view={view} nameOf={nameOf} />
-        </>
-      }
-    />
+    <PickProvider params={params}>
+      <MainRail
+        main={
+          <>
+            {header}
+            <MapSection view={view} params={params} />
+          </>
+        }
+        rail={
+          <>
+            <ChosenIdea ideas={view.ideas} />
+            <SameIdeas view={view} nameOf={nameOf} />
+            <UntestedNearKnown view={view} nameOf={nameOf} />
+          </>
+        }
+      />
+    </PickProvider>
   );
 }
 
@@ -130,15 +129,7 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 // -- The map -----------------------------------------------------------------
 
-function MapSection({
-  view,
-  params,
-  hasSelection,
-}: {
-  view: IdeaMapView;
-  params: MapParams;
-  hasSelection: boolean;
-}) {
+function MapSection({ view, params }: { view: IdeaMapView; params: MapParams }) {
   // From the ideas rather than the placed domains: colouring by domain needs
   // no field to have been placed, only each idea's own domain.
   const domains = ideaDomains(view.ideas);
@@ -159,10 +150,8 @@ function MapSection({
     };
   });
 
-  const selected = params.idea
-    ? (view.ideas.find((idea) => idea.id === params.idea) ?? null)
-    : null;
-  const areas = params.labels && placed ? areaLabels(view, params, selected) : null;
+  const areas = params.labels && placed ? areaLabels(view, params) : null;
+  const axes = params.layout === 'axes' ? axisEnds(view.ideas) : null;
 
   return (
     <section aria-label="The map">
@@ -213,11 +202,11 @@ function MapSection({
 
       <Card padding="none">
         <div className="p-1 sm:p-2">
-          <IdeaPlot key={params.idea ?? 'none'} dots={dots} areas={areas} params={params} />
+          <IdeaPlot dots={dots} areas={areas} axes={axes} colour={params.colour} />
         </div>
         <div className="card-pad-x pb-(--card-p)">
           <Legend params={params} dots={dots} domains={domains} slots={slots} />
-          <MapNotes view={view} params={params} placed={placed} hasSelection={hasSelection} />
+          <MapNotes view={view} params={params} placed={placed} />
         </div>
       </Card>
     </section>
@@ -229,16 +218,14 @@ function MapNotes({
   view,
   params,
   placed,
-  hasSelection,
 }: {
   view: IdeaMapView;
   params: MapParams;
   placed: boolean;
-  hasSelection: boolean;
 }) {
   return (
     <div className="mt-2 space-y-1 text-ui text-ink-muted">
-      {!hasSelection && <p>Tap an idea to see its six nearest.</p>}
+      <TapHint />
       {params.layout === 'axes' && (
         <p>
           These two axes keep {Math.round((view.variance.first + view.variance.second) * 100)}% of
@@ -276,12 +263,15 @@ function ideaDomains(
   return [...found.values()];
 }
 
-/** The field and domain names, with whether each fits on a phone and wider. */
-function areaLabels(view: IdeaMapView, params: MapParams, selected: IdeaOnMap | null): PlotArea[] {
+/**
+ * The field and domain names. Which of them fit, and where, is worked out on
+ * the map itself, which knows the open idea and where every dot is.
+ */
+function areaLabels(view: IdeaMapView, params: MapParams): PlotArea[] {
   const at = (area: { pca: { x: number; y: number }; neighbourMap: { x: number; y: number } }) =>
     framePosition(params.layout === 'axes' ? area.pca : area.neighbourMap);
 
-  const labels: (AreaLabel & { visited: boolean })[] = [
+  return [
     // Domains first: they are fewer and say more.
     ...view.areas.domains.map((domain) => ({
       id: `domain:${domain.id}`,
@@ -300,26 +290,6 @@ function areaLabels(view: IdeaMapView, params: MapParams, selected: IdeaOnMap | 
       visited: field.ideaCount > 0,
     })),
   ];
-  // The open idea's name goes down first and every other name gives way to
-  // it. It is drawn by the map itself, so it is fitted here and left out.
-  const fitted: AreaLabel[] = [...labels];
-  if (selected) {
-    fitted.push({
-      id: 'idea',
-      text: selected.name,
-      kind: 'idea',
-      ...at(selected),
-      priority: Number.POSITIVE_INFINITY,
-      raise: SELECTED_RAISE_PX,
-    });
-  }
-  const phone = labelsThatFit(fitted, LABEL_FRAMES.phone);
-  const wide = labelsThatFit(fitted, LABEL_FRAMES.wide);
-  return labels.map((label) => ({
-    ...label,
-    fitsPhone: phone.has(label.id),
-    fitsWide: wide.has(label.id),
-  }));
 }
 
 function Switch({
@@ -431,87 +401,6 @@ function Legend({
 }
 
 // -- The rail ----------------------------------------------------------------
-
-function ChosenIdea({
-  idea,
-  view,
-  params,
-  nameOf,
-}: {
-  idea: IdeaOnMap;
-  view: IdeaMapView;
-  params: MapParams;
-  nameOf: Map<string, string>;
-}) {
-  const stateOf = new Map(view.ideas.map((other) => [other.id, other.state]));
-  const facts: [string, string | null][] = [
-    ['State', STATE_MARK_LABEL[markOf(idea.state)]],
-    ['Subject', idea.track?.name ?? null],
-    ['Field', idea.field?.name ?? null],
-    ['Domain', idea.domain?.name ?? null],
-  ];
-
-  return (
-    <Card padding="standard" id="chosen">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="min-w-0 text-body font-medium text-ink">
-          <Link href={CONCEPT_HREF(idea.id)} className="press-area hover:text-accent">
-            {idea.name}
-          </Link>
-        </h2>
-        <Link
-          href={mapHref(params, { idea: null })}
-          scroll={false}
-          aria-label="Close this idea"
-          className="press-area -mr-1 shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
-        >
-          <X className="size-4" strokeWidth={2} aria-hidden />
-        </Link>
-      </div>
-      <p className="mt-1 line-clamp-4 text-ui text-ink-muted">{idea.claim}</p>
-      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-ui">
-        {facts.map(([label, value]) =>
-          value ? (
-            <div key={label} className="contents">
-              <dt className="text-ink-muted">{label}</dt>
-              <dd className="text-ink">{value}</dd>
-            </div>
-          ) : null,
-        )}
-      </dl>
-
-      {idea.neighbours.length > 0 && (
-        <>
-          <h3 className="mt-4 text-ui font-semibold text-ink">Nearest ideas</h3>
-          <ol className="mt-1 divide-y divide-border">
-            {idea.neighbours.map((neighbour) => (
-              <li key={neighbour.id}>
-                <Link
-                  href={mapHref(params, { idea: neighbour.id })}
-                  scroll={false}
-                  className="flex min-h-11 items-center gap-2 py-1.5 text-ui text-ink hover:text-accent"
-                >
-                  <svg viewBox="-2 -2 4 4" className="size-3 shrink-0" aria-hidden>
-                    <g transform="scale(1.4)">
-                      <Mark
-                        dot={{ mark: markOf(stateOf.get(neighbour.id) ?? 'unknown'), slot: 'none' }}
-                        colour="state"
-                      />
-                    </g>
-                  </svg>
-                  <span className="min-w-0 flex-1">{nameOf.get(neighbour.id) ?? 'An idea'}</span>
-                  <span className="tabular shrink-0 text-small text-ink-muted">
-                    {similarityText(neighbour.similarity)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-    </Card>
-  );
-}
 
 function RailList<T>({
   title,
