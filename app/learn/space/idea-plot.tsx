@@ -20,7 +20,7 @@ import { usePick } from './pick';
  * SVG, with the field and domain names laid over it in HTML.
  *
  * The SVG stretches to the frame, so the marks are drawn at one unit and
- * scaled per width by class: a dot is about eight pixels across on a phone
+ * scaled per width by class: a dot is about nine pixels across on a phone
  * and on a laptop alike, where scaling with the frame would make it three
  * times larger on the wider one. Names are HTML on top for the same reason,
  * since text inside a stretched SVG would shrink to nothing on a phone.
@@ -45,6 +45,7 @@ export type PlotDot = {
   mark: StateMark;
   /** The domain's colour slot, `other` for a domain without one, `none` for no domain. */
   slot: number | 'other' | 'none';
+  domainId: string | null;
   neighbours: string[];
 };
 
@@ -58,14 +59,14 @@ const REACH_PX = 22;
 
 /** One unit of the 0–100 frame is drawn at this scale per width. */
 const MARK_SCALE =
-  '[transform-box:fill-box] origin-center scale-[1.1] sm:scale-[0.7] lg:scale-[0.55]';
+  '[transform-box:fill-box] origin-center scale-[1.25] sm:scale-[0.8] lg:scale-[0.65]';
 
 /** The same scale as a number, for the window's width (the sm and lg breakpoints). */
 function markScale(): number {
-  if (typeof window === 'undefined') return 1.1;
-  if (window.matchMedia('(min-width: 64rem)').matches) return 0.55;
-  if (window.matchMedia('(min-width: 40rem)').matches) return 0.7;
-  return 1.1;
+  if (typeof window === 'undefined') return 1.25;
+  if (window.matchMedia('(min-width: 64rem)').matches) return 0.65;
+  if (window.matchMedia('(min-width: 40rem)').matches) return 0.8;
+  return 1.25;
 }
 
 /** The open idea's name: its rough width per character, its height, and its gap from the dot. */
@@ -75,8 +76,11 @@ const NAME_GAP_PX = 12;
 /** How far from its dot the open idea's name sits: half its height and the gap. */
 const SELECTED_RAISE_PX = NAME_LINE_PX / 2 + NAME_GAP_PX;
 
-/** What every mark outside the open idea's neighbourhood fades to. */
+/** What every mark outside the open idea's neighbourhood fades to (Part 10, rule 3). */
 const FADED = 'opacity-25';
+
+/** How many field and domain names show at once; the rest name themselves on hover (Part 10, rule 4). */
+export const NAMES_SHOWN = 7;
 
 export function IdeaPlot({
   dots,
@@ -91,7 +95,7 @@ export function IdeaPlot({
   axes: AxisEnds | null;
   colour: MapColour;
 }) {
-  const { selectedId, pick } = usePick();
+  const { selectedId, pick, params, clearDomain } = usePick();
   const [pointing, setPointing] = useState<string | null>(null);
   const frame = useRef<HTMLDivElement>(null);
   // The frame's width in pixels, measured, since where a name sits clear of
@@ -111,7 +115,14 @@ export function IdeaPlot({
   const byId = useMemo(() => new Map(dots.map((dot) => [dot.id, dot])), [dots]);
   const selected = selectedId ? (byId.get(selectedId) ?? null) : null;
   const near = new Set(selected?.neighbours ?? []);
-  const lit = (id: string) => !selected || id === selected.id || near.has(id);
+  // A domain pressed in the legend stands out the same way, while no idea is open.
+  const domain = colour === 'domain' && !selected ? params.domain : null;
+  const lit = (id: string) =>
+    selected
+      ? id === selected.id || near.has(id)
+      : domain
+        ? byId.get(id)?.domainId === domain
+        : true;
 
   // The open idea's name sits over its dot, or under it when over would hide
   // more of the six it is shown with.
@@ -150,7 +161,15 @@ export function IdeaPlot({
       });
     }
     const reach = Math.max(DOT_REACH_PX, (markScale() * width) / 100 + 1.5);
-    return placeLabels(fitted, width, { dots, shifts: LABEL_SHIFTS, reach });
+    const kept = placeLabels(fitted, width, { dots, shifts: LABEL_SHIFTS, reach });
+    // Placed most important first, so the first seven names kept are the ones shown.
+    const shown = new Map<string, number>();
+    for (const [id, shift] of kept) {
+      if (id === 'idea') continue;
+      if (shown.size === NAMES_SHOWN) break;
+      shown.set(id, shift);
+    }
+    return shown;
   }, [areas, width, dots, selected, nameBelow]);
 
   const nearest = (event: React.PointerEvent<HTMLDivElement>): PlotDot | null => {
@@ -173,7 +192,11 @@ export function IdeaPlot({
 
   const press = (event: React.PointerEvent<HTMLDivElement>) => {
     const dot = nearest(event);
-    if (!dot && !selectedId) return;
+    if (!dot && !selectedId) {
+      // Empty ground lets go of a domain picked out in the legend too.
+      if (domain) clearDomain();
+      return;
+    }
     pick(dot ? dot.id : null);
   };
 
@@ -211,6 +234,14 @@ export function IdeaPlot({
           role="img"
           aria-label={`A map of ${dots.length} ideas, each placed near the ideas most like it`}
         >
+          {/* The main axes' centre lines: dashed hairlines under the marks (Part 10, rule 6). */}
+          {axes && (
+            <g className="stroke-border" strokeWidth={1} strokeDasharray="3 5">
+              <line x1={0} y1={50} x2={100} y2={50} vectorEffect="non-scaling-stroke" />
+              <line x1={50} y1={0} x2={50} y2={100} vectorEffect="non-scaling-stroke" />
+            </g>
+          )}
+
           {selected &&
             selected.neighbours.map((id) => {
               const other = byId.get(id);
@@ -281,7 +312,7 @@ export function IdeaPlot({
             top={selected.top}
             above={!nameBelow}
             below={nameBelow}
-            className="bg-raised text-ui font-medium text-ink ring-1 ring-border"
+            className="bg-raised text-small text-ink ring-1 ring-border"
           >
             {selected.name}
           </MapName>
@@ -291,7 +322,7 @@ export function IdeaPlot({
             left={shown.left}
             top={shown.top}
             above
-            className="bg-raised text-ui text-ink ring-1 ring-border"
+            className="bg-raised text-small text-ink ring-1 ring-border"
           >
             {shown.name}
           </MapName>
@@ -377,17 +408,19 @@ export function Mark({ dot, colour }: { dot: Pick<PlotDot, 'mark' | 'slot'>; col
     return <circle r={1} style={{ fill: hueFill(dot.slot) }} />;
   }
   switch (dot.mark) {
-    // Filled in the accent: what you know is what the map is mostly for.
+    // Filled in the accent: what you know is the answer the map gives, and
+    // the only thing in it drawn in the accent before an idea is picked
+    // (Part 10, rule 1).
     case 'known':
       return <circle r={1} className="fill-accent" />;
-    // A heavy ring of the same colour: on the way to filled.
+    // Filled in the muted ink: on the way to known, and not yet the answer.
     case 'getting-there':
-      return <circle r={0.78} className="fill-surface stroke-accent" strokeWidth={0.45} />;
+      return <circle r={0.85} className="fill-ink-muted" />;
     case 'mixed-up':
       return <path d="M0 -1.3L1.3 0L0 1.3L-1.3 0Z" className="fill-danger" />;
-    // A thin ring in the faint ink at nearly a known dot's size: ground you
-    // have not been to, which is half the map and should read as such.
+    // A hollow ring at nearly a known dot's size: ground you have not been
+    // to, which is half the map and should read as ground (Part 10, rule 2).
     default:
-      return <circle r={0.85} className="fill-surface stroke-ink-ghost" strokeWidth={0.25} />;
+      return <circle r={0.85} className="fill-surface stroke-ink-ghost" strokeWidth={0.35} />;
   }
 }

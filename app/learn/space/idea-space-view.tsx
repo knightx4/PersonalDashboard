@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { NEIGHBOURS_PER_IDEA } from '@/lib/learn/map/idea-map';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import {
+  DOMAIN_HUES,
   STATE_MARKS,
   STATE_MARK_LABEL,
   axisEnds,
@@ -146,6 +147,7 @@ function MapSection({ view, params }: { view: IdeaMapView; params: MapParams }) 
       top: at.top,
       mark: markOf(idea.state),
       slot,
+      domainId: idea.domain?.id ?? null,
       neighbours: idea.neighbours.map((n) => n.id),
     };
   });
@@ -176,7 +178,7 @@ function MapSection({ view, params }: { view: IdeaMapView; params: MapParams }) 
           options={[
             {
               label: 'What you know',
-              href: mapHref(params, { colour: 'state' }),
+              href: mapHref(params, { colour: 'state', domain: null }),
               on: params.colour === 'state',
             },
             {
@@ -213,7 +215,11 @@ function MapSection({ view, params }: { view: IdeaMapView; params: MapParams }) 
   );
 }
 
-/** What the map cannot show by itself: what is missing from it, and how far to trust the axes. */
+/**
+ * The caption: what the map shows and how far to trust it (Part 10, rule 7),
+ * then what is missing from it. The neighbour layout has no axis, so the
+ * caption says so (rule 5).
+ */
 function MapNotes({
   view,
   params,
@@ -225,12 +231,21 @@ function MapNotes({
 }) {
   return (
     <div className="mt-2 space-y-1 text-ui text-ink-muted">
-      <TapHint />
-      {params.layout === 'axes' && (
+      {params.layout === 'axes' ? (
         <p>
-          These two axes keep {Math.round((view.variance.first + view.variance.second) * 100)}% of
-          how your ideas differ, so two ideas close here can still be far apart.
+          Ideas sit along the two directions in which your ideas differ most. These keep{' '}
+          {Math.round((view.variance.first + view.variance.second) * 100)}% of how they differ, so two
+          ideas close here can still be far apart.
         </p>
+      ) : (
+        <p>
+          Close ideas are ones read as being about the same thing. The layout has no axes: up, down,
+          left and right mean nothing, and only nearness does.
+        </p>
+      )}
+      <TapHint />
+      {params.colour === 'domain' && !params.domain && (
+        <p>Press a domain under the map to pick out its ideas.</p>
       )}
       {!placed && <p>Field and domain names show once the daily run has placed the fields.</p>}
       {placed && params.labels && view.areas.fieldsMissing > 0 && (
@@ -335,7 +350,15 @@ function Legend({
   domains: { id: string; name: string; ideaCount: number }[];
   slots: Map<string, number>;
 }) {
-  const items: { key: string; mark: React.ReactNode; label: string; count: number }[] = [];
+  const items: {
+    key: string;
+    mark: React.ReactNode;
+    label: string;
+    count: number;
+    /** Pressing it picks out the domain's ideas on the map, or lets them go again. */
+    href?: string;
+    on?: boolean;
+  }[] = [];
 
   if (params.colour === 'state') {
     const counts = new Map<StateMark, number>();
@@ -351,24 +374,29 @@ function Legend({
       });
     }
   } else {
-    const coloured = domains
-      .filter((domain) => slots.has(domain.id))
-      .sort((a, b) => slots.get(a.id)! - slots.get(b.id)!);
-    for (const domain of coloured) {
+    // Every domain gets its own entry, the three with a colour first and then
+    // the ones sharing the gray, so each can be pressed and picked out.
+    const ordered = [...domains].sort(
+      (a, b) =>
+        (slots.get(a.id) ?? DOMAIN_HUES.length) - (slots.get(b.id) ?? DOMAIN_HUES.length) ||
+        b.ideaCount - a.ideaCount ||
+        a.name.localeCompare(b.name),
+    );
+    for (const domain of ordered) {
+      const slot = slots.get(domain.id);
+      const on = params.domain === domain.id;
       items.push({
         key: domain.id,
-        mark: <circle r={1} style={{ fill: hueFill(slots.get(domain.id)!) }} />,
+        mark:
+          slot === undefined ? (
+            <Mark dot={{ mark: 'known', slot: 'other' }} colour="domain" />
+          ) : (
+            <circle r={1} style={{ fill: hueFill(slot) }} />
+          ),
         label: domain.name,
         count: domain.ideaCount,
-      });
-    }
-    const rest = domains.filter((domain) => !slots.has(domain.id));
-    if (rest.length > 0) {
-      items.push({
-        key: 'other',
-        mark: <Mark dot={{ mark: 'known', slot: 'other' }} colour="domain" />,
-        label: plural(rest.length, coloured.length > 0 ? 'other domain' : 'domain'),
-        count: rest.reduce((sum, domain) => sum + domain.ideaCount, 0),
+        href: mapHref(params, { domain: on ? null : domain.id, idea: null }),
+        on,
       });
     }
     const none = dots.filter((dot) => dot.slot === 'none').length;
@@ -384,18 +412,39 @@ function Legend({
 
   return (
     <ul
-      className="flex flex-wrap gap-x-4 gap-y-1 text-ui text-ink"
+      className="flex flex-wrap gap-x-4 gap-y-1 text-small text-ink-muted"
       aria-label="What the marks mean"
     >
-      {items.map((item) => (
-        <li key={item.key} className="inline-flex items-center gap-1.5">
-          <svg viewBox="-2 -2 4 4" className="size-3 shrink-0" aria-hidden>
-            <g transform="scale(1.4)">{item.mark}</g>
-          </svg>
-          {item.label}
-          <span className="tabular text-ink-muted">{item.count}</span>
-        </li>
-      ))}
+      {items.map((item) => {
+        const body = (
+          <>
+            <svg viewBox="-2 -2 4 4" className="size-3 shrink-0" aria-hidden>
+              <g transform="scale(1.4)">{item.mark}</g>
+            </svg>
+            {item.label}
+            <span className="tabular">{item.count}</span>
+          </>
+        );
+        return (
+          <li key={item.key} className="inline-flex items-center">
+            {item.href ? (
+              <Link
+                href={item.href}
+                scroll={false}
+                aria-pressed={item.on}
+                className={cn(
+                  'press-area inline-flex items-center gap-1.5 rounded-control hover:text-ink',
+                  item.on && 'text-ink underline underline-offset-4',
+                )}
+              >
+                {body}
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">{body}</span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
