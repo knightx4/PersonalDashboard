@@ -2,23 +2,18 @@ import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import Link, { linkVariants } from '@/components/ui/link';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { modulesFor, type ModuleId } from '@/lib/modules';
-import { AppShell } from '@/components/shell/app-shell';
+import { shellFor, type ShellFrame } from '@/lib/shell/shell-for';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Card } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { describeCount, loadModuleCounts } from '@/lib/modules/counts';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
+import { describeCount } from '@/lib/modules/counts';
+import { moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgenda, type Agenda } from '@/lib/todo/agenda/load';
 import { todaySlice } from '@/lib/todo/agenda/today';
 import { dayClosed, doneToday, type DoneTodayTask } from '@/lib/todo/agenda/day-close';
@@ -133,24 +128,29 @@ export default async function HomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // The frame: who you are, your settings, which workspaces are on, and what
-  // the shell itself needs. One round of reads, the same one every workspace's
-  // layout makes, and the only thing the greeting waits for. Everything under
-  // the date is started here and awaited in its own section below (plan
-  // #1443), so a slow agenda or brief costs that section and nothing else.
-  const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner, shopping, core, jobs, params, jar] =
-    await Promise.all([
-      loadAccountSettings(user.id),
-      loadModuleCounts(user.id),
-      loadRaisedNotifications(user.id),
-      loadMainCheck(),
-      isOwner({ user }),
-      createShoppingClient(),
-      createCoreClient(),
-      createJobsClient(),
-      searchParams,
-      cookies(),
-    ]);
+  // the shell itself needs. One round of reads, made by shellFor as it is for
+  // every workspace, and the only thing the greeting waits for. Everything
+  // under the date is started in homeContent and awaited in its own section
+  // below (plan #1443), so a slow agenda or brief costs that section and
+  // nothing else. Home draws its own columns, so it is not narrowed.
+  return shellFor({
+    module: null,
+    narrow: false,
+    children: (frame) => homeContent(frame, searchParams),
+  });
+}
+
+async function homeContent(
+  { user, settings, owner, counts }: ShellFrame,
+  searchParams: Promise<Record<string, string | string[] | undefined>>,
+) {
+  const [shopping, core, jobs, params, jar] = await Promise.all([
+    createShoppingClient(),
+    createCoreClient(),
+    createJobsClient(),
+    searchParams,
+    cookies(),
+  ]);
   const now = new Date();
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: settings.timezone,
@@ -291,130 +291,116 @@ export default async function HomePage({
   }));
 
   return (
-    <div className="min-h-full">
-      <AppShell
-        account={user.id}
-        module={null}
-        sections={[]}
-        displayName={settings.displayName}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        mainCheck={mainCheck}
-      >
-        {/* Home on the main-plus-rail pattern (plan #1627): what you work
-            through on the left, what you glance at on the right from laptop
-            width and under it on a phone. The first visit of the day arrives
-            in order (plan #1558): each part marked data-arrive rises a beat
-            after the one before. The brief, the rest of the column and the
-            rail are marked outside their Suspense boundaries, so they rise on
-            time and their content lands inside them whenever it is ready. */}
-        <HomeColumns
-          arrive={firstToday(jar.get(HOME_ARRIVED_COOKIE)?.value, today)}
-          day={today}
-          header={
-            <HomeHeader
-              greeting={`${greeting(settings.timezone, now)}${settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}`}
-              date={date}
-              sigil={
-                <Suspense fallback={null}>
-                  <FinishedDay
-                    agenda={agenda}
-                    done={done}
-                    seed={`${user.id}:${today}:todo`}
-                    draw={firstToday(jar.get(HOME_SIGIL_COOKIE)?.value, today)}
-                    day={today}
-                  />
+    <>
+      {/* Home on the main-plus-rail pattern (plan #1627): what you work
+          through on the left, what you glance at on the right from laptop
+          width and under it on a phone. The first visit of the day arrives
+          in order (plan #1558): each part marked data-arrive rises a beat
+          after the one before. The brief, the rest of the column and the
+          rail are marked outside their Suspense boundaries, so they rise on
+          time and their content lands inside them whenever it is ready. */}
+      <HomeColumns
+        arrive={firstToday(jar.get(HOME_ARRIVED_COOKIE)?.value, today)}
+        day={today}
+        header={
+          <HomeHeader
+            greeting={`${greeting(settings.timezone, now)}${settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}`}
+            date={date}
+            sigil={
+              <Suspense fallback={null}>
+                <FinishedDay
+                  agenda={agenda}
+                  done={done}
+                  seed={`${user.id}:${today}:todo`}
+                  draw={firstToday(jar.get(HOME_SIGIL_COOKIE)?.value, today)}
+                  day={today}
+                />
+              </Suspense>
+            }
+            brief={
+              // The fallback carries the brief's anchor, so the morning
+              // notification's #brief has somewhere to land before the
+              // brief itself does.
+              <Suspense
+                fallback={
+                  <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
+                    <Skeleton className="h-4 w-72 max-w-full" />
+                    <Skeleton className="h-3 w-56 max-w-full" />
+                  </div>
+                }
+              >
+                <DayBriefSection brief={dayBrief} opened={opened} day={today} />
+              </Suspense>
+            }
+          />
+        }
+        main={
+          <>
+            <WorkspaceMarks workspaces={workspaces} />
+
+            <Suspense fallback={null}>
+              <AgendaBanner agenda={agenda} />
+            </Suspense>
+
+            {/* One line per workspace, each landing when its own brief does. A
+                workspace with nothing to say takes its placeholder away. */}
+            <ul className="mt-2 divide-y divide-border">
+              {briefs.map(([module, brief]) => (
+                <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
+                  <BriefRow module={module} brief={brief} />
                 </Suspense>
-              }
-              brief={
-                // The fallback carries the brief's anchor, so the morning
-                // notification's #brief has somewhere to land before the
-                // brief itself does.
-                <Suspense
-                  fallback={
-                    <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
-                      <Skeleton className="h-4 w-72 max-w-full" />
-                      <Skeleton className="h-3 w-56 max-w-full" />
-                    </div>
-                  }
-                >
-                  <DayBriefSection brief={dayBrief} opened={opened} day={today} />
-                </Suspense>
-              }
+              ))}
+            </ul>
+            <Suspense fallback={null}>
+              <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
+            </Suspense>
+
+            <Suspense fallback={<SectionSkeleton rows={2} className="mt-4" />}>
+              <ObservationsSection observations={observations} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={<SectionSkeleton rows={3} className="mt-4" />}>
+              <TodaySection agenda={agenda} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={null}>
+              <DoneTodaySection done={doneList} logging={on('goals')} />
+            </Suspense>
+
+            <Suspense fallback={<SectionSkeleton rows={4} className="mt-4" />}>
+              <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={null}>
+              <ReviewLinks observations={observations} />
+            </Suspense>
+          </>
+        }
+        rail={
+          <>
+            {/* The fallback carries #watching, where every watch push opens. */}
+            <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
+              <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={null}>
+              <DashTodayBlock groups={dashToday} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={<SectionSkeleton rows={3} />}>
+              <WeekSection agenda={agenda} timezone={settings.timezone} />
+            </Suspense>
+
+            <WorkspaceList
+              workspaces={workspaces.map((workspace) => ({
+                ...workspace,
+                stat: describeCount(counts[workspace.id]) || workspace.description,
+              }))}
             />
-          }
-          main={
-            <>
-              <WorkspaceMarks workspaces={workspaces} />
-
-              <Suspense fallback={null}>
-                <AgendaBanner agenda={agenda} />
-              </Suspense>
-
-              {/* One line per workspace, each landing when its own brief does. A
-                  workspace with nothing to say takes its placeholder away. */}
-              <ul className="mt-2 divide-y divide-border">
-                {briefs.map(([module, brief]) => (
-                  <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
-                    <BriefRow module={module} brief={brief} />
-                  </Suspense>
-                ))}
-              </ul>
-              <Suspense fallback={null}>
-                <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
-              </Suspense>
-
-              <Suspense fallback={<SectionSkeleton rows={2} className="mt-4" />}>
-                <ObservationsSection observations={observations} timezone={settings.timezone} />
-              </Suspense>
-
-              <Suspense fallback={<SectionSkeleton rows={3} className="mt-4" />}>
-                <TodaySection agenda={agenda} timezone={settings.timezone} />
-              </Suspense>
-
-              <Suspense fallback={null}>
-                <DoneTodaySection done={doneList} logging={on('goals')} />
-              </Suspense>
-
-              <Suspense fallback={<SectionSkeleton rows={4} className="mt-4" />}>
-                <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
-              </Suspense>
-
-              <Suspense fallback={null}>
-                <ReviewLinks observations={observations} />
-              </Suspense>
-            </>
-          }
-          rail={
-            <>
-              {/* The fallback carries #watching, where every watch push opens. */}
-              <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
-                <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
-              </Suspense>
-
-              <Suspense fallback={null}>
-                <DashTodayBlock groups={dashToday} timezone={settings.timezone} />
-              </Suspense>
-
-              <Suspense fallback={<SectionSkeleton rows={3} />}>
-                <WeekSection agenda={agenda} timezone={settings.timezone} />
-              </Suspense>
-
-              <WorkspaceList
-                workspaces={workspaces.map((workspace) => ({
-                  ...workspace,
-                  stat: describeCount(counts[workspace.id]) || workspace.description,
-                }))}
-              />
-            </>
-          }
-        />
-      </AppShell>
-    </div>
+          </>
+        }
+      />
+    </>
   );
 }
 

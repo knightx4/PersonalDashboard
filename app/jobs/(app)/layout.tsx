@@ -1,28 +1,21 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
-import { AppShell, type NavSection } from '@/components/shell/app-shell';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadActivity } from '@/lib/shell/activity';
-import { loadMainCheck } from '@/lib/shell/main-check';
+import type { NavSection } from '@/components/shell/app-shell';
 import { loadJobsBrief } from '@/lib/shell/brief';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { shellFor } from '@/lib/shell/shell-for';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
 import { countReviewItems } from '@/lib/jobs/review/load';
-import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
-import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for every signed-in section.
  *
  * The proxy already blocks unauthenticated requests to this group; the check
- * here is a second line, not the first, and it is also where the profile and
- * the review count are loaded once for the whole shell.
+ * here is a second line, not the first, and it is where the job workspace's
+ * onboarding gate runs before the shell is read.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -39,34 +32,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (await onboardingNeeded(supabase, core, user)) {
     redirect('/jobs/onboarding');
   }
-
-  const [
-    { data: profile },
-    reviewCount,
-    inbox,
-    settings,
-    counts,
-    activity,
-    raised,
-    mainCheck,
-    owner,
-    costs,
-  ] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    countReviewItems(supabase, core, user.id),
-    loadInboxBannerState(user.id),
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadActivity(),
-    loadRaisedNotifications(user.id),
-    loadMainCheck(),
-    isOwner({ user }),
-    // Every paid button's $ hint in Jobs, from one read of the spend ledger
-    // (plan #918, the same as Learn's in #917).
-    estimatePaidActions(core, user.id, paidActionsUnder('app/jobs/')).catch(() => ({})),
-  ]);
-
-  const brief = await loadJobsBrief(user.id, reviewCount);
 
   /**
    * Eight sections, the most the design language allows. Today took in
@@ -87,31 +52,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   ];
 
-  const { accountIds, initialJob } = inbox;
-
-  return (
-    <div data-workspace="jobs">
-      <AppShell
-        account={user.id}
-        module="jobs"
-        sections={sections}
-        settingsHref="/jobs/settings"
-        settingsLabel="Job search settings"
-        feedbackHref="/dev/bugs"
-        displayName={profile?.display_name ?? null}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        activity={activity}
-        mainCheck={mainCheck}
-        brief={brief}
-        banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
-      >
-        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
-      </AppShell>
-    </div>
-  );
+  return shellFor({
+    module: 'jobs',
+    user,
+    sections,
+    settingsHref: '/jobs/settings',
+    settingsLabel: 'Job search settings',
+    feedbackHref: '/dev/bugs',
+    brief: async () => loadJobsBrief(user.id, await countReviewItems(supabase, core, user.id)),
+    banner: async () => {
+      const { accountIds, initialJob } = await loadInboxBannerState(user.id);
+      return <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />;
+    },
+    // Every paid button's $ hint in Jobs, from one read of the spend ledger
+    // (plan #918, the same as Learn's in #917).
+    paidActions: paidActionsUnder('app/jobs/'),
+    children,
+  });
 }

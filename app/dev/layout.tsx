@@ -2,13 +2,9 @@ import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { NoPermission } from '@/components/shell/no-permission';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { AppShell, type NavSection } from '@/components/shell/app-shell';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadActivity } from '@/lib/shell/activity';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
+import type { NavSection } from '@/components/shell/app-shell';
+import type { Notification } from '@/components/shell/notifications-button';
+import { shellFor } from '@/lib/shell/shell-for';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
@@ -16,9 +12,7 @@ import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
 import { planRowRef, raiseRef, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
 import { countPlanRunQuestions } from '@/lib/plan/run-answer';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
-import { createCoreClient } from '@/lib/core/auth/server';
-import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
-import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -59,29 +53,42 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges, runQuestions, snoozes] =
-    await Promise.all([
-      loadAccountSettings(user.id),
-      loadModuleCounts(user.id),
-      loadActivity(),
-      loadRaisedNotifications(user.id),
-      loadPlanForRequest(user.id),
-      loadMainCheck(),
-      // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
-      // (plan #918).
-      createCoreClient()
-        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/dev/')))
-        .catch(() => ({})),
-      // Changes to specs waiting on a yes, which Home lists under To approve
-      // (plan #1506).
-      countProposedSpecChanges(supabase, user.id),
-      // Runs held on a question they asked partway, which the Inbox lists
-      // under Need your answer (plan #1824).
-      countPlanRunQuestions(supabase, user.id),
-      // Rows put aside until a later day leave the count too (plan #1843).
-      loadSnoozeState(supabase, user.id),
-    ]);
+  // Started here, beside the shell's own reads, and awaited by the Inbox tab.
+  const inboxReads = Promise.all([
+    loadPlanForRequest(user.id),
+    // Changes to specs waiting on a yes, which Home lists under To approve
+    // (plan #1506).
+    countProposedSpecChanges(supabase, user.id),
+    // Runs held on a question they asked partway, which the Inbox lists
+    // under Need your answer (plan #1824).
+    countPlanRunQuestions(supabase, user.id),
+    // Rows put aside until a later day leave the count too (plan #1843).
+    loadSnoozeState(supabase, user.id),
+  ]);
+  // A failure still fails the layout when the tab awaits it, as it did when
+  // these were read in one round with the shell's; this only keeps it from
+  // being reported as unhandled in the meantime.
+  inboxReads.catch(() => {});
 
+  return shellFor({
+    module: 'dev',
+    user,
+    sections: async ({ raised }) => devSections(raised, ...(await inboxReads)),
+    feedbackHref: '/dev/bugs',
+    // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
+    // (plan #918).
+    paidActions: paidActionsUnder('app/dev/'),
+    children,
+  });
+}
+
+function devSections(
+  raised: Notification[],
+  plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
+  specChanges: number,
+  runQuestions: number,
+  snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
+): NavSection[] {
   /**
    * The badge is everything waiting on you, which is more than the raises.
    *
@@ -128,7 +135,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * than in the middle of the things that still want doing. Posts sits below
    * it, since a post is written from what the changelog lists.
    */
-  const sections: NavSection[] = [
+  return [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
     { href: '/dev/raised', label: 'Home', icon: 'devHome' },
@@ -164,27 +171,4 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     // already has its own section on the plan, and a tab beside it was the
     // same list twice (note 4308875b).
   ];
-
-  return (
-    <div data-workspace="dev">
-      <AppShell
-        account={user.id}
-        module="dev"
-        sections={sections}
-        feedbackHref="/dev/bugs"
-        displayName={settings.displayName}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        // Proved above: a non-owner never reaches this line.
-        isOwner
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        activity={activity}
-        mainCheck={mainCheck}
-      >
-        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
-      </AppShell>
-    </div>
-  );
 }

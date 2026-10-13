@@ -8,13 +8,7 @@ import {
   type ConnectorCallInput,
   type GrantInput,
 } from '@/lib/connector/apps';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
-import { AppShell } from '@/components/shell/app-shell';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { shellFor } from '@/lib/shell/shell-for';
 import { vapidPublicKey } from '@/lib/push/web-push';
 import { tabFrom } from '@/lib/tabs';
 import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
@@ -90,35 +84,22 @@ export default async function AccountPage({
   // data is read: the connected apps and their calls are Activity's alone.
   const tab = tabFrom((await searchParams).tab, ACCOUNT_TABS, ACCOUNT_TAB_ADDRESS) as AccountTab;
   const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner, connected, capture, origin] = await Promise.all([
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadRaisedNotifications(user.id),
-    loadMainCheck(),
-    isOwner({ user }),
+  // Started beside the shell's own reads; the open tab's data waits on them.
+  const reads = Promise.all([
     tab === 'activity' ? loadConnectedApps(user.id) : null,
     tab === 'activity' ? loadCapture(user.id) : null,
     requestOrigin(),
   ]);
+  // Awaited below; this only keeps a failure from reading as unhandled first.
+  reads.catch(() => {});
 
-  return (
-    <div className="min-h-full">
-      <AppShell
-        account={user.id}
-        module={null}
-        sections={[]}
-        displayName={settings.displayName}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        mainCheck={mainCheck}
-      >
-        <div className="mx-auto max-w-3xl">
-
-          <div>
+  return shellFor({
+    module: null,
+    user,
+    children: async ({ settings, owner }) => {
+      const [connected, capture, origin] = await reads;
+      return (
+        <div>
           <AccountView
             tab={tab}
             email={user.email ?? ''}
@@ -138,10 +119,9 @@ export default async function AccountPage({
               }
             }
             capture={capture && { ...capture, address: `${origin}/api/capture` }}
-            />
-          </div>
+          />
         </div>
-      </AppShell>
-    </div>
-  );
+      );
+    },
+  });
 }

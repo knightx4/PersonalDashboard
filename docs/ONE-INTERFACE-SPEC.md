@@ -479,7 +479,7 @@ Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
 Checked by: count `form-only-pages`, baseline 9, target 0, pending #1953.
 
 **R9.** The shell is mounted in one place.
-Checked by: count `shell-mounts`, baseline 15, target 1, pending #1928.
+Checked by: count `shell-mounts`, baseline 15, target 1.
 
 **R10.** Every route group has `error.tsx`, `not-found.tsx` and
 `loading.tsx`.
