@@ -91,6 +91,8 @@ export type EssayVaultInput = {
   self: string;
   /** Raise the note's stage to at least this one (Finish, plan #1873). */
   stage?: EssayStage;
+  /** Publish (plan #1863.11): mark the note published, first on this day (`YYYY-MM-DD`). */
+  published?: string;
 };
 
 export type EssayVaultFailure = SaveNoteFailure | 'empty';
@@ -104,6 +106,8 @@ export type EssayVaultResult =
       commitSha: string | null;
       /** The note's stage as written, so Finish can name it (plan #1873). */
       stage: EssayStage;
+      /** The whole file as the vault now holds it, which Publish snapshots (plan #1863.11). */
+      file: string;
     }
   | { ok: false; reason: EssayVaultFailure; error: string };
 
@@ -175,11 +179,9 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         const marked = { ...authorship, marks: noteBodyMarks(input.body, input.marks) };
         // A save that changes nothing but the date is no save: the file stays
         // as it is and no commit is made.
-        const same = rewriteEssayFile(raw, next, { title, stage: input.stage }, fresh, marked);
-        written =
-          same === raw
-            ? raw
-            : rewriteEssayFile(raw, next, { title, updated: input.today, stage: input.stage }, fresh, marked);
+        const change = { title, stage: input.stage, published: input.published };
+        const same = rewriteEssayFile(raw, next, change, fresh, marked);
+        written = same === raw ? raw : rewriteEssayFile(raw, next, { ...change, updated: input.today }, fresh, marked);
         return written;
       },
     });
@@ -193,7 +195,14 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         draftMarks: input.marks,
         authorship: ranges(written),
       });
-      return { ok: true, path: essay.path, blobSha: saved.blobSha, commitSha: saved.commitSha, stage: stageOf(written) };
+      return {
+        ok: true,
+        path: essay.path,
+        blobSha: saved.blobSha,
+        commitSha: saved.commitSha,
+        stage: stageOf(written),
+        file: written ?? '',
+      };
     }
     // The note was deleted or moved in Obsidian: write a new one below, so
     // the words are in the vault again rather than the essay never saving.
@@ -208,6 +217,10 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
   const slug = essay.slug ?? uniqueSlug(essaySlug(title), await ports.takenSlugs(essay.id));
   const fm = newEssayFrontmatter({ title, slug, description: brief.claim, today: input.today });
   if (input.stage) fm.stage = atLeastStage(fm.stage, input.stage);
+  if (input.published) {
+    fm.publish = true;
+    fm.published = input.published;
+  }
   const file = essayNoteText(fm, input.body, authorship);
   const created = await createCapturedNote(ports.create, file, title, ESSAYS_FOLDER);
   if (!created.ok) return { ok: false, reason: created.reason, error: created.error };
@@ -221,7 +234,14 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
     draftMarks: input.marks,
     authorship: ranges(file),
   });
-  return { ok: true, path: created.path, blobSha: created.blobSha, commitSha: created.commitSha, stage: fm.stage };
+  return {
+    ok: true,
+    path: created.path,
+    blobSha: created.blobSha,
+    commitSha: created.commitSha,
+    stage: fm.stage,
+    file,
+  };
 }
 
 /** The vault's version of an essay, as the editor takes it on a reload (plan #1868). */

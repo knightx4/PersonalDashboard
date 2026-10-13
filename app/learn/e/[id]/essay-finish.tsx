@@ -238,6 +238,7 @@ export function EssayFinishCard({
   inEvidenceBank,
   canFinish,
   onFinish,
+  onFinished,
   initial = { kind: 'idle' },
   className,
   stage = null,
@@ -248,6 +249,8 @@ export function EssayFinishCard({
   /** False while the essay is empty or a vault save is running. */
   canFinish: boolean;
   onFinish: () => Promise<FinishResult>;
+  /** Told when a press finishes the essay, so Publish can follow. */
+  onFinished?: (at: string) => void;
   initial?: FinishView;
   className?: string;
   /** The note's stage, known once Finish has run in this visit (and in the gallery). */
@@ -266,9 +269,10 @@ export function EssayFinishCard({
       return;
     }
     setFinished(result.finishedAt);
+    onFinished?.(result.finishedAt);
     setStageNow(result.stage);
     setView({ kind: 'offers', claims: result.claims, inEvidenceBank: result.inEvidenceBank });
-  }, [onFinish]);
+  }, [onFinish, onFinished]);
 
   const add = useCallback(
     async (offers: Offers, create: string[], evidence: boolean) => {

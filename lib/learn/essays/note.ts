@@ -182,7 +182,9 @@ const BLOCK = /^---\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
 /**
  * The file with `title` and `updated` rewritten in its frontmatter and its
  * body replaced; without `updated` the date the file has is kept. With `stage`
- * the note's stage is raised to it and never lowered (plan #1873). Every other line of the frontmatter is kept as it was. A
+ * the note's stage is raised to it and never lowered (plan #1873). With
+ * `published` (Publish, plan #1863.11) `publish` becomes true and an empty
+ * `published` date takes that day; a date already there is kept. Every other line of the frontmatter is kept as it was. A
  * file with no frontmatter (someone removed it in Obsidian) gets a fresh
  * block from `fresh`, so the note is still found as an essay.
  *
@@ -193,7 +195,7 @@ const BLOCK = /^---\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
 export function rewriteEssayFile(
   raw: string,
   body: string,
-  change: { title: string; updated?: string; stage?: EssayStage },
+  change: { title: string; updated?: string; stage?: EssayStage; published?: string },
   fresh: EssayFrontmatter,
   authorship?: EssayAuthorship,
 ): string {
@@ -204,6 +206,7 @@ export function rewriteEssayFile(
       title: change.title,
       updated: change.updated ?? fresh.updated,
       stage: change.stage ? atLeastStage(fresh.stage, change.stage) : fresh.stage,
+      ...(change.published ? { publish: true, published: fresh.published ?? change.published } : {}),
     };
     const written = essayNoteBody(body);
     if (!authorship || !written) return essayNoteText(fm, body);
@@ -226,6 +229,12 @@ export function rewriteEssayFile(
     const have = line?.slice('stage:'.length).trim().replace(/^["']|["']$/g, '');
     const next = atLeastStage(have, change.stage);
     if (next !== have) set('stage', next);
+  }
+  if (change.published) {
+    set('publish', 'true');
+    // The date it first went out stays; only an empty one is filled.
+    const line = lines.find((entry) => entry.startsWith('published:'));
+    if (!line?.slice('published:'.length).trim()) set('published', change.published);
   }
 
   const written = essayNoteBody(body);
