@@ -10,6 +10,7 @@ import {
   Bug,
   Building2,
   FileText,
+  Fingerprint,
   Flag,
   GalleryHorizontalEnd,
   Gauge,
@@ -34,6 +35,7 @@ import {
   Mail,
   Megaphone,
   Map,
+  MapPin,
   Network,
   Orbit,
   PenLine,
@@ -43,6 +45,7 @@ import {
   Repeat,
   Share2,
   Shapes,
+  Sparkles,
   StickyNote,
   Tag,
   Target,
@@ -179,6 +182,11 @@ export const NAV_ICONS = {
   goalsFiles: FileText,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
+
+  personality: Fingerprint,
+  places: MapPin,
+  workSchool: GraduationCap,
+  insights: Sparkles,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

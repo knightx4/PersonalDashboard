@@ -11,6 +11,7 @@ import { Meter } from '@/components/ui/meter';
 import { Kbd } from '@/components/ui/kbd';
 import { ICON_STROKE } from './measurements';
 import { formatMoney } from '@/lib/money';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * How a whole page is arranged, drawn from the components that draw the real
@@ -340,7 +341,7 @@ function DashboardAnatomy() {
  */
 function SettingsAnatomy() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Settings" />
 
       <div className="space-y-4">
@@ -392,7 +393,7 @@ function SettingsAnatomy() {
           </ul>
         </CardSection>
       </div>
-    </div>
+    </PageColumn>
   );
 }
 

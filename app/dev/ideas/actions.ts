@@ -289,5 +289,6 @@ export async function shapeIdea(
   if (!result.ok) return { error: result.error };
 
   revalidatePath('/dev/ideas');
+  revalidatePath('/dev/modules/[id]', 'page');
   return { message: 'Sent. A proposal will appear on the plan page when the session is done.' };
 }

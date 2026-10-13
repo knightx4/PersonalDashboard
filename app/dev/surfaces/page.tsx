@@ -6,6 +6,7 @@ import { surfaceOf } from '@/lib/feedback/surfaces';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { surfacesChangedWithin } from '@/lib/plan/screen-change';
 import { SurfaceReview } from './review';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Surfaces' };
 
@@ -65,12 +66,12 @@ export default async function DevSurfacesPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <PageColumn>
       <PageHeader
         title="Surfaces"
         description="The real components, at the width they are read at. Say what is wrong under one and it joins the notes queue."
       />
       <SurfaceReview surfaces={surfaces} />
-    </div>
+    </PageColumn>
   );
 }

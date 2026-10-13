@@ -7,6 +7,7 @@ import type { VideoPage } from '@/lib/learn/youtube/load';
 import type { Paragraph } from '@/lib/learn/youtube/paragraphs';
 import { transcribeVideoAction } from '../../actions';
 import { Press } from '../../press';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One video: the player, and the transcript under it.
@@ -32,7 +33,7 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
   const embedded = segments.filter((segment) => segment.embedded).length;
 
   return (
-    <>
+    <PageColumn>
       {channel && (
         <p className="mb-3">
           <Link
@@ -113,6 +114,6 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
           </div>
         )}
       </section>
-    </>
+    </PageColumn>
   );
 }

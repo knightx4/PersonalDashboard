@@ -128,6 +128,14 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       <path d="M10.2 3.3c1.15-.65 2.2.45 3.5-.1a.3.3 0 0 1 .42.28v2.35a.4.4 0 0 1-.24.37c-1.3.55-2.35-.55-3.68.1Z" />
     ),
   },
+  person: {
+    // A bust: the head is the colour, sitting into a pair of glass shoulders,
+    // and the V of a collar is what makes the pane shoulders rather than a hill.
+    back: <circle cx={12} cy={7.8} r={5.2} />,
+    front:
+      'M9 12.4h6a6.4 6.4 0 0 1 6.4 6.4v.6a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2v-.6A6.4 6.4 0 0 1 9 12.4Z',
+    lines: <path d="M9.4 13.6l2.6 2.8 2.6-2.8" />,
+  },
   terminal: {
     back: <rect x={9.4} y={2.6} width={12} height={9.2} rx={2.4} />,
     front:

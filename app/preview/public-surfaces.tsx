@@ -13,6 +13,7 @@ import { OnboardingSteps } from '@/app/(onboarding)/onboarding/onboarding-steps'
 import { ShareForm } from '@/app/s/[token]/share-form';
 import type { ShareGroup, SharePage } from '@/lib/share/read/load-disposition';
 import { NoLongerThere } from '@/components/shell/no-longer-there';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The pages a visitor reaches before signing in, or outside the app's shell,
@@ -160,8 +161,8 @@ export function ShareFormSurface() {
 /** A ref whose row has been deleted, in the shell's box as /open draws it. */
 export function OpenMissingSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <NoLongerThere />
-    </div>
+    </PageColumn>
   );
 }

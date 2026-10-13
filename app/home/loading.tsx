@@ -1,6 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { MAIN_BOX } from '@/components/shell/main-box';
 
 /**
  * The front door's own shape: the masthead, a few brief lines, then the
@@ -10,7 +11,7 @@ export default function Loading() {
   return (
     <div className="min-h-full">
       <div className="h-14 bg-page" />
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <main className={MAIN_BOX}>
         <div className="border-b border-border-strong pb-6 pt-2">
           <Skeleton className="h-3.5 w-28" />
           {/* ui-ok: fixed-control-height -- stands in for the page title, not a control */}

@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Card } from '@/components/ui/card';
 import type { PendingSuggestion } from '@/lib/share/families-store';
 import { FamilySuggestionCard } from './family-ui';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Grouping, drawn from what the page read (page.tsx), so the gallery can draw
@@ -12,7 +13,7 @@ import { FamilySuggestionCard } from './family-ui';
  */
 export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[] }) {
   return (
-    <div className="[&_a]:press-area">
+    <PageColumn className="[&_a]:press-area">
       <Link
         href="/shopping/share"
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
@@ -48,6 +49,6 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
           {suggestions.length} {suggestions.length === 1 ? 'suggestion' : 'suggestions'}
         </p>
       )}
-    </div>
+    </PageColumn>
   );
 }

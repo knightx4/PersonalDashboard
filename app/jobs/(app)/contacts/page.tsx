@@ -3,6 +3,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ContactsView } from './view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Contacts' };
 
@@ -31,7 +32,7 @@ export default async function ContactsPage() {
 
   if ((contacts ?? []).length === 0 && (companies ?? []).length === 0) {
     return (
-      <>
+      <PageColumn>
         <PageHeader
           title="Contacts"
           description="People to talk to, and a record of when you did."
@@ -42,7 +43,7 @@ export default async function ContactsPage() {
           description="Add a role first so there is a company to attach people to — or add someone unattached and link them later."
           action={{ label: 'Add a role', href: '/jobs/roles/new' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -65,7 +66,7 @@ export default async function ContactsPage() {
   const answered = outbound.filter((t) => t.responded_at !== null);
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Contacts"
         description={
@@ -101,6 +102,6 @@ export default async function ContactsPage() {
           pendingReplies: pendingByContact.get(contact.id) ?? 0,
         }))}
       />
-    </>
+    </PageColumn>
   );
 }

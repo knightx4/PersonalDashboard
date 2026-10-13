@@ -5,6 +5,7 @@ import { groupByMonth } from '@/lib/timeline/months';
 import type { ShownObservation } from '@/lib/timeline/observations-view';
 import { TIMELINE_MODULES, type TimelineEvent } from '@/lib/timeline/timeline';
 import { yearTotals } from '@/lib/timeline/year-review';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The timeline page (plan #1118) in the surface gallery, from typed fixtures
@@ -73,7 +74,7 @@ const OBSERVATIONS: ShownObservation[] = [
 export function TimelineSurface() {
   const months = groupByMonth(EVENTS, 'America/New_York', { first: '2025-10', last: '2026-09' });
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Timeline" description="What you did across the app, month by month." />
       <TimelineView
         months={months}
@@ -85,7 +86,7 @@ export function TimelineSurface() {
         timezone="America/New_York"
         observations={OBSERVATIONS}
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -100,7 +101,7 @@ export function YearReviewSurface() {
   const totals = yearTotals(year, 2026, timezone, '2026-09');
   const of = (...kinds: TimelineEvent['kind'][]) => year.filter((event) => kinds.includes(event.kind));
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="2026 in review" description="What the year held, counted from the timeline and written up by Dash." />
       <YearReviewView
         year={2026}
@@ -132,6 +133,6 @@ export function YearReviewSurface() {
         earlier={2025}
         later={null}
       />
-    </div>
+    </PageColumn>
   );
 }

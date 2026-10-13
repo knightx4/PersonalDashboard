@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { RoleForm } from './role-form';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Add a role' };
 
@@ -19,8 +20,7 @@ export default async function NewRolePage() {
   ]);
 
   return (
-    // A single form, so the form column rather than the reading column.
-    <div className="mx-auto max-w-2xl">
+    <PageColumn>
       <PageHeader
         title="Add a role"
         description="Paste a link and it fills itself in. Paste the description if it cannot."
@@ -29,6 +29,6 @@ export default async function NewRolePage() {
         companies={(companies ?? []).map((c) => ({ name: c.name as string }))}
         contacts={referrerOptions(contacts ?? [])}
       />
-    </div>
+    </PageColumn>
   );
 }

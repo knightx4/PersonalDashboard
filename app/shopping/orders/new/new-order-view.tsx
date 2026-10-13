@@ -5,6 +5,7 @@ import { Banner } from '@/components/ui/banner';
 import type { Person } from '@/lib/people/load';
 import type { OrderFormPrefill } from '@/lib/review/read-order';
 import { OrderForm } from './order-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Add an order, drawn from what the page read (page.tsx), so the gallery can
@@ -32,7 +33,7 @@ export function NewOrderView({
   return (
     // A form, but not a narrow one: each line item is a six-field row, and at
     // the single-form width those fields would be too tight to type into.
-    <div className="mx-auto max-w-3xl max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11 max-sm:[&_select]:min-h-11 max-sm:[&_select]:min-w-11 max-sm:[&_textarea]:min-h-11">
+    <PageColumn className="max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11 max-sm:[&_select]:min-h-11 max-sm:[&_select]:min-w-11 max-sm:[&_textarea]:min-h-11">
       <PageHeader
         title="Add an order"
         actions={
@@ -73,6 +74,6 @@ export function NewOrderView({
         prefill={prefill}
         sourceMessageId={sourceMessageId}
       />
-    </div>
+    </PageColumn>
   );
 }

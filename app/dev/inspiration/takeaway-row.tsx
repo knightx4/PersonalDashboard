@@ -52,7 +52,7 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
     );
   if (cover?.kind === 'plan') {
     return (
-      <Link href={planHref(cover.number)} className="hover:underline">
+      <Link href={planHref(cover.number)} className="press-area hover:underline">
         <StateLabel
           glyph="dashed"
           word={status === 'crafted' ? `In the plan as ${stepRef(cover)}` : `Already in the plan as ${stepRef(cover)}`}
@@ -67,7 +67,7 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
     // Crafted and linked to an idea with no feature yet: the shape routine has
     // it, and the feature number replaces this when the proposal is written.
     return (
-      <Link href={`/dev/ideas#idea-${cover.ideaId}`} className="hover:underline">
+      <Link href={`/dev/ideas#idea-${cover.ideaId}`} className="press-area hover:underline">
         <StateLabel
           glyph="dashed"
           word={status === 'crafted' ? 'Sent to be shaped' : 'Already an idea'}
@@ -121,7 +121,7 @@ function Moment({ source, label }: { source: TakeawaySource; label?: string }) {
       href={source.href}
       target="_blank"
       rel="noreferrer"
-      className={cn('tabular font-medium', linkVariants())}
+      className={cn('press-area tabular font-medium', linkVariants())}
       title={at ? `Open the video at ${at}` : 'Open the video'}
     >
       {label ?? (at ? `Watch at ${at}` : 'Watch')}

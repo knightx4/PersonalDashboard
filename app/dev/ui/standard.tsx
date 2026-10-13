@@ -61,6 +61,7 @@ import * as M from './measurements';
 import { CorrectionsChart } from './corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { SectionLabel } from '@/components/ui/section-heading';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The standard the interface is held to, and the only copy of it.
@@ -288,6 +289,7 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   learn: 'bg-w-learn',
   news: 'bg-w-news',
   goals: 'bg-w-goals',
+  you: 'bg-w-you',
   dev: 'bg-w-dev',
 };
 
@@ -685,7 +687,7 @@ export function UiStandard({
   outlines?: OutlineIndex;
 }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 pb-16">
+    <PageColumn className="space-y-8 pb-16">
       <PageHeader
         title="UI"
         description="The whole standard, rendered from the tokens it describes. Every swatch, control, size and number below is the real one — this page is a mirror, not a specification, and it is the only copy."
@@ -2060,6 +2062,6 @@ export function UiStandard({
           , where every one is rendered at the width it is read at.
         </p>
       </Section>
-    </div>
+    </PageColumn>
   );
 }

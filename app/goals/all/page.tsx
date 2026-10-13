@@ -7,6 +7,7 @@ import { allGoalsViewOf } from '@/lib/goals/all-goals';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { GoalsView } from '../goals-view';
 import { loadAllGoals } from './data';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'All goals' };
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export default async function AllGoalsPage({
   const data = await loadAllGoals(user, view);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader
         title="All goals"
         crumbs={allGoalsCrumbs()}
@@ -54,6 +55,6 @@ export default async function AllGoalsPage({
         }
       />
       <GoalsView {...data} view={view} />
-    </div>
+    </PageColumn>
   );
 }

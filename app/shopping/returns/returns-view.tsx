@@ -19,6 +19,7 @@ import type { OnTimeSavings } from '@/lib/returns/savings';
 import { OnTimeSavingsFigure } from './on-time-savings';
 import { ReturnItemRow } from './return-item-row';
 import { ReturnsOrderList } from './returns-order-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 function returnsHref(
   view: ReturnsView,
@@ -151,7 +152,7 @@ export function ReturnsPageView({
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header}
         <div className="mb-4">{tools}</div>
         <EmptyState
@@ -172,7 +173,7 @@ export function ReturnsPageView({
           }
         />
         <OnTimeSavingsFigure savings={savings} className="mt-6" />
-      </div>
+      </PageColumn>
     );
   }
 

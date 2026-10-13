@@ -86,6 +86,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/learn/s/[id]/clips',
   '/learn/s/[id]/p/[piece]',
   '/learn/s/[id]/probe',
+  '/learn/save',
   '/learn/space',
   '/learn/t/[id]',
   '/learn/today',
@@ -154,4 +155,9 @@ export const PAGE_ROUTES: readonly string[] = [
   '/vault/n/[...path]',
   '/vault/settings',
   '/vault/triage',
+  '/you',
+  '/you/insights',
+  '/you/personality',
+  '/you/places',
+  '/you/work',
 ];

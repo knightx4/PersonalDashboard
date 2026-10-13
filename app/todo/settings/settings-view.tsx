@@ -5,6 +5,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import { PageHeader } from '@/components/shell/page-header';
 import { AgendaSettingsForm, type SourceGroup } from './view';
 import { CalendarFeeds } from './feeds';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The agenda's sources, grouped by the workspace they read. `isOn` says
@@ -52,7 +53,7 @@ export function TodoSettingsView({
   timezone: string;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Todo settings" />
 
       <AgendaSettingsForm groups={groups} enabled={enabled} horizonDays={horizonDays} />
@@ -60,6 +61,6 @@ export function TodoSettingsView({
       <div className="mt-6">
         <CalendarFeeds feeds={feeds} timezone={timezone} />
       </div>
-    </div>
+    </PageColumn>
   );
 }

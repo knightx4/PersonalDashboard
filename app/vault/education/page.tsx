@@ -4,6 +4,7 @@ import { groupCourses } from '@/lib/vault/education';
 import type { Course, Transcript } from '@/lib/vault/transcripts';
 import { AddTranscript } from './add-transcript';
 import { SchoolCourses } from './course-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,7 @@ export default async function EducationPage() {
   for (const course of courses) courseCounts[course.transcript_id] = (courseCounts[course.transcript_id] ?? 0) + 1;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Education"
         description={
@@ -55,6 +56,6 @@ export default async function EducationPage() {
       {groups.map((group) => (
         <SchoolCourses key={group.school} group={group} courseCounts={courseCounts} />
       ))}
-    </>
+    </PageColumn>
   );
 }

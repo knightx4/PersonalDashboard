@@ -5,6 +5,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
+import { YouTabEmpty } from '@/app/you/you-tabs';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -318,7 +319,7 @@ import {
   DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
-import { DevModuleSurface, DevModulesSurface } from './module-surfaces';
+import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -349,6 +350,7 @@ import {
   VaultSettingsSurface,
   VaultThemeSurface,
 } from './vault-page-surfaces';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -2593,7 +2595,7 @@ const waitingSenders = new Map(
 function NeedsConfirmingSurface() {
   return (
     // The top of the All newsletters page as it draws now (plan #1774).
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       <PageHeader title="Newsletters" />
       <NeedsConfirming
         timezone="Europe/London"
@@ -2604,7 +2606,7 @@ function NeedsConfirmingSurface() {
           { id: 'w3', senderId: 's1', subject: 'One more step', receivedAt: '2026-10-03T09:05:00Z', confirmUrl: 'https://theweekly.example/confirm/9' },
         ]}
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -2663,6 +2665,14 @@ const shellSections: NavSection[] = [
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
   { href: '/jobs/material', label: 'Material', icon: 'answers' },
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
+];
+
+/** The sections app/you/layout.tsx passes, copied for the same reason. */
+const youSections: NavSection[] = [
+  { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
+  { href: '/you/places', label: 'Places', icon: 'places', exact: true },
+  { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
+  { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
 ];
 
 const triageCrumbs = [
@@ -5258,6 +5268,38 @@ export const SURFACES: readonly Surface[] = [
   },
 
   {
+    /* The You workspace in its shell, on Personality, its first tab (plan
+     * #1991.1): the four tabs in the sidebar and the tab's empty state. */
+    id: 'you-shell',
+    label: 'You · The workspace on its first tab',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <AppShell
+        account="preview"
+        module="you"
+        sections={youSections}
+        feedbackHref="/dev/bugs"
+        displayName="Chris"
+        email="chris@example.com"
+        isOwner
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <YouTabEmpty tab="personality" />
+      </AppShell>
+    ),
+  },
+  {
+    id: 'you-insights',
+    label: 'You · Insights, before Dash has noticed anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouTabEmpty tab="insights" />,
+  },
+
+  {
     id: 'news-issue-digest',
     label: 'News · Issue summary and stories',
     module: 'news',
@@ -6068,6 +6110,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevModuleSurface />,
+  },
+  {
+    id: 'dev-module-ideas',
+    label: 'Dev · Module, its ideas',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevModuleIdeasSurface />,
   },
 
   /* The Goals, Jobs and Mail pages (plan #1601). Fixtures in

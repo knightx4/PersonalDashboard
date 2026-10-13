@@ -30,6 +30,7 @@ import { MaterialForClaim, NoMaterialNote } from './material';
 import { MapBranch, UnlocksMap } from './unlocks-map';
 import { isLit, litRecently } from '@/lib/learn/graph/lit';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * What /learn/c/[id] draws, from what its page read: the page hands its reads
@@ -183,7 +184,7 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
     referredToBy.length > 0;
 
   return (
-    <>
+    <PageColumn>
       <p className="mb-3">
         <Link
           href={`/learn/s/${subject.id}`}
@@ -361,6 +362,6 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
           </ul>
         )}
       </CardSection>
-    </>
+    </PageColumn>
   );
 }

@@ -98,6 +98,12 @@ export const learnActions: ModuleActions = {
       note: 'Dash starts the list and adds each work to it, where the page reads a pasted list first.',
     },
   },
+  'app/learn/save/actions.ts': {
+    saveReadingLink: {
+      tool: 'add_track_reading',
+      note: 'Dash adds the work by its title and link to a list it is told, where the page reads the title from the link and puts it on "Saved links".',
+    },
+  },
   'app/learn/now/actions.ts': {
     loadMoreCards: none('page'),
     openCardSource: none('page'),

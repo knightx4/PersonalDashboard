@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
 import { loadActivity } from '@/lib/jobs/activity/load';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Activity' };
 
@@ -30,7 +31,7 @@ export default async function ActivityPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       {/* No description: the heading says it, and what the inbox and the
           nightly sweep do is told in the empty state, where it is news. */}
       <PageHeader title="Activity" />
@@ -44,6 +45,6 @@ export default async function ActivityPage() {
         }))}
       />
       <ActivityFeed activity={activity} timezone={profile?.timezone ?? 'UTC'} />
-    </div>
+    </PageColumn>
   );
 }

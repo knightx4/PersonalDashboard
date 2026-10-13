@@ -9,6 +9,7 @@ import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
 import { MergeLog } from './merge-log';
 import { SweepAction, SweepPanel } from './sweep-panel';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
@@ -29,7 +30,7 @@ export function VaultMapView({
 
   if (themes.length === 0) {
     return (
-      <>
+      <PageColumn>
         <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
         <SweepPanel sweep={sweep} />
         {/* Themes arrive two ways: the sweep above, and one note's own Map
@@ -40,12 +41,12 @@ export function VaultMapView({
           description="The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Sweep every note to fill it, or open one note and use its Map section. What the sweep reads and what you accept on a note appear here."
           action={{ label: 'Open your notes', href: '/vault' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
   return (
-    <>
+    <PageColumn>
       <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
       <SweepPanel sweep={sweep} />
 
@@ -86,7 +87,7 @@ export function VaultMapView({
       <div className="[&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
         <MergeLog log={mergeLog} />
       </div>
-    </>
+    </PageColumn>
   );
 }
 

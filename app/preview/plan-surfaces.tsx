@@ -14,6 +14,7 @@ import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
 import { applyView, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
 import { placeCheckBacks } from '@/lib/plan/check-backs';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -356,7 +357,7 @@ const site = projectById('website')!;
 
 export function ProjectPlanSurface() {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader
         title={site.label}
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
@@ -374,7 +375,7 @@ export function ProjectPlanSurface() {
         commitChecks={{}}
         unfolded
       />
-    </div>
+    </PageColumn>
   );
 }
 

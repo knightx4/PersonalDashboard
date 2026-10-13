@@ -21,6 +21,7 @@ import type { RunLinesState } from '@/components/runs/run-lines';
 import { loadRunActivities } from '@/lib/core/run-activities-store';
 import type { RunOutcome } from '@/lib/goals/runs';
 import { acknowledgeGoalRunAction, answerGoalRunAction } from './actions';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Run' };
 export const dynamic = 'force-dynamic';
@@ -77,7 +78,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
   const state = linesState(outcome);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       <PageHeader
         title={JOB_LABELS[run.job]}
         description={
@@ -157,6 +158,6 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
           <RunChanges runId={run.id} lines={lines} hrefs={hrefs} />
         </Card>
       )}
-    </div>
+    </PageColumn>
   );
 }

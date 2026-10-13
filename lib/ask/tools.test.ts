@@ -258,6 +258,24 @@ describe('open_row', () => {
     expect(expectLinkedRows(result)).toEqual([]);
   });
 
+  it('carries the newest comments under the row, so a reply from Dash can be found (notes 1527e0bf, ae78d95e)', async () => {
+    const note = '11111111-1111-4111-8111-111111111111';
+    const withThread: Tables = {
+      ...tables,
+      'core.thread_turns': [
+        { user_id: ME, ref: `obsidian.notes:${note}`, author: 'me', body: '@dash Help me prepare.', created_at: '2026-10-13T17:27:35Z' },
+        { user_id: ME, ref: `obsidian.notes:${note}`, author: 'claude', body: 'I added a to-do.', created_at: '2026-10-13T17:28:02Z' },
+        { user_id: THEM, ref: `obsidian.notes:${note}`, author: 'me', body: 'Not yours.', created_at: '2026-10-13T17:29:00Z' },
+      ],
+    };
+    const result = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(withThread));
+    expect(expectLinkedRows(result)[0].detail?.comments).toBe(
+      '[2026-10-13 17:27] You: @dash Help me prepare.\n[2026-10-13 17:28] Dash: I added a to-do.',
+    );
+    const bare = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(tables));
+    expect(expectLinkedRows(bare)[0].detail).not.toHaveProperty('comments');
+  });
+
   it('refuses a table it cannot open', async () => {
     const result = await executeAskTool('open_row', { table: 'public.profiles', ref: ME }, context(tables));
     expect(result).toEqual({ ok: false, error: 'public.profiles is not a table that can be opened.' });
