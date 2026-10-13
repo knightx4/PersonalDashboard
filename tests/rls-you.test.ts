@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['personality_results']);
+    expect(rows.map((r) => r.tablename)).toEqual(['courses', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {

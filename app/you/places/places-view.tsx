@@ -1,5 +1,6 @@
 import { House, MapPin, Plus } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
+import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -32,7 +33,7 @@ export function PlacesView({ places }: { places: readonly Place[] }) {
 
   if (places.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header}
         <EmptyState
           icon={MapPin}
@@ -40,7 +41,7 @@ export function PlacesView({ places }: { places: readonly Place[] }) {
           description="Add the places you have lived, with a year or a month for when you moved in and out. Dash reads them when you ask where you were living at some point."
           action={{ label: 'Add a place', href: '/you/places/new' }}
         />
-      </div>
+      </PageColumn>
     );
   }
 
