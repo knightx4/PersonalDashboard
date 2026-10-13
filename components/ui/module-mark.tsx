@@ -208,8 +208,9 @@ function GlintObject({
       {dots && <g fill={colour}>{dots}</g>}
     </>
   );
-  const glassTop = tint ? `color-mix(in srgb, ${to} 62%, #0d0f18)` : `color-mix(in srgb, ${to} 22%, #10121b)`;
-  const glassBottom = tint ? `color-mix(in srgb, ${to} 38%, #07080d)` : `color-mix(in srgb, ${to} 10%, #07080c)`;
+  // Smoked, but not near-black: enough of the hue in the glass that it reads as coloured glass.
+  const glassTop = tint ? `color-mix(in srgb, ${from} 55%, ${to})` : `color-mix(in srgb, ${to} 50%, #2a2e3d)`;
+  const glassBottom = tint ? `color-mix(in srgb, ${to} 80%, #1a1c26)` : `color-mix(in srgb, ${to} 34%, #1b1e29)`;
 
   return (
     <>
@@ -268,14 +269,14 @@ function GlintObject({
           {onBack}
         </g>
       )}
-      {pane({ fill: `url(#${id}-glass)`, opacity: 0.94 })}
+      {pane({ fill: `url(#${id}-glass)`, opacity: 0.9 })}
       <g clipPath={`url(#${id}-clip)`}>
         {/* The colour seen through the smoked glass, softened. */}
         <g fill={`url(#${id}-back)`} filter={`url(#${id}-blur)`} opacity={tint ? 0.55 : 0.8} transform="translate(-.5 .7)">
           {back}
         </g>
         {!tint && (
-          <g filter={`url(#${id}-blur)`} opacity={0.35} transform="translate(12 16) scale(.6 .45) translate(-12 -16)">
+          <g filter={`url(#${id}-blur)`} opacity={0.5} transform="translate(12 15) scale(.7 .55) translate(-12 -15)">
             {pane({ fill: from })}
           </g>
         )}
@@ -290,8 +291,8 @@ function GlintObject({
         </g>
         {pane({ stroke: '#fff', strokeWidth: 0.6 })}
       </g>
-      <g opacity={0.5} filter={`url(#${id}-soft)`} transform="translate(0 .4)">
-        {detail('#000')}
+      <g opacity={0.3} filter={`url(#${id}-soft)`} transform="translate(0 .4)">
+        {detail(`color-mix(in srgb, ${to} 70%, #000)`)}
       </g>
       {detail('#fff')}
     </>
