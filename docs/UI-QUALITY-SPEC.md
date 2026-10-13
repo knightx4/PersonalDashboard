@@ -364,6 +364,21 @@ takes.
 Other workspaces follow the same rule when a step next changes them. A step
 that adds a job to a workspace names which of the three it is.
 
+## Part 11: Quiet outlines on controls
+
+A button's words and fill already say it is a button, so its outline does
+not have to. Today every control is outlined in `--c-border-control`, a mid
+gray picked to meet the 3:1 contrast floor for control edges, and on a busy
+page those outlines are the darkest lines after the text. Buttons and
+segmented controls are outlined in `--c-border-strong` instead, the light
+border colour. The chosen segment of a segmented control is filled in the
+accent tint with accent text, so which one is on still stands apart at 3:1.
+Text inputs keep the stronger outline, since an empty box has no words to
+identify it, and so does the keyboard focus ring.
+
+The person asked for this on 12 October 2026, comparing the app's buttons
+with the thinner outlines on the Idea Space sketch.
+
 ## Part 12: One focal point, and a face for figures
 
 Two habits make a dense page look composed.
@@ -421,6 +436,9 @@ Checked by: audit.
 Checked by: audit.
 
 **R11.** A workspace page does not keep a chart that Dash made in a reply.
+Checked by: audit.
+
+**R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
 Checked by: audit.
 
 **R16.** A card or region has at most one bold element.
