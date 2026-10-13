@@ -12,6 +12,7 @@ import { Note } from '@/components/ui/note';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { Input, Label, Select } from '@/components/ui/field';
+import { Tooltip } from '@/components/ui/tooltip';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { RoundPrep } from './prep-note';
 import {
@@ -499,23 +500,25 @@ function Interviewers({
           {participant.role !== 'interviewer' && (
             <span className="text-ink-muted">{participant.role}</span>
           )}
-          <IconButton
-            size="sm"
-            label={`Remove ${participant.name}`}
-            disabled={pending}
-            onClick={() =>
-              startTransition(
-                () =>
-                  void removeInterviewer({
-                    interviewId: interview.id,
-                    contactId: participant.contactId,
-                  }),
-              )
-            }
-            className="-my-1 -mr-1 hover:text-danger"
-          >
-            <X strokeWidth={1.75} aria-hidden />
-          </IconButton>
+          <Tooltip label="Take this person off the interview">
+            <IconButton
+              size="sm"
+              label={`Remove ${participant.name}`}
+              disabled={pending}
+              onClick={() =>
+                startTransition(
+                  () =>
+                    void removeInterviewer({
+                      interviewId: interview.id,
+                      contactId: participant.contactId,
+                    }),
+                )
+              }
+              className="-my-1 -mr-1 hover:text-danger"
+            >
+              <X strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
         </Chip>
       ))}
 

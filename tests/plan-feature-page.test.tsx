@@ -8,6 +8,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 
+// The Tooltip draws its text only while it shows, so these renders read it
+// from a title on a stand-in instead (plan #1985.5).
+vi.mock('@/components/ui/tooltip', async () => {
+  const { createElement } = await import('react');
+  return {
+    Tooltip: ({ label, children }: { label: string; children: React.ReactNode }) =>
+      createElement('span', { title: label }, children),
+  };
+});
+
+
 vi.mock('@/app/dev/plan/actions', () => {
   const noop = async () => ({});
   return {

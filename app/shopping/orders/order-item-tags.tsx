@@ -7,6 +7,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { Input } from '@/components/ui/field';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * An item's tags as chips on one line, ending in a quiet "Add tag" that
@@ -37,23 +38,25 @@ export function OrderItemTags({
           {/* A glyph inside the chip, not a standalone icon button: the
               32px icon-button shape would be taller than the chip. */}
           {!readOnly && (
-            <button
-              type="button"
-              className="press flex items-center rounded-control text-ink-muted transition-colors duration-quick hover:text-danger disabled:opacity-50"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  await removeOrderItemTag({
-                    orderId,
-                    orderItemId,
-                    tagId: tag.id,
-                  });
-                })
-              }
-            >
-              <X strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Remove {tag.name} tag</span>
-            </button>
+            <Tooltip label={`Remove the ${tag.name} tag`}>
+              <button
+                type="button"
+                className="press flex items-center rounded-control text-ink-muted transition-colors duration-quick hover:text-danger disabled:opacity-50"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await removeOrderItemTag({
+                      orderId,
+                      orderItemId,
+                      tagId: tag.id,
+                    });
+                  })
+                }
+              >
+                <X strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Remove {tag.name} tag</span>
+              </button>
+            </Tooltip>
           )}
         </Chip>
       ))}

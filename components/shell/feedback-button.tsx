@@ -23,6 +23,7 @@ import type { FeedbackKind } from '@/lib/feedback/load';
 import type { FiledAs } from '@/lib/feedback/move';
 import type { TriageView } from '@/lib/feedback/triage';
 import { usePopover } from '@/lib/use-popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Always-available capture for bugs, requests and ideas.
@@ -176,17 +177,19 @@ export function FeedbackButton({
 
   return (
     <div className="relative shrink-0">
-      <IconButton
-        ref={triggerRef}
-        label="Report a bug, request a feature, or note an idea"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        active={open}
-        className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
-      >
-        <MessageSquarePlus strokeWidth={1.75} aria-hidden />
-      </IconButton>
+      <Tooltip label="Report a bug, request a feature, or note an idea" align="end">
+        <IconButton
+          ref={triggerRef}
+          label="Report a bug, request a feature, or note an idea"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          active={open}
+          className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
+        >
+          <MessageSquarePlus strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </Tooltip>
 
       {open && (
         <Popover

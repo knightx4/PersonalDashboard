@@ -12,6 +12,7 @@ import { MAX_QUIZ_NOTES } from '@/lib/learn/quiz/model';
 import { QUIZ_FILE_ACCEPT } from '@/lib/learn/quiz/file';
 import { startQuiz, type NewQuizState } from './actions';
 import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Choosing what to be quizzed on.
@@ -165,13 +166,15 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
                   className="inline-flex max-w-xs items-center gap-1.5 rounded-pill bg-sunken py-1 pl-2.5 pr-1 text-small text-ink"
                 >
                   <span className="min-w-0 truncate">{note.title}</span>
-                  <IconButton
-                    size="sm"
-                    label={`Take ${note.title} out of this quiz`}
-                    onClick={() => setPicked((all) => all.filter((one) => one.id !== note.id))}
-                  >
-                    <X strokeWidth={1.75} aria-hidden />
-                  </IconButton>
+                  <Tooltip label="Take this note out of the quiz" className="shrink-0">
+                    <IconButton
+                      size="sm"
+                      label={`Take ${note.title} out of this quiz`}
+                      onClick={() => setPicked((all) => all.filter((one) => one.id !== note.id))}
+                    >
+                      <X strokeWidth={1.75} aria-hidden />
+                    </IconButton>
+                  </Tooltip>
                 </li>
               ))}
             </ul>
@@ -202,16 +205,18 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
           {file ? (
             <span className="inline-flex max-w-full items-center gap-1.5 rounded-pill bg-sunken py-1 pl-2.5 pr-1 text-small text-ink">
               <span className="min-w-0 truncate">{file}</span>
-              <IconButton
-                size="sm"
-                label={`Take ${file} out of this quiz`}
-                onClick={() => {
-                  if (fileRef.current) fileRef.current.value = '';
-                  setFile(null);
-                }}
-              >
-                <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              <Tooltip label="Take this file out of the quiz" className="shrink-0">
+                <IconButton
+                  size="sm"
+                  label={`Take ${file} out of this quiz`}
+                  onClick={() => {
+                    if (fileRef.current) fileRef.current.value = '';
+                    setFile(null);
+                  }}
+                >
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
             </span>
           ) : (
             <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>

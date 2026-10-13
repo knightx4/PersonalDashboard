@@ -21,6 +21,7 @@ import {
   type MainDot,
 } from '@/lib/plan/main-check';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The status line.
@@ -229,18 +230,19 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
 
   return (
     <span className="pointer-events-auto relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={said}
-        className="-m-1.5 flex items-center rounded-full p-1.5 transition-colors hover:bg-shell-hover"
-      >
-        <span className={cn('size-2 rounded-full', DOT[state])} aria-hidden />
-        <span className="sr-only">{`CI on main. ${said}`}</span>
-      </button>
+      <Tooltip label={said} above>
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className="-m-1.5 flex items-center rounded-full p-1.5 transition-colors hover:bg-shell-hover"
+        >
+          <span className={cn('size-2 rounded-full', DOT[state])} aria-hidden />
+          <span className="sr-only">{`CI on main. ${said}`}</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover

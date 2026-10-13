@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/field';
 import { scrim } from '@/components/ui/popover';
 import { IconButton } from '@/components/ui/icon-button';
 import { SectionLabel } from '@/components/ui/section-heading';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Contextual filters. Contents change per section, so each page passes its own
@@ -84,9 +85,11 @@ export function LeftRail({
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Filters</h2>
-              <IconButton label="Close filters" onClick={() => setOpen(false)}>
-                <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              <Tooltip label="Close filters" align="end">
+                <IconButton label="Close filters" onClick={() => setOpen(false)}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto p-4" onClick={() => setOpen(false)}>
               {children}

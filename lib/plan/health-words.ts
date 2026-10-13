@@ -62,13 +62,21 @@ export const HEALTH: Record<PlanHealth, HealthWord> = {
     tone: 'caution',
     title: 'A question waiting on you. It closes on an answer, not a commit.',
   },
-  answered: { word: 'Answered', tone: 'positive' },
+  answered: {
+    word: 'Answered',
+    tone: 'positive',
+    title: 'Settled by your answer. Nothing more is needed from you.',
+  },
   proposed: {
     word: 'Proposed',
     tone: 'caution',
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: DEV_STATE_WORD.working, tone: 'info' },
+  in_progress: {
+    word: DEV_STATE_WORD.working,
+    tone: 'info',
+    title: 'Dash has claimed this and is on it. Nothing is needed from you.',
+  },
   // The three readings of a claim. `in_progress` above is the fourth and says
   // the least: the row is claimed and nothing has looked into what the session
   // is doing.
@@ -107,7 +115,11 @@ export const HEALTH: Record<PlanHealth, HealthWord> = {
   },
   // A step waiting on another step, which clears itself. Nothing else to say
   // "on you" about, and the plan is the only queue that has it.
-  waiting: { word: 'Waiting', tone: 'caution' },
+  waiting: {
+    word: 'Waiting',
+    tone: 'caution',
+    title: 'Waits on another step, and frees itself when that one closes.',
+  },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
   // nothing.
@@ -118,10 +130,26 @@ export const HEALTH: Record<PlanHealth, HealthWord> = {
   // in this comment and rendered as grey on the only page that shows it.
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
-  ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
-  not_started: { word: 'Not started', tone: 'caution' },
-  done: { word: DEV_STATE_WORD.done, tone: 'positive' },
-  dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
+  ready: {
+    word: DEV_STATE_WORD.ready,
+    tone: 'info',
+    title: 'Nothing holds this up, so Dash can start it. Nothing is needed from you.',
+  },
+  not_started: {
+    word: 'Not started',
+    tone: 'caution',
+    title: 'Agreed, but not marked ready to build, so Dash will not start it yet.',
+  },
+  done: {
+    word: DEV_STATE_WORD.done,
+    tone: 'positive',
+    title: 'Built and closed. Nothing is left to do.',
+  },
+  dropped: {
+    word: DEV_STATE_WORD.dropped,
+    tone: 'ghost',
+    title: 'Decided against. Its note says why, and nothing is left to do.',
+  },
 };
 
 /** A step as a tooltip names it: "#12 The title". */
@@ -149,6 +177,9 @@ export type HealthFacts = {
 
 const named = (ref: StepRef) => `#${ref.outline ?? ref.number} ${ref.title}`;
 
+/** What a waiting step asks of you, after what it waits on. */
+const FREES_ITSELF = 'It moves on by itself, with nothing needed from you.';
+
 export function healthOf(
   health: PlanHealth,
   facts: HealthFacts,
@@ -170,8 +201,9 @@ export function healthOf(
   }
 
   // The three tooltips that can only be written with the step in hand.
-  if (health === 'answered') return { ...base, title: facts.resolution ?? undefined };
-  if (health === 'blocked') return { ...base, title: facts.blockAsk ?? facts.comment ?? undefined };
+  if (health === 'answered') return { ...base, title: facts.resolution ?? base.title };
+  if (health === 'blocked')
+    return { ...base, title: facts.blockAsk ?? facts.comment ?? base.title };
   if (health === 'waiting') {
     const parts = [
       facts.waitingOn.length > 0 ? `Waits on ${facts.waitingOn.map(named).join(', ')}` : '',
@@ -182,7 +214,11 @@ export function healthOf(
     // Put down until a day rather than held up by another step: the clock,
     // not the dashed hexagon, so the two waits read apart (note 5025f689).
     const onlyADay = facts.waitingOn.length === 0 && (facts.waitsUntil?.length ?? 0) > 0;
-    return { ...base, glyph: onlyADay ? 'clock' : base.glyph, title: parts.join('. ') };
+    return {
+      ...base,
+      glyph: onlyADay ? 'clock' : base.glyph,
+      title: parts.length ? `${parts.join('. ')}. ${FREES_ITSELF}` : base.title,
+    };
   }
   return base;
 }
@@ -225,9 +261,10 @@ export const PLAN_MOVE_TITLE: Record<PlanMove, string> = {
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you:
     'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
-  working: 'A session is working on this now.',
-  with_dash: 'A session took this and has not reported back lately.',
-  waiting: 'Waiting on another step that has not closed.',
+  working: 'Dash is working on this now. Nothing is needed from you.',
+  with_dash:
+    'Dash took this and has not reported back lately. Open it to see where its run got to.',
+  waiting: 'Waiting on another step that has not closed. It moves on by itself when that one does.',
   yours: 'You kept this one, so the runner will not take it.',
   none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
   settled: 'Nothing left to do on this one.',

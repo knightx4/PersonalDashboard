@@ -23,6 +23,7 @@ import type {
   DisplayView,
   ListDisplayMenu,
 } from '@/lib/list-display';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The Display button and its panel: how a list is sorted, how it is grouped,
@@ -286,30 +287,34 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
         <input type="hidden" name="list" value={list} />
         <input type="hidden" name="id" value={view.id} />
         {view.isDefault && <input type="hidden" name="clear" value="1" />}
-        <IconButton
-          type="submit"
-          size="sm"
-          label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
-          className={cn(
-            'opacity-0 focus-visible:opacity-100 group-hover/view:opacity-100',
-            view.isDefault && 'text-accent opacity-100',
-          )}
-        >
-          <Pin strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`} align="end">
+          <IconButton
+            type="submit"
+            size="sm"
+            label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
+            className={cn(
+              'opacity-0 focus-visible:opacity-100 group-hover/view:opacity-100',
+              view.isDefault && 'text-accent opacity-100',
+            )}
+          >
+            <Pin strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       </form>
 
       <form action={remove} className="shrink-0">
         <input type="hidden" name="list" value={list} />
         <input type="hidden" name="id" value={view.id} />
-        <IconButton
-          type="submit"
-          size="sm"
-          label={`Delete ${view.name}`}
-          className="opacity-0 hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
-        >
-          <Trash2 strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label={`Delete ${view.name}`} align="end">
+          <IconButton
+            type="submit"
+            size="sm"
+            label={`Delete ${view.name}`}
+            className="opacity-0 hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
+          >
+            <Trash2 strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       </form>
 
       <Button

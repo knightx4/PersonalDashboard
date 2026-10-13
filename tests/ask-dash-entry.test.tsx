@@ -147,8 +147,9 @@ describe('the page the sheet will tell Dash', () => {
   it('drops the page when its × is pressed', () => {
     const onDrop = vi.fn();
     const chip = LookingAt({ label: 'Trip ideas', onDrop });
-    const [, button] = (chip.props as { children: React.ReactElement<{ onClick: () => void }>[] }).children;
-    button.props.onClick();
+    // The × sits inside its Tooltip, so it is the tooltip's one child.
+    const [, tip] = (chip.props as { children: React.ReactElement<{ children: React.ReactElement<{ onClick: () => void }> }>[] }).children;
+    tip.props.children.props.onClick();
     expect(onDrop).toHaveBeenCalledOnce();
   });
 
