@@ -69,14 +69,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const brief = await loadJobsBrief(user.id, reviewCount);
 
   /**
-   * Seven sections, within the eight the design language allows. Today took
-   * in Interviews, Activity and Review (plan #1591): their pages keep their
-   * addresses and are reached from Today, and the review count is on Today's
-   * strip and in the brief rather than on a tab.
+   * Eight sections, the most the design language allows. Today took in
+   * Interviews and Review (plan #1591): their pages keep their addresses and
+   * are reached from Today, and the review count is on Today's strip and in
+   * the brief rather than on a tab. Activity went the same way and came back
+   * as a tab at the person's ask, since "See all" at the foot of Today was
+   * too far down to find.
    */
   const sections: NavSection[] = [
     { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
