@@ -177,6 +177,22 @@ not held.
    #<the decision>`. The brief reads any name that is not one of the three
    as waiting on the person.
 
+   **A screen the person has pointed at a design for carries a reference.**
+   When the idea or a note links or attaches a design they prefer for the
+   screen, the step that changes it adds a line of its own after the pattern
+   line, listing the pictures and links:
+
+   ```
+   Reference: https://example.com/reading-list
+   ```
+
+   The brief prints it, the builder registers it in
+   `lib/preview/references.ts` under the screen's gallery surface, and the
+   design critic judges that screen against it on this step and every later
+   one (`docs/UI-QUALITY-SPEC.md`, Part 2 and R18). Put only designs the
+   person named there. A screen that already has one registered needs no
+   line: later steps on it are judged against it anyway.
+
    **A feature whose screens have a moment ends with a moments step.** The
    moments are the catalogue in `app/dev/ui/moments.ts`, listed on `/dev/ui`
    (Part 8 of `docs/UI-QUALITY-SPEC.md`). When the feature builds or changes

@@ -50,7 +50,9 @@ thread`, `Pattern: tabbed detail`, `Pattern: main plus rail` or `Pattern: tabbed
 sections`, the names in `lib/plan/patterns.ts`. The brief prints that pattern's
 rule for the design critic. When none fits, the line is `Pattern: none fits,
 see #<outline>`, naming the decision written for the person (`shaping.md`). A step
-that changes no screen has no pattern line.
+that changes no screen has no pattern line. A design the person prefers for
+the screen goes on a `Reference:` line after it, listing its pictures and
+links (`shaping.md`).
 
 **Do not write:**
 
