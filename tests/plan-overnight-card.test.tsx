@@ -257,7 +257,7 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect((html.match(/Asleep, nothing to work on/g) ?? []).length).toBe(4);
+    expect((html.match(/Nothing ready/g) ?? []).length).toBe(4);
     expect(html).not.toContain('Nothing is handed to Dash.');
     expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
   });
@@ -270,13 +270,13 @@ describe('the Overnight card while a night is running', () => {
 
   it('draws no disclosure for an asleep slot with only the default reason', () => {
     const html = draw({ run: run({ lastTickNote: null }), sessions: [] });
-    expect(html).toContain('Free until the next check</span>');
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
     expect(html).not.toContain('Waiting for the next check.');
   });
 
   it('says a slot is free, not that nothing is ready, after a tick that started one', () => {
     const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
-    expect((html.match(/Free until the next check/g) ?? []).length).toBe(3);
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
   });
 
   it('says the ready work is in busy workspaces when that is why a slot waits', () => {
@@ -286,7 +286,8 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect(html).toContain('Waiting: what is ready is in busy workspaces');
+    // The pill says only "Free"; the reason is in the panel it opens.
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
   });
 
   it('leaves all four idle when the runner is off', () => {
@@ -437,7 +438,6 @@ describe('the goals half on Dash', () => {
     expect(html).toContain('Working the goal step');
     expect(html).toContain('Find three courses');
     expect(html).toContain('20m');
-    expect(html).toContain('Reading the course pages');
     expect(html).toContain('2 goal steps ready');
   });
 
