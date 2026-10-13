@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { formatMoney } from '@/lib/money';
 import { deadlineLabel } from '@/lib/returns/deadline';
 import { ReturnFuse } from '@/components/ui/return-fuse';

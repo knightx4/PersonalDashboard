@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft, Clapperboard } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MainRail } from '@/components/patterns/main-rail';
@@ -36,7 +36,7 @@ export function SubjectClipsView({ subject, clips, counts, fixed = false }: Subj
           href={`/learn/s/${subject.id}`}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           {subject.name}
         </Link>
       </p>

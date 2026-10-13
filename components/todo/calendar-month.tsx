@@ -1,7 +1,9 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
+import { iconButtonVariants } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
 import { formatClock } from '@/lib/clock';
 
@@ -46,12 +48,9 @@ export function CalendarMonthGrid({
     <Card padding="none" className="relative mt-4 overflow-hidden">
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAYS.map((label) => (
-          <div
-            key={label}
-            className="truncate px-1.5 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted sm:px-2"
-          >
+          <SectionLabel key={label} as="span" className="block truncate px-1.5 py-1.5 sm:px-2">
             {label}
-          </div>
+          </SectionLabel>
         ))}
       </div>
 
@@ -71,9 +70,12 @@ export function CalendarMonthGrid({
               href={newEventHref(day.day)}
               aria-label={`New event on ${day.day}`}
               title="New event"
-              className="press absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full text-ink-ghost opacity-0 transition-opacity duration-quick hover:bg-accent-tint hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+              className={cn(
+                iconButtonVariants({ size: 'sm' }),
+                'absolute right-1 top-1 hidden opacity-0 focus-visible:opacity-100 group-hover:opacity-100 sm:inline-flex',
+              )}
             >
-              <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <Plus strokeWidth={1.75} aria-hidden />
             </Link>
 
             {/* The number is the way into the day, at every width: a square
@@ -194,7 +196,7 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
   const body = (
     <span
       className={cn(
-        'flex items-baseline gap-1 truncate rounded px-1 py-0.5 text-small leading-tight',
+        'flex items-baseline gap-1 truncate rounded-control px-1 py-0.5 text-small leading-tight',
         entry.kind === 'event' && 'bg-accent-tint font-medium text-ink',
         // Outlined where your own event is filled: it is on the day, but it
         // belongs to a calendar somewhere else and cannot be edited here.

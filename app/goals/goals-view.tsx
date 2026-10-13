@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Archive, ChevronRight, CloudFog, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';

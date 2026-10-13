@@ -175,7 +175,7 @@ export function ReadingText({
                 Replace the text
               </Button>
               <Button type="button" variant="secondary" size="md" onClick={() => fileRef.current?.click()} disabled={pending}>
-                <FileUp className="size-4" strokeWidth={2} aria-hidden />
+                <FileUp className="size-4" strokeWidth={1.75} aria-hidden />
                 {pending ? 'Reading the PDF…' : 'Upload a PDF'}
               </Button>
               <Button type="button" variant="ghost" size="md" className="px-0" onClick={clear} disabled={pending}>
@@ -193,11 +193,11 @@ export function ReadingText({
             {error && <FieldError>{error}</FieldError>}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="secondary" size="md" onClick={open} disabled={pending}>
-                <ClipboardPaste className="size-4" strokeWidth={2} aria-hidden />
+                <ClipboardPaste className="size-4" strokeWidth={1.75} aria-hidden />
                 Paste the text
               </Button>
               <Button type="button" variant="secondary" size="md" onClick={() => fileRef.current?.click()} disabled={pending}>
-                <FileUp className="size-4" strokeWidth={2} aria-hidden />
+                <FileUp className="size-4" strokeWidth={1.75} aria-hidden />
                 {pending ? 'Reading the PDF…' : 'Upload a PDF'}
               </Button>
             </div>

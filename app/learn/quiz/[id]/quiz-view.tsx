@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
@@ -49,7 +49,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
           href={QUIZZES_HREF}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Quizzes
         </Link>
       </p>

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';

@@ -1,11 +1,11 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { CheckRow, Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import {
   addEvent,
   editEvent,
@@ -100,20 +100,14 @@ export function EventForm({
           </Field>
         </div>
 
-        <label
-          htmlFor="event-all-day"
-          className="flex w-fit cursor-pointer items-center gap-2 text-ui text-ink"
-        >
-          <input
-            id="event-all-day"
-            type="checkbox"
-            name="allDay"
-            checked={allDay}
-            onChange={(event) => setAllDay(event.target.checked)}
-            className="size-4 accent-accent"
-          />
-          All day
-        </label>
+        <CheckRow
+          id="event-all-day"
+          name="allDay"
+          title="All day"
+          checked={allDay}
+          onChange={(event) => setAllDay(event.target.checked)}
+          className="w-fit"
+        />
 
         {/* Hidden rather than unmounted: a time typed, then switched to all
             day, then switched back is still there. The write layer ignores

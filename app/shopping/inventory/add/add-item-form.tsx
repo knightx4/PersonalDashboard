@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Banknote, CalendarDays, Tag } from 'lucide-react';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';

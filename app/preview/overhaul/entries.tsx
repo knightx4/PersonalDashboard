@@ -1,30 +1,36 @@
+/* ui-ok-file: undefined-colour -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-chip -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-icon-button -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-label -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-link -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: raw-checkbox -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: raw-kbd -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: pulsing-dot -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: dashed-without-width -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: heavy-stroke -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: fixed-radius -- this file draws the app's markup from before the overhaul, on purpose. */
 /* ui-ok-file: hand-rolled-box -- the radius swatches are drawings of a corner, and the prose names classes. */
 /* ui-ok-file: fixed-control-height -- the radius swatches are drawings, not controls. */
 
 import { ChevronDown, ChevronRight, HelpCircle, MoreHorizontal, Pencil, Plus, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Banner } from '@/components/ui/banner';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { Specimen, Specimens } from './frame';
 import * as Now from './now';
-import {
-  CheckRow,
-  Chip,
-  IconButton,
-  LiveDot,
-  Note,
-  ProposedButton,
-  ProposedEmpty,
-  SectionHeading,
-  SectionLabel,
-  Stat,
-  linkVariants,
-  menuItemClass,
-  proposedSurface,
-} from './proposed';
-import { SegmentedLinks, Switch, ToggleChipRow } from './proposed-interactive';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { Chip } from '@/components/ui/chip';
+import { linkVariants } from '@/components/ui/link';
+import { CheckRow, Switch } from '@/components/ui/field';
+import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
+import { Note } from '@/components/ui/note';
+import { Stat } from '@/components/ui/stat';
+import { LiveDot } from '@/components/ui/live-dot';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
+import { SegmentedLinks, ToggleChipRow } from './after-interactive';
 
 /**
  * The component overhaul, one entry per component (/preview/overhaul).
@@ -70,23 +76,23 @@ export const ENTRIES: readonly Entry[] = [
     next: () => (
       <Specimens>
         <Specimen label="primary, secondary, ghost, danger (ghost now hovers quiet)">
-          <ProposedButton>Save</ProposedButton>
-          <ProposedButton variant="secondary">Cancel</ProposedButton>
-          <ProposedButton variant="ghost">Skip</ProposedButton>
-          <ProposedButton variant="danger">Delete</ProposedButton>
+          <Button>Save</Button>
+          <Button variant="secondary">Cancel</Button>
+          <Button variant="ghost">Skip</Button>
+          <Button variant="danger">Delete</Button>
         </Specimen>
         <Specimen label="variant=link: every underlined text action">
-          <ProposedButton variant="link">Not a match</ProposedButton>
-          <ProposedButton variant="link">Regenerate</ProposedButton>
-          <ProposedButton variant="link">I don&rsquo;t know</ProposedButton>
+          <Button variant="link">Not a match</Button>
+          <Button variant="link">Regenerate</Button>
+          <Button variant="link">I don&rsquo;t know</Button>
         </Specimen>
         <Specimen label="size=xs, for a button inside a row">
-          <ProposedButton variant="ghost" size="xs">Keep</ProposedButton>
-          <ProposedButton variant="secondary" size="xs">Undo</ProposedButton>
+          <Button variant="ghost" size="xs">Keep</Button>
+          <Button variant="secondary" size="xs">Undo</Button>
         </Specimen>
         <Specimen label="pressed, for a button that is a toggle">
-          <ProposedButton variant="secondary" pressed>Reading now</ProposedButton>
-          <ProposedButton variant="secondary" pressed={false}>Read now</ProposedButton>
+          <Button variant="secondary" pressed>Reading now</Button>
+          <Button variant="secondary" pressed={false}>Read now</Button>
         </Specimen>
       </Specimens>
     ),
@@ -302,8 +308,18 @@ export const ENTRIES: readonly Entry[] = [
         </Specimen>
         <Specimen label="Switch, for a setting that applies at once">
           <div className="w-full">
-            <Switch label="Haptics" hint="A small tap when something is done." initial />
-            <Switch label="Morning summary" />
+            {[
+              { label: 'Haptics', hint: 'A small tap when something is done.', on: true },
+              { label: 'Morning summary', hint: undefined, on: false },
+            ].map((row) => (
+              <label key={row.label} className="flex items-start justify-between gap-4 py-1">
+                <span className="min-w-0">
+                  <span className="block text-ui text-ink">{row.label}</span>
+                  {row.hint && <span className="mt-0.5 block text-small text-ink-muted">{row.hint}</span>}
+                </span>
+                <Switch defaultChecked={row.on} className="mt-0.5" />
+              </label>
+            ))}
           </div>
         </Specimen>
       </Specimens>
@@ -331,7 +347,7 @@ export const ENTRIES: readonly Entry[] = [
         <Specimen label="Two cards on one page, both through SectionHeading">
           <div className="w-full space-y-3">
             <div className="sheet card-pad-dense rounded-card bg-surface">
-              <SectionHeading title="Roles here, across cycles" count={2} action={<ProposedButton variant="ghost" size="sm">Merge roles</ProposedButton>} />
+              <SectionHeading title="Roles here, across cycles" count={2} action={<Button variant="ghost" size="sm">Merge roles</Button>} />
               <p className="text-ui text-ink">Senior Software Engineer, Research Platform</p>
             </div>
             <div className="sheet card-pad-dense rounded-card bg-surface">
@@ -339,10 +355,10 @@ export const ENTRIES: readonly Entry[] = [
                 title="Tasks"
                 count={1}
                 action={
-                  <ProposedButton variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm">
                     <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
                     Add
-                  </ProposedButton>
+                  </Button>
                 }
               />
               <p className="text-ui text-ink">Send Dana the follow-up</p>
@@ -415,20 +431,15 @@ export const ENTRIES: readonly Entry[] = [
         </Specimen>
         <Specimen label="box, for an empty section">
           <div className="w-full">
-            <ProposedEmpty
-              size="box"
-              title="No mail linked yet"
-              description="Mail about this role is linked when it arrives."
-              action={<ProposedButton variant="secondary" size="sm">Find mail</ProposedButton>}
-            />
+            <EmptyState size="box" title="No mail linked yet" description="Mail about this role is linked when it arrives.">
+              <Button variant="secondary" size="sm">Find mail</Button>
+            </EmptyState>
           </div>
         </Specimen>
         <Specimen label="inline, for an empty list inside a card">
-          <ProposedEmpty
-            size="inline"
-            title="No steps under this feature yet."
-            action={<ProposedButton variant="link">Add a step</ProposedButton>}
-          />
+          <EmptyState size="inline" title="No steps under this feature yet.">
+            <Button variant="link">Add a step</Button>
+          </EmptyState>
         </Specimen>
       </Specimens>
     ),
@@ -588,7 +599,7 @@ export const ENTRIES: readonly Entry[] = [
     next: () => (
       <Specimens>
         <Specimen label="One surface, inset items">
-          <div className={cn(proposedSurface, 'w-52')}>
+          <div className={cn(popoverSurface, 'w-52 p-1')}>
             {['Open', 'Rename', 'Move to…'].map((item) => (
               <button key={item} type="button" className={menuItemClass()}>
                 {item}

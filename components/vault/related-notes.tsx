@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, use } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { FileText } from 'lucide-react';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 

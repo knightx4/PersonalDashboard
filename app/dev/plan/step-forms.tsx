@@ -77,7 +77,7 @@ export function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriorit
       name="priority"
       defaultValue={String(defaultValue)}
       aria-label="Priority"
-      icon={<Flag className="size-3.5" strokeWidth={2} />}
+      icon={<Flag className="size-3.5" strokeWidth={1.75} />}
     >
       {PLAN_PRIORITIES.map((priority) => (
         <option key={priority} value={priority}>
@@ -96,7 +96,7 @@ export function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null
       defaultValue={defaultValue ?? ''}
       placeholderValue=""
       aria-label="Size"
-      icon={<Scale className="size-3.5" strokeWidth={2} />}
+      icon={<Scale className="size-3.5" strokeWidth={1.75} />}
     >
       <option value="">Size</option>
       {PLAN_SIZES.map((size) => (
@@ -116,7 +116,7 @@ export function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssigne
       defaultValue={defaultValue ?? ''}
       placeholderValue=""
       aria-label="Who is on it"
-      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+      icon={<CircleUser className="size-3.5" strokeWidth={1.75} />}
     >
       <option value="">Nobody</option>
       {PLAN_ASSIGNEES.map((assignee) => (
@@ -134,7 +134,7 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
       name="status"
       defaultValue={defaultValue}
       aria-label="Status"
-      icon={<Circle className="size-3.5" strokeWidth={2} />}
+      icon={<Circle className="size-3.5" strokeWidth={1.75} />}
     >
       <StatusOptions />
     </ChipSelect>

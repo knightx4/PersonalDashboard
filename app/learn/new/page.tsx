@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ImportForm } from './import-form';
@@ -22,7 +22,7 @@ export default function NewTrackPage() {
           href="/learn/lists"
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Reading lists
         </Link>
       </p>

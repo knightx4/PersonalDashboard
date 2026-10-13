@@ -100,7 +100,7 @@ export function CardNotes({
                     aria-label="Delete this note"
                     className="shrink-0"
                   >
-                    <X className="size-3.5" strokeWidth={2} aria-hidden />
+                    <X className="size-3.5" strokeWidth={1.75} aria-hidden />
                   </Button>
                 </li>
               );
@@ -155,7 +155,7 @@ export function CardNotes({
           onClick={() => setOpen(true)}
           className={cn(notes.length > 0 && 'mt-2')}
         >
-          <NotebookPen className="size-3.5" strokeWidth={2} aria-hidden />
+          <NotebookPen className="size-3.5" strokeWidth={1.75} aria-hidden />
           Add a note
         </Button>
       )}

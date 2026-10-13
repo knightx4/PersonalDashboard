@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Play, TriangleAlert } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';

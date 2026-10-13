@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useRef, useState } from 'react';
 import { CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';

@@ -51,7 +51,7 @@ function PlanButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Working it out…' : 'Plan this topic'}
     </Button>
   );

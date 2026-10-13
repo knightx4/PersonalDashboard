@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
@@ -43,7 +43,7 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
           aria-label="Close this idea"
           className="press-area -mr-1 shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
         >
-          <X className="size-4" strokeWidth={2} aria-hidden />
+          <X className="size-4" strokeWidth={1.75} aria-hidden />
         </Link>
       </div>
       <p className="mt-1 line-clamp-4 text-ui text-ink-muted">{idea.claim}</p>

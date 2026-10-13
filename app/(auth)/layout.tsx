@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';

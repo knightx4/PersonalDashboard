@@ -1,5 +1,16 @@
 'use client';
 
+/* ui-ok-file: undefined-colour -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-chip -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-icon-button -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-label -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: hand-rolled-link -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: raw-checkbox -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: raw-kbd -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: pulsing-dot -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: dashed-without-width -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: heavy-stroke -- this file draws the app's markup from before the overhaul, on purpose. */
+/* ui-ok-file: fixed-radius -- this file draws the app's markup from before the overhaul, on purpose. */
 /* ui-ok-file: hand-rolled-box -- this file reproduces the app's hand-written markup on purpose, to draw it beside the proposal. */
 /* ui-ok-file: hand-rolled-fold -- as above. */
 /* ui-ok-file: fixed-control-height -- as above: view-toggle's h-7 is the drift being shown. */
@@ -14,7 +25,7 @@ import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { cardVariants, CardSection } from '@/components/ui/card';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { GroupHeader } from '@/components/shell/group-header';
 import { popoverSurface } from '@/components/ui/popover';
 import { Specimen, Specimens } from './frame';

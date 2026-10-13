@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { formatMoney } from '@/lib/money';
 import { Banner } from '@/components/ui/banner';
 import { SavedItemBody } from './item-forms';

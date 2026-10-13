@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { IconButton } from '@/components/ui/icon-button';

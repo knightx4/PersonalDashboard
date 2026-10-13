@@ -5,6 +5,7 @@ import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Group } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/field';
+import { Kbd } from '@/components/ui/kbd';
 import { useToast } from '@/components/ui/toast';
 import { formatMoney } from '@/lib/money';
 import { matchOrders, type SearchableOrder } from '@/lib/review/attach-email';
@@ -71,9 +72,9 @@ export function AttachChoices({
         <ul className="space-y-1.5">
           {row.candidates.map((candidate, index) => (
             <li key={candidate.orderId} className="flex flex-wrap items-center gap-2">
-              <kbd className="rounded border border-border bg-canvas px-1.5 text-small text-ink-muted">
+              <Kbd always announce>
                 {index + 1}
-              </kbd>
+              </Kbd>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-ui text-ink">{orderLabel(candidate)}</p>
                 <p className="truncate text-small text-ink-muted">
@@ -152,7 +153,7 @@ function OtherOrderPicker({
                 type="button"
                 disabled={pending}
                 onClick={() => onPick(row.messageId, order.orderId)}
-                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {orderLabel(order)}

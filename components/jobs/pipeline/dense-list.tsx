@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';

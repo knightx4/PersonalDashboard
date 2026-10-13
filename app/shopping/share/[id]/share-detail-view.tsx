@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft, Package } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection } from '@/components/ui/card';
@@ -100,7 +100,7 @@ export function ShareDetailView({
                     >
                       {/* Ground, no frame: this tile is already inside the
                           row. Law 11. */}
-                      <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-canvas">
+                      <div className="size-12 shrink-0 overflow-hidden rounded-card bg-canvas">
                         {group.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={group.imageUrl} alt="" className="size-full object-cover" />

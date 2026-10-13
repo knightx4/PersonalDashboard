@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
 import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';

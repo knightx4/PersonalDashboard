@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
 import { cn } from '@/lib/cn';
 import { stepAnchor } from '@/lib/goals/goal-page';

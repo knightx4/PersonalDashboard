@@ -169,7 +169,7 @@ export function PhraseExplainer({
         }}
         onClick={() => explain(pressed.current || selection)}
       >
-        <Sparkles className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        <Sparkles className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         <span className="truncate">Explain “{selection}”</span>
       </Button>
       <span onMouseDown={(event) => event.preventDefault()}>
@@ -235,7 +235,7 @@ function Explanation({
           onClick={onClose}
           aria-label="Close the explanation"
         >
-          <X className="size-3.5" strokeWidth={2} aria-hidden />
+          <X className="size-3.5" strokeWidth={1.75} aria-hidden />
         </Button>
       </div>
 
@@ -260,9 +260,9 @@ function Explanation({
                   disabled={made !== null}
                 >
                   {made ? (
-                    <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                   ) : (
-                    <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
                   )}
                   {made ? 'Card made' : making ? 'Writing the card…' : 'Make it a card'}
                 </Button>
@@ -282,7 +282,7 @@ function Explanation({
                 value={`What is ${phrase}, and how does it bear on ${cardTitle}?`}
               />
               <Button type="submit" variant="ghost" size="sm" pending={startingTrack}>
-                <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+                <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
                 {startingTrack ? 'Starting a subject…' : 'Start a subject'}
               </Button>
             </form>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { FilePlus2, Search } from 'lucide-react';
 import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { Banner } from '@/components/ui/banner';

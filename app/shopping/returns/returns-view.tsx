@@ -1,5 +1,5 @@
 import { RotateCcw } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ListPage } from '@/components/patterns/list-detail';
 import { FilterSheet } from '@/components/shell/filter-sheet';
 import { RailGroup, RailItem } from '@/components/shell/left-rail';

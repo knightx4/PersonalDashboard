@@ -133,9 +133,9 @@ export function ProjectCard({
                 {latest.marks.map((mark, index) => (
                   <li key={index} className="flex items-start gap-1.5 text-ui">
                     {mark.met ? (
-                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={2} aria-label="Right" />
+                      <Check className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={1.75} aria-label="Right" />
                     ) : (
-                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Missing" />
+                      <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-label="Missing" />
                     )}
                     <span className={mark.met ? 'text-ink' : 'text-ink-muted'}>{mark.note}</span>
                   </li>

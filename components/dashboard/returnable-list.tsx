@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import type { ReturnableRow } from '@/lib/dashboard/load';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { deadlineLabel } from '@/lib/returns/deadline';

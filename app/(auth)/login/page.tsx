@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Banner } from '@/components/ui/banner';
 import { PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';

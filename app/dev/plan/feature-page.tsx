@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
@@ -742,7 +742,7 @@ function StepGroupRows({ group, children }: { group: StepGroup; children: React.
         >
           <ChevronRight
             className={cn('size-3.5 text-ink-muted transition-transform', open && 'rotate-90')}
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-hidden
           />
           {heading}

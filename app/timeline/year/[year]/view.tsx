@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import type { VisionReviewStatus } from '@/lib/specs/vision-review-run';
 

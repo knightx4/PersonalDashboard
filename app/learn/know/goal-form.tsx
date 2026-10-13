@@ -31,7 +31,7 @@ function AskButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Laying it out…' : 'Lay out the chain'}
     </Button>
   );

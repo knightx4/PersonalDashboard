@@ -34,7 +34,7 @@ function ReadButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <GraduationCap className="size-4" strokeWidth={2} aria-hidden />
+      <GraduationCap className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Reading it…' : 'Read what I know'}
     </Button>
   );

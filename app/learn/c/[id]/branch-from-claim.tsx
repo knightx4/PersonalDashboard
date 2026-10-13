@@ -44,7 +44,7 @@ function AskButton({ pending }: { pending: boolean }) {
       pending={pending}
       onMouseDown={(event) => event.preventDefault()}
     >
-      <Sparkles className="size-3.5" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-3.5" strokeWidth={1.75} aria-hidden />
       {pending ? 'Laying it out…' : 'Learn this'}
     </Button>
   );

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Clapperboard, MonitorPlay } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { PageHeader } from '@/components/shell/page-header';

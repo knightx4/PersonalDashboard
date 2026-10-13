@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { MOVE_WORD } from '@/lib/core/move';
 import {

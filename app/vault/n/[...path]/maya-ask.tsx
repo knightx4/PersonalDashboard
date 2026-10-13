@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ArrowRight } from 'lucide-react';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { formatDate, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import type { ClosestApplication, ClosestRound } from '@/lib/jobs/today/closest';

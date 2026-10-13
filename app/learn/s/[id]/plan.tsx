@@ -82,7 +82,7 @@ export function PlanSection({
             className={cn(buttonVariants({ variant: 'primary' }), 'press mt-3')}
           >
             {progress.next.state === 'open' ? 'Start it' : 'Carry on'}
-            <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+            <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
           </Link>
         </div>
       ) : finished && goal ? (
@@ -193,7 +193,7 @@ function PieceRow({ piece, href, next }: { piece: PlanPiece; href: string; next:
       )}
       {piece.state === 'passed' ? (
         <span className="inline-flex shrink-0 items-center gap-0.5 text-small text-ink-muted">
-          <Check className="size-3.5" strokeWidth={2} aria-hidden />
+          <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
           {words}
         </span>
       ) : (

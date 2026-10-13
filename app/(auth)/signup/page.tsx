@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AuthForm } from '../auth-form';
 
 export const metadata = { title: 'Sign up' };

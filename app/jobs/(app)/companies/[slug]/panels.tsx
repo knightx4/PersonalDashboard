@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useSearchParams } from 'next/navigation';
 import { useActionState, useState, useTransition, type ReactNode } from 'react';
 import { Briefcase, Building2, MessagesSquare, Send, Users } from 'lucide-react';

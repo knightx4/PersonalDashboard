@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Disclosure } from '@/components/ui/disclosure';

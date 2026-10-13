@@ -3,6 +3,8 @@
 import { Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { IconButton } from '@/components/ui/icon-button';
+import Link, { linkVariants } from '@/components/ui/link';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
@@ -129,7 +131,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             </span>
           )}
           {item.link ? (
-            <a
+            <Link
               href={item.link.href}
               className={cn(
                 'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
@@ -137,7 +139,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               )}
             >
               {item.title}
-            </a>
+            </Link>
           ) : (
             <span
               className={cn('text-ui font-medium text-ink', shown === 'done' && 'line-through')}
@@ -160,12 +162,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               no hover to reveal it. This matches a linked task's anchor, so
               "click through to the job" reads the same on both kinds of row. */}
           {item.link && (
-            <a
-              href={item.link.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
-            >
+            <Link href={item.link.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }))}>
               {item.link.label}
-            </a>
+            </Link>
           )}
 
           {item.action && (
@@ -173,9 +172,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
+              className={cn('inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
             >
-              <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+              <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               {item.action.label}
             </a>
           )}
@@ -196,9 +195,8 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        <button
-          type="button"
-          title="Later"
+        <IconButton
+          label="Later"
           onClick={(event) =>
             run({
               state: 'deferred',
@@ -206,14 +204,11 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               from: event.currentTarget.getBoundingClientRect(),
             })
           }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
-          <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Later</span>
-        </button>
-        <button
-          type="button"
-          title="Not this one"
+          <Clock strokeWidth={1.75} aria-hidden />
+        </IconButton>
+        <IconButton
+          label="Not this one"
           onClick={(event) =>
             run({
               state: 'dismissed',
@@ -221,11 +216,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               from: event.currentTarget.getBoundingClientRect(),
             })
           }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
-          <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Not this one</span>
-        </button>
+          <X strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </div>
     </div>
   );

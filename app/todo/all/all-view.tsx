@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ListChecks } from 'lucide-react';
 import type { Anchor } from '@/lib/todo/agenda/anchors';
 import type { Task } from '@/lib/todo/tasks/model';

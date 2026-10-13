@@ -1,6 +1,6 @@
 /* ui-ok-file: card-per-row -- two cards side by side, each holding a list; not a card per row. */
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { isOwner } from '@/lib/dev/owner';

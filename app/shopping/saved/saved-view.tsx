@@ -1,5 +1,5 @@
 import { Bookmark } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';

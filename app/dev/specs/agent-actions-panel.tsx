@@ -67,7 +67,7 @@ function Fold({
       <summary className="press flex cursor-pointer list-none items-center gap-2 rounded-control py-1 text-ui text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden
-          strokeWidth={2}
+          strokeWidth={1.75}
           className={cn(
             'size-3.5 shrink-0 transition-transform duration-quick',
             inner ? 'group-open/agentws:rotate-90' : 'group-open/agentfold:rotate-90',

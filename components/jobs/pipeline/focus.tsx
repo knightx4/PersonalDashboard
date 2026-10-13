@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CardSection, cardVariants } from '@/components/ui/card';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';

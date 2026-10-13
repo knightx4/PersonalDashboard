@@ -118,7 +118,7 @@ export function CheckMark({ check }: { check: CommitCheck | undefined }) {
         alarming ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
       )}
     >
-      {alarming && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
+      {alarming && <CircleAlert className="size-3.5" strokeWidth={1.75} aria-hidden />}
       {word}
     </span>
   );

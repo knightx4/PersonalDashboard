@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -137,9 +137,9 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
           {question.response && <p className="text-ui text-ink-muted">You wrote: {question.response}</p>}
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', question.correct ? 'text-ink' : 'text-ink-muted')}>
             {question.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {question.correct ? 'Right.' : 'Not this time.'}
           </p>

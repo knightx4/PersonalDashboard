@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { BookOpen, BookOpenCheck, ListChecks, ListPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Plus } from 'lucide-react';
@@ -14,7 +14,7 @@ function MakeButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" variant="primary" pending={pending}>
-      <Plus className="size-4" strokeWidth={2} aria-hidden />
+      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Writing the curriculum…' : 'Make the subject'}
     </Button>
   );

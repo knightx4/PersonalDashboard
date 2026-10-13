@@ -1,7 +1,7 @@
 'use client';
 
 import Form from 'next/form';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react';
 import { Copy, ExternalLink, Mail, Search } from 'lucide-react';

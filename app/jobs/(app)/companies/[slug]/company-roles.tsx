@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { CardSection } from '@/components/ui/card';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { formatDate } from '@/lib/jobs/applications/load';

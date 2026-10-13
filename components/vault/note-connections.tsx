@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';

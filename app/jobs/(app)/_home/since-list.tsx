@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowUpRight, Mail, Minus, X } from 'lucide-react';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { SinceView } from '@/lib/jobs/home/since-load';

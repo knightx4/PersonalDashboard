@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { BellRing, ChevronDown, Copy, ExternalLink } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';

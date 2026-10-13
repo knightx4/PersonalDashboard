@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Disclosure } from '@/components/ui/disclosure';
 import { deadlineLabel } from '@/lib/returns/deadline';
 import type { ReturnsOrderGroup } from '@/lib/returns/grouping';

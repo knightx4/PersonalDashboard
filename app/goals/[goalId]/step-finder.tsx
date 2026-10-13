@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useId, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input, PressLabel } from '@/components/ui/field';

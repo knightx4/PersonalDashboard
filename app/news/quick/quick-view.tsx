@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
 import { StoryRating } from '@/components/news/story-rating';

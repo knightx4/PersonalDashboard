@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { approveSpecChange, declineSpecChange, type SpecChangeActionState } from './actions';
 import { Thread } from '@/components/thread/thread';

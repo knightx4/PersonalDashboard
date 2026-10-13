@@ -62,7 +62,7 @@ function PendingCard({ row }: { row: PendingRow }) {
   return (
     <li className="flex gap-3 px-4 py-3">
       <span className="pt-0.5">
-        <Loader2 className="size-4 animate-spin text-ink-muted" strokeWidth={2} aria-hidden />
+        <Loader2 className="size-4 animate-spin text-ink-muted" strokeWidth={1.75} aria-hidden />
       </span>
       <span className="min-w-0">
         <span className="block truncate text-body text-ink-muted">{row.raw}</span>
@@ -80,7 +80,7 @@ function ResolvedRow({ row, index }: { row: PreviewRow; index: number }) {
     return (
       <li className="flex gap-3 px-4 py-3">
         <span className="pt-0.5">
-          <AlertTriangle className="size-4 text-caution" strokeWidth={2} aria-hidden />
+          <AlertTriangle className="size-4 text-caution" strokeWidth={1.75} aria-hidden />
         </span>
         <span className="min-w-0">
           <span className="block text-body text-ink-muted line-through decoration-border">

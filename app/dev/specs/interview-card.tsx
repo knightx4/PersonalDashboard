@@ -58,7 +58,7 @@ function Turn({ turn, now }: { turn: DevComment; now: number }) {
         {dash ? (
           <DashMark size="2xs" decorative className="text-ink-ghost" />
         ) : (
-          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />
+          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
         )}
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
@@ -312,7 +312,7 @@ export function InterviewPanel({
                     title="Send your answer"
                     className="press flex size-7 items-center justify-center rounded-full bg-accent text-fill-ink transition-colors duration-quick hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-ghost"
                   >
-                    <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                    <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
                     <span className="sr-only">Send your answer</span>
                   </button>
                 </div>

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronLeft } from 'lucide-react';
 import { MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';

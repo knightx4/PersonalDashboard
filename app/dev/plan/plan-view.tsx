@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronRight } from 'lucide-react';
 import {
   seedPlan,
@@ -245,24 +245,22 @@ function ImportTheBuildOrder() {
   const [state, action, pending] = useActionState(seedPlan, {} as PlanActionState);
 
   return (
-    <form action={action} className={cn(cardVariants(), 'border-dashed px-4 py-8 text-center')}>
-      <p className="text-ui text-ink">Nothing here yet.</p>
-      <p className="mx-auto mt-1 max-w-prose text-ui text-ink-muted">
-        The build order in <code>docs/BUILD-ORDER.md</code> and the job side&rsquo;s own plan can be
-        written in as a starting point — every numbered step, with the ones already marked done
-        carried across, each at the top of its module for you to group as you see fit. After that
-        this is the plan, and the documents are background reading: nothing here reads them again,
-        and the two will drift.
-      </p>
-      <div className="mt-4 flex flex-col items-center gap-2">
-        <Button type="submit" pending={pending}>
-          {pending ? 'Importing…' : 'Import the build order'}
-        </Button>
-        <FieldError>{state.error}</FieldError>
-        {state.message && !state.error && (
-          <span className="text-small text-ink-muted">{state.message}</span>
-        )}
-      </div>
+    <form action={action}>
+      <EmptyState
+        size="box"
+        title="Nothing here yet."
+        description="The build order in docs/BUILD-ORDER.md and the job side’s own plan can be written in as a starting point — every numbered step, with the ones already marked done carried across, each at the top of its module for you to group as you see fit. After that this is the plan, and the documents are background reading: nothing here reads them again, and the two will drift."
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Button type="submit" pending={pending}>
+            {pending ? 'Importing…' : 'Import the build order'}
+          </Button>
+          <FieldError>{state.error}</FieldError>
+          {state.message && !state.error && (
+            <span className="text-small text-ink-muted">{state.message}</span>
+          )}
+        </div>
+      </EmptyState>
     </form>
   );
 }
@@ -317,13 +315,9 @@ function SearchThePlan({
             ? 'Nothing matches'
             : `${hits} ${hits === 1 ? 'step' : 'steps'} found`}
           {' · '}
-          <button
-            type="button"
-            onClick={() => onQuery('')}
-            className="underline underline-offset-2 hover:text-ink"
-          >
+          <Button variant="link" type="button" onClick={() => onQuery('')}>
             clear
-          </button>
+          </Button>
         </p>
       )}
     </div>
@@ -677,7 +671,7 @@ export function PlanView({
                 <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
                   <ChevronRight
                     aria-hidden
-                    strokeWidth={2}
+                    strokeWidth={1.75}
                     className="size-4 shrink-0 text-ink-muted transition-transform duration-quick group-open/section:rotate-90"
                   />
                   {section.label}
@@ -769,7 +763,7 @@ export function PlanView({
             <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
               <ChevronRight
                 aria-hidden
-                strokeWidth={2}
+                strokeWidth={1.75}
                 className="size-4 shrink-0 text-ink-muted transition-transform duration-quick group-open/section:rotate-90"
               />
               Finished

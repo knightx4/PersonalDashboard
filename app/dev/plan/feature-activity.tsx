@@ -86,7 +86,7 @@ function ActivityMark({ entry }: { entry: ActivityEntry }) {
   if (entry.kind === 'comment' && entry.who === 'dash') return <DashMark size="2xs" decorative />;
   if (entry.kind === 'dash') return <DashMark size="2xs" decorative />;
   const Icon = entry.kind === 'run' ? Play : entry.kind === 'comment' ? MessageSquare : StickyNote;
-  return <Icon aria-hidden className="size-3.5 text-ink-muted" strokeWidth={2} />;
+  return <Icon aria-hidden className="size-3.5 text-ink-muted" strokeWidth={1.75} />;
 }
 
 function ActivityRow({ entry }: { entry: ActivityEntry }) {

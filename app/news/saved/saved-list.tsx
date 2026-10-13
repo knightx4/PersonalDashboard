@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Bookmark, BookmarkMinus, ExternalLink } from 'lucide-react';
 import { StoryText } from '@/components/news/story-text';
 import { Button } from '@/components/ui/button';

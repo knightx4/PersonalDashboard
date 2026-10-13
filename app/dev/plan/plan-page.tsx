@@ -2,7 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { featureTable } from '@/lib/plan/feature-table';
 import { updateOverdueDays } from '@/lib/plan/updates';
 import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -280,7 +280,7 @@ export async function renderPlanPage({
             scroll={false}
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
-            <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
             New feature
           </Link>
         }

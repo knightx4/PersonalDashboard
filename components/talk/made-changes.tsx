@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { MadeChange } from '@/lib/talk/changes';
 import { useClockNow } from '@/lib/use-clock-now';

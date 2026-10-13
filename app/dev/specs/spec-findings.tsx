@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';

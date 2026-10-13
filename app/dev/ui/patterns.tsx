@@ -198,7 +198,7 @@ const DECK_ITEMS: readonly DeckItem[] = STORIES.map((story) => ({
   ),
   actions: (
     <Button size="lg" variant="secondary">
-      <Bookmark className="size-4" strokeWidth={2} aria-hidden />
+      <Bookmark className="size-4" strokeWidth={1.75} aria-hidden />
       Save
     </Button>
   ),

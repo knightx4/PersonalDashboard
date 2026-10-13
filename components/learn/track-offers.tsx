@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Moon, Sprout } from 'lucide-react';
@@ -144,7 +144,7 @@ function FeedOfferCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+        <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
         A new subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
@@ -236,7 +236,7 @@ function RestingTrackCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <Moon className="size-3.5" strokeWidth={2} aria-hidden />
+        <Moon className="size-3.5" strokeWidth={1.75} aria-hidden />
         A resting subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">

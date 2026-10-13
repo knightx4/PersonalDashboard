@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { ListChecks, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -543,7 +543,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
           >
-            <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+            <HelpCircle className="size-3" strokeWidth={1.75} aria-hidden />
             {unanswered}
             <span className="sr-only">
               unanswered {unanswered === 1 ? 'question' : 'questions'}

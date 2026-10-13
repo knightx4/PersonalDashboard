@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { modulesFor, type AppModule, type ModuleId } from '@/lib/modules';
 import { cn } from '@/lib/cn';

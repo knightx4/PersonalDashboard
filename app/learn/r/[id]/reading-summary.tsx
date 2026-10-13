@@ -100,7 +100,7 @@ export function ReadingSummary({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <div className="flex items-center gap-1">
                 <Button type="button" variant="secondary" size="md" onClick={run} disabled={pending}>
-                  <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+                  <RotateCcw className="size-4" strokeWidth={1.75} aria-hidden />
                   {pending ? 'Summarizing…' : 'Redo'}
                 </Button>
                 <PaidHint action="app/learn/r/[id]/actions.ts#summarizeReading" what="Cost of a summary" />
@@ -122,7 +122,7 @@ export function ReadingSummary({
                 onClick={run}
                 disabled={pending}
               >
-                <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+                <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
                 {pending ? 'Summarizing…' : 'Summarize'}
               </Button>
               <PaidHint action="app/learn/r/[id]/actions.ts#summarizeReading" what="Cost of a summary" />

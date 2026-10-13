@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { issueHref } from '@/lib/news/issues/list';
 import type { AlsoIn } from '@/lib/news/quick/next';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';

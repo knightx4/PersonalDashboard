@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Orbit } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -231,7 +231,7 @@ export function AreasGrid({
           href={SPACE_HREF}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-accent"
         >
-          <Orbit className="size-3.5" strokeWidth={2} aria-hidden />
+          <Orbit className="size-3.5" strokeWidth={1.75} aria-hidden />
           Idea Space
         </Link>
       </div>

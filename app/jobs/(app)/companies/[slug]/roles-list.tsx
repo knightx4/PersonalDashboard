@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Briefcase, GitMerge } from 'lucide-react';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { Button } from '@/components/ui/button';

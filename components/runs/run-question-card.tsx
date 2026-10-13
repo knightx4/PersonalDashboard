@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { exactTime, shortWhen } from '@/lib/comments/when';

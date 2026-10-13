@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,7 +57,7 @@ function ModuleSelect({
       name="module"
       defaultValue={defaultValue ?? ''}
       aria-label="Module"
-      icon={<Boxes className="size-3.5" strokeWidth={2} />}
+      icon={<Boxes className="size-3.5" strokeWidth={1.75} />}
     >
       {scopes.map((scope) => (
         <option key={scope ?? 'app'} value={scope ?? ''}>

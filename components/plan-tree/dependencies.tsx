@@ -116,7 +116,7 @@ export function Dependencies<E extends TreeCatalogEntry>({
                   aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
                   className="press rounded-full p-0.5 hover:bg-surface/60"
                 >
-                  <X className="size-3" strokeWidth={2} aria-hidden />
+                  <X className="size-3" strokeWidth={1.75} aria-hidden />
                 </button>
               </span>
             </form>

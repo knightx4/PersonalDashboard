@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Telescope } from 'lucide-react';
 import { cardVariants } from '@/components/ui/card';
 import { Group, SectionFold } from '@/components/ui/disclosure';

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { isOwner } from '@/lib/dev/owner';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { SURFACES } from './surfaces';
 import { ShellFrame } from './shell-frame';
 import { MAIN_BOX } from '@/components/shell/main-box';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { isOwner } from '@/lib/dev/owner';
 import { MAIN_BOX } from '@/components/shell/main-box';

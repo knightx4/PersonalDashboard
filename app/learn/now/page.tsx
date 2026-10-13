@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
@@ -214,7 +214,7 @@ export default async function NowPage({
                       <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
                         <Button type="submit" variant="primary" size="sm">
-                          <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden />
+                          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
                           Open
                         </Button>
                         <PaidHint

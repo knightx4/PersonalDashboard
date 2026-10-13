@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { formatDay } from '@/lib/goals/dates';
 import { stepHref } from '@/lib/goals/all-goals';
 import { useActionState, useId, useRef, useState, useTransition } from 'react';

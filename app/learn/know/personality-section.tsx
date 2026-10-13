@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { buttonVariants } from '@/components/ui/button';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';

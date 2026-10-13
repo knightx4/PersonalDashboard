@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { formatMoney, type CurrencyCode, type MerchantSpendSlice } from '@/lib/money';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Meter } from '@/components/ui/meter';

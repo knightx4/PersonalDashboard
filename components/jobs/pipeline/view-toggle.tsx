@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Columns3, ListChecks, Table2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { segmentedFrame } from '@/components/ui/segmented';

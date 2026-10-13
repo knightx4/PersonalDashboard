@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Check, Copy, Download, Plus } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';

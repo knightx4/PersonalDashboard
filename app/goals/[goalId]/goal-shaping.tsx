@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { Card } from '@/components/ui/card';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRef, useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
 import { Card, CardSection } from '@/components/ui/card';

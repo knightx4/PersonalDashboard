@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { Link2, Link2Off } from 'lucide-react';
 import { usePopover } from '@/lib/use-popover';
 import { useToast } from '@/components/ui/toast';
+import { IconButton } from '@/components/ui/icon-button';
 import { LinkFinder } from '@/components/todo/link-picker';
 import { pointTaskAt, unpointTask } from '@/app/todo/actions';
 
@@ -59,26 +60,20 @@ export function TaskAbout({
   return (
     <span className="relative inline-flex items-center gap-0.5">
       {!controlled && (
-        <button
+        <IconButton
           ref={triggerRef}
-          type="button"
-          title={linked ? 'Point it at something else' : 'What is this about?'}
+          label={linked ? 'Point it at something else' : 'What is this about?'}
           aria-expanded={open}
           disabled={pending}
           onClick={() => setOpen(!open)}
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
         >
-          <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">
-            {linked ? 'Point it at something else' : 'What is this about?'}
-          </span>
-        </button>
+          <Link2 strokeWidth={1.75} aria-hidden />
+        </IconButton>
       )}
 
       {!controlled && linked && (
-        <button
-          type="button"
-          title="Not about anything"
+        <IconButton
+          label="Not about anything"
           disabled={pending}
           onClick={() =>
             start(async () => {
@@ -86,11 +81,9 @@ export function TaskAbout({
               toast({ text: error ?? 'unlinked' });
             })
           }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
         >
-          <Link2Off className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Not about anything</span>
-        </button>
+          <Link2Off strokeWidth={1.75} aria-hidden />
+        </IconButton>
       )}
 
       {open && (

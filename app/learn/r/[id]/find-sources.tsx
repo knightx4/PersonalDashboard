@@ -86,7 +86,7 @@ function SearchButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" pending={pending}>
-      <Search className="size-4" strokeWidth={2} aria-hidden />
+      <Search className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Searching…' : 'Find something to read'}
     </Button>
   );

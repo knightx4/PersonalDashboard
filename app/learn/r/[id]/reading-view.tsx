@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -241,9 +241,9 @@ function ReadingTabBody({
 
           <p className="flex items-start gap-2 text-body text-ink">
             {verified ? (
-              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
             ) : (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-caution" strokeWidth={2} aria-hidden />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
             )}
             <span>{where || 'The whole thing'}</span>
           </p>
@@ -271,7 +271,7 @@ function ReadingTabBody({
               <form action={openReading} className="flex flex-wrap items-center gap-1">
                 <input type="hidden" name="readingId" value={reading.id} />
                 <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
+                  <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
                   Open
                 </Button>
                 <PaidHint action="app/learn/r/[id]/actions.ts#openReading" what="Cost of finding the passage" />
@@ -302,7 +302,7 @@ function ReadingTabBody({
           <form action={goDeeper}>
             <input type="hidden" name="readingId" value={reading.id} />
             <Button type="submit" variant="secondary" size="md">
-              <GitBranch className="size-4" strokeWidth={2} aria-hidden />
+              <GitBranch className="size-4" strokeWidth={1.75} aria-hidden />
               Go deeper on this
             </Button>
           </form>

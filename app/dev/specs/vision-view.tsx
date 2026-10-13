@@ -103,7 +103,7 @@ export function ModuleVisionPanel({
           title={`Edit the vision for ${label}`}
           className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
-          <Pencil className="size-3.5" strokeWidth={2} aria-hidden />
+          <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Edit the vision for {label}</span>
         </button>
       </div>

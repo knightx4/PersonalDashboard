@@ -7,6 +7,7 @@ import { Card, CardSection } from '@/components/ui/card';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Textarea } from '@/components/ui/field';
+import { Note } from '@/components/ui/note';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import {
@@ -277,16 +278,13 @@ function AnswerCard({
         live only in the session that generated it.
       */}
       {!draft && answer.unsupportedClaims.length > 0 && (
-        <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
-          <p className="text-small font-medium text-ink">
-            This answer states things your bank does not carry:
-          </p>
-          <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
+        <Note tone="caution" className="mt-2" title="This answer states things your bank does not carry:">
+          <ul className="list-disc pl-4 text-small text-ink">
             {answer.unsupportedClaims.map((claim) => (
               <li key={claim}>{claim}</li>
             ))}
           </ul>
-        </div>
+        </Note>
       )}
 
       {/* The answer, read. It was a five-row textarea holding its own value,
@@ -434,7 +432,7 @@ function AnswerCard({
         // yours yet -- a machine's suggestion waiting to be inserted or thrown
         // away -- and a recessed ground says that without adding a second
         // border inside the answer card. Law 11: a shared ground groups.
-        <div className="mt-3 rounded-card bg-canvas p-3">
+        <Note className="mt-3 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
             <span className="text-small text-ink-muted">
@@ -455,9 +453,8 @@ function AnswerCard({
           </p>
 
           {draft.unsupportedClaims.length > 0 && (
-            <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
-              <p className="text-small font-medium text-ink">Not grounded in anything you wrote:</p>
-              <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
+            <Note tone="caution" className="mt-2" title="Not grounded in anything you wrote:">
+              <ul className="list-disc pl-4 text-small text-ink">
                 {draft.unsupportedClaims.map((claim) => (
                   <li key={claim}>{claim}</li>
                 ))}
@@ -465,7 +462,7 @@ function AnswerCard({
               <p className="mt-1 text-small text-ink-muted">
                 Check each of these before it goes out, or cut it.
               </p>
-            </div>
+            </Note>
           )}
 
           {draft.bannedFound.length > 0 && (
@@ -504,7 +501,7 @@ function AnswerCard({
               Discard
             </Button>
           </div>
-        </div>
+        </Note>
       )}
     </Card>
   );

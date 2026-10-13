@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ClipPlayer } from '@/components/learn/clip-player';
@@ -49,7 +49,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
     <div className="max-w-3xl">
       <p className="mb-3">
         <Link href="/learn/videos" className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Videos
         </Link>
       </p>

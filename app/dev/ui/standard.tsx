@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
 import { Card, CardSection } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import {
   Input,
   Label,
 } from '@/components/ui/field';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Figure, FigureDelta } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';

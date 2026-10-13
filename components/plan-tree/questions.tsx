@@ -157,7 +157,7 @@ export function QuestionRow({
           )}
         >
           {settled && node.status !== 'dropped' ? (
-            <Check className="size-3.5" strokeWidth={2} />
+            <Check className="size-3.5" strokeWidth={1.75} />
           ) : (
             '?'
           )}

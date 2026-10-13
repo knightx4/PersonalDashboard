@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { RotateCcw, Tag } from 'lucide-react';
 import { separateCopy, ungroupItems } from '@/app/shopping/inventory/group-actions';

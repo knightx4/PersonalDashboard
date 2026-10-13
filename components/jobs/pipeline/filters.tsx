@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState, type ComponentProps } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
