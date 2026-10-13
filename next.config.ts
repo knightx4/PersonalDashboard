@@ -67,6 +67,13 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       { source: '/news/quick', destination: '/news', permanent: false },
+      /**
+       * Education moved from the Vault to You's Work & school tab (plan
+       * #1991.3). A course or transcript link keeps its #anchor, which the
+       * browser carries across the redirect, and a transcript's file link
+       * keeps its id.
+       */
+      { source: '/vault/education/:path*', destination: '/you/work/:path*', permanent: false },
     ];
   },
 };

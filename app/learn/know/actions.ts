@@ -34,6 +34,7 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { classifyNote } from '@/lib/learn/vault/classify';
 import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
 import { loadNote } from '@/lib/vault/notes/load';
 import {
   approvedChainSchema,
@@ -414,8 +415,8 @@ export async function approvePrior(
 /**
  * The ideas one course on your transcript probably covered (plan #1390).
  *
- * The same first step as `proposePrior`, from a course saved on the vault's
- * Education tab instead of a paste: it calls the model and writes nothing.
+ * The same first step as `proposePrior`, from a course saved on You's Work &
+ * school tab instead of a paste: it calls the model and writes nothing.
  * With a track picked it proposes into that track; without one the model is
  * offered your track names and puts the course into one of them or names a
  * new one. Approval is #1391's, through saveChain and declareKnown as
@@ -452,14 +453,14 @@ export async function proposeFromCourse(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Reading a course needs ANTHROPIC_API_KEY to be set.' };
 
-  const { data: course, error: courseError } = await (await createVaultClient())
+  const { data: course, error: courseError } = await (await createYouClient())
     .from('courses')
     .select('id, school, code, title, term, year, grade')
     .eq('id', parsed.data.courseId)
     .eq('user_id', user.id)
     .maybeSingle();
   if (courseError) return { error: 'That course could not be read. Try again.' };
-  if (!course) return { error: 'That course is not in the vault any more.' };
+  if (!course) return { error: 'That course is not saved any more.' };
 
   const supabase = await createLearnClient();
   const subject = parsed.data.subjectId

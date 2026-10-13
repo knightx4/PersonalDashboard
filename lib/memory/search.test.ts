@@ -14,15 +14,23 @@ import {
  * is tested in lib/ask/tools.test.ts with a fake embedder.
  */
 
-const MIGRATIONS = join(__dirname, '..', '..', 'supabase', 'migrations');
+/**
+ * The folders that define core.memory_sources, in the order
+ * scripts/db-reset.sh applies them: migrations-you runs last, and its 0004
+ * rewrote the function when the transcripts moved there (plan #1991.3).
+ */
+const MIGRATION_FOLDERS = ['migrations', 'migrations-you'].map((folder) =>
+  join(__dirname, '..', '..', 'supabase', folder),
+);
 
 /** The source_table values the newest core.memory_sources emits. */
 function sqlSourceTables(): string[] {
-  const defining = readdirSync(MIGRATIONS)
-    .filter((name) => name.endsWith('.sql'))
-    .sort()
-    .map((name) => readFileSync(join(MIGRATIONS, name), 'utf8'))
-    .filter((sql) => /create or replace function core\.memory_sources\(/.test(sql));
+  const defining = MIGRATION_FOLDERS.flatMap((folder) =>
+    readdirSync(folder)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .map((name) => readFileSync(join(folder, name), 'utf8')),
+  ).filter((sql) => /create or replace function core\.memory_sources\(/.test(sql));
   const sql = defining.at(-1)!;
   const body = sql.slice(sql.indexOf('create or replace function core.memory_sources('));
   const fn = body.slice(0, body.indexOf('$$;'));

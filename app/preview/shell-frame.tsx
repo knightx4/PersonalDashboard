@@ -80,7 +80,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
       { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
       { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
       { href: '/vault/maya', label: 'Maya', icon: 'maya' },
-      { href: '/vault/education', label: 'Education', icon: 'education' },
     ],
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',

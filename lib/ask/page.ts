@@ -88,7 +88,7 @@ function nounOf(table: string): string {
 /**
  * The pattern an href function makes, or null when it ignores its ref or puts
  * it only in the fragment. A fragment ref is a list page scrolled to one of
- * its rows, such as a course on the vault's Education tab (plan #1308): the
+ * its rows, such as a course on You's Work & school tab (plan #1308): the
  * page shows every row, and the fragment never reaches the path this matches.
  */
 export function patternOf(table: string, href: (ref: string) => string, refColumn = 'id'): RowPattern | null {
