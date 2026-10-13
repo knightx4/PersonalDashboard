@@ -1,6 +1,7 @@
 import type { AskDb, AskSchema, SchemaClient } from '@/lib/ask/db';
 import { parseRef } from '@/lib/core/refs';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
+import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -168,6 +169,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   'move_roles',
   'add_quick_note',
   ...LEARN_CHANGE_KINDS,
+  ...TODO_CHANGE_KINDS,
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
