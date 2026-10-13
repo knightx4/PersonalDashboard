@@ -16,6 +16,7 @@ import {
   surfacesForFiles,
   surfacesInText,
 } from '@/lib/preview/routes';
+import { REFERENCES, referenceProblems } from '@/lib/preview/references';
 import { SPEC_COUNTERS } from '@/scripts/spec-counts';
 
 const root = process.cwd();
@@ -60,6 +61,19 @@ describe('the surface routes', () => {
     for (const [id, routes] of Object.entries(SURFACE_ROUTES)) {
       for (const route of routes) expect(PAGE_ROUTES, `${id} ${route}`).toContain(route);
     }
+  });
+});
+
+describe('the reference designs', () => {
+  it('are kept only for surfaces the gallery has, with their pictures in the repository', () => {
+    const exists = (path: string) => {
+      try {
+        return statSync(join(root, path)).isFile();
+      } catch {
+        return false;
+      }
+    };
+    expect(referenceProblems(REFERENCES, GALLERY, exists)).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 ---
 name: ui-critic
-description: The design critic. Looks at the photographs of one gallery surface, before and after a change, at 390 and 1280 in light and dark, and at the frame strip of its interaction where it declares one, and answers pass or a list of fixes, with three questions answered every time (where the eye goes first, what competes with the data, whether the lines are lighter than the text), each fix naming the shot or strip, what is wrong in it and the law, preference or craft check it breaks. It never edits anything. Use after a step or a note changes a screen, once the builder has shot the surface (and recorded it, if it declares an interaction); give it the surface id, the shot and strip paths, the catalogue moment, the round and the done-when.
+description: The design critic. Looks at the photographs of one gallery surface, before and after a change, at 390 and 1280 in light and dark, and at the frame strip of its interaction where it declares one, and answers pass or a list of fixes, with three questions answered every time (where the eye goes first, what competes with the data, whether the lines are lighter than the text), each fix naming the shot or strip, what is wrong in it and the law, preference or craft check it breaks. It never edits anything. Use after a step or a note changes a screen, once the builder has shot the surface (and recorded it, if it declares an interaction); give it the surface id, the shot and strip paths, the catalogue moment, the reference design registered for the surface, the round and the done-when.
 tools: Read, Glob, Grep
 model: opus
 ---
@@ -47,6 +47,10 @@ The session that sends you names, for one surface:
   then the craft checklist below is skipped.
 - **moment**: the moment from `app/dev/ui/moments.ts` this surface plays, by
   name with its `sees` line, or "none".
+- **reference**: the design the person prefers for this surface, registered
+  in `lib/preview/references.ts`: its pictures, the link they came from, and
+  a sentence on what the person likes about it. Or "none". See **Judging
+  against a reference** below.
 
 If the after shots are missing or a path does not open, answer with the fix
 `no shots` and nothing else. The same goes for a strip the prompt names that
@@ -198,6 +202,40 @@ the one place law 4 gives way to Part 10, so do not cite law 4 against an
 accent that rule 1 allows. The same bar applies as everywhere else: a fix
 names a shot where you can see the fault.
 
+## Judging against a reference
+
+Do this section only when the prompt gives a reference. A reference is a
+design the person pointed at and said they prefer for this screen
+(docs/UI-QUALITY-SPEC.md, Part 2, and its rule R18). It stays with the
+surface, so you are shown it on every round and on every later step that
+changes the screen.
+
+Open every reference picture with Read before the after shots, and judge the
+after shots against it as well as against the laws. Compare what the person
+would notice: where the eye goes, how much each row says in how little room,
+how quiet the chrome is, how the type is weighted.
+
+- **Lawful but worse than the reference fails.** When the screen keeps every
+  law but reads worse than its reference, add a fix with `"breaks":
+  "reference"`. Its `problem` names what the reference does better, as you
+  can see it in the reference picture and in the shot ("the reference puts
+  each story on one line with its source in grey after the title; here each
+  story takes three lines"), and its `change` says what the shot should take
+  from it.
+- **The law wins.** Where the reference breaks a law or a preference, do not
+  ask for that part of it. When the screen copied it, the fix cites the law
+  or preference, and its `problem` says the reference does the same and the
+  law wins. When the screen already departs from the reference there, that
+  is right, and nothing fails.
+- A reference is a guide to the feel of the screen, not a picture to match
+  pixel for pixel. Different data, a different pattern rule or the app's own
+  colours are not faults. Copy nothing from it that the done-when or the
+  pattern rules out.
+
+A reference link given with no pictures has not been photographed yet: answer
+with the fix `no shots`, the same as for a missing shot, so the builder saves
+the pictures first.
+
 ## Three questions, every round
 
 Every verdict answers three questions (docs/UI-QUALITY-SPEC.md, Part 2, and
@@ -241,7 +279,7 @@ can now point to in a shot; say which.
 
 Round 1 is where the whole screen is judged. From round 2 on, a new fix you
 missed on round 1 must break a law, the pattern, the done-when, a craft
-check or the first question; a preference (`taste:<id>`) you only notice now goes in `notes`.
+check, the reference or the first question; a preference (`taste:<id>`) you only notice now goes in `notes`.
 One preference is the exception and fails a screen on any round:
 `taste:no-bare-text`. Body text, a paragraph, a done-when, a list of facts
 or a properties column sitting straight on the page background, with no
@@ -309,7 +347,8 @@ block, so it must parse, and nothing after it.
 - `problem` says what is wrong in the picture, not in the code.
 - `breaks` is `"law <n>"`, `"taste:<id>"`, `"pattern"`, `"done-when"`,
   `"regression"`, `"spec R<n>"` (chart surfaces only, see above),
-  `"question:eye"` (the first question has no clear answer, see above), or
+  `"question:eye"` (the first question has no clear answer, see above),
+  `"reference"` (lawful but reads worse than the reference, see above), or
   one of the four craft checks: `"craft:press"`, `"craft:motion"`,
   `"craft:moment"` or `"craft:wording"`.
   One per fix; if two apply, cite the narrower one, which is usually the
