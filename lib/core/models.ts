@@ -70,8 +70,6 @@ export const MODELS = {
   jobsInboxTierB: HAIKU,
   /** lib/jobs/interview/prep.ts */
   jobsInterviewPrep: OPUS,
-  /** lib/jobs/learning/suggest.ts */
-  jobsLearningSuggest: OPUS,
   /** lib/jobs/role-thread/ask.ts, Dash's reply on a role (lib/dash/models.ts roleThread) */
   roleCommentReply: SONNET,
   /** lib/thread/ask.ts, Dash's reply under any other row, a file first (lib/dash/models.ts rowThread) */

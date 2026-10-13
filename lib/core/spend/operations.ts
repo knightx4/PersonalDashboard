@@ -30,8 +30,9 @@ export const SPEND_OPERATIONS = {
     // Proposing evidence items from a pasted or uploaded source, on the
     // evidence settings page. Opus.
     'propose-evidence',
-    // Suggesting learning tracks from the career goals entries, on the Career
-    // goals page. Opus.
+    // Suggesting learning tracks from the career goals entries. No longer
+    // made since Find stopped offering tracks; kept so the spend it recorded
+    // keeps its name.
     'suggest-learning-tracks',
     // Finding people to meet for the work the person wants, with a web
     // search, and writing what to say to each. From the job suggestion cron

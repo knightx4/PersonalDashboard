@@ -21,7 +21,7 @@ import { CHANCE_DISPLAY, CHANCE_FILTER_EDGES, chanceBand, type ChanceBand } from
  * Ten fixed questions about each opening Dash recommends (plan #1178; fit
  * and chance scores added by #1202).
  *
- * The openings on Roles come from a web search that writes a title, a
+ * The recommended roles on Find come from a web search that writes a title, a
  * location, why it fits and how to go about it (job_search.suggestions, kind
  * `apply`). Jev reads that text, the posting itself once posting.ts has read
  * it from the link (job_search 0039), the person's evidence titles, the roles

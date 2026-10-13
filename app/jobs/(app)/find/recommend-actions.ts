@@ -17,8 +17,8 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
- * Dash's recommendations (job_search.suggestions, 0028), shown at the top of
- * Roles and Contacts.
+ * Dash's recommendations (job_search.suggestions, 0028): the roles and the
+ * people to meet on Find.
  *
  * The daily cron fills both lists. The two search presses run the same code
  * for the one person without waiting for the cadence, for when a list has run

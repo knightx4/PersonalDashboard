@@ -15,13 +15,13 @@
  * the forced-report follow-up as a second batch, once; a refusal, an error
  * or an expiry closes the run as failed, saying which.
  *
- * Spend is recorded at the model's full rate, which overstates a batch by
- * half: the ledger has no batch price yet.
+ * Spend is recorded at the batch price: the usage is marked `batch`, and
+ * costMicrosFor halves its tokens (lib/core/spend/pricing.ts).
  */
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
+import { asBatch, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { SuggestionKind } from './cadence';
 import { OPENINGS_TOOL, PEOPLE_TOOL, SUGGEST_MODEL, searchStep, type SearchRequest } from './model';
@@ -136,7 +136,7 @@ async function collectOne(
   if (result.type !== 'succeeded') return fail(`The background search ${result.type === 'expired' ? 'expired' : 'failed'}.`);
 
   const message = result.message;
-  const spend: SpendReport[] = [{ model: SUGGEST_MODEL, usage: usageFrom(message.usage) }];
+  const spend: SpendReport[] = [{ model: SUGGEST_MODEL, usage: asBatch(usageFrom(message.usage)) }];
 
   if (row.kind === 'apply') {
     const taken = await openingsTaken(supabase, row.user_id);
