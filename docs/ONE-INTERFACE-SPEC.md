@@ -19,12 +19,17 @@ the same in all of them. It was written from the code and the database on
 the 60 days before, the page views recorded since 2 October, and photographs
 of every workspace's first page at 390 pixels.
 
-> **Status:** proposed 13 October 2026, not yet shaped. The counts under
-> **Rules** were measured for this document and are not yet in
-> `scripts/spec-counts.ts`; shaping adds the counters, the step numbers and
-> the registry entry in `lib/specs/registry.ts`. Built as an overhaul in the
-> order [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) Part 4 gives: shared pieces
-> and one workspace moved first, then the rest one at a time.
+> **Status:** proposed 13 October 2026 and shaped the same day, at the
+> person's ask, into seven features on `/dev/plan`: #1919 (the fixes), #1927
+> (one shell mount), #1937 (Now and Inbox), #1931 (the path and the way
+> back), #1950 (capture is the add), #1957 (closing words and the clock) and
+> #1964 (Dash is one presence). Four questions are decisions under #1937 and
+> #1950. The counts under **Rules** were measured for this document; each
+> counter is built by the step its rule names, and the baseline is written
+> then. Shaped as ordinary features rather than as an overhaul so the
+> overnight runner can build them, with the shared piece first in each and
+> the counts holding the old way from growing, which is what Part 4 of
+> [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) is for.
 
 ## What there is today
 
@@ -443,63 +448,64 @@ add a role from the pipeline in one press and find it in the Inbox.
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes.
-Baselines were measured on main on 13 October 2026 for this document; a
-counter marked pending is written when the spec is shaped.
+Baselines were measured on main on 13 October 2026 for this document; each
+counter is written by the plan step its rule names, which records the
+baseline it measures and takes the pending mark off.
 
 **R1.** Every workspace's first two sections are named Now and Inbox, in
 that order, and its settings link is set.
-Checked by: test `tests/workspace-rooms.test.ts`, pending.
+Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 
 **R2.** Only an Inbox carries a badge.
-Checked by: test `tests/workspace-rooms.test.ts`, pending.
+Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 43, target 0, pending.
+Checked by: count `row-pages-without-path`, baseline 43, target 0, pending #1932.
 
 **R4.** There is one back-link component.
-Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending.
+Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending #1934.
 
-**R5.** Back restores the pane's scroll offset.
-Checked by: test `tests/interaction/back-restores-scroll.test.ts`, pending.
+**R5.** Back from a row lands on the list at the same scroll offset.
+Checked by: test `tests/flows/search-open-back.test.ts`, pending #1934.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
-Checked by: count `date-formatting-files`, baseline 116, target 1, pending.
+Checked by: count `date-formatting-files`, baseline 116, target 1, pending #1961.
 
 **R7.** A row is closed with one of Done, Dropped, Later or Declined, and
 every workspace status maps onto one.
-Checked by: test `tests/lifecycle-words.test.ts`, pending.
+Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
 
 **R8.** No section links to a page whose only job is a form.
-Checked by: count `form-only-pages`, baseline 9, target 0, pending.
+Checked by: count `form-only-pages`, baseline 9, target 0, pending #1953.
 
 **R9.** The shell is mounted in one place.
-Checked by: count `shell-mounts`, baseline 15, target 1, pending.
+Checked by: count `shell-mounts`, baseline 15, target 1, pending #1928.
 
 **R10.** Every route group has `error.tsx`, `not-found.tsx` and
 `loading.tsx`.
-Checked by: test `tests/route-states.test.ts`, pending.
+Checked by: test `tests/route-states.test.ts`, pending #1923.
 
 **R11.** Opening `/` while signed in is one redirect, to Home.
-Checked by: test `tests/proxy-launch.test.ts`, pending.
+Checked by: test `tests/proxy-launch.test.ts`, pending #1920.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.
-Checked by: count `ai-on-controls`, baseline 1, target 0, pending.
+Checked by: count `ai-on-controls`, baseline 1, target 0, pending #1965.
 
 **R13.** There is one thread component.
-Checked by: count `thread-components`, baseline 2, target 1, pending.
+Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
 
 **R14.** A radius class is one of the three tokens or `rounded-full`.
-Checked by: count `off-token-radii`, baseline 199, target 0, pending.
+Checked by: count `off-token-radius`, baseline 199, target 0, pending #1922.
 
 **R15.** Lucide icons are drawn at one stroke weight.
-Checked by: count `icon-stroke-off`, baseline 184, target 0, pending.
+Checked by: count `icon-stroke-off`, baseline 184, target 0, pending #1926.
 
 **R16.** The phone top bar holds at most four controls.
 Checked by: audit.
 
 **R17.** Every page view records the device it came from.
-Checked by: test `tests/proxy-page-views.test.ts`, pending.
+Checked by: test `tests/proxy-device.test.ts`, pending #1925.
 
 ## Decisions
 
