@@ -505,7 +505,7 @@ Checked by: count `icon-stroke-off`, baseline 184, target 0, pending #1926.
 Checked by: audit.
 
 **R17.** Every page view records the device it came from.
-Checked by: test `tests/proxy-device.test.ts`, pending #1925.
+Checked by: test `tests/proxy-device.test.ts`.
 
 ## Decisions
 
