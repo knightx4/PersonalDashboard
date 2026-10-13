@@ -17,13 +17,14 @@ const button = cva(
   {
     variants: {
       variant: {
-        // A control's border is the only thing identifying it, so it is the
-        // 3:1 token rather than the container hairline. `text-fill-ink` on the
+        // A button's words and fill identify it, so its outline is the light
+        // `border-strong`, not the 3:1 `border-control` a text input keeps
+        // (UI-QUALITY-SPEC Part 11). `text-fill-ink` on the
         // primary rather than white: in a dark theme the accent is light, and
         // white on it would be unreadable.
         primary: 'bg-accent text-fill-ink hover:bg-accent-hover',
         secondary:
-          'bg-surface text-ink border border-control hover:bg-sunken',
+          'bg-surface text-ink border border-strong hover:bg-sunken',
         ghost: 'text-ink-muted hover:bg-accent-tint hover:text-accent',
         danger: 'bg-surface text-danger border border-danger hover:bg-danger-tint',
       },

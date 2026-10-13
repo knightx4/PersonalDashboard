@@ -184,7 +184,7 @@ export function RailPicker({
           wearing the *container* hairline -- `border-border`, which owes no
           contrast because a container is also identified by its fill -- at a
           height nothing beside it shared, four pixels above the search field
-          it reveals. `secondary` brings `border-control` (3:1, WCAG 1.4.11)
+          it reveals. `secondary` brings the light `border-strong`
           and the dial's height, so the trigger and the field under it are the
           same control. All the caller adds is the full width and what
           "filtered" looks like. */}

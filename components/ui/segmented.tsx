@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
  * wherever the thing inside it has to be something else.
  */
 export const segmentedFrame =
-  'inline-flex rounded-control border border-control *:press-area ' +
+  'inline-flex rounded-control border border-strong *:press-area ' +
   // The ends are rounded on the segments rather than clipped by the frame:
   // `overflow: hidden` here would cut off the press area each segment has on
   // a phone (`press-area`, app/globals.css), leaving it drawn but unpressable.
