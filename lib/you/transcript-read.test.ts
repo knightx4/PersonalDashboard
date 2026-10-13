@@ -2,13 +2,13 @@ import { deflateRawSync } from 'node:zlib';
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
-import { askTranscriptModel } from '@/lib/vault/transcript-model';
+import { askTranscriptModel } from '@/lib/you/transcript-model';
 import {
   COURSES_MAX,
   readTranscript,
   readTranscriptAnswer,
   transcriptTool,
-} from '@/lib/vault/transcript-read';
+} from '@/lib/you/transcript-read';
 
 /** A model stub that records what it was given and answers with this tool input. */
 function stub(input: unknown) {

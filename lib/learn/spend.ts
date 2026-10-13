@@ -166,7 +166,7 @@ export const LEARN_OPERATIONS = [
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.
   'reply-to-maya',
-  // Reading the courses off an uploaded transcript for the vault's Education
+  // Reading the courses off an uploaded transcript for You's Work & school
   // tab (plan #1307). One Haiku call per transcript, from the read button;
   // nothing is saved until the person checks the list.
   'read-transcript',

@@ -2029,14 +2029,14 @@ describe('the channels found for a subject', () => {
 
 describe('courses read in from a transcript', () => {
   // 0086_course_reads.sql (plan #1389). One row per course from the vault's
-  // Education tab that has been read into Learn, with the track it went into.
+  // Work & school tab that has been read into Learn, with the track it went into.
   let transcriptA = '';
   let courseA = '';
   let subjectA = '';
 
   async function seedCourse(userId: string, transcriptId: string, title: string): Promise<string> {
     const [row] = await admin<{ id: string }[]>`
-      insert into obsidian.courses (user_id, transcript_id, school, title, position)
+      insert into you.courses (user_id, transcript_id, school, title, position)
       values (${userId}, ${transcriptId}, 'State University', ${title}, 0)
       returning id`;
     return row.id;
@@ -2044,7 +2044,7 @@ describe('courses read in from a transcript', () => {
 
   beforeAll(async () => {
     const [t] = await admin<{ id: string }[]>`
-      insert into obsidian.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
       values (${userA}, 'State University', 'record.pdf', ${`${userA}/${crypto.randomUUID()}-record.pdf`},
               'application/pdf', 1000)
       returning id`;
@@ -2102,14 +2102,14 @@ describe('courses read in from a transcript', () => {
       select subject_id from course_reads where course_id = ${courseA}`;
     expect(kept.subject_id).toBeNull();
 
-    await admin`delete from obsidian.courses where id = ${courseA}`;
+    await admin`delete from you.courses where id = ${courseA}`;
     expect(await admin`select id from course_reads where course_id = ${courseA}`).toHaveLength(0);
   });
 
   it('drops the record with the transcript its course came from', async () => {
     const course = await seedCourse(userA, transcriptA, 'Calculus I');
     await admin`insert into course_reads (user_id, course_id) values (${userA}, ${course})`;
-    await admin`delete from obsidian.transcripts where id = ${transcriptA}`;
+    await admin`delete from you.transcripts where id = ${transcriptA}`;
     expect(await admin`select id from course_reads where course_id = ${course}`).toHaveLength(0);
   });
 });

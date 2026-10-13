@@ -10,7 +10,7 @@ import { DOCUMENT_BUCKET } from '@/lib/goals/extract';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
-import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
+import { TRANSCRIPTS_BUCKET } from '@/lib/you/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
@@ -144,10 +144,10 @@ export async function POST(request: NextRequest) {
     // As above: a file left behind does not stop the deletion.
   }
 
-  //    And the transcripts the Education tab keeps (plan #1306), in a bucket
+  //    And the transcripts the Work & school tab keeps (plan #1306), in a bucket
   //    of their own with one folder per account.
   try {
-    await removeAttachmentFolder(admin, user.id, VAULT_TRANSCRIPTS_BUCKET);
+    await removeAttachmentFolder(admin, user.id, TRANSCRIPTS_BUCKET);
   } catch {
     // As above.
   }

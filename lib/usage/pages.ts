@@ -147,7 +147,6 @@ export const PAGE_ROUTES: readonly string[] = [
   '/todo/settings',
   '/todo/waiting',
   '/vault',
-  '/vault/education',
   '/vault/map',
   '/vault/map/[id]',
   '/vault/maya',

@@ -200,7 +200,7 @@ export const MODELS = {
   maya: OPUS,
   /** lib/vault/notes/connections-model.ts */
   vaultConnections: HAIKU,
-  /** lib/vault/transcript-model.ts */
+  /** lib/you/transcript-model.ts */
   vaultTranscript: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,

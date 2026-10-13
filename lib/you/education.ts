@@ -1,6 +1,7 @@
 /**
- * The vault's Education tab (plan #1308, under #1304): the rules the page and
- * its actions share, kept pure so the tests can reach them.
+ * Education on You's Work & school tab (plan #1308, moved from the Vault by
+ * #1991.3): the rules the page and its actions share, kept pure so the tests
+ * can reach them.
  *
  * - Which files it takes, and the content type each is kept under.
  * - Where a course or a transcript opens, for links from elsewhere.
@@ -16,9 +17,9 @@ import {
   type Course,
   type Transcript,
   type TranscriptMimeType,
-} from '@/lib/vault/transcripts';
+} from '@/lib/you/transcripts';
 
-export const EDUCATION_HREF = '/vault/education';
+export const EDUCATION_HREF = '/you/work';
 
 /** The file picker's accept list: the bucket's types, by extension. */
 export const TRANSCRIPT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx,.txt';
@@ -26,22 +27,22 @@ export const TRANSCRIPT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx,.txt';
 /** The name pasted text is kept under, so the reader takes it as text. */
 export const PASTED_FILE_NAME = 'Pasted transcript.txt';
 
-/** The anchor a course row carries on the Education tab. */
+/** The anchor a course row carries on the Work & school tab. */
 export function courseAnchor(id: string): string {
   return `course-${id}`;
 }
 
-/** The anchor a transcript's line carries on the Education tab. */
+/** The anchor a transcript's line carries on the Work & school tab. */
 export function transcriptAnchor(id: string): string {
   return `transcript-${id}`;
 }
 
-/** Where one course opens: its row on the Education tab. */
+/** Where one course opens: its row on the Work & school tab. */
 export function courseHref(id: string): string {
   return `${EDUCATION_HREF}#${courseAnchor(id)}`;
 }
 
-/** Where one transcript opens: its line on the Education tab. */
+/** Where one transcript opens: its line on the Work & school tab. */
 export function transcriptHref(id: string): string {
   return `${EDUCATION_HREF}#${transcriptAnchor(id)}`;
 }

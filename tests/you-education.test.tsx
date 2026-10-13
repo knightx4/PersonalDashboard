@@ -1,5 +1,5 @@
 /**
- * The vault's Education tab (plan #1308). The runner has no DOM, so what is
+ * You's Work & school tab (plan #1308). The runner has no DOM, so what is
  * pinned is the markup: the empty state says what to upload, the check view
  * starts from what was read with every field editable, and a saved school
  * lists its terms newest first with each transcript's original linked.
@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-vi.mock('@/app/vault/education/actions', () => ({
+vi.mock('@/app/you/work/actions', () => ({
   discardUploadAction: vi.fn(),
   readTranscriptAction: vi.fn(),
   saveTranscriptAction: vi.fn(),
@@ -17,10 +17,10 @@ vi.mock('@/app/vault/education/actions', () => ({
 }));
 vi.mock('@/lib/auth/client', () => ({ createClient: vi.fn() }));
 
-import { AddTranscript, CheckCourses } from '@/app/vault/education/add-transcript';
-import { SchoolCourses } from '@/app/vault/education/course-list';
-import { groupCourses } from '@/lib/vault/education';
-import type { Course, Transcript } from '@/lib/vault/transcripts';
+import { AddTranscript, CheckCourses } from '@/app/you/work/add-transcript';
+import { SchoolCourses } from '@/app/you/work/course-list';
+import { groupCourses } from '@/lib/you/education';
+import type { Course, Transcript } from '@/lib/you/transcripts';
 
 const USER = 'u1';
 
@@ -111,7 +111,7 @@ describe('SchoolCourses', () => {
     expect(html).toContain('3 credits');
     expect(html).toContain('6 credits');
     expect(html).toContain('id="course-a"');
-    expect(html).toContain('href="/vault/education/file/t1"');
+    expect(html).toContain('href="/you/work/file/t1"');
     expect(html).toContain('Delete');
   });
 });

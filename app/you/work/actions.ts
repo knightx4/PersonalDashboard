@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
-import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
 import {
   EDUCATION_HREF,
   isTranscriptSize,
@@ -14,17 +14,17 @@ import {
   parseRowList,
   schoolField,
   transcriptContentType,
-} from '@/lib/vault/education';
-import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/vault/transcript-model';
-import { readTranscript, type DraftCourse } from '@/lib/vault/transcript-read';
+} from '@/lib/you/education';
+import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/you/transcript-model';
+import { readTranscript, type DraftCourse } from '@/lib/you/transcript-read';
 import {
   deleteTranscript,
-  VAULT_TRANSCRIPTS_BUCKET,
+  TRANSCRIPTS_BUCKET,
   type TranscriptStore,
-} from '@/lib/vault/transcripts';
+} from '@/lib/you/transcripts';
 
 /**
- * The Education tab's actions (plan #1308, under #1304).
+ * The Work & school tab's actions (plan #1308, under #1304).
  *
  * Adding a transcript is two presses with you between them, as the goals
  * document reader is. The browser uploads the file (or the pasted text, as a
@@ -68,8 +68,8 @@ export async function readTranscriptAction(raw: { path: string; fileName: string
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot read transcripts.' };
 
-  const vault = await createVaultClient();
-  const { data, error } = await vault.storage.from(VAULT_TRANSCRIPTS_BUCKET).download(path);
+  const you = await createYouClient();
+  const { data, error } = await you.storage.from(TRANSCRIPTS_BUCKET).download(path);
   if (error || !data) return { error: 'That file could not be opened. Try uploading it again.' };
   const bytes = new Uint8Array(await data.arrayBuffer());
 
@@ -86,7 +86,7 @@ export async function readTranscriptAction(raw: { path: string; fileName: string
 
   if (!read.ok) {
     // Nothing points at the file yet, and nothing will: you upload again to retry.
-    await vault.storage.from(VAULT_TRANSCRIPTS_BUCKET).remove([path]);
+    await you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
     return { error: read.error };
   }
   return {
@@ -128,8 +128,8 @@ export async function saveTranscriptAction(
   const courses = parseCourseRows(get, parseRowList(get('rows')), school.data);
   if (!courses.ok) return { error: courses.error, row: courses.row, field: courses.field };
 
-  const vault = await createVaultClient();
-  const { data: transcript, error } = await vault
+  const you = await createYouClient();
+  const { data: transcript, error } = await you
     .from('transcripts')
     .insert({
       user_id: user.id,
@@ -150,7 +150,7 @@ export async function saveTranscriptAction(
     };
   }
 
-  const { error: coursesError } = await vault.from('courses').insert(
+  const { error: coursesError } = await you.from('courses').insert(
     courses.courses.map((course, position) => ({
       ...course,
       user_id: user.id,
@@ -160,7 +160,7 @@ export async function saveTranscriptAction(
   );
   if (coursesError) {
     // Take the transcript back out, so a retry does not meet a half-saved copy.
-    await vault.from('transcripts').delete().eq('id', transcript.id).eq('user_id', user.id);
+    await you.from('transcripts').delete().eq('id', transcript.id).eq('user_id', user.id);
     return { error: 'The courses were not saved. Try again.' };
   }
 
@@ -173,10 +173,10 @@ export async function saveTranscriptAction(
 export async function discardUploadAction(path: string): Promise<void> {
   const user = await requireUser();
   if (!ownsTranscriptPath(user.id, path)) return;
-  const vault = await createVaultClient();
-  const { data } = await vault.from('transcripts').select('id').eq('storage_path', path).limit(1);
+  const you = await createYouClient();
+  const { data } = await you.from('transcripts').select('id').eq('storage_path', path).limit(1);
   if (data && data.length > 0) return;
-  await vault.storage.from(VAULT_TRANSCRIPTS_BUCKET).remove([path]);
+  await you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
 }
 
 export type CourseEditState = { error?: string; field?: string; saved?: boolean };
@@ -190,8 +190,8 @@ export async function updateCourseAction(_prev: CourseEditState, form: FormData)
   const courseId = id.safeParse(form.get('id'));
   if (!courseId.success) return { error: 'That course could not be found.' };
 
-  const vault = await createVaultClient();
-  const { data: current } = await vault
+  const you = await createYouClient();
+  const { data: current } = await you
     .from('courses')
     .select('school')
     .eq('id', courseId.data)
@@ -204,7 +204,7 @@ export async function updateCourseAction(_prev: CourseEditState, form: FormData)
   }, (current as { school: string }).school);
   if (!read.ok) return { error: read.error, field: read.field };
 
-  const { error } = await vault
+  const { error } = await you
     .from('courses')
     .update(read.course)
     .eq('id', courseId.data)
@@ -223,8 +223,8 @@ export async function removeCourseAction(form: FormData): Promise<RemoveResult> 
   const user = await requireUser();
   const courseId = id.safeParse(form.get('id'));
   if (!courseId.success) return { ok: false, error: 'That course could not be found.' };
-  const vault = await createVaultClient();
-  const { error } = await vault.from('courses').delete().eq('id', courseId.data).eq('user_id', user.id);
+  const you = await createYouClient();
+  const { error } = await you.from('courses').delete().eq('id', courseId.data).eq('user_id', user.id);
   if (error) return { ok: false, error: 'The course was not removed. Try again.' };
   revalidatePath(EDUCATION_HREF);
   return { ok: true };
@@ -236,9 +236,9 @@ export async function removeTranscriptAction(form: FormData): Promise<RemoveResu
   const user = await requireUser();
   const transcriptId = id.safeParse(form.get('id'));
   if (!transcriptId.success) return { ok: false, error: 'That transcript could not be found.' };
-  const vault = await createVaultClient();
+  const you = await createYouClient();
   try {
-    await deleteTranscript(vault as unknown as TranscriptStore, user.id, transcriptId.data);
+    await deleteTranscript(you as unknown as TranscriptStore, user.id, transcriptId.data);
   } catch {
     return { ok: false, error: 'The transcript was not deleted. Try again.' };
   }

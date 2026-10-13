@@ -8,6 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
 import type { DashActionDeps } from '@/lib/core/dash-actions';
 import { removeAttachmentsFor } from '@/lib/attachments/store';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
@@ -30,6 +31,7 @@ const FACTORIES: Record<AskSchema, () => Promise<unknown>> = {
   learn: createLearnClient,
   news: createNewsClient,
   goals: () => createGoalsClient(),
+  you: createYouClient,
 };
 
 export function requestAskDb(): AskDb {

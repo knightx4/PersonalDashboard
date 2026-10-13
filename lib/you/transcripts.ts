@@ -1,7 +1,7 @@
 /**
  * Academic transcripts and the courses on them (plan #1306, under #1304).
  *
- * The tables are obsidian.transcripts and obsidian.courses, and the original
+ * The tables are you.transcripts and you.courses, and the original
  * files are kept in the private vault-transcripts bucket at
  * `<user id>/<a fresh uuid>-<the file's name>`. See
  * supabase/migrations-vault/0030_transcripts.sql for what the database
@@ -9,9 +9,14 @@
  *
  * Courses cascade with their transcript. The file does not, so a transcript
  * is deleted through deleteTranscript, which removes both.
+ *
+ * Both tables moved from obsidian to the you schema with Education's move
+ * to Work & school (plan #1991.3, migrations-you/0004). The bucket kept its
+ * name and its files, so the paths saved on the rows still find them.
  */
 
-export const VAULT_TRANSCRIPTS_BUCKET = 'vault-transcripts';
+/** The bucket keeps its first name, from when the transcripts were in the Vault. */
+export const TRANSCRIPTS_BUCKET = 'vault-transcripts';
 
 /** 20 MB, the bucket's limit and the table's. */
 export const TRANSCRIPT_MAX_BYTES = 20_971_520;
@@ -33,7 +38,7 @@ export function isTranscriptMimeType(value: string): value is TranscriptMimeType
   return (TRANSCRIPT_MIME_TYPES as readonly string[]).includes(value);
 }
 
-/** A row of obsidian.transcripts. */
+/** A row of you.transcripts. */
 export type Transcript = {
   id: string;
   user_id: string;
@@ -46,7 +51,7 @@ export type Transcript = {
   updated_at: string;
 };
 
-/** A row of obsidian.courses. term, year, credits and grade are as written, and may be missing. */
+/** A row of you.courses. term, year, credits and grade are as written, and may be missing. */
 export type Course = {
   id: string;
   user_id: string;
@@ -123,7 +128,7 @@ export async function deleteTranscript(
   const paths = (data ?? []).map((row) => row.storage_path);
   if (paths.length === 0) return false;
 
-  const removed = await client.storage.from(VAULT_TRANSCRIPTS_BUCKET).remove(paths);
+  const removed = await client.storage.from(TRANSCRIPTS_BUCKET).remove(paths);
   if (removed.error) throw new Error(`Removing the transcript file failed: ${removed.error.message}`);
   return true;
 }

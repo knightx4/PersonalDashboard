@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   deleteTranscript,
   transcriptStoragePath,
-  VAULT_TRANSCRIPTS_BUCKET,
+  TRANSCRIPTS_BUCKET,
   type TranscriptStore,
-} from '@/lib/vault/transcripts';
+} from '@/lib/you/transcripts';
 
 describe('transcriptStoragePath', () => {
   it('puts the file in the account folder behind a fresh id', () => {
@@ -51,7 +51,7 @@ describe('deleteTranscript', () => {
     const store = fakeStore([{ id: 't1', user_id: 'u1', storage_path: 'u1/x-a.pdf' }]);
     expect(await deleteTranscript(store.client, 'u1', 't1')).toBe(true);
     expect(store.rows).toEqual([]);
-    expect(store.removed).toEqual([{ bucket: VAULT_TRANSCRIPTS_BUCKET, paths: ['u1/x-a.pdf'] }]);
+    expect(store.removed).toEqual([{ bucket: TRANSCRIPTS_BUCKET, paths: ['u1/x-a.pdf'] }]);
   });
 
   it("touches nothing for another account's transcript", async () => {

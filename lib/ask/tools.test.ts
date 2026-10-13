@@ -125,7 +125,7 @@ function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
     }) as unknown as SchemaClient;
 }
 
-const ALL_MODULES: ModuleId[] = ['shopping', 'jobs', 'vault', 'todo', 'learn', 'news', 'goals', 'dev'];
+const ALL_MODULES: ModuleId[] = ['shopping', 'jobs', 'vault', 'todo', 'learn', 'news', 'goals', 'you', 'dev'];
 
 function context(tables: Tables, extra: Partial<AskContext> = {}): AskContext {
   return {
@@ -584,7 +584,7 @@ describe('courses', () => {
     ...fields,
   });
   const tables: Tables = {
-    'obsidian.courses': [
+    'you.courses': [
       course('c1', ME, { code: 'ECON 101', title: 'Principles of Economics', term: 'Fall 2019', year: 2019, credits: '3.00', grade: 'A-' }),
       course('c2', ME, { title: 'Writing Seminar', term: 'Fall', year: 2019, credits: 1, position: 1 }),
       course('c3', ME, { code: 'ECON 201', title: 'Intermediate Micro', term: 'Spring 2020', year: 2020, position: 2 }),
@@ -593,14 +593,14 @@ describe('courses', () => {
     ],
   };
 
-  it('lists the courses of a term, each linked to its row on the Education tab', async () => {
+  it('lists the courses of a term, each linked to its row on the Work & school tab', async () => {
     const result = await executeAskTool('courses', { term: 'fall 2019' }, context(tables));
     const rows = expectLinkedRows(result);
     expect(rows.map((r) => r.ref)).toEqual(['c1', 'c2']);
     expect(rows[0]).toMatchObject({
-      table: 'obsidian.courses',
+      table: 'you.courses',
       title: 'ECON 101 Principles of Economics',
-      href: '/vault/education#course-c1',
+      href: '/you/work#course-c1',
       detail: { school: 'State University', term: 'Fall 2019', credits: 3, grade: 'A-' },
     });
     // A term written without its year is read with it.
@@ -625,7 +625,7 @@ describe('courses', () => {
     expect((await executeAskTool('courses', { year: 'soon' }, context(tables))).ok).toBe(false);
   });
 
-  it('needs the vault switched on', async () => {
+  it('needs You switched on', async () => {
     const off = await executeAskTool('courses', {}, context(tables, { enabledModules: ['jobs'] }));
     expect(off.ok).toBe(false);
   });
@@ -814,11 +814,11 @@ describe('recall', () => {
     expect(refs).not.toContain('Home/Garden.md');
   });
 
-  it('links a transcript to its line on the Education tab', async () => {
+  it('links a transcript to its line on the Work & school tab', async () => {
     const TRANSCRIPT = 'f1000000-0000-4000-8000-000000000001';
     const courseTables: Tables = {
       'core.memory_chunks': [
-        passage(ME, 'obsidian.transcripts', TRANSCRIPT, 0,
+        passage(ME, 'you.transcripts', TRANSCRIPT, 0,
           'Transcript from State University\n\nECON 101 Principles of Economics, Fall 2019, 3 credits, grade A-', 0.6),
       ],
     };
@@ -827,7 +827,7 @@ describe('recall', () => {
     });
     const rows = expectLinkedRows(result);
     expect(rows.map((r) => [r.table, r.href])).toEqual([
-      ['obsidian.transcripts', `/vault/education#transcript-${TRANSCRIPT}`],
+      ['you.transcripts', `/you/work#transcript-${TRANSCRIPT}`],
     ]);
     expect(rows[0].detail?.passage).toContain('Principles of Economics');
   });
