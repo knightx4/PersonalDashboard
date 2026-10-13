@@ -14,6 +14,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { actionGaps } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
@@ -259,5 +260,15 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'pages under app/ with no surface in the gallery',
     target: 0,
     measure: routesWithoutSurface,
+  },
+  {
+    // Plan #1895: the actions a page lets the person do that an agent should
+    // be able to do and has no Dash tool for. Read from the catalogue the
+    // modules declare (lib/agent-actions), which its own test holds to the
+    // files under app/, so it is measured from the code rather than `root`.
+    name: 'agent-action-gaps',
+    counts: 'server actions an agent should be able to do and has no tool for',
+    target: 0,
+    measure: () => actionGaps(),
   },
 ];

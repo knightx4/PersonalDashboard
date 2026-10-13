@@ -15,6 +15,8 @@ import { SpecChangeCard } from './spec-change-card';
 import { SpecFindings } from './spec-findings';
 import { InterviewPanel } from './interview-card';
 import type { InterviewCardView } from '@/lib/specs/interview-view';
+import { AgentActionsPanel } from './agent-actions-panel';
+import type { AgentActionSummary } from '@/lib/agent-actions/summary';
 import { cn } from '@/lib/cn';
 
 /**
@@ -53,6 +55,7 @@ export function SpecsView({
   audit,
   interviews = {},
   openInterviews = false,
+  agentActions,
 }: {
   counts: Record<string, number>;
   visions: Partial<Record<VisionScope, ModuleVision>>;
@@ -63,6 +66,8 @@ export function SpecsView({
   interviews?: Partial<Record<VisionScope, InterviewCardView>>;
   /** Draw open interviews opened rather than behind Continue: the gallery's. */
   openInterviews?: boolean;
+  /** What Dash can do of what the pages let the person do, under the app's vision. */
+  agentActions: AgentActionSummary;
 }) {
   const groups = groupSpecs(SPECS, counts);
 
@@ -182,6 +187,12 @@ export function SpecsView({
                   ))}
                 </ul>
               )}
+
+              {/* In the app's group, which the app's vision heads: that vision
+                  asks for everything a person can do to be done by an agent
+                  too (plan #1895). After the documents, so the fold does not
+                  read as holding them. */}
+              {!group.module && <AgentActionsPanel summary={agentActions} />}
             </div>
           </Disclosure>
         ))}
