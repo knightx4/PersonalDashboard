@@ -2,46 +2,36 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
-import {
-  DOT_REACH_PX,
-  LABEL_SHIFTS,
-  anchorAt,
-  hueFill,
-  placeLabels,
-  type AreaLabel,
-  type AxisEnds,
-  type MapColour,
-  type StateMark,
-} from '@/lib/learn/map/view';
+import type { Point } from '@/lib/learn/map/layout';
+import { hueFill, type AxisEnds, type MapColour, type StateMark } from '@/lib/learn/map/view';
 import { usePick } from './pick';
 
 /**
- * The Idea Space map itself (plan #1857): every embedded idea as a mark, in
- * SVG, with the field and domain names laid over it in HTML.
+ * The Idea Space map itself (plan #1857): every embedded idea as a mark.
  *
- * The SVG stretches to the frame, so the marks are drawn at one unit and
- * scaled per width by class: a dot is about nine pixels across on a phone
- * and on a laptop alike, where scaling with the frame would make it three
- * times larger on the wider one. Names are HTML on top for the same reason,
- * since text inside a stretched SVG would shrink to nothing on a phone.
+ * Redrawn on 13 October to work the way the sketch built in chat on 12
+ * October does, which the person preferred to the two builds before it:
  *
- * A dot is a few pixels across, too small to press, so the map is pressed as
- * a whole and the press picks the nearest idea within a finger's reach;
- * pressing empty ground closes the open idea. The pick shows at once on the
- * map and in the rail (pick.tsx), and the address follows (law 5). With a
- * mouse, pointing names the idea under the pointer.
+ * - The frame is measured and the SVG is drawn in its own pixels, so a dot is
+ *   the same size at every width and the layout is fitted to the frame with
+ *   one scale. The frame is wide on a laptop and square on a phone, and never
+ *   taller than three quarters of the window, where the square it used to be
+ *   ran off the bottom of a wide screen.
+ * - Pointing at an idea shows it at once: everything but it and its six
+ *   nearest fades, lines join them and rings mark the six. A tap or click
+ *   pins it, and the rail follows. Nothing waits on the server.
+ * - Switching layout moves every dot to its new place, so the eye can follow
+ *   a group from one layout to the other.
  *
- * Plan #1883 made it read as the map built in chat on 12 October: known ideas
- * in the accent, ideas not seen yet as rings rather than specks, everything
- * but the open idea's neighbourhood faded, the main axes' ends named, and
- * field and domain names quiet and never over a dot.
+ * Names stay HTML over the SVG so they are the same size at every width, and
+ * one is drawn only where it covers no dot and no other name (Part 10, rule 4).
  */
 
 export type PlotDot = {
   id: string;
   name: string;
-  left: number;
-  top: number;
+  /** Where the current layout puts it, in the layout's own units. */
+  at: Point;
   mark: StateMark;
   /** The domain's colour slot, `other` for a domain without one, `none` for no domain. */
   slot: number | 'other' | 'none';
@@ -49,38 +39,62 @@ export type PlotDot = {
   neighbours: string[];
 };
 
-export type PlotArea = AreaLabel & {
+export type PlotArea = {
+  id: string;
+  text: string;
+  kind: 'field' | 'domain';
+  at: Point;
+  priority: number;
   /** Ideas on the map under it. A field with none is ground not visited yet. */
   visited: boolean;
 };
 
-/** A finger's reach, in CSS pixels: half the 44px press target. */
-const REACH_PX = 22;
+/** How close a pointer has to come to a dot to point at it, and a finger to tap it, in pixels. */
+const POINT_REACH = 14;
+const TAP_REACH = 22;
 
-/** One unit of the 0–100 frame is drawn at this scale per width. */
-const MARK_SCALE =
-  '[transform-box:fill-box] origin-center scale-[1.25] sm:scale-[0.8] lg:scale-[0.65]';
+/** The gap kept between the outermost dots and the frame's edge, in pixels. */
+const INSET = 22;
+/** Room kept above and below for the axis names, in pixels. */
+const AXIS_BAND = 24;
 
-/** The same scale as a number, for the window's width (the sm and lg breakpoints). */
-function markScale(): number {
-  if (typeof window === 'undefined') return 1.25;
-  if (window.matchMedia('(min-width: 64rem)').matches) return 0.65;
-  if (window.matchMedia('(min-width: 40rem)').matches) return 0.8;
-  return 1.25;
-}
-
-/** The open idea's name: its rough width per character, its height, and its gap from the dot. */
-const NAME_CHAR_PX = 7.4;
-const NAME_LINE_PX = 22;
-const NAME_GAP_PX = 12;
-/** How far from its dot the open idea's name sits: half its height and the gap. */
-const SELECTED_RAISE_PX = NAME_LINE_PX / 2 + NAME_GAP_PX;
-
-/** What every mark outside the open idea's neighbourhood fades to (Part 10, rule 3). */
-const FADED = 'opacity-25';
-
-/** How many field and domain names show at once; the rest name themselves on hover (Part 10, rule 4). */
+/** How many field and domain names show at once (Part 10, rule 4). */
 export const NAMES_SHOWN = 7;
+
+/** A name's rough width per character and its line height, for keeping names apart. */
+const CHAR_PX = 6.6;
+const LINE_PX = 18;
+
+type Box = { x: number; y: number; w: number; h: number };
+const overlaps = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** One scale for both directions, so distances keep their proportions. */
+function fitter(points: readonly Point[], width: number, height: number, band: number) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  if (!Number.isFinite(minX)) return () => ({ x: width / 2, y: height / 2 });
+  const spanX = Math.max(maxX - minX, 1e-6);
+  const spanY = Math.max(maxY - minY, 1e-6);
+  const innerW = Math.max(width - 2 * INSET, 1);
+  const innerH = Math.max(height - 2 * (INSET + band), 1);
+  const scale = Math.min(innerW / spanX, innerH / spanY);
+  const ox = (width - scale * spanX) / 2;
+  const oy = (height - scale * spanY) / 2;
+  // Up in the layout is up on the screen.
+  return (p: Point) => ({
+    x: ox + (Math.min(Math.max(p.x, minX), maxX) - minX) * scale,
+    y: height - (oy + (Math.min(Math.max(p.y, minY), maxY) - minY) * scale),
+  });
+}
 
 export function IdeaPlot({
   dots,
@@ -98,14 +112,15 @@ export function IdeaPlot({
   const { selectedId, pick, params, clearDomain } = usePick();
   const [pointing, setPointing] = useState<string | null>(null);
   const frame = useRef<HTMLDivElement>(null);
-  // The frame's width in pixels, measured, since where a name sits clear of
-  // the dots depends on it. Until it is known no name is drawn.
-  const [width, setWidth] = useState<number | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     const element = frame.current;
     if (!element) return;
-    const measure = () => setWidth(element.getBoundingClientRect().width || null);
+    const measure = () => {
+      const box = element.getBoundingClientRect();
+      setSize(box.width > 0 && box.height > 0 ? { w: box.width, h: box.height } : null);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -113,75 +128,91 @@ export function IdeaPlot({
   }, []);
 
   const byId = useMemo(() => new Map(dots.map((dot) => [dot.id, dot])), [dots]);
-  const selected = selectedId ? (byId.get(selectedId) ?? null) : null;
-  const near = new Set(selected?.neighbours ?? []);
-  // A domain pressed in the legend stands out the same way, while no idea is open.
-  const domain = colour === 'domain' && !selected ? params.domain : null;
-  const lit = (id: string) =>
-    selected
-      ? id === selected.id || near.has(id)
-      : domain
-        ? byId.get(id)?.domainId === domain
-        : true;
 
-  // The open idea's name sits over its dot, or under it when over would hide
-  // more of the six it is shown with.
-  const nameBelow = useMemo(() => {
-    if (!selected || !width) return false;
-    const w = Math.min(selected.name.length * NAME_CHAR_PX + 8, 320);
-    const x = (selected.left / 100) * width;
-    const y = (selected.top / 100) * width;
-    const anchor = anchorAt(selected.left);
-    const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
-    const hidden = (top: number) =>
-      selected.neighbours.filter((id) => {
-        const other = byId.get(id);
-        if (!other) return false;
-        const ox = (other.left / 100) * width;
-        const oy = (other.top / 100) * width;
-        return ox > left - 4 && ox < left + w + 4 && oy > top - 4 && oy < top + NAME_LINE_PX + 4;
-      }).length;
-    return hidden(y + NAME_GAP_PX) < hidden(y - NAME_GAP_PX - NAME_LINE_PX);
-  }, [selected, width, byId]);
+  const band = axes ? AXIS_BAND : 0;
+  const placed = useMemo(() => {
+    if (!size) return null;
+    const fit = fitter(
+      dots.map((dot) => dot.at),
+      size.w,
+      size.h,
+      band,
+    );
+    return new Map(dots.map((dot) => [dot.id, fit(dot.at)]));
+  }, [dots, size, band]);
 
-  const placement = useMemo(() => {
-    if (!areas || !width) return null;
-    const fitted: AreaLabel[] = [...areas];
-    // The open idea's name goes down first and every other name gives way
-    // to it. The map draws it itself, so it is fitted here and left out.
-    if (selected) {
-      fitted.push({
-        id: 'idea',
-        text: selected.name,
-        kind: 'idea',
-        left: selected.left,
-        top: selected.top,
-        priority: Number.POSITIVE_INFINITY,
-        raise: nameBelow ? -SELECTED_RAISE_PX : SELECTED_RAISE_PX,
-      });
+  const areaAt = useMemo(() => {
+    if (!size || !areas) return null;
+    const fit = fitter(
+      dots.map((dot) => dot.at),
+      size.w,
+      size.h,
+      band,
+    );
+    return new Map(areas.map((area) => [area.id, fit(area.at)]));
+  }, [areas, dots, size, band]);
+
+  // What is shown: the idea pointed at, else the one pinned.
+  const focusId = pointing ?? selectedId;
+  const focus = focusId ? (byId.get(focusId) ?? null) : null;
+  const near = useMemo(() => new Set(focus?.neighbours ?? []), [focus]);
+  const domain = colour === 'domain' && !focus ? params.domain : null;
+  const lit = (dot: PlotDot) =>
+    focus ? dot.id === focus.id || near.has(dot.id) : domain ? dot.domainId === domain : true;
+
+  // The focused idea's name over its dot, or under it when over leaves the frame.
+  const focusName = useMemo(() => {
+    if (!focus || !placed || !size) return null;
+    const p = placed.get(focus.id)!;
+    const w = Math.min(focus.name.length * CHAR_PX + 16, 300);
+    const x = Math.min(Math.max(p.x - w / 2, 4), size.w - w - 4);
+    const above = p.y - 14 - LINE_PX >= 2;
+    return { x, y: above ? p.y - 14 - LINE_PX : p.y + 14, w };
+  }, [focus, placed, size]);
+
+  // Field and domain names: most important first, each only where it covers
+  // no dot and no name already down, at most seven.
+  const names = useMemo(() => {
+    if (!areas || !areaAt || !placed || !size) return [];
+    const taken: Box[] = focusName
+      ? [{ x: focusName.x, y: focusName.y, w: focusName.w, h: LINE_PX }]
+      : [];
+    const dotsAt = [...placed.values()];
+    const out: { area: PlotArea; box: Box }[] = [];
+    for (const area of [...areas].sort((a, b) => b.priority - a.priority)) {
+      if (out.length === NAMES_SHOWN) break;
+      const p = areaAt.get(area.id)!;
+      const w = area.text.length * CHAR_PX + 8;
+      for (const dy of [0, -16, 16, -30, 30]) {
+        const box = { x: p.x - w / 2, y: p.y - LINE_PX / 2 + dy, w, h: LINE_PX };
+        if (box.x < 2 || box.y < 2 || box.x + w > size.w - 2 || box.y + LINE_PX > size.h - 2)
+          continue;
+        if (taken.some((other) => overlaps(box, other))) continue;
+        const pad = { x: box.x - 4, y: box.y - 3, w: box.w + 8, h: box.h + 6 };
+        if (
+          dotsAt.some(
+            (d) => d.x > pad.x && d.x < pad.x + pad.w && d.y > pad.y && d.y < pad.y + pad.h,
+          )
+        )
+          continue;
+        taken.push(box);
+        out.push({ area, box });
+        break;
+      }
     }
-    const reach = Math.max(DOT_REACH_PX, (markScale() * width) / 100 + 1.5);
-    const kept = placeLabels(fitted, width, { dots, shifts: LABEL_SHIFTS, reach });
-    // Placed most important first, so the first seven names kept are the ones shown.
-    const shown = new Map<string, number>();
-    for (const [id, shift] of kept) {
-      if (id === 'idea') continue;
-      if (shown.size === NAMES_SHOWN) break;
-      shown.set(id, shift);
-    }
-    return shown;
-  }, [areas, width, dots, selected, nameBelow]);
+    return out;
+  }, [areas, areaAt, placed, size, focusName]);
 
-  const nearest = (event: React.PointerEvent<HTMLDivElement>): PlotDot | null => {
+  const nearest = (event: React.PointerEvent<HTMLDivElement>, reach: number): PlotDot | null => {
+    if (!placed) return null;
     const box = event.currentTarget.getBoundingClientRect();
-    if (box.width === 0) return null;
-    const x = ((event.clientX - box.left) / box.width) * 100;
-    const y = ((event.clientY - box.top) / box.height) * 100;
-    const reach = (REACH_PX / box.width) * 100;
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
     let best: PlotDot | null = null;
     let bestDistance = reach * reach;
     for (const dot of dots) {
-      const d = (dot.left - x) ** 2 + (dot.top - y) ** 2;
+      const p = placed.get(dot.id)!;
+      const d = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d <= bestDistance) {
         best = dot;
         bestDistance = d;
@@ -191,7 +222,7 @@ export function IdeaPlot({
   };
 
   const press = (event: React.PointerEvent<HTMLDivElement>) => {
-    const dot = nearest(event);
+    const dot = nearest(event, event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH);
     if (!dot && !selectedId) {
       // Empty ground lets go of a domain picked out in the legend too.
       if (domain) clearDomain();
@@ -202,203 +233,170 @@ export function IdeaPlot({
 
   const point = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'mouse') return;
-    setPointing(nearest(event)?.id ?? null);
+    const id = nearest(event, POINT_REACH)?.id ?? null;
+    if (id !== pointing) setPointing(id);
   };
 
-  const shown = pointing && pointing !== selectedId ? byId.get(pointing) : null;
-  // Drawn in this order so the dots that say most sit on top.
+  // Drawn in this order so the dots that say most sit on top, and the
+  // focused neighbourhood over everything.
   const order: Record<StateMark, number> = {
     unseen: 0,
     'getting-there': 1,
     known: 2,
     'mixed-up': 3,
   };
-  const drawn = [...dots].sort((a, b) => order[a.mark] - order[b.mark]);
+  const drawn = [...dots].sort((a, b) => {
+    const la = focus && lit(a) ? 1 : 0;
+    const lb = focus && lit(b) ? 1 : 0;
+    return la - lb || order[a.mark] - order[b.mark];
+  });
+
+  const focusAt = focus && placed ? placed.get(focus.id)! : null;
 
   return (
     <div>
-      {axes?.top && <p className={cn(AXIS_NAME, 'px-2 pt-2 pb-1 text-center')}>↑ {axes.top}</p>}
       <div
         ref={frame}
         className={cn(
-          'relative aspect-square w-full overflow-hidden',
-          dots.length > 0 && 'cursor-pointer',
+          'relative aspect-square max-h-[75vh] w-full overflow-hidden sm:aspect-[16/10]',
+          dots.length > 0 && 'cursor-crosshair',
         )}
         onPointerUp={press}
         onPointerMove={point}
         onPointerLeave={() => setPointing(null)}
       >
-        <svg
-          viewBox="0 0 100 100"
-          className="absolute inset-0 size-full"
-          role="img"
-          aria-label={`A map of ${dots.length} ideas, each placed near the ideas most like it`}
-        >
-          {/* The main axes' centre lines: dashed hairlines under the marks (Part 10, rule 6). */}
-          {axes && (
-            <g className="stroke-border" strokeWidth={1} strokeDasharray="3 5">
-              <line x1={0} y1={50} x2={100} y2={50} vectorEffect="non-scaling-stroke" />
-              <line x1={50} y1={0} x2={50} y2={100} vectorEffect="non-scaling-stroke" />
-            </g>
-          )}
+        {size && placed && (
+          <svg
+            width={size.w}
+            height={size.h}
+            viewBox={`0 0 ${size.w} ${size.h}`}
+            className="absolute inset-0"
+            role="img"
+            aria-label={`A map of ${dots.length} ideas, each placed near the ideas most like it`}
+          >
+            {/* The main axes' centre lines: dashed hairlines under the marks (Part 10, rule 6). */}
+            {axes && (
+              <g className="stroke-border" strokeWidth={1} strokeDasharray="3 6">
+                <line x1={0} y1={size.h / 2} x2={size.w} y2={size.h / 2} />
+                <line x1={size.w / 2} y1={0} x2={size.w / 2} y2={size.h} />
+              </g>
+            )}
 
-          {selected &&
-            selected.neighbours.map((id) => {
-              const other = byId.get(id);
-              if (!other) return null;
+            {focus &&
+              focusAt &&
+              focus.neighbours.map((id) => {
+                const other = placed.get(id);
+                if (!other) return null;
+                return (
+                  <line
+                    key={id}
+                    x1={focusAt.x}
+                    y1={focusAt.y}
+                    x2={other.x}
+                    y2={other.y}
+                    className="stroke-accent"
+                    strokeWidth={1.5}
+                    strokeOpacity={0.8}
+                  />
+                );
+              })}
+
+            {drawn.map((dot) => {
+              const p = placed.get(dot.id)!;
               return (
-                <line
-                  key={id}
-                  x1={selected.left}
-                  y1={selected.top}
-                  x2={other.left}
-                  y2={other.top}
-                  className="stroke-accent"
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                />
+                <g
+                  key={dot.id}
+                  style={{ transform: `translate(${p.x}px, ${p.y}px)` }}
+                  className={cn(
+                    'transition-[transform,opacity] duration-move ease-out-soft motion-reduce:transition-none',
+                    !lit(dot) && 'opacity-20',
+                  )}
+                >
+                  <MarkPx dot={dot} colour={colour} />
+                  {near.has(dot.id) && (
+                    <circle r={8.5} fill="none" className="stroke-accent" strokeWidth={1.5} />
+                  )}
+                  {focus?.id === dot.id && (
+                    <circle r={9.5} fill="none" className="stroke-ink" strokeWidth={2} />
+                  )}
+                </g>
               );
             })}
-
-          {drawn.map((dot) => (
-            <g
-              key={dot.id}
-              transform={`translate(${dot.left} ${dot.top})`}
-              className={cn('transition-opacity duration-quick', !lit(dot.id) && FADED)}
-            >
-              <g className={MARK_SCALE}>
-                <Mark dot={dot} colour={colour} />
-                {near.has(dot.id) && (
-                  <circle r={1.7} fill="none" className="stroke-accent" strokeWidth={0.35} />
-                )}
-              </g>
-            </g>
-          ))}
-
-          {selected && (
-            <g transform={`translate(${selected.left} ${selected.top})`}>
-              <g className={MARK_SCALE}>
-                <Mark dot={selected} colour={colour} />
-                <circle r={2.1} fill="none" className="stroke-ink" strokeWidth={0.5} />
-              </g>
-            </g>
-          )}
-        </svg>
-
-        {placement &&
-          areas?.map((area) => {
-            const shift = placement.get(area.id);
-            if (shift === undefined) return null;
-            return (
-              <MapName
-                key={area.id}
-                left={area.left}
-                top={area.top}
-                shift={shift}
-                className={cn(
-                  'text-ink-muted',
-                  area.kind === 'domain' ? 'text-small' : 'text-micro',
-                  !area.visited && 'italic',
-                )}
-              >
-                {area.text}
-              </MapName>
-            );
-          })}
-
-        {selected && (
-          <MapName
-            left={selected.left}
-            top={selected.top}
-            above={!nameBelow}
-            below={nameBelow}
-            className="bg-raised text-small text-ink ring-1 ring-border"
-          >
-            {selected.name}
-          </MapName>
+          </svg>
         )}
-        {shown && (
-          <MapName
-            left={shown.left}
-            top={shown.top}
-            above
-            className="bg-raised text-small text-ink ring-1 ring-border"
+
+        {axes?.top && (
+          <span className={cn(AXIS_NAME, 'top-1 left-1/2 -translate-x-1/2')}>↑ {axes.top}</span>
+        )}
+        {axes?.bottom && (
+          <span className={cn(AXIS_NAME, 'bottom-1 left-1/2 -translate-x-1/2')}>
+            ↓ {axes.bottom}
+          </span>
+        )}
+
+        {names.map(({ area, box }) => (
+          <span
+            key={area.id}
+            className={cn(
+              'pointer-events-none absolute truncate text-center leading-[18px] text-ink-muted',
+              area.kind === 'domain' ? 'text-small' : 'text-micro',
+              !area.visited && 'italic',
+            )}
+            style={{ left: box.x, top: box.y, width: box.w }}
           >
-            {shown.name}
-          </MapName>
+            {area.text}
+          </span>
+        ))}
+
+        {focus && focusName && (
+          <span
+            className="pointer-events-none absolute truncate rounded-control bg-raised px-2 text-center text-small leading-[18px] text-ink ring-1 ring-border"
+            style={{ left: focusName.x, top: focusName.y, width: focusName.w }}
+          >
+            {focus.name}
+          </span>
         )}
       </div>
-      {axes && (axes.bottom || axes.left || axes.right) && <AxisFoot axes={axes} />}
-    </div>
-  );
-}
-
-/** The axis-end names: small and muted, in strips outside the square the dots are drawn in. */
-const AXIS_NAME = 'text-small text-ink-muted text-balance';
-
-/**
- * What the ideas at the bottom, left and right ends of the main axes are
- * about, under the map: the bottom end centred, then the left and right ends
- * at their own sides. The top end sits over the map. Kept off the square so
- * no name covers a dot, and wrapped rather than cut, so every word shows.
- */
-function AxisFoot({ axes }: { axes: AxisEnds }) {
-  return (
-    <div className="space-y-1 px-2 pt-1 pb-3">
-      {axes.bottom && <p className={cn(AXIS_NAME, 'text-center')}>↓ {axes.bottom}</p>}
-      {(axes.left || axes.right) && (
-        <div className="flex items-start justify-between gap-4">
-          <p className={cn(AXIS_NAME, 'max-w-1/2')}>{axes.left && <>← {axes.left}</>}</p>
-          <p className={cn(AXIS_NAME, 'max-w-1/2 text-right')}>
-            {axes.right && <>{axes.right} →</>}
-          </p>
+      {axes && (axes.left || axes.right) && (
+        <div className="flex items-start justify-between gap-4 px-2 pt-1 pb-2 text-small text-ink-muted">
+          <p className="max-w-1/2 text-balance">{axes.left && <>← {axes.left}</>}</p>
+          <p className="max-w-1/2 text-right text-balance">{axes.right && <>{axes.right} →</>}</p>
         </div>
       )}
     </div>
   );
 }
 
-/** A name laid over the map at a point, hanging inwards from the frame's edges. */
-function MapName({
-  left,
-  top,
-  above = false,
-  below = false,
-  shift = 0,
-  className,
-  children,
-}: {
-  left: number;
-  top: number;
-  /** Over the point rather than on it, for an idea's own name. */
-  above?: boolean;
-  /** Under the point, for an idea's name that would hide its neighbours from above. */
-  below?: boolean;
-  /** Pixels down from the point (negative is up), to sit clear of the dots. */
-  shift?: number;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  const anchor = anchorAt(left);
-  const x = anchor === 'start' ? '0' : anchor === 'end' ? '-100%' : '-50%';
-  const y = above ? 'calc(-100% - 0.75rem)' : below ? '0.75rem' : `calc(-50% + ${shift}px)`;
-  return (
-    <span
-      className={cn(
-        'pointer-events-none absolute max-w-xs truncate rounded-control px-1 whitespace-nowrap',
-        // A halo of the card's own ground rather than a box, so a name
-        // stays readable over the lines without hiding them.
-        '[text-shadow:0_0_2px_var(--color-surface),0_0_4px_var(--color-surface),0_0_6px_var(--color-surface)]',
-        className,
-      )}
-      style={{ left: `${left}%`, top: `${top}%`, transform: `translate(${x}, ${y})` }}
-    >
-      {children}
-    </span>
-  );
+/** The top and bottom axis names, in the bands kept clear of dots. */
+const AXIS_NAME =
+  'pointer-events-none absolute max-w-sm truncate text-small leading-[18px] text-ink-muted';
+
+/** One idea's mark in pixels, centred on the origin. */
+function MarkPx({ dot, colour }: { dot: Pick<PlotDot, 'mark' | 'slot'>; colour: MapColour }) {
+  if (colour === 'domain') {
+    if (dot.slot === 'none') {
+      return <circle r={4} className="fill-surface stroke-ink-ghost" strokeWidth={1.5} />;
+    }
+    if (dot.slot === 'other') return <circle r={4.5} className="fill-ink-muted" />;
+    return <circle r={4.5} style={{ fill: hueFill(dot.slot) }} />;
+  }
+  switch (dot.mark) {
+    // Filled in the accent: what you know is the answer the map gives
+    // (Part 10, rule 1).
+    case 'known':
+      return <circle r={5} className="fill-accent" />;
+    case 'getting-there':
+      return <circle r={4.5} className="fill-ink-muted" />;
+    case 'mixed-up':
+      return <path d="M0 -6L6 0L0 6L-6 0Z" className="fill-danger" />;
+    // A hollow ring at nearly a known dot's size: ground not visited yet
+    // (Part 10, rule 2).
+    default:
+      return <circle r={4} className="fill-surface stroke-ink-ghost" strokeWidth={1.5} />;
+  }
 }
 
-/** One idea's mark, one unit across before scaling. */
+/** One idea's mark, one unit across, for the legend and the rail. */
 export function Mark({ dot, colour }: { dot: Pick<PlotDot, 'mark' | 'slot'>; colour: MapColour }) {
   if (colour === 'domain') {
     if (dot.slot === 'none') {
@@ -408,19 +406,13 @@ export function Mark({ dot, colour }: { dot: Pick<PlotDot, 'mark' | 'slot'>; col
     return <circle r={1} style={{ fill: hueFill(dot.slot) }} />;
   }
   switch (dot.mark) {
-    // Filled in the accent: what you know is the answer the map gives, and
-    // the only thing in it drawn in the accent before an idea is picked
-    // (Part 10, rule 1).
     case 'known':
       return <circle r={1} className="fill-accent" />;
-    // Filled in the muted ink: on the way to known, and not yet the answer.
     case 'getting-there':
-      return <circle r={0.85} className="fill-ink-muted" />;
+      return <circle r={0.9} className="fill-ink-muted" />;
     case 'mixed-up':
       return <path d="M0 -1.3L1.3 0L0 1.3L-1.3 0Z" className="fill-danger" />;
-    // A hollow ring at nearly a known dot's size: ground you have not been
-    // to, which is half the map and should read as ground (Part 10, rule 2).
     default:
-      return <circle r={0.85} className="fill-surface stroke-ink-ghost" strokeWidth={0.35} />;
+      return <circle r={0.8} className="fill-surface stroke-ink-ghost" strokeWidth={0.3} />;
   }
 }

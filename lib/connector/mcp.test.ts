@@ -299,7 +299,11 @@ describe('a write call', () => {
     expect(calls.checkConnectorRate).toHaveBeenCalledWith(core, 'me', undefined);
     expect(makeWrite).toHaveBeenCalledWith('me');
     expect(calls.runConnectorWrite.mock.calls[0][0].definition.name).toBe('add_to_reading_list');
-    expect(calls.runConnectorWrite.mock.calls[0][1]).toBe(writeCtx);
+    // The write context, with the workspaces and day the token's lookups run with (plan #1894.2).
+    expect(calls.runConnectorWrite.mock.calls[0][1]).toEqual({
+      ...writeCtx,
+      account: { enabledModules: session.ctx.enabledModules, today: session.ctx.today, timezone: session.ctx.timezone },
+    });
     expect(calls.executeAskTool).not.toHaveBeenCalled();
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
     expect(calls.recordConnectorCall).toHaveBeenCalledWith(logClient, expect.objectContaining({ tool: 'add_to_reading_list', result }));

@@ -100,7 +100,19 @@ export type DashWriteContext = AskContext & {
    * from lib/jobs/ats when absent, a fake in tests.
    */
   readPosting?: (url: string) => Promise<FetchOutcome>;
+  /**
+   * Writes a quick note into the vault's Inbox, for add_quick_note (plan
+   * #1894.2): fileVaultNote from lib/capture/vault.ts on the person's session,
+   * or the connector's service-role write for the person its token names.
+   * Absent: the note is refused.
+   */
+  fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
 };
+
+/** A quick note written to the vault, or the sentence saying why not. */
+export type QuickNoteFiled =
+  | { ok: true; noteId: string; path: string; title: string; blobSha: string }
+  | { ok: false; error: string };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */
 export type DashThreadActs = (name: string, input: unknown) => Promise<DashRecordedWrite | { ok: false; error: string }>;
