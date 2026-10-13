@@ -147,7 +147,6 @@ export const PAGE_ROUTES: readonly string[] = [
   '/todo/settings',
   '/todo/waiting',
   '/vault',
-  '/vault/education',
   '/vault/map',
   '/vault/map/[id]',
   '/vault/maya',
@@ -158,6 +157,10 @@ export const PAGE_ROUTES: readonly string[] = [
   '/you',
   '/you/insights',
   '/you/personality',
+  '/you/personality/test',
   '/you/places',
+  '/you/places/[id]',
+  '/you/places/[id]/edit',
+  '/you/places/new',
   '/you/work',
 ];

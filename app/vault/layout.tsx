@@ -28,8 +28,6 @@ export default async function VaultLayout({ children }: { children: React.ReactN
       { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
       // Maya's threads on your notes (plan #1286).
       { href: '/vault/maya', label: 'Maya', icon: 'maya' },
-      // Your transcripts and the courses on them (plan #1308).
-      { href: '/vault/education', label: 'Education', icon: 'education' },
     ],
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',

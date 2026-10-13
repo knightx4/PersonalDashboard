@@ -7,6 +7,7 @@ import { learnActions } from '@/lib/learn/agent-actions';
 import { newsActions } from '@/lib/news/agent-actions';
 import { todoActions } from '@/lib/todo/agent-actions';
 import { vaultActions } from '@/lib/vault/agent-actions';
+import { youActions } from '@/lib/you/agent-actions';
 import type { ModuleId } from '@/lib/modules';
 import type { ActionEntry, ModuleActions } from './types';
 
@@ -27,6 +28,7 @@ export const WORKSPACE_ACTIONS: readonly (readonly [ModuleId | null, ModuleActio
   ['learn', learnActions],
   ['news', newsActions],
   ['goals', goalsActions],
+  ['you', youActions],
   ['dev', devActions],
   // Signing in, the account, Ask, Home and the threads belong to no one workspace.
   [null, coreActions],

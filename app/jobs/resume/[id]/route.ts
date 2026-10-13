@@ -4,7 +4,7 @@ import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { ownsResumePath } from '@/lib/jobs/resume-file';
 
 /**
- * Open a resume version's PDF, as /vault/education/file/<id> opens a
+ * Open a resume version's PDF, as /you/work/file/<id> opens a
  * transcript. The bucket is private, so the settings page links here with the
  * version's id and this signs a one-minute link to the file on your session.
  * The row is read through RLS and the bucket's policies (job search migration

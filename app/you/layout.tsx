@@ -11,8 +11,8 @@ export default async function YouLayout({ children }: { children: React.ReactNod
   return shellFor({
     module: 'you',
     sections: [
-      { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
-      { href: '/you/places', label: 'Places', icon: 'places', exact: true },
+      { href: '/you/personality', label: 'Personality', icon: 'personality' },
+      { href: '/you/places', label: 'Places', icon: 'places' },
       { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
       { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     ],

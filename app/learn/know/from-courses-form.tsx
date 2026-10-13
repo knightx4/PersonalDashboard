@@ -13,8 +13,8 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { KindBadge } from '@/components/learn/kind-badge';
 import { keepTicked, type ChainNode, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { readLine, type CourseRead } from '@/lib/learn/graph/course-reads';
-import { EDUCATION_HREF, type SchoolGroup } from '@/lib/vault/education';
-import type { Course } from '@/lib/vault/transcripts';
+import { EDUCATION_HREF, type SchoolGroup } from '@/lib/you/education';
+import type { Course } from '@/lib/you/transcripts';
 import {
   approveFromCourse,
   proposeFromCourse,
@@ -26,7 +26,7 @@ import { Chip } from '@/components/ui/chip';
 /**
  * Start from your courses (plan #1391, under #1388).
  *
- * Every course saved from a transcript on the vault's Education tab, by school
+ * Every course saved from a transcript on You's Work & school tab, by school
  * and term, with a button that has Dash list the ideas a course by that name
  * usually teaches. One course at a time: the list gives way to the check
  * screen, which shows the course with its term and grade, every idea with its
@@ -387,14 +387,14 @@ export function FromCoursesForm({
       <Card padding="standard">
         <p className="text-ui text-ink">No courses saved yet.</p>
         <p className="mt-1 text-small text-ink-muted">
-          Add a transcript on the vault&apos;s Education tab and its courses show up here, each with
+          Add a transcript on Work &amp; school, in You, and its courses show up here, each with
           a button that has Dash list the ideas it usually teaches for you to keep as known.
         </p>
         <Link
           href={EDUCATION_HREF}
           className={cn(buttonVariants({ variant: 'secondary' }), 'mt-3')}
         >
-          Open Education
+          Open Work &amp; school
         </Link>
       </Card>
     );

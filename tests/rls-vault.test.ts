@@ -218,12 +218,12 @@ beforeAll(async () => {
   // school, so the isolation checks below have rows of B's to miss.
   for (const user of [userA, userB]) {
     const [transcript] = await admin<{ id: string }[]>`
-      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
       values (${user}, 'State University', 'record.pdf', ${`${user}/t-record.pdf`},
               'application/pdf', 4096)
       returning id`;
     await admin`
-      insert into courses (user_id, transcript_id, school, code, title, term, year, credits, grade, position)
+      insert into you.courses (user_id, transcript_id, school, code, title, term, year, credits, grade, position)
       values (${user}, ${transcript.id}, 'State University', 'HIST 101', 'World History',
               'Fall', 2019, 3, 'A-', 0)`;
     if (user === userA) transcriptA = transcript.id;
@@ -271,7 +271,6 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
       'attachments',
-      'courses',
       'jev_trial_answers',
       'map_merge_proposals',
       'map_merge_resets',
@@ -298,7 +297,6 @@ describe('RLS coverage', () => {
       'theme_notes',
       'theme_positions',
       'themes',
-      'transcripts',
       'vault_connections',
     ]);
   });
@@ -1254,8 +1252,8 @@ describe('attachments, across users (plan #1299)', () => {
 describe('transcripts and courses, across users (plan #1306)', () => {
   it('shows each account its own transcripts and courses only', async () => {
     for (const [user, other] of [[userA, userB], [userB, userA]]) {
-      const transcripts = await asUser(user, (tx) => tx<{ user_id: string }[]>`select user_id from transcripts`);
-      const courses = await asUser(user, (tx) => tx<{ user_id: string }[]>`select user_id from courses`);
+      const transcripts = await asUser(user, (tx) => tx<{ user_id: string }[]>`select user_id from you.transcripts`);
+      const courses = await asUser(user, (tx) => tx<{ user_id: string }[]>`select user_id from you.courses`);
       expect(transcripts.map((r) => r.user_id)).toEqual([user]);
       expect(courses.map((r) => r.user_id)).toEqual([user]);
       expect(transcripts.some((r) => r.user_id === other)).toBe(false);
@@ -1264,41 +1262,41 @@ describe('transcripts and courses, across users (plan #1306)', () => {
 
   it('lets another account neither edit nor delete them', async () => {
     const edited = await asUser(userB, (tx) => tx`
-      update transcripts set school = 'Taken' where id = ${transcriptA} returning id`);
+      update you.transcripts set school = 'Taken' where id = ${transcriptA} returning id`);
     const editedCourses = await asUser(userB, (tx) => tx`
-      update courses set grade = 'F' where transcript_id = ${transcriptA} returning id`);
+      update you.courses set grade = 'F' where transcript_id = ${transcriptA} returning id`);
     const deleted = await asUser(userB, (tx) => tx`
-      delete from transcripts where id = ${transcriptA} returning id`);
+      delete from you.transcripts where id = ${transcriptA} returning id`);
     expect([edited.length, editedCourses.length, deleted.length]).toEqual([0, 0, 0]);
 
-    const [row] = await admin<{ school: string }[]>`select school from transcripts where id = ${transcriptA}`;
+    const [row] = await admin<{ school: string }[]>`select school from you.transcripts where id = ${transcriptA}`;
     expect(row.school).toBe('State University');
   });
 
   it("refuses a course filed on another account's transcript, or a row in another's name", async () => {
     await expect(
       asUser(userB, (tx) => tx`
-        insert into courses (user_id, transcript_id, school, title, position)
+        insert into you.courses (user_id, transcript_id, school, title, position)
         values (${userB}, ${transcriptA}, 'State University', 'Planted', 1)`),
     ).rejects.toThrow();
     await expect(
       asUser(userB, (tx) => tx`
-        insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+        insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
         values (${userA}, 'Elsewhere', 'x.pdf', ${`${userA}/planted.pdf`}, 'application/pdf', 1)`),
     ).rejects.toThrow();
   });
 
   it("refuses a file outside the owner's folder, an unkept type and an oversized file", async () => {
     await expect(
-      admin`insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      admin`insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
             values (${userA}, 'S', 'x.pdf', ${`${userB}/x.pdf`}, 'application/pdf', 1)`,
     ).rejects.toThrow();
     await expect(
-      admin`insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      admin`insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
             values (${userA}, 'S', 'x.svg', ${`${userA}/x.svg`}, 'image/svg+xml', 1)`,
     ).rejects.toThrow();
     await expect(
-      admin`insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      admin`insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
             values (${userA}, 'S', 'x.pdf', ${`${userA}/big.pdf`}, 'application/pdf', 20971521)`,
     ).rejects.toThrow();
   });
@@ -1320,19 +1318,19 @@ describe('transcripts and courses, across users (plan #1306)', () => {
 
   it('takes the courses with the transcript', async () => {
     const [extra] = await admin<{ id: string }[]>`
-      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
       values (${userB}, 'College', 'pasted.txt', ${`${userB}/p-pasted.txt`}, 'text/plain', 10)
       returning id`;
     await admin`
-      insert into courses (user_id, transcript_id, school, title, position)
+      insert into you.courses (user_id, transcript_id, school, title, position)
       values (${userB}, ${extra.id}, 'College', 'Transfer credit', 0)`;
 
-    const deleted = await asUser(userB, (tx) => tx`delete from transcripts where id = ${extra.id} returning id`);
+    const deleted = await asUser(userB, (tx) => tx`delete from you.transcripts where id = ${extra.id} returning id`);
     expect(deleted).toHaveLength(1);
-    const left = await admin`select id from courses where transcript_id = ${extra.id}`;
+    const left = await admin`select id from you.courses where transcript_id = ${extra.id}`;
     expect(left).toHaveLength(0);
     const [kept] = await admin<{ n: number }[]>`
-      select count(*)::int as n from courses where transcript_id = ${transcriptB}`;
+      select count(*)::int as n from you.courses where transcript_id = ${transcriptB}`;
     expect(kept.n).toBe(1);
   });
 });

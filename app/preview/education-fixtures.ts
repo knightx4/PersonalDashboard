@@ -1,8 +1,8 @@
-import type { TranscriptDraft } from '@/app/vault/education/actions';
-import { groupCourses } from '@/lib/vault/education';
-import type { Course, Transcript } from '@/lib/vault/transcripts';
+import type { TranscriptDraft } from '@/app/you/work/actions';
+import { groupCourses } from '@/lib/you/education';
+import type { Course, Transcript } from '@/lib/you/transcripts';
 
-/** Fixtures for the Education tab's surfaces in the preview gallery (plan #1308). */
+/** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
 
 const USER = '00000000-0000-4000-8000-000000000001';
 
