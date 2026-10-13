@@ -1,42 +1,50 @@
 import { Card } from '@/components/ui/card';
-import { DASH_LOOKS, DASH_LOOK_NAMES, DashMark, type DashLook, type DashState } from '@/components/ui/dash-mark';
+import {
+  DASH_RUNNERS,
+  DASH_RUNNER_VISORS,
+  DASH_STATES,
+  DashMark,
+  type DashRunner,
+  type DashState,
+} from '@/components/ui/dash-mark';
 
 /**
- * Dash's looks in the surface gallery (plan #1702): each hat in the three
- * states the runner card shows, at the card's 44px and the 24px a list uses,
- * on the brand ramp, with bareheaded Dash first to compare against. The last
- * row is the four idle in the colour of their place, as beside muted text.
+ * Dash and the runner's four Dashes in the surface gallery: every state at the
+ * runner card's 44px and the 24px a list uses. Dash itself comes first, on the
+ * brand ramp in its capsule; then each runner in its own visor and colour; and
+ * last, Dash in the colour of the text beside it.
  */
 
-const STATES: readonly { state: DashState; name: string }[] = [
-  { state: 'idle', name: 'Idle' },
-  { state: 'working', name: 'Working' },
-  { state: 'asleep', name: 'Asleep' },
-];
-
-/** Which slot on the runner card wears each look. */
-const SLOTS: Record<DashLook, string> = {
-  'top-hat': 'Feature 1',
-  'ball-cap': 'Feature 2',
-  'cowboy-hat': 'Feature 3',
-  'newsboy-cap': 'Goals',
+const STATE_NAMES: Record<DashState, string> = {
+  idle: 'Idle',
+  asleep: 'Asleep',
+  working: 'Working',
+  done: 'Done',
+  failed: 'Failed',
 };
 
-function LookRow({ look, name, detail }: { look?: DashLook; name: string; detail: string }) {
+const SLOT_NAMES: Record<DashRunner, string> = {
+  'feature-1': 'Feature 1',
+  'feature-2': 'Feature 2',
+  'feature-3': 'Feature 3',
+  goals: 'Goals',
+};
+
+function Row({ name, detail, runner, plain }: { name: string; detail: string; runner?: DashRunner; plain?: boolean }) {
   return (
     <li className="card-pad-x row-pad flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 sm:w-36 sm:shrink-0">
         <p className="text-ui text-ink">{name}</p>
         <p className="text-small text-ink-muted">{detail}</p>
       </div>
-      <div className="grid flex-1 grid-cols-3 gap-2">
-        {STATES.map(({ state, name: stateName }) => (
+      <div className={`grid flex-1 grid-cols-5 gap-2 ${plain ? 'text-ink-muted' : ''}`}>
+        {DASH_STATES.map((state) => (
           <div key={state} className="flex flex-col items-start gap-1">
-            <div className="flex items-end gap-2">
-              <DashMark state={state} look={look} tone="brand" size="lg" />
-              <DashMark state={state} look={look} tone="brand" size="sm" />
+            <div className="flex items-end gap-1">
+              <DashMark state={state} runner={runner} tone={plain ? 'current' : 'brand'} size="lg" />
+              <DashMark state={state} runner={runner} tone={plain ? 'current' : 'brand'} size="sm" />
             </div>
-            <span className="text-micro text-ink-muted">{stateName}</span>
+            <span className="text-micro text-ink-muted">{STATE_NAMES[state]}</span>
           </div>
         ))}
       </div>
@@ -44,30 +52,15 @@ function LookRow({ look, name, detail }: { look?: DashLook; name: string; detail
   );
 }
 
-export function DashMarkLooks() {
+export function DashMarkRunners() {
   return (
     <Card padding="none">
       <ul className="divide-y divide-border">
-        <LookRow name="No hat" detail="Dash as everywhere else" />
-        {DASH_LOOKS.map((look) => (
-          <LookRow
-            key={look}
-            look={look}
-            name={DASH_LOOK_NAMES[look][0].toUpperCase() + DASH_LOOK_NAMES[look].slice(1)}
-            detail={SLOTS[look]}
-          />
+        <Row name="Dash" detail="The capsule, on the brand ramp" />
+        {DASH_RUNNERS.map((runner) => (
+          <Row key={runner} runner={runner} name={SLOT_NAMES[runner]} detail={DASH_RUNNER_VISORS[runner]} />
         ))}
-        <li className="card-pad-x row-pad flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <div className="min-w-0 sm:w-36 sm:shrink-0">
-            <p className="text-ui text-ink">Plain</p>
-            <p className="text-small text-ink-muted">In the colour of the text beside it</p>
-          </div>
-          <div className="flex flex-1 items-center gap-3 text-ink-muted">
-            {DASH_LOOKS.map((look) => (
-              <DashMark key={look} look={look} size="sm" />
-            ))}
-          </div>
-        </li>
+        <Row name="Plain" detail="In the colour of the text beside it" plain />
       </ul>
     </Card>
   );

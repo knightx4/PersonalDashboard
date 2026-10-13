@@ -49,7 +49,7 @@ export function rememberArrived(id: string): void {
 
 /**
  * The mark's one flash. The mark is 12 pixels across, so the done mark's
- * 1.06 swell (dash-mark-flash in app/globals.css) cannot be seen on a phone:
+ * gentle bob (dash-mark-bob in app/globals.css) cannot be seen on a phone:
  * this one swells to half again its size and takes the accent at the peak.
  */
 const FLASH_KEYFRAMES: Keyframe[] = [

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DashMark, type DashLook } from '@/components/ui/dash-mark';
+import { DashMark, type DashRunner } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Meter } from '@/components/ui/meter';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -16,9 +16,9 @@ import { answerPlanRunAction } from './run-actions';
  * #1704): three feature sessions and the goals seat, which a fourth feature
  * takes while goals has nothing to start.
  *
- * They sit in a strip, one pill each. A pill wears its Dash's hat, so the eye
- * can follow one from glance to glance, and says in one line what the slot is
- * doing: the feature and its meter with the run's newest line while it
+ * They sit in a strip, one pill each. A pill shows its own Dash, with its own
+ * visor shape and colour, so the eye can follow one from glance to glance, and
+ * says in one line what the slot is doing: the feature and its meter with the run's newest line while it
  * works, the tick's reason while it sleeps, "Held" or "Not running" while the
  * runner is held or off.
  *
@@ -30,14 +30,14 @@ import { answerPlanRunAction } from './run-actions';
  * Which session takes which slot is `runnerSlots`' call; this only draws it.
  */
 
-/** Decision #1701: the hats, in slot order. */
-const LOOKS: Record<SlotId, DashLook> = {
-  'feature-1': 'top-hat',
-  'feature-2': 'ball-cap',
-  'feature-3': 'cowboy-hat',
-  // The fourth feature sits in the goals seat, so it wears the goals hat.
-  'feature-4': 'newsboy-cap',
-  goals: 'newsboy-cap',
+/** Each slot's Dash: its own visor shape and colour, in slot order. */
+const RUNNERS: Record<SlotId, DashRunner> = {
+  'feature-1': 'feature-1',
+  'feature-2': 'feature-2',
+  'feature-3': 'feature-3',
+  // The fourth feature sits in the goals seat, so it takes the goals Dash.
+  'feature-4': 'goals',
+  goals: 'goals',
 };
 
 /** What the slot's pill says under its heading. */
@@ -83,14 +83,7 @@ function Pill({
         open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
       }`}
     >
-      <DashMark
-        state={slot.state}
-        look={LOOKS[slot.slot]}
-        tone={working ? 'brand' : 'current'}
-        size="md"
-        decorative
-        className={working ? undefined : 'text-ink-muted'}
-      />
+      <DashMark state={slot.state} runner={RUNNERS[slot.slot]} size="md" decorative />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <SectionLabel as="span" className="block truncate">
           {slot.label}

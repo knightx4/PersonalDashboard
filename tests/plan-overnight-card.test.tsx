@@ -227,10 +227,10 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('2 of 5 steps done');
   });
 
-  it('draws four Dashes in their four hats', () => {
+  it('draws four Dashes, each in its own visor', () => {
     const html = draw({ sessions: [SESSION] });
-    for (const look of ['top-hat', 'ball-cap', 'cowboy-hat', 'newsboy-cap']) {
-      expect(html).toContain(`data-dash-look="${look}"`);
+    for (const runner of ['feature-1', 'feature-2', 'feature-3', 'goals']) {
+      expect(html).toContain(`data-dash-runner="${runner}"`);
     }
     for (const label of ['Feature 1', 'Feature 2', 'Feature 3', 'Goals']) {
       expect(html).toContain(label);

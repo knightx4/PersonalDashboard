@@ -36,7 +36,7 @@ export default function manifest(): MetadataRoute.Manifest {
      *
      * icon-192 and icon-512 are app/icon.svg at those sizes. The maskable one
      * is the composition of apple-icon.png: the ground runs to every edge and
-     * the dash spans 56% of the width, inside the central 80% circle that every
+     * the capsule spans 56% of the width, inside the central 80% circle that every
      * launcher mask keeps. They live in public/ rather than app/ because a
      * numbered icon file in app/ becomes another <link rel="icon"> on every
      * page. If the mark changes, redraw these with it.

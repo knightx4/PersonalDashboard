@@ -1123,7 +1123,7 @@ export function DevRunnerCrewSurface() {
             step: {
               number: 1700,
               ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own hat',
+              title: 'Show the four Dashes on the runner card, each in its own visor',
             },
             module: 'Dev',
             doing: null,
