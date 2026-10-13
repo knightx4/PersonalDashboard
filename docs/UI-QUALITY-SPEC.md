@@ -414,10 +414,13 @@ that has one.
    page. The address updates after it (law 5).
 9. **Marks are big enough to see:** at least 4 pixels across at any width,
    and the ones that matter most a step larger.
-10. **Past three categories, colour gets help.** The limit of three hues on
-    one chart, kept for readers with red-green colour blindness, stands. The
-    other categories are told apart by direct labels, shapes, or tapping a
-    legend entry to highlight its marks, rather than sharing one gray.
+10. **Up to ten categories get their own colour, and colour gets help.** A
+    chart may give each of up to ten categories its own hue, such as one per
+    domain, and keeps each category's colour fixed so it means the same on
+    every visit. Ten hues cannot all stay apart for every reader, so colour is
+    never the only cue: categories are also named on the chart, or picked out
+    by pressing their legend entry. Changed from a three-hue limit on 13
+    October 2026 at the person's request.
 
 The Idea Space sketch the person preferred, at
 https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.

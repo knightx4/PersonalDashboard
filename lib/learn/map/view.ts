@@ -139,39 +139,64 @@ export function markOf(state: KnowledgeState): StateMark {
 }
 
 /**
- * The domain colours, in fixed order, light and dark.
+ * The domain colours, one per domain of the area catalogue, light and dark.
  *
- * Three, because on a scatter every pair of colours sits beside every other,
- * and past three no set of hues stays apart for a reader with red-green
- * colour blindness (checked with the dataviz palette validator, all pairs:
- * worst ΔE 8.1 light, 10.8 dark). The three domains with the most ideas
- * take them; the rest share the muted ink and are counted in the legend.
- * Green, red and amber are left out because each already means something
- * here (law 4). These colours mean "this domain" on this map and nowhere
- * else.
+ * Ten, one for each domain, decided with the person on 13 October 2026; until
+ * then three hues went to the three domains with the most ideas and the rest
+ * shared gray, which hid most of the map. Ten hues cannot all stay apart for
+ * every reader, so colour is never the only cue (Part 10, rule 10): the map
+ * names its domains and the legend picks one out when pressed.
+ *
+ * A domain keeps its colour for good, keyed by its catalogue name, so its
+ * colour does not change as ideas arrive. The catalogue changes only by
+ * migration; a domain added later takes a colour by its name's hash.
  */
 export const DOMAIN_HUES: readonly { light: string; dark: string }[] = [
-  { light: '#2a78d6', dark: '#3987e5' },
-  { light: '#eb6834', dark: '#d95926' },
-  { light: '#c04aa8', dark: '#c04aa8' },
+  { light: '#5b5fc7', dark: '#8f93f0' },
+  { light: '#2a7fc4', dark: '#5aaef0' },
+  { light: '#2e9254', dark: '#5cc786' },
+  { light: '#c8414f', dark: '#f0727e' },
+  { light: '#0b8f97', dark: '#3fc4cc' },
+  { light: '#c27d0e', dark: '#e8a945' },
+  { light: '#9c4f2c', dark: '#d38a63' },
+  { light: '#8a55c4', dark: '#b78cf0' },
+  { light: '#c95a86', dark: '#ef8fb5' },
+  { light: '#6f8a1f', dark: '#a6c552' },
 ];
 
-/** A hue as CSS that follows the theme's colour scheme. */
+/** The catalogue's domains in the order of their colours (migration learn 0027). */
+const DOMAIN_ORDER = [
+  'Mathematics and logic',
+  'Physical sciences',
+  'Life sciences',
+  'Health and medicine',
+  'Technology and engineering',
+  'Social sciences',
+  'History',
+  'Philosophy and religion',
+  'Language and literature',
+  'Arts and culture',
+];
+
 export function hueFill(slot: number): string {
   const hue = DOMAIN_HUES[slot]!;
   return `light-dark(${hue.light}, ${hue.dark})`;
 }
 
-/**
- * The colour slot of each domain that gets one: the domains with the most
- * ideas on the map, most first, ties by name. A domain with no ideas gets
- * none, since nothing on the map would wear it.
- */
-export function domainSlots(domains: readonly { id: string; name: string; ideaCount: number }[]): Map<string, number> {
-  const ranked = domains
-    .filter((domain) => domain.ideaCount > 0)
-    .sort((a, b) => b.ideaCount - a.ideaCount || a.name.localeCompare(b.name));
-  return new Map(ranked.slice(0, DOMAIN_HUES.length).map((domain, slot) => [domain.id, slot]));
+/** The colour slot of a domain, by its catalogue name: the same on every visit. */
+export function domainSlot(name: string): number {
+  const at = DOMAIN_ORDER.indexOf(name);
+  if (at >= 0) return at;
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash % DOMAIN_HUES.length;
+}
+
+/** The colour slot of each domain on the map. Every domain gets one. */
+export function domainSlots(
+  domains: readonly { id: string; name: string; ideaCount: number }[],
+): Map<string, number> {
+  return new Map(domains.map((domain) => [domain.id, domainSlot(domain.name)]));
 }
 
 // -- Labels ------------------------------------------------------------------
