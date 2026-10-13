@@ -163,6 +163,8 @@ import {
   LearnEssaysSurface,
 } from './essay-surfaces';
 import { educationGroups, educationCounts } from './education-fixtures';
+import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
+import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
 import { NowHeader } from '@/app/learn/now/header';
@@ -4654,6 +4656,49 @@ export const SURFACES: readonly Surface[] = [
         attachments={buildAttachmentIndex(attachmentRows)}
         hrefForAttachment={(entry) => attachmentPictures[entry.id] ?? '#'}
       />
+    ),
+  },
+  {
+    /* The tab with jobs above the courses (plan #1991.4): the job held now
+     * first, a row the person corrected, one they added with no title, a
+     * long employer, and the note offering to read a changed résumé again. */
+    id: 'you-work-jobs',
+    label: 'Work & school · Jobs from your résumé',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* No jobs yet, with a résumé in Jobs to read: the press that lists them. */
+    id: 'you-work-jobs-empty',
+    label: 'Work & school · No jobs yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={[]} resume={workHistoryResume} changed={false} />
+        <EducationSection groups={[]} courseCounts={{}} transcripts={0} courses={0} />
+      </>
+    ),
+  },
+  {
+    /* Correcting a job in place: the row's form open, the rest of the list around it. */
+    id: 'you-work-jobs-edit',
+    label: 'Work & school · Correcting a job',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-ey" />
+      </>
     ),
   },
   {

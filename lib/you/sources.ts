@@ -1,5 +1,6 @@
 import { courseHref, transcriptHref } from '@/lib/you/education';
 import type { ModuleSources } from '@/lib/sources/types';
+import { jobHref } from '@/lib/you/work-history';
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -53,6 +54,20 @@ export const youSources: ModuleSources = {
       newest: 'moved_in',
       href: (id) => `/you/places/${id}`,
       note: 'moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.',
+    },
+    {
+      table: 'you.work_history',
+      module: 'You',
+      holds: 'The jobs they have held: employer, title, place and dates, read from their résumé or added by hand.',
+      weight: 'record',
+      search: ['employer', 'title', 'place', 'note'],
+      title: 'employer',
+      facts: ['started', 'ended', 'edited'],
+      newest: 'started',
+      href: jobHref,
+      note:
+        'started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. ' +
+        'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',
     },
   ],
   notSources: [],

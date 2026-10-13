@@ -179,7 +179,7 @@ function TranscriptRow({ transcript, courses }: { transcript: Transcript; course
         href={transcriptFileHref(transcript.id)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex w-full min-w-0 items-center gap-1.5 text-body text-ink hover:text-accent sm:w-auto sm:flex-1"
+        className="inline-flex min-h-11 w-full min-w-0 items-center gap-1.5 text-body text-ink hover:text-accent sm:min-h-0 sm:w-auto sm:flex-1"
       >
         <FileText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="truncate">{transcript.file_name}</span>

@@ -493,6 +493,15 @@ The places they have lived, with when they moved in and out.
 - Opens at `/you/places/<id>`
 - moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.
 
+### `you.work_history` (You)
+
+The jobs they have held: employer, title, place and dates, read from their résumé or added by hand.
+
+- Search: `employer`, `title`, `place`, `note`
+- Name a row by `employer`; link it by `id`
+- Opens at `/you/work#job-<id>`
+- started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.

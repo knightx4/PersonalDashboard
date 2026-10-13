@@ -148,6 +148,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A transcript of three or four pages as PDF text and images, and about
   // fifty courses back at forty tokens each.
   'read-transcript': run(HAIKU, 10_000, 2_500),
+  // A two-page résumé as text, and about ten jobs back at sixty tokens each.
+  'read-work-history': run(HAIKU, 3_500, 700),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),

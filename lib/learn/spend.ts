@@ -170,6 +170,9 @@ export const LEARN_OPERATIONS = [
   // tab (plan #1307). One Haiku call per transcript, from the read button;
   // nothing is saved until the person checks the list.
   'read-transcript',
+  // Reading the jobs off the default résumé for You's Work & school tab (plan
+  // #1991.4). One Haiku call on the résumé's text, from the read button.
+  'read-work-history',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.

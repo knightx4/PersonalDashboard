@@ -3,22 +3,28 @@ import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { groupCourses } from '@/lib/you/education';
 import type { Course, Transcript } from '@/lib/you/transcripts';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { resumeHash } from '@/lib/you/resume-hash';
+import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
 import { EducationSection } from './education-section';
+import { JobsSection } from './jobs-section';
 
 export const metadata = { title: 'Work & school' };
 
 export const dynamic = 'force-dynamic';
 
 /**
- * You's Work & school tab. Education moved here from the Vault (plan
+ * You's Work & school tab: your jobs, read from your default résumé in Jobs
+ * (plan #1991.4), above Education, which moved here from the Vault (plan
  * #1991.3): your transcripts and every course on them. Read on the session
  * client, so RLS keeps it to your own. The old /vault/education address
  * redirects here (next.config.ts), anchors and all.
  */
 export default async function Page() {
-  await requireUser();
   const you = await createYouClient();
-  const [transcripts, courses] = await Promise.all([
+  const user = await requireUser();
+  const jobsClient = await createJobsClient();
+  const [transcripts, courses, jobs, resume] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -39,14 +45,42 @@ export default async function Page() {
           credits: course.credits === null ? null : Number(course.credits),
         }));
       }),
+    you
+      .from('work_history')
+      .select('*')
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Loading jobs failed: ${error.message}`);
+        return (data ?? []) as Job[];
+      }),
+    // The résumé a read takes: the default, or the newest with text when none is marked.
+    jobsClient
+      .from('resume_versions')
+      .select('id, label, text_content')
+      .eq('user_id', user.id)
+      .not('text_content', 'is', null)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        const row = data as { id: string; label: string; text_content: string | null } | null;
+        return row?.text_content?.trim() ? { id: row.id, label: row.label, text: row.text_content } : null;
+      }),
   ]);
 
   const courseCounts: Record<string, number> = {};
   for (const course of courses) courseCounts[course.transcript_id] = (courseCounts[course.transcript_id] ?? 0) + 1;
 
+  const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
+
   return (
     <>
       <PageHeader title="Work & school" />
+      <JobsSection
+        jobs={sortJobs(jobs)}
+        resume={resumeChoice ? { label: resumeChoice.label } : null}
+        changed={resumeChanged(resumeChoice, jobs)}
+      />
       <EducationSection
         groups={groupCourses(transcripts, courses)}
         courseCounts={courseCounts}
