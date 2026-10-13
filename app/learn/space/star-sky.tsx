@@ -32,6 +32,7 @@ import {
 import { STATE_MARK_LABEL, markOf } from '@/lib/learn/map/view';
 import { graphHeight, paramsFor, type IdeaGraph, type Opened } from '@/lib/learn/map/place-graph';
 import { halvesOn, stateSetAt, type StrengthInput } from '@/lib/learn/strength';
+import type { LightThen } from '@/lib/learn/map/timeline';
 import { cn } from '@/lib/cn';
 import { usePick } from './pick';
 import { PlaceGraph } from './place-graph';
@@ -61,6 +62,10 @@ import { PlaceGraph } from './place-graph';
  * graph you can read (plan #1997.7, place-graph.tsx). The address holds the
  * place, so the back button flies out to the whole map again. While a graph
  * is open the sky behind it holds still.
+ *
+ * The timeline under the map (plan #1997.8) hands in `replay`, the map as it
+ * stood on a day. The same stars are relit from it, and those not written yet
+ * are left out, so the camera and every star's place hold still while it plays.
  */
 
 export type Star = {
@@ -76,6 +81,8 @@ export type Star = {
   slot: number | 'other' | 'none';
   domainId: string | null;
   neighbours: string[];
+  /** Not written yet on the day the timeline shows (plan #1997.8), so not drawn. */
+  absent?: boolean;
 };
 
 /** A name for the zoomed-out sky: a place, or a domain while no place is named. */
@@ -162,6 +169,7 @@ export function StarSky({
   label,
   pointingAt = null,
   graph = null,
+  replay = null,
 }: {
   stars: readonly Star[];
   names: readonly SkyName[];
@@ -175,6 +183,8 @@ export function StarSky({
   pointingAt?: string | null;
   /** The place or neighbourhood opened as a graph, or null for the whole map. */
   graph?: IdeaGraph | null;
+  /** The map as it stood on the day the timeline shows, or null for today. */
+  replay?: ReadonlyMap<string, LightThen> | null;
 }) {
   const { selectedId, pick, params, clearDomain, set } = usePick();
   const frame = useRef<HTMLDivElement>(null);
@@ -209,6 +219,20 @@ export function StarSky({
 
   const byId = useMemo(() => new Map(stars.map((star, i) => [star.id, i])), [stars]);
   const starOf = useMemo(() => new Map(stars.map((star) => [star.id, star])), [stars]);
+  // The stars as the timeline's day had them: the same ones in the same
+  // order, relit, so nothing keyed on `stars` (places, the camera) moves.
+  const lit = useMemo(
+    () =>
+      replay
+        ? stars.map((star): Star => {
+            const then = replay.get(star.id);
+            return then
+              ? { ...star, strength: then.strength, haze: then.haze, state: then.state, stateRow: then.stateRow }
+              : { ...star, strength: 0, haze: 0, absent: true };
+          })
+        : stars,
+    [stars, replay],
+  );
 
   // The graph is drawn once the camera has arrived; until then the sky shows.
   // A page opened on a graph shows it at once, with nothing to fly in from.
@@ -225,9 +249,9 @@ export function StarSky({
   const focusIndex = focusId ? (byId.get(focusId) ?? -1) : -1;
 
   // Kept for the draw, which runs outside React.
-  const latest = useRef({ stars, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
+  const latest = useRef({ stars: lit, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
   useEffect(() => {
-    latest.current = { stars, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
+    latest.current = { stars: lit, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
   });
 
   // -- Measuring the frame --------------------------------------------------
@@ -319,7 +343,7 @@ export function StarSky({
     ctx.fill();
 
     // Who stands out: the idea in focus and its six nearest, or the domain picked in the legend.
-    const focus = focusIndex >= 0 ? stars[focusIndex] : undefined;
+    const focus = focusIndex >= 0 && !stars[focusIndex]!.absent ? stars[focusIndex] : undefined;
     const near = new Set(focus?.neighbours ?? []);
     const litUp = (star: Star) =>
       behind
@@ -335,6 +359,7 @@ export function StarSky({
     // with how many stars are in view, and come back as you zoom in.
     let inView = 0;
     for (let i = 0; i < stars.length; i++) {
+      if (stars[i]!.absent) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
       if (x >= 0 && y >= 0 && x <= w && y <= h) inView += 1;
@@ -371,7 +396,7 @@ export function StarSky({
     const squares = new Map<string, number[]>();
     for (let i = 0; i < stars.length; i++) {
       const star = stars[i]!;
-      if (behind?.has(star.id)) continue;
+      if (star.absent || behind?.has(star.id)) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
       const look = starLook(star.strength, star.haze, zoom);
@@ -447,7 +472,7 @@ export function StarSky({
       ctx.beginPath();
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i]!;
-        if (star.state !== 'misconception' || litUp(star) !== pass || behind?.has(star.id)) continue;
+        if (star.state !== 'misconception' || star.absent || litUp(star) !== pass || behind?.has(star.id)) continue;
         const x = sx(px[i]!);
         const y = sy(py[i]!);
         if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
@@ -468,7 +493,7 @@ export function StarSky({
       ctx.beginPath();
       for (const id of focus.neighbours) {
         const j = byIdOf(stars, id);
-        if (j < 0) continue;
+        if (j < 0 || stars[j]!.absent) continue;
         ctx.moveTo(fx, fy);
         ctx.lineTo(sx(px[j]!), sy(py[j]!));
       }
@@ -478,7 +503,7 @@ export function StarSky({
       ctx.beginPath();
       for (const id of focus.neighbours) {
         const j = byIdOf(stars, id);
-        if (j < 0) continue;
+        if (j < 0 || stars[j]!.absent) continue;
         const x = sx(px[j]!);
         const y = sy(py[j]!);
         ctx.moveTo(x + 7, y);
@@ -495,6 +520,7 @@ export function StarSky({
     // in, none covering a star (R13).
     const marks = markGrid();
     for (let i = 0; i < stars.length; i++) {
+      if (stars[i]!.absent) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
       if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
@@ -558,7 +584,7 @@ export function StarSky({
       const candidates: NameCandidate[] = [];
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i]!;
-        if (i === focusIndex || (focus && !litUp(star))) continue;
+        if (i === focusIndex || star.absent || (focus && !litUp(star))) continue;
         const x = sx(px[i]!);
         const y = sy(py[i]!);
         if (x < 0 || y < 0 || x > w || y > h) continue;
@@ -659,7 +685,7 @@ export function StarSky({
   // Anything else drawn changed: the focus, the domain picked out, the names.
   useEffect(() => {
     redraw();
-  }, [focusIndex, params.domain, names, dust, behind, open, redraw]);
+  }, [focusIndex, params.domain, names, dust, behind, open, lit, redraw]);
 
   // -- Moving the camera ---------------------------------------------------
   const flyTo = useCallback(
@@ -798,7 +824,9 @@ export function StarSky({
     const cam = camera.current;
     let best = -1;
     let bestDistance = reach * reach;
+    const now = latest.current.stars;
     for (let i = 0; i < xs.length; i++) {
+      if (now[i]?.absent) continue;
       const x = size.w / 2 + (xs[i]! - cam.x) * cam.k;
       const y = size.h / 2 - (ys[i]! - cam.y) * cam.k;
       const d = (x - at.x) ** 2 + (y - at.y) ** 2;
@@ -929,13 +957,14 @@ export function StarSky({
 
   // -- The card for the star pointed at ----------------------------------------
   const held = pointingAt && !open ? byId.get(pointingAt) : undefined;
-  const cardStar = open
+  const pointed = open
     ? undefined
     : hover
-      ? stars[byId.get(hover.id) ?? -1]
+      ? lit[byId.get(hover.id) ?? -1]
       : held !== undefined && heldAt
-        ? stars[held]
+        ? lit[held]
         : undefined;
+  const cardStar = pointed?.absent ? undefined : pointed;
   const cardAt = hover ?? heldAt;
   // A graph grows the frame so its names keep their room.
   const graphH =

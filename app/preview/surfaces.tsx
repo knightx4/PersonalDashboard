@@ -24,6 +24,7 @@ import { SearchBarSurface } from './search-bar-surface';
 import {
   IdeaSpaceAroundSurface,
   IdeaSpacePlaceSurface,
+  IdeaSpaceReplaySurface,
   IdeaSpaceCardSurface,
   IdeaSpaceDenseSurface,
   IdeaSpaceDomainsSurface,
@@ -5083,6 +5084,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceCardSurface />,
+  },
+  {
+    /* The timeline under the map moved back seven weeks (plan #1997.8): ideas
+     * written since are left off, and the rest are lit as they were that day,
+     * with the counts for the day above the timeline. */
+    id: 'learn-idea-space-replay',
+    label: 'Learn · Idea Space, replaying an earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceReplaySurface />,
   },
   {
     /* One place opened as a graph (plan #1997.7), with one idea pointed at

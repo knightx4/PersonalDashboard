@@ -167,6 +167,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-card': ['/learn/space'],
   'learn-idea-space-dense': ['/learn/space'],
   'learn-idea-space-place': ['/learn/space'],
+  'learn-idea-space-replay': ['/learn/space'],
   'learn-idea-space-around': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],

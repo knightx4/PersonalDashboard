@@ -6,7 +6,7 @@ import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 import type { IdeaMapView, IdeaOnMap, PlaceOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
 import { lightOn } from '@/lib/learn/map/sky';
-import type { StrengthInput } from '@/lib/learn/strength';
+import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 
 /**
@@ -278,6 +278,20 @@ function stateRowFor(state: KnowledgeState, random: () => number): StrengthInput
   };
 }
 
+/**
+ * When each fixture idea was written, for the timeline (plan #1997.8): a few
+ * days before its state was set, or any day in the last four months for an
+ * idea not known yet. A sequence of its own, so the map's layout is unchanged.
+ */
+function withCreated(ideas: IdeaOnMap[], seed: number): void {
+  const random = seeded(seed);
+  for (const idea of ideas) {
+    const set = idea.stateRow ? stateSetAt(idea.stateRow) : null;
+    const at = set ? set.getTime() - Math.floor(random() * 7) * DAY_MS : AS_OF.getTime() - Math.floor(random() * 125) * DAY_MS;
+    idea.createdAt = new Date(Math.min(at, AS_OF.getTime())).toISOString();
+  }
+}
+
 /** Strength and haze for every fixture idea, worked out as the page does. */
 function lit(ideas: IdeaOnMap[]): IdeaOnMap[] {
   const light = lightOn(ideas, AS_OF);
@@ -337,6 +351,7 @@ function fixture(): IdeaMapView {
         strength: 0,
         haze: 0,
         placeId: null,
+      createdAt: null,
         pca: { x: clamp(1.3 * (field.axes.x + jitter(0.28))), y: clamp(1.3 * (field.axes.y + jitter(0.28))) },
         neighbourMap: { x: clamp(field.at.x + jitter(0.24)), y: clamp(field.at.y + jitter(0.24)) },
         neighbours: [],
@@ -358,6 +373,7 @@ function fixture(): IdeaMapView {
       strength: 0,
       haze: 0,
       placeId: null,
+      createdAt: null,
       pca: { x: jitter(0.6), y: jitter(0.6) },
       neighbourMap: { x: 0.45 + jitter(0.1), y: -0.85 + jitter(0.1) },
       neighbours: [],
@@ -411,6 +427,7 @@ function fixture(): IdeaMapView {
     };
   });
 
+  withCreated(ideas, 1997_8);
   const { places, placeOf } = placesFor(ideas);
   const shown = lit(ideas).map((idea) => ({ ...idea, placeId: placeOf.get(idea.id) ?? null }));
 
@@ -514,6 +531,7 @@ function dense(count: number): IdeaMapView {
       strength: 0,
       haze: 0,
       placeId: null,
+      createdAt: null,
       pca: at,
       neighbourMap: at,
       neighbours: [1, 2, 3, 4, 5, 6].map((step) => ({
@@ -525,6 +543,7 @@ function dense(count: number): IdeaMapView {
       domain: { id: cluster.domain, name: DOMAINS[cluster.domain]! },
     });
   }
+  withCreated(ideas, 1997_8);
   const shown = lit(ideas);
   return {
     ...VIEW,
@@ -555,6 +574,14 @@ export function IdeaSpacePlaceSurface() {
   return (
     <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: place.id }} pointingAt={pointed} />
   );
+}
+
+/**
+ * The timeline (plan #1997.8) moved back seven weeks: the ideas written since
+ * are not on the map yet, and the ones lit then shine as they did that day.
+ */
+export function IdeaSpaceReplaySurface() {
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} daysAgo={50} />;
 }
 
 /** An idea in no place opened as its neighbourhood: itself and its six nearest. */

@@ -37,12 +37,15 @@ export function IdeaSpaceView({
   view,
   params,
   pointingAt,
+  daysAgo,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
   params: MapParams;
   /** The gallery holds the card open over this idea, as a pointer would. */
   pointingAt?: string | null;
+  /** The gallery opens the timeline this many days before today. */
+  daysAgo?: number;
 }) {
   const header = (
     <PageHeader
@@ -92,7 +95,7 @@ export function IdeaSpaceView({
         main={
           <>
             {header}
-            <MapSection view={view} pointingAt={pointingAt} />
+            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} />
           </>
         }
         rail={

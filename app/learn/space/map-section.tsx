@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from '@/components/ui/link';
 import { buttonVariants } from '@/components/ui/button';
@@ -11,10 +11,12 @@ import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
 import { ideaGraph, openedFrom, type IdeaGraph } from '@/lib/learn/map/place-graph';
 import { dustAt } from '@/lib/learn/map/sky';
+import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
 import { StarSky, type SkyName, type Star } from './star-sky';
 import { StarSwatch } from './swatch';
+import { MapTimeline } from './timeline';
 
 /**
  * Idea Space's map with its layout switch, legend and caption (plan #1857),
@@ -23,6 +25,11 @@ import { StarSwatch } from './swatch';
  * In the browser, so a switch redraws from the ideas already on the page
  * instead of asking the server to work both layouts out again. The address
  * still follows every switch (pick.tsx), so links and reloads keep the view.
+ *
+ * The timeline under the sky (plan #1997.8) replays how the map grew. Its day
+ * is held here and not in the address, since playing it changes the day
+ * several times a second. While a place is open as a graph the timeline is
+ * put away and the map shows today.
  */
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -32,7 +39,16 @@ function plural(n: number, one: string, many = `${one}s`): string {
 /** How many domains the legend shows on a phone before the rest wait behind More. */
 const DOMAINS_ON_A_PHONE = 1;
 
-export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt?: string | null }) {
+export function MapSection({
+  view,
+  pointingAt,
+  daysAgo,
+}: {
+  view: IdeaMapView;
+  pointingAt?: string | null;
+  /** The gallery opens the timeline this many days before today. */
+  daysAgo?: number;
+}) {
   const { params, set } = usePick();
   const domains = useMemo(() => ideaDomains(view.ideas), [view.ideas]);
   const slots = useMemo(() => domainSlots(domains), [domains]);
@@ -58,15 +74,34 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
   const names = useMemo(() => skyNames(view, layout), [view, layout]);
   const graph = useOpenGraph(view);
 
+  // The timeline: the day shown, and the map relit as it stood then.
+  const today = useMemo(() => new Date(view.asOf), [view.asOf]);
+  const span = useMemo(() => timelineSpan(view.ideas, today), [view.ideas, today]);
+  const [day, setDay] = useState(() => Math.max(0, span.days - (daysAgo ?? 0)));
+  const onDay = useCallback((next: number) => setDay(next), []);
+  const shownDay = Math.min(day, span.days);
+  const past = !graph && shownDay < span.days;
+  const replay = useMemo(
+    () => (past ? mapOn(view.ideas, momentOf(span, shownDay, today)) : null),
+    [past, view.ideas, span, shownDay, today],
+  );
   const dust = useMemo(() => {
     const at = new Map(view.ideas.map((idea) => [idea.id, layout === 'axes' ? idea.pca : idea.neighbourMap]));
     const out: Point[] = [];
     for (const speck of view.dust) {
       const idea = at.get(speck.conceptId);
-      if (idea) out.push(dustAt(idea, speck.noteId, speck.similarity));
+      // A note beside an idea not written yet waits with it.
+      if (idea && (!replay || replay.has(speck.conceptId))) out.push(dustAt(idea, speck.noteId, speck.similarity));
     }
     return out;
-  }, [view.ideas, view.dust, layout]);
+  }, [view.ideas, view.dust, layout, replay]);
+  // The legend counts the domains of the ideas on the map that day; colours stay as today's.
+  const domainsThen = useMemo(
+    () => (replay ? ideaDomains(view.ideas.filter((idea) => replay.has(idea.id))) : domains),
+    [replay, view.ideas, domains],
+  );
+  const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
+
 
   const axes = layout === 'axes' ? axisEnds(view.ideas) : null;
 
@@ -105,7 +140,8 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
             stars={stars}
             names={names}
             dust={dust}
-            asOf={view.asOf}
+            asOf={replay ? momentOf(span, shownDay, today).toISOString() : view.asOf}
+            replay={replay}
             label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as you know it`}
             pointingAt={pointingAt}
             graph={graph}
@@ -113,8 +149,11 @@ export function MapSection({ view, pointingAt }: { view: IdeaMapView; pointingAt
           {!graph && <AxisEndsBelow axes={axes} />}
         </div>
         <div className="card-pad-x pb-(--card-p)">
-          <Legend params={params} set={set} view={view} domains={domains} slots={slots} dust={dust.length} />
-          <MapNotes view={view} params={params} graph={graph} />
+          {!graph && span.days > 0 && (
+            <MapTimeline start={span.start} days={span.days} day={shownDay} counts={countsOf(lights)} onDay={onDay} />
+          )}
+          <Legend params={params} set={set} lights={lights} domains={domainsThen} slots={slots} dust={dust.length} />
+          <MapNotes view={view} params={params} graph={graph} past={past} />
         </div>
       </Card>
     </section>
@@ -172,7 +211,21 @@ function skyNames(view: IdeaMapView, layout: MapParams['layout']): SkyName[] {
  * no axis, so the caption says so (rule 5). How to zoom and point is left to
  * the buttons on the map and the card a star shows.
  */
-function MapNotes({ view, params, graph }: { view: IdeaMapView; params: MapParams; graph: IdeaGraph | null }) {
+function MapNotes({
+  view,
+  params,
+  graph,
+  past,
+}: {
+  view: IdeaMapView;
+  params: MapParams;
+  graph: IdeaGraph | null;
+  /** The timeline shows a day before today. */
+  past: boolean;
+}) {
+  const bright = past
+    ? 'A star is as bright as you knew the idea on the day shown.'
+    : 'A star is as bright as you know the idea today.';
   if (graph) {
     return (
       <div className="mt-2 space-y-1 text-ui text-ink-muted">
@@ -191,13 +244,13 @@ function MapNotes({ view, params, graph }: { view: IdeaMapView; params: MapParam
     <div className="mt-2 space-y-1 text-ui text-ink-muted">
       {params.layout === 'axes' ? (
         <p>
-          A star is as bright as you know the idea today. Ideas sit along the two directions that keep{' '}
+          {bright} Ideas sit along the two directions that keep{' '}
           {Math.round((view.variance.first + view.variance.second) * 100)}% of how they differ, so two close here
           can still be far apart.
         </p>
       ) : (
         <p>
-          A star is as bright as you know the idea today. Only nearness means anything here: close stars are ideas
+          {bright} Only nearness means anything here: close stars are ideas
           about the same thing.
         </p>
       )}
@@ -236,23 +289,24 @@ function ideaDomains(ideas: readonly IdeaOnMap[]): { id: string; name: string; i
 function Legend({
   params,
   set,
-  view,
+  lights,
   domains,
   slots,
   dust,
 }: {
   params: MapParams;
   set: (change: Partial<MapParams>) => void;
-  view: IdeaMapView;
+  /** Every idea on the map on the day shown, lit as it was then. */
+  lights: readonly Pick<LightThen, 'strength' | 'haze' | 'state'>[];
   domains: { id: string; name: string; ideaCount: number }[];
   slots: Map<string, number>;
   dust: number;
 }) {
   const [allDomains, setAllDomains] = useState(false);
-  const lit = view.ideas.filter((idea) => idea.strength > 0).length;
-  const hazed = view.ideas.filter((idea) => idea.strength <= 0 && idea.haze > 0.02).length;
-  const dark = view.ideas.length - lit - hazed;
-  const mixedUp = view.ideas.filter((idea) => idea.state === 'misconception').length;
+  const lit = lights.filter((idea) => idea.strength > 0).length;
+  const hazed = lights.filter((idea) => idea.strength <= 0 && idea.haze > 0.02).length;
+  const dark = lights.length - lit - hazed;
+  const mixedUp = lights.filter((idea) => idea.state === 'misconception').length;
 
   const marks: { key: string; swatch: React.ReactNode; label: string; count: number }[] = [
     {

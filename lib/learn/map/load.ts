@@ -43,6 +43,8 @@ export type IdeaOnMap = MapIdea & {
   haze: number;
   /** The place it is in (plan #1997.3), or null for an idea in none. */
   placeId: string | null;
+  /** When the idea was written, which the timeline replays from (plan #1997.8). */
+  createdAt: string | null;
 };
 
 /** A named place on the map, at the middle of its ideas in each layout. */
@@ -80,6 +82,7 @@ type ConceptRow = {
   claim: string;
   subject_id: string | null;
   embedding: string | number[] | null;
+  created_at: string | null;
 };
 type StateRow = {
   concept_id: string;
@@ -125,7 +128,7 @@ export async function loadIdeaMap(
     };
 
   const [concepts, states, subjects, fields, domains, placeRead, dustRows] = await Promise.all([
-    readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding', 'id')),
+    readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding, created_at', 'id')),
     readAll<StateRow>(
       own(
         'concept_state',
@@ -270,6 +273,7 @@ export async function loadIdeaMap(
         strength: light.get(idea.id)?.strength ?? 0,
         haze: light.get(idea.id)?.haze ?? 0,
         placeId: placeRead?.placeOf.get(idea.id) ?? null,
+        createdAt: row.created_at ?? null,
       };
     }),
   };
