@@ -20,7 +20,9 @@ describe('healthOf', () => {
 
   it('names what a waiting step waits on', () => {
     const word = healthOf('waiting', facts({ waitingOn: [{ number: 12, title: 'Schema' }] }));
-    expect(word.title).toBe('Waits on #12 Schema');
+    expect(word.title).toBe(
+      'Waits on #12 Schema. It moves on by itself, with nothing needed from you.',
+    );
     expect(word.glyph).toBe('dashed');
   });
 
@@ -28,10 +30,14 @@ describe('healthOf', () => {
     const word = healthOf(
       'waiting',
       facts({
-        waitsUntil: [{ title: 'Five closes from evidence exist.', dueAt: '2026-10-26T06:00:00.000Z' }],
+        waitsUntil: [
+          { title: 'Five closes from evidence exist.', dueAt: '2026-10-26T06:00:00.000Z' },
+        ],
       }),
     );
-    expect(word.title).toBe('Waits until 26 Oct: Five closes from evidence exist');
+    expect(word.title).toBe(
+      'Waits until 26 Oct: Five closes from evidence exist. It moves on by itself, with nothing needed from you.',
+    );
     expect(word.glyph).toBe('clock');
   });
 
@@ -51,7 +57,9 @@ describe('healthOf', () => {
 
 describe('moveFor', () => {
   it('says when the word came from a step beneath', () => {
-    expect(moveFor('working', 'working').title).toBe('A session is working on this now.');
+    expect(moveFor('working', 'working').title).toBe(
+      'Dash is working on this now. Nothing is needed from you.',
+    );
     expect(moveFor('working', 'none').title).toMatch(/\(from a step beneath this one\.\)$/);
     expect(moveFor('with_dash', 'none').title).toMatch(/\(from a step beneath this one\.\)$/);
     expect(moveFor('on_you', 'on_you').tone).toBe('caution');

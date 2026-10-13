@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { Tooltip } from '@/components/ui/tooltip';
 import { createClient as createBrowserJobsClient } from '@/lib/jobs/auth/client';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { resumeFileProblem, resumePath } from '@/lib/jobs/resume-file';
@@ -502,24 +503,33 @@ function EvidenceSection({
             <li key={item.id} id={`evidence-${item.id}`} className="row-pad">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{item.title}</span>
-                <span className="tabular text-small text-ink-muted">
-                  {'★'.repeat(item.strength)}
-                </span>
+                <Tooltip label={`How strong this evidence is, ${item.strength} of 5`}>
+                  <span
+                    tabIndex={0}
+                    role="img"
+                    aria-label={`Strength ${item.strength} of 5`}
+                    className="tabular text-small text-ink-muted"
+                  >
+                    {'★'.repeat(item.strength)}
+                  </span>
+                </Tooltip>
                 {item.skills.map((skill) => (
                   <Chip key={skill}>{skill.replace(/_/g, ' ')}</Chip>
                 ))}
-                <IconButton
-                  size="sm"
-                  label={`Delete ${item.title}`}
-                  className="ml-auto self-center hover:text-danger"
-                  onClick={() =>
-                    startTransition(async () => {
-                      await deleteEvidence(item.id);
-                    })
-                  }
-                >
-                  <Trash2 strokeWidth={1.75} aria-hidden />
-                </IconButton>
+                <Tooltip label="Delete this piece of evidence" align="end" className="ml-auto self-center">
+                  <IconButton
+                    size="sm"
+                    label={`Delete ${item.title}`}
+                    className="hover:text-danger"
+                    onClick={() =>
+                      startTransition(async () => {
+                        await deleteEvidence(item.id);
+                      })
+                    }
+                  >
+                    <Trash2 strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                </Tooltip>
               </div>
               <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
               {item.metrics && <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>}

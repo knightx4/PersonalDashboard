@@ -2,6 +2,7 @@ import Link from '@/components/ui/link';
 import { AlertTriangle, BadgeCheck, CircleDashed, CircleSlash, Check } from 'lucide-react';
 import type { ReadingRow, SourceAccess } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Chip } from '@/components/ui/chip';
 
 /**
@@ -23,6 +24,15 @@ const ACCESS_LABEL: Record<SourceAccess, string | null> = {
   unknown: 'Access unknown',
 };
 
+/** What each badge means, for the mouse: the card is one link, so a badge takes no focus of its own. */
+const ACCESS_HINT: Record<SourceAccess, string | null> = {
+  open: null,
+  paywalled: 'The source sits behind a paywall',
+  purchase: 'You would have to buy the source to read it',
+  library: 'The source is easiest to borrow from a library',
+  unknown: 'Dash could not tell how to get hold of the source',
+};
+
 function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents: number | null }) {
   const label = ACCESS_LABEL[access];
   if (!label) return null;
@@ -33,9 +43,11 @@ function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents:
   // marking off, and a fill marks them off without adding a frame to a row
   // that is already inside a card -- law 11's "a shared ground groups".
   return (
-    <Chip>
-      {price ? `${label} · ${price}` : label}
-    </Chip>
+    <Tooltip label={ACCESS_HINT[access] ?? label}>
+      <Chip>
+        {price ? `${label} · ${price}` : label}
+      </Chip>
+    </Tooltip>
   );
 }
 
@@ -70,7 +82,11 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
           already tell the claims apart. The caution keeps its colour because
           it is the one of the pair you have to act on. */}
       {verified ? (
-        <BadgeCheck className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <Tooltip label="Dash checked this place in the source" className="shrink-0">
+          <span role="img" aria-label="Checked" className="inline-flex">
+            <BadgeCheck className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          </span>
+        </Tooltip>
       ) : (
         <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
       )}
@@ -85,20 +101,30 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
     // Read is not a refund. The four statuses are told apart by their glyphs
     // -- tick, slash, dashed circle, nothing -- and only the one that means
     // "in progress" earns the accent. Law 4.
-    return <Check className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-label="Read" />;
+    return (
+      <Tooltip label="You have read this" className="shrink-0">
+        <span role="img" aria-label="Read" className="inline-flex">
+          <Check className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        </span>
+      </Tooltip>
+    );
   }
   if (status === 'abandoned') {
     return (
-      <CircleSlash className="size-4 shrink-0 text-ink-ghost" strokeWidth={1.75} aria-label="Gave up" />
+      <Tooltip label="You gave up on this one" className="shrink-0">
+        <span role="img" aria-label="Gave up" className="inline-flex">
+          <CircleSlash className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+        </span>
+      </Tooltip>
     );
   }
   if (status === 'reading') {
     return (
-      <CircleDashed
-        className="size-4 shrink-0 text-accent"
-        strokeWidth={1.75}
-        aria-label="Started"
-      />
+      <Tooltip label="You have started this" className="shrink-0">
+        <span role="img" aria-label="Started" className="inline-flex">
+          <CircleDashed className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
+        </span>
+      </Tooltip>
     );
   }
   return <span className="size-4 shrink-0" aria-hidden />;

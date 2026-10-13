@@ -9,6 +9,7 @@ import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { completeReminder } from '@/app/jobs/(app)/_home/actions';
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { Tooltip } from '@/components/ui/tooltip';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -146,24 +147,28 @@ function TodoLine({
        * line under the words. */
       <div>
         <div className="flex items-center gap-2">
-          <IconButton
-            size="sm"
-            label="Mark done"
-            disabled={finishing}
-            onClick={() => finish(() => void completeReminder(todo.id))}
-            className="-m-1 hover:text-accent"
-          >
-            <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
-          </IconButton>
+          <Tooltip label="Mark this to-do done" className="-m-1 shrink-0">
+            <IconButton
+              size="sm"
+              label="Mark done"
+              disabled={finishing}
+              onClick={() => finish(() => void completeReminder(todo.id))}
+              className="hover:text-accent"
+            >
+              <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
+            </IconButton>
+          </Tooltip>
           <span className="min-w-0 flex-1 truncate text-ui text-ink">{todo.body}</span>
           <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt)}</span>
-          <IconButton
-            label={answering ? 'Close' : 'Edit, push back or finish it'}
-            aria-expanded={answering}
-            onClick={() => setAnswering((value) => !value)}
-          >
-            <MoreHorizontal strokeWidth={1.75} aria-hidden />
-          </IconButton>
+          <Tooltip label={answering ? 'Close' : 'Edit, push back or finish it'} align="end" className="shrink-0">
+            <IconButton
+              label={answering ? 'Close' : 'Edit, push back or finish it'}
+              aria-expanded={answering}
+              onClick={() => setAnswering((value) => !value)}
+            >
+              <MoreHorizontal strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
         </div>
         <TodoMail todo={todo} messages={messages} timezone={timezone} offer={false} />
         {answering && (
@@ -276,9 +281,11 @@ function TodoMail({
         )}
         {/* No confirm: re-linking is one pick away, so this is reversible.
             The same unlink glyph the task rows use for detaching. */}
-        <IconButton label="Unlink the email" disabled={pending} onClick={() => save(null)}>
-          <Unlink strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label="Unlink the email from this to-do" align="end" className="shrink-0">
+          <IconButton label="Unlink the email" disabled={pending} onClick={() => save(null)}>
+            <Unlink strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
         {error && <span className="text-danger">{error}</span>}
       </p>
     );

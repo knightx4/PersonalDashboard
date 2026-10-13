@@ -23,6 +23,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const initial: ActionState = {};
 
@@ -149,9 +150,11 @@ function AddMerchantForm({
     <Group
       title="Add a retailer"
       action={
-        <IconButton label="Cancel" size="sm" onClick={onCancel}>
-          <X strokeWidth={1.75} />
-        </IconButton>
+        <Tooltip label="Cancel" align="end">
+          <IconButton label="Cancel" size="sm" onClick={onCancel}>
+            <X strokeWidth={1.75} />
+          </IconButton>
+        </Tooltip>
       }
     >
       <form action={action} className="flex flex-wrap items-end gap-(--field-gap)">

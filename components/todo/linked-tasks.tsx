@@ -18,6 +18,7 @@ import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The tasks attached to one thing, wherever that thing is rendered.
@@ -176,21 +177,23 @@ function LinkedRow({
     >
       {/* The same toggle as a row on /todo: the glyph is the state, the
           button is the hit area. */}
-      <button
-        type="button"
-        aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => run(done ? 'open' : 'done')}
-        className={cn(
-          'press flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
-          done
-            ? 'text-status-offer'
-            : dropped
-              ? 'text-ink-muted'
-              : 'text-ink-muted hover:text-accent',
-        )}
-      >
-        <StatusGlyph glyph={TASK_STATUS_GLYPHS[shown]} size={14} />
-      </button>
+      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+        <button
+          type="button"
+          aria-label={done ? 'Reopen' : 'Mark done'}
+          onClick={() => run(done ? 'open' : 'done')}
+          className={cn(
+            'press flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
+            done
+              ? 'text-status-offer'
+              : dropped
+                ? 'text-ink-muted'
+                : 'text-ink-muted hover:text-accent',
+          )}
+        >
+          <StatusGlyph glyph={TASK_STATUS_GLYPHS[shown]} size={14} />
+        </button>
+      </Tooltip>
 
       <span
         className={cn(
@@ -209,13 +212,15 @@ function LinkedRow({
 
       {/* Detach, not delete. The task is yours and may well belong somewhere
           else; unlinking it from this page must not destroy it. */}
-      <IconButton
-        label="Detach from this"
-        onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
-        className="opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-      >
-        <Unlink strokeWidth={1.75} aria-hidden />
-      </IconButton>
+      <Tooltip label="Detach from this" align="end" className="shrink-0">
+        <IconButton
+          label="Detach from this"
+          onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
+          className="opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+        >
+          <Unlink strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </Tooltip>
     </li>
   );
 }

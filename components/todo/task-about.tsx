@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { IconButton } from '@/components/ui/icon-button';
 import { LinkFinder } from '@/components/todo/link-picker';
 import { pointTaskAt, unpointTask } from '@/app/todo/actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Saying what a task is about, from the row it is already on.
@@ -60,30 +61,34 @@ export function TaskAbout({
   return (
     <span className="relative inline-flex items-center gap-0.5">
       {!controlled && (
-        <IconButton
-          ref={triggerRef}
-          label={linked ? 'Point it at something else' : 'What is this about?'}
-          aria-expanded={open}
-          disabled={pending}
-          onClick={() => setOpen(!open)}
-        >
-          <Link2 strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label={linked ? 'Point it at something else' : 'What is this about?'} align="end">
+          <IconButton
+            ref={triggerRef}
+            label={linked ? 'Point it at something else' : 'What is this about?'}
+            aria-expanded={open}
+            disabled={pending}
+            onClick={() => setOpen(!open)}
+          >
+            <Link2 strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       )}
 
       {!controlled && linked && (
-        <IconButton
-          label="Not about anything"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              const { error } = await unpointTask(taskId);
-              toast({ text: error ?? 'unlinked' });
-            })
-          }
-        >
-          <Link2Off strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label="Not about anything" align="end">
+          <IconButton
+            label="Not about anything"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const { error } = await unpointTask(taskId);
+                toast({ text: error ?? 'unlinked' });
+              })
+            }
+          >
+            <Link2Off strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       )}
 
       {open && (

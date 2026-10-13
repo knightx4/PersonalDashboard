@@ -1,4 +1,5 @@
 import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One of the row's quick actions, on the dev plan and a goal's steps alike.
@@ -10,20 +11,25 @@ import { IconButton } from '@/components/ui/icon-button';
  */
 export function RowIconButton({
   label,
+  tip,
   type = 'button',
   pending = false,
   onClick,
   children,
 }: {
   label: string;
+  /** The Tooltip's sentence, where the label alone does not say what happens. */
+  tip?: string;
   type?: 'button' | 'submit';
   pending?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <IconButton type={type} label={label} onClick={onClick} disabled={pending}>
-      {children}
-    </IconButton>
+    <Tooltip label={tip ?? label} align="end">
+      <IconButton type={type} label={label} onClick={onClick} disabled={pending}>
+        {children}
+      </IconButton>
+    </Tooltip>
   );
 }

@@ -249,7 +249,7 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('Add a payment method');
   });
 
-  it('puts every slot with nothing going to sleep, with the tick’s reason', () => {
+  it('puts every slot with nothing going to sleep, the reason left for when it is opened', () => {
     const html = draw({
       run: run({
         lastTickAt: '2026-09-17T04:28:00Z',
@@ -258,28 +258,14 @@ describe('the Overnight card while a night is running', () => {
       sessions: [],
     });
     expect((html.match(/Asleep, nothing to work on/g) ?? []).length).toBe(4);
-    expect(html).toContain('Waiting until something is ready. Nothing is handed to Dash.');
-    expect(html).toContain('No goal step is ready.');
+    expect(html).not.toContain('Nothing is handed to Dash.');
     expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
   });
 
-  it('keeps the asleep reason folded, so the closed card shows only the line', () => {
-    const html = draw({
-      run: run({ lastTickNote: 'Waiting until something is ready. Nothing is handed to Dash.' }),
-      sessions: [],
-    });
-    // A closed disclosure draws no text for its body: strip every closed
-    // details body and the reason is gone from what the card reads.
-    expect(html).not.toMatch(/<details[^>]*\sopen/);
-    const visible = html.replace(
-      /<details[^>]*>[\s\S]*?<\/details>/g,
-      (d) => (d.match(/<summary[^>]*>[\s\S]*?<\/summary>/) ?? [''])[0],
-    );
-    expect(visible).not.toContain('Waiting until something is ready.');
-    expect(visible).toContain('Asleep, nothing to work on');
-    expect(
-      (html.match(/Asleep, nothing to work on<\/span><\/span><\/summary>/g) ?? []).length,
-    ).toBe(4);
+  it('opens nothing to begin with: every slot is a closed pill', () => {
+    const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
+    expect((html.match(/aria-expanded="false"/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(html).not.toContain('id="runner-crew-focus"');
   });
 
   it('draws no disclosure for an asleep slot with only the default reason', () => {

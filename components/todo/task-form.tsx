@@ -11,6 +11,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import { addDays, type Task } from '@/lib/todo/tasks/model';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One line, and the rest only when you want it.
@@ -131,15 +132,12 @@ export function AddTask({ today }: { today: string }) {
             with a second control inside it is the shape #137 decided against. */}
         <LinkPicker value={about} onChange={setAbout} />
 
-        <ToggleChip
-          on={pinned}
-          onClick={() => setPinned((on) => !on)}
-          title={pinned ? 'Pinned to the top' : 'Pin to the top'}
-          className="px-2"
-        >
-          <Pin strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
-        </ToggleChip>
+        <Tooltip label={pinned ? 'Pinned to the top' : 'Pin to the top'}>
+          <ToggleChip on={pinned} onClick={() => setPinned((on) => !on)} className="px-2">
+            <Pin strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
+          </ToggleChip>
+        </Tooltip>
         <input type="hidden" name="pinned" value={pinned ? 'on' : ''} />
 
         {/* One button for the one thing that genuinely needs its own room,

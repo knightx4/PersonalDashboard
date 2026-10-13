@@ -38,6 +38,7 @@ import { sideOf, type PaletteSide as PosterPalette } from '@/lib/theme/poster';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The density attribute on <html> is the store; this component only reads it.
@@ -493,24 +494,25 @@ function Swatch({
   }, [theme.mode, theme.hue, theme.way, way]);
 
   return (
-    <button
-      type="button"
-      onClick={() => onChoose(theme)}
-      aria-pressed={chosen}
-      title={label}
-      className={cn(
-        // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
-        'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
-        way && 'wash-chip',
-        chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
-      )}
-      // ui-ok: raw-hex -- this is the generated colour itself, which is the
-      // one thing on the screen that cannot be a token.
-      style={style}
-    >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
-      <span className="sr-only">{label}</span>
-    </button>
+    <Tooltip label={label}>
+      <button
+        type="button"
+        onClick={() => onChoose(theme)}
+        aria-pressed={chosen}
+        className={cn(
+          // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
+          'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
+          way && 'wash-chip',
+          chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
+        )}
+        // ui-ok: raw-hex -- this is the generated colour itself, which is the
+        // one thing on the screen that cannot be a token.
+        style={style}
+      >
+        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
+        <span className="sr-only">{label}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -531,23 +533,24 @@ function PaletteSwatch({
 }) {
   const [b1, b2, b3] = palette.bands;
   return (
-    <button
-      type="button"
-      onClick={onChoose}
-      aria-pressed={chosen}
-      title={label}
-      className="press flex size-8 items-center justify-center transition-transform hover:scale-105"
-      // ui-ok: raw-hex -- the palette itself, which is the one thing on the
-      // screen that cannot be a token.
-      style={{
-        background: `linear-gradient(to bottom, ${b1.fill} 0 33%, ${b2.fill} 33% 66%, ${b3.fill} 66%)`,
-        border: `2px solid ${palette.ink}`,
-        boxShadow: `2px 2px 0 ${palette.ink}`,
-      }}
-    >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
-      <span className="sr-only">{label}</span>
-    </button>
+    <Tooltip label={label}>
+      <button
+        type="button"
+        onClick={onChoose}
+        aria-pressed={chosen}
+        className="press flex size-8 items-center justify-center transition-transform hover:scale-105"
+        // ui-ok: raw-hex -- the palette itself, which is the one thing on the
+        // screen that cannot be a token.
+        style={{
+          background: `linear-gradient(to bottom, ${b1.fill} 0 33%, ${b2.fill} 33% 66%, ${b3.fill} 66%)`,
+          border: `2px solid ${palette.ink}`,
+          boxShadow: `2px 2px 0 ${palette.ink}`,
+        }}
+      >
+        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
+        <span className="sr-only">{label}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -595,23 +598,24 @@ function SkySwatch({
   }, [sky, side]);
 
   return (
-    <button
-      type="button"
-      onClick={onChoose}
-      aria-pressed={chosen}
-      title={label}
-      className={cn(
-        // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
-        'press wash-chip flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
-        chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
-      )}
-      // ui-ok: raw-hex -- this is the sky itself, which is the one thing on the
-      // screen that cannot be a token.
-      style={style}
-    >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
-      <span className="sr-only">{label}</span>
-    </button>
+    <Tooltip label={label}>
+      <button
+        type="button"
+        onClick={onChoose}
+        aria-pressed={chosen}
+        className={cn(
+          // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
+          'press wash-chip flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
+          chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
+        )}
+        // ui-ok: raw-hex -- this is the sky itself, which is the one thing on the
+        // screen that cannot be a token.
+        style={style}
+      >
+        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
+        <span className="sr-only">{label}</span>
+      </button>
+    </Tooltip>
   );
 }
 

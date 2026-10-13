@@ -11,6 +11,7 @@ import { SNOOZE_DAYS, type WaitingOnYou } from '@/lib/jobs/today/load';
 import { addLinkedTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import { completeWaiting, snoozeWaiting } from './actions';
 import { prepareWithDash, type PrepareState } from './prepare-actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Same two answers as a reminder -- dealt with, or not now -- for the one
@@ -27,26 +28,28 @@ function DismissActions({
 
   return (
     <span className="ml-auto flex shrink-0 items-center gap-2">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        pending={busy}
-        onClick={() => startTransition(() => void onSnooze())}
-        title={`Brings it back in ${SNOOZE_DAYS} days`}
-      >
-        Later
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        pending={busy}
-        onClick={() => startTransition(() => void onComplete())}
-        title="Takes it off this list for good"
-      >
-        Dismiss
-      </Button>
+      <Tooltip label={`Brings it back in ${SNOOZE_DAYS} days`} align="end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          pending={busy}
+          onClick={() => startTransition(() => void onSnooze())}
+        >
+          Later
+        </Button>
+      </Tooltip>
+      <Tooltip label="Takes it off this list for good" align="end">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          pending={busy}
+          onClick={() => startTransition(() => void onComplete())}
+        >
+          Dismiss
+        </Button>
+      </Tooltip>
     </span>
   );
 }

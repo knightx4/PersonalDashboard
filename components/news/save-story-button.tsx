@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { setStorySaved } from '@/app/news/i/[id]/actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Save, or Saved (plan #869). One press puts the story on the Saved list and
@@ -34,21 +35,22 @@ export function SaveStoryButton({
   });
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      aria-pressed={shown}
-      title={shown ? 'Take this story off your Saved list' : 'Keep this story on your Saved list'}
-      onClick={() => run(!shown)}
-      className={cn(shown && 'text-accent', failed && 'text-danger', className)}
-    >
-      {shown ? (
-        <BookmarkCheck className="size-3.5" strokeWidth={1.75} aria-hidden />
-      ) : (
-        <Bookmark className="size-3.5" strokeWidth={1.75} aria-hidden />
-      )}
-      {shown ? 'Saved' : 'Save'}
-    </Button>
+    <Tooltip label={shown ? 'Take this story off your Saved list' : 'Keep this story on your Saved list'}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-pressed={shown}
+        onClick={() => run(!shown)}
+        className={cn(shown && 'text-accent', failed && 'text-danger', className)}
+      >
+        {shown ? (
+          <BookmarkCheck className="size-3.5" strokeWidth={1.75} aria-hidden />
+        ) : (
+          <Bookmark className="size-3.5" strokeWidth={1.75} aria-hidden />
+        )}
+        {shown ? 'Saved' : 'Save'}
+      </Button>
+    </Tooltip>
   );
 }

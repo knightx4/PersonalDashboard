@@ -8,6 +8,7 @@ import { scrim } from '@/components/ui/popover';
 import { VaultPanel } from '@/components/vault/vault-panel';
 import type { VaultFolderGroup } from '@/components/vault/vault-tree';
 import { noteHref } from '@/lib/vault/paths';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Whether following this link should close the sheet.
@@ -109,9 +110,11 @@ export function VaultSheet({
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Vault</h2>
-              <IconButton label="Close the vault" onClick={() => setOpen(false)}>
-                <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              <Tooltip label="Close the vault" align="end">
+                <IconButton label="Close the vault" onClick={() => setOpen(false)}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
             </div>
 
             <VaultPanel

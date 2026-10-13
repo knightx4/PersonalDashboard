@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Popover } from '@/components/ui/popover';
 import { IconButton } from '@/components/ui/icon-button';
 import { usePopover } from '@/lib/use-popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type Notification = {
   id: string;
@@ -49,21 +50,22 @@ export function NotificationsButton({
 
   return (
     <div className="relative shrink-0">
-      <IconButton
-        ref={triggerRef}
-        label={`Notifications, ${count} unread`}
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={`${count} notification${count === 1 ? '' : 's'}`}
-        active={open}
-        className={cn('relative', !open && 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink')}
-      >
-        <Bell strokeWidth={1.75} aria-hidden />
-        <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
-          {count > 9 ? '9+' : count}
-        </span>
-      </IconButton>
+      <Tooltip label={`${count} notification${count === 1 ? '' : 's'}`} align="end">
+        <IconButton
+          ref={triggerRef}
+          label={`Notifications, ${count} unread`}
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          active={open}
+          className={cn('relative', !open && 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink')}
+        >
+          <Bell strokeWidth={1.75} aria-hidden />
+          <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
+            {count > 9 ? '9+' : count}
+          </span>
+        </IconButton>
+      </Tooltip>
 
       {open && (
         <Popover

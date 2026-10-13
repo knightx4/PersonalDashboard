@@ -50,6 +50,7 @@ import { EssayResearchCard, useEssayResearch } from './essay-research';
 import { EssayFinishCard, type FinishView } from './essay-finish';
 import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -810,9 +811,13 @@ export function EssayView({
           )}
           <TargetForm id={essay.id} target={target} onSet={setTarget} />
           {/* One row like Target; the counting rule is on the figure, for a pointer and a screen reader. */}
-          <p className="mt-2 flex items-center justify-between gap-3 text-ui text-ink" title={YOUR_WORDS_RULE}>
+          <p className="mt-2 flex items-center justify-between gap-3 text-ui text-ink">
             <span>Your words</span>
-            <span className="tabular-nums">{share === null ? 'None yet' : `${share}%`}</span>
+            <Tooltip label={YOUR_WORDS_RULE} align="end">
+              <span tabIndex={0} className="tabular-nums">
+                {share === null ? 'None yet' : `${share}%`}
+              </span>
+            </Tooltip>
             <span className="sr-only">{YOUR_WORDS_RULE}</span>
           </p>
         </CardSection>

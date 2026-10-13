@@ -59,6 +59,7 @@ import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { TaskFiles, TaskFilesCount, type TaskFile } from '@/components/attachments/task-files';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -487,24 +488,26 @@ export function TaskRow({
           is the same claim twice. A dropped task gets the struck hexagon here
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
-        <button
-          ref={glyph}
-          type="button"
-          aria-label={done ? 'Reopen' : 'Mark done'}
-          onClick={() =>
-            done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
-          }
-          className={cn(
-            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
-            done
-              ? 'text-status-offer'
-              : dropped
-                ? 'text-ink-muted'
-                : 'text-ink-muted hover:text-accent',
-          )}
-        >
-          <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
-        </button>
+        <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+          <button
+            ref={glyph}
+            type="button"
+            aria-label={done ? 'Reopen' : 'Mark done'}
+            onClick={() =>
+              done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
+            }
+            className={cn(
+              'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
+              done
+                ? 'text-status-offer'
+                : dropped
+                  ? 'text-ink-muted'
+                  : 'text-ink-muted hover:text-accent',
+            )}
+          >
+            <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
+          </button>
+        </Tooltip>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -622,17 +625,17 @@ export function TaskRow({
                 pile that does nothing is a control that lies. */}
               <span className="contents [@media(hover:hover)]:hidden [@media(hover:hover)]:group-focus-within:contents">
                 {index > 0 && (
-                  <IconButton label="Move up" onClick={() => move('up')}>
+                  <RowAction label="Move up" onClick={() => move('up')}>
                     <ArrowUp strokeWidth={1.75} aria-hidden />
-                  </IconButton>
+                  </RowAction>
                 )}
                 {index !== -1 && index < siblings.length - 1 && (
-                  <IconButton label="Move down" onClick={() => move('down')}>
+                  <RowAction label="Move down" onClick={() => move('down')}>
                     <ArrowDown strokeWidth={1.75} aria-hidden />
-                  </IconButton>
+                  </RowAction>
                 )}
               </span>
-              <IconButton
+              <RowAction
                 label={task.pinned ? 'Unpin' : 'Pin'}
                 onClick={() =>
                   run({
@@ -642,41 +645,41 @@ export function TaskRow({
                 }
               >
                 <Pin strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               {task.snoozedUntil ? (
-                <IconButton
+                <RowAction
                   label="Bring back"
                   onClick={() =>
                     run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) })
                   }
                 >
                   <Undo2 strokeWidth={1.75} aria-hidden />
-                </IconButton>
+                </RowAction>
               ) : (
-                <IconButton label="Later" onClick={later}>
+                <RowAction label="Later" onClick={later}>
                   <Clock strokeWidth={1.75} aria-hidden />
-                </IconButton>
+                </RowAction>
               )}
-              <IconButton label="Drop" onClick={drop}>
+              <RowAction label="Drop" onClick={drop}>
                 <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               {/* Breaking the task up: the box opens under the row, where the
                 list is. Hidden with the rest of the actions until the row is
                 pointed at, so a task with no list looks as it always did. */}
-              <IconButton label="Add an item" onClick={() => setAdding(true)}>
+              <RowAction label="Add an item" onClick={() => setAdding(true)}>
                 <Plus strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               {/* The whole form, for the parts of a task the row does not
                 show: the notes, and a date given to a task that has none.
                 The title and an existing date are edited in the row itself,
                 which is what this used to be the only way to do. */}
-              <IconButton label="Edit everything" onClick={() => setEditing(true)}>
+              <RowAction label="Edit everything" onClick={() => setEditing(true)}>
                 <Pencil strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               {/* A note on the task, or a question for Dash about it (plan #1471). */}
-              <IconButton label="Comment" onClick={() => setCommenting(true)}>
+              <RowAction label="Comment" onClick={() => setCommenting(true)}>
                 <MessageSquare strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               {/* Last in the group, because it is the one action here that opens
                 something rather than doing something. `anchor` is what the
                 page resolved, so the unlink half only appears where there is
@@ -685,9 +688,9 @@ export function TaskRow({
               {/* Makes the task an errand on Goals and starts Dash on it
                 (plan #1263). Opens a form in place of the row, like Edit
                 everything. */}
-              <IconButton label="Hand to Dash" onClick={() => setHanding(true)}>
+              <RowAction label="Hand to Dash" onClick={() => setHanding(true)}>
                 <DashMark size="2xs" decorative />
-              </IconButton>
+              </RowAction>
             </span>
           )}
 
@@ -701,12 +704,12 @@ export function TaskRow({
               {/* On All the menu holds these two as well (plan #1776). */}
               {!archive && (
                 <>
-                  <IconButton label="Drop" onClick={drop}>
+                  <RowAction label="Drop" onClick={drop}>
                     <X strokeWidth={1.75} aria-hidden />
-                  </IconButton>
-                  <IconButton label="Edit everything" onClick={() => setEditing(true)}>
+                  </RowAction>
+                  <RowAction label="Edit everything" onClick={() => setEditing(true)}>
                     <Pencil strokeWidth={1.75} aria-hidden />
-                  </IconButton>
+                  </RowAction>
                 </>
               )}
               <ActionMenu label="More actions" items={moreActions} />
@@ -722,12 +725,12 @@ export function TaskRow({
 
           {(done || dropped) && (
             <>
-              <IconButton
+              <RowAction
                 label="Reopen"
                 onClick={() => run({ patch: { status: 'open' }, write: () => reopenTask(task.id) })}
               >
                 <RotateCcw strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              </RowAction>
               <ConfirmStep
                 prompt="Deletes this task for good. Dropping it keeps it in the archive."
                 confirmLabel="Delete"
@@ -895,17 +898,19 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
 
   return (
     <li className="group/item flex items-start gap-2">
-      <button
-        type="button"
-        aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={onTick}
-        className={cn(
-          'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
-          done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
-        )}
-      >
-        <StatusGlyph glyph={TASK_STATUS_GLYPHS[item.status]} size={14} />
-      </button>
+      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+        <button
+          type="button"
+          aria-label={done ? 'Reopen' : 'Mark done'}
+          onClick={onTick}
+          className={cn(
+            'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
+            done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
+          )}
+        >
+          <StatusGlyph glyph={TASK_STATUS_GLYPHS[item.status]} size={14} />
+        </button>
+      </Tooltip>
 
       <span
         className={cn(
@@ -916,14 +921,16 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         {item.title}
       </span>
 
-      <IconButton
-        label="Remove"
-        size="sm"
-        onClick={onDrop}
-        className="opacity-100 sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
-      >
-        <X strokeWidth={1.75} aria-hidden />
-      </IconButton>
+      <Tooltip label="Remove" align="end" className="shrink-0">
+        <IconButton
+          label="Remove"
+          size="sm"
+          onClick={onDrop}
+          className="opacity-100 sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
+        >
+          <X strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </Tooltip>
     </li>
   );
 }
@@ -982,6 +989,25 @@ function AddItem({ parentId, onClose }: { parentId: string; onClose: () => void 
         className="min-w-0 flex-1 border-none bg-transparent p-0 text-small text-ink outline-none placeholder:text-ink-ghost"
       />
     </form>
+  );
+}
+
+/** A row action: the shared IconButton, with its name in a Tooltip. */
+function RowAction({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip label={label} align="end">
+      <IconButton label={label} onClick={onClick}>
+        {children}
+      </IconButton>
+    </Tooltip>
   );
 }
 

@@ -1,11 +1,10 @@
 import Link from '@/components/ui/link';
-import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
-import { iconButtonVariants } from '@/components/ui/icon-button';
 import { SectionLabel } from '@/components/ui/section-heading';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
 import { formatClock } from '@/lib/clock';
+import { NewEventLink } from '@/components/todo/new-event-link';
 
 /**
  * A month, drawn.
@@ -66,17 +65,12 @@ export function CalendarMonthGrid({
             {/* Adding to a square you are already looking at, without going
                 anywhere first. Not drawn on a phone: the squares are a fifth
                 of the width there and the day number is the way in. */}
-            <Link
+            <NewEventLink
               href={newEventHref(day.day)}
-              aria-label={`New event on ${day.day}`}
-              title="New event"
-              className={cn(
-                iconButtonVariants({ size: 'sm' }),
-                'absolute right-1 top-1 hidden opacity-0 focus-visible:opacity-100 group-hover:opacity-100 sm:inline-flex',
-              )}
-            >
-              <Plus strokeWidth={1.75} aria-hidden />
-            </Link>
+              day={day.day}
+              className="absolute right-1 top-1 hidden sm:flex"
+              linkClassName="opacity-0 transition-opacity duration-quick focus-visible:opacity-100 group-hover:opacity-100"
+            />
 
             {/* The number is the way into the day, at every width: a square
                 that cannot hold everything in it has to lead somewhere that

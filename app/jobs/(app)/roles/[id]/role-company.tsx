@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import { moveRoleToCompany } from './actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The company a role belongs to, correctable in place.
@@ -44,17 +45,18 @@ export function RoleCompany({
         </Link>
         {/* The icon button's full hit target, pulled in with negative margins
             so a 32px box does not push the subtitle's line apart. */}
-        <IconButton
-          label="Move this role to another company"
-          onClick={() => {
-            setDraft(name);
-            setError(null);
-            setEditing(true);
-          }}
-          className="-my-2"
-        >
-          <Pencil strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label="Move this role to another company" className="-my-2">
+          <IconButton
+            label="Move this role to another company"
+            onClick={() => {
+              setDraft(name);
+              setError(null);
+              setEditing(true);
+            }}
+          >
+            <Pencil strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       </span>
     );
   }

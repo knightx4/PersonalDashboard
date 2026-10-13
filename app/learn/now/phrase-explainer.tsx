@@ -12,6 +12,7 @@ import {
 import { Check, Plus, Sparkles, Sprout, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { Tooltip } from '@/components/ui/tooltip';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import type { MarkedPart } from '@/lib/learn/feed/mentions';
@@ -227,9 +228,11 @@ function Explanation({
     <Note aria-live="polite" className="mb-2 max-h-[45vh] overflow-y-auto">
       <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 text-small font-semibold break-words text-ink">“{phrase}”</h3>
-        <IconButton label="Close the explanation" onClick={onClose}>
-          <X strokeWidth={1.75} aria-hidden />
-        </IconButton>
+        <Tooltip label="Close the explanation" align="end">
+          <IconButton label="Close the explanation" onClick={onClose}>
+            <X strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       </div>
 
       {explaining && !explained && (
