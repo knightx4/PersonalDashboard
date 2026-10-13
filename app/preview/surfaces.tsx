@@ -165,6 +165,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -5694,6 +5695,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <OpenMissingSurface />,
+  },
+  /* A workspace's not-found and error files, inside the shell (plan #1923). */
+  {
+    id: 'route-not-found',
+    label: 'Any workspace · A row that is no longer there',
+    module: 'news',
+    width: 'page',
+    render: () => <RouteNotFoundSurface />,
+  },
+  {
+    id: 'route-error',
+    label: 'Any workspace · A page that failed to load',
+    module: 'news',
+    width: 'page',
+    render: () => <RouteErrorSurface />,
   },
 
   /* The account, the week review and the Dev tabs (plan #1600). Fixtures

@@ -483,7 +483,7 @@ Checked by: count `shell-mounts`, baseline 15, target 1, pending #1928.
 
 **R10.** Every route group has `error.tsx`, `not-found.tsx` and
 `loading.tsx`.
-Checked by: test `tests/route-states.test.ts`, pending #1923.
+Checked by: test `tests/route-states.test.ts`.
 
 **R11.** Opening `/` while signed in is one redirect, to Home.
 Checked by: test `tests/proxy-launch.test.ts`.
