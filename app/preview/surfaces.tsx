@@ -142,6 +142,7 @@ import {
   LearnEssayInterviewSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
+  LearnSubjectConversationsSurface,
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
@@ -6149,6 +6150,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnPlanFinishedSurface />,
+  },
+  {
+    id: 'learn-subject-conversations',
+    label: 'Subject · Conversations, each ready to write about',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectConversationsSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

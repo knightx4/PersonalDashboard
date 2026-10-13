@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import type { SubjectLearning } from '@/lib/learn/chat/subject-load';
 
 /**
@@ -13,7 +14,16 @@ import type { SubjectLearning } from '@/lib/learn/chat/subject-load';
 
 const STATUS_LABEL = { queued: 'To read', reading: 'Reading', read: 'Read', abandoned: 'Set aside' } as const;
 
-export function ChatLearningSection({ learning, timezone }: { learning: SubjectLearning; timezone: string }) {
+export function ChatLearningSection({
+  learning,
+  timezone,
+  conversationsOpen = false,
+}: {
+  learning: SubjectLearning;
+  timezone: string;
+  /** The gallery draws the conversations open; the page keeps them folded. */
+  conversationsOpen?: boolean;
+}) {
   const { readings, sessions } = learning;
   if (readings.length === 0 && sessions.length === 0) return null;
 
@@ -47,7 +57,7 @@ export function ChatLearningSection({ learning, timezone }: { learning: SubjectL
       )}
 
       {sessions.length > 0 && (
-        <SectionFold title={`Conversations · ${sessions.length}`} defaultOpen={false} className="mt-6">
+        <SectionFold title={`Conversations · ${sessions.length}`} defaultOpen={conversationsOpen} className="mt-6">
           <p className="mb-2 text-ui text-ink-muted">
             What your chats covered. Their ideas are in the graph untested until you answer on them.
           </p>
@@ -60,6 +70,7 @@ export function ChatLearningSection({ learning, timezone }: { learning: SubjectL
                 </div>
                 <p className="mt-1 text-ui text-ink">{row.summary}</p>
                 {row.ideas.length > 0 && <p className="mt-1 text-ui text-ink-muted">{row.ideas.join(' · ')}</p>}
+                <WriteAboutThis kind="log" refId={row.id} title={row.topic} size="md" className="mt-3" />
               </li>
             ))}
           </ul>

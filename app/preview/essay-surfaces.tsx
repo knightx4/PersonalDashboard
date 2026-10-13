@@ -4,6 +4,7 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EssaysView } from '@/app/learn/essays/essays-view';
 import { EssayView } from '@/app/learn/e/[id]/essay-view';
 import { PlanSection } from '@/app/learn/s/[id]/plan';
+import { ChatLearningSection } from '@/app/learn/s/[id]/chat-learning';
 import { openingAsk } from '@/lib/learn/essays/interview';
 import type { Essay, EssayPin, EssaySummary } from '@/lib/learn/essays/model';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
@@ -688,6 +689,36 @@ export function LearnPlanFinishedSurface() {
       units={finishedUnits}
       project={passedProject}
       goal={{ aimId: goalPin.id, name: goalPin.title }}
+    />
+  );
+}
+
+/** A subject's logged conversations, each with "Write about this" (plan #1882). */
+export function LearnSubjectConversationsSurface() {
+  return (
+    <ChatLearningSection
+      timezone="Europe/London"
+      conversationsOpen
+      learning={{
+        readings: [],
+        sessions: [
+          {
+            id: '00000000-0000-4000-8000-0000000000a1',
+            topic: 'Why a rent cap helps the people already housed and does little for anyone still looking',
+            summary:
+              'You worked through who a cap protects, why landlords stop listing in capped areas, and what the listings data from your own city shows.',
+            ideas: ['Rent control', 'Supply elasticity', 'Insider-outsider markets'],
+            createdAt: '2026-10-09T18:20:00Z',
+          },
+          {
+            id: '00000000-0000-4000-8000-0000000000a2',
+            topic: 'Mortgage rates',
+            summary: 'A short chat on how a point of interest changes the price a buyer can reach.',
+            ideas: [],
+            createdAt: '2026-10-02T09:05:00Z',
+          },
+        ],
+      }}
     />
   );
 }

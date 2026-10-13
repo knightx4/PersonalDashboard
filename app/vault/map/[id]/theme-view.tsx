@@ -4,6 +4,7 @@ import { MapPosition, MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MapSource, ThemeMap } from '@/lib/vault/map/read';
 import { noteHref } from '@/lib/vault/paths';
+import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 
 /**
  * One theme on the map, drawn from what the page read (page.tsx), so the
@@ -34,6 +35,7 @@ export function ThemeView({ map }: { map: ThemeMap }) {
           {count(notes.length, 'note', 'notes')} · {count(positions.length, 'position', 'positions')}
           {span && <> · {span}</>}
         </p>
+        <WriteAboutThis kind="theme" refId={theme.id} title={theme.name} size="md" className="mt-3" />
       </header>
 
       {positions.length > 0 && (
