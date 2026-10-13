@@ -4,6 +4,12 @@ import { loadPipeline } from '@/lib/jobs/applications/load';
 import { summariseSearch, type SummaryInterview } from '@/lib/jobs/home/summary';
 import { loadSinceView } from '@/lib/jobs/home/since-load';
 import { loadReviewQueue } from '@/lib/jobs/review/load';
+import {
+  CLOSEST_STATUSES,
+  closestToOffer,
+  loadClosestInterviews,
+  withoutClosestDebriefs,
+} from '@/lib/jobs/today/closest';
 import { liveByMove } from '@/lib/jobs/today/live';
 import { loadToday } from '@/lib/jobs/today/load';
 import { reviewPeek } from '@/lib/jobs/today/review-peek';
@@ -19,6 +25,10 @@ export const metadata = { title: 'Today' };
  * follow-up drafts. This week's board is read before "Since you last looked",
  * which leaves out the mail This week lists as waiting on you; the same mail
  * puts the live list's move on you.
+ *
+ * The applications at final round or in process are read once more, for
+ * their interviews' prep and notes, which open the page; the debriefs they
+ * ask for are taken out of This week so a round is nudged once.
  *
  * /jobs/today, the page Home replaced, redirects here.
  */
@@ -47,10 +57,17 @@ export default async function JobsToday() {
       .not('scheduled_at', 'is', null),
   ]);
 
-  const [board, queue] = await Promise.all([
-    loadToday(supabase, user.id, { senderName, pipeline }),
+  const now = new Date();
+  const [board, queue, closestInterviews] = await Promise.all([
+    loadToday(supabase, user.id, { senderName, pipeline, now }),
     loadReviewQueue(supabase, core, user.id),
+    loadClosestInterviews(
+      supabase,
+      user.id,
+      pipeline.filter((row) => CLOSEST_STATUSES.includes(row.status)).map((row) => row.applicationId),
+    ),
   ]);
+  const closest = closestToOffer(pipeline, closestInterviews, now);
   const since = await loadSinceView(supabase, core, {
     userId: user.id,
     timezone,
@@ -69,8 +86,9 @@ export default async function JobsToday() {
   return (
     <TodayPage
       review={reviewPeek(queue.rows)}
-      board={board}
-      summary={summariseSearch(pipeline, interviews, new Date())}
+      closest={closest}
+      board={withoutClosestDebriefs(board, closest)}
+      summary={summariseSearch(pipeline, interviews, now)}
       live={liveByMove(pipeline, new Set(board.waiting.map((item) => item.applicationId)))}
       since={since}
       timezone={timezone}
