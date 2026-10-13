@@ -33,7 +33,7 @@ export default async function AreaPage({
   if (!data.areas.some((area) => area.id === areaId)) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <GoalsView {...data} view={view} areaId={areaId} />
     </div>
   );

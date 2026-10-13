@@ -116,7 +116,7 @@ export default async function AccountPage({
         notifications={raised}
         mainCheck={mainCheck}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-5xl">
 
           <div>
           <AccountView

@@ -69,7 +69,7 @@ export default async function GoalsPage() {
   const awayFrom = catchUpSince(visit, today);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Goals" />
       <HomeView
         {...home}

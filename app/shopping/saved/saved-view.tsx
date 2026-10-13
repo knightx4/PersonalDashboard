@@ -129,7 +129,7 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
   return (
     <div className="max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
       {items.length === 0 ? (
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-5xl">
           {header}
           <div className="mb-4">{tools}</div>
           <EmptyState

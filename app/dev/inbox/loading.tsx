@@ -4,7 +4,7 @@ import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skel
 /** The inbox's shape while it loads: the header, the four counts, then the rows. */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeaderSkeleton action={false} />
 
       <Card padding="dense" className="grid grid-cols-2 gap-1 sm:grid-cols-4">

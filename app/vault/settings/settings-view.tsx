@@ -54,7 +54,7 @@ export function VaultSettingsView({
   progress: SyncProgress | null;
 }) {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Vault settings"
         description="Where your notes come from, and how they get here."

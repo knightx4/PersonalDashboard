@@ -254,12 +254,6 @@ export async function renderPlanPage({
   // Light on purpose -- the tree is already on the page once.
   const catalog = catalogOf(everything);
 
-  // Wider than the other dev pages, which are prose and lists at max-w-3xl.
-  // This one is a table with six columns and a tree indenting the first of
-  // them, and the Status column took the last of the room the titles had: at
-  // 3xl a third-level step's title truncated after about two words. The page
-  // earns the extra width by being the only one here that is a grid rather
-  // than a column of text.
   // A project sends to its own routine, and only once that routine is set:
   // with no id the send would fall back to this repository's.
   const canSend = project

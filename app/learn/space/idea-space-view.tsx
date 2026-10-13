@@ -54,7 +54,7 @@ export function IdeaSpaceView({
 
   if (!view) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-5xl">
         {header}
         <p className="text-body text-ink-muted">
           Your ideas could not be read just now, so the map is missing. Reload to try again.
@@ -65,7 +65,7 @@ export function IdeaSpaceView({
 
   if (view.ideas.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-5xl">
         {header}
         <EmptyState
           icon={Orbit}

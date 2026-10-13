@@ -682,7 +682,7 @@ export function UiStandard({
   outlines?: OutlineIndex;
 }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 pb-16">
+    <div className="mx-auto max-w-5xl space-y-8 pb-16">
       <PageHeader
         title="UI"
         description="The whole standard, rendered from the tokens it describes. Every swatch, control, size and number below is the real one — this page is a mirror, not a specification, and it is the only copy."

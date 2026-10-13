@@ -30,7 +30,7 @@ export default async function ActivityPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       {/* No description: the heading says it, and what the inbox and the
           nightly sweep do is told in the empty state, where it is news. */}
       <PageHeader title="Activity" />

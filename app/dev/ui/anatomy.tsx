@@ -340,7 +340,7 @@ function DashboardAnatomy() {
  */
 function SettingsAnatomy() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Settings" />
 
       <div className="space-y-4">

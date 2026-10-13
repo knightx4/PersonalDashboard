@@ -56,7 +56,7 @@ import type { AgentActionSummary } from '@/lib/agent-actions/summary';
  * like the live rows. Each sits in the 3xl column its page draws.
  */
 
-const column = (children: React.ReactNode) => <div className="mx-auto max-w-3xl space-y-6">{children}</div>;
+const column = (children: React.ReactNode) => <div className="mx-auto max-w-5xl space-y-6">{children}</div>;
 
 // ---- Bugs and requests ----------------------------------------------------
 

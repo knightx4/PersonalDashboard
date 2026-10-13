@@ -42,7 +42,7 @@ export default async function GoalRunsPage() {
   const views = runViews(runs, account.timezone);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Runs" />
       {views.length === 0 ? (
         <EmptyState

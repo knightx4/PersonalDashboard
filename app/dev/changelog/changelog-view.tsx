@@ -81,7 +81,7 @@ export function ChangelogView({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       {/* No paragraph under the heading: the rows say what they are, and a
           chevron on each says it opens (plan #1745). */}
       <PageHeader title="Changelog" />

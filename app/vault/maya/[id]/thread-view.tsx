@@ -36,7 +36,7 @@ export function MayaThreadView({
     }));
 
   return (
-    <article className="mx-auto max-w-3xl">
+    <article className="mx-auto max-w-5xl">
       <div className="mb-4">
         <Link
           href="/vault/maya"

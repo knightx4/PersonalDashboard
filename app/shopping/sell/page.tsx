@@ -26,7 +26,7 @@ export default async function SellPage() {
     await loadSellQueue({ supabase, userId: user.id });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Sell assistant"
         description="Everything you marked for sale, priced and sorted by what it nets you. Drafts only — nothing posts without you."

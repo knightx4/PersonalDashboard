@@ -44,7 +44,7 @@ export default async function AskLayout({ children }: { children: React.ReactNod
         mainCheck={mainCheck}
       >
         <PaidCostsProvider costs={costs}>
-          <div className="mx-auto max-w-3xl">{children}</div>
+          <div className="mx-auto max-w-5xl">{children}</div>
         </PaidCostsProvider>
       </AppShell>
     </div>

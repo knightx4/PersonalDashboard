@@ -28,7 +28,7 @@ export function EssaysView({ essays, now = new Date() }: { essays: EssaySummary[
   if (essays.length === 0) {
     // The empty state carries the one button, so the header does not repeat it.
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <PageHeader title="Essays" />
         <EmptyState
           icon={PenLine}

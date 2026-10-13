@@ -72,7 +72,7 @@ export function SpecsView({
   const groups = groupSpecs(SPECS, counts);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader title="Specs" />
 
       {/* Changes Dash proposes to the specs, above the documents they change

@@ -39,7 +39,7 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-3xl', className)}>
+    <div className={cn('mx-auto max-w-5xl', className)}>
       {header}
       {tools && <div className="mb-4">{tools}</div>}
       <Card padding="none">
@@ -110,7 +110,7 @@ export function DetailPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-3xl space-y-6', className)}>
+    <div className={cn('mx-auto max-w-5xl space-y-6', className)}>
       <div>
         {header}
         <section aria-label="Details">{details}</section>

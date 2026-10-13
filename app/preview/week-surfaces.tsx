@@ -73,7 +73,7 @@ const WEEKS = ['2026-09-27', '2026-09-20', '2026-09-13', '2026-09-06'];
 
 export function WeekReviewSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <WeekReviewView state="shown" review={REVIEW} weeks={WEEKS} timezone="America/New_York" />
     </div>
   );
@@ -81,7 +81,7 @@ export function WeekReviewSurface() {
 
 export function WeekReviewNoneSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <WeekReviewView state="none" next={{ day: '2026-10-11', due: false }} />
     </div>
   );

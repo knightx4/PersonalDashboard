@@ -52,7 +52,7 @@ function indexLine(summary: ModuleSummary): string {
 
 export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSummary[] }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         crumbs={moduleCrumbs()}
         title="Modules"

@@ -37,7 +37,7 @@ export default async function FilesPage() {
     }));
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Files" description="Longer pieces Dash wrote for your goals, kept as pages." />
       {files.length === 0 ? (
         <EmptyState

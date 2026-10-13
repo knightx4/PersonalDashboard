@@ -99,7 +99,7 @@ export const GOAL_RUN_QUESTION: RunQuestion = {
 /** Every state of the card, stacked as the gallery shows them. */
 export function RunLinesSurface() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <RunLinesArriving lines={RUN_LINES} />
       <RunLinesView lines={RUN_LINES.slice(0, 5)} state="waiting" answer={answerGoalRunAction} />
       <RunLinesView lines={OPEN_QUESTION_LINES} state="waiting" answer={answerGoalRunAction} />

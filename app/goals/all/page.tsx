@@ -38,7 +38,7 @@ export default async function AllGoalsPage({
   const data = await loadAllGoals(user, view);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="All goals"
         crumbs={allGoalsCrumbs()}

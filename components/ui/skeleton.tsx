@@ -78,10 +78,10 @@ export function ListPageSkeleton({ thumb = false }: { thumb?: boolean }) {
   );
 }
 
-/** A single reading column. */
+/** A one-column page at the shared page width. */
 export function ReadingPageSkeleton() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeaderSkeleton action={false} />
       <RowsSkeleton rows={5} />
     </div>

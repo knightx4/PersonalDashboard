@@ -94,7 +94,13 @@ const ON_SCALE_TYPE = `export const heading = 'font-display text-title font-semi
 const ARBITRARY_WIDTH = `export const page = 'mx-auto max-w-[1100px] px-6';
 `;
 
-const NAMED_WIDTH = `export const page = 'mx-auto max-w-3xl px-6 max-w-[1400px] max-w-sm';
+const NAMED_WIDTH = `export const page = 'mx-auto max-w-5xl px-6 max-w-[1400px] max-w-sm';
+`;
+
+const OTHER_PAGE_WIDTH = `export const page = 'mx-auto max-w-3xl space-y-6';
+`;
+
+const INNER_WIDTH = `export const video = 'relative mx-auto aspect-video w-full lg:max-w-3xl';
 `;
 
 const RAW_HEX =
@@ -123,8 +129,20 @@ describe('the design-language rules', () => {
     expect(await lint('app/__design_probe.ts', ARBITRARY_WIDTH)).toMatch(/no-restricted-syntax/);
   });
 
-  it('allows the three page widths and the named inner sizes', async () => {
+  it('allows the page width and the named inner sizes', async () => {
     expect(await lint('app/__design_probe.ts', NAMED_WIDTH)).toBe('');
+  });
+
+  it('blocks a page frame narrower or wider than the shared one', async () => {
+    expect(await lint('app/__design_probe.ts', OTHER_PAGE_WIDTH)).toMatch(/no-restricted-syntax/);
+  });
+
+  it('allows a breakpoint width on something inside a page', async () => {
+    expect(await lint('app/__design_probe.ts', INNER_WIDTH)).toBe('');
+  });
+
+  it('leaves the pages outside the shell their own width', async () => {
+    expect(await lint('app/(legal)/__design_probe.ts', OTHER_PAGE_WIDTH)).toBe('');
   });
 
   it('blocks a hex colour in a class string, even a template one', async () => {

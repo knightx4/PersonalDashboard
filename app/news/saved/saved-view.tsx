@@ -12,7 +12,7 @@ export type SavedViewProps = {
  */
 export function SavedView({ stories }: SavedViewProps) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Saved"
         description="Stories you saved from your newsletters, the most recently saved first."

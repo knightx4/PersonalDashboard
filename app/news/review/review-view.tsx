@@ -45,7 +45,7 @@ export type ReviewViewProps = {
 export function ReviewView({ review, earlier, later, todayAt }: ReviewViewProps) {
   if (!review) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <PageHeader title="Daily review" />
         <EmptyState
           icon={Newspaper}
@@ -58,7 +58,7 @@ export function ReviewView({ review, earlier, later, todayAt }: ReviewViewProps)
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Daily review"
         description={

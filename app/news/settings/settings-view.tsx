@@ -25,7 +25,7 @@ export function NewsSettingsView({
   localArea: string | null;
 }) {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="News settings" />
 
       <div className="space-y-5">

@@ -8,7 +8,7 @@ import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeaderSkeleton action={false} />
 
       {/* The dial, not forty pixels. The bar this stands in for is a text

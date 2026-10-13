@@ -113,7 +113,7 @@ export default async function NowPage({
     after(() => topUpFeedAfterResponse(user.id, subject.id));
     const related = relatedNotesForCards(supabase, user.id, cards);
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         {header()}
         <LearnNowFeed
           first={cards}
@@ -154,7 +154,7 @@ export default async function NowPage({
 
   if (practice) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
         {strip}
         <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
@@ -173,7 +173,7 @@ export default async function NowPage({
   const queued = readings ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       {header(
         queued.length === 0
           ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'

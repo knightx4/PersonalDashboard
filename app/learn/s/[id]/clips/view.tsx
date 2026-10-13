@@ -48,7 +48,7 @@ export function SubjectClipsView({ subject, clips, counts, fixed = false }: Subj
 
   if (clips.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-5xl">
         {header}
         <SubjectClipsEmpty />
       </div>

@@ -97,7 +97,7 @@ export function AllTasksView({
     // clear.
     <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
       {tasks.length === 0 ? (
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-5xl">
           {header}
           {tools}
           {search ? (

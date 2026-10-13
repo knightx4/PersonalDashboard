@@ -80,7 +80,7 @@ export function StepPage({
   const substeps = siblings.filter((sibling) => sibling.kind !== 'decision');
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       {/* The path down to the step, through every step it sits under (plan #1622). */}
       {crumbs && <Breadcrumb crumbs={crumbs} className="mb-3" />}
       {/* The step's own row is the page's heading: its title, the status

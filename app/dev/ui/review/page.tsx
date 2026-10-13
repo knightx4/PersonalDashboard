@@ -61,7 +61,7 @@ export default async function DevUiReviewPage({
     }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader title="Review" />
       <ReviewView standings={standings} only={only} />
     </div>

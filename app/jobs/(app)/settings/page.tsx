@@ -111,7 +111,7 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Settings"
         description="What the job search needs, and what you want from the next job. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."

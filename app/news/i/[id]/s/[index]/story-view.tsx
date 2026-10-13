@@ -34,7 +34,7 @@ export function StoryView({
   const paragraphs = storyParagraphs(story.text);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <Link
         href={back.href}
         className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"

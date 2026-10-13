@@ -47,7 +47,7 @@ import {
 /** The instant every fixture is measured from, so the shots do not move. */
 const NOW = new Date('2026-10-06T14:00:00Z');
 
-const page = (children: React.ReactNode) => <div className="mx-auto max-w-3xl">{children}</div>;
+const page = (children: React.ReactNode) => <div className="mx-auto max-w-5xl">{children}</div>;
 
 // ---- Activity ---------------------------------------------------------------
 

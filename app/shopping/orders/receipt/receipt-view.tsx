@@ -6,7 +6,7 @@ import { ReceiptPhotoForm } from './receipt-form';
 /** The receipt photo page, apart from the sign-in check, so the gallery can draw it (plan #1604). */
 export function ReceiptView() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Receipt photo"
         actions={

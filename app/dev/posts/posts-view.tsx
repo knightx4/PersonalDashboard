@@ -73,7 +73,7 @@ export function PostsScreen({
 }) {
   const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <PageHeader
           title="Posts"

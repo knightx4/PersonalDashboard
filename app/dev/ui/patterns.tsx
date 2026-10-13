@@ -206,7 +206,7 @@ const DECK_ITEMS: readonly DeckItem[] = STORIES.map((story) => ({
 
 function DeckSurface() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Quick read" />
       <Deck
         items={DECK_ITEMS}
@@ -246,7 +246,7 @@ const TURNS: DevComment[] = [
 
 function ThreadSurface() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <ThreadPanel title="Show the count on Home" href="#" meta="Step #412 · In progress · Dash">
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
@@ -580,7 +580,7 @@ function AccountQuiet({ line }: { line: string }) {
 
 function SectionsSurface() {
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Account" description="Sam Okafor" />
       <TabbedSections tabs={ACCOUNT_TABS} label="Account" address={{ param: SECTION_PARAM }}>
         <OpenTab
@@ -657,7 +657,7 @@ export const PATTERNS: readonly PagePattern[] = [
     name: 'main plus rail',
     label: 'Main plus rail',
     when: 'An overview page with status worth keeping beside the work, such as Home.',
-    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
+    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left, in what the shared page width leaves beside the rail. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
     component: { path: 'components/patterns/main-rail.tsx', exports: ['MainRail'] },
     surfaces: [{ id: 'pattern-rail', label: 'An overview', render: () => <RailSurface /> }],
   },

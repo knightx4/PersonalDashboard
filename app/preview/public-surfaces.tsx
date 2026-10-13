@@ -160,7 +160,7 @@ export function ShareFormSurface() {
 /** A ref whose row has been deleted, in the shell's box as /open draws it. */
 export function OpenMissingSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <NoLongerThere />
     </div>
   );

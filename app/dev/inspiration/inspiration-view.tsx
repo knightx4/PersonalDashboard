@@ -198,7 +198,7 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
  */
 export function InspirationScreen({ page, view }: { page: InspirationPage; view: InspirationViewName }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <PageHeader
           title="Inspiration"

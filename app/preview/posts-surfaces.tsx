@@ -173,7 +173,7 @@ export function PostsMatchedSurface() {
         page={{ ...page, posted: [], onX: { posts: [], total: 0 } }}
         x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T12:00:00Z' }}
       />
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <SectionFold title="Posted" count={page.posted.length}>
           <PostList cards={page.posted} />
         </SectionFold>
@@ -225,7 +225,7 @@ export function PostsNoDraftSurface() {
  */
 export function PostsXSurface() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <XConnection view={{ state: 'unconfigured', setupStep: 1816 }} />
       <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
       <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
@@ -246,7 +246,7 @@ export function PostsXSurface() {
 /** Write your own, opened: the compose box a post the person writes goes in. */
 export function PostsWriteSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <WritePost defaultOpen />
     </div>
   );

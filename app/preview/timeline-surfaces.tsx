@@ -73,7 +73,7 @@ const OBSERVATIONS: ShownObservation[] = [
 export function TimelineSurface() {
   const months = groupByMonth(EVENTS, 'America/New_York', { first: '2025-10', last: '2026-09' });
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Timeline" description="What you did across the app, month by month." />
       <TimelineView
         months={months}
@@ -100,7 +100,7 @@ export function YearReviewSurface() {
   const totals = yearTotals(year, 2026, timezone, '2026-09');
   const of = (...kinds: TimelineEvent['kind'][]) => year.filter((event) => kinds.includes(event.kind));
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="2026 in review" description="What the year held, counted from the timeline and written up by Dash." />
       <YearReviewView
         year={2026}

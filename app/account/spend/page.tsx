@@ -175,7 +175,7 @@ export default async function SpendPage() {
         notifications={raised}
         mainCheck={mainCheck}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-5xl">
           <p className="mb-3">
             <Link
               href="/account"

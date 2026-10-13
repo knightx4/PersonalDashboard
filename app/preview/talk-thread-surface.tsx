@@ -186,7 +186,7 @@ const send: TalkSend = async (body) => {
 
 export function TalkThreadSurface() {
   return (
-    <div className="mx-auto max-w-3xl py-4">
+    <div className="mx-auto max-w-5xl py-4">
       <Card padding="standard">
         <TalkThread
           id="talk-thread-preview"
@@ -238,7 +238,7 @@ const ANSWER_COST: CostEstimate = {
  */
 export function TalkThreadFilesSurface() {
   return (
-    <div className="mx-auto max-w-3xl py-4">
+    <div className="mx-auto max-w-5xl py-4">
       <Card padding="standard">
         <TalkThread
           id="talk-thread-files-preview"

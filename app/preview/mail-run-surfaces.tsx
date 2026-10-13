@@ -80,7 +80,7 @@ const ACTIVITY: RunActivity[] = [
 export function GoalRunSurface() {
   const { meta } = runMeta(RUN, NOW, 'America/New_York');
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <PageHeader
         title={JOB_LABELS[RUN.job]}
         description={
@@ -155,7 +155,7 @@ export function MailMessageSurface() {
   const subject = MESSAGES.find((m) => m.subject)?.subject ?? '(no subject)';
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <BackButton />
       <PageHeader title={subject} description={`${MESSAGES.length} messages`} />
       <div className="mb-4 flex flex-wrap gap-2">

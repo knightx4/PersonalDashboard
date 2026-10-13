@@ -198,7 +198,7 @@ export function UsageScreen({
   now: Date;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Usage" />
       <OpensByWorkspace report={report} phoneShare={phoneShare} />
       <section aria-labelledby="usage-functions" className="mt-8">

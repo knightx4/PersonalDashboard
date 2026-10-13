@@ -59,7 +59,7 @@ export function ShoppingSettingsView({
   returnPolicies: MerchantPolicyRow[];
 }) {
   return (
-    <div className="mx-auto max-w-3xl [&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
+    <div className="mx-auto max-w-5xl [&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
       <PageHeader title="Settings" />
 
       <div className="space-y-4">

@@ -15,7 +15,7 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
   const count = waiting.groups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Waiting" />
 
       {waiting.failed.length > 0 && (

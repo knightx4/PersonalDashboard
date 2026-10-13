@@ -46,7 +46,7 @@ export default async function AddItemPage() {
     .order('name');
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Add new item"
         description="Type in anything you own, or use one of the capture flows for the things that have a catalog behind them."

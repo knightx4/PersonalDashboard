@@ -7,7 +7,7 @@ import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skel
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeaderSkeleton action={false} />
 
       <Card padding="dense" className="space-y-3">

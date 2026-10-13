@@ -423,7 +423,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
 
 export function GoalsHomeSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Goals" />
       <HomeView {...home} timeZone="Europe/London" canRun />
     </div>
@@ -433,7 +433,7 @@ export function GoalsHomeSurface() {
 /** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
 export function GoalsInboxSurface() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
         groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
@@ -468,7 +468,7 @@ const areas: AreaWithGoals[] = [
 
 export function GoalsAllSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
       <GoalsView
         areas={areas}
@@ -521,7 +521,7 @@ const moneyArea: AreaWithGoals = {
 /** An area's own page (plan #1619): the Money area alone, two goals open and two Dash proposed. */
 export function GoalsAreaSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <GoalsView
         areas={[moneyArea, ...areas.slice(1)]}
         areaId="a-money"
@@ -678,7 +678,7 @@ Read from the job search on 26 Sept. No applications or messages were sent.`;
 /** A file as its page shows it: the body in its card. The summary is for lists. */
 export function FileSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Your applications by role family"
         description={
@@ -1152,7 +1152,7 @@ export function InformationListSurface({ seam }: { seam?: InformationSeam }) {
 /** The bare goal's Link line pressed: the picker in a card of its own. */
 export function GoalLinkingSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <GoalLinksSection
         goalId={marathon.id}
         links={{ aims: [], jobSearch: null, jobs: [] }}

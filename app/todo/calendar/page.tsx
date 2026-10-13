@@ -130,7 +130,7 @@ export default async function TodoCalendarPage({
 
   return (
     // No width of its own: a calendar is a grid, and seven columns want every
-    // bit of the shell's 1400. The other todo pages are reading columns.
+    // bit of the shell's 1400. The other todo pages share the max-w-5xl page width.
     <div>
       <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
 

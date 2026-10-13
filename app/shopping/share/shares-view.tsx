@@ -62,7 +62,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl [&_a]:press-area">
+      <div className="mx-auto max-w-5xl [&_a]:press-area">
         {header}
         <EmptyState
           icon={Share2}

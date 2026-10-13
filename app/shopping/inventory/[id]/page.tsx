@@ -310,9 +310,8 @@ export default async function InventoryItemPage({
     item.status === 'owned' ? await loadShareOptions(supabase, user.id) : [];
 
   return (
-    // A detail page reads top to bottom, so it gets the reading column rather
-    // than the single-form width the panels below might suggest.
-    <div className="mx-auto max-w-3xl space-y-8">
+    // The page width every page in the shell shares.
+    <div className="mx-auto max-w-5xl space-y-8">
       <PageHeader
         title={title}
         description={[displayVariant(item.variant), category?.name, item.status]

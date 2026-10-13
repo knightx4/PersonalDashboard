@@ -21,7 +21,7 @@ export type GameMode = (typeof GAME_MODES)[number]['id'];
  */
 export function AddGamesView({ mode }: { mode: GameMode }) {
   return (
-    <div className="mx-auto max-w-3xl [&_a]:press-area">
+    <div className="mx-auto max-w-5xl [&_a]:press-area">
       <PageHeader
         title="Add board games"
         actions={

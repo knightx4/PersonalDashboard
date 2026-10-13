@@ -45,7 +45,7 @@ export default async function TimelineLayout({ children }: { children: React.Rea
         mainCheck={mainCheck}
       >
         <PaidCostsProvider costs={costs}>
-          <div className="mx-auto max-w-3xl">{children}</div>
+          <div className="mx-auto max-w-5xl">{children}</div>
         </PaidCostsProvider>
       </AppShell>
     </div>

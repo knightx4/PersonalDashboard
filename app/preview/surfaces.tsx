@@ -2593,7 +2593,7 @@ const waitingSenders = new Map(
 function NeedsConfirmingSurface() {
   return (
     // The top of the All newsletters page as it draws now (plan #1774).
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <PageHeader title="Newsletters" />
       <NeedsConfirming
         timezone="Europe/London"

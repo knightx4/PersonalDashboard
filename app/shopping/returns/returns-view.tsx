@@ -151,7 +151,7 @@ export function ReturnsPageView({
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         {header}
         <div className="mb-4">{tools}</div>
         <EmptyState

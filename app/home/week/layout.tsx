@@ -36,7 +36,7 @@ export default async function WeekLayout({ children }: { children: React.ReactNo
         notifications={raised}
         mainCheck={mainCheck}
       >
-        <div className="mx-auto max-w-3xl">{children}</div>
+        <div className="mx-auto max-w-5xl">{children}</div>
       </AppShell>
     </div>
   );

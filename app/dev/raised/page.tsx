@@ -207,7 +207,7 @@ export default async function DevRaisedPage() {
     .slice(0, SHIPPED_SHOWN);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* No description: the page is the day, and says so by what is on it. */}
       <PageHeader title="Home" />
       <InboxRedirect />

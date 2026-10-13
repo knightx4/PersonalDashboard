@@ -126,7 +126,7 @@ export function HomeView({
   const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <section aria-labelledby="briefing-heading">
         <Card padding="standard" className="space-y-3">
           <div className="flex items-center gap-2">

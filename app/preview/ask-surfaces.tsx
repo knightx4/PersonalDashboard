@@ -333,7 +333,7 @@ export function AskChangesSurface() {
   ];
   return (
     <AskDashProvider source={FIXTURES}>
-      <div className="mx-auto max-w-3xl py-4">
+      <div className="mx-auto max-w-5xl py-4">
         <AskThread
           id="ask-changes-preview"
           conversationRef="00000000-0000-4000-8000-000000000009"
@@ -417,7 +417,7 @@ export function AskMadeChangesSurface() {
     },
   };
   return (
-    <div className="mx-auto max-w-3xl py-4">
+    <div className="mx-auto max-w-5xl py-4">
       <PageHeader title="Questions to Dash" />
       <div className="space-y-6">
         <SectionFold title={<><DashCredit className="text-ink-muted" />Changes Dash made</>} count={changes.length}>

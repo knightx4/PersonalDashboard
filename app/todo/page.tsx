@@ -71,7 +71,7 @@ export default async function TodoPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Agenda"
         description={empty ? 'Nothing on the list.' : 'What needs you, in the order it runs out.'}

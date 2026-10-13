@@ -52,7 +52,7 @@ export function TodoSettingsView({
   timezone: string;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title="Todo settings" />
 
       <AgendaSettingsForm groups={groups} enabled={enabled} horizonDays={horizonDays} />

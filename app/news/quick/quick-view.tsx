@@ -141,7 +141,7 @@ export function QuickReadView({
 
   if (!card) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-5xl">
         <PageHeader title="Quick read" />
         {chips}
         {/* Reading the last story draws the day's sigil in (plan #1340). The
@@ -201,7 +201,7 @@ export function QuickReadView({
         : 'hidden md:inline-flex';
 
   return (
-    <div className={cn('mx-auto max-w-2xl', grid && 'md:max-w-5xl')}>
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Quick read"
         actions={

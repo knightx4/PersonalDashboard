@@ -19,8 +19,7 @@ export default async function NewRolePage() {
   ]);
 
   return (
-    // A single form, so the form column rather than the reading column.
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Add a role"
         description="Paste a link and it fills itself in. Paste the description if it cannot."

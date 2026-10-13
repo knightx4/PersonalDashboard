@@ -90,7 +90,7 @@ async function RecommendedPage({ userId }: { userId: string }) {
   const domain = newsDomainOrNull();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <PageHeader title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters

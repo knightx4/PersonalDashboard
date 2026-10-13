@@ -129,7 +129,7 @@ export function ShoppingAddGamesSurface() {
   return (
     <div>
       <AddGamesView mode="search" />
-      <div className="mx-auto mt-4 max-w-3xl">
+      <div className="mx-auto mt-4 max-w-5xl">
         <GamesEditionPickerDemo />
       </div>
     </div>

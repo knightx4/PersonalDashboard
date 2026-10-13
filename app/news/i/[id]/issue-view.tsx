@@ -103,9 +103,8 @@ export function IssueView({
 }: IssueViewProps) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
   const sentOf = (story: NewsStory) => sent[story.headline.trim()];
-  // From md up a summarised issue's stories are a grid (plan #942), so the
-  // page widens to hold it. An essay, the original email and anything below
-  // md keep the one column they had.
+  // From md up a summarised issue's stories are a grid (plan #942). An essay,
+  // the original email and anything below md keep one column.
   const grid = showDigest && digest !== null && digest.stories.length > 0;
   /**
    * The issue's actions. `compact` is the phone's row, where every action but
@@ -206,7 +205,7 @@ export function IssueView({
     );
   };
   return (
-    <div className={cn('mx-auto max-w-3xl', grid && 'md:max-w-5xl')}>
+    <div className="mx-auto max-w-5xl">
       <p className="mb-3">
         <Link
           href={back.href}
