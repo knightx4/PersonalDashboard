@@ -17,7 +17,8 @@ import type { CommentTarget } from '@/lib/comments/load';
  * The targets a thread can sit under today: a dev row, a goal or step
  * (plan #957), a role in Jobs (note 89ad8bef), a file (note 7a6a37aa), or a
  * todo, an order, an inventory item, a saved news story or a vault note
- * (plan #1471).
+ * (plan #1471), or a reading in Learn, where the thread is a chat with Dash
+ * about it (plan #1876.5).
  */
 export type ThreadTarget =
   | CommentTarget
@@ -28,7 +29,8 @@ export type ThreadTarget =
   | 'order'
   | 'item'
   | 'story'
-  | 'vault_note';
+  | 'vault_note'
+  | 'reading';
 
 /** The table each target's rows live in, which is the table half of its ref. */
 export const THREAD_TABLES = {
@@ -47,6 +49,7 @@ export const THREAD_TABLES = {
   item: 'public.inventory_items',
   story: 'news.saved_stories',
   vault_note: 'obsidian.notes',
+  reading: 'learn.readings',
 } as const satisfies Record<ThreadTarget, string>;
 
 const TARGET_OF = new Map<string, ThreadTarget>(
@@ -55,6 +58,16 @@ const TARGET_OF = new Map<string, ThreadTarget>(
     target,
   ]),
 );
+
+/**
+ * Whether everything written in this thread reaches Dash, tagged or not. A
+ * raise is a question put to the person (#541), and a reading's thread is a
+ * chat with Dash about the reading (plan #1876.5). Everywhere else the @dash
+ * tag is what does it.
+ */
+export function answersEvery(target: ThreadTarget): boolean {
+  return target === 'raise' || target === 'reading';
+}
 
 /** The ref a thread under this row is keyed by. */
 export function threadRef(target: ThreadTarget, id: string): string {

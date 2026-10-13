@@ -7,6 +7,7 @@ import { addComment, deleteComment, type CommentActionState } from '@/app/dev/co
 import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
 import { addRoleComment, deleteRoleComment } from '@/app/jobs/(app)/roles/[id]/comment-actions';
 import { addRowComment, deleteRowComment } from '@/app/thread-actions';
+import { addReadingComment } from '@/app/learn/r/[id]/actions';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -19,7 +20,7 @@ import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
-import { threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
+import { answersEvery, threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 
@@ -96,6 +97,16 @@ const ROW_STORE: CommentStore = {
   paid: 'app/thread-actions.ts#addRowComment',
 };
 
+/**
+ * A reading's chat (plan #1876.5): everything written is answered, by Dash
+ * reading the reading's text, before the write returns.
+ */
+const READING_STORE: CommentStore = {
+  add: addReadingComment,
+  remove: deleteRowComment,
+  paid: 'app/learn/r/[id]/actions.ts#addReadingComment',
+};
+
 const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   idea: DEV_STORE,
   step: DEV_STORE,
@@ -112,6 +123,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   item: ROW_STORE,
   story: ROW_STORE,
   vault_note: ROW_STORE,
+  reading: READING_STORE,
 };
 
 function DeleteComment({
@@ -434,7 +446,7 @@ export function Thread({
   // A raise is a question put to you, so anything you write on one reaches
   // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
   // what does it.
-  const reaches = (body: string) => target === 'raise' || mentionsDash(body);
+  const reaches = (body: string) => answersEvery(target) || mentionsDash(body);
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
@@ -482,7 +494,12 @@ export function Thread({
               wrote, left behind above the real answer forever. A line that is
               only there while you wait says the same thing and does not. */}
           {asking && (
-            <li className="flex gap-2" aria-live="polite">
+            <li
+              // On the pattern's card the answer still being written takes
+              // the same recessed ground as Dash's written turns.
+              className={cn('flex gap-2', onCard && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}
+              aria-live="polite"
+            >
               <div className="flex w-4 shrink-0 justify-center pt-1">
                 {/* Working while the answer is written. If Dash only
                     acknowledges, this row goes and the mark comes to rest
@@ -505,7 +522,9 @@ export function Thread({
                 <p className="text-body text-ink-muted">
                   {!sending && state.message && !state.error
                     ? state.message
-                    : 'Reading the row and replying…'}
+                    : target === 'reading'
+                      ? 'Reading it and replying…'
+                      : 'Reading the row and replying…'}
                 </p>
               </div>
             </li>
@@ -661,13 +680,15 @@ export function Thread({
                 <p className="min-w-0 flex-1 text-small text-ink-muted">
                   {target === 'raise'
                     ? 'This is your answer. A session acts on it and replies in the thread.'
-                    : tagged
-                      ? target === 'file'
-                        ? 'Dash will read this and the file, and reply in the thread.'
-                        : 'Dash will read this and reply in the thread.'
-                      : target === 'file'
-                        ? 'A note on the file. Dash reads it before revising the file.'
-                        : 'A note on the row. Nothing reads it.'}
+                    : target === 'reading'
+                      ? 'Dash answers from the reading and its summary, here in the thread.'
+                      : tagged
+                        ? target === 'file'
+                          ? 'Dash will read this and the file, and reply in the thread.'
+                          : 'Dash will read this and reply in the thread.'
+                        : target === 'file'
+                          ? 'A note on the file. Dash reads it before revising the file.'
+                          : 'A note on the row. Nothing reads it.'}
                 </p>
               )}
               {/* Only a tagged comment is answered by Dash; the rest are free. */}
