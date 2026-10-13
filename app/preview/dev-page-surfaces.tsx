@@ -1007,7 +1007,7 @@ export function DevRunnerCrewSurface() {
     endedAt: null,
     endedReason: null,
     lastTickAt: minutesAgo(2),
-    lastTickNote: 'Waiting: 2 sessions are running, and nothing else is ready outside their modules.',
+    lastTickNote: 'Waiting: 2 sessions are running, and nothing else ready can run beside them.',
     createdAt: started,
     updatedAt: minutesAgo(2),
   };

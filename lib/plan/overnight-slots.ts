@@ -1,8 +1,8 @@
 /**
  * What each of the runner's four slots is doing.
  *
- * The runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, one per
- * module, and one goals run beside them. When goals has nothing to start, a
+ * The runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, at most
+ * two to a module, and one goals run beside them. When goals has nothing to start, a
  * fourth feature takes its seat (`OVERNIGHT_AT_ONCE_GOALS_IDLE`). The runner
  * card draws one Dash for each seat, and this file says which of three things
  * each Dash is doing so the card has nothing to work out.
