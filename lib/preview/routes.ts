@@ -370,6 +370,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
+  // The shared tooltip (plan #1985.1).
+  'core-tooltip': ['components/ui/tooltip.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
