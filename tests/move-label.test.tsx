@@ -2,13 +2,24 @@
  * One whose-move label on the dev plan and on Goals (plan #1433): the same
  * state draws the same word in the same colour wherever it comes from.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MoveLabel } from '@/components/ui/move-label';
 import { GoalProgress } from '@/app/goals/goal-progress';
 import { MOVE_WORD, VIEW_LABEL } from '@/lib/core/move';
 import { moveFor } from '@/lib/plan/health-words';
 import { goalMoveLabel, type GoalProgress as Progress } from '@/lib/goals/status';
+
+// The Tooltip draws its text only while it shows, so these renders read it
+// from a title on a stand-in instead (plan #1985.5).
+vi.mock('@/components/ui/tooltip', async () => {
+  const { createElement } = await import('react');
+  return {
+    Tooltip: ({ label, children }: { label: string; children: React.ReactNode }) =>
+      createElement('span', { title: label }, children),
+  };
+});
+
 
 const goal = (move: Progress['move']): Progress => ({
   live: 3,

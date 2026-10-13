@@ -1,3 +1,5 @@
+import { Tooltip } from '@/components/ui/tooltip';
+
 /**
  * One of the row's quick actions, on the dev plan and a goal's steps alike.
  *
@@ -8,27 +10,31 @@
  */
 export function RowIconButton({
   label,
+  tip,
   type = 'button',
   pending = false,
   onClick,
   children,
 }: {
   label: string;
+  /** The Tooltip's sentence, where the label alone does not say what happens. */
+  tip?: string;
   type?: 'button' | 'submit';
   pending?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type={type}
-      title={label}
-      onClick={onClick}
-      disabled={pending}
-      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
-    >
-      {children}
-      <span className="sr-only">{label}</span>
-    </button>
+    <Tooltip label={tip ?? label} align="end">
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={pending}
+        className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
+      >
+        {children}
+        <span className="sr-only">{label}</span>
+      </button>
+    </Tooltip>
   );
 }

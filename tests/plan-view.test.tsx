@@ -23,6 +23,17 @@ import {
   summarize,
 } from '@/lib/plan/tree';
 
+// The Tooltip draws its text only while it shows, so these renders read it
+// from a title on a stand-in instead (plan #1985.5).
+vi.mock('@/components/ui/tooltip', async () => {
+  const { createElement } = await import('react');
+  return {
+    Tooltip: ({ label, children }: { label: string; children: React.ReactNode }) =>
+      createElement('span', { title: label }, children),
+  };
+});
+
+
 // The server actions pull in the session client, which has no business in a
 // render test; the page only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/plan/actions', () => {
@@ -250,8 +261,8 @@ describe('PlanView', () => {
     );
     // Both presses are on the page: the runner's step offers Mine, and the one
     // already held offers the press that gives it back.
-    expect(html).toContain('title="Mine"');
-    expect(html).toContain('title="Not mine"');
+    expect(html).toContain('<span class="sr-only">Mine</span>');
+    expect(html).toContain('<span class="sr-only">Not mine</span>');
     // Pressed buttons, not forms: the row changes at once (plan #1850), so the
     // press carries no hidden fields for the action to read.
     expect(html).not.toContain('name="assignee"');
@@ -291,7 +302,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</a><span title="Yours. The runner will not take this one."',
+      '>Account deletion</a><span title="Yours, so the runner will not take it.'
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -321,7 +332,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</a><span title="Overhaul.');
+    expect(html).toContain('>Move threads onto the core</a><span title="An overhaul:');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });
@@ -1220,7 +1231,7 @@ describe('a step a session added under an approved feature', () => {
     const html = drawAdded();
     expect(html).toContain('Added by Dash on 2026-09-26');
     // The session is there for whoever wants it, under the pointer.
-    expect(html).toContain('title="Session cse_01abc"');
+    expect(html).toContain('Session cse_01abc.');
     // Said once: the stamp is not also shown as the row's note.
     expect(html).not.toContain('Note: Added by');
     expect(html).not.toContain('Claude');

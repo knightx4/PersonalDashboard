@@ -1,5 +1,6 @@
 'use client';
 
+import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import { ArrowUp, CircleUser, MessagesSquare } from 'lucide-react';
 import { ThreadPanel } from '@/components/patterns/thread';
@@ -304,17 +305,18 @@ export function InterviewPanel({
                 />
                 <div className="mt-1 flex items-center justify-end gap-1">
                   <PaidHint action={ANSWER} what="Cost of answering" />
-                  <button
-                    type="submit"
-                    name="intent"
-                    value="answer"
-                    disabled={!draft.trim()}
-                    title="Send your answer"
-                    className="press flex size-7 items-center justify-center rounded-full bg-accent text-fill-ink transition-colors duration-quick hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-ghost"
-                  >
-                    <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
-                    <span className="sr-only">Send your answer</span>
-                  </button>
+                  <Tooltip label="Send your answer to Dash." align="end">
+                    <button
+                      type="submit"
+                      name="intent"
+                      value="answer"
+                      disabled={!draft.trim()}
+                      className="press flex size-7 items-center justify-center rounded-full bg-accent text-fill-ink transition-colors duration-quick hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-ghost"
+                    >
+                      <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                      <span className="sr-only">Send your answer</span>
+                    </button>
+                  </Tooltip>
                 </div>
               </ComposeBox>
             ) : (

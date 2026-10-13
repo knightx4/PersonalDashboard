@@ -330,7 +330,12 @@ function StatusLine({ card }: { card: PostCard }) {
   if (post.status === 'posted') {
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <StateLabel glyph="check" word={`Posted ${day}`} tone="quiet" />
+        <StateLabel
+          glyph="check"
+          word={`Posted ${day}`}
+          tone="quiet"
+          title="You posted this on X. Nothing more is needed."
+        />
         {post.postedUrl && (
           <a
             href={post.postedUrl}
@@ -344,7 +349,15 @@ function StatusLine({ card }: { card: PostCard }) {
       </span>
     );
   }
-  if (post.status === 'dropped') return <StateLabel glyph="slash" word={`Dropped ${day}`} tone="ghost" />;
+  if (post.status === 'dropped')
+    return (
+      <StateLabel
+        glyph="slash"
+        word={`Dropped ${day}`}
+        tone="ghost"
+        title="You dropped this draft. Bring it back if you want to post it after all."
+      />
+    );
   return <span className="tabular text-small text-ink-muted">Drafted {day}</span>;
 }
 

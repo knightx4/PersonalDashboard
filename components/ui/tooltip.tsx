@@ -88,6 +88,9 @@ export function Tooltip({
       onFocus={(event) => {
         if ((event.target as HTMLElement).matches(':focus-visible')) ask();
       }}
+      // A press means the child is being used: the tip goes, so it does not
+      // sit over the menu or panel the press opens.
+      onPointerDown={hide}
       onBlur={hide}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && controller.isOpen()) {

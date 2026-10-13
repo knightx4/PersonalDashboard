@@ -203,3 +203,11 @@ export const WAITING_WORD: Record<
   proposed: 'To approve',
   setup: 'Setup',
 };
+
+/** What each waiting row asks of you, in one sentence, for its Tooltip. */
+export const WAITING_TITLE: Record<keyof typeof WAITING_WORD, string> = {
+  blocked: 'A step stopped on something only you can settle. Its note says what.',
+  unanswered: 'A question for you. Pick an answer and the step it holds up moves on.',
+  proposed: 'Dash wrote this up and it waits on you. Approve it, edit it, or drop it.',
+  setup: 'Something only you can set up. Do what it says, then mark it done.',
+};

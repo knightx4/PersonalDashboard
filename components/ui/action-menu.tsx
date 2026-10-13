@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type ActionMenuItem = {
   id: string;
@@ -100,7 +101,10 @@ export const IconActionButton = forwardRef<
     label: string;
     active?: boolean;
   }
->(function IconActionButton({ label, className, active, children, type = 'button', ...props }, ref) {
+>(function IconActionButton(
+  { label, className, active, children, type = 'button', ...props },
+  ref,
+) {
   return (
     <button
       ref={ref}
@@ -223,25 +227,38 @@ export function ActionMenu({
     });
   }
 
+  const button = (
+    <IconActionButton
+      ref={triggerRef}
+      label={label}
+      // The browser's own title is off: the default trigger's name shows in
+      // the shared Tooltip, and a custom trigger is a word that says itself.
+      title={undefined}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-controls={open ? menuId : undefined}
+      active={open}
+      disabled={pending}
+      className={triggerClassName}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setMenuOpen(!open);
+      }}
+    >
+      {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
+    </IconActionButton>
+  );
+
   return (
     <div className={cn('relative', className)}>
-      <IconActionButton
-        ref={triggerRef}
-        label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        active={open}
-        disabled={pending}
-        className={triggerClassName}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setMenuOpen(!open);
-        }}
-      >
-        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
-      </IconActionButton>
+      {trigger ? (
+        button
+      ) : (
+        <Tooltip label={label} align={align} className="flex">
+          {button}
+        </Tooltip>
+      )}
 
       {open &&
         pos &&
@@ -296,9 +313,7 @@ export function ActionMenu({
               }
               const itemClass = cn(
                 'flex w-full items-center px-3 py-2 text-left text-ui transition-colors',
-                item.destructive
-                  ? 'text-danger hover:bg-danger-tint'
-                  : 'text-ink hover:bg-canvas',
+                item.destructive ? 'text-danger hover:bg-danger-tint' : 'text-ink hover:bg-canvas',
                 (item.disabled || pending) && 'pointer-events-none opacity-40',
               );
 

@@ -122,6 +122,16 @@ const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
   dropped: 'ghost',
 };
 
+/** What each closed state means and what is left for you, in its Tooltip. */
+const HEALTH_TITLE: Record<RaisedHealth, string> = {
+  waiting: 'Waiting on your answer. Reply below, or close it with a reason.',
+  unfinished:
+    'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.',
+  answered: 'You answered, and what came of it is in the thread. Nothing more is needed.',
+  closed: 'You finished with this one. Nothing more is needed.',
+  dropped: 'You turned this down. Nothing more is needed.',
+};
+
 function StatusLabel({ row }: { row: RaisedRow }) {
   if (row.status === 'open') return null;
   const health = raisedHealth(row);
@@ -130,11 +140,7 @@ function StatusLabel({ row }: { row: RaisedRow }) {
       glyph={RAISED_HEALTH_GLYPHS[health]}
       word={RAISED_HEALTH_WORD[health]}
       tone={HEALTH_TONE[health]}
-      title={
-        health === 'unfinished'
-          ? 'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.'
-          : undefined
-      }
+      title={HEALTH_TITLE[health]}
     />
   );
 }

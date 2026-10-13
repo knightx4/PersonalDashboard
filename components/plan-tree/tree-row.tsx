@@ -19,6 +19,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { Tooltip } from '@/components/ui/tooltip';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
 import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
@@ -372,6 +373,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
   const foldLabel = foldable
     ? `${expanded ? 'Fold' : 'Unfold'} #${handle}`
     : `${expanded ? 'Close' : 'Open'} #${handle}`;
+  const foldTip = foldable
+    ? expanded
+      ? `Fold #${handle}, hiding its detail and the steps beneath it.`
+      : `Unfold #${handle} to read its detail and the steps beneath it.`
+    : expanded
+      ? `Close #${handle}'s detail.`
+      : `Open #${handle} to read its detail here.`;
   const titleClass = cn(
     'min-w-0',
     open ? 'break-words' : 'break-words sm:truncate',
@@ -399,7 +407,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // link brackets: what a folded panel shows beside Show details.
   const foldedPreview = readable(node.detail ?? node.acceptance ?? '')
     .split('\n')
-    .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
+    .map((line) =>
+      line
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/[*_#>`]/g, '')
+        .trim(),
+    )
     .find((line) => line.length > 0);
 
   // A link to this row by its own id (a goal step from the Goals home, or
@@ -424,12 +437,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // step to change: "where is this" is the question the page exists for, and
   // answering it differently should not be a form. The grid draws it after
   // the title; the list draws it before, where a checkbox would be.
-  const healthMenu = (
+  // What the state means rides on the menu's trigger as a Tooltip, rather
+  // than on the label inside it, so the button keeps the one tab stop.
+  const healthTrigger = (
     <ActionMenu
       label={`Status of #${node.outline} ${node.title}`}
       items={statusMenu}
       align="start"
-      className={list ? 'shrink-0' : 'justify-self-start'}
       triggerClassName={cn(
         list
           ? 'size-7 px-0 text-small font-medium'
@@ -443,7 +457,6 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // button.
           className="text-inherit"
           tone={health.tone}
-          title={health.title}
           word={health.word}
           // No glyph on a dropped row. The slash was a third way of
           // saying what the ghost tone and the struck-through title
@@ -467,6 +480,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
         </StateLabel>
       }
     />
+  );
+  const healthMenu = health.title ? (
+    <Tooltip label={health.title} className={list ? 'shrink-0' : 'justify-self-start'}>
+      <span className="inline-flex">{healthTrigger}</span>
+    </Tooltip>
+  ) : (
+    <span className={cn('inline-flex', list ? 'shrink-0' : 'justify-self-start')}>
+      {healthTrigger}
+    </span>
   );
 
   // What the title cell says: the title and the lines under it. A button
@@ -521,16 +543,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
          * knows is there is the thing this whole section exists to
          * stop. */}
         {unanswered > 0 && !open && (
-          <span
-            title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+          <Tooltip
+            label={`${unanswered === 1 ? 'A question' : `${unanswered} questions`} under this step ${unanswered === 1 ? 'waits' : 'wait'} on your answer. Open the step to answer.`}
+            className="shrink-0"
           >
-            <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-            {unanswered}
-            <span className="sr-only">
-              unanswered {unanswered === 1 ? 'question' : 'questions'}
+            <span
+              // A tab stop only where the row is not itself a button.
+              tabIndex={titleHref ? 0 : undefined}
+              className="inline-flex items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+            >
+              <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+              {unanswered}
+              <span className="sr-only">
+                unanswered {unanswered === 1 ? 'question' : 'questions'}
+              </span>
             </span>
-          </span>
+          </Tooltip>
         )}
         {/* And whether anything has been said about it. */}
         <CommentCount count={node.thread.length} />
@@ -550,13 +578,18 @@ export function TreeRow<E extends TreeCatalogEntry>({
             stops at the feature, so this row never asked you; saying so
             is what the Drop at the top of its menu is for. */}
       {addedBy && (
-        <span
-          title={addedBy.session ? `Session ${addedBy.session}` : undefined}
-          className="block truncate text-small text-ink-ghost"
+        <Tooltip
+          label={`Dash wrote this under a feature you approved, so it did not ask you first. Drop it from the menu if you do not want it.${addedBy.session ? ` Session ${addedBy.session}.` : ''}`}
+          className="flex max-w-full"
         >
-          <DashCredit />
-          Added by Dash on {addedBy.date}
-        </span>
+          <span
+            tabIndex={titleHref ? 0 : undefined}
+            className="block truncate text-small text-ink-ghost"
+          >
+            <DashCredit />
+            Added by Dash on {addedBy.date}
+          </span>
+        </Tooltip>
       )}
       {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
       {need && !open && (
@@ -610,57 +643,73 @@ export function TreeRow<E extends TreeCatalogEntry>({
           {/* The fold, where there is something beneath to fold. A spacer
               where there is not, so the titles at one depth line up. */}
           {heading ? null : foldable || (titleHref && !isDecision && !setupOpen) ? (
-            <button
-              type="button"
-              onClick={toggle}
-              aria-expanded={expanded}
-              title={foldLabel}
-              aria-label={foldLabel}
+            <Tooltip
+              label={foldTip}
               className={cn(
-                LEVEL,
-                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                'shrink-0',
                 // In the list the row can run to several lines (the title,
                 // Needs, a date), so the fold sits on the title's line.
-                list ? 'mt-1 h-5 self-start' : 'h-5 self-center sm:mt-1 sm:self-start',
+                list ? 'mt-1 self-start' : 'self-center sm:mt-1 sm:self-start',
               )}
             >
-              <ChevronDown
+              <button
+                type="button"
+                onClick={toggle}
+                aria-expanded={expanded}
+                aria-label={foldLabel}
                 className={cn(
-                  'size-3.5 transition-transform duration-quick',
-                  !expanded && '-rotate-90',
+                  LEVEL,
+                  'press flex h-5 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
                 )}
-                strokeWidth={1.75}
-                aria-hidden
-              />
-            </button>
+              >
+                <ChevronDown
+                  className={cn(
+                    'size-3.5 transition-transform duration-quick',
+                    !expanded && '-rotate-90',
+                  )}
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              </button>
+            </Tooltip>
           ) : isDecision ? (
             // Where a build step's checkbox would be. A question and a piece
             // of work are different things, and the row should say which it is
             // before the health column is read.
-            <span
-              title="A decision: a question, closed by an answer rather than a commit."
-              className={cn(
-                LEVEL,
-                'flex h-5 shrink-0 select-none items-center justify-center self-center text-small font-semibold text-caution',
-              )}
+            <Tooltip
+              label="A decision: a question for you, closed by your answer rather than a commit."
+              className="shrink-0 self-center"
             >
-              ?<span className="sr-only">Decision</span>
-            </span>
+              <span
+                tabIndex={0}
+                className={cn(
+                  LEVEL,
+                  'flex h-5 select-none items-center justify-center rounded text-small font-semibold text-caution',
+                )}
+              >
+                ?<span className="sr-only">Decision</span>
+              </span>
+            </Tooltip>
           ) : setupOpen ? (
             // The same slot, for the other row that is not a piece of work.
             // A setup job is an errand, closed by going and doing it, and the
             // row should say so before the health column is read -- the same
             // argument as the question mark above.
-            <span
-              title="A setup job: something only you can set up, closed when you have."
-              className={cn(
-                LEVEL,
-                'flex h-5 shrink-0 select-none items-center justify-center self-center text-caution',
-              )}
+            <Tooltip
+              label="A setup job: something only you can set up. Open it for what to do, and say so when you have."
+              className="shrink-0 self-center"
             >
-              <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Setup</span>
-            </span>
+              <span
+                tabIndex={0}
+                className={cn(
+                  LEVEL,
+                  'flex h-5 select-none items-center justify-center rounded text-caution',
+                )}
+              >
+                <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Setup</span>
+              </span>
+            </Tooltip>
           ) : (
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
@@ -767,7 +816,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
           <>
             {/* Wraps rather than clips: "Waiting on 26 Oct" is wider than the
                 column, and a cut word lost the day it waits for (note 5025f689). */}
-            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">{move}</span>
+            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">
+              {move}
+            </span>
 
             <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>
 
@@ -784,7 +835,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div className={cn('flex items-center justify-self-end', list ? 'shrink-0' : 'self-center sm:self-start')}>
+        <div
+          className={cn(
+            'flex items-center justify-self-end',
+            list ? 'shrink-0' : 'self-center sm:self-start',
+          )}
+        >
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}

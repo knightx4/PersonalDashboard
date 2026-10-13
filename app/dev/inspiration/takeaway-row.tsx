@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -39,7 +40,15 @@ function WorkspaceChip({ module }: { module: ModuleId | null }) {
 /** Where it already stands, or nothing for an open one. */
 function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
   const { cover, status } = takeaway;
-  if (status === 'dismissed') return <StateLabel glyph="slash" word="Dismissed" tone="ghost" />;
+  if (status === 'dismissed')
+    return (
+      <StateLabel
+        glyph="slash"
+        word="Dismissed"
+        tone="ghost"
+        title="You put this aside. Nothing more is needed."
+      />
+    );
   if (cover?.kind === 'plan') {
     return (
       <Link href={planHref(cover.number)} className="hover:underline">
@@ -47,6 +56,8 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
           glyph="dashed"
           word={status === 'crafted' ? `In the plan as ${stepRef(cover)}` : `Already in the plan as ${stepRef(cover)}`}
           tone="info"
+          title="The plan already covers this, so nothing more is needed. Open it to see the step."
+          focusable={false}
         />
       </Link>
     );
@@ -60,6 +71,12 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
           glyph="dashed"
           word={status === 'crafted' ? 'Sent to be shaped' : 'Already an idea'}
           tone="info"
+          title={
+            status === 'crafted'
+              ? 'Dash is shaping the idea into a proposal for you to approve.'
+              : 'An idea already says this, so nothing more is needed. Open it to see the idea.'
+          }
+          focusable={false}
         />
       </Link>
     );
@@ -75,19 +92,23 @@ function ScoreLabel({ takeaway }: { takeaway: Takeaway }) {
   const view = ideaScoreView(takeaway.score);
   if (!takeaway.score || view.state === 'unscored') {
     return (
-      <span title="Jev has not scored this takeaway yet" className="text-small text-ink-ghost">
-        Unscored
-      </span>
+      <Tooltip label="Jev has not scored this takeaway yet.">
+        <span tabIndex={0} className="text-small text-ink-ghost">
+          Unscored
+        </span>
+      </Tooltip>
     );
   }
   return (
-    <span
-      title={view.title}
-      className={cn('tabular text-small', view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted')}
-    >
-      <span aria-hidden>Score {Math.round(takeaway.score.value)}</span>
-      <span className="sr-only">{view.title}</span>
-    </span>
+    <Tooltip label={view.title}>
+      <span
+        tabIndex={0}
+        className={cn('tabular text-small', view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted')}
+      >
+        <span aria-hidden>Score {Math.round(takeaway.score.value)}</span>
+        <span className="sr-only">{view.title}</span>
+      </span>
+    </Tooltip>
   );
 }
 

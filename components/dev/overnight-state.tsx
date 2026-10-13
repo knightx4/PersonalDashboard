@@ -35,6 +35,14 @@ export const OVERNIGHT_GLYPH: Record<OvernightStanding, GlyphName> = {
   stopped: 'check',
 };
 
+/** What each state means for you, in the label's Tooltip. */
+export const OVERNIGHT_TITLE: Record<OvernightStanding, string> = {
+  off: 'No night is running. Start one when you want Dash to work through the plan.',
+  running: 'Dash is working through the plan tonight. Nothing is needed from you.',
+  paused: 'Held: what is building finishes, and nothing new starts until you carry on.',
+  stopped: 'The night has ended. Its summary says what was built.',
+};
+
 export const OVERNIGHT_TONE: Record<OvernightStanding, DevTone> = {
   off: 'ghost',
   running: 'accent',
@@ -54,6 +62,7 @@ export function OvernightState({
       glyph={OVERNIGHT_GLYPH[standing]}
       word={OVERNIGHT_WORD[standing]}
       tone={OVERNIGHT_TONE[standing]}
+      title={OVERNIGHT_TITLE[standing]}
       className={className}
     />
   );
