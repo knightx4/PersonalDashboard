@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/auth/server';
-import { readPageOpens } from '@/lib/usage/opens';
+import { readPageOpens, readPhoneShare } from '@/lib/usage/opens';
 import { readFunctionSpend, usageReport } from '@/lib/usage/report';
 import { UsageScreen } from './usage-view';
 
@@ -14,6 +14,10 @@ export const metadata = { title: 'Usage' };
  */
 export default async function DevUsagePage() {
   const supabase = await createClient();
-  const [opened, functions] = await Promise.all([readPageOpens(supabase), readFunctionSpend(supabase)]);
-  return <UsageScreen report={usageReport(opened)} functions={functions} now={new Date()} />;
+  const [opened, functions, phoneShare] = await Promise.all([
+    readPageOpens(supabase),
+    readFunctionSpend(supabase),
+    readPhoneShare(supabase),
+  ]);
+  return <UsageScreen report={usageReport(opened)} functions={functions} phoneShare={phoneShare} now={new Date()} />;
 }
