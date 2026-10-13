@@ -205,6 +205,18 @@ describe('the runners', () => {
       expect(render({ runner, state: 'working' })).toContain('dash-mark-streak');
     }
   });
+
+  it('sits unlit when still: no core motion and no glow past the visor (note bfe0d726)', () => {
+    for (const runner of DASH_RUNNERS) {
+      for (const state of ['idle', 'asleep'] as const) {
+        const lit = render({ runner, state });
+        const still = render({ runner, state, still: true });
+        expect(still).not.toMatch(/dash-mark-(glow|ember|pulse)/);
+        // One blurred core fewer: the layer that bleeds outside the visor.
+        expect(still.match(/-blur\)/g)!.length).toBeLessThan(lit.match(/-blur\)/g)!.length);
+      }
+    }
+  });
 });
 
 describe('its animations', () => {

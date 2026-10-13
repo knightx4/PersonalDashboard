@@ -25,6 +25,14 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
+    // Share, then Dash, on a phone saves the link to the reading list
+    // (app/learn/save/page.tsx). Android reads this; iOS has no share target
+    // for web apps, so there the box on Reading lists is the quick way.
+    share_target: {
+      action: '/learn/save',
+      method: 'GET',
+      params: { title: 'title', text: 'text', url: 'url' },
+    },
     background_color:
       '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
     theme_color:
