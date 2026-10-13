@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
 import { TimezoneField, detectTimeZone } from '@/components/ui/timezone-field';
 import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
-import { modulesFor, type ModuleId } from '@/lib/modules';
+import { MODULES, modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 import { cardVariants } from '@/components/ui/card';
 import { NotificationsSection } from './notifications';
@@ -20,6 +20,7 @@ import { CaptureTokensSection } from './capture-tokens';
 import { CaptureShortcutSection } from './capture-shortcut';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
+import { PageHeader } from '@/components/shell/page-header';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 
@@ -76,49 +77,52 @@ export function AccountView({
   } | null;
 }) {
   return (
-    <TabbedSections
-      tabs={ACCOUNT_TABS}
-      label="Account"
-      address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
-    >
-      <div className="space-y-6">
-        {tab === 'you' && <YouSection email={email} settings={settings} />}
-        {tab === 'workspaces' && (
-          <>
-            <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
-            <ModuleSettingsSection enabled={settings.enabledModules} />
-          </>
-        )}
-        {tab === 'notifications' && (
-          <>
-            <NotificationsSection publicKey={vapidPublicKey} />
-            <FeelSection />
-          </>
-        )}
-        {tab === 'activity' && (
-          <>
-            {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
-            {capture && (
-              <>
-                <CaptureTokensSection
-                  tokens={capture.tokens}
-                  failed={capture.failed}
-                  justMade={capture.justMade}
-                  timezone={settings.timezone}
-                />
-                <CaptureShortcutSection address={capture.address} />
-              </>
-            )}
-          </>
-        )}
-        {tab === 'session' && (
-          <>
-            <SessionSection />
-            <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
-          </>
-        )}
-      </div>
-    </TabbedSections>
+    <>
+      <PageHeader title="Account" />
+      <TabbedSections
+        tabs={ACCOUNT_TABS}
+        label="Account"
+        address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
+      >
+        <div className="space-y-6">
+          {tab === 'you' && <YouSection email={email} settings={settings} />}
+          {tab === 'workspaces' && (
+            <>
+              <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
+              <ModuleSettingsSection enabled={settings.enabledModules} />
+            </>
+          )}
+          {tab === 'notifications' && (
+            <>
+              <NotificationsSection publicKey={vapidPublicKey} />
+              <FeelSection />
+            </>
+          )}
+          {tab === 'activity' && (
+            <>
+              {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
+              {capture && (
+                <>
+                  <CaptureTokensSection
+                    tokens={capture.tokens}
+                    failed={capture.failed}
+                    justMade={capture.justMade}
+                    timezone={settings.timezone}
+                  />
+                  <CaptureShortcutSection address={capture.address} />
+                </>
+              )}
+            </>
+          )}
+          {tab === 'session' && (
+            <>
+              <SessionSection />
+              <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
+            </>
+          )}
+        </div>
+      </TabbedSections>
+    </>
   );
 }
 
@@ -164,7 +168,12 @@ function YouSection({
       {/* No "You" heading: the tab above already says it (law 9). */}
       <p className="text-ui text-ink-muted">{email}</p>
 
-      <div className={cn('mt-3 divide-y divide-border border-y border-border', pending && 'opacity-70')}>
+      <div
+        className={cn(
+          'mt-3 divide-y divide-border border-y border-border',
+          pending && 'opacity-70',
+        )}
+      >
         <SettingRow
           label="Name"
           editing={editing === 'displayName'}
@@ -327,8 +336,7 @@ function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: bo
   return (
     <section className={cardVariants({ padding: 'standard' })}>
       {/* No "Workspaces" heading: the tab above already says it (law 9). */}
-      <p className="text-ui text-ink-muted">Turning one off hides it. Nothing is deleted.
-      </p>
+      <p className="text-ui text-ink-muted">Turning one off hides it. Nothing is deleted.</p>
 
       <form action={action} className="mt-4">
         {/* Divides, not one box per row. Six workspaces drawn as six bordered
@@ -373,32 +381,18 @@ function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: bo
  * rather than leaving someone hunting for the Gmail connection.
  */
 function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
-  const links = ([
-    {
-      module: 'shopping',
-      href: '/shopping/settings',
-      label: 'Shopping settings',
-      hint: 'Connected mailbox, merchants and return windows',
-    },
-    {
-      module: 'jobs',
-      href: '/jobs/settings',
-      label: 'Job search settings',
-      hint: 'Ghost threshold, résumés and evidence',
-    },
-    {
-      module: 'vault',
-      href: '/vault/settings',
-      label: 'Vault settings',
-      hint: 'The repository this mirrors, and its token',
-    },
-    {
-      module: 'todo',
-      href: '/todo/settings',
-      label: 'Todo settings',
-      hint: 'How far ahead the agenda looks, and what feeds it',
-    },
-  ] as const).filter((link) => enabled.includes(link.module));
+  // From the module list, so a workspace with a settings page cannot be left out.
+  const links = MODULES.flatMap((module) =>
+    module.settings && enabled.includes(module.id)
+      ? [
+          {
+            href: module.settings.href,
+            label: `${module.label} settings`,
+            hint: module.settings.hint,
+          },
+        ]
+      : [],
+  );
   // Account-wide pages read every workspace, so they sit in the same list.
   const rows = [
     ...links,
@@ -429,7 +423,6 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
     </section>
   );
 }
-
 
 /**
  * Signing out is an account action, so it lives on the account page.
@@ -485,9 +478,9 @@ function DangerSection({ vaultEnabled }: { vaultEnabled: boolean }) {
         // revokes and stays quiet about the token it cannot is the page that
         // leaves somebody believing a live token is gone.
         <p className="mt-2 text-small leading-relaxed text-ink-muted">
-          One thing this cannot do for you: the vault&rsquo;s GitHub token was pasted in here, so
-          it lives on your GitHub account. This forgets it — only you can delete it, under
-          Developer settings there.
+          One thing this cannot do for you: the vault&rsquo;s GitHub token was pasted in here, so it
+          lives on your GitHub account. This forgets it — only you can delete it, under Developer
+          settings there.
         </p>
       )}
 
