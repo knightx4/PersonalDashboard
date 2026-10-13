@@ -17,6 +17,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
+import { fileVaultNote, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
@@ -97,7 +98,10 @@ export async function askDashInRequest(input: {
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
       write: (tool, args, seen) =>
-        tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask }, args),
+        tool.apply(
+          { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, fileQuickNote: (text) => fileVaultNote(user.id, text) },
+          args,
+        ),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
@@ -159,7 +163,17 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     today: todayInTimezone(settings.timezone),
     execute: (name, args) => executeAskTool(name, args, ctx),
     apply: (tool, args, seen, acts) =>
-      tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, thread: acts }, args),
+      tool.apply(
+        {
+          ...ctx,
+          seen,
+          goals: (history) => createGoalsClient(history),
+          createTask,
+          fileQuickNote: (text) => fileVaultNote(userId, text),
+          thread: acts,
+        },
+        args,
+      ),
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
   };
 }
@@ -265,6 +279,8 @@ async function changeDeps(): Promise<ChangeDeps> {
     db: requestAskDb(),
     goals: (history) => createGoalsClient(history),
     createTask,
+    // A quick note's file comes out of the vault too (plan #1894.2).
+    undoVaultNote: (action) => undoVaultCapture({ userId: user.id, core, db: requestAskDb() }, action),
   };
 }
 

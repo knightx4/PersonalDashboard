@@ -1,11 +1,11 @@
-import { GAP, gap, none, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the Vault pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const vaultActions: ModuleActions = {
   'app/vault/actions.ts': {
     dismissNoteConnection: none('theirs'),
     newVaultNote: GAP,
-    addQuickNote: gap('Save a quick thought (plan #1896).'),
+    addQuickNote: tool('add_quick_note'),
   },
   'app/vault/triage/actions.ts': {
     fileQuickNoteAction: GAP,

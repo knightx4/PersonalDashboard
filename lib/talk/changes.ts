@@ -41,6 +41,7 @@ export const DASH_CHANGE_KINDS = [
   'change_items',
   'move_roles',
   'set_goal_done_when',
+  'add_quick_note',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -88,6 +89,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  (lib/dash/bulk-roles.ts).
  * set_goal_done_when  the goal, the done-when it now has (null: cleared) and
  *                  the one it had before (notes 06d36ab2, fa2ac6fe).
+ * add_quick_note   a quick note written to the vault's Inbox (plan #1894.2):
+ *                  its title, its path and the text as given. Undo takes the
+ *                  file back out of the notes repository, by the blob SHA
+ *                  kept in `undo.vault_blob_sha`, as capture's Undo does.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -134,6 +139,7 @@ export type DashChangeInput = {
     left: number;
   };
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
+  add_quick_note: { noteId: string; title: string; path: string; body: string };
 };
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
