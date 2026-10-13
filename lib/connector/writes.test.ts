@@ -24,7 +24,7 @@ function ctx(): ConnectorWriteContext {
 }
 
 describe('runConnectorWrite', () => {
-  it('offers the Learn writes, then the quick note, the idea and the job lead', () => {
+  it('offers the Learn writes, then the quick note, the idea and the job lead, then the rest of Learn', () => {
     expect(CONNECTOR_WRITE_TOOLS.map((entry) => entry.definition.name)).toEqual([
       'add_to_reading_list',
       'log_learning',
@@ -32,6 +32,12 @@ describe('runConnectorWrite', () => {
       'add_quick_note',
       'add_idea',
       'add_job_lead',
+      'change_reading',
+      'add_learn_track',
+      'add_track_reading',
+      'reword_concept',
+      'add_concept_note',
+      'change_video',
     ]);
   });
 
@@ -43,6 +49,9 @@ describe('runConnectorWrite', () => {
     ['log_learning', { topic: 'Evals', summary: 'x', subject: 'Evals', ideas: [{ name: 'A' }] }, 'claim is required.'],
     ['mark_read', {}, 'title is required.'],
     ['mark_read', { reading_id: 'not-an-id' }, "reading_id must be a reading's id."],
+    ['change_reading', { reading_id: 'not-an-id' }, "reading_id must be a reading's id, as a lookup returned it."],
+    ['add_learn_track', {}, 'title is missing: name the reading list.'],
+    ['change_video', { video_id: 'short' }, 'video_id must be the YouTube video id, eleven characters, as a lookup returned it.'],
   ])('%s refuses %j', async (name, input, error) => {
     expect(await runConnectorWrite(tool(name), ctx(), input)).toEqual({ ok: false, error });
   });

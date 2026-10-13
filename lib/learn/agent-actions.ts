@@ -1,24 +1,28 @@
-import { GAP, none, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * What the Learn pages let the person do, and the tool that does each
  * (lib/agent-actions/types.ts). Most of Learn is the person studying, which
  * no agent does for them, or a model writing material, which costs money.
+ * The changes an agent makes are lib/dash/learn-writes.ts (plan #1894.8).
  */
 export const learnActions: ModuleActions = {
   'app/learn/c/[id]/actions.ts': {
     proposeBranch: none('spends'),
     approveBranch: none('theirs'),
-    rewriteClaim: GAP,
-    queueMaterial: GAP,
-    addConceptNote: GAP,
+    rewriteClaim: tool('reword_concept'),
+    queueMaterial: {
+      tool: 'add_track_reading',
+      note: 'Dash adds the work by its title and link, where the page queues a section the catalogue found for the idea.',
+    },
+    addConceptNote: tool('add_concept_note'),
   },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
     clipShownAction: none('own'),
     clipFinishedAction: none('own'),
     clipSkippedAction: none('own'),
-    clipSavedAction: GAP,
+    clipSavedAction: none('own', "Saving a clip is the person's own reaction to what they watched, as finishing or skipping one is."),
     clipNotInterestedAction: none('own'),
   },
   'app/learn/essays/actions.ts': {
@@ -61,36 +65,48 @@ export const learnActions: ModuleActions = {
     proposeBrief: none('spends'),
     approveBrief: none('theirs'),
     proposeFromNote: none('spends'),
-    createCustomTrack: GAP,
+    createCustomTrack: none(
+      'spends',
+      'Making a subject writes its curriculum and places it among the areas with a model. A reading list with no model run is add_learn_track.',
+    ),
   },
   'app/learn/know/personality/actions.ts': {
     saveBigFiveAction: none('own'),
-    saveTypedAction: GAP,
+    saveTypedAction: none(
+      'own',
+      "A type from another test is the person's own result, entered by them as their Big Five scores are, and saving it starts a read of it.",
+    ),
     deleteTypedAction: none('deletes'),
     restoreTypedAction: none('theirs'),
     readAgainAction: none('spends'),
   },
   'app/learn/know/move-actions.ts': {
-    moveTheme: GAP,
+    moveTheme: none('setting', 'Where a theme sits on the areas grid is how the person arranges their own map.'),
   },
   'app/learn/know/level3-actions.ts': {
-    addLevel3Goal: GAP,
+    addLevel3Goal: {
+      tool: 'add_goal',
+      note: 'A ready-made goal offered as one press on Subjects; asked for in words, Dash adds the goal with add_goal.',
+    },
   },
   'app/learn/new/actions.ts': {
     parseImport: none('page'),
     resolveCandidate: none('page'),
-    startTrack: GAP,
-    confirmImport: GAP,
+    startTrack: tool('add_learn_track'),
+    confirmImport: {
+      tool: ['add_learn_track', 'add_track_reading'],
+      note: 'Dash starts the list and adds each work to it, where the page reads a pasted list first.',
+    },
   },
   'app/learn/now/actions.ts': {
     loadMoreCards: none('page'),
     openCardSource: none('page'),
-    addCardNote: GAP,
+    addCardNote: tool('add_concept_note'),
     deleteCardNote: none('deletes'),
     dismissCard: none('own'),
     rateCard: none('own'),
     swipeCard: none('own'),
-    saveCard: GAP,
+    saveCard: none('own', "Saving a card is the person's own verdict on it, as a swipe or a rating is."),
     testMeOnCard: none('spends'),
     startTrackOffer: none('theirs'),
     makeTrackOfCard: none('spends'),
@@ -119,17 +135,17 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/r/[id]/actions.ts': {
     findSources: none('spends'),
-    attachSource: GAP,
-    updateStatus: GAP,
-    toggleReadNow: GAP,
-    updateNote: GAP,
+    attachSource: { tool: 'change_reading', note: 'Dash attaches the link it is given, where the page picks from a search.' },
+    updateStatus: tool('change_reading'),
+    toggleReadNow: tool('change_reading'),
+    updateNote: tool('change_reading'),
     openReading: none('page'),
     readNoteIntoGraph: none('spends'),
     approveNoteConcepts: none('theirs'),
     goDeeper: none('spends'),
-    saveReadingText: GAP,
-    saveReadingPdf: GAP,
-    clearReadingText: GAP,
+    saveReadingText: tool('change_reading'),
+    saveReadingPdf: { tool: 'change_reading', note: "Dash keeps the PDF's text, which is what an upload is read into." },
+    clearReadingText: tool('change_reading'),
     summarizeReading: none('spends'),
     addReadingComment: none('theirs'),
   },
@@ -144,9 +160,9 @@ export const learnActions: ModuleActions = {
     findSubjectChannels: none('spends'),
     deleteSubject: none('deletes'),
     writeTrackCurriculum: none('spends'),
-    moveUnitInPlan: GAP,
-    removeUnitFromPlan: GAP,
-    addUnitToPlan: GAP,
+    moveUnitInPlan: none('setting', "The order of a learning goal's units is how the person arranges their own plan."),
+    removeUnitFromPlan: none('deletes'),
+    addUnitToPlan: none('spends', 'Each unit added is described by a model before it is kept.'),
   },
   'app/learn/s/[id]/p/[piece]/actions.ts': {
     writeLessonForPiece: none('spends'),
@@ -167,23 +183,29 @@ export const learnActions: ModuleActions = {
     handInPlanProject: none('own'),
   },
   'app/learn/t/[id]/actions.ts': {
-    addToTrack: GAP,
-    removeFromTrack: GAP,
+    addToTrack: tool('add_track_reading'),
+    removeFromTrack: none('deletes'),
     removeTrack: none('deletes'),
     planTrack: none('spends'),
     confirmPlan: none('theirs'),
     keepAreas: none('theirs'),
   },
   'app/learn/videos/actions.ts': {
-    setWatchedAction: GAP,
-    moveVideoAction: GAP,
+    setWatchedAction: tool('change_video'),
+    moveVideoAction: tool('change_video'),
   },
   'app/learn/youtube/actions.ts': {
-    addChannelAction: GAP,
-    relistChannelAction: GAP,
+    addChannelAction: none(
+      'spends',
+      "Following a channel lists it on the owner's YouTube quota and queues its transcripts on paid credits.",
+    ),
+    relistChannelAction: none('spends', 'Listing a channel again spends YouTube quota and queues transcripts on paid credits.'),
     setAutoTranscribeAction: none('setting'),
-    removeChannelAction: GAP,
-    unfollowSubjectChannelAction: GAP,
+    removeChannelAction: none('deletes'),
+    unfollowSubjectChannelAction: none(
+      'deletes',
+      'Takes the channel out of the YouTube library when no other subject follows it.',
+    ),
     transcribeVideoAction: none('spends'),
     transcribePlaylistAction: none('spends'),
     setWatchListPlaylistAction: none('setting'),

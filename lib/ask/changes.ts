@@ -18,6 +18,7 @@ import {
   type DashChangeStatus,
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
+import { isLearnChange, type LearnChangeKind } from './learn-changes';
 
 /**
  * Confirming, declining and undoing a change Dash proposed in an Ask Dash
@@ -101,6 +102,7 @@ export { changeHref } from './change-view';
 
 /** The pages a change lands on, to revalidate after a confirm or an undo. */
 export function changePaths(change: DashChange): string[] {
+  if (isLearnChange(change)) return change.input.paths;
   switch (change.kind) {
     case 'add_todo':
       return ['/todo', '/todo/all', '/home'];
@@ -156,7 +158,10 @@ export function changePaths(change: DashChange): string[] {
 }
 
 /** The workspace each kind writes into; a watch is the home page's and needs none. */
-const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | null> = {
+/** The kinds with a writer here: Learn's are written by their tools alone (lib/dash/learn-writes.ts). */
+type WrittenKind = Exclude<DashChangeKind, LearnChangeKind>;
+
+const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null> = {
   add_todo: { module: 'todo', label: 'Todo' },
   add_goal_step: { module: 'goals', label: 'Goals' },
   mark_returned: { module: 'shopping', label: 'Shopping' },
@@ -174,7 +179,7 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   add_quick_note: { module: 'vault', label: 'Vault' },
 };
 
-const WRITTEN_TABLE: Record<DashChangeKind, string> = {
+const WRITTEN_TABLE: Record<WrittenKind, string> = {
   add_todo: 'todo.tasks',
   add_goal_step: 'goals.items',
   mark_returned: 'public.inventory_items',
@@ -193,7 +198,7 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
-const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
+const WRITTEN_OP: Record<WrittenKind, 'insert' | 'update'> = {
   add_todo: 'insert',
   add_goal_step: 'insert',
   mark_returned: 'update',

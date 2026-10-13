@@ -3,6 +3,7 @@ import { watchPlan } from '@/lib/watch/start';
 import { stepHref } from '@/lib/goals/all-goals';
 import { statusLabel } from '@/lib/jobs/status-label';
 import { noteHref } from '@/lib/vault/paths';
+import { isLearnChange, learnChangeWords } from './learn-changes';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -12,6 +13,7 @@ import { noteHref } from '@/lib/vault/paths';
 
 /** Where each kind's row is shown, for the card and the list to link to. */
 export function changeHref(change: DashChange): string {
+  if (isLearnChange(change)) return change.input.href;
   switch (change.kind) {
     case 'add_todo':
       return change.writtenRef ? `/todo/all?status=all&focus=${change.writtenRef}` : '/todo';
@@ -122,6 +124,7 @@ export function dueDay(day: string, today?: string): string {
 export type ChangeWords = { verb: string; what: string; rest: string };
 
 export function changeWords(change: DashChange, done: boolean, today?: string): ChangeWords {
+  if (isLearnChange(change)) return learnChangeWords(change.input);
   switch (change.kind) {
     case 'add_todo':
       return {
@@ -238,6 +241,7 @@ export const CHANGE_STATUS_LABEL: Record<DashChangeStatus, string> = {
 
 /** Where a written change's row is, as the link's words. */
 export function changeWhere(change: DashChange): string {
+  if (isLearnChange(change)) return change.input.where;
   switch (change.kind) {
     case 'add_todo':
       return 'Open in Todo';
