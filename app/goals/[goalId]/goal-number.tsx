@@ -629,6 +629,7 @@ function ReadingLine({
                 d={chart.path}
                 fill="none"
                 stroke="currentColor"
+                /* ui-ok: the chart's line, drawn heavier than an icon on purpose */
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"

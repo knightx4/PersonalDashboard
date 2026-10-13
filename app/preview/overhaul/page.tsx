@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { notFound } from 'next/navigation';
 import { isOwner } from '@/lib/dev/owner';
 import { MAIN_BOX } from '@/components/shell/main-box';
@@ -79,16 +80,16 @@ export default async function OverhaulPage({
         <div className="space-y-12">
           {FAMILIES.map((family) => (
             <section key={family} className="space-y-8">
-              <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">{family}</h2>
+              <SectionLabel as="h2">{family}</SectionLabel>
               {ENTRIES.filter((entry) => entry.family === family).map((entry) => (
                 <article key={entry.id} id={entry.id} className="scroll-mt-6 space-y-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                     <h3 className="font-display text-title tracking-tight text-ink">{entry.name}</h3>
                     <Link
                       href={`/preview/overhaul/${entry.id}`}
-                      className="text-small text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+                      className={cn(linkVariants(), 'text-small')}
                     >
-                      What changes and why
+                      What changed and why
                     </Link>
                   </div>
                   <Pair entry={entry} show={show} />
