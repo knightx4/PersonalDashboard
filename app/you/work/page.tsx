@@ -1,3 +1,4 @@
+import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
@@ -74,7 +75,7 @@ export default async function Page() {
   const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader title="Work & school" />
       <JobsSection
         jobs={sortJobs(jobs)}
@@ -87,6 +88,6 @@ export default async function Page() {
         transcripts={transcripts.length}
         courses={courses.length}
       />
-    </>
+    </PageColumn>
   );
 }

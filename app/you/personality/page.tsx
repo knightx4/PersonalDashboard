@@ -1,3 +1,4 @@
+import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -39,12 +40,12 @@ export default async function PersonalityPage() {
     : null;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Personality"
         description={latest ? `Big Five, taken ${formatDay(latest.takenAt, true)}` : undefined}
       />
       <PersonalitySection latest={latest} earlier={earlier} typed={typed} themes={themes} />
-    </>
+    </PageColumn>
   );
 }

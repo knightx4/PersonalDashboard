@@ -1,3 +1,4 @@
+import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
@@ -33,7 +34,7 @@ export default async function PersonalityTestPage() {
   const typed = results.filter((r): r is TypedResult => r.kind !== 'big_five');
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         crumbs={[
           { label: 'Personality', href: '/you/personality' },
@@ -45,6 +46,6 @@ export default async function PersonalityTestPage() {
       <div className="mt-10">
         <OtherTests results={typed} today={todayIn(settings.timezone)} />
       </div>
-    </>
+    </PageColumn>
   );
 }

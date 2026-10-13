@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -38,7 +39,7 @@ export function PlaceForm({
   const back = place ? placeHref(place.id) : '/you/places';
 
   return (
-    <div className="mx-auto max-w-xl">
+    <PageColumn className="max-w-xl">
       <PageHeader
         title={place ? `Edit ${place.name}` : 'Add a place'}
         crumbs={[
@@ -119,6 +120,6 @@ export function PlaceForm({
           </div>
         </form>
       </Card>
-    </div>
+    </PageColumn>
   );
 }
