@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
 import { cardVariants } from '@/components/ui/card';
 import { MapQuote } from '@/components/vault/map-position';
@@ -28,9 +29,7 @@ export function MergeLog({ log }: { log: MergeLogPage }) {
 
   return (
     <section id="merges" aria-labelledby="merges-heading" className="mt-8 scroll-mt-4">
-      <h2 id="merges-heading" className="text-body font-semibold text-ink">
-        Merges
-      </h2>
+      <SectionHeading id="merges-heading" title="Merges" />
       <p className="mb-3 mt-1 text-ui text-ink-muted">
         {count(counts.theme, 'theme merge', 'theme merges')} and{' '}
         {count(counts.position, 'position merge', 'position merges')}
@@ -69,7 +68,7 @@ function MergeRow({ row }: { row: MergeLogRow }) {
         <Side label="Folded in" side={row.absorbed} kind={row.kind} />
         <ArrowRight
           className="hidden size-4 self-start text-ink-muted sm:mt-5 sm:block"
-          strokeWidth={2}
+          strokeWidth={1.75}
           aria-hidden
         />
         <Side
@@ -174,7 +173,7 @@ function Quote({ item }: { item: MergeLogItem }) {
                 document load, as on the theme page. */}
             <a
               href={`${noteHref(item.path)}${item.quote ? quoteFragment(item.quote) : ''}`}
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className={linkVariants({ tone: 'quiet' })}
             >
               {item.title ?? item.path}
             </a>

@@ -233,7 +233,7 @@ function AddLinks({
             defaultValue=""
             placeholderValue=""
             aria-label="A Learn goal to link"
-            icon={<GraduationCap className="size-3.5" strokeWidth={2} />}
+            icon={<GraduationCap className="size-3.5" strokeWidth={1.75} />}
           >
             <option value="" disabled>
               A Learn goal…

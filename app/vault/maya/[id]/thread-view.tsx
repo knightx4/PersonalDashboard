@@ -1,4 +1,6 @@
-import Link from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Note } from '@/components/ui/note';
 import { ChevronLeft } from 'lucide-react';
 import { MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
@@ -40,7 +42,7 @@ export function MayaThreadView({
           href="/vault/maya"
           className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
         >
-          <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Maya
         </Link>
       </div>
@@ -55,10 +57,7 @@ export function MayaThreadView({
           {thread.note ? (
             <>
               On{' '}
-              <Link
-                href={noteHref(thread.note.path)}
-                className="font-medium text-ink hover:underline"
-              >
+              <Link href={noteHref(thread.note.path)} className={linkVariants({ tone: 'quiet' })}>
                 {thread.note.title}
               </Link>
             </>
@@ -85,9 +84,7 @@ export function MayaThreadView({
         }}
       >
         <section aria-labelledby="thought-heading">
-          <h2 id="thought-heading" className="text-body font-semibold text-ink">
-            Maya&rsquo;s thought
-          </h2>
+          <SectionHeading id="thought-heading" title="Maya&rsquo;s thought" />
           {thought && thought.points.length > 0 ? (
             <>
               <ol className="mt-1 divide-y divide-border">
@@ -136,7 +133,7 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
                       (note 9d8f9bd9). */}
                   <MapQuote
                     quote={note.quote}
-                    className="rounded-r-md border-accent bg-accent-tint py-1.5 pr-3 text-ink"
+                    className="rounded-r-control border-accent bg-accent-tint py-1.5 pr-3 text-ink"
                   />
                   <p className="mt-1 pl-3.5 text-ui text-ink-muted">
                     {link ? (
@@ -144,7 +141,7 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
                       // on a document load, as on the map's theme page.
                       <a
                         href={`${noteHref(link.path)}${quoteFragment(note.quote)}`}
-                        className="font-medium text-ink underline-offset-2 hover:underline"
+                        className={linkVariants({ tone: 'quiet' })}
                       >
                         {link.title}
                       </a>
@@ -167,7 +164,7 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
               // voice from your notes above, and set apart from Maya's own.
               <li
                 key={`${source.author}-${index}`}
-                className="rounded-md bg-sunken px-3 py-2 text-ui text-ink"
+                className="rounded-control bg-sunken px-3 py-2 text-ui text-ink"
               >
                 <span className="font-medium">{source.author}</span>, <cite>{source.work}</cite>
                 <span className="text-ink-muted"> (paraphrased): </span>
@@ -186,14 +183,11 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
 function Synthesis({ synthesis }: { synthesis: MayaSynthesis }) {
   const [left, right] = synthesis.positionNames;
   return (
-    <div className="mt-2 rounded-card bg-sunken p-4">
-      <p className="text-ui font-medium text-ink">
-        Reconciling &ldquo;{left}&rdquo; and &ldquo;{right}&rdquo;
-      </p>
-      <p className="mt-1 whitespace-pre-line text-body text-ink">
+    <Note className="mt-2" title={<>Reconciling &ldquo;{left}&rdquo; and &ldquo;{right}&rdquo;</>}>
+      <p className="whitespace-pre-line text-body">
         <LinkedText text={synthesis.resolution} />
       </p>
-    </div>
+    </Note>
   );
 }
 

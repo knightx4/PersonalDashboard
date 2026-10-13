@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -77,7 +77,7 @@ export function QuickNoteRow({
               setOpen((was) => !was);
             }}
           >
-            <Plus className="size-4" strokeWidth={2} aria-hidden />
+            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
             Add a quick note
           </Button>
         )}
@@ -121,7 +121,7 @@ export function QuickNoteRow({
           <p className={cn(cardVariants(), 'p-4 text-ui text-ink-muted')}>
             Your vault token can read notes but not write them, so a quick note cannot be added from
             here.{' '}
-            <Link href="/vault/settings" className="font-medium whitespace-nowrap text-accent hover:underline">
+            <Link href="/vault/settings" className={`whitespace-nowrap ${linkVariants()}`}>
               Vault settings
             </Link>
           </p>

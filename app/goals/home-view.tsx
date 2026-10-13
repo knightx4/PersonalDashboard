@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
@@ -270,7 +270,7 @@ function SinceLine({
         {/* Runs left the tab bar: an audit log, read from here when wanted. */}
         <Link
           href="/goals/runs"
-          className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
+          className={cn(PRESS_AREA, linkVariants())}
         >
           Every run
         </Link>
@@ -305,7 +305,7 @@ function FilesLine({ files, timeZone }: { files: FileListing[] | null; timeZone:
       <p className="px-1 text-small">
         <Link
           href="/goals/files"
-          className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
+          className={cn(PRESS_AREA, linkVariants())}
         >
           {files.length > shown.length ? `All ${files.length} on Files` : 'All files'}
         </Link>

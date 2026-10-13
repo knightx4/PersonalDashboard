@@ -1,7 +1,9 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { LiveDot } from '@/components/ui/live-dot';
+import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { Card } from '@/components/ui/card';
@@ -62,7 +64,7 @@ export function GoalShaping({
 
   const status = running && (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
-      <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+      <LiveDot />
       <span>Dash is on it · {progress}</span>
     </p>
   );
@@ -154,7 +156,7 @@ export function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }
             <p className="text-small break-words">
               <Link
                 href={`/goals/runs/${run.id}`}
-                className="font-medium text-ink underline-offset-2 hover:underline"
+                className="font-medium text-ink hover:underline"
               >
                 {run.label}
               </Link>
@@ -171,7 +173,7 @@ export function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }
         ))}
       </ul>
       {more && (
-        <Link href="/goals/runs" className="text-small text-ink-muted underline-offset-2 hover:underline">
+        <Link href="/goals/runs" className={cn('text-small', linkVariants({ tone: 'quiet' }))}>
           All runs
         </Link>
       )}

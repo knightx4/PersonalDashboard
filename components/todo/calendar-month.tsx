@@ -154,7 +154,7 @@ export function WorkweekOutline({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none absolute inset-y-0 left-0 w-[calc(100%*5/7)] rounded-l-[inherit] ring-1 ring-inset ring-border-strong',
+        'pointer-events-none absolute inset-y-0 left-0 w-[calc(100%*5/7)] rounded-l-card ring-1 ring-inset ring-border-strong',
         className,
       )}
     />

@@ -7,6 +7,8 @@ import {
   type AgentActionSummary,
 } from '@/lib/agent-actions/summary';
 import { cn } from '@/lib/cn';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Stat } from '@/components/ui/stat';
 
 /**
  * What Dash can do of what the pages let the person do (plan #1895), under
@@ -90,23 +92,18 @@ export function AgentActionsPanel({ summary }: { summary: AgentActionSummary }) 
 
   return (
     <section aria-labelledby="agent-actions" className="mt-3 space-y-2">
-      <h3 id="agent-actions" className="text-body font-semibold text-ink">
-        What Dash can do of what you can
-      </h3>
+      <SectionHeading as="h3" id="agent-actions" title="What Dash can do of what you can" />
       <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-3')}>
         <p className="text-ui text-ink-muted">
           <span className="tabular">{summary.total}</span> things the pages let you do: how many Dash
           has a tool for, how many no agent should do, and how many it cannot do yet.
         </p>
 
-        <dl className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {figures.map((f) => (
-            <div key={f.label} className="min-w-0">
-              <dd className="tabular text-body font-semibold tracking-tight text-ink">{f.value}</dd>
-              <dt className="text-small text-ink-muted">{f.label}</dt>
-            </div>
+            <Stat key={f.label} size="sm" value={f.value} label={f.label} />
           ))}
-        </dl>
+        </div>
         <p className="text-small text-ink-muted">
           The gate refuses a new action that is in no list, and the last count may only go down.
         </p>

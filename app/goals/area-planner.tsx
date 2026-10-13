@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { LiveDot } from '@/components/ui/live-dot';
 import { Button } from '@/components/ui/button';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { cn } from '@/lib/cn';
@@ -45,19 +46,19 @@ export function AreaPlanner({
 
   const line = running ? (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
-      <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+      <LiveDot />
       <span>Dash is planning this area · {running}</span>
     </p>
   ) : run?.error ? (
     <p className="text-small text-danger">
       The last plan did not finish: {run.error}{' '}
-      <Link href={`/goals/runs/${run.runId}`} className="underline underline-offset-2">
+      <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
         Details
       </Link>
     </p>
   ) : run?.summary ? (
     <p className="text-small text-ink-muted">
-      <Link href={`/goals/runs/${run.runId}`} className="underline-offset-2 hover:underline">
+      <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
         Last plan
       </Link>
       : {run.summary}

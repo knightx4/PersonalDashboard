@@ -18,7 +18,7 @@ export default function Loading() {
         <div className="mt-2 divide-y divide-border">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="flex items-center gap-3 py-3.5">
-              <Skeleton className="size-6 shrink-0 rounded-[7px]" />
+              <Skeleton className="size-6 shrink-0 rounded-control" />
               <Skeleton className="h-4" style={{ width: `${62 - index * 9}%` }} />
             </div>
           ))}
@@ -29,7 +29,7 @@ export default function Loading() {
               key={index}
               className={cn(cardVariants({ padding: 'dense' }), 'flex items-center gap-3')}
             >
-              <Skeleton className="size-8 shrink-0 rounded-[9px]" />
+              <Skeleton className="size-8 shrink-0 rounded-control" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-3.5 w-24" />
                 <Skeleton className="h-3 w-32" />

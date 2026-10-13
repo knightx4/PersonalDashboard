@@ -16,6 +16,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { iconButtonVariants } from '@/components/ui/icon-button';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
 import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
@@ -146,7 +148,7 @@ export default async function TodoCalendarPage({
             date={shiftAnchor(calendar.view, calendar.anchor, -1)}
             label={`Previous ${calendar.view}`}
           >
-            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+            <ChevronLeft strokeWidth={1.75} aria-hidden />
           </StepLink>
           <h2 className="px-1 text-body font-semibold whitespace-nowrap text-ink">
             {title(calendar.view, calendar.days)}
@@ -156,7 +158,7 @@ export default async function TodoCalendarPage({
             date={shiftAnchor(calendar.view, calendar.anchor, 1)}
             label={`Next ${calendar.view}`}
           >
-            <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
+            <ChevronRight strokeWidth={1.75} aria-hidden />
           </StepLink>
         </div>
 
@@ -181,7 +183,7 @@ export default async function TodoCalendarPage({
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
-        <nav aria-label="View" className="ml-auto flex items-center gap-1">
+        <nav aria-label="View" className={cn(segmentedFrame, 'ml-auto')}>
           {CALENDAR_VIEWS.map((candidate) => (
             <Link
               key={candidate}
@@ -190,12 +192,7 @@ export default async function TodoCalendarPage({
                 query: { view: candidate, date: calendar.anchor },
               }}
               aria-current={candidate === calendar.view ? 'page' : undefined}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-                candidate === calendar.view
-                  ? 'bg-accent text-surface'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
+              className={segmentClass(candidate === calendar.view)}
             >
               {CALENDAR_VIEW_LABEL[candidate]}
             </Link>
@@ -337,7 +334,7 @@ function StepLink({
       href={{ pathname: '/todo/calendar', query: { view, date } }}
       aria-label={label}
       title={label}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+      className={iconButtonVariants({ size: 'md' })}
     >
       {children}
     </Link>

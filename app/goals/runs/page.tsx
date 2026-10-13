@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
@@ -69,14 +69,14 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
   return (
     <li className="card-pad-x row-pad space-y-1">
       <p className="text-ui break-words text-ink">
-        <Link href={`/goals/runs/${run.id}`} className="font-semibold underline-offset-2 hover:underline">
+        <Link href={`/goals/runs/${run.id}`} className="font-semibold hover:underline">
           {JOB_LABELS[run.job]}
         </Link>
         {run.item && (
           <>
             {' on '}
             {run.item.level === 'goal' ? (
-              <Link href={`/goals/${run.item.id}`} className="underline-offset-2 hover:underline">
+              <Link href={`/goals/${run.item.id}`} className={linkVariants()}>
                 {run.item.title}
               </Link>
             ) : (
@@ -87,7 +87,7 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
         {run.area && (
           <>
             {' on '}
-            <Link href="/goals/all" className="underline-offset-2 hover:underline">
+            <Link href="/goals/all" className={linkVariants()}>
               {run.area.name}
             </Link>
           </>

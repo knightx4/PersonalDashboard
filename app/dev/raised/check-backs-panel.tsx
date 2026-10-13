@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
@@ -87,7 +87,7 @@ export function CheckBacksPanel({
                     For{' '}
                     <Link
                       href={hrefOf(row.step)}
-                      className="press-area text-ink underline underline-offset-2"
+                      className={cn('press-area', linkVariants())}
                     >
                       #{row.step.outline} {row.step.title}
                     </Link>

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { MessageSquare, Play, StickyNote } from 'lucide-react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { DashCredit, DashMark } from '@/components/ui/dash-mark';
@@ -57,9 +58,9 @@ export function FeatureActivity({ entries }: { entries: readonly ActivityEntry[]
     <div className="space-y-5">
       {days.map(({ day, entries: onDay }) => (
         <section key={day} aria-label={dayHeading(day)}>
-          <h2 className="mb-2 text-small font-semibold uppercase tracking-wide text-ink-muted">
+          <SectionLabel as="h2" className="mb-2">
             {dayHeading(day)}
-          </h2>
+          </SectionLabel>
           <ol className={cn(cardVariants(), 'divide-y divide-border')}>
             {onDay.map((entry) => (
               <ActivityRow key={entry.id} entry={entry} />
@@ -93,7 +94,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
   const subject = (
     <Link
       href={entry.subject.href}
-      className="font-medium text-ink underline-offset-2 hover:underline"
+      className={cn('font-medium', linkVariants())}
     >
       {entry.subject.isFeature ? 'this feature' : `${stepRef(entry.subject)} ${entry.subject.title}`}
     </Link>
@@ -110,7 +111,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
         {entry.verb}{' '}
         <Link
           href={entry.subject.href}
-          className="text-ink-muted underline-offset-2 hover:underline"
+          className={linkVariants({ tone: 'quiet' })}
         >
           Open {stepRef(entry.subject)}
         </Link>

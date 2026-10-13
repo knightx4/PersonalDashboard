@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
 import { Card, CardSection } from '@/components/ui/card';
@@ -60,6 +60,7 @@ import * as C from './content';
 import * as M from './measurements';
 import { CorrectionsChart } from './corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * The standard the interface is held to, and the only copy of it.
@@ -1078,7 +1079,7 @@ export function UiStandard({
                 {['Status: any', 'Sort: newest', 'Group: none', 'Window: 30 days'].map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-control bg-accent px-2 text-small text-accent-ink"
+                    className="rounded-control bg-accent px-2 text-small text-fill-ink"
                   >
                     {chip}
                   </span>
@@ -1487,12 +1488,12 @@ export function UiStandard({
           </div>
           <Card padding="none">
             <ul className="divide-y divide-border">
-              <li className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] gap-x-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-                <span>Variable</span>
+              <li className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] gap-x-2">
+                <SectionLabel as="span">Variable</SectionLabel>
                 {DENSITY_LABELS.map((label) => (
-                  <span key={label} className="text-right">
+                  <SectionLabel as="span" key={label} className="text-right">
                     {label.slice(0, 4)}
-                  </span>
+                  </SectionLabel>
                 ))}
               </li>
               {M.DIAL.map((row) => (
@@ -2050,7 +2051,7 @@ export function UiStandard({
         </Card>
         <p className="text-small text-ink-muted">
           Something wrong with a surface? Say so on{' '}
-          <Link href="/dev/surfaces" className="text-accent hover:underline">
+          <Link href="/dev/surfaces" className={linkVariants()}>
             Surfaces
           </Link>
           , where every one is rendered at the width it is read at.

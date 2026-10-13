@@ -590,8 +590,12 @@ export function IdeasView({
                 <Disclosure
                   key={group.key}
                   defaultOpen
-                  title={group.label}
-                  meta={`(${group.rows.length})`}
+                  title={
+                    <>
+                      {group.label}{' '}
+                      <span className="font-normal text-ink-muted">({group.rows.length})</span>
+                    </>
+                  }
                   bodyClassName="mt-2"
                 >
                   <ul className={cn(cardVariants(), 'divide-y divide-border')}>

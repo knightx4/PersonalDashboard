@@ -1,6 +1,7 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import type { VisionReviewStatus } from '@/lib/specs/vision-review-run';
+import { cn } from '@/lib/cn';
 
 /** A date as the line says it: "Sunday 4 October". UTC, as the schedule is. */
 function day(at: string): string {
@@ -32,7 +33,7 @@ export function VisionReviewLine({ status, now }: { status: VisionReviewStatus; 
     <div className="space-y-1">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="text-ui font-medium text-ink">Vision review</h3>
-        <Link href="/dev/specs" className="ml-auto text-ui text-accent hover:underline">
+        <Link href="/dev/specs" className={cn('ml-auto text-ui', linkVariants())}>
           Specs
         </Link>
       </div>

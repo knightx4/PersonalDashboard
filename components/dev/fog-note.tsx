@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * A patch of fog: what is not known yet about a feature on the dev plan, or
@@ -28,9 +29,7 @@ export function FogNote({
 }) {
   return (
     <div className="border-l-2 border-dashed border-border-strong pl-2.5">
-      <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
-        Not yet specified
-      </p>
+      <SectionLabel className="text-ink-ghost">Not yet specified</SectionLabel>
       <p className="whitespace-pre-wrap text-small text-ink-muted">
         <LinkedText text={fog} />
       </p>

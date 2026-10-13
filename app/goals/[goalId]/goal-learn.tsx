@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { Gauge, Route, Timer } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -79,7 +79,7 @@ export function GoalLearn({
           {plan && (
             <span className="flex items-center gap-1">
               <Route className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-              <Link href={plan.href} className="text-accent hover:underline">
+              <Link href={plan.href} className={linkVariants()}>
                 Open the plan
               </Link>
               <span className="tabular-nums">· {plan.line}</span>
@@ -90,7 +90,7 @@ export function GoalLearn({
             <Link
               href={practiceHref({ goal: aim.id })}
               aria-label={`Practise ${aim.name}`}
-              className="text-accent hover:underline"
+              className={linkVariants()}
             >
               Practise
             </Link>

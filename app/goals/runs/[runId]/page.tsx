@@ -1,9 +1,11 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ListChecks } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Note } from '@/components/ui/note';
+import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -84,10 +86,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
               run.item.level === 'goal' ? (
                 <>
                   {'On '}
-                  <Link
-                    href={`/goals/${run.item.id}`}
-                    className="underline-offset-2 hover:underline"
-                  >
+                  <Link href={`/goals/${run.item.id}`} className={linkVariants({ tone: 'quiet' })}>
                     {run.item.title}
                   </Link>
                   {' · '}
@@ -95,7 +94,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
               ) : runItemHref ? (
                 <>
                   {'On the step '}
-                  <Link href={runItemHref} className="underline-offset-2 hover:underline">
+                  <Link href={runItemHref} className={linkVariants({ tone: 'quiet' })}>
                     {run.item.title}
                   </Link>
                   {' · '}
@@ -106,7 +105,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
             ) : run.area ? (
               <>
                 {'On '}
-                <Link href={areaHref(run.area.id)} className="underline-offset-2 hover:underline">
+                <Link href={areaHref(run.area.id)} className={linkVariants({ tone: 'quiet' })}>
                   {run.area.name}
                 </Link>
                 {' · '}
@@ -118,7 +117,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
         actions={
           <Link
             href="/goals/runs"
-            className="press-area text-small text-ink-muted underline-offset-2 hover:underline"
+            className={cn('press-area text-small', linkVariants({ tone: 'quiet' }))}
           >
             All runs
           </Link>
@@ -130,9 +129,11 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
         </p>
       ) : (
         run.summary && (
-          <p className="rounded-card bg-sunken card-pad text-small break-words whitespace-pre-wrap text-ink">
-            <LinkedText text={run.summary} />
-          </p>
+          <Note>
+            <p className="text-small break-words whitespace-pre-wrap">
+              <LinkedText text={run.summary} />
+            </p>
+          </Note>
         )
       )}
       <LiveRunLines

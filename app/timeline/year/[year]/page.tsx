@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
@@ -71,7 +71,7 @@ export default async function YearReviewPage({ params }: { params: Promise<{ yea
         title={`${year} in review`}
         description="What the year held, counted from the timeline and written up by Dash."
         actions={
-          <Link href="/timeline" className="text-ui text-accent hover:underline">
+          <Link href="/timeline" className={`text-ui ${linkVariants()}`}>
             Timeline
           </Link>
         }

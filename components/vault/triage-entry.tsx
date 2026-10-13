@@ -17,12 +17,12 @@ export function TriageEntry({ waiting, bare = false }: { waiting: number; bare?:
         'flex items-center gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas',
       )}
     >
-      <Inbox className="size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+      <Inbox className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       <span className="min-w-0 flex-1 text-body font-medium text-ink">Quick note triage</span>
       <span className="tabular shrink-0 text-ui text-ink-muted">
         {waiting === 0 ? 'Nothing waiting' : `${waiting} waiting`}
       </span>
-      <ChevronRight className="size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+      <ChevronRight className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
     </Link>
   );
 }

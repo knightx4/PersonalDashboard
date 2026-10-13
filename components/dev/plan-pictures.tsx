@@ -13,13 +13,13 @@ export function PlanPictures({ pictures }: { pictures: readonly PlanPicture[] })
       {pictures.map((picture) => (
         <figure key={picture.id} className="min-w-0 space-y-1.5">
           <figcaption className="text-small text-ink">{picture.caption}</figcaption>
-          <a href={picture.src} target="_blank" rel="noreferrer" className="press block rounded-md">
+          <a href={picture.src} target="_blank" rel="noreferrer" className="press block rounded-card">
             {/* eslint-disable-next-line @next/next/no-img-element -- an SVG from our own route, loaded as an image so nothing in it runs */}
             <img
               src={picture.src}
               alt={picture.caption}
               loading="lazy"
-              className="w-full rounded-md bg-sunken"
+              className="w-full rounded-card bg-sunken"
             />
           </a>
         </figure>

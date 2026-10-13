@@ -157,7 +157,7 @@ export default async function NotePage({
             href="/vault"
             className="inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
           >
-            <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
+            <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
             All notes
           </Link>
 
@@ -178,7 +178,7 @@ export default async function NotePage({
           blobSha={note.blobSha}
           heading={
             <header>
-              <h1 className="font-display text-title font-semibold tracking-tight text-ink">
+              <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
                 {note.title}
               </h1>
               <p className="mt-1 text-ui text-ink-muted">

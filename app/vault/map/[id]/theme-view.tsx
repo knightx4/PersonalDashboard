@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ChevronLeft } from 'lucide-react';
 import { MapPosition, MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
@@ -21,13 +22,13 @@ export function ThemeView({ map }: { map: ThemeMap }) {
           href="/vault/map"
           className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
         >
-          <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           Map
         </Link>
       </div>
 
       <header className="mb-6">
-        <h1 className="font-display text-title font-semibold tracking-tight text-ink">
+        <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
           {theme.name}
         </h1>
         <p className="mt-1 text-body text-ink">{theme.about}</p>
@@ -40,9 +41,7 @@ export function ThemeView({ map }: { map: ThemeMap }) {
 
       {positions.length > 0 && (
         <section aria-labelledby="positions-heading">
-          <h2 id="positions-heading" className="mb-1 text-body font-semibold text-ink">
-            Positions
-          </h2>
+          <SectionHeading id="positions-heading" title="Positions" className="mb-1" />
           <ul className="divide-y divide-border">
             {positions.map((position) => (
               <li key={position.id} className="py-4">
@@ -66,9 +65,7 @@ export function ThemeView({ map }: { map: ThemeMap }) {
 
       {notes.length > 0 && (
         <section aria-labelledby="notes-heading" className="mt-8">
-          <h2 id="notes-heading" className="mb-1 text-body font-semibold text-ink">
-            Notes
-          </h2>
+          <SectionHeading id="notes-heading" title="Notes" className="mb-1" />
           <ul className="divide-y divide-border">
             {notes.map((note) => (
               <li key={note.path} className="py-3">
@@ -99,7 +96,7 @@ function Source({ source }: { source: MapSource }) {
                 the note at the top and look for an element with that id. */}
             <a
               href={`${noteHref(source.note.path)}${quoteFragment(source.quote)}`}
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className={linkVariants({ tone: 'quiet' })}
             >
               {source.note.title}
             </a>

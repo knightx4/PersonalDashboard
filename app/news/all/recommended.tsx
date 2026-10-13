@@ -6,6 +6,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
+import { EmptyState } from '@/components/ui/empty-state';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatArrival } from '@/lib/news/issues/list';
@@ -113,7 +114,7 @@ export function RecommendedNewsletters({
                       href={pick.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-baseline gap-1.5 text-body font-medium text-ink underline-offset-2 hover:text-accent hover:underline"
+                      className="inline-flex items-baseline gap-1.5 text-body font-medium text-ink hover:text-accent hover:underline"
                     >
                       {pick.name}
                       <ExternalLink
@@ -146,7 +147,7 @@ export function RecommendedNewsletters({
             ))}
           </div>
         ) : failed ? null : (
-          <p className="text-ui text-ink-muted">No list has been made yet.</p>
+          <EmptyState size="inline" title="No list has been made yet." />
         )}
       </Card>
     </div>

@@ -1,10 +1,12 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRef, useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
 import { Card, CardSection } from '@/components/ui/card';
-import { FieldError, InlineInput } from '@/components/ui/field';
+import { Checkbox, FieldError, InlineInput } from '@/components/ui/field';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SectionLabel } from '@/components/ui/section-heading';
 import type { ModuleId } from '@/lib/modules';
 import type { SourceId } from '@/lib/todo/agenda/sources';
 import { saveAgendaSettingsNow } from './actions';
@@ -81,16 +83,14 @@ export function AgendaSettingsForm({
         hint="Things the other workspaces already know about, shown on your agenda. They are read where they live and never copied here. Finishing one writes to the workspace that owns it."
       >
         {groups.length === 0 ? (
-          <p className="mt-2 text-ui text-ink-muted">
-            No sources yet. The agenda shows the tasks you typed.
-          </p>
+          <EmptyState size="inline" title="No sources yet. The agenda shows the tasks you typed." className="mt-2" />
         ) : (
           <div className="mt-2 space-y-5">
             {groups.map((group) => (
               <div key={group.moduleId}>
-                <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+                <SectionLabel as="h3" className="mb-2">
                   {group.moduleLabel}
-                </h3>
+                </SectionLabel>
                 {/* Divides rather than one box per source: the card around
                     them has already drawn that edge once, and drawing it again
                     per row turns a list of sources into a wall of rectangles.
@@ -104,12 +104,11 @@ export function AgendaSettingsForm({
                         !source.available && 'opacity-60',
                       )}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={on.includes(source.id)}
                         onChange={(event) => toggle(source.id, event.target.checked)}
                         disabled={!source.available}
-                        className="mt-1 size-4 accent-accent"
+                        className="mt-1"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-ui font-medium text-ink">{source.label}</span>
@@ -157,7 +156,7 @@ export function AgendaSettingsForm({
               type="button"
               onClick={() => setEditing(true)}
               aria-label={`${days} days. Change how many days this week covers`}
-              className="press rounded-control underline decoration-ink-ghost decoration-dotted underline-offset-4 hover:bg-sunken"
+              className="press rounded-control underline decoration-ink-ghost decoration-dotted hover:bg-sunken"
             >
               {days}
             </button>
@@ -166,7 +165,7 @@ export function AgendaSettingsForm({
         </p>
         <p className="mt-2 text-small text-ink-muted">
           Your timezone decides what counts as today, in every workspace.{' '}
-          <Link href="/account" className="press font-medium text-accent hover:underline">
+          <Link href="/account" className={linkVariants()}>
             Account settings
           </Link>
         </p>

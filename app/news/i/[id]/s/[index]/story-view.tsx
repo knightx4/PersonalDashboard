@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
@@ -65,7 +65,7 @@ export function StoryView({
             )}
             <Link
               href={issueHref(issue.id, { original: false, pictures: true, from: null })}
-              className="press-area text-ui text-accent hover:underline"
+              className={`press-area text-ui ${linkVariants()}`}
             >
               Open the whole newsletter
             </Link>

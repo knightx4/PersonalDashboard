@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { formatDay } from '@/lib/goals/dates';
 import { stepHref } from '@/lib/goals/all-goals';
 import { useActionState, useId, useRef, useState, useTransition } from 'react';
@@ -182,7 +182,7 @@ export function PrepNote({ goalId, prep }: { goalId: string; prep: StepPrep }) {
       Dash is preparing:{' '}
       <Link
         href={stepHref(goalId, prep.id)}
-        className="press-area text-ink underline underline-offset-2"
+        className={cn('press-area', linkVariants())}
       >
         {prep.title}
       </Link>
@@ -610,7 +610,7 @@ export function StepFacts({
                   id={linkPickerId}
                   name="goalId"
                   aria-label="Another goal this counts towards"
-                  icon={<Target className="size-3.5" strokeWidth={2} />}
+                  icon={<Target className="size-3.5" strokeWidth={1.75} />}
                   // Unset until picked: with the first goal chosen, the chip
                   // read as a link the step already had (note 4a2c79b9).
                   defaultValue=""
@@ -681,7 +681,7 @@ function KindChip({
         value={value}
         onChange={(event) => onChange(event.target.value as StepKind)}
         aria-label={label}
-        icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+        icon={<CircleUser className="size-3.5" strokeWidth={1.75} />}
       >
         {STEP_KINDS.map((option) => (
           <option key={option} value={option}>
@@ -717,7 +717,7 @@ function RhythmFields({
         defaultValue={count ?? 1}
         onBlur={onCommit}
         aria-label="How many times"
-        icon={<Repeat className="size-3.5" strokeWidth={2} />}
+        icon={<Repeat className="size-3.5" strokeWidth={1.75} />}
       />
       <span className="text-ui text-ink-muted">a</span>
       <ChipSelect

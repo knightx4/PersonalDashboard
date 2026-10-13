@@ -207,14 +207,16 @@ function StepFields({
           </div>
         </>
       ) : (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => setShowMore(true)}
-          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
+          className="-ml-1.5 gap-1"
         >
           <span aria-hidden>+</span>
           Detail and acceptance
-        </button>
+        </Button>
       )}
 
       <div className="flex flex-wrap items-center gap-1">

@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -27,7 +27,7 @@ export type WeekReviewViewProps =
   | { state: 'shown'; review: ShownWeekReview; weeks: string[]; timezone: string };
 
 const HOME_LINK = (
-  <Link href="/home" className="press-area text-ui text-accent hover:underline">
+  <Link href="/home" className={`press-area text-ui ${linkVariants()}`}>
     Home
   </Link>
 );
@@ -107,7 +107,7 @@ export function WeekReviewView(props: WeekReviewViewProps) {
                 {observation.goal && (
                   <p className="text-small text-ink-muted">
                     {'Bears on '}
-                    <Link href={`/goals/${observation.goal.id}`} className="font-medium text-accent hover:underline">
+                    <Link href={`/goals/${observation.goal.id}`} className={linkVariants()}>
                       {observation.goal.title}
                     </Link>
                   </p>
@@ -165,14 +165,14 @@ function OtherWeeks({ week, weeks }: { week: string; weeks: string[] }) {
       {(earlier || later) && (
         <nav aria-label="Other weeks" className="flex items-center justify-between gap-3 text-ui">
           {earlier ? (
-            <Link href={`/home/week/${earlier}`} className="press-area text-accent hover:underline">
+            <Link href={`/home/week/${earlier}`} className={`press-area ${linkVariants()}`}>
               {weekShortLabel(earlier)}
             </Link>
           ) : (
             <span />
           )}
           {later && (
-            <Link href={`/home/week/${later}`} className="press-area text-accent hover:underline">
+            <Link href={`/home/week/${later}`} className={`press-area ${linkVariants()}`}>
               {weekShortLabel(later)}
             </Link>
           )}

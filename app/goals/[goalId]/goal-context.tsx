@@ -54,7 +54,7 @@ function ContextRow({ item }: { item: ContextItem }) {
         <p className="text-ui break-words text-ink">
           <span className="text-small text-ink-muted">{item.module} · </span>
           {item.href ? (
-            <Link href={item.href} className="underline-offset-2 hover:underline">
+            <Link href={item.href} className="hover:underline">
               {title}
             </Link>
           ) : (

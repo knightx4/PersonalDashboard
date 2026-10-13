@@ -5,8 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SectionFold } from '@/components/ui/disclosure';
 import { FeedbackList } from '@/components/feedback/feedback-list';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
-import { segmentedFrame } from '@/components/ui/segmented';
-import { cn } from '@/lib/cn';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import {
   FEEDBACK_KINDS,
   FEEDBACK_KIND_LABEL,
@@ -130,13 +129,7 @@ function KindFilter({ kind }: { kind: FeedbackKind | null }) {
             href={option.value ? `/dev/bugs?kind=${option.value}` : '/dev/bugs'}
             scroll={false}
             aria-current={on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on
-                ? 'bg-accent-tint text-accent'
-                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(on)}
           >
             {option.label}
           </Link>

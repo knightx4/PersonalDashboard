@@ -13,6 +13,7 @@ import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
+import Link, { linkVariants } from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
 import { DayClosed } from '@/components/todo/day-closed';
@@ -150,7 +151,7 @@ export default async function TodoPage() {
                       {context.map((entry) => (
                         <li
                           key={entry.key}
-                          className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
+                          className="flex flex-wrap items-baseline gap-x-2 rounded-control bg-accent-tint px-3 py-1.5 text-small text-ink"
                         >
                           <CalendarClock
                             className="size-3.5 shrink-0 text-accent"
@@ -168,12 +169,9 @@ export default async function TodoPage() {
                           <span className="font-medium">{entry.label}</span>
                           {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
                           {entry.link && (
-                            <a
-                              href={entry.link.href}
-                              className="font-medium text-accent underline underline-offset-2"
-                            >
+                            <Link href={entry.link.href} className={linkVariants()}>
                               {entry.link.label}
-                            </a>
+                            </Link>
                           )}
                         </li>
                       ))}

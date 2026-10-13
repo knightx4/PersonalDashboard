@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { approveSpecChange, declineSpecChange, type SpecChangeActionState } from './actions';
 import { Thread } from '@/components/thread/thread';
@@ -120,7 +120,7 @@ export function SpecChangeCard({
           {change.madeBy === 'claude' && <DashCredit />}
           {change.madeBy === 'claude' ? 'Dash proposes a change to ' : 'Your change to '}
           {specTitle ? (
-            <Link href={`/dev/specs/${change.spec}`} className="text-ink hover:underline">
+            <Link href={`/dev/specs/${change.spec}`} className={linkVariants()}>
               {specTitle}
             </Link>
           ) : (

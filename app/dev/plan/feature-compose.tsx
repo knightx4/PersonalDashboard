@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -214,17 +214,13 @@ function Added({ number, onClose }: { number: number; onClose: () => void }) {
       </span>
       <Link
         href={featureHref(number)}
-        className="text-ink underline underline-offset-2 hover:text-accent"
+        className={linkVariants()}
       >
         Open it to add steps
       </Link>
-      <button
-        type="button"
-        onClick={onClose}
-        className="press rounded-control px-1 text-ink-ghost hover:text-ink-muted"
-      >
+      <Button type="button" variant="ghost" size="xs" onClick={onClose}>
         Dismiss
-      </button>
+      </Button>
     </p>
   );
 }

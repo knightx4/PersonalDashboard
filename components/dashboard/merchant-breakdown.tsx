@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { formatMoney, type CurrencyCode, type MerchantSpendSlice } from '@/lib/money';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Meter } from '@/components/ui/meter';
@@ -61,7 +61,7 @@ export function MerchantBreakdown({
         {slices.length > 0 && (
           <p className="mt-4 text-small text-ink-muted">
             Gross orders placed in this period.{' '}
-            <Link href="/shopping/orders" className="text-accent hover:underline">
+            <Link href="/shopping/orders" className={linkVariants()}>
               See all orders
             </Link>
           </p>

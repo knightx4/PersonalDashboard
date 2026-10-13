@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -37,7 +37,7 @@ function Outcome({ finding }: { finding: SpecFinding }) {
         {href ? (
           <>
             Proposed change:{' '}
-            <Link href={href} className="text-ink underline-offset-2 hover:underline">
+            <Link href={href} className={linkVariants()}>
               {change.title}
             </Link>
           </>

@@ -1,6 +1,7 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ArrowRight } from 'lucide-react';
@@ -34,10 +35,10 @@ function ThreadLink({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="mt-3 inline-flex items-center gap-1 text-ui font-medium text-accent hover:underline"
+      className={`mt-3 inline-flex items-center gap-1 text-ui ${linkVariants()}`}
     >
       Open the thread
-      <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+      <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
     </Link>
   );
 }
@@ -47,9 +48,7 @@ export function MayaAsk({ notePath, thread }: { notePath: string; thread: NoteTh
 
   return (
     <section aria-labelledby="maya-heading" className="mt-10">
-      <h2 id="maya-heading" className="text-body font-semibold text-ink">
-        Maya
-      </h2>
+      <SectionHeading id="maya-heading" title="Maya" />
 
       {thread ? (
         <div className="mt-2">

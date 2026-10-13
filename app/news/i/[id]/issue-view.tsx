@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   ArrowLeft,
   CircleDot,
@@ -193,7 +193,7 @@ export function IssueView({
           href={back.href}
           className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           {back.label}
         </Link>
       </p>
@@ -391,7 +391,7 @@ function LeadStory({
         />
       )}
       <div className="card-pad">
-        <h2 className="break-words text-title font-semibold tracking-tight text-ink">
+        <h2 className="break-words font-display text-title tracking-tight text-ink">
           {story.headline}
         </h2>
         <StoryRating rating={story.rating} className="mt-1 block" />
@@ -427,10 +427,10 @@ function StoryActions({
           href={story.link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+          className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
         >
           Read the article
-          <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
         </a>
       ) : (
         <span aria-hidden />

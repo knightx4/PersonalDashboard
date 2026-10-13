@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ToggleChip } from '@/components/ui/chip';
-import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { Checkbox, Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
@@ -109,7 +109,7 @@ export function AddTask({ today }: { today: string }) {
             if (!event.target.value) setTime('');
           }}
           className={cn(
-            'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
+            'tabular rounded-full px-2 py-1 text-small outline-none transition-colors duration-quick',
             'focus:ring-1 focus:ring-accent/40',
             dueOn ? 'text-ink' : 'text-ink-muted',
           )}
@@ -122,7 +122,7 @@ export function AddTask({ today }: { today: string }) {
             aria-label="At"
             value={time}
             onChange={(event) => setTime(event.target.value)}
-            className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-quick focus:ring-1 focus:ring-accent/40"
+            className="tabular rounded-full px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-quick focus:ring-1 focus:ring-accent/40"
           />
         )}
 
@@ -246,13 +246,7 @@ function DueFields({
 function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecked?: boolean }) {
   return (
     <label htmlFor={id} className="group flex w-fit cursor-pointer items-center gap-2 text-ui text-ink">
-      <input
-        id={id}
-        type="checkbox"
-        name="pinned"
-        defaultChecked={defaultChecked}
-        className="peer sr-only"
-      />
+      <Checkbox id={id} name="pinned" defaultChecked={defaultChecked} className="peer sr-only" />
       <StatusGlyph
         glyph="empty"
         size={16}

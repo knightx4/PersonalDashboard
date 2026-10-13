@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -25,6 +25,7 @@ import { stepRef } from '@/lib/plan/ref';
 import { visionAnchor } from '@/lib/specs/vision';
 import type { Tab } from '@/lib/tabs';
 import { openedText } from '@/lib/usage/report';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * The module index and one module's page in Dev. Server components, so the
@@ -97,7 +98,7 @@ function tabHref(summary: ModuleSummary, tab: ModuleTab): string {
 }
 
 const rowLink = 'press-area text-body text-ink underline-offset-2 hover:underline';
-const moreLink = 'press-area text-small text-accent hover:underline';
+const moreLink = cn('press-area text-small', linkVariants());
 const list = cn(cardVariants(), 'divide-y divide-border overflow-hidden');
 
 /**
@@ -126,10 +127,6 @@ function Row({
 }
 
 /** A list with nothing in it, said in a sentence rather than left blank. */
-function Nothing({ children }: { children: React.ReactNode }) {
-  return <p className="text-body text-ink-muted">{children}</p>;
-}
-
 function FeatureRows({ items, flat }: { items: readonly PlanItem[]; flat?: boolean }) {
   return (
     <Rows flat={flat}>
@@ -243,7 +240,7 @@ function Preview({
         ) : undefined
       }
     >
-      {total > 0 ? children : <Nothing>{empty}</Nothing>}
+      {total > 0 ? children : <EmptyState size="inline" title={empty} />}
     </CardSection>
   );
 }
@@ -316,7 +313,7 @@ function SpecTab({ summary }: { summary: ModuleSummary }) {
             <LinkedText text={summary.vision} />
           </p>
         ) : (
-          <Nothing>No vision written for this workspace yet.</Nothing>
+          <EmptyState size="inline" title="No vision written for this workspace yet." />
         )}
       </CardSection>
       {summary.specs.length > 0 ? (
@@ -330,7 +327,7 @@ function SpecTab({ summary }: { summary: ModuleSummary }) {
           ))}
         </Rows>
       ) : (
-        <Nothing>No spec describes this workspace yet.</Nothing>
+        <EmptyState size="inline" title="No spec describes this workspace yet." />
       )}
     </div>
   );
@@ -355,7 +352,7 @@ function UiTab({ summary }: { summary: ModuleSummary }) {
             <LinkedText text={review.note} />
           </p>
         ) : (
-          <Nothing>{review ? 'The pass left no note.' : 'Nobody has reviewed this workspace yet.'}</Nothing>
+          <EmptyState size="inline" title={review ? 'The pass left no note.' : 'Nobody has reviewed this workspace yet.'} />
         )}
       </CardSection>
       {findings.length > 0 && (
@@ -404,7 +401,7 @@ function UsageTab({ summary, now }: { summary: ModuleSummary; now: Date }) {
           ))}
         </Rows>
       ) : (
-        <Nothing>No page in this workspace has been recorded yet.</Nothing>
+        <EmptyState size="inline" title="No page in this workspace has been recorded yet." />
       )}
       <Link href="/dev/usage" className={moreLink}>
         Every workspace in Usage
@@ -419,19 +416,19 @@ function OpenTab({ summary, tab, now }: { summary: ModuleSummary; tab: ModuleTab
       return summary.features.length > 0 ? (
         <FeatureRows items={summary.features} />
       ) : (
-        <Nothing>No open features.</Nothing>
+        <EmptyState size="inline" title="No open features." />
       );
     case 'bugs':
       return summary.bugs.length > 0 ? (
         <BugRows rows={summary.bugs} />
       ) : (
-        <Nothing>Nothing outstanding was filed from this workspace.</Nothing>
+        <EmptyState size="inline" title="Nothing outstanding was filed from this workspace." />
       );
     case 'ideas':
       return summary.ideas.length > 0 ? (
         <IdeaRows ideas={summary.ideas} />
       ) : (
-        <Nothing>No live ideas for this workspace.</Nothing>
+        <EmptyState size="inline" title="No live ideas for this workspace." />
       );
     case 'spec':
       return <SpecTab summary={summary} />;
@@ -443,7 +440,7 @@ function OpenTab({ summary, tab, now }: { summary: ModuleSummary; tab: ModuleTab
       return summary.shipped.length > 0 ? (
         <ShippedRows items={summary.shipped} />
       ) : (
-        <Nothing>Nothing has shipped here yet.</Nothing>
+        <EmptyState size="inline" title="Nothing has shipped here yet." />
       );
     case 'overview':
     default:

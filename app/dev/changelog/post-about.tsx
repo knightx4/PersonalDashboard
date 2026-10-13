@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { suggestPostAbout, type PostsActionState } from '../posts/actions';
@@ -26,7 +26,7 @@ export function PostAbout({ number }: { number: number }) {
       {state.message && (
         <p role="status" className="text-small text-ink-muted">
           {state.message}{' '}
-          <Link href="/dev/posts" className="text-accent hover:underline">
+          <Link href="/dev/posts" className={linkVariants()}>
             Open Posts
           </Link>
         </p>

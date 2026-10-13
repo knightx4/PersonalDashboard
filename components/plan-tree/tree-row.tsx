@@ -26,6 +26,9 @@ import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
 import { readableRefs } from '@/lib/plan/ref';
 import type { PlanProgress } from '@/lib/plan/tree';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { Breakdown } from './counts';
 import { Dependencies } from './dependencies';
@@ -539,16 +542,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
          * knows is there is the thing this whole section exists to
          * stop. */}
         {unanswered > 0 && !open && (
-          <span
+          <Chip
+            tone="caution"
             title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
           >
-            <HelpCircle className="size-3" strokeWidth={1.75} aria-hidden />
+            <HelpCircle strokeWidth={1.75} aria-hidden />
             {unanswered}
             <span className="sr-only">
               unanswered {unanswered === 1 ? 'question' : 'questions'}
             </span>
-          </span>
+          </Chip>
         )}
         {/* And whether anything has been said about it. */}
         <CommentCount count={node.thread.length} />
@@ -636,7 +639,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               aria-label={foldLabel}
               className={cn(
                 LEVEL,
-                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                'press flex shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-accent-tint hover:text-accent',
                 // In the list the row can run to several lines (the title,
                 // Needs, a date), so the fold sits on the title's line.
                 list ? 'mt-1 h-5 self-start' : 'h-5 self-center sm:mt-1 sm:self-start',
@@ -866,7 +869,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded-control px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -900,9 +903,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   )}
                   {(node.acceptance || acceptanceView) && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Done when
-                      </p>
+                      <SectionLabel>Done when</SectionLabel>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
                           <LinkedText text={readable(node.acceptance ?? '')} />
@@ -915,18 +916,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   sentence that still stands. */}
                   {node.blockAsk && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Needs
-                      </p>
+                      <SectionLabel>Needs</SectionLabel>
                       <p className="whitespace-pre-wrap text-ui text-ink">
                         <LinkedText text={readable(node.blockAsk)} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
-                    <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
+                    <Note className="whitespace-pre-wrap">
                       <LinkedText text={readable(node.comment)} />
-                    </p>
+                    </Note>
                   )}
 
                   {body}

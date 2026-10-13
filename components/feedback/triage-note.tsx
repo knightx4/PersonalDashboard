@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { matchHref, type TriageView } from '@/lib/feedback/triage';
 
 /**
@@ -32,7 +32,7 @@ export function TriageNote({
       {match && (
         <p>
           {view.match ? 'Says the same as ' : 'Might repeat '}
-          <Link href={matchHref(match)} onClick={onNavigate} className="text-accent hover:underline">
+          <Link href={matchHref(match)} onClick={onNavigate} className={linkVariants()}>
             “{match.line}”
           </Link>
         </p>

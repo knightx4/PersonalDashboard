@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -78,7 +78,7 @@ export default async function TimelinePage({
         title="Timeline"
         description="What you did across the app, month by month."
         actions={
-          <Link href={`/timeline/year/${current.slice(0, 4)}`} className="text-ui text-accent hover:underline">
+          <Link href={`/timeline/year/${current.slice(0, 4)}`} className={`text-ui ${linkVariants()}`}>
             {`${current.slice(0, 4)} in review`}
           </Link>
         }

@@ -55,7 +55,7 @@ function ChangeRow({ runId, line, href }: { runId: string; line: ChangeLine; hre
         }
       >
         {href ? (
-          <Link href={href} className="underline-offset-2 hover:underline">
+          <Link href={href} className="hover:underline">
             {line.sentence}
           </Link>
         ) : (

@@ -110,7 +110,7 @@ export default async function VaultPage({
             {groups.map((group) => (
               <section key={group.folder || '(root)'}>
                 <h2 className="mb-2 flex items-center gap-1.5 text-ui font-semibold text-ink-muted">
-                  <FolderTree className="size-3.5" strokeWidth={2} aria-hidden />
+                  <FolderTree className="size-3.5" strokeWidth={1.75} aria-hidden />
                   {group.folder || 'Vault root'}
                 </h2>
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>

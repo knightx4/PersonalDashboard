@@ -23,16 +23,11 @@ import {
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { useClockNow } from '@/lib/use-clock-now';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
-import {
-  applyRowChange,
-  type RowChange,
-  type RowFields,
-  type SiblingMove,
-} from '@/lib/plan/optimistic';
+import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
-import { Chip } from '@/components/ui/chip';
+import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
 import { checkWaitName } from '@/lib/plan/check-backs';
@@ -67,7 +62,14 @@ import {
   TheQuestion,
   useAnswerDraft,
 } from '@/components/dev/question';
-import { CheckMark, LastRunLine, RunWork, RunningFor, Underway, when } from './plan-run-status';
+import {
+  CheckMark,
+  LastRunLine,
+  RunWork,
+  RunningFor,
+  Underway,
+  when,
+} from './plan-run-status';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
@@ -93,6 +95,7 @@ import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
 import { PlanPictures } from '@/components/dev/plan-pictures';
+import { linkVariants } from '@/components/ui/link';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -163,8 +166,8 @@ function AnswerDecision({
     <Note tone="caution" glyph={false} role={undefined}>
       <div className="space-y-2.5">
         {/* The question and its options, before the box that closes them. The
-          box used to come first with the options as a row of chips above it,
-          which put the form in front of the thing the form is about. */}
+            box used to come first with the options as a row of chips above it,
+            which put the form in front of the thing the form is about. */}
         <TheQuestion outline={node.outline} title={node.title} />
         <TheOptions
           detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
@@ -1004,99 +1007,99 @@ export function usePlanRow({
   const confirmNotice =
     confirmingSend && quietAsk && !sendState.error && !sendState.message ? (
       <>
-        <p className="text-ink-muted">{quietAsk}</p>
-        <div className="mt-1 flex items-center gap-2">
-          {/* Cancel first and plain, because doing nothing is the safe half
+              <p className="text-ink-muted">{quietAsk}</p>
+              <div className="mt-1 flex items-center gap-2">
+                {/* Cancel first and plain, because doing nothing is the safe half
                     of this and the press that sends should be the deliberate one. */}
-          <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmingSend(false)}>
-            Cancel
-          </Button>
-          <form action={sendAction}>
-            <input type="hidden" name="id" value={node.id} />
-            {/* The answer, and the only thing that carries it. The guard
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmingSend(false)}
+                >
+                  Cancel
+                </Button>
+                <form action={sendAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  {/* The answer, and the only thing that carries it. The guard
                       refuses the press without it. */}
-            <input type="hidden" name="confirm" value="quiet" />
-            <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
-              {sendPending ? 'Sending…' : 'Send it anyway'}
-            </Button>
-          </form>
-        </div>
+                  <input type="hidden" name="confirm" value="quiet" />
+                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                    {sendPending ? 'Sending…' : 'Send it anyway'}
+                  </Button>
+                </form>
+              </div>
       </>
     ) : null;
   /* Cancel first and plain, because doing nothing is the safe half
                     of this and the press that sends should be the deliberate one. */
-  const resultNotice =
-    (actionError ?? actionMessage) ? (
+  const resultNotice = (actionError ?? actionMessage) ? (
       <>
-        <FieldError>{actionError}</FieldError>
-        {!actionError && (
-          // Ink, not green. The tones above are a status system where
-          // positive means done; this is a transient "Assigned" or "Sent"
-          // from the action that just ran, which is the system reporting
-          // itself and is not a claim about money (law 4).
-          <span className="text-ink-muted">{actionMessage}</span>
-        )}
+              <FieldError>{actionError}</FieldError>
+              {!actionError && (
+                // Ink, not green. The tones above are a status system where
+                // positive means done; this is a transient "Assigned" or "Sent"
+                // from the action that just ran, which is the system reporting
+                // itself and is not a claim about money (law 4).
+                <span className="text-ink-muted">{actionMessage}</span>
+              )}
       </>
     ) : null;
   const marks = (
     <>
-      {/* The steps you kept, on the row.
-       * The runner takes anything approved that is not yours, so the
-       * fact worth reading off a resting row is which steps it will
-       * skip. The row's Mine press carries the same fact in its accented
-       * icon, but that icon is drawn only under the pointer and not at
-       * all below sm, so this is the only place a plan at rest says it.
-       * Steps still holding the old 'claude' value are not read here and
-       * nothing clears them. A mark, not a column: it appears on the few
-       * steps you held back, which is what makes it worth reading. */}
-      {mine && (
-        <Chip
-          tone="accent"
-          size="sm"
-          title="Yours. The runner will not take this one."
-          className="px-1"
-        >
-          {/* The head-and-shoulders from the assignee picker, the same
+          {/* The steps you kept, on the row.
+           * The runner takes anything approved that is not yours, so the
+           * fact worth reading off a resting row is which steps it will
+           * skip. The row's Mine press carries the same fact in its accented
+           * icon, but that icon is drawn only under the pointer and not at
+           * all below sm, so this is the only place a plan at rest says it.
+           * Steps still holding the old 'claude' value are not read here and
+           * nothing clears them. A mark, not a column: it appears on the few
+           * steps you held back, which is what makes it worth reading. */}
+          {mine && (
+            <span
+              title="Yours. The runner will not take this one."
+              className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'px-1')}
+            >
+              {/* The head-and-shoulders from the assignee picker, the same
                   icon the Mine press uses, so the mark and the press that
                   sets it are recognisably one thing. */}
-          <CircleUser strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Marked yours</span>
-        </Chip>
-      )}
-      {/* An overhaul, on its feature row. It is built in its own order
-       * by its own routine and the runner never fires it, which is the
-       * one thing about it a resting plan would otherwise hide: its ready
-       * steps look like any other's. A word rather than an icon, because
-       * there is no glyph that already means "replaces how this works".
-       * Not on a phone, where it took the title's width beside it and a
-       * title of six words ran to three lines (plan #1688); an overhaul's
-       * summary line under the title says what it is. */}
-      {node.track === 'overhaul' && (
-        <Chip
-          tone="accent"
-          size="sm"
-          title="Overhaul. Built by its own routine; the runner will not take it."
-          className="max-sm:hidden"
-        >
-          Overhaul
-        </Chip>
-      )}
-      {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
-      {/* And whether the checks passed on what it shipped in. */}
-      {node.status === 'done' && node.commitSha && (
-        <CheckMark check={commitChecks[node.commitSha]} />
-      )}
-      {/* And how long it has been going.
-       * "In progress" in the health column is a state; this is the
-       * thing you actually want to know about a step Claude is on --
-       * whether it started four minutes ago or has been sitting at
-       * "in progress" since yesterday, which is what a stuck routine
-       * looks like from here. The dot pulses because the one fact it
-       * carries is that something is happening right now. */}
-      {node.status === 'in_progress' && node.startedAt && (
-        <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
-      )}
-    </>
+              <CircleUser strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Marked yours</span>
+            </span>
+          )}
+          {/* An overhaul, on its feature row. It is built in its own order
+           * by its own routine and the runner never fires it, which is the
+           * one thing about it a resting plan would otherwise hide: its ready
+           * steps look like any other's. A word rather than an icon, because
+           * there is no glyph that already means "replaces how this works".
+           * Not on a phone, where it took the title's width beside it and a
+           * title of six words ran to three lines (plan #1688); an overhaul's
+           * summary line under the title says what it is. */}
+          {node.track === 'overhaul' && (
+            <span
+              title="Overhaul. Built by its own routine; the runner will not take it."
+              className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'max-sm:hidden')}
+            >
+              Overhaul
+            </span>
+          )}
+          {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
+          {/* And whether the checks passed on what it shipped in. */}
+          {node.status === 'done' && node.commitSha && (
+            <CheckMark check={commitChecks[node.commitSha]} />
+          )}
+          {/* And how long it has been going.
+           * "In progress" in the health column is a state; this is the
+           * thing you actually want to know about a step Claude is on --
+           * whether it started four minutes ago or has been sitting at
+           * "in progress" since yesterday, which is what a stuck routine
+           * looks like from here. The dot pulses because the one fact it
+           * carries is that something is happening right now. */}
+          {node.status === 'in_progress' && node.startedAt && (
+            <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
+          )}
+        </>
   );
   const priority = (
     /* Priority, and only when it says something. Nearly every step is at
@@ -1110,215 +1113,219 @@ export function usePlanRow({
            itself, drawn only while the row is under the pointer or the menu
            is being reached by keyboard: the resting row still says nothing,
            which is the whole reason Normal is silent. */
-    <span className="whitespace-nowrap">
-      {/* At Normal the size leads, so it sits where Next or Someday would
+        <span className="whitespace-nowrap">
+          {/* At Normal the size leads, so it sits where Next or Someday would
               rather than after a word that is not drawn (plan #1747). */}
-      {node.priority === 2 && node.size && (
-        <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-          {node.size.toUpperCase()}{' '}
-        </span>
-      )}
-      <ActionMenu
-        label={`Priority of ${stepRef(node)} ${node.title}`}
-        items={priorityMenu}
-        align="start"
-        // Inline in the column too, so the word and the size after it stay
-        // on one line ("Next · M") rather than the size dropping under
-        // the menu's block (plan #1688).
-        className="inline-block align-baseline"
-        triggerClassName={cn(
-          'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
-          node.priority === 2 &&
-            'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
-        )}
-        trigger={
-          <span
-            className={cn(
-              node.priority === 1 && 'text-accent',
-              node.priority === 3 && 'text-ink-ghost',
+          {node.priority === 2 && node.size && (
+            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
+              {node.size.toUpperCase()}{' '}
+            </span>
+          )}
+          <ActionMenu
+            label={`Priority of ${stepRef(node)} ${node.title}`}
+            items={priorityMenu}
+            align="start"
+            // Inline in the column too, so the word and the size after it stay
+            // on one line ("Next · M") rather than the size dropping under
+            // the menu's block (plan #1688).
+            className="inline-block align-baseline"
+            triggerClassName={cn(
+              'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
+              node.priority === 2 &&
+                'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
             )}
-          >
-            {PLAN_PRIORITY_LABEL[node.priority]}
-          </span>
-        }
-      />
-      {node.priority !== 2 && node.size && (
-        <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-          {' · '}
-          {node.size.toUpperCase()}
+            trigger={
+              <span
+                className={cn(
+                  node.priority === 1 && 'text-accent',
+                  node.priority === 3 && 'text-ink-ghost',
+                )}
+              >
+                {PLAN_PRIORITY_LABEL[node.priority]}
+              </span>
+            }
+          />
+          {node.priority !== 2 && node.size && (
+            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
+              {' · '}
+              {node.size.toUpperCase()}
+            </span>
+          )}
         </span>
-      )}
-    </span>
   );
   const quickActions = (
     <>
-      {!closed &&
-        (quietAsk ? (
-          // Nothing is sent from here while the run is quiet: the press
-          // puts the question on the row instead, and the answer to it
-          // is what sends. The icon has no room for a question of its
-          // own, and a confirmation that appeared under the pointer and
-          // vanished with it would be no confirmation at all.
-          <RowIconButton label={sendLabel(node)} onClick={() => setConfirmingSend(true)}>
-            <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </RowIconButton>
-        ) : (
-          <form action={sendAction}>
-            <input type="hidden" name="id" value={node.id} />
-            <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
-              <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-            </RowIconButton>
-          </form>
-        ))}
-      <>
-        <RowIconButton
-          type="button"
-          label={assignLabel}
-          onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
-        >
-          {/* The head-and-shoulders the assignee picker uses for Me, and
+          {!closed &&
+            (quietAsk ? (
+              // Nothing is sent from here while the run is quiet: the press
+              // puts the question on the row instead, and the answer to it
+              // is what sends. The icon has no room for a question of its
+              // own, and a confirmation that appeared under the pointer and
+              // vanished with it would be no confirmation at all.
+              <RowIconButton label={sendLabel(node)} onClick={() => setConfirmingSend(true)}>
+                <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </RowIconButton>
+            ) : (
+              <form action={sendAction}>
+                <input type="hidden" name="id" value={node.id} />
+                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+                  <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </RowIconButton>
+              </form>
+            ))}
+          <>
+            <RowIconButton
+              type="button"
+              label={assignLabel}
+              onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+            >
+              {/* The head-and-shoulders the assignee picker uses for Me, and
                   accented while the step is yours, so the icon says which way
                   the next press goes. */}
-          <CircleUser
-            className={cn('size-3.5', mine && 'text-accent')}
-            strokeWidth={1.75}
-            aria-hidden
-          />
-        </RowIconButton>
-      </>
-      <RowIconButton label="Edit" onClick={() => setEditing(true)}>
-        <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
-      </RowIconButton>
-    </>
+              <CircleUser
+                className={cn('size-3.5', mine && 'text-accent')}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </RowIconButton>
+          </>
+          <RowIconButton label="Edit" onClick={() => setEditing(true)}>
+            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+          </RowIconButton>
+        </>
   );
-  const edit = <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />;
+  const edit = (
+    <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
+  );
   const body = (
     <>
-      {/* What its run has done, above the questions and the thread: on a
+          {/* What its run has done, above the questions and the thread: on a
               step you opened because it says somebody is working it, this is
               the thing you opened it to find out. */}
-      {accountForRun && run && (
-        <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
-      )}
+          {accountForRun && run && (
+            <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
+          )}
 
-      {isDecision && (
-        <AnswerDecision
-          node={node}
-          action={answerAction}
-          pending={answerPending}
-          autoFocus={row.answering}
-          outlines={outlines}
-        />
-      )}
+          {isDecision && (
+            <AnswerDecision
+              node={node}
+              action={answerAction}
+              pending={answerPending}
+              autoFocus={row.answering}
+              outlines={outlines}
+            />
+          )}
 
-      {/* The drawn options on a proposal or decision, before anything
+          {/* The drawn options on a proposal or decision, before anything
               is built: what the person is being asked to approve or choose. */}
-      <PlanPictures pictures={pictures[node.id] ?? []} />
+          <PlanPictures pictures={pictures[node.id] ?? []} />
 
-      {/* A screen the critic stopped after its last round: its fixes and
+          {/* A screen the critic stopped after its last round: its fixes and
               shots, and the two ways on (plan #1610). */}
-      {criticStop && <CriticStop id={node.id} view={criticStop} />}
+          {criticStop && <CriticStop id={node.id} view={criticStop} />}
 
-      {/* The screens this step changed, before and after, as the critic
+          {/* The screens this step changed, before and after, as the critic
               passed them (plan #1541), each with a thumbs-down that reopens
               a finished step with your words on it (plan #1542). */}
-      <ScreenChanges
-        changes={screenChanges[node.number] ?? []}
-        footer={
-          node.status === 'done'
-            ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
-            : undefined
-        }
-      />
+          <ScreenChanges
+            changes={screenChanges[node.number] ?? []}
+            footer={
+              node.status === 'done'
+                ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
+                : undefined
+            }
+          />
 
-      {setupOpen && (
-        <SetupJob
-          node={node}
-          action={setupAction}
-          pending={setupPending}
-          error={setupState.error}
-          outlines={outlines}
-        />
-      )}
-    </>
+          {setupOpen && (
+            <SetupJob
+              node={node}
+              action={setupAction}
+              pending={setupPending}
+              error={setupState.error}
+              outlines={outlines}
+            />
+          )}
+        </>
   );
   const meta = (
     <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
-      <span>{scopeLabel(node.module)}</span>
-      {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
-      {node.size && <span>{SIZE_LABEL[node.size]}</span>}
-      {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
-      {when(node.startedAt) && (
-        <span>
-          Started {when(node.startedAt)}
-          {node.status === 'in_progress' && node.startedAt && (
-            <RunningFor startedAt={node.startedAt} claim={claim} />
+          <span>{scopeLabel(node.module)}</span>
+          {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
+          {node.size && <span>{SIZE_LABEL[node.size]}</span>}
+          {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
+          {when(node.startedAt) && (
+            <span>
+              Started {when(node.startedAt)}
+              {node.status === 'in_progress' && node.startedAt && (
+                <RunningFor startedAt={node.startedAt} claim={claim} />
+              )}
+            </span>
           )}
-        </span>
-      )}
-      {when(node.completedAt) && (
-        <span>
-          {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
-        </span>
-      )}
-      {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
-      {node.status === 'done' && node.commitSha && (
-        <span
-          className={
-            commitChecks[node.commitSha]?.conclusion === 'failed' ||
-            commitChecks[node.commitSha]?.conclusion === 'unmerged'
-              ? 'text-caution'
-              : undefined
-          }
-        >
-          {checkLine(commitChecks[node.commitSha])}
-        </span>
-      )}
-      {/* Only where the block above is not already accounting for
+          {when(node.completedAt) && (
+            <span>
+              {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
+            </span>
+          )}
+          {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
+          {node.status === 'done' && node.commitSha && (
+            <span
+              className={
+                commitChecks[node.commitSha]?.conclusion === 'failed' ||
+                commitChecks[node.commitSha]?.conclusion === 'unmerged'
+                  ? 'text-caution'
+                  : undefined
+              }
+            >
+              {checkLine(commitChecks[node.commitSha])}
+            </span>
+          )}
+          {/* Only where the block above is not already accounting for
               this run: two sentences about the same run on one opened row
               is one of them too many. */}
-      {run && !accountForRun && <LastRunLine run={run} />}
-    </p>
+          {run && !accountForRun && <LastRunLine run={run} />}
+        </p>
   );
   const panelActions = (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
-      >
-        {assignLabel}
-      </Button>
-      {!closed && (
-        <SendToClaude
-          node={node}
-          canSend={canSend}
-          action={sendAction}
-          pending={sendPending}
-          batchAction={batchAction}
-          batchPending={batchPending}
-          reshapeAction={reshapeAction}
-          reshapePending={reshapePending}
-          overhaulAction={overhaulAction}
-          overhaulPending={overhaulPending}
-          running={run?.status === 'started'}
-          resolving={beingResolved}
-          quietAsk={quietAsk}
-          onAskQuiet={() => setConfirmingSend(true)}
-          quiet={!sendState.error && !sendState.message && !batchState.error && !batchState.message}
-        />
-      )}
-    </>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+          >
+            {assignLabel}
+          </Button>
+          {!closed && (
+            <SendToClaude
+              node={node}
+              canSend={canSend}
+              action={sendAction}
+              pending={sendPending}
+              batchAction={batchAction}
+              batchPending={batchPending}
+              reshapeAction={reshapeAction}
+              reshapePending={reshapePending}
+              overhaulAction={overhaulAction}
+              overhaulPending={overhaulPending}
+              running={run?.status === 'started'}
+              resolving={beingResolved}
+              quietAsk={quietAsk}
+              onAskQuiet={() => setConfirmingSend(true)}
+              quiet={
+                !sendState.error && !sendState.message && !batchState.error && !batchState.message
+              }
+            />
+          )}
+        </>
   );
   const addChild = (
     <AddStep
-      module={node.module}
-      parentId={node.id}
-      level={childLevel}
-      open
-      onDone={() => row.setAddingChild(false)}
-    />
+          module={node.module}
+          parentId={node.id}
+          level={childLevel}
+          open
+          onDone={() => row.setAddingChild(false)}
+        />
   );
 
   // The one press a feature's own page keeps in its header: the same Send the
@@ -1375,7 +1382,7 @@ export function usePlanRow({
         node.waitingOn.length === 1 ? (
           <a
             href={waitedOnHref(node, node.waitingOn[0])}
-            className="press-area underline underline-offset-2"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
           >
             <StateLabel
               glyph={null}
@@ -1393,12 +1400,7 @@ export function usePlanRow({
           />
         )
       ) : (
-        <MoveLabel
-          move={move.move}
-          title={move.title}
-          className="max-w-full"
-          wordClassName="whitespace-normal"
-        />
+        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
       )
     ) : null,
     statusMenu,
@@ -1445,65 +1447,65 @@ export function PlanRow(props: PlanRowProps) {
   const feature = trail.length === 0 && !props.asStep && own.kind === 'build';
   return (
     <SiblingMoveProvider move={parts.moveChildren}>
-      <TreeRow
-        node={parts.node}
-        trail={trail}
-        row={parts.row}
-        health={parts.health}
-        move={parts.move}
-        statusMenu={parts.statusMenu}
-        menu={parts.menu}
-        actions={PLAN_TREE_ACTIONS}
-        origin={parts.origin}
-        addedBy={parts.addedBy}
-        titles={parts.refTitles}
-        titleHref={feature ? featureHref(own.number) : undefined}
-        source={props.source}
-        dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
-        marks={parts.marks}
-        priority={parts.priority}
-        quickActions={parts.quickActions}
-        notices={
-          <>
-            {parts.confirmNotice && (
-              <li style={inset} className="pb-1.5 pr-3 text-small">
-                {parts.confirmNotice}
-              </li>
-            )}
-            {parts.resultNotice && (
-              <li style={inset} className="pb-1.5 pr-3 text-small">
-                {parts.resultNotice}
-              </li>
-            )}
-          </>
-        }
-        edit={parts.edit}
-        body={parts.body}
-        meta={parts.meta}
-        panelActions={parts.panelActions}
-        addChild={parts.addChild}
-        renderChild={(child, childTrail) => (
-          <PlanRow
-            // The shared row hands back the node it was given, so this is one.
-            node={child as PlanNode}
-            trail={childTrail}
-            catalog={props.catalog}
-            canSend={props.canSend}
-            lastRuns={props.lastRuns}
-            runRaises={props.runRaises}
-            liveness={props.liveness}
-            commitChecks={props.commitChecks}
-            overhaulProgress={props.overhaulProgress}
-            criticStops={props.criticStops}
-            screenChanges={props.screenChanges}
-            pictures={props.pictures}
-            view={view}
-            searching={searching}
-            unfolded={unfolded}
-            opened={opened}
-          />
-        )}
-      />
+    <TreeRow
+      node={parts.node}
+      trail={trail}
+      row={parts.row}
+      health={parts.health}
+      move={parts.move}
+      statusMenu={parts.statusMenu}
+      menu={parts.menu}
+      actions={PLAN_TREE_ACTIONS}
+      origin={parts.origin}
+      addedBy={parts.addedBy}
+      titles={parts.refTitles}
+      titleHref={feature ? featureHref(own.number) : undefined}
+      source={props.source}
+      dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
+      marks={parts.marks}
+      priority={parts.priority}
+      quickActions={parts.quickActions}
+      notices={
+        <>
+          {parts.confirmNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.confirmNotice}
+            </li>
+          )}
+          {parts.resultNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.resultNotice}
+            </li>
+          )}
+        </>
+      }
+      edit={parts.edit}
+      body={parts.body}
+      meta={parts.meta}
+      panelActions={parts.panelActions}
+      addChild={parts.addChild}
+      renderChild={(child, childTrail) => (
+        <PlanRow
+          // The shared row hands back the node it was given, so this is one.
+          node={child as PlanNode}
+          trail={childTrail}
+          catalog={props.catalog}
+          canSend={props.canSend}
+          lastRuns={props.lastRuns}
+          runRaises={props.runRaises}
+          liveness={props.liveness}
+          commitChecks={props.commitChecks}
+          overhaulProgress={props.overhaulProgress}
+          criticStops={props.criticStops}
+          screenChanges={props.screenChanges}
+          pictures={props.pictures}
+          view={view}
+          searching={searching}
+          unfolded={unfolded}
+          opened={opened}
+        />
+      )}
+    />
     </SiblingMoveProvider>
   );
 }
@@ -1526,20 +1528,14 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   const placeholder = 'hidden shrink-0 text-micro text-ink-muted sm:inline';
   if (!progress || progress.state === 'no-spec') {
     return (
-      <span
-        className={placeholder}
-        title="Its detail names no spec, so there are no rule counts to show."
-      >
+      <span className={placeholder} title="Its detail names no spec, so there are no rule counts to show.">
         No rule counts yet
       </span>
     );
   }
   if (progress.state === 'missing') {
     return (
-      <span
-        className={placeholder}
-        title={`${progress.spec} could not be read, so its counts cannot be shown.`}
-      >
+      <span className={placeholder} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
         No rule counts yet
       </span>
     );
@@ -1570,10 +1566,7 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
         </span>
       ))}
       {progress.counts.length === 0 && (
-        <span
-          className={placeholder}
-          title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}
-        >
+        <span className={placeholder} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
           No rule counts yet
         </span>
       )}

@@ -3,7 +3,7 @@ import { BellOff, Mail } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { TopicChips } from '@/components/news/topic-chips';
@@ -335,13 +335,7 @@ export function ViewSwitch({ view, topic }: { view: ListView; topic: NewsTopic |
           })}
           scroll={false}
           aria-current={view === option.key ? 'true' : undefined}
-          className={cn(
-            'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-            view === option.key
-              ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
+          className={segmentClass(view === option.key)}
         >
           {option.label}
         </Link>

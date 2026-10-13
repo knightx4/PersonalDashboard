@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Waypoints } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -55,7 +55,7 @@ export function VaultMapView({
         {mergeTotal > 0 && (
           <>
             {' · '}
-            <a href="#merges" className="text-ink underline-offset-2 hover:underline">
+            <a href="#merges" className={linkVariants()}>
               {mergeTotal.toLocaleString('en-GB')} {mergeTotal === 1 ? 'merge' : 'merges'} below
             </a>
           </>

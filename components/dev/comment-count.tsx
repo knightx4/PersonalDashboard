@@ -21,7 +21,7 @@ export function CommentCount({ count }: { count: number }) {
       title={`${count} ${word}`}
       className="tabular inline-flex shrink-0 items-center gap-0.5 text-small text-ink-ghost"
     >
-      <MessageSquare className="size-3" strokeWidth={1.75} aria-hidden />
+      <MessageSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
       {count}
       <span className="sr-only">{word}</span>
     </span>

@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -93,14 +93,14 @@ export function YearReviewView({
       {(earlier || later) && (
         <nav aria-label="Other years" className="flex items-center justify-between gap-3 text-ui">
           {earlier ? (
-            <Link href={`/timeline/year/${earlier}`} className="text-accent hover:underline">
+            <Link href={`/timeline/year/${earlier}`} className={linkVariants()}>
               {`${earlier} in review`}
             </Link>
           ) : (
             <span />
           )}
           {later && (
-            <Link href={`/timeline/year/${later}`} className="text-accent hover:underline">
+            <Link href={`/timeline/year/${later}`} className={linkVariants()}>
               {`${later} in review`}
             </Link>
           )}
