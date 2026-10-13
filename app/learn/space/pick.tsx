@@ -20,6 +20,8 @@ type Pick = {
   selectedId: string | null;
   params: MapParams;
   pick: (id: string | null) => void;
+  /** Lets go of the domain picked out in the legend, as pressing empty ground does. */
+  clearDomain: () => void;
 };
 
 const PickContext = createContext<Pick | null>(null);
@@ -45,7 +47,14 @@ export function PickProvider({
     [params, router],
   );
 
-  const value = useMemo(() => ({ selectedId, params, pick }), [selectedId, params, pick]);
+  const clearDomain = useCallback(() => {
+    router.push(mapHref(params, { domain: null }), { scroll: false });
+  }, [params, router]);
+
+  const value = useMemo(
+    () => ({ selectedId, params, pick, clearDomain }),
+    [selectedId, params, pick, clearDomain],
+  );
   return <PickContext.Provider value={value}>{children}</PickContext.Provider>;
 }
 
