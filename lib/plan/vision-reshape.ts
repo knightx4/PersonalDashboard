@@ -74,7 +74,15 @@ export function visionReshapeText(input: {
     'rewrite fog, or add again what a feature already holds. A feature the new vision ' +
     'leaves as it was gets nothing. You change rows, not code: do not commit or push. ' +
     'Report, by number and title, what you proposed and which drops you asked about, and ' +
-    `which features you read and left alone.\n\n${PLAIN_ENGLISH_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\n` +
+    'which features you read and left alone.\n\n' +
+    // Nothing else can end this run: it is about no step, so no close or block
+    // marks it, and on 27 September and 12 October three runs that did their
+    // work were written back as failed hours later because none closed its
+    // own row.
+    "As the run's last write, mark it finished, with this job name exactly: " +
+    "`update plan_runs set status = 'finished', error = null where id = (select id from plan_runs " +
+    "where job = 'vision_reshape' and status = 'started' order by created_at desc limit 1);`" +
+    `\n\n${PLAIN_ENGLISH_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\n` +
     `## The new vision\n\n${input.after.trim()}\n\n` +
     `## The vision it replaced\n\n${input.before?.trim() || 'Nothing was written before.'}\n\n` +
     `## Open features in ${label}\n\n${list}`
