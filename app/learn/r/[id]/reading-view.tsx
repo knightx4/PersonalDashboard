@@ -15,6 +15,7 @@ import { ReadingText } from './reading-text';
 import { NoteToGraph } from './note-to-graph';
 import { StatusButtons } from './status-buttons';
 import { ReadNowButton } from './read-now-button';
+import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -207,6 +208,7 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
               Go deeper on this
             </Button>
           </form>
+          <WriteAboutThis kind="reading" refId={reading.id} title={reading.subject} size="md" />
         </div>
       </section>
 
