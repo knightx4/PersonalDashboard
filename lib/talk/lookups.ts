@@ -3,6 +3,7 @@ import type { TalkToolCall } from './talk';
 import { CHART_TOOL } from './chart';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
+import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -68,6 +69,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_quick_note',
   ...LEARN_CHANGE_KINDS,
   ...TODO_CHANGE_KINDS,
+  ...YOU_CHANGE_KINDS,
 ];
 
 /**

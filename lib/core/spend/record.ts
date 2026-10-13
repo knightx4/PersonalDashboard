@@ -29,6 +29,7 @@ export type SpendModule =
   | 'todo'
   | 'news'
   | 'goals'
+  | 'you'
   | 'core';
 
 export type SpendRecord = {

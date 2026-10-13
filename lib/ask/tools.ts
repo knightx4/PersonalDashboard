@@ -259,7 +259,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'courses',
     description:
-      'The courses on the academic transcripts the person saved on the vault\'s Education tab: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
+      'The courses on the academic transcripts the person saved on the Work & school tab in You: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
     input_schema: {
       type: 'object',
       properties: {
@@ -416,7 +416,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },
-  courses: { run: coursesLookup, module: 'vault' },
+  courses: { run: coursesLookup, module: 'you' },
   reading_list: { run: readingListLookup, module: 'learn' },
   learning_covered: { run: learningCoveredLookup, module: 'learn' },
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).

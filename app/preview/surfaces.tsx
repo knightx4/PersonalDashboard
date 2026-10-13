@@ -6,6 +6,10 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouTabEmpty } from '@/app/you/you-tabs';
+import { PlacesView } from '@/app/you/places/places-view';
+import { PlaceView } from '@/app/you/places/place-view';
+import { PlaceForm } from '@/app/you/places/place-form';
+import type { Place } from '@/lib/you/places';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -113,15 +117,16 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
+import { SectionHeading } from '@/components/ui/section-heading';
 import {
   PersonalityAddTypeSurface,
   PersonalityScoresSurface,
   PersonalityTestSurface,
-  KnowPersonalitySurface,
-  KnowPersonalityEmptySurface,
-  KnowPersonalityReadingSurface,
+  YouPersonalitySurface,
+  YouPersonalityEmptySurface,
+  YouPersonalityReadingSurface,
 } from './personality-surfaces';
-import { AddTranscript } from '@/app/vault/education/add-transcript';
+import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import {
@@ -168,8 +173,9 @@ import {
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
-import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
+import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
+import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
 import { NowHeader } from '@/app/learn/now/header';
@@ -2678,10 +2684,58 @@ const shellSections: NavSection[] = [
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
 ];
 
+/**
+ * Places they have lived, for You's Places tab (plan #1991.5): the home they
+ * live in now, a long name, a year-only stay, and one with nothing but a
+ * name and a date.
+ */
+const youPlaces: Place[] = [
+  {
+    id: 'place-york',
+    name: 'The terraced house on Bishopthorpe Road, by the river',
+    city: 'York',
+    region: 'North Yorkshire',
+    country: 'United Kingdom',
+    movedIn: '2019-08',
+    movedOut: null,
+    note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+  },
+  {
+    id: 'place-leeds',
+    name: 'Flat above the bakery',
+    city: 'Leeds',
+    region: 'West Yorkshire',
+    country: 'United Kingdom',
+    movedIn: '2015',
+    movedOut: '2019-08',
+    note: null,
+  },
+  {
+    id: 'place-lisbon',
+    name: 'Lisbon',
+    city: 'Lisbon',
+    region: null,
+    country: 'Portugal',
+    movedIn: '2014-02',
+    movedOut: '2014-09',
+    note: null,
+  },
+  {
+    id: 'place-childhood',
+    name: 'Mum and Dad’s',
+    city: null,
+    region: null,
+    country: null,
+    movedIn: '1992',
+    movedOut: '2014',
+    note: null,
+  },
+];
+
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
-  { href: '/you/personality', label: 'Personality', icon: 'personality', exact: true },
-  { href: '/you/places', label: 'Places', icon: 'places', exact: true },
+  { href: '/you/personality', label: 'Personality', icon: 'personality' },
+  { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
 ];
@@ -4617,28 +4671,72 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Education tab with nothing on it yet (plan #1308): the empty state
-     * says what to upload. */
-    id: 'vault-education-empty',
-    label: 'Education · Empty',
-    module: 'vault',
+    /* The tab with jobs above the courses (plan #1991.4): the job held now
+     * first, a row the person corrected, one they added with no title, a
+     * long employer, and the note offering to read a changed résumé again. */
+    id: 'you-work-jobs',
+    label: 'Work & school · Jobs from your résumé',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
-        <AddTranscript empty />
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* No jobs yet, with a résumé in Jobs to read: the press that lists them. */
+    id: 'you-work-jobs-empty',
+    label: 'Work & school · No jobs yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={[]} resume={workHistoryResume} changed={false} />
+        <EducationSection groups={[]} courseCounts={{}} transcripts={0} courses={0} />
+      </>
+    ),
+  },
+  {
+    /* Correcting a job in place: the row's form open, the rest of the list around it. */
+    id: 'you-work-jobs-edit',
+    label: 'Work & school · Correcting a job',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-ey" />
+      </>
+    ),
+  },
+  {
+    /* Work & school with no transcripts yet (plan #1308, moved to You by
+     * #1991.3): the empty state says what to upload. */
+    id: 'you-work-empty',
+    label: 'Work & school · No transcripts yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection groups={[]} courseCounts={{}} transcripts={0} courses={0} />
       </>
     ),
   },
   {
     /* Choosing a transcript or pasting its text, before Dash reads it. */
-    id: 'vault-education-upload',
-    label: 'Education · Upload',
-    module: 'vault',
+    id: 'you-work-upload',
+    label: 'Work & school · Upload a transcript',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
+        <PageHeader title="Work & school" />
+        <SectionHeading title="Education" className="mb-2" />
         <EducationUploadPreview />
       </>
     ),
@@ -4646,13 +4744,14 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The courses Dash read, to check before saving: a school it found, a
      * course with no grade, and a transfer course showing its own school. */
-    id: 'vault-education-check',
-    label: 'Education · Check before saving',
-    module: 'vault',
+    id: 'you-work-check',
+    label: 'Work & school · Check before saving',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
+        <PageHeader title="Work & school" />
+        <SectionHeading title="Education" className="mb-2" />
         <EducationCheckPreview />
       </>
     ),
@@ -4660,17 +4759,14 @@ export const SURFACES: readonly Surface[] = [
   {
     /* Saved courses by school and then by term, newest first, with the
      * transcripts each school issued. */
-    id: 'vault-education-list',
-    label: 'Education · Courses by school and term',
-    module: 'vault',
+    id: 'you-work-list',
+    label: 'Work & school · Courses by school and term',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" description="9 courses from 2 transcripts" />
-        <AddTranscript empty={false} />
-        {educationGroups.map((group) => (
-          <SchoolCourses key={group.school} group={group} courseCounts={educationCounts} />
-        ))}
+        <PageHeader title="Work & school" />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
       </>
     ),
   },
@@ -4716,7 +4812,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The courses fold on Learn's Tracks page with no transcript saved: it
-     * points to the vault's Education tab (plan #1391). */
+     * points to You's Work & school tab (plan #1391). */
     id: 'learn-courses-empty',
     label: 'Tracks · Courses, none saved',
     module: 'learn',
@@ -5008,57 +5104,58 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The Big Five test (plan #1632): fifty statements, the first seven
      * answered. Fixtures in personality-surfaces.tsx. */
-    id: 'learn-personality-test',
-    label: 'Learn · Personality test',
-    module: 'learn',
+    id: 'you-personality-test',
+    label: 'You · Personality test',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityTestSurface />,
   },
   {
     /* The same page opened with a result kept: the five scores. */
-    id: 'learn-personality-scores',
-    label: 'Learn · Personality scores',
-    module: 'learn',
+    id: 'you-personality-scores',
+    label: 'You · Personality scores',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityScoresSurface />,
   },
   {
     /* Typing in a type from another test (plan #1633): the compose form
      * open beneath the scores, one type already kept. */
-    id: 'learn-personality-add-type',
-    label: 'Learn · Personality, adding a type',
-    module: 'learn',
+    id: 'you-personality-add-type',
+    label: 'You · Personality, adding a type',
+    module: 'you',
     width: 'page',
     render: () => <PersonalityAddTypeSurface />,
   },
   {
-    /* The Big Five result on the Know page (plan #1634): the five traits,
+    /* The Big Five result on You's Personality tab (plan #1634, moved from
+     * Learn's Know page by #1991.2): the five traits,
      * the vault themes nearest each, Dash's read against the notes (#1635)
      * with two clashes and two agreements, two typed-in types with their
      * reads folded, and one earlier result folded. Intellect has no theme
      * near it. */
-    id: 'learn-know-personality',
-    label: 'Learn · Know, personality result',
-    module: 'learn',
+    id: 'you-personality',
+    label: 'You · Personality, a result read',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalitySurface />,
+    render: () => <YouPersonalitySurface />,
   },
   {
     /* Straight after a save (plan #1635): Dash's read of the result is
-     * still running, so the section says so where the read will be. */
-    id: 'learn-know-personality-reading',
-    label: 'Learn · Know, personality being read',
-    module: 'learn',
+     * still running, so the tab says so where the read will be. */
+    id: 'you-personality-reading',
+    label: 'You · Personality, being read',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalityReadingSurface />,
+    render: () => <YouPersonalityReadingSurface />,
   },
   {
-    /* The same section before any test is taken: one line offering it. */
-    id: 'learn-know-personality-empty',
-    label: 'Learn · Know, personality not taken',
-    module: 'learn',
+    /* The same tab before any test is taken: one line offering it. */
+    id: 'you-personality-empty',
+    label: 'You · Personality, no test taken',
+    module: 'you',
     width: 'page',
-    render: () => <KnowPersonalityEmptySurface />,
+    render: () => <YouPersonalityEmptySurface />,
   },
   {
     /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
@@ -5357,7 +5454,8 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* The You workspace in its shell, on Personality, its first tab (plan
-     * #1991.1): the four tabs in the sidebar and the tab's empty state. */
+     * #1991.1): the four tabs in the sidebar and, since #1991.2, the tab
+     * with a result taken and read. */
     id: 'you-shell',
     label: 'You · The workspace on its first tab',
     module: 'you',
@@ -5375,7 +5473,7 @@ export const SURFACES: readonly Surface[] = [
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
       >
-        <YouTabEmpty tab="personality" />
+        <YouPersonalitySurface />
       </AppShell>
     ),
   },
@@ -5385,6 +5483,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouTabEmpty tab="insights" />,
+  },
+  {
+    /* Places they have lived, newest first, the home they live in now marked (plan #1991.5). */
+    id: 'you-places',
+    label: 'You · Places, four homes',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} />,
+  },
+  {
+    id: 'you-places-empty',
+    label: 'You · Places, before any are added',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={[]} />,
+  },
+  {
+    id: 'you-place',
+    label: 'You · One place, the home they live in now',
+    module: 'you',
+    width: 'page',
+    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+  },
+  {
+    id: 'you-place-form',
+    label: 'You · Changing a place',
+    module: 'you',
+    width: 'page',
+    render: () => <PlaceForm place={youPlaces[1]} />,
   },
 
   {

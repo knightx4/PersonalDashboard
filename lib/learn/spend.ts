@@ -166,10 +166,13 @@ export const LEARN_OPERATIONS = [
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.
   'reply-to-maya',
-  // Reading the courses off an uploaded transcript for the vault's Education
+  // Reading the courses off an uploaded transcript for You's Work & school
   // tab (plan #1307). One Haiku call per transcript, from the read button;
   // nothing is saved until the person checks the list.
   'read-transcript',
+  // Reading the jobs off the default résumé for You's Work & school tab (plan
+  // #1991.4). One Haiku call on the résumé's text, from the read button.
+  'read-work-history',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
@@ -309,11 +312,6 @@ export const LEARN_OPERATIONS = [
   // score questions in one request per clip, and one Haiku call for up to
   // forty clips Jev could not rate. One row per model per person per run.
   'rate-clips',
-  // Dash's read of a personality result against your notes (plan #1635): one
-  // Sonnet call when a result is saved, after the page has answered, and one
-  // more each time the button on the Know page asks for a fresh read. The
-  // notes are found with the cached trait sentences, under 'embed-note-match'.
-  'read-personality',
   // Matching the subject names a Claude chat gives to the person's own
   // subjects (plan #1809): one Haiku call per reading list or session added
   // through the connector, made only when a name is not an exact match.

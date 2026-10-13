@@ -100,8 +100,8 @@ export const MODELS = {
   learnGraphFromBrief: SONNET,
   /** lib/learn/graph/from-course.ts */
   learnGraphFromCourse: SONNET,
-  /** lib/learn/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
-  learnPersonalityRead: SONNET,
+  /** lib/you/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
+  youPersonalityRead: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
@@ -202,8 +202,10 @@ export const MODELS = {
   maya: OPUS,
   /** lib/vault/notes/connections-model.ts */
   vaultConnections: HAIKU,
-  /** lib/vault/transcript-model.ts */
+  /** lib/you/transcript-model.ts */
   vaultTranscript: HAIKU,
+  /** lib/you/work-history-model.ts */
+  youWorkHistory: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
 } as const;
