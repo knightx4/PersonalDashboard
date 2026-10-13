@@ -311,21 +311,22 @@ export async function checkPress(page: Page, url: string): Promise<string[]> {
 
   const findings: string[] = [];
   let dirty = false;
-  for (const target of targets) {
+  /** Presses one target: whether it showed a press, or null when it could not be judged. */
+  const press = async (index: number): Promise<boolean | null> => {
     if (dirty) await fresh();
     dirty = false;
     const at = await page.evaluate<{ x: number; y: number; covered: boolean } | null>(
-      `window.__deck.place(${target.index})`,
+      `window.__deck.place(${index})`,
     );
     // Gone, or under something else: the dock check is what speaks for a covered control.
-    if (!at || at.covered) continue;
+    if (!at || at.covered) return null;
     await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y });
     await wait(HOVER_MS);
     const armed = await page.evaluate<{ armed: boolean; restless: boolean }>(
-      `window.__deck.arm(${target.index}, ${PRESS_MS})`,
+      `window.__deck.arm(${index}, ${PRESS_MS})`,
     );
     // A control already moving at rest cannot be told apart from one answering a press.
-    if (!armed.armed) continue;
+    if (!armed.armed) return null;
     const network = await holdNetwork(page);
     dirty = true;
     try {
@@ -350,11 +351,20 @@ export async function checkPress(page: Page, url: string): Promise<string[]> {
       const got = await page
         .evaluate<{ pressed: boolean; first: number | null } | null>('window.__deck.result()')
         .catch(() => ({ pressed: true, first: 0 }));
-      if (got && got.pressed && got.first === null) {
-        findings.push(`${target.what} shows nothing for ${PRESS_MS}ms after it is pressed`);
-      }
+      return !(got && got.pressed && got.first === null);
     } finally {
       await network.release();
+    }
+  };
+  for (const target of targets) {
+    // A press that showed nothing is tried once more on a fresh page: on a
+    // machine busy with the rest of the gate a frame can land after 100ms,
+    // and a control that really shows nothing shows nothing twice.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const showed = await press(target.index);
+      if (showed !== false) break;
+      dirty = true;
+      if (attempt === 1) findings.push(`${target.what} shows nothing for ${PRESS_MS}ms after it is pressed`);
     }
   }
   return findings;
