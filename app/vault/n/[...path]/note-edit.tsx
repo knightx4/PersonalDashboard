@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
-import { saveNoteEdit, type SaveNoteState } from './actions';
+import { ComposeBody, ComposeBox, FieldError, Input } from '@/components/ui/field';
+import { basenameOf, noteHref } from '@/lib/vault/paths';
+import { renameNoteAction, saveNoteEdit, type RenameNoteState, type SaveNoteState } from './actions';
 
 /**
  * Editing a note in place on its page (plan #1425).
@@ -46,6 +47,7 @@ export function NoteEdit({
   children: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   // The version a reload was asked for after a refused save. While the page
   // still shows that version, the app has not pulled Obsidian's one yet.
   const [staleAt, setStaleAt] = useState<string | null>(null);
@@ -61,18 +63,24 @@ export function NoteEdit({
   return (
     <>
       <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">{heading}</div>
-        {!editing && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Edit
-          </Button>
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <RenameForm notePath={notePath} blobSha={blobSha} onDone={() => setRenaming(false)} />
+          ) : (
+            heading
+          )}
+        </div>
+        {!editing && !renaming && (
+          <div className="flex shrink-0 items-center gap-2">
+            {/* The file's name is the note's name in Obsidian, so this moves the file (note 69c302f1). */}
+            <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+              Rename
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Edit
+            </Button>
+          </div>
         )}
       </div>
 
@@ -102,6 +110,59 @@ export function NoteEdit({
         </>
       )}
     </>
+  );
+}
+
+/**
+ * Renaming the note in place of its title (note 69c302f1). The box holds the
+ * file's name without `.md`; Save moves the file in the vault and opens the
+ * note at its new address, Escape or Cancel leaves it as it was.
+ */
+export function RenameForm({
+  notePath,
+  blobSha,
+  onDone,
+}: {
+  notePath: string;
+  blobSha: string;
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(() => basenameOf(notePath));
+  const [state, rename, pending] = useActionState<RenameNoteState, FormData>(async (prev, formData) => {
+    const result = await renameNoteAction(prev, formData);
+    if (result.renamedPath) router.replace(noteHref(result.renamedPath));
+    return result;
+  }, {});
+
+  return (
+    <form action={rename} className="space-y-2">
+      <input type="hidden" name="notePath" value={notePath} />
+      <input type="hidden" name="blobSha" value={blobSha} />
+      <Input
+        name="name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            onDone();
+          }
+        }}
+        aria-label="Note name"
+        autoFocus
+        onFocus={(event) => event.currentTarget.select()}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" pending={pending} disabled={!name.trim()}>
+          {pending ? 'Renaming…' : 'Rename'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+      {!state.renamedPath && <FieldError>{state.error}</FieldError>}
+    </form>
   );
 }
 
