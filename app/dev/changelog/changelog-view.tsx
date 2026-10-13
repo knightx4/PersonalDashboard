@@ -6,6 +6,7 @@ import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
 import { toggleChipClass } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Timeline, type TimelineEntry } from '@/components/ui/timeline';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
   CHANGELOG_DEFAULT_GROUPING,
@@ -143,36 +144,45 @@ export function ChangelogView({
          * border and eight pixels of margin around every day of work. One
          * surface under the rows is the list pattern's (plan #1745). */
         <div className="space-y-3">
-          <Card padding="dense" className="divide-y divide-border">
-            {groups.map((group) => (
-              <div key={group.key} className="py-1 first:pt-0 last:pb-0">
-                {/* By issue, a feature is one line until it is asked to be
+          {/* By date the changelog is a timeline: the day is the time on each
+              entry, and the line says how long a quiet stretch was. The other
+              groupings keep their lists, which need the headings. */}
+          {grouping === 'day' ? (
+            <Card>
+              <Timeline entries={timelineEntries(groups)} />
+            </Card>
+          ) : (
+            <Card padding="dense" className="divide-y divide-border">
+              {groups.map((group) => (
+                <div key={group.key} className="py-1 first:pt-0 last:pb-0">
+                  {/* By issue, a feature is one line until it is asked to be
                     more. Its steps are the detail underneath. A group that is
                     its own heading -- a note, a feature that shipped by
                     itself -- has nothing to open and stays a plain line. */}
-                {group.kind === 'issue' && !isItsOwnHeading(group) ? (
-                  <IssueSummary group={group} screens={screens} />
-                ) : (
-                  <section>
-                    {/* A group of one whose heading is its own entry gets no
+                  {group.kind === 'issue' && !isItsOwnHeading(group) ? (
+                    <IssueSummary group={group} screens={screens} />
+                  ) : (
+                    <section>
+                      {/* A group of one whose heading is its own entry gets no
                         heading: it would be the same sentence twice, which is
                         law 15. */}
-                    {!isItsOwnHeading(group) && <GroupHeading group={group} />}
-                    <ul className="divide-y divide-border">
-                      {group.entries.map((entry) => (
-                        <Entry
-                          key={entry.key}
-                          entry={entry}
-                          inGroup={group.kind}
-                          screens={screensOf(screens, entry)}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                )}
-              </div>
-            ))}
-          </Card>
+                      {!isItsOwnHeading(group) && <GroupHeading group={group} />}
+                      <ul className="divide-y divide-border">
+                        {group.entries.map((entry) => (
+                          <Entry
+                            key={entry.key}
+                            entry={entry}
+                            inGroup={group.kind}
+                            screens={screensOf(screens, entry)}
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                </div>
+              ))}
+            </Card>
+          )}
           {/* The count closes the list, under the card, as on every list page. */}
           <p className="text-micro text-ink-ghost">
             {matched.length} {matched.length === 1 ? 'change' : 'changes'}
@@ -180,6 +190,26 @@ export function ChangelogView({
         </div>
       )}
     </div>
+  );
+}
+
+/** The matched entries as timeline entries; each closed at `at`, so each is done. */
+function timelineEntries(groups: ChangelogGroup[]): TimelineEntry[] {
+  return groups.flatMap((group) =>
+    group.entries.map((entry) => ({
+      id: entry.key,
+      time: entry.at,
+      kind: 'done' as const,
+      title:
+        entry.number === null
+          ? entry.title
+          : `${stepRef({ number: entry.number, outline: entry.outline })} ${entry.title}`,
+      body: entry.detail || undefined,
+      link: {
+        href: entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs',
+        label: `${moduleById(entry.module)?.label ?? 'The app as a whole'} · ${entry.source === 'plan' ? 'plan' : 'note'}`,
+      },
+    })),
   );
 }
 
@@ -205,9 +235,7 @@ function workspaceLabel(candidate: WorkspaceView): string {
  * sets one, which is where the reader has seen it before.
  */
 function isItsOwnHeading(group: ChangelogGroup): boolean {
-  return (
-    group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null
-  );
+  return group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null;
 }
 
 /**
@@ -219,7 +247,10 @@ function isItsOwnHeading(group: ChangelogGroup): boolean {
  * underneath. Listing the feature's row again beneath its own title was the
  * page showing the top level and the underneath separately.
  */
-function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps: ChangelogEntry[] } {
+function splitIssue(group: ChangelogGroup): {
+  self: ChangelogEntry | null;
+  steps: ChangelogEntry[];
+} {
   return {
     self: group.entries.find((entry) => entry.issue === null) ?? null,
     steps: group.entries.filter((entry) => entry.issue !== null),
@@ -280,9 +311,7 @@ function IssueSummary({
             part of it the summary had no room for. */}
         {self?.detail && <p className="row-pad text-small text-ink-muted">{self.detail}</p>}
         {self?.commitSha && (
-          <p className="row-pad font-mono break-all text-micro text-ink-ghost">
-            {self.commitSha}
-          </p>
+          <p className="row-pad font-mono break-all text-micro text-ink-ghost">{self.commitSha}</p>
         )}
         <ul className="divide-y divide-border">
           {steps.map((entry) => (
@@ -389,7 +418,11 @@ function Entry({
           <RowLead
             open="group-open/entry:rotate-90"
             module={entry.module}
-            name={entry.number === null ? null : stepRef({ number: entry.number, outline: entry.outline })}
+            name={
+              entry.number === null
+                ? null
+                : stepRef({ number: entry.number, outline: entry.outline })
+            }
           />
           {/* Two lines at most on a phone and one from the small breakpoint
               up. A note's title is the whole thing somebody typed on a phone,
