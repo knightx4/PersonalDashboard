@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: entry ? `${entry.name} · Overhaul` : 'Overhaul' };
 }
 
-/** One component in the overhaul: what is wrong, the proposal, and both drawings. */
+/** One component in the overhaul: what was wrong, what changed, and both drawings. */
 export default async function OverhaulEntryPage({ params }: { params: Promise<{ id: string }> }) {
   if (process.env.UI_PREVIEW !== '1' && !(await isOwner())) notFound();
   const { id } = await params;
@@ -42,7 +42,7 @@ export default async function OverhaulEntryPage({ params }: { params: Promise<{ 
 
           <div className="grid gap-3 md:grid-cols-2">
             <Card padding="standard">
-              <h2 className="mb-2 text-ui font-semibold text-ink">What is wrong</h2>
+              <h2 className="mb-2 text-ui font-semibold text-ink">What was wrong</h2>
               <ul className="list-disc space-y-2 pl-4 text-ui text-ink marker:text-ink-ghost">
                 {entry.problems.map((problem) => (
                   <li key={problem}>{problem}</li>
@@ -50,13 +50,13 @@ export default async function OverhaulEntryPage({ params }: { params: Promise<{ 
               </ul>
             </Card>
             <Card padding="standard">
-              <h2 className="mb-2 text-ui font-semibold text-ink">The proposal</h2>
+              <h2 className="mb-2 text-ui font-semibold text-ink">What changed</h2>
               <ul className="list-disc space-y-2 pl-4 text-ui text-ink marker:text-ink-ghost">
                 {entry.change.map((change) => (
                   <li key={change}>{change}</li>
                 ))}
               </ul>
-              <h3 className="mt-4 mb-1 text-small font-semibold text-ink">What moves</h3>
+              <h3 className="mt-4 mb-1 text-small font-semibold text-ink">What moved</h3>
               <p className="text-small text-ink-muted">{entry.moves}</p>
             </Card>
           </div>

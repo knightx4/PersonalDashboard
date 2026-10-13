@@ -15,8 +15,8 @@ export const dynamic = 'force-dynamic';
 
 const SHOWS: readonly { value: Show; label: string }[] = [
   { value: 'both', label: 'Both' },
-  { value: 'now', label: 'Now' },
-  { value: 'next', label: 'Proposed' },
+  { value: 'now', label: 'Before' },
+  { value: 'next', label: 'After' },
 ];
 
 /**
@@ -37,7 +37,7 @@ export default async function OverhaulPage({
       <div className={MAIN_BOX}>
         <PageHeader
           title="Component overhaul"
-          description={`${ENTRIES.length} shared components, each drawn as the app has it today and as proposed. Open one for what is wrong with it and what would move.`}
+          description={`${ENTRIES.length} shared components, each drawn as it was before the overhaul of 13 October 2026 and as it is now. Open one for what was wrong with it and what changed.`}
           actions={
             <nav aria-label="Show" className={cn(segmentedFrame, 'overflow-hidden')}>
               {SHOWS.map((option) => (
@@ -60,7 +60,7 @@ export default async function OverhaulPage({
         />
 
         <Card padding="dense" className="mb-8">
-          <h2 className="mb-2 text-ui font-semibold text-ink">Where the app is not unified</h2>
+          <h2 className="mb-2 text-ui font-semibold text-ink">Where the app was not unified</h2>
           <ul className="divide-y divide-border">
             {ENTRIES.map((entry) => (
               <li key={entry.id}>

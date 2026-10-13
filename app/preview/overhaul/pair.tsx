@@ -11,14 +11,14 @@ export function parseShow(value: string | undefined): Show {
 }
 
 /**
- * One component drawn twice: as the app has it today and as proposed. Side
+ * One component drawn twice: as the app had it before the overhaul (13 October 2026) and as it is now. Side
  * by side from md up, stacked on a phone with today first. `show` keeps only
  * one half, for flicking between them at one place on the page.
  */
 export function Pair({ entry, show }: { entry: Entry; show: Show }) {
   const halves = [
-    show !== 'next' && { key: 'now', title: 'Now', body: entry.now() },
-    show !== 'now' && { key: 'next', title: 'Proposed', body: entry.next() },
+    show !== 'next' && { key: 'now', title: 'Before', body: entry.now() },
+    show !== 'now' && { key: 'next', title: 'After', body: entry.next() },
   ].filter(Boolean) as { key: string; title: string; body: React.ReactNode }[];
 
   return (
