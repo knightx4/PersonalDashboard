@@ -1,6 +1,7 @@
 import { Fingerprint, GraduationCap, MapPin, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * What each of You's four tabs says before anything is in it (plan #1991.1).
@@ -56,7 +57,7 @@ export const YOU_TABS: Record<YouTab, TabCopy> = {
 export function YouTabEmpty({ tab }: { tab: YouTab }) {
   const copy = YOU_TABS[tab];
   return (
-    <>
+    <PageColumn>
       <PageHeader title={copy.title} />
       <EmptyState
         icon={copy.icon}
@@ -64,6 +65,6 @@ export function YouTabEmpty({ tab }: { tab: YouTab }) {
         description={copy.emptyDescription}
         action={copy.action}
       />
-    </>
+    </PageColumn>
   );
 }
