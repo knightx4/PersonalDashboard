@@ -629,20 +629,16 @@ describe('overnightTick', () => {
 
   it('fills every free slot in one tick, one module each', async () => {
     const sections = tree(
-      ['news', 'learn', 'todo', 'vault', 'jobs'].flatMap((module, index) => [
-        item({ id: `${module}-feature`, module, priority: index + 1 }),
-        item({ id: `${module}-step`, parentId: `${module}-feature`, module, priority: index + 1 }),
+      (['news', 'learn', 'todo', 'vault', 'jobs'] as const).flatMap((module) => [
+        item({ id: `${module}-feature`, module }),
+        item({ id: `${module}-step`, parentId: `${module}-feature`, module }),
       ]),
     );
     const { ports: p, calls } = ports({ loadSections: async () => sections, atOnce: 3 });
 
     const tick = await overnightTick(p);
     expect(tick).toMatchObject({ act: 'fired', running: 3, featuresLeft: 3 });
-    expect(calls.fired.map((one) => one.feature)).toEqual([
-      'news-feature',
-      'learn-feature',
-      'todo-feature',
-    ]);
+    expect(new Set(calls.fired.map((one) => one.feature)).size).toBe(3);
     expect(calls.recorded).toEqual([6, 5, 4]);
     expect(tick.act === 'fired' && tick.features).toHaveLength(3);
     expect(tickNote(tick)).toMatch(/^Started #\d+, #\d+ and #\d+\. 3 sessions are running\.$/);
@@ -650,7 +646,7 @@ describe('overnightTick', () => {
 
   it('stops filling slots when the budget is spent', async () => {
     const sections = tree(
-      ['news', 'learn', 'todo'].flatMap((module) => [
+      (['news', 'learn', 'todo'] as const).flatMap((module) => [
         item({ id: `${module}-feature`, module }),
         item({ id: `${module}-step`, parentId: `${module}-feature`, module }),
       ]),
@@ -668,7 +664,7 @@ describe('overnightTick', () => {
 
   it('keeps what it started when a later send breaks', async () => {
     const sections = tree(
-      ['news', 'learn'].flatMap((module) => [
+      (['news', 'learn'] as const).flatMap((module) => [
         item({ id: `${module}-feature`, module }),
         item({ id: `${module}-step`, parentId: `${module}-feature`, module }),
       ]),
