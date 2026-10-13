@@ -14,8 +14,8 @@ import {
   transcriptAnchor,
   transcriptFileHref,
   type SchoolGroup,
-} from '@/lib/vault/education';
-import type { Course, Transcript } from '@/lib/vault/transcripts';
+} from '@/lib/you/education';
+import type { Course, Transcript } from '@/lib/you/transcripts';
 import {
   removeCourseAction,
   removeTranscriptAction,

@@ -1,9 +1,9 @@
-import { courseHref } from '@/lib/vault/education';
+import { courseHref } from '@/lib/you/education';
 import { AskInputError, optionalString, type AskContext, type AskToolResult } from './db';
 
 /**
- * courses: what the person studied, from the transcripts saved on the vault's
- * Education tab (plan #1309, under #1304).
+ * courses: what the person studied, from the transcripts saved on You's
+ * Work & school tab (plan #1309, under #1304).
  *
  * The command box's search caps a workspace at eight hits, and a term can
  * hold more courses than that, so a question like "what did I take in Fall
@@ -84,7 +84,7 @@ export async function coursesLookup(ctx: AskContext, input: Record<string, unkno
     query: optionalString(input, 'query'),
   };
 
-  const client = await ctx.db('obsidian');
+  const client = await ctx.db('you');
   const { data, error } = await client
     .from('courses')
     .select('id, school, code, title, term, year, credits, grade, position, transcript_id')
@@ -100,7 +100,7 @@ export async function coursesLookup(ctx: AskContext, input: Record<string, unkno
   const narrowed = Boolean(filter.term || filter.year !== null || filter.school || filter.query);
   const note =
     all.length === 0
-      ? 'No courses are saved. Transcripts are added on the Education tab of the vault, /vault/education.'
+      ? 'No courses are saved. Transcripts are added on the Work & school tab of You, /you/work.'
       : matched.length === 0 && narrowed
         ? `None of their ${all.length} saved courses matched. Terms are kept as the transcript writes them; call again with no term to see how they are written.`
         : matched.length > COURSE_ROWS
@@ -110,7 +110,7 @@ export async function coursesLookup(ctx: AskContext, input: Record<string, unkno
   return {
     ok: true,
     rows: matched.slice(0, COURSE_ROWS).map((course) => ({
-      table: 'obsidian.courses',
+      table: 'you.courses',
       ref: course.id,
       title: course.code ? `${course.code} ${course.title}` : course.title,
       href: courseHref(course.id),

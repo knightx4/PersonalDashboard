@@ -16,9 +16,9 @@ import {
   TRANSCRIPT_ACCEPT,
   courseFieldName,
   transcriptContentType,
-} from '@/lib/vault/education';
-import type { DraftCourse } from '@/lib/vault/transcript-read';
-import { TRANSCRIPT_MAX_BYTES, VAULT_TRANSCRIPTS_BUCKET, transcriptStoragePath } from '@/lib/vault/transcripts';
+} from '@/lib/you/education';
+import type { DraftCourse } from '@/lib/you/transcript-read';
+import { TRANSCRIPT_MAX_BYTES, TRANSCRIPTS_BUCKET, transcriptStoragePath } from '@/lib/you/transcripts';
 import {
   discardUploadAction,
   readTranscriptAction,
@@ -40,7 +40,7 @@ import {
  * text is kept as a .txt file so every transcript has an original to open.
  */
 
-const READ_ACTION = 'app/vault/education/actions.ts#readTranscriptAction';
+const READ_ACTION = 'app/you/work/actions.ts#readTranscriptAction';
 
 export function AddTranscript({ empty }: { empty: boolean }) {
   const [open, setOpen] = useState(false);
@@ -147,7 +147,7 @@ async function upload(file: File): Promise<{ path: string } | { error: string }>
   if (!data.user) return { error: 'You are signed out. Sign in again to upload.' };
   const path = transcriptStoragePath(data.user.id, file.name, crypto.randomUUID());
   const { error } = await supabase.storage
-    .from(VAULT_TRANSCRIPTS_BUCKET)
+    .from(TRANSCRIPTS_BUCKET)
     .upload(path, file, { contentType, upsert: false });
   if (error) return { error: 'That file could not be uploaded. Try again.' };
   return { path };
@@ -219,13 +219,12 @@ export function CheckCourses({ draft, onDone }: { draft: TranscriptDraft; onDone
       <input type="hidden" name="sizeBytes" value={draft.sizeBytes} />
       <input type="hidden" name="rows" value={rows.map((r) => r.key).join(',')} />
 
-      <p className="mb-3 text-body text-ink-muted">
-        Dash read {draft.courses.length} {draft.courses.length === 1 ? 'course' : 'courses'} from{' '}
-        {draft.fileName}. Check each one against the transcript and correct anything misread. Nothing is saved
-        until you press Save.
-      </p>
-
       <div className={cn(cardVariants({ padding: 'standard' }), 'mb-3')}>
+        <p className="mb-4 text-body text-ink-muted">
+          Dash read {draft.courses.length} {draft.courses.length === 1 ? 'course' : 'courses'} from{' '}
+          {draft.fileName}. Check each one against the transcript and correct anything misread. Nothing is saved
+          until you press Save.
+        </p>
         <Field
           id={`${id}-school`}
           label="School"

@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { createVaultClient } from '@/lib/vault/auth/server';
-import { courseHref } from '@/lib/vault/education';
+import { createYouClient } from '@/lib/you/auth/server';
+import { courseHref } from '@/lib/you/education';
 import { rankHits } from '@/lib/search/rank';
 import type {
   SearchContext,
@@ -11,7 +11,7 @@ import type {
 } from '@/lib/search/sources';
 
 /**
- * Courses from the vault's Education tab, in the command palette and Dash's
+ * Courses from You's Work & school tab, in the command palette and Dash's
  * search (plan #1309).
  *
  * A course is looked for by its title, its code ("ECON 101") or when and
@@ -37,10 +37,10 @@ type CourseRow = {
 export function courseHit(row: CourseRow): SearchHit {
   const when = row.term?.trim() || (row.year === null ? '' : String(row.year));
   return {
-    module: 'vault',
+    module: 'you',
     kind: 'course',
     id: row.id,
-    ref: `obsidian.courses:${row.id}`,
+    ref: `you.courses:${row.id}`,
     title: row.code ? `${row.code} ${row.title}` : row.title,
     subtitle: ['Course', row.school, when].filter(Boolean).join(' · '),
     match: [row.term, row.year, row.school].filter((part) => part !== null && part !== '').join(' '),
@@ -49,7 +49,7 @@ export function courseHit(row: CourseRow): SearchHit {
 }
 
 async function readAll(ctx: SearchListContext, limit: number): Promise<SearchHit[]> {
-  const supabase = await createVaultClient();
+  const supabase = await createYouClient();
   const { data, error } = await supabase
     .from('courses')
     .select(COLUMNS)
@@ -63,7 +63,7 @@ async function readAll(ctx: SearchListContext, limit: number): Promise<SearchHit
 
 export const educationSearchSource: SearchSource = {
   id: 'education',
-  module: 'vault',
+  module: 'you',
   label: 'Education',
   kinds: ['course'],
 

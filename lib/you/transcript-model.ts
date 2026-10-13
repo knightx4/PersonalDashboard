@@ -3,7 +3,7 @@
  * call with the course list as a forced tool, made the same way the goals
  * reader sends a document (lib/goals/extract-model.ts): a PDF as a document
  * block, a photo as an image block, a Word file or pasted text as text.
- * lib/vault/transcript-read.ts builds the tool and reads the answer back.
+ * lib/you/transcript-read.ts builds the tool and reads the answer back.
  *
  * Haiku, as for the goals reader: listing courses is copying rows off a page
  * rather than judging anything, and it reads scans and photos. What it gets
@@ -15,7 +15,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { LearnOperation } from '@/lib/learn/spend';
-import { TRANSCRIPT_TOOL, transcriptPrompt, transcriptTool } from '@/lib/vault/transcript-read';
+import { TRANSCRIPT_TOOL, transcriptPrompt, transcriptTool } from '@/lib/you/transcript-read';
 import { MODELS } from '@/lib/core/models';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 

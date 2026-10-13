@@ -20,6 +20,7 @@ import { AreasGrid, type OpenedThemes } from './areas-grid';
 import { destinationsFor, openedPlace, runnerUpOf, targetValue } from '@/lib/learn/areas/move';
 import { loadPlacedThemes } from '@/lib/learn/areas/themes-load';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
 import { chooseTrackOffer } from '@/lib/learn/flow/offer';
 import { chooseRestingOffer } from '@/lib/learn/lessons/resting-load';
 import { TrackOffers } from '@/components/learn/track-offers';
@@ -32,8 +33,8 @@ import { CustomTrackForm } from './custom-track-form';
 import { PriorForm } from './prior-form';
 import { FromCoursesForm } from './from-courses-form';
 import { readsByCourse, type CourseRead, type CourseReadRow } from '@/lib/learn/graph/course-reads';
-import { groupCourses, type SchoolGroup } from '@/lib/vault/education';
-import type { Course, Transcript } from '@/lib/vault/transcripts';
+import { groupCourses, type SchoolGroup } from '@/lib/you/education';
+import type { Course, Transcript } from '@/lib/you/transcripts';
 import { loadQuizzes, type QuizListItem } from '@/lib/learn/quiz/load';
 import { QuizzesSection } from './quizzes';
 import { LearnGoalsLine } from './learn-goals-line';
@@ -167,9 +168,10 @@ export default async function KnowPage({
   let courseReads: Record<string, CourseRead> = {};
   let coursesFailed = false;
   try {
+    const you = await createYouClient();
     const [transcripts, courses, reads] = await Promise.all([
-      vault.from('transcripts').select('*'),
-      vault.from('courses').select('*').order('position'),
+      you.from('transcripts').select('*'),
+      you.from('courses').select('*').order('position'),
       supabase.from('course_reads').select('course_id, subject_id, concepts_added, read_at'),
     ]);
     if (transcripts.error || courses.error || reads.error) throw new Error('courses');

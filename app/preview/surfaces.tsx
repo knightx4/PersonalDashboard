@@ -102,6 +102,7 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
+import { SectionHeading } from '@/components/ui/section-heading';
 import {
   PersonalityAddTypeSurface,
   PersonalityScoresSurface,
@@ -110,7 +111,7 @@ import {
   KnowPersonalityEmptySurface,
   KnowPersonalityReadingSurface,
 } from './personality-surfaces';
-import { AddTranscript } from '@/app/vault/education/add-transcript';
+import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import {
@@ -157,7 +158,6 @@ import {
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
-import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
@@ -4605,28 +4605,29 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Education tab with nothing on it yet (plan #1308): the empty state
-     * says what to upload. */
-    id: 'vault-education-empty',
-    label: 'Education · Empty',
-    module: 'vault',
+    /* Work & school with no transcripts yet (plan #1308, moved to You by
+     * #1991.3): the empty state says what to upload. */
+    id: 'you-work-empty',
+    label: 'Work & school · No transcripts yet',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
-        <AddTranscript empty />
+        <PageHeader title="Work & school" />
+        <EducationSection groups={[]} courseCounts={{}} transcripts={0} courses={0} />
       </>
     ),
   },
   {
     /* Choosing a transcript or pasting its text, before Dash reads it. */
-    id: 'vault-education-upload',
-    label: 'Education · Upload',
-    module: 'vault',
+    id: 'you-work-upload',
+    label: 'Work & school · Upload a transcript',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
+        <PageHeader title="Work & school" />
+        <SectionHeading title="Education" className="mb-2" />
         <EducationUploadPreview />
       </>
     ),
@@ -4634,13 +4635,14 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The courses Dash read, to check before saving: a school it found, a
      * course with no grade, and a transfer course showing its own school. */
-    id: 'vault-education-check',
-    label: 'Education · Check before saving',
-    module: 'vault',
+    id: 'you-work-check',
+    label: 'Work & school · Check before saving',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" />
+        <PageHeader title="Work & school" />
+        <SectionHeading title="Education" className="mb-2" />
         <EducationCheckPreview />
       </>
     ),
@@ -4648,17 +4650,14 @@ export const SURFACES: readonly Surface[] = [
   {
     /* Saved courses by school and then by term, newest first, with the
      * transcripts each school issued. */
-    id: 'vault-education-list',
-    label: 'Education · Courses by school and term',
-    module: 'vault',
+    id: 'you-work-list',
+    label: 'Work & school · Courses by school and term',
+    module: 'you',
     width: 'page',
     render: () => (
       <>
-        <PageHeader title="Education" description="9 courses from 2 transcripts" />
-        <AddTranscript empty={false} />
-        {educationGroups.map((group) => (
-          <SchoolCourses key={group.school} group={group} courseCounts={educationCounts} />
-        ))}
+        <PageHeader title="Work & school" />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
       </>
     ),
   },
@@ -4704,7 +4703,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The courses fold on Learn's Tracks page with no transcript saved: it
-     * points to the vault's Education tab (plan #1391). */
+     * points to You's Work & school tab (plan #1391). */
     id: 'learn-courses-empty',
     label: 'Tracks · Courses, none saved',
     module: 'learn',

@@ -68,8 +68,8 @@ describe('transcript files', () => {
   });
 
   it('links a course to its row and a transcript to its file', () => {
-    expect(courseHref('abc')).toBe('/vault/education#course-abc');
-    expect(transcriptFileHref('abc')).toBe('/vault/education/file/abc');
+    expect(courseHref('abc')).toBe('/you/work#course-abc');
+    expect(transcriptFileHref('abc')).toBe('/you/work/file/abc');
   });
 });
 

@@ -3,13 +3,13 @@
  *
  * You give it a transcript as a PDF, a Word file, a photo or pasted text, and
  * it hands back every course on it as a draft for you to check. Nothing is
- * saved here: the Education tab (plan #1308) shows the draft, lets you fix a
- * misread row, and saves what you confirm into obsidian.courses.
+ * saved here: the Work & school tab (plan #1308) shows the draft, lets you fix a
+ * misread row, and saves what you confirm into you.courses.
  *
  * The file handling is the goals document reader's (extractSource in
  * lib/goals/extract-read.ts): the same kinds of file, the same 20 MB limit,
  * and a Word file sent as its text. The model call is askTranscriptModel in
- * lib/vault/transcript-model.ts, passed in here so the tests stub it.
+ * lib/you/transcript-model.ts, passed in here so the tests stub it.
  *
  * Term, grade and credits are kept as the transcript writes them. A letter
  * grade stays "A-", a pass stays "P", and a transfer credit with no grade has
@@ -27,10 +27,10 @@ export const TRANSCRIPT_TOOL = 'list_courses';
 /** The most courses one read hands back; a four-year transcript has about fifty. */
 export const COURSES_MAX = 300;
 
-/** The longest of each field kept from the model: obsidian.courses' own limits. */
+/** The longest of each field kept from the model: you.courses' own limits. */
 const MAX = { school: 200, code: 50, title: 300, term: 50, grade: 20, note: 300 } as const;
 
-/** A course as read, before you check it. Mirrors obsidian.courses without the ids. */
+/** A course as read, before you check it. Mirrors you.courses without the ids. */
 export type DraftCourse = {
   /** The school the course was taken at; null when the transcript does not say. */
   school: string | null;
@@ -203,7 +203,7 @@ function yearIn(term: string | null): number | null {
 
 function credits(value: unknown): number | null {
   const n = typeof value === 'string' ? Number(value.trim()) : value;
-  // numeric(6, 2) in obsidian.courses.
+  // numeric(6, 2) in you.courses.
   if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n >= 10_000) return null;
   return Math.round(n * 100) / 100;
 }
