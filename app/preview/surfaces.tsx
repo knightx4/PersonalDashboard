@@ -318,7 +318,7 @@ import {
   DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
-import { DevModuleSurface, DevModulesSurface } from './module-surfaces';
+import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -6068,6 +6068,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevModuleSurface />,
+  },
+  {
+    id: 'dev-module-ideas',
+    label: 'Dev · Module, its ideas',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevModuleIdeasSurface />,
   },
 
   /* The Goals, Jobs and Mail pages (plan #1601). Fixtures in
