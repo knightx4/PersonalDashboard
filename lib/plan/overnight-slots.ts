@@ -51,6 +51,8 @@ export type SlotGoalRun = {
 };
 
 export type SlotWork = {
+  /** The plan run's id, whose lines the card follows; null when the fire left none. */
+  runId: string | null;
   /** The step number, null for a goals run or a fire with no record. */
   step: number | null;
   /** How the plan writes it ("#1700.2"), null where `step` is. */
@@ -173,8 +175,12 @@ export function assignSlots(sessions: readonly SlotSession[]): Map<string, numbe
   return assigned;
 }
 
+/** A session id that is a plan run's, not the stand-in a fire with no row gets. */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function workOf(
   src: {
+    id?: string;
     firedAt: string;
     step: SlotSession['step'];
     title?: string | null;
@@ -185,6 +191,7 @@ function workOf(
   now: number,
 ): SlotWork {
   return {
+    runId: src.id && RUN_ID.test(src.id) ? src.id : null,
     step: src.step?.number ?? null,
     ref: src.step ? (src.step.ref ?? `#${src.step.number}`) : null,
     title: src.step?.title ?? src.title ?? null,

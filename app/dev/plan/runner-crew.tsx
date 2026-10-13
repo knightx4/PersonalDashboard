@@ -1,9 +1,13 @@
+'use client';
+
 import { DashMark, type DashLook } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
+import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
+import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
 
 /**
  * The runner's four Dashes, one for each thing it can run at once (plan
@@ -35,10 +39,13 @@ function SlotText({
   slot,
   held,
   progress,
+  newest,
 }: {
   slot: RunnerSlot;
   held: boolean;
   progress: FeatureProgress | null;
+  /** The run's newest line, live, or null before it has written one. */
+  newest: RunActivity | null;
 }) {
   if (slot.state === 'working') {
     const { work } = slot;
@@ -59,6 +66,18 @@ function SlotText({
           {work.title ?? 'a run with no step recorded'}
         </span>
         {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
+        {newest && (
+          // Keyed by the line, so a new one replaces the old rather than the
+          // text changing under the reader; aria-live says it once.
+          <span
+            key={newest.id}
+            aria-live="polite"
+            className={`mt-1 block truncate text-small ${newest.kind === 'error' ? 'text-danger' : 'text-ink'}`}
+          >
+            <span className="text-ink-muted">{RUN_ACTIVITY_LABEL[newest.kind]}: </span>
+            {newest.body}
+          </span>
+        )}
         {progress && (
           <Meter
             value={progress.done}
@@ -105,6 +124,10 @@ export function RunnerCrew({
   /** The runner is held: an idle slot says so rather than "Not running". */
   held?: boolean;
 }) {
+  const runIds = slots.flatMap((slot) =>
+    slot.state === 'working' && slot.work.runId ? [slot.work.runId] : [],
+  );
+  const newest = useNewestRunLines(runIds);
   return (
     <ul
       aria-label="What each of the runner's four sessions is doing"
@@ -127,6 +150,11 @@ export function RunnerCrew({
             <SlotText
               slot={slot}
               held={held}
+              newest={
+                slot.state === 'working' && slot.work.runId
+                  ? (newest.get(slot.work.runId) ?? null)
+                  : null
+              }
               progress={
                 slot.state === 'working' && slot.work.step !== null
                   ? (slot.work.progress ?? progress[`#${slot.work.step}`] ?? null)
