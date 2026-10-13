@@ -227,7 +227,7 @@ function FocusLine({
         {row.needsReview && (
           <AlertTriangle
             className="size-3.5 shrink-0 text-caution"
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-label="Needs review"
           />
         )}

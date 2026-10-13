@@ -1,7 +1,6 @@
 import Link from '@/components/ui/link';
 import { Columns3, ListChecks, Table2 } from 'lucide-react';
-import { cn } from '@/lib/cn';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { pipelineHref, type PipelineParams, type PipelineViewName } from '@/lib/jobs/pipeline-view';
 
 const VIEWS = [
@@ -40,13 +39,7 @@ export function PipelineViewToggle({
           )}
           scroll={false}
           aria-current={view === value ? 'true' : undefined}
-          className={cn(
-            'press inline-flex h-7 items-center gap-1.5 px-2.5 text-ui font-medium',
-            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-            view === value
-              ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
+          className={segmentClass(view === value)}
         >
           <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
           {label}

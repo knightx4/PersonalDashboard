@@ -267,9 +267,9 @@ function AnswerCard({
       </div>
 
       {usingCanonical && (
-        <p className="mt-2 rounded bg-accent-tint px-2 py-1 text-small text-accent">
+        <Note tone="accent" className="mt-2 text-small">
           Filled from your default answer for this question. Edit it if this one needs tailoring.
-        </p>
+        </Note>
       )}
 
       {/*

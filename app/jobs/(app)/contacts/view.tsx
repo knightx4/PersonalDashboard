@@ -1,6 +1,7 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { useActionState, useState } from 'react';
 import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -153,7 +154,7 @@ export function ContactsView({
                         // cell stretches, so the company is still its own destination.
                         <Link
                           href={`/jobs/companies/${contact.companySlug}`}
-                          className="relative transition-colors duration-quick hover:text-accent hover:underline"
+                          className={cn(linkVariants({ tone: 'quiet' }), 'relative')}
                         >
                           {contact.companyName}
                         </Link>

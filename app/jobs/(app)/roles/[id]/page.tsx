@@ -1,8 +1,9 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
+import { chipVariants } from '@/components/ui/chip';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
 import { DetailFacts } from '@/components/patterns/list-detail';
@@ -403,7 +404,7 @@ export default async function RoleDetailPage({
                   website: company.website,
                   careersUrl: company.careers_url,
                 }}
-                className="size-11 rounded-xl"
+                className="size-11 rounded-control"
                 imageClassName="size-7"
               />
             }
@@ -426,16 +427,13 @@ export default async function RoleDetailPage({
                 {coverageLabel && (
                   <Link
                     href={`/jobs/roles/${role.id}?tab=posting`}
-                    className={cn(
-                      'tabular rounded-full px-2 py-0.5 text-small',
-                      coverage.gaps > 0
-                        ? 'bg-caution-tint text-ink'
-                        : // Not the offer hue: full coverage is a good answer, not a
-                          // stage of the pipeline, and law 4 gives those five colours
-                          // one meaning each. Amber still carries the gaps, where
-                          // "something is wrong and only you can fix it" is true.
-                          'bg-sunken text-ink-muted',
-                    )}
+                    className={chipVariants({
+                      // Not the offer hue: full coverage is a good answer, not a
+                      // stage of the pipeline, and law 4 gives those five colours
+                      // one meaning each. Amber still carries the gaps, where
+                      // "something is wrong and only you can fix it" is true.
+                      tone: coverage.gaps > 0 ? 'caution' : 'neutral',
+                    })}
                     title={
                       coverage.gaps > 0
                         ? `${coverage.gaps} must-have${coverage.gaps === 1 ? '' : 's'} your bank does not cover`
@@ -460,7 +458,7 @@ export default async function RoleDetailPage({
                     href={role.jd_url as string}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
+                    className={cn(linkVariants({ tone: 'quiet' }), 'text-ui')}
                   >
                     Original posting
                   </a>

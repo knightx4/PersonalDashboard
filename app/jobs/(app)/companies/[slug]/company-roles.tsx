@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { CardSection } from '@/components/ui/card';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -64,7 +65,7 @@ export function CompanyRoles({
                   {todo.role && (
                     <Link
                       href={`/jobs/roles/${todo.role.id}`}
-                      className="press-area text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
+                      className={cn(linkVariants({ tone: 'quiet' }), 'press-area text-small')}
                     >
                       {todo.role.title}
                     </Link>

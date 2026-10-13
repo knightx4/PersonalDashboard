@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { chipVariants } from '@/components/ui/chip';
 import { chanceText, type ScoreFigure, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
@@ -34,7 +35,7 @@ export function ScoreChips({ note, className }: { note: ScoreNote | null | undef
       {note.fit && (
         <span
           title={note.fit.unsure ? UNSURE_TITLE : undefined}
-          className={cn('tabular rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted', note.fit.unsure && 'opacity-70')}
+          className={cn(chipVariants(), note.fit.unsure && 'opacity-70')}
         >
           {FIT_SCORE_LABEL} {fitText(note)}
         </span>
@@ -42,7 +43,7 @@ export function ScoreChips({ note, className }: { note: ScoreNote | null | undef
       {note.chance && (
         <span
           title={note.chance.unsure ? UNSURE_TITLE : undefined}
-          className={cn('rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted', note.chance.unsure && 'opacity-70')}
+          className={cn(chipVariants(), note.chance.unsure && 'opacity-70')}
         >
           {CHANCE_LABEL}: {chanceFigureText(note)?.toLowerCase()}
         </span>

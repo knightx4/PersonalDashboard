@@ -146,15 +146,15 @@ function TodoLine({
        * line under the words. */
       <div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Mark done"
+          <IconButton
+            size="sm"
+            label="Mark done"
             disabled={finishing}
             onClick={() => finish(() => void completeReminder(todo.id))}
-            className="press flex size-4 shrink-0 items-center justify-center text-ink-muted transition-colors duration-quick hover:text-accent"
+            className="-m-1 hover:text-accent"
           >
             <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
-          </button>
+          </IconButton>
           <span className="min-w-0 flex-1 truncate text-ui text-ink">{todo.body}</span>
           <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt)}</span>
           <IconButton

@@ -7,6 +7,8 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
+import { IconButton } from '@/components/ui/icon-button';
+import { Note } from '@/components/ui/note';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { ScoreLine } from '@/components/jobs/ui/score-figures';
@@ -618,7 +620,7 @@ function PipelineCard({
           // Laid over the card's top right corner rather than beside it, so
           // the invisible pair holds no width at a laptop: the stars and the
           // age end on the card's own edge there too (law 18).
-          <span className="absolute top-1 right-1 hidden items-center gap-0.5 rounded-lg focus-within:bg-surface group-hover:bg-surface sm:flex">
+          <span className="absolute top-1 right-1 hidden items-center gap-0.5 rounded-control focus-within:bg-surface group-hover:bg-surface sm:flex">
             {onReject && <QuickReject row={row} onReject={onReject} />}
             <Dismiss row={row} />
           </span>
@@ -626,10 +628,12 @@ function PipelineCard({
       </div>
 
       {row.nextAction && (
-        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-small text-ink-muted">
-          {row.nextAction}
-          {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
-        </p>
+        <Note className="mt-1.5 px-1.5 py-1 text-small text-ink-muted">
+          <p className="truncate">
+            {row.nextAction}
+            {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
+          </p>
+        </Note>
       )}
 
       {/* Only a closed card still needs a row of its own, and only for the
@@ -684,15 +688,13 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
   }
 
   return (
-    <button
-      type="button"
-      title="Send straight to rejected"
+    <IconButton
+      label="Send straight to rejected"
       onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
     >
-      <Ban className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Send straight to rejected</span>
-    </button>
+      <Ban strokeWidth={1.75} aria-hidden />
+    </IconButton>
   );
 }
 
@@ -735,14 +737,12 @@ function Dismiss({ row }: { row: PipelineRow }) {
   }
 
   return (
-    <button
-      type="button"
-      title="Not a real pursuit — remove it"
+    <IconButton
+      label="Not a real pursuit — remove it"
       onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
     >
-      <X className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Not a real pursuit — remove it</span>
-    </button>
+      <X strokeWidth={1.75} aria-hidden />
+    </IconButton>
   );
 }

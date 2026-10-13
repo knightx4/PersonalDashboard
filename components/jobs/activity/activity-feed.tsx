@@ -5,6 +5,9 @@ import { Activity as ActivityIcon } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { APPLICATION_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
@@ -56,7 +59,7 @@ function Highlights({ highlights }: { highlights: ActivityHighlights }) {
       <Card padding="none" className="grid grid-cols-2 gap-px overflow-hidden bg-border sm:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="bg-surface px-4 py-3">
-            <p className="text-micro uppercase tracking-wider text-ink-muted">{tile.label}</p>
+            <SectionLabel>{tile.label}</SectionLabel>
             {/* Zero is grey: nothing happened is not news. */}
             <p
               className={cn(
@@ -178,28 +181,31 @@ export function ActivityFeed({
       )}
 
       <Card padding="standard">
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
-          <dt className="text-ink-muted">Last inbox sync</dt>
-          <dd className="text-ink">
-            {latestRun
-              ? `${formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, timezone)} · ${
-                  latestRun.messagesSeen
-                } read${latestRun.status === 'failed' ? ' · failed' : ''}`
-              : 'Not yet'}
-          </dd>
-
-          <dt className="text-ink-muted">Nightly sweep</dt>
-          <dd className="text-ink">
-            {activity.lastSweepAt
-              ? `Last changed something ${formatDateTime(activity.lastSweepAt, timezone)}`
-              : 'Has not changed anything yet'}
-          </dd>
-        </dl>
+        <ValueList>
+          <ValueRow
+            label="Last inbox sync"
+            value={
+              latestRun
+                ? `${formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, timezone)} · ${
+                    latestRun.messagesSeen
+                  } read${latestRun.status === 'failed' ? ' · failed' : ''}`
+                : 'Not yet'
+            }
+          />
+          <ValueRow
+            label="Nightly sweep"
+            value={
+              activity.lastSweepAt
+                ? `Last changed something ${formatDateTime(activity.lastSweepAt, timezone)}`
+                : 'Has not changed anything yet'
+            }
+          />
+        </ValueList>
 
         {latestRun?.error && (
-          <p className="mt-3 rounded-lg bg-caution-tint px-3 py-2 text-small text-ink">
+          <Note tone="caution" className="mt-3 text-small">
             Last run reported: {latestRun.error}
-          </p>
+          </Note>
         )}
       </Card>
     </div>

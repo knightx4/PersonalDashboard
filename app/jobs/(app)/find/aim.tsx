@@ -1,6 +1,7 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { useActionState, useRef, useState } from 'react';
 import { CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';
@@ -32,7 +33,7 @@ export function SearchAim({
             <li key={gap.key} className="text-small text-caution">
               {gap.text}{' '}
               {gap.href && (
-                <Link href={gap.href} className="press-area font-medium underline underline-offset-2">
+                <Link href={gap.href} className={cn(linkVariants(), 'press-area font-medium')}>
                   Set it
                 </Link>
               )}

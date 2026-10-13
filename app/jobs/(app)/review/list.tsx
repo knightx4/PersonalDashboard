@@ -1,11 +1,14 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { ExternalLink, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { Kbd } from '@/components/ui/kbd';
+import { Note } from '@/components/ui/note';
 import { PageHeader } from '@/components/shell/page-header';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import {
@@ -156,18 +159,18 @@ export function ReviewQueue({
 
         <div className="min-w-0 flex-1 space-y-2">
           <p className="text-small text-ink-muted">
-            <kbd className="rounded border border-border bg-surface px-1">j</kbd>/
-            <kbd className="rounded border border-border bg-surface px-1">k</kbd> to move,{' '}
-            <kbd className="rounded border border-border bg-surface px-1">x</kbd> to select,{' '}
-            <kbd className="rounded border border-border bg-surface px-1">1</kbd>–
-            <kbd className="rounded border border-border bg-surface px-1">3</kbd> to link,{' '}
-            <kbd className="rounded border border-border bg-surface px-1">d</kbd> to dismiss.
+            <Kbd always announce>j</Kbd>/
+            <Kbd always announce>k</Kbd> to move,{' '}
+            <Kbd always announce>x</Kbd> to select,{' '}
+            <Kbd always announce>1</Kbd>–
+            <Kbd always announce>3</Kbd> to link,{' '}
+            <Kbd always announce>d</Kbd> to dismiss.
           </p>
 
           {message && (
-            <p role="status" className="rounded-lg bg-accent-tint px-3 py-2 text-ui text-accent">
+            <Note tone="accent" role="status">
               {message}
-            </p>
+            </Note>
           )}
 
           {rows.map((row) => (
@@ -342,9 +345,7 @@ function MessageRow({
        * up nothing changes at all.
        */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="rounded-full bg-canvas px-2 py-0.5 text-micro font-medium text-ink-muted">
-          {classificationLabel(row.classification)}
-        </span>
+        <Chip size="sm">{classificationLabel(row.classification)}</Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.subject ?? '(no subject)'}
         </h3>
@@ -368,9 +369,7 @@ function MessageRow({
         <ul className="mt-3 space-y-1.5">
           {row.candidates.map((candidate, index) => (
             <li key={candidate.applicationId} className="flex flex-wrap items-center gap-2">
-              <kbd className="rounded border border-border bg-canvas px-1.5 text-small text-ink-muted">
-                {index + 1}
-              </kbd>
+              <Kbd always>{index + 1}</Kbd>
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-2 text-ui text-ink sm:truncate">{candidate.label}</p>
                 <p className="text-small text-ink-muted sm:truncate">
@@ -422,7 +421,7 @@ function MessageRow({
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
+            className={cn(linkVariants({ tone: 'quiet' }), 'inline-flex items-center gap-1 text-small')}
           >
             Open in Gmail
             <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -507,7 +506,7 @@ function OtherRolePicker({
                     onDone(result.error ?? `Linked to ${label}.`);
                   })
                 }
-                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {role.companyName} · {role.roleTitle}
@@ -670,9 +669,9 @@ function ApplicationRow({
     <>
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-medium text-accent">
+        <Chip tone="accent" size="sm">
           Created from email
-        </span>
+        </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
@@ -703,7 +702,7 @@ function ApplicationRow({
         </Button>
         <Link
           href={`/jobs/roles/${row.roleId}`}
-          className="text-ui font-medium text-accent hover:underline"
+          className={cn(linkVariants(), 'text-ui font-medium')}
         >
           Edit the details
         </Link>
@@ -764,9 +763,9 @@ function EventRow({
     <>
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-ink">
+        <Chip tone="caution" size="sm">
           Arrived after it closed
-        </span>
+        </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
