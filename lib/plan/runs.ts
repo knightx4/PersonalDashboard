@@ -45,6 +45,7 @@ import {
   type RunStatus,
   type StoredRunReading,
 } from './run-end';
+import { runMarker } from './auto-line';
 import { commitSubjects, listPushes } from './ci';
 import type { RunRaise } from './work';
 import {
@@ -159,20 +160,29 @@ export async function startRoutineRun(input: {
   text?: string | null;
   fetch?: typeof globalThis.fetch;
 }): Promise<FireRoutineResult> {
+  // The id is made before the fire so the brief can carry it: the session's
+  // run-line hook reads it there to know which run its lines belong to
+  // (lib/plan/auto-line.ts). The row is still written after the fire, which
+  // is what decides whether it reads started or failed.
+  const id = crypto.randomUUID();
+  const text = [input.text?.trim(), runMarker(id)].filter(Boolean).join('\n\n');
   const result = await fireFeatureRoutine({
     apiKey: input.routine.token,
     routineId: input.routine.id,
-    text: input.text,
+    text,
     fetch: input.fetch,
   });
 
-  const row = runRowFor({
-    userId: input.userId,
-    job: input.job,
-    routineId: input.routine.id,
-    planItemId: input.planItemId,
-    result,
-  });
+  const row = {
+    id,
+    ...runRowFor({
+      userId: input.userId,
+      job: input.job,
+      routineId: input.routine.id,
+      planItemId: input.planItemId,
+      result,
+    }),
+  };
 
   const { error } = await input.supabase.from('plan_runs').insert(row);
   if (error) {
@@ -254,12 +264,14 @@ export async function endQuietRuns(input: {
   // run to those, as before there were lines.
   let lines = new Map<string, string>();
   try {
-    lines = await (input.readLines ??
-      ((ids) => readLastLines(input.supabase.schema('core') as never, 'plan_runs', ids)))(
-      started.map((row) => row.id),
-    );
+    lines = await (
+      input.readLines ??
+      ((ids) => readLastLines(input.supabase.schema('core') as never, 'plan_runs', ids))
+    )(started.map((row) => row.id));
   } catch (err) {
-    console.error(`the runs' last lines could not be read: ${err instanceof Error ? err.message : 'failed'}`);
+    console.error(
+      `the runs' last lines could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+    );
   }
 
   // Only the steps these runs name, and only the two columns that say one is
@@ -474,7 +486,9 @@ export async function readRunWork(
     const rows = await readAll<Row>((from, to) =>
       supabase
         .from('plan_items')
-        .select('id, parent_id, number, position, status, created_at, updated_at, completed_at, blocked_at, commit_sha')
+        .select(
+          'id, parent_id, number, position, status, created_at, updated_at, completed_at, blocked_at, commit_sha',
+        )
         .eq('user_id', userId)
         .order('id', { ascending: true })
         .range(from, to),
@@ -520,9 +534,9 @@ export async function readRunWork(
       .is('parent_id', null)
       .gte('created_at', earliest);
     if (error) throw new Error(`plan_items: ${error.message}`);
-    topLevel = ((data ?? []) as Array<{ id: string; created_at: string; detail: string | null }>).map(
-      (row) => ({ id: row.id, createdAt: row.created_at, detail: row.detail }),
-    );
+    topLevel = (
+      (data ?? []) as Array<{ id: string; created_at: string; detail: string | null }>
+    ).map((row) => ({ id: row.id, createdAt: row.created_at, detail: row.detail }));
   }
 
   // Which of those rows an idea now points at: an idea that was shaped.
@@ -957,7 +971,9 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
     if (status !== 'finished' && status !== 'failed') going.set(stepId, runId);
   }
   if (going.size > 0) {
-    const lines = await readLastLines(supabase.schema('core') as never, 'plan_runs', [...going.values()]);
+    const lines = await readLastLines(supabase.schema('core') as never, 'plan_runs', [
+      ...going.values(),
+    ]);
     for (const [stepId, runId] of going) last[stepId].lastLineAt = lines.get(runId) ?? null;
   }
   return last;
