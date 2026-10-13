@@ -8,7 +8,7 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
-import { NOTES_WORK_KINDS, OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { NOTES_WORK_KINDS, NOT_MOVED_TO_IDEAS, OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -103,6 +103,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .in('status', [...OUTSTANDING_STATUSES])
+        .or(NOT_MOVED_TO_IDEAS)
         .in('kind', [...NOTES_WORK_KINDS])
         .then((r) => r.count),
       null,

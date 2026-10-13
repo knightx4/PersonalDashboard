@@ -132,12 +132,14 @@ export function FeedbackButton({
       setTriage({ id: filedId, view });
       setPlacement({ noteId: filedId, as: ideaId ? 'idea' : 'note', ideaId });
     };
-    void triageFiled({ table: filedTable, id: filedId })
+    void triageFiled({ table: filedTable, id: filedId, pagePath: pathname })
       .then((result) => settle(result?.view ?? null, result?.ideaId ?? null))
       .catch(() => settle(null, null));
     return () => {
       cancelled = true;
     };
+    // The page it was filed from, read when it saved rather than tracked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filedId, filedTable]);
   const triaged = filedId !== null && triage?.id === filedId ? triage.view : null;
   const triaging = Boolean(filedId && triage?.id !== filedId);

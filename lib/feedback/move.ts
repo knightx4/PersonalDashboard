@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MOVED_TO_IDEAS } from '@/lib/feedback/load';
 import { isSure, triageFrom, triageLine, type Triage } from '@/lib/feedback/triage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -23,7 +24,7 @@ export type FiledAs = 'note' | 'idea';
 
 /** The resolution a note moved to the ideas page carries. */
 export function movedResolution(body: string): string {
-  return `Moved to the ideas page as the idea “${triageLine(body)}”.`;
+  return `${MOVED_TO_IDEAS} as the idea “${triageLine(body)}”.`;
 }
 
 /** Whether triage is sure this note is work to plan. An unsure answer stays a note. */

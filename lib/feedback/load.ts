@@ -75,7 +75,29 @@ export const OUTSTANDING_STATUSES = [
 ] as const;
 
 export function isOutstanding(row: FeedbackRow): boolean {
-  return (OUTSTANDING_STATUSES as readonly string[]).includes(row.status);
+  return (OUTSTANDING_STATUSES as readonly string[]).includes(row.status) && !isMovedToIdeas(row);
+}
+
+/**
+ * How a note moved to the ideas page starts its resolution, whether triage
+ * moved it (`movedResolution` in lib/feedback/move.ts) or a notes run did.
+ */
+export const MOVED_TO_IDEAS = 'Moved to the ideas page';
+
+/**
+ * A note that now lives on the ideas page as an idea. It stays `planned` so a
+ * flip can bring it back, but it is not waiting in the queue, so the queue
+ * lists it under Closed rather than as an outstanding request (note 43f91515).
+ */
+/**
+ * The same test as a PostgREST `or` filter, for the counts that ask the
+ * database rather than reading rows: `.or(NOT_MOVED_TO_IDEAS)`.
+ */
+export const NOT_MOVED_TO_IDEAS =
+  `status.neq.planned,resolution_note.is.null,resolution_note.not.like."${MOVED_TO_IDEAS}*"`;
+
+export function isMovedToIdeas(row: Pick<FeedbackRow, 'status' | 'resolutionNote'>): boolean {
+  return row.status === 'planned' && (row.resolutionNote ?? '').startsWith(MOVED_TO_IDEAS);
 }
 
 /**
