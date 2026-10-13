@@ -364,6 +364,49 @@ takes.
 Other workspaces follow the same rule when a step next changes them. A step
 that adds a job to a workspace names which of the three it is.
 
+## Part 10: Diagrams and charts
+
+Laws 4 and 7 keep colour and expression out of the data. That suits a table
+of figures and leaves a chart with nothing to point with. Idea Space, built on
+12 October 2026, followed every law and read worse than the sketch it was
+built from: known ideas in black, unseen ideas as specks, labels heavier than
+the marks, and nothing faded when an idea was picked. This part says how a
+chart, a map or a diagram is drawn, and the critic reads it for any surface
+that has one.
+
+1. **One question, one accent.** A chart answers one question, and the
+   accent marks the answer: the series, marks or region the question is
+   about. Everything else is ink, gray or hollow. Inside a chart this is what
+   the accent means, an extension of law 4 written into `app/dev/ui/laws.ts`.
+2. **Absence is drawn.** Anything unknown, untested, empty or not visited is
+   a hollow outline at nearly the size of a filled mark, so empty ground
+   reads as ground. It is never left out and never shrunk to a speck.
+3. **Picking focuses.** Picking a mark fades every unrelated mark to about a
+   quarter of its strength and draws what relates to it in the accent.
+   Picking empty ground clears it.
+4. **Labels are quiet.** Chart text is a step smaller than body text, in
+   regular weight and the muted ink, and never sits on a mark. About seven
+   labels show at once; the rest show on hover or tap. A label heavier than
+   the data it names is a fault.
+5. **Axes say what they mean,** in words at each end, such as "economics"
+   against "history", as well as in units. An axis with no meaning, as in a
+   force layout, is named as such in the caption.
+6. **Structure sits under the data.** Gridlines, frames and guides are
+   dashed or dotted hairlines in the lightest border colour, beneath the marks.
+7. **A caption says what the chart shows** and how far to trust it, in one or
+   two sentences under it. That is a finding, so law 15 does not forbid it.
+8. **A hover or tap answers in the same frame,** from data already on the
+   page. The address updates after it (law 5).
+9. **Marks are big enough to see:** at least 4 pixels across at any width,
+   and the ones that matter most a step larger.
+10. **Past three categories, colour gets help.** The limit of three hues on
+    one chart, kept for readers with red-green colour blindness, stands. The
+    other categories are told apart by direct labels, shapes, or tapping a
+    legend entry to highlight its marks, rather than sharing one gray.
+
+The Idea Space sketch the person preferred, at
+https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -405,6 +448,15 @@ Checked by: audit.
 Checked by: audit.
 
 **R11.** A workspace page does not keep a chart that Dash made in a reply.
+Checked by: audit.
+
+**R12.** In a chart, the accent marks only what the chart's question is about.
+Checked by: audit.
+
+**R13.** A chart draws missing or unvisited items as hollow marks, and no label covers a mark.
+Checked by: audit.
+
+**R14.** Picking a mark in a chart fades the marks unrelated to it.
 Checked by: audit.
 
 ## Decisions
@@ -455,5 +507,6 @@ for is screens that need one round of the person's notes, not five.
 
 ## What this does not do
 
-It does not change the design laws, replace `check:ui`, or redesign existing
+Apart from Part 10 extending law 4 to charts, it does not change the design
+laws. It does not replace `check:ui` or redesign existing
 screens on its own. Existing screens improve as steps touch them.
