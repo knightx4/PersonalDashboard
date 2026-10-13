@@ -80,6 +80,16 @@ describe('the stream', () => {
     expect(result).toEqual({ turns: [], stop: 'answered' });
   });
 
+  it('hands each piece of the answer to onText in order, and still returns the result', async () => {
+    const lines = [{ text: 'You spent ' }, { text: '$412.60.' }, { result: { turns: [], stop: 'answered' } }]
+      .map((line) => JSON.stringify(line))
+      .join('\n');
+    const pieces: string[] = [];
+    const result = await readAskStream(streamOf([lines.slice(0, 7), lines.slice(7)]), () => {}, (piece) => pieces.push(piece));
+    expect(pieces).toEqual(['You spent ', '$412.60.']);
+    expect(result).toEqual({ turns: [], stop: 'answered' });
+  });
+
   it('says the answer stopped when the stream ends without one', async () => {
     const result = await readAskStream(streamOf(['{"lookup":']), () => {});
     expect(result.error).toBe(STREAM_CUT);

@@ -140,6 +140,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
+  'ask-dash-writing': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],
   'ask-dash-page': ['/goals', '/ask'],
   'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],

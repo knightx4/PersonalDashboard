@@ -12,7 +12,8 @@ import { CHART_TOOL } from './chart';
  * streamed is the line a reopened answer shows.
  *
  * The lines travel from app/api/ask/route.ts as newline-delimited JSON: one
- * `lookup` line per event, then one `result` line with the AskDashResult the
+ * `lookup` line per event, `text` lines with the answer's words as they are
+ * written (plan #1902), then one `result` line with the AskDashResult the
  * server action returns. Nothing here reads a database or the network, so the
  * browser imports it.
  */
@@ -36,7 +37,12 @@ export type LookupWire = {
   found?: number | null;
 };
 
-export type AskStreamLine = { lookup: LookupWire } | { result: AskDashResult };
+/**
+ * One line of the stream: a lookup starting or finishing, a piece of the
+ * answer's text as Dash writes it (plan #1902), each following the last, or
+ * the result, which carries the answer as kept.
+ */
+export type AskStreamLine = { lookup: LookupWire } | { text: string } | { result: AskDashResult };
 
 /**
  * The write tools (lib/dash/writes.ts, plan #1440), named here because this
@@ -221,13 +227,15 @@ export function encodeStreamLine(line: AskStreamLine): string {
 }
 
 /**
- * Reads the stream to its result, handing each lookup to `onLookup` as it
- * arrives. A stream that ends without a result is a failed answer, said in a
- * sentence; it never throws for that.
+ * Reads the stream to its result, handing each lookup to `onLookup` and each
+ * piece of the answer's text to `onText` as they arrive. A stream that ends
+ * without a result is a failed answer, said in a sentence; it never throws
+ * for that.
  */
 export async function readAskStream(
   body: ReadableStream<Uint8Array>,
   onLookup: (wire: LookupWire) => void,
+  onText?: (piece: string) => void,
 ): Promise<AskDashResult> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -243,9 +251,10 @@ export async function readAskStream(
       return;
     }
     if ('result' in parsed) result = parsed.result;
-    else if ('lookup' in parsed) {
+    else {
       try {
-        onLookup(parsed.lookup);
+        if ('lookup' in parsed) onLookup(parsed.lookup);
+        else if ('text' in parsed && typeof parsed.text === 'string') onText?.(parsed.text);
       } catch {
         // A listener that throws must not lose the answer.
       }

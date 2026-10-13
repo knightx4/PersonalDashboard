@@ -224,6 +224,7 @@ import {
   AskMadeChangesSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
+  WRITING_QUESTION,
 } from './ask-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
@@ -4724,6 +4725,20 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <AskDashSurface open question="What did I spend on eBay flips this quarter?">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* An answer being written (plan #1902): the lookup that ran sits under
+     * Dash's name, and the answer's first sentences follow it as they arrive,
+     * the mark showing Dash writing. The fixture holds it there. */
+    id: 'ask-dash-writing',
+    label: 'Ask Dash · An answer being written',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open question={WRITING_QUESTION}>
         <PreviewShell />
       </AskDashSurface>
     ),

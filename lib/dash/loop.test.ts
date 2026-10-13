@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import { dateLine, LOOK_FIRST, runDash, type DashContext, type DashVoice } from './loop';
+import { answerSoFar, dateLine, LOOK_FIRST, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
 
 /**
@@ -172,6 +172,122 @@ describe('a voice with server tools and its own ending (plan #1479, Maya)', () =
     ]);
     const answer = await runDash({ voice: maya, context, turns, today: '2026-10-03', execute, anthropicApiKey: 'k', client: stub });
     expect(answer.ok).toBe(false);
+  });
+});
+
+describe('answerSoFar', () => {
+  it('reads the answer field as far as it has arrived, escapes decoded', () => {
+    expect(answerSoFar('')).toBe('');
+    expect(answerSoFar('{"answ')).toBe('');
+    expect(answerSoFar('{"answer": "')).toBe('');
+    expect(answerSoFar('{"answer": "You spent')).toBe('You spent');
+    expect(answerSoFar('{"answer":"Line one\\nThe \\"Catan\\" lot')).toBe('Line one\nThe "Catan" lot');
+    expect(answerSoFar('{"answer": "caf\\u00e9 done", "cited": [')).toBe('café done');
+  });
+
+  it('holds back an escape cut in half, so what it returns only grows', () => {
+    expect(answerSoFar('{"answer": "a\\')).toBe('a');
+    expect(answerSoFar('{"answer": "a\\u00')).toBe('a');
+  });
+
+  it('reads the top level only, past fields written before it', () => {
+    const json = '{"cited": [{"table": "t", "ref": "{\\"answer\\": \\"no\\"}"}], "answer": "Yes';
+    expect(answerSoFar(json)).toBe('Yes');
+    expect(answerSoFar('{"cited": [{"table": "t"')).toBe('');
+  });
+});
+
+describe('runDash with onText', () => {
+  /** A client whose stream plays each round's events and ends with its message. */
+  function streaming(rounds: { events: unknown[]; message: unknown }[]) {
+    const sent: { tools: { name: string; eager_input_streaming?: boolean }[] }[] = [];
+    const stub = {
+      messages: {
+        create: async () => {
+          throw new Error('a streamed run must not make a plain request');
+        },
+        stream: (params: { tools: { name: string }[] }) => {
+          sent.push(structuredClone(params));
+          const round = rounds[sent.length - 1];
+          const heard: ((event: unknown) => void)[] = [];
+          return {
+            on(name: string, fn: (event: unknown) => void) {
+              if (name === 'streamEvent') heard.push(fn);
+              return this;
+            },
+            async finalMessage() {
+              for (const event of round.events) for (const fn of heard) fn(event);
+              return round.message;
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    return { stub, sent };
+  }
+
+  const start = (id: string, name: string) => ({
+    type: 'content_block_start',
+    index: 0,
+    content_block: { type: 'tool_use', id, name, input: {} },
+  });
+  const delta = (partial_json: string) => ({
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'input_json_delta', partial_json },
+  });
+
+  it('hands out the answer as it is written, and returns the answer as kept', async () => {
+    const { stub, sent } = streaming([
+      {
+        events: [start('a1', 'answer'), delta('{"answer": "You sp'), delta('ent $41'), delta('2.60 on \\"flips\\".", "cited": []}')],
+        message: call('a1', 'answer', { answer: 'You spent $412.60 on "flips".', cited: [] }),
+      },
+    ]);
+    const heard: string[] = [];
+    const answer = await runDash({
+      voice,
+      context,
+      turns,
+      today: '2026-10-03',
+      execute: vi.fn(),
+      anthropicApiKey: 'k',
+      client: stub,
+      onText: (piece) => heard.push(piece),
+    });
+    expect(heard).toEqual(['You sp', 'ent $41', '2.60 on "flips".']);
+    expect(answer.ok && answer.body).toBe('You spent $412.60 on "flips".');
+    const tools = sent[0].tools;
+    expect(tools.find((t) => t.name === 'answer')?.eager_input_streaming).toBe(true);
+    expect(tools.find((t) => t.name === 'todos')?.eager_input_streaming).toBeUndefined();
+  });
+
+  it('says nothing for a lookup round, and a listener that throws loses nothing', async () => {
+    const { stub } = streaming([
+      { events: [start('t1', 'todos'), delta('{"answer": "no"}')], message: call('t1', 'todos', {}) },
+      {
+        events: [start('a1', 'answer'), delta('{"answer": "None due."')],
+        message: call('a1', 'answer', { answer: 'None due.', cited: [] }),
+      },
+    ]);
+    const execute = vi.fn(async () => ({ ok: true as const, rows: [] }));
+    const heard: string[] = [];
+    const answer = await runDash({
+      voice,
+      context,
+      turns,
+      today: '2026-10-03',
+      execute,
+      anthropicApiKey: 'k',
+      client: stub,
+      onText: (piece) => {
+        heard.push(piece);
+        throw new Error('listener broke');
+      },
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(heard).toEqual(['None due.']);
+    expect(answer.ok && answer.body).toBe('None due.');
   });
 });
 

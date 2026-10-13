@@ -257,7 +257,11 @@ Dash on a role page can be recalled from Ask a week later.
 
 **Limits.** The time budget is set to fit the route's `maxDuration`, and the
 lookups stream to the page as they run, which are #1437 and #1438 and are built
-first.
+first. Ask's answer streams too (#1902): the loop's `onText` hands out the
+`answer` call's text as the model writes it, the route sends each piece as a
+`text` line after the lookups, and the `result` line still carries the saved
+turn, which replaces the draft. Threads on rows share the loop and do not
+stream yet.
 
 **Maya** is the second decision below.
 
