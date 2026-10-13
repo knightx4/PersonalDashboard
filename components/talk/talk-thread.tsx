@@ -242,6 +242,7 @@ export function TalkThread({
   activity,
   incoming,
   working,
+  written = '',
   onCard = false,
   withFiles = false,
   sendHint,
@@ -302,6 +303,12 @@ export function TalkThread({
    * for an Ask Dash answer, as each lookup starts (plan #1438).
    */
   working?: React.ReactNode;
+  /**
+   * The reply as far as it has been written, while it is coming (plan
+   * #1902): drawn under `working` in place of the waiting line, the way the
+   * finished turn draws it, and replaced by the saved turn when it lands.
+   */
+  written?: string;
   /**
    * The caller has put the thread on a card of its own. Dash's turns then
    * take the recessed ground, so his words look different from yours at a
@@ -424,18 +431,27 @@ export function TalkThread({
             />
           ))}
           {sending && (
-            <li className="flex gap-2" aria-live="polite">
+            <li className="flex gap-2" aria-live="polite" aria-busy={written ? true : undefined}>
               <div className="flex w-4 shrink-0 justify-center pt-1">
                 <AuthorMark
                   role="assistant"
                   assistant={assistant}
                   state="working"
-                  activity={activity}
+                  activity={written ? 'writing' : activity}
                 />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>
+                {written ? (
+                  <span className="block text-small font-semibold text-ink">{assistant.name}</span>
+                ) : (
+                  <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>
+                )}
                 {working}
+                {written && (
+                  <div className="text-body text-ink">
+                    <CommentBody body={written} refs={false} />
+                  </div>
+                )}
               </div>
             </li>
           )}

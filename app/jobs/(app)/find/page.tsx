@@ -1,9 +1,7 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { formatDate, loadPipeline } from '@/lib/jobs/applications/load';
-import { loadLearningTracks } from '@/lib/jobs/learning/load';
-import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadPipeline } from '@/lib/jobs/applications/load';
 import { loadOperationCost } from '@/lib/core/spend/load';
 import {
   loadJobPreferences,
@@ -28,17 +26,14 @@ export const metadata = { title: 'Find' };
 export const maxDuration = 300;
 
 /**
- * Find: what the search is aiming at, and what Dash found that fits it
- * (plan #1589).
+ * Find: what the search is aiming at, and the roles, companies and people
+ * Dash found that fit it (plan #1589).
  *
- * The target titles and the industries never to suggest, which were in
- * Settings, lead the page. The recommended roles, which were above the Roles
- * table, the startups discovery found (feature #1679), and the people to
- * meet, which were above Contacts, follow. Career
- * goals, which was its own tab, closes it (decision #1585): the dated
- * entries (job_search.thoughts, 0026) and the learning tracks suggested from
- * them (job_search.learning_tracks, 0027). Goals reads the entries through
- * the sources catalogue, which links a row here.
+ * The target titles and the industries never to suggest lead the page. The
+ * recommended roles, the startups discovery found (feature #1679) and the
+ * people to meet follow. Find holds only what helps find the next job: the
+ * career goals entries the searches read are written on Settings, and the
+ * learning tracks once suggested from them are no longer offered here.
  */
 export default async function FindPage({
   searchParams,
@@ -49,7 +44,6 @@ export default async function FindPage({
   const user = await requireUser();
   const supabase = await createClient();
   const core = await createCoreClient();
-  const learn = await createLearnClient();
   const params = await searchParams;
 
   const [
@@ -61,8 +55,7 @@ export default async function FindPage({
     searchCost,
     latestRun,
     { data: profile },
-    { data: thoughts },
-    tracks,
+    goalEntries,
     discovered,
     discoveryRun,
     resume,
@@ -77,19 +70,12 @@ export default async function FindPage({
     loadLatestRun(supabase, user.id, 'apply'),
     supabase
       .from('profiles')
-      .select('timezone, target_titles, excluded_industries, min_fit_score')
+      .select('target_titles, excluded_industries, min_fit_score')
       .eq('id', user.id)
       .single(),
-    supabase
-      .from('thoughts')
-      .select('id, body, created_at, updated_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
-    // A failed read hides the section rather than failing the page.
-    loadLearningTracks(supabase, learn, user.id).catch((error) => {
-      console.error('[jobs find] learning tracks', error);
-      return null;
-    }),
+    // Only counted: the setup list asks for a career goals entry until
+    // there is one, and links to Settings where they are written.
+    supabase.from('thoughts').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     // A failed read shows the section empty rather than failing the page.
     loadJobPreferences(supabase, user.id).then((prefs) => loadDiscoveredCompanies(supabase, user.id, prefs)).catch((error) => {
       console.error('[jobs find] discovered companies', error);
@@ -110,13 +96,6 @@ export default async function FindPage({
     withOpeningNotes(openings, historyFromPipeline(pipeline)),
     preferences,
   );
-  const timezone = (profile?.timezone as string | null) ?? 'UTC';
-  const entries = (thoughts ?? []) as Array<{
-    id: string;
-    body: string;
-    created_at: string;
-    updated_at: string;
-  }>;
 
   return (
     <>
@@ -128,7 +107,7 @@ export default async function FindPage({
           gaps: setupGaps({
             preferences,
             targetTitles: (profile?.target_titles as string[] | null) ?? [],
-            goalEntries: entries.length,
+            goalEntries: goalEntries.count ?? 0,
             hasResume: !!resume.data,
             jevOn,
             minFitScore: readMinFitScore(profile?.min_fit_score),
@@ -145,18 +124,6 @@ export default async function FindPage({
         }}
         companies={{ companies: discovered, status: describeDiscovery(discoveryRun) }}
         people={people}
-        tracks={tracks}
-        thoughts={entries.map((row) => ({
-          id: row.id,
-          body: row.body,
-          written: formatDate(row.created_at, timezone),
-          // A minute's grace, because the insert and its trigger stamp both
-          // columns a few microseconds apart.
-          edited:
-            new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
-              ? formatDate(row.updated_at, timezone)
-              : null,
-        }))}
       />
     </>
   );

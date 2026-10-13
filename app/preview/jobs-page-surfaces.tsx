@@ -1,7 +1,6 @@
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
-import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -9,11 +8,9 @@ import { CasePageView, type CasePage } from '@/components/jobs/case-page';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
 import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
-import { ThoughtList } from '@/app/jobs/(app)/find/thoughts';
-import { LearningTracks } from '@/app/jobs/(app)/find/tracks';
+import { ThoughtList } from '@/app/jobs/(app)/settings/career-goals';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
 import { WelcomeForm } from '@/app/jobs/(onboarding)/onboarding/forms';
-import { SONNET } from '@/lib/core/models';
 import type { Activity, ActivityEntry } from '@/lib/jobs/activity/load';
 import {
   RESPONSE_WINDOW_DAYS,
@@ -442,71 +439,24 @@ export function JobsAnswersSurface() {
 // ---- Career goals -----------------------------------------------------------
 
 export function JobsThoughtsSurface() {
+  // The career goals section as Settings draws it.
   return (
-    <PaidCostsProvider
-      costs={{
-        'app/jobs/(app)/find/actions.ts#suggestTracks': {
-          lowMicros: 20_000,
-          medianMicros: 40_000,
-          highMicros: 80_000,
-          runs: 2,
-          basis: 'guess',
-          per: 'run',
-          models: [SONNET],
+    <ThoughtList
+      thoughts={[
+        {
+          id: 'th1',
+          body: 'I want a strategic finance role at a company between 200 and 1,000 people, where the planning model is the thing the leadership team argues over. Not another reporting job. I am strongest at building the model and weakest at presenting it, so a role with a CFO who lets me present would be worth a smaller title.',
+          written: 'Oct 2, 2026',
+          edited: 'Oct 4, 2026',
         },
-      }}
-    >
-      {/* Career goals and Learning tracks as the Find page stacks them. */}
-      <div className="space-y-6">
-        <ThoughtList
-          thoughts={[
-            {
-              id: 'th1',
-              body: 'I want a strategic finance role at a company between 200 and 1,000 people, where the planning model is the thing the leadership team argues over. Not another reporting job. I am strongest at building the model and weakest at presenting it, so a role with a CFO who lets me present would be worth a smaller title.',
-              written: 'Oct 2, 2026',
-              edited: 'Oct 4, 2026',
-            },
-            {
-              id: 'th2',
-              body: 'Starting the search. Open to FP&A or strategic finance, fintech or developer tools, New York or remote.',
-              written: 'Jul 1, 2026',
-              edited: null,
-            },
-          ]}
-        />
-        <LearningTracks
-          hasEntries
-          started={[
-            {
-              id: 't1',
-              name: 'Cohort analysis for subscription businesses',
-              about: 'Retention curves, payback and LTV by acquisition channel',
-              depth: 'solid',
-              why: 'Every strategic finance role you described asks for it.',
-              subjectId: 's1',
-              units: 6,
-              gone: false,
-            },
-          ]}
-          suggested={[
-            {
-              id: 't2',
-              name: 'SQL for finance',
-              about: null,
-              depth: 'familiar',
-              why: 'You want to pull your own numbers rather than wait on the data team.',
-            },
-            {
-              id: 't3',
-              name: 'Board-level storytelling with a planning model, from assumptions to the one slide that carries the decision',
-              about: 'Turning a model into the case the leadership team acts on',
-              depth: 'deep',
-              why: 'The next step up is presenting the plan, not only building it.',
-            },
-          ]}
-        />
-      </div>
-    </PaidCostsProvider>
+        {
+          id: 'th2',
+          body: 'Starting the search. Open to FP&A or strategic finance, fintech or developer tools, New York or remote.',
+          written: 'Jul 1, 2026',
+          edited: null,
+        },
+      ]}
+    />
   );
 }
 

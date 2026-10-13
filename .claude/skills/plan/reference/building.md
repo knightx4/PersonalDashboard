@@ -256,6 +256,28 @@ name. A step that changes a page with no surface adds one, and adds its routes
 to `SURFACE_ROUTES` in the same file; `tests/preview-routes.test.ts` fails on
 a surface with no routes. A step that changes no surface skips this section.
 
+**References.** A reference is a design the person prefers for a screen
+(`docs/UI-QUALITY-SPEC.md`, Part 2 and R18), kept by surface id in
+`lib/preview/references.ts`, so every later step on that surface is judged
+against it too. The brief prints a `## Reference` section when the step's
+detail has a `Reference:` line or one of its surfaces already has a reference
+registered; working offline, read the line and `REFERENCES` yourself.
+
+- **Register one the step names**, before round 1. Add an entry under the
+  surface it is for, with `pictures`, `link`, `why` (what the person likes
+  about it, in a sentence, from the step or their note) and `from` (this
+  step's outline). Save its pictures under `docs/references/<surface>/` and
+  list them. A link with no pictures is photographed the first time: open it
+  at 390 and 1280 wide, as the gallery shots are, save the shots there, and
+  list them, so every later round sees the same design whatever the page
+  shows by then. A step that names a reference without saying which surface
+  it is for registers it under the surface the step changes; with several,
+  the one the step's words name. `tests/preview-routes.test.ts` fails on a
+  reference whose surface is not in the gallery or whose pictures are missing.
+- **Send a registered reference to the critic on every round** on its
+  surface, in this step and every later one, as the prompt's `reference`
+  (4 below). A surface with none is sent "none".
+
 **The loop, for each surface:**
 
 1. **Shoot main first.** Before changing anything, photograph the surface as
@@ -313,7 +335,9 @@ a surface with no routes. A step that changes no surface skips this section.
    The prompt names the surface id, the round (1, 2 or 3), the four after
    shots, the before shots or "none", the strip and its JSON or "none", the
    moment from `app/dev/ui/moments.ts` the surface plays (its name and
-   `sees` line) or "none", the step's done-when, the page pattern, and on
+   `sees` line) or "none", the reference registered for the surface in
+   `lib/preview/references.ts` (its picture paths, link and `why`, as
+   `referenceForCritic` prints it) or "none", the step's done-when, the page pattern, and on
    rounds 2 and 3 the fixes from the round before. The
    pattern is the name and rule under the brief's `## Pattern` section.
    Working offline, take the name from the `Pattern:` line of the step's
@@ -324,8 +348,19 @@ a surface with no routes. A step that changes no surface skips this section.
    `/dev/ui`, which the critic must not cite: `select taste_id from
    ui_taste_removals where user_id = '…'`, or "none". It answers with a paragraph and a fenced `json` verdict:
    `verdict` is `pass` or `fix`, and each fix names the shot, where, the
-   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`
-   or `regression`) and the change.
+   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`,
+   `regression`, `question:eye` or `reference`) and the change. A screen
+   that keeps every law but reads worse than its reference fails with a
+   `reference` fix naming what the reference does better; where the
+   reference breaks a law, the law wins. Every verdict also
+   answers three questions under `questions`, each with an `answer` and an
+   `ok`: `eye`, where the eye goes first and whether that is what the screen
+   is for; `competition`, whether anything such as a label, outline or
+   heading competes with the data; and `lines`, whether the lines are
+   lighter than the text (UI-QUALITY-SPEC Part 2, R19). A screen with no
+   clear answer to the first fails. The prompt asks for all three; a
+   verdict that comes back without them goes back to the critic, since the
+   recorder refuses it.
 5. **Record the round** (below), whatever the verdict.
 6. **On `fix`, make every change it asks for**, shoot again and start the next
    round. Most surfaces fail round 1. A fix you think is wrong is still the
@@ -388,11 +423,12 @@ you make its fixes:
    ```
 
    It checks the file is the critic's shape and is for that surface and
-   round, keeps a copy of the four shots beside it as
+   round, refusing one that leaves out any of the three questions or passes
+   a screen whose `eye` answer is not `ok`, keeps a copy of the four shots beside it as
    `<step>--<surface>--r<round>--<shot>.png` (the next shoot overwrites the
    originals), and writes one row to `public.ui_checks`: step, surface,
    round, verdict, the fixes and the `earlier` list as the critic wrote them,
-   its notes, and the shots' paths in the private `ui-shots` bucket. A round
+   its notes, the three answers in `questions`, and the shots' paths in the private `ui-shots` bucket. A round
    recorded twice is replaced, not duplicated.
 
 What the recorder can reach depends on the session:

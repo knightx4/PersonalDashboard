@@ -100,7 +100,24 @@ export type TokenUsage = {
    * on a call that offered no search, which is read as none.
    */
   webSearchRequests?: number;
+  /**
+   * Sent through the Message Batches API, which bills tokens at half the
+   * rates above (BATCH_TOKEN_RATE). Absent on a live call.
+   */
+  batch?: true;
 };
+
+/**
+ * What a Message Batches call pays per token, as a share of the live rate.
+ * Only the tokens are halved here. The web search fee is kept at its full
+ * rate, so a batch that searched can read high but never low.
+ */
+export const BATCH_TOKEN_RATE = 0.5;
+
+/** The same usage, marked as billed through the Message Batches API. */
+export function asBatch(usage: TokenUsage): TokenUsage {
+  return { ...usage, batch: true };
+}
 
 export const EMPTY_USAGE: TokenUsage = {
   inputTokens: 0,
@@ -121,12 +138,13 @@ export function costMicrosFor(model: string, usage: TokenUsage): number | null {
   const promptTokens = usage.inputTokens + usage.cachedInputTokens + usage.cacheWriteTokens;
   const price = card.longPrompt && promptTokens > card.longPrompt.aboveTokens ? card.longPrompt : card;
 
-  const micros =
+  const tokens =
     usage.inputTokens * price.input +
     usage.cachedInputTokens * price.cachedInput +
     usage.cacheWriteTokens * price.cacheWrite +
-    usage.outputTokens * price.output +
-    (usage.webSearchRequests ?? 0) * WEB_SEARCH_MICROS;
+    usage.outputTokens * price.output;
+  const micros =
+    tokens * (usage.batch ? BATCH_TOKEN_RATE : 1) + (usage.webSearchRequests ?? 0) * WEB_SEARCH_MICROS;
 
   return Math.round(micros);
 }
@@ -191,14 +209,16 @@ export type SpendSink = (report: SpendReport) => void;
 
 /**
  * One report per model, so a batch Jev answered item by item records one
- * spend row rather than twenty.
+ * spend row rather than twenty. Batch and live calls on the same model stay
+ * apart, since they are priced differently.
  */
 export function sumByModel(reports: SpendReport[]): SpendReport[] {
   const byModel = new Map<string, SpendReport>();
   for (const report of reports) {
-    const seen = byModel.get(report.model);
+    const key = report.usage.batch ? `${report.model}\u0000batch` : report.model;
+    const seen = byModel.get(key);
     if (!seen) {
-      byModel.set(report.model, { model: report.model, usage: { ...report.usage } });
+      byModel.set(key, { model: report.model, usage: { ...report.usage } });
       continue;
     }
     seen.usage.inputTokens += report.usage.inputTokens;

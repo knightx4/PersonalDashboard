@@ -45,7 +45,7 @@ export function setupGaps(state: SetupState): SetupGap[] {
     gaps.push({
       key: 'goals',
       text: 'No career goals entry is written, so the searches know only your titles and CV.',
-      href: '/jobs/find#career-goals',
+      href: '/jobs/settings#career-goals',
     });
   }
   if (!state.hasResume) {

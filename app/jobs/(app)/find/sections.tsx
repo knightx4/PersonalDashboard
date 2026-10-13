@@ -40,7 +40,7 @@ import {
   suggestOpenings,
   suggestPeople,
   type SuggestState,
-} from './actions';
+} from './recommend-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { LinkedText } from '@/components/ui/linked-text';
 
@@ -198,7 +198,7 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
       searching="Searching…"
       paidHint={
         <PaidHint
-          action="app/jobs/(app)/recommend/actions.ts#suggestPeople"
+          action="app/jobs/(app)/find/recommend-actions.ts#suggestPeople"
           what="Cost of a search for people"
           align="end"
         />
@@ -253,7 +253,7 @@ export function RecommendedRoles({
       searching="Searching…"
       paidHint={
         <PaidHint
-          action="app/jobs/(app)/recommend/actions.ts#suggestOpenings"
+          action="app/jobs/(app)/find/recommend-actions.ts#suggestOpenings"
           what="Cost of a search for roles"
           align="end"
         />

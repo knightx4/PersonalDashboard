@@ -13,7 +13,7 @@ import { readPreferences } from './preferences';
  * Score the open recommended roles that have not been scored yet (plan #1178).
  *
  * Called after the daily suggestion run for every account that agreed to Jev,
- * and after the search button on Roles, so an opening from a goals run, which
+ * and after the roles search button on Find, so an opening from a goals run, which
  * writes its row in plain SQL, is scored on the next day's run. `rescore`
  * scores every open opening again, for a change to the questions.
  *
