@@ -6,6 +6,7 @@ import { dashToolsOf } from '@/lib/dash/registry';
 import type { ConnectorAccess } from './access';
 import { checkConnectorRate, recordConnectorCall, type ConnectorCall } from './calls';
 import type { ConnectorRefusal } from './token';
+import { CONNECTOR_WRITE_TOOLS, runConnectorWrite, type ConnectorWriteContext, type ConnectorWriteTool } from './writes';
 
 /**
  * The connector's MCP server (plan #1256): Dash's read lookups offered
@@ -13,6 +14,10 @@ import type { ConnectorRefusal } from './token';
  * request. The route verifies the token with connectorAccess() and hands the
  * result in here; every tool call is then capped, run and logged as the
  * token's holder.
+ *
+ * Beside the lookups, a few named Learn writes (plan #1808, lib/connector/
+ * writes.ts). The token still cannot write; the route hands in `write`, which
+ * makes the service-role context those tools run on for the verified person.
  *
  * Nothing here reads the environment or makes a client, so the tests drive
  * the whole handler with a stubbed access and a stubbed database.
@@ -90,7 +95,11 @@ export function metadataOptionsResponse(): Response {
  * the token, plus `log`, the service-role core client its calls are recorded
  * through.
  */
-export type ConnectorSession = Extract<ConnectorAccess, { ok: true }> & { log: SchemaClient };
+export type ConnectorSession = Extract<ConnectorAccess, { ok: true }> & {
+  log: SchemaClient;
+  /** The service-role context a write runs on, for this person. Absent: the writes are refused. */
+  write?: (userId: string) => ConnectorWriteContext;
+};
 
 /** A lookup's result with each link made absolute, so it opens from wherever the client shows it. */
 function withAbsoluteLinks(result: Extract<AskToolResult, { ok: true }>, origin: string) {
@@ -140,6 +149,33 @@ export async function runConnectorTool(
   return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
 }
 
+/**
+ * One write call, the way runConnectorTool runs a lookup: the cap, the write,
+ * then the log. Rows come back with absolute links.
+ */
+export async function runConnectorWriteTool(
+  session: ConnectorSession,
+  tool: ConnectorWriteTool,
+  input: unknown,
+  origin: string,
+  now?: number,
+): Promise<CallToolResult> {
+  const { caller, core, log } = session;
+  const who = { userId: caller.userId, clientId: caller.clientId, tool: tool.definition.name, input };
+
+  const rate = await checkConnectorRate(core, caller.userId, now);
+  if (!rate.ok) {
+    await logCall(log, { ...who, limited: rate.message });
+    return text(rate.message, true);
+  }
+
+  const result = session.write
+    ? await runConnectorWrite(tool, session.write(caller.userId), input)
+    : ({ ok: false, error: 'Changes cannot be made through this connection.' } as const);
+  await logCall(log, { ...who, result });
+  return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
+}
+
 /** Where the verified session rides from the route to the tool calls. */
 const SESSION_KEY = 'connectorSession';
 
@@ -171,6 +207,21 @@ export function registerAskTools(server: McpServer): void {
       },
     );
   }
+  for (const tool of CONNECTOR_WRITE_TOOLS) {
+    server.registerTool(
+      tool.definition.name,
+      {
+        description: tool.definition.description,
+        inputSchema: fromJsonSchema<Record<string, unknown>>(tool.definition.input_schema as Parameters<typeof fromJsonSchema>[0]),
+        // Adds and updates the person's own rows, each listed on Home with an Undo.
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      },
+      async (args, ctx) => {
+        const origin = ctx.http?.req ? getPublicOrigin(ctx.http.req) : '';
+        return runConnectorWriteTool(sessionOf(ctx.http?.authInfo?.extra), tool, args, origin);
+      },
+    );
+  }
 }
 
 const handler = createMcpHandler(registerAskTools, {
@@ -182,24 +233,26 @@ const handler = createMcpHandler(registerAskTools, {
   // limit that way. Without it, a listen is acknowledged and closed at once.
   capabilities: { tools: { listChanged: false } },
   instructions:
-    "Read-only lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard.",
+    "Lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, their Learn reading list and what they have studied, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard. Three tools change Learn: add_to_reading_list when they ask to save something to read, log_learning when they ask to record what a conversation covered, and mark_read when they say they finished something.",
 });
 
 /**
  * Answer one request to /api/mcp. `access` is connectorAccess on the request's
  * Authorization header; a refusal is the 401 that starts the sign-in. `log`
  * makes the service-role core client the calls are recorded through, and is
- * only called once the token has been verified.
+ * only called once the token has been verified. `write` makes the context the
+ * Learn writes run on for the verified person; without it they are refused.
  */
 export async function serveMcp(
   request: Request,
   access: (authorization: string | null) => Promise<ConnectorAccess>,
   log: () => SchemaClient,
+  write?: (userId: string) => ConnectorWriteContext,
 ): Promise<Response> {
   const origin = getPublicOrigin(request);
   const granted = await access(request.headers.get('authorization'));
   if (!granted.ok) return unauthorizedResponse(origin, granted);
-  const verdict: ConnectorSession = { ...granted, log: log() };
+  const verdict: ConnectorSession = { ...granted, log: log(), ...(write ? { write } : {}) };
 
   request.auth = {
     token: '',

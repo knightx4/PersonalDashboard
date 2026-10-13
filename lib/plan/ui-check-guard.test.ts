@@ -4,6 +4,7 @@ import {
   isScreenFile,
   uiCheckRefusal,
   uiGuardSql,
+  uiSettleSql,
   unpassedSurfaces,
   type GitRunner,
 } from './ui-check-guard';
@@ -133,6 +134,14 @@ describe('filesOfStep', () => {
     expect(calls.find((c) => c[0] === 'log')).toContain('--grep=(plan #12)');
   });
 
+  it('also finds the commits tagged with the step outline', () => {
+    const { git, calls } = fakeGit('abc1234 p1');
+    filesOfStep(1084, 'abc1234', git, '1073.4');
+    const log = calls.find((c) => c[0] === 'log');
+    expect(log).toContain('--grep=(plan #1084)');
+    expect(log).toContain('--grep=(plan #1073.4)');
+  });
+
   it('reads an ordinary commit with show', () => {
     const { git } = fakeGit('abc1234 p1');
     expect(filesOfStep(12, 'abc1234', git)).toEqual(['components/b.tsx', 'lib/a.ts', 'lib/own.ts']);
@@ -164,5 +173,28 @@ describe('uiGuardSql', () => {
     );
     expect(() => uiGuardSql(1, ["a'; select 1"])).toThrow();
     expect(() => uiGuardSql(1, ['a'], "x' or 1=1")).toThrow();
+  });
+});
+
+describe('uiSettleSql', () => {
+  it('writes an accepted round for each surface still waiting, marked as settled by Dash', () => {
+    const sql = uiSettleSql(42, ['news-saved', 'news-home'], 'the critic stopped at round 3 with 1 fix open');
+    expect(sql).toContain("array['news-saved', 'news-home']");
+    expect(sql).toContain("'accepted'");
+    expect(sql).toContain('$r$Settled by Dash: the critic stopped at round 3 with 1 fix open$r$');
+    expect(sql).toContain("not in ('pass', 'accepted')");
+    expect(sql).toContain('coalesce(last.round, 0) + 1');
+    // No answer from the person is needed.
+    expect(sql).not.toContain('Answered');
+  });
+
+  it('needs a reason, and nothing that closes its quotes', () => {
+    expect(() => uiSettleSql(42, ['news-saved'], '  ')).toThrow();
+    expect(() => uiSettleSql(42, ['news-saved'], 'x$r$; drop table ui_checks')).toThrow();
+    expect(() => uiSettleSql(42, ["a'; select 1"], 'why')).toThrow();
+  });
+
+  it('writes nothing for no surfaces', () => {
+    expect(uiSettleSql(42, [], 'why')).toBe('');
   });
 });

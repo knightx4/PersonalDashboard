@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { answerQuestion, askDash, ASK_MODEL, type AskLookupEvent, type AskStores } from './ask';
+import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, type AskLookupEvent, type AskStores } from './ask';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
@@ -128,7 +128,37 @@ function memoryStores(existing: TalkTurn[] = []) {
   return { stores, written, spend, changes };
 }
 
+describe("Dash's voice", () => {
+  it('names a plan step by its outline, never the stored number', () => {
+    expect(ASK_VOICE.system.replace(/\s+/g, ' ')).toContain(
+      'Name a plan step by its outline, such as #1073.4, the way the plan page heads it, never by the stored number.',
+    );
+  });
+});
+
 describe('askDash', () => {
+  it('files what it could not do as a note, with the question, once it has looked', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'search', { query: 'concert' })]),
+      reply([
+        use('u2', 'answer', {
+          answer: 'I cannot see any concert tickets.',
+          cited: [],
+          could_not: 'find concert tickets: nothing holds them',
+        }),
+      ]),
+    ]);
+    const { execute } = stubExecute();
+    const { stores } = memoryStores();
+    const gaps: [string, string][] = [];
+    stores.noteGap = async (body, ref) => {
+      gaps.push([body, ref]);
+    };
+    await askDash({ question: 'When is my next concert?', today: '2026-10-07', execute, anthropicApiKey: 'k', client }, stores);
+    expect(gaps).toEqual([[gapNote('find concert tickets: nothing holds them', 'When is my next concert?'), 'conv-new']]);
+    expect(gaps[0][0]).toContain('Asked: "When is my next concert?"');
+  });
+
   it('runs a search and a total, stops at the answer, keeps the turns and the spend, and cites only rows the tools returned', async () => {
     const { client, sent } = stubClient([
       reply([use('u1', 'search', { query: 'ebay' })]),
@@ -160,7 +190,7 @@ describe('askDash', () => {
     ]);
     expect(sent).toHaveLength(3);
     expect(sent.every((s) => s.model === ASK_MODEL)).toBe(true);
-    expect(sent.every((s) => s.tool_choice.type === 'any')).toBe(true);
+    expect(sent.every((s) => s.tool_choice.type === 'auto')).toBe(true);
     expect(sent[0].system[1].text).toContain('2026-09-27');
 
     // Each lookup's result went back as the tool_result for its call.
@@ -196,7 +226,7 @@ describe('askDash', () => {
 
   it('answers with what it has when the lookups run out, and says so', async () => {
     const { client, sent } = stubClient([], (call) =>
-      sent[call - 1]?.tool_choice.type === 'tool'
+      call > MAX_LOOKUPS
         ? reply([use('a', 'answer', { answer: 'Here is what I found.', cited: [{ table: 'public.orders', ref: 'o-1' }] })])
         : reply([use(`u${call}`, 'search', { query: `try ${call}` })]),
     );
@@ -210,7 +240,7 @@ describe('askDash', () => {
 
     expect(calls).toHaveLength(MAX_LOOKUPS);
     expect(sent).toHaveLength(MAX_LOOKUPS + 1);
-    expect(sent[MAX_LOOKUPS].tool_choice).toEqual({ type: 'tool', name: 'answer' });
+    expect(sent[MAX_LOOKUPS].tool_choice).toEqual({ type: 'auto' });
     expect(result.stop).toBe('lookups');
     const body = written[1].turns[0].body;
     expect(body).toBe(`Here is what I found.\n\n${limitNote('lookups')}`);
@@ -238,7 +268,7 @@ describe('askDash', () => {
     const results = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
     expect(results).toHaveLength(MAX_LOOKUPS + 2);
     expect(results[MAX_LOOKUPS]).toMatchObject({ is_error: true });
-    expect(sent[1].tool_choice).toEqual({ type: 'tool', name: 'answer' });
+    expect(sent[1].tool_choice).toEqual({ type: 'auto' });
     expect(answer.ok && answer.stop).toBe('lookups');
   });
 
@@ -261,7 +291,7 @@ describe('askDash', () => {
       now: () => clock,
     });
 
-    expect(sent[1].tool_choice).toEqual({ type: 'tool', name: 'answer' });
+    expect(sent[1].tool_choice).toEqual({ type: 'auto' });
     expect(answer).toMatchObject({ ok: true, stop: 'time', body: `So far, one order.\n\n${limitNote('time')}` });
   });
 
@@ -487,7 +517,7 @@ describe('askDash proposals', () => {
             before: null,
             after: { id: STEP_ID, title: 'Update my CV' },
             summary: 'Dash added the step "Update my CV" under the goal "Find a new job".',
-            row: { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+            row: { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}/s/${STEP_ID}` },
           };
         },
         anthropicApiKey: 'k',
@@ -510,7 +540,7 @@ describe('askDash proposals', () => {
     const back = sent[2].messages[sent[2].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
     expect(back[0].content).toContain('Done: Dash added the step');
     expect(result.turns[1].citations).toEqual([
-      { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+      { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}/s/${STEP_ID}` },
     ]);
 
     // The change is done and hangs from the answer.
@@ -875,7 +905,7 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(calls).toHaveLength(5);
     expect(sent).toHaveLength(6);
     // Thirty-five seconds of looking is inside the budget, so it was never forced.
-    expect(sent.every((s) => s.tool_choice.type === 'any')).toBe(true);
+    expect(sent.every((s) => s.tool_choice.type === 'auto')).toBe(true);
     expect(sent.every((s) => s.max_tokens === ANSWER_MAX_TOKENS)).toBe(true);
     expect(answer).toMatchObject({
       ok: true,
@@ -938,6 +968,8 @@ describe('questions that need several lookups (plan #1437)', () => {
   it('still says it could not answer when the lookups found nothing', async () => {
     const { client } = stubClient([
       reply([use('u1', 'nope', {})]),
+      reply([], 'end_turn'),
+      // Asked once more for its answer, it still gives none.
       reply([], 'end_turn'),
     ]);
     const { execute } = stubExecute();

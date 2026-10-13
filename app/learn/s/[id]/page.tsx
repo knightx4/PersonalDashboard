@@ -11,7 +11,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
-import { practiceHref } from '@/lib/learn/flow/href';
+import { nowHref, practiceHref, subjectClipsHref } from '@/lib/learn/flow/href';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -27,7 +27,9 @@ import { loadProjectView } from '@/lib/learn/lessons/project-store';
 import { isOwner } from '@/lib/dev/owner';
 import { loadSubjectChannels, type SubjectChannels } from '@/lib/learn/youtube/subject-channels';
 import { deleteSubject } from './actions';
+import { loadSubjectLearning, type SubjectLearning } from '@/lib/learn/chat/subject-load';
 import { ChannelsSection } from './channels';
+import { ChatLearningSection } from './chat-learning';
 import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
@@ -63,6 +65,10 @@ export const maxDuration = 300;
  * its own, which lays out its chain of ideas as a goal filed under it, and a
  * chain is shown inside the unit it belongs to. Goals asked outside the
  * curriculum come after it.
+ *
+ * Below the goals, the readings related to the subject from any list and
+ * the conversations logged about it (plan #1814), apart from the graph
+ * because neither says what you know.
  *
  * Writes from here: opening a unit or naming another goal, which saves nothing
  * until the chain is approved; writing a curriculum for a track that has
@@ -262,7 +268,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -273,6 +279,9 @@ export default async function SubjectPage({
     loadCurriculum(supabase, id).catch(() => [] as StoredUnit[]),
     // A goal's pieces that cannot be read leave the units without their links.
     loadTrackPieces(supabase, user.id, id).catch(() => new Map<string, PieceSibling[]>()),
+    // Readings related to it and chats logged about it (plan #1814). Ones that
+    // cannot be read leave the section out.
+    loadSubjectLearning(supabase, id).catch((): SubjectLearning => ({ readings: [], sessions: [] })),
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
@@ -288,7 +297,8 @@ export default async function SubjectPage({
   // The Channels section is the owner's alone (plan #1199): finding channels
   // spends their YouTube quota and transcript credits. Channels that cannot
   // be read leave the section showing none, with the button to find some.
-  const channels: SubjectChannels | null = (await isOwner({ user }))
+  const owner = await isOwner({ user });
+  const channels: SubjectChannels | null = owner
     ? await loadSubjectChannels(supabase, user.id, id).catch(() => ({ channels: [], kept: new Set<string>() }))
     : null;
   const counts = countStates(graph);
@@ -321,6 +331,19 @@ export default async function SubjectPage({
         }
         actions={
           <>
+            {/* Now with only this subject's cards (plan #1698). Its empty
+                state says when there are none, so it shows on every subject. */}
+            <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
+              Now
+            </Link>
+            {/* The clips that serve this subject (plan #1697). The owner's
+                alone, like Videos, since they are cut from the owner's
+                YouTube library. Its own empty state says when none serve it. */}
+            {owner && (
+              <Link href={subjectClipsHref(id)} className={buttonVariants({ variant: 'secondary' })}>
+                Clips
+              </Link>
+            )}
             {counts.total > 0 && (
               <>
                 <Link
@@ -383,7 +406,7 @@ export default async function SubjectPage({
         </p>
       )}
 
-      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} />}
+      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
       {units.length === 0 ? (
         <WriteCurriculum subjectId={id} />
@@ -495,6 +518,8 @@ export default async function SubjectPage({
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
       <GoalForm subjectId={subject.id} />
+
+      <ChatLearningSection learning={learning} timezone={settings.timezone} />
 
       {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
 

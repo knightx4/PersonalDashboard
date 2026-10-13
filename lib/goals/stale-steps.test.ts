@@ -50,7 +50,7 @@ function stale(
   goals: Goal[],
   steps: Step[],
   touched: Record<string, number>,
-  options: { deps?: [string, string][]; today?: string } = {},
+  options: { deps?: [string, string][]; today?: string; underWay?: string[] } = {},
 ) {
   const { byGoal, nodes } = buildForest(
     goals.map((g) => g.id),
@@ -63,7 +63,7 @@ function stale(
   );
   if (options.today) markStartDates(byGoal, options.today);
   const times = new Map(Object.entries(touched).map(([id, days]) => [id, NOW - days * DAY]));
-  return staleSteps(goals, byGoal, times, NOW);
+  return staleSteps(goals, byGoal, times, NOW, new Set(options.underWay ?? []));
 }
 
 describe('touchTimes', () => {
@@ -82,9 +82,38 @@ describe('touchTimes', () => {
     expect(times.get('a')).toBe(NOW - 3 * DAY);
     expect(times.get('b')).toBe(NOW - 9 * DAY);
   });
+
+  it('counts a progress entry logged on the step as a touch', () => {
+    const times = touchTimes(
+      [{ id: 'a', created_at: daysAgo(20), updated_at: daysAgo(12) }],
+      [],
+      [{ item_id: 'a', created_at: daysAgo(2) }],
+    );
+    expect(times.get('a')).toBe(NOW - 2 * DAY);
+  });
 });
 
 describe('staleSteps', () => {
+  it('leaves out a step under way, which the progress nudge looks after instead', () => {
+    const list = stale([goal('g')], [step('a', 'g'), step('b', 'g')], { a: 20, b: 20 }, {
+      underWay: ['a'],
+    });
+    expect(list.map((s) => s.id)).toEqual(['b']);
+  });
+
+  it('reads a progress entry on a sub-step as a touch on the branch above it', () => {
+    const progress = touchTimes(
+      [
+        { id: 'phase', created_at: daysAgo(20), updated_at: daysAgo(20) },
+        { id: 'smaller', created_at: daysAgo(20), updated_at: daysAgo(20) },
+      ],
+      [],
+      [{ item_id: 'smaller', created_at: daysAgo(1) }],
+    );
+    const { byGoal } = buildForest(['g'], [step('phase', 'g'), step('smaller', 'phase', { status: 'done' })]);
+    expect(staleSteps([goal('g')], byGoal, progress, NOW)).toEqual([]);
+  });
+
   it('lists a step of yours untouched for a week, longest first', () => {
     const list = stale(
       [goal('g')],

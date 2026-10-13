@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
   type UiReviewActionState,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { chipsThatFit } from '@/lib/news/quick/chip-fit';
 
 /** One module's standing: the gate, the surfaces, and the last pass. */
 export type Standing = {
@@ -203,6 +204,116 @@ function FindingRow({ finding }: { finding: UiFinding }) {
   );
 }
 
+const CHIP =
+  'press press-area inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick';
+const CHIP_OFF = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
+const CHIP_ON = 'bg-accent text-surface';
+/** Below md, where the row is kept to one line. Matches Tailwind's max-md. */
+const PHONE = '(max-width: 767.98px)';
+/** gap-x-1, in pixels. */
+const GAP = 4;
+
+/**
+ * The module filters. On a phone the row stays on one line: Everything and as
+ * many modules as fit, then More, which opens the whole row. The module in
+ * force moves to the front there so it is never the one folded away. Widths
+ * come from an invisible copy of the row, the same way the news topic chips
+ * are measured.
+ */
+function ModuleChips({ only }: { only: UiScope | null }) {
+  const [fit, setFit] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const rowRef = useRef<HTMLElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+
+  const order = only ? [only, ...UI_SCOPES.filter((scope) => scope !== only)] : [...UI_SCOPES];
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const ghost = ghostRef.current;
+    if (!row || !ghost) return;
+    const phone = window.matchMedia(PHONE);
+    const measure = () => {
+      if (!phone.matches) return setFit(null);
+      const widths = Array.from(ghost.children, (child) => (child as HTMLElement).offsetWidth);
+      setFit(
+        chipsThatFit({
+          all: widths[0],
+          topics: widths.slice(1, -1),
+          more: widths[widths.length - 1],
+          available: row.clientWidth,
+          gap: GAP,
+        }),
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    phone.addEventListener('change', measure);
+    return () => {
+      observer.disconnect();
+      phone.removeEventListener('change', measure);
+    };
+  }, [only]);
+
+  const folded = fit !== null && !open;
+  const drawn = folded ? order.slice(0, fit) : order;
+
+  return (
+    <div className="relative">
+      <div
+        ref={ghostRef}
+        aria-hidden
+        className="pointer-events-none invisible absolute left-0 top-0 flex max-w-full gap-x-1 overflow-hidden"
+      >
+        <span className={CHIP}>Everything</span>
+        {order.map((scope) => (
+          <span key={scope} className={CHIP}>
+            {scope}
+          </span>
+        ))}
+        <span className={CHIP}>More</span>
+      </div>
+      <nav
+        ref={rowRef}
+        aria-label="Module"
+        className={cn(
+          'flex items-center gap-x-1 gap-y-2',
+          open ? 'flex-wrap' : 'max-md:flex-nowrap max-md:overflow-hidden md:flex-wrap',
+        )}
+      >
+        <Link
+          href="/dev/ui/review"
+          aria-current={only === null ? 'page' : undefined}
+          className={cn(CHIP, only === null ? CHIP_ON : CHIP_OFF)}
+        >
+          Everything
+        </Link>
+        {drawn.map((scope) => (
+          <Link
+            key={scope}
+            href={{ pathname: '/dev/ui/review', query: { module: scope } }}
+            aria-current={only === scope ? 'page' : undefined}
+            className={cn(CHIP, only === scope ? CHIP_ON : CHIP_OFF)}
+          >
+            {scope}
+          </Link>
+        ))}
+        {fit !== null && (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className={cn(CHIP, CHIP_OFF)}
+          >
+            {open ? 'Less' : 'More'}
+          </button>
+        )}
+      </nav>
+    </div>
+  );
+}
+
 /**
  * The standings, and what the passes found.
  *
@@ -221,35 +332,7 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
 
   return (
     <div className="space-y-6">
-      <nav aria-label="Module" className="flex flex-wrap items-center gap-x-1 gap-y-2">
-        <Link
-          href="/dev/ui/review"
-          aria-current={only === null ? 'page' : undefined}
-          className={cn(
-            'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-            only === null
-              ? 'bg-accent text-surface'
-              : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-          )}
-        >
-          Everything
-        </Link>
-        {UI_SCOPES.map((scope) => (
-          <Link
-            key={scope}
-            href={{ pathname: '/dev/ui/review', query: { module: scope } }}
-            aria-current={only === scope ? 'page' : undefined}
-            className={cn(
-              'press press-area rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick',
-              only === scope
-                ? 'bg-accent text-surface'
-                : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-            )}
-          >
-            {scope}
-          </Link>
-        ))}
-      </nav>
+      <ModuleChips only={only} />
 
       <ul className={cn(cardVariants(), 'divide-y divide-border')}>
         {standings.map((standing) => (

@@ -15,7 +15,8 @@ the building follow it the first time.
 > **Status:** shaped 3 October 2026 into proposed features #1528 (the critic),
 > #1536 (phone checks), #1540 (before and after pictures) and #1544 (patterns).
 > Part 8, added the same day, is #1548 (motion), #1555 and #1559 (moments)
-> and #1564 (judging craft).
+> and #1564 (judging craft). Part 9, added 8 October 2026, is feature #1653
+> (which jobs get a list, a chart or Dash).
 
 ## What happens today
 
@@ -79,16 +80,30 @@ build. The critic is given:
 - the before shots, taken from main, and the after shots
 - the design laws and the person's preferences (Part 3)
 - the pattern the step uses (Part 4) and the step's done-when
+- a reference design, when the person has pointed at one they prefer for
+  this surface: its pictures, or a link the builder photographs
 
 It answers with pass, or with fixes. Each fix names what is wrong in the
 picture, at which width and theme, and the law or preference it breaks. The
 builder makes the fixes, shoots again and hands the new shots back. A step
-gets three rounds. After a third failure the step blocks on the person, with
-the critic's last fixes, where the shots are and the branch in its ask, and
-the person accepts the screen as it is or says what to change (decision 1,
-answered A). Saying what to change gives the builder three fresh rounds,
-numbered on from 4. `lib/plan/ui-check-stop.ts` writes the ask and
-`npm run ui-stop` prints it.
+gets three rounds. After a third failure the builder settles the screen
+itself and closes the step, with the critic's last fixes in its close note
+(decision 1, now answered B). Surfaces a step reaches only through a shared
+file are settled the same way. `npm run ui-stop` prints the fixes and the
+settle command, `npm run ui-guard -- <n> --settle "<why>"`.
+
+A reference is judged alongside the laws. A screen that keeps every law but
+reads worse than its reference fails, and the fixes say what the reference
+does better; where a reference breaks a law, the law wins and the fix says
+so. A reference stays with its surface, kept by surface id in
+`lib/preview/references.ts`, so later steps on that surface are judged
+against it too.
+
+Every round also answers three questions in its verdict. Where does the eye
+go first, and is that what the screen is for? Does anything compete with the
+data, such as a label, outline or heading heavier than what it frames? Are
+the lines lighter than the text? A screen with no clear answer to the first
+fails.
 
 The builder never writes the verdict. Each round is recorded in a table,
 `public.ui_checks`, with the step, the surface, the round, the verdict and the
@@ -134,7 +149,10 @@ last two weeks:
 The notes routine adds an entry when a note says the request applies
 "anywhere" or "everywhere", or when the same request comes in on two
 different pages. It adds the entry and fixes the pages in the same batch. The
-person can remove any entry from `/dev/ui`. An entry that keeps applying
+person can remove any entry from `/dev/ui`. A press cannot edit `taste.ts`, so
+a removal is a row in `public.ui_taste_removals`: the page leaves the entry
+out, the session that runs the critic tells it not to cite the entry, and the
+notes routine does not add it again. An entry that keeps applying
 across workspaces can be promoted to a law by the person.
 
 ## Part 4: Page patterns
@@ -142,13 +160,34 @@ across workspaces can be promoted to a law by the person.
 Most layout problems come from a page being arranged from scratch. A small set
 of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
-first three are the shapes the gallery shows most:
+first three are the shapes the gallery shows most, the fourth was added for
+pages that hold several views of one thing, the fifth for overview pages on a
+wide screen, and the sixth for pages of peer sections:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
 - **Deck**: one item at a time with a fixed forward action and the next item
   loaded, as Quick read and Learn now work.
 - **Thread**: a row's comments and Dash's replies.
+- **Tabbed detail**: one thing's page with breadcrumbs, a title, tabs that
+  each have their own address, and its properties in a column on the right.
+  On a phone the two or three facts read first sit in one row under the
+  title, with the rest folded under "All details", so the tabs are on the
+  first screen. The actions sit on the title's line, and every tab is as wide
+  as the row of tabs (plan 1688). The feature page on the plan and the goal
+  page use it (decision 1661, answered B, after Linear's project page). Its
+  text and its properties sit on cards (plan 1686).
+- **Main plus rail**: an overview page such as Home, with the column you work
+  in and, from laptop width, a narrow column on the right holding what you
+  glance at (counts, what is running, what Dash did, what is due soon). On a
+  phone the rail follows the main column. Never on a detail page, which stays
+  one column (feature 1624).
+- **Tabbed sections**: a page of peer sections looked at one at a time, such
+  as Account or a company, shows one behind a row of tabs kept in the
+  address, so a refresh and a pasted link return to it. Only the open tab is
+  drawn, and folds may sit inside it. A page read top to bottom stays
+  stacked, and two or three modes of one view are a segmented control. The
+  role page uses it (feature 1624).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person
@@ -286,6 +325,134 @@ A feature whose screens have a catalogue moment gets a last step from
 shaping, "Build its moments and pass the craft check", and is not done until
 that step is.
 
+## Part 9: Which jobs get a list, a chart or Dash
+
+Part 1 to 8 say how a screen is checked. This part says which screen a job
+needs in the first place. A workspace has three kinds of interface for a job,
+and each job gets the one that suits it.
+
+**A plain list, with a detail page, is for browsing and for acting on one row.**
+Finding an item, reading it, editing a field, marking one thing done, or
+checking what a single order or role says. The person is looking at the rows
+and decides as they go, so the list is the interface and nothing replaces it.
+
+**A chart in Dash's reply is for a one-off question about totals or trends.**
+"What did I spend by month this year?" "How many applications went out each
+week?" The answer is read once and does not need to stay on a page. Dash
+reads the person's rows, picks the chart that fits the question, and draws it
+in the reply. The chart is not saved to a workspace page. Keeping one on a
+page is a separate idea and not part of this rule.
+
+**Handing the job to Dash is for changing many rows by a rule.** "Tag
+everything from this order as gift." "Mark every role I have not heard from in
+a month as stale." The person states the rule and Dash finds the rows. A
+change of this kind is one Dash action with one Undo that reverses all of it,
+and the reply says how many rows it touched. Selecting rows by hand on the
+list stays for a handful of rows the person can see. The line is a rule that
+the person would otherwise apply row by row.
+
+**What never goes to Dash.** Deleting rows stays on the list's own bulk bar,
+because a delete cannot be undone from a reply. Anything outside the app, such
+as sending an email, placing an order or posting, stays a step the person
+takes.
+
+### Shopping
+
+- List and detail: inventory and each item, orders and each order, saved
+  items, returns, recurring payments, the review queue, selling an item.
+- Chart in Dash's reply: spending by month, category or shop; how many items
+  of each kind are owned; what returns saved or cost over a period.
+- Handed to Dash: tag, categorize or mark for sale every item matching a rule
+  such as an order, a shop or an age; set the same field on many items.
+- Stays on the list's bulk bar: deleting items or orders.
+
+### Jobs
+
+- List and detail: roles and each role, the pipeline, companies, contacts,
+  interviews, the review queue, answers.
+- Chart in Dash's reply: applications per week, how long roles sit in each
+  stage, where offers and rejections come from.
+- Handed to Dash: move, tag or close every role matching a rule such as stage,
+  company or days since the last contact; set the same field on many roles.
+- Stays on the list's bulk bar: deleting roles.
+
+Other workspaces follow the same rule when a step next changes them. A step
+that adds a job to a workspace names which of the three it is.
+
+## Part 10: Diagrams and charts
+
+Laws 4 and 7 keep colour and expression out of the data. That suits a table
+of figures and leaves a chart with nothing to point with. Idea Space, built on
+12 October 2026, followed every law and read worse than the sketch it was
+built from: known ideas in black, unseen ideas as specks, labels heavier than
+the marks, and nothing faded when an idea was picked. This part says how a
+chart, a map or a diagram is drawn, and the critic reads it for any surface
+that has one.
+
+1. **One question, one accent.** A chart answers one question, and the
+   accent marks the answer: the series, marks or region the question is
+   about. Everything else is ink, gray or hollow. Inside a chart this is what
+   the accent means, an extension of law 4 written into `app/dev/ui/laws.ts`.
+2. **Absence is drawn.** Anything unknown, untested, empty or not visited is
+   a hollow outline at nearly the size of a filled mark, so empty ground
+   reads as ground. It is never left out and never shrunk to a speck.
+3. **Picking focuses.** Picking a mark fades every unrelated mark to about a
+   quarter of its strength and draws what relates to it in the accent.
+   Picking empty ground clears it.
+4. **Labels are quiet.** Chart text is a step smaller than body text, in
+   regular weight and the muted ink, and never sits on a mark. About seven
+   labels show at once; the rest show on hover or tap. A label heavier than
+   the data it names is a fault.
+5. **Axes say what they mean,** in words at each end, such as "economics"
+   against "history", as well as in units. An axis with no meaning, as in a
+   force layout, is named as such in the caption.
+6. **Structure sits under the data.** Gridlines, frames and guides are
+   dashed or dotted hairlines in the lightest border colour, beneath the marks.
+7. **A caption says what the chart shows** and how far to trust it, in one or
+   two sentences under it. That is a finding, so law 15 does not forbid it.
+8. **A hover or tap answers in the same frame,** from data already on the
+   page. The address updates after it (law 5).
+9. **Marks are big enough to see:** at least 4 pixels across at any width,
+   and the ones that matter most a step larger.
+10. **Past three categories, colour gets help.** The limit of three hues on
+    one chart, kept for readers with red-green colour blindness, stands. The
+    other categories are told apart by direct labels, shapes, or tapping a
+    legend entry to highlight its marks, rather than sharing one gray.
+
+The Idea Space sketch the person preferred, at
+https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.
+
+## Part 11: Quiet outlines on controls
+
+A button's words and fill already say it is a button, so its outline does
+not have to. Today every control is outlined in `--c-border-control`, a mid
+gray picked to meet the 3:1 contrast floor for control edges, and on a busy
+page those outlines are the darkest lines after the text. Buttons and
+segmented controls are outlined in `--c-border-strong` instead, the light
+border colour. The chosen segment of a segmented control is filled in the
+accent tint with accent text, so which one is on still stands apart at 3:1.
+Text inputs keep the stronger outline, since an empty box has no words to
+identify it, and so does the keyboard focus ring.
+
+The person asked for this on 12 October 2026, comparing the app's buttons
+with the thinner outlines on the Idea Space sketch.
+
+## Part 12: One focal point, and a face for figures
+
+Two habits make a dense page look composed.
+
+**One focal point to a region.** Each card or region has one element set to
+draw the eye first, by size and weight before colour. A second bold element
+in the same region competes with the first, so the less important one goes
+back to regular weight.
+
+**Figures in a second face.** Numbers and the facts about a row, such as
+scores, counts, dates, sizes and similarities, are set in the monospace face
+already defined as `--font-mono`, in tabular figures, a step smaller than the
+text beside them. Running text stays in the sans face. The change of face
+gives a page texture without decoration, and it keeps law 7: the figures are
+still set plainly.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -319,6 +486,40 @@ Checked by: count `raw-motion-values`, baseline 234, target 0.
 **R8.** No workspace has more than three moments.
 Checked by: test `tests/dev-ui-moments.test.ts`.
 
+**R9.** A list job that changes many rows by a rule is also offered to Dash,
+and the change is one Dash action with one Undo.
+Checked by: audit.
+
+**R10.** Deleting rows is not offered to Dash in any workspace.
+Checked by: audit.
+
+**R11.** A workspace page does not keep a chart that Dash made in a reply.
+Checked by: audit.
+
+**R12.** In a chart, the accent marks only what the chart's question is about.
+Checked by: audit.
+
+**R13.** A chart draws missing or unvisited items as hollow marks, and no label covers a mark.
+Checked by: audit.
+
+**R14.** Picking a mark in a chart fades the marks unrelated to it.
+Checked by: audit.
+
+**R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
+Checked by: audit.
+
+**R16.** A card or region has at most one bold element.
+Checked by: audit.
+
+**R17.** Numbers and the facts about a row are set in the monospace face, in tabular figures.
+Checked by: audit.
+
+**R18.** A surface with a reference design is judged against it as well as the laws.
+Checked by: audit.
+
+**R19.** Every design check verdict answers the three questions of Part 2.
+Checked by: audit.
+
 ## Decisions
 
 **1. What happens when a screen fails its third round with the critic?**
@@ -333,11 +534,13 @@ Recommendation: A. Three failed rounds usually means the step is missing a
 decision, such as which pattern the screen should use, and that is the
 person's to make.
 
-Answered A on the plan (#1535). The stop is plan #1609; accepting or
-redirecting from the step's row is plan #1610. Accepting writes a round with
-the verdict `accepted` for each surface that stopped. Only the person writes
-it, and the close guard counts it as passed, so the record keeps who let the
-screen through.
+Answered A on the plan (#1535), then changed to B on 12 October 2026: the
+person asked for their questions to be about direction, and a week of
+"accept it as it is" blocks were not. The builder writes the `accepted`
+round itself (`uiSettleSql`), with notes opening "Settled by Dash", and the
+person's own accepts from the step's row (#1610) still work for steps blocked
+before the change. The close guard counts both as passed, and the record
+keeps who let the screen through.
 
 ## Order of work
 
@@ -365,5 +568,6 @@ for is screens that need one round of the person's notes, not five.
 
 ## What this does not do
 
-It does not change the design laws, replace `check:ui`, or redesign existing
+Apart from Part 10 extending law 4 to charts, it does not change the design
+laws. It does not replace `check:ui` or redesign existing
 screens on its own. Existing screens improve as steps touch them.

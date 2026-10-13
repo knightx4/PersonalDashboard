@@ -11,7 +11,8 @@ import { fromClaim, MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { generateChain } from '@/lib/learn/graph/generate';
-import { isSameClaim, MAX_CLAIM, rewriteClaimPatch } from '@/lib/learn/graph/rewrite';
+import { isSameClaim, MAX_CLAIM } from '@/lib/learn/graph/rewrite';
+import { rewrittenClaimUpdate } from '@/lib/learn/graph/rewrite-save';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
@@ -182,7 +183,7 @@ export async function rewriteClaim({
   conceptId: string;
   claim: string;
 }): Promise<{ error?: string }> {
-  await requireUser();
+  const user = await requireUser();
 
   const parsed = z
     .object({
@@ -215,7 +216,9 @@ export async function rewriteClaim({
   const { error: writeError } = await supabase
     .from('concepts')
     .update(
-      rewriteClaimPatch(
+      await rewrittenClaimUpdate(
+        supabase,
+        user.id,
         { claim: current.claim, claimOriginal: current.claim_original },
         parsed.data.claim,
       ),

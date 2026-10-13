@@ -2,7 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import type { NewsIssue, NewsSender, UnreadStories } from './list';
+import { waitingSignups, type NewsIssue, type NewsSender, type UnreadStories, type WaitingSignup } from './list';
 import { readStories, type NewsStory } from './stories';
 import type { NewsTopic } from './topics';
 
@@ -54,6 +54,48 @@ export async function loadIssues(
     readAt: (row.read_at as string | null) ?? null,
     summaryLine: (row.summary_line as string | null) ?? null,
   }));
+}
+
+/**
+ * Signup emails waiting for a Confirm press, newest first (plan #1725): a
+ * confirm_url and no confirmed_at. Read through the person's own client, so
+ * only their issues come back, as in loadIssues. A signup whose sender has
+ * since sent regular news is left out (waitingSignups).
+ */
+export async function loadWaitingSignups(client: NewsSupabaseClient): Promise<WaitingSignup[]> {
+  const { data, error } = await client
+    .from('issues')
+    .select('id, sender_id, subject, received_at, confirm_url')
+    .not('confirm_url', 'is', null)
+    .is('confirmed_at', null)
+    .order('received_at', { ascending: false })
+    .limit(PAGE);
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading your signups to confirm failed (${error.message})`);
+  const signups = (data ?? []).map((row) => ({
+    id: row.id as string,
+    senderId: row.sender_id as string,
+    subject: (row.subject as string | null) ?? null,
+    receivedAt: row.received_at as string,
+    confirmUrl: row.confirm_url as string,
+  }));
+  if (signups.length === 0) return [];
+
+  const { data: news, error: newsError } = await client
+    .from('issues')
+    .select('sender_id, received_at')
+    .eq('purpose', 'news')
+    .in('sender_id', [...new Set(signups.map((s) => s.senderId))])
+    .order('received_at', { ascending: false })
+    .limit(PAGE);
+  assertSchemaExposed(newsError, NEWS_SCHEMA);
+  if (newsError) throw new Error(`news: reading your signups to confirm failed (${newsError.message})`);
+  const newsSince = new Map<string, string>();
+  for (const row of news ?? []) {
+    const sender = row.sender_id as string;
+    if (!newsSince.has(sender)) newsSince.set(sender, row.received_at as string);
+  }
+  return waitingSignups(signups, newsSince);
 }
 
 /** One newsletter with its bodies, which is what the reading page needs. */
@@ -122,6 +164,13 @@ export type NewsIssueDetail = {
    * set.
    */
   digestError: string | null;
+  /**
+   * The https link a signup email asks you to press (plan #1723), or null
+   * when the issue is not a confirmation or no link was clear.
+   */
+  confirmUrl: string | null;
+  /** When Confirm was pressed for this issue (plan #1724), or null while it has not been. */
+  confirmedAt: string | null;
 };
 
 /**
@@ -134,7 +183,7 @@ export type NewsIssueDetail = {
  * type inside loadIssue are the only places the issue's shape is written down.
  */
 const ISSUE_DETAIL_COLUMNS =
-  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at, summary, stories, digest_error';
+  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at, summary, stories, digest_error, confirm_url, confirmed_at';
 
 /**
  * One issue, by id, or null when there is no such issue for this account.
@@ -175,6 +224,8 @@ export async function loadIssue(
     summary: string | null;
     stories: unknown;
     digest_error: string | null;
+    confirm_url: string | null;
+    confirmed_at: string | null;
   };
 
   const { data: senderRow } = await client
@@ -196,5 +247,7 @@ export async function loadIssue(
     unsubscribeSentAt: row.unsubscribe_sent_at ?? null,
     digest: row.summary ? { summary: row.summary, stories: readStories(row.stories) } : null,
     digestError: row.digest_error ?? null,
+    confirmUrl: row.confirm_url ?? null,
+    confirmedAt: row.confirmed_at ?? null,
   };
 }

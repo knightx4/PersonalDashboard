@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanThread, parsePostedUrl, postImageSrc, socialPostFromRow, threadCopyText } from './posts';
-import { buildPostsPage } from './posts-page';
+import { buildPostsPage, xPostsShown } from './posts-page';
 
 /** The helpers the Posts tab writes through, and the page it draws (plan #1419). */
 
@@ -62,6 +62,38 @@ describe('buildPostsPage', () => {
       ...extra,
     });
 
+  it('asks about a candidate on a waiting draft only, and lists the posts on X (plan #1820)', () => {
+    const stored = (id: string) => ({
+      xPostId: id,
+      text: `post ${id}`,
+      url: `https://x.com/me/status/${id}`,
+      createdAt: '2026-10-01T10:00:00Z',
+      threadPosts: 1,
+    });
+    const page = buildPostsPage({
+      posts: [
+        row('a', 'suggested', { x_candidate_id: '7' }),
+        row('b', 'posted', { posted_at: '2026-10-02T09:00:00Z', posted_url: 'https://x.com/1', x_candidate_id: '7' }),
+      ],
+      steps: [],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+      x: { candidates: [stored('7')], listed: [stored('8'), stored('9')], total: 60 },
+    });
+    expect(page.suggested[0].candidate?.xPostId).toBe('7');
+    expect(page.posted[0].candidate).toBeNull();
+    expect(page.onX.posts.map((p) => p.xPostId)).toEqual(['8', '9']);
+    expect(page.onX.total).toBe(60);
+  });
+
+  it('lists the posts on X in whole pages of fifty, up to what X returns', () => {
+    expect(xPostsShown(null)).toBe(50);
+    expect(xPostsShown('70')).toBe(100);
+    expect(xPostsShown('nonsense')).toBe(50);
+    expect(xPostsShown('99999')).toBe(3200);
+  });
+
   it('splits by status and links the steps in number order, leaving out a deleted one', () => {
     const page = buildPostsPage({
       posts: [
@@ -86,8 +118,19 @@ describe('buildPostsPage', () => {
     const card = page.suggested[0]!;
     expect(card.sources.map((source) => source.label)).toEqual(['#1415', '#1417', 'a note']);
     expect(card.sources[2]).toMatchObject({ title: 'The posts page is slow', href: '/dev/bugs#note-n1' });
-    expect(card.images).toEqual(['https://example.com/shot.png']);
+    expect(card.images).toEqual([{ path: 'https://example.com/shot.png', src: 'https://example.com/shot.png' }]);
     expect(card.day).toBe('1 Oct');
     expect(page.posted[0]!.day).toBe('2 Oct');
+  });
+
+  it('labels a cited step by its outline when the plan places it, linking by number', () => {
+    const page = buildPostsPage({
+      posts: [row('a', 'suggested', { source_plan_item_ids: ['s1'], source_feedback_ids: [] })],
+      steps: [{ id: 's1', number: 1084, title: 'Name steps by outline', outline: '1073.4' }],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+    });
+    expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan?view=all&q=%231084' });
   });
 });

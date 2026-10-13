@@ -243,6 +243,11 @@ describe('read_dev_row', () => {
       { id: OPEN_QUESTION, user_id: ME, number: 1251, title: 'Which name?', kind: 'decision', status: 'not_started', resolution: null, detail: 'A — one.\nB — two.', parent_id: STEP, position: 2, dismissed_at: null },
       { id: DISMISSED_STEP, user_id: ME, number: 1252, title: 'Put aside', kind: 'build', status: 'not_started', parent_id: FEATURE, position: 3, dismissed_at: at },
     ],
+    plan_runs: [
+      { user_id: ME, plan_item_id: STEP, status: 'failed', error: 'Nothing was heard from this run for 2h.', stop_reason: null, stop_pieces: null, created_at: '2026-09-02T10:00:00Z' },
+      { user_id: ME, plan_item_id: STEP, status: 'failed', error: 'Too big for one sitting.', stop_reason: 'Too big for one sitting.', stop_pieces: ['Read a note', 'Read a raise'], created_at: '2026-09-03T10:00:00Z' },
+      { user_id: THEM, plan_item_id: STEP, status: 'failed', error: 'Not yours.', stop_reason: null, stop_pieces: null, created_at: '2026-09-04T10:00:00Z' },
+    ],
     raised_items: [
       { id: RAISE, user_id: ME, title: 'Migration 0019 is unapplied', detail: 'The Learn page reads a column.', ask: 'Apply it?', status: 'answered', source: 'plan #12', outcome: null, module: 'learn', created_at: at, goal_id: null },
       { id: DISMISSED_RAISE, user_id: ME, title: 'Old', detail: null, ask: 'No?', status: 'dismissed', source: null, outcome: null, module: null, created_at: at, goal_id: null },
@@ -312,16 +317,62 @@ describe('read_dev_row', () => {
     }
   });
 
+  it('names a step by its outline when the plan places it, reads an outline as a ref, and makes stored refs readable', async () => {
+    const outlined: Tables = {
+      ...tables,
+      plan_item_outlines: [
+        { user_id: ME, number: 1319, outline: '1319' },
+        { user_id: ME, number: 1248, outline: '1319.1' },
+        { user_id: ME, number: 1250, outline: '1319.1.1' },
+        { user_id: ME, number: 1251, outline: '1319.1.2' },
+        { user_id: THEM, number: 1248, outline: '9.9' },
+      ],
+      dev_comments: [
+        { user_id: ME, plan_item_id: STEP, author: 'claude', body: 'Waits on #1250, not #12 or PR #1251.', created_at: at },
+      ],
+    };
+    for (const ref of ['#1319.1', '1319.1', '#1248']) {
+      const result = await read({ kind: 'step', ref }, { tables: outlined });
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      const [row] = result.rows;
+      expect(row.title).toBe('#1319.1 Read a row');
+      // The link still carries the number, the step's identity.
+      expect(row.href).toBe('/dev/plan?view=all&q=%231248');
+      expect(row.detail).toMatchObject({
+        step: '#1319.1',
+        number: 1248,
+        under: '#1319 Let Dash read your Dev pages in full',
+        comments: '[2026-09-01, Dash] Waits on #1319.1.1, not #12 or PR #1251.',
+      });
+      expect(row.detail?.decisions).toBe(
+        '#1319.1.1 Which shape? Answered: B, JSON.\n#1319.1.2 Which name? Not answered yet.',
+      );
+    }
+    const unknown = await read({ kind: 'step', ref: '#1319.7' }, { tables: outlined });
+    expect(unknown.ok).toBe(false);
+  });
+
+  it('reads the sessions sent at a step, newest first, with why each stopped', async () => {
+    const result = await read({ kind: 'step', ref: '#1248' });
+    expect(result.ok && result.rows[0].detail?.sessions).toBe(
+      '[2026-09-03] failed. The session said why it stopped: Too big for one sitting. It would split the work into: Read a note; Read a raise.\n' +
+        "[2026-09-02] failed. The app's note: Nothing was heard from this run for 2h.",
+    );
+    const feature = await read({ kind: 'step', ref: '#1319' });
+    expect(feature.ok && feature.rows[0].detail?.sessions).toBeNull();
+  });
+
   it('links an open question to its card on the Dash tab, and reads it as a step', async () => {
     const result = await read({ kind: 'plan', ref: '#1251' });
-    expect(result.ok && result.rows[0].href).toBe(`/dev/raised#waiting-${OPEN_QUESTION}`);
+    expect(result.ok && result.rows[0].href).toBe(`/dev/inbox#waiting-${OPEN_QUESTION}`);
   });
 
   it('reads a raise, which Dash raised', async () => {
     const result = await read({ kind: 'public.raised_items', ref: RAISE });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: 'Migration 0019 is unapplied',
-      href: `/dev/raised#raise-${RAISE}`,
+      href: `/dev/inbox#raise-${RAISE}`,
       detail: { raised_by: 'Dash', ask: 'Apply it?', comments: '[2026-09-01, me] Go ahead.' },
     });
   });
@@ -461,6 +512,22 @@ describe('find_dev_text', () => {
     ]);
   });
 
+  it('names the step a hit sits on by its outline, and reads stored refs in the excerpt as outlines', async () => {
+    const outlined = {
+      ...tables,
+      plan_item_outlines: [
+        { user_id: ME, number: 1400, outline: '1390.2' },
+        { user_id: ME, number: 1323, outline: '1320.3' },
+      ],
+    };
+    const result = await find({ query: 'drop step', kinds: ['comment'] }, { tables: outlined });
+    expect(result.ok && result.rows[0]).toMatchObject({
+      title: '#1390.2 Show counts',
+      href: '/dev/plan?view=all&q=%231400',
+      detail: { excerpt: 'Drop this step, #1320.3 covers it.' },
+    });
+  });
+
   it('looks in every kind, newest first, naming what Dash wrote, and leaves dismissed rows out', async () => {
     const result = await find({ query: 'ranking', kinds: ['idea', 'note', 'step', 'raise', 'comment'] });
     expect(result.ok).toBe(true);
@@ -471,7 +538,7 @@ describe('find_dev_text', () => {
       ['public.raised_items', RAISE, 'raise', 'Dash'],
       ['public.ideas', RANK_IDEA, 'comment', 'Dash'],
     ]);
-    expect(result.rows[2].href).toBe(`/dev/raised#raise-${RAISE}`);
+    expect(result.rows[2].href).toBe(`/dev/inbox#raise-${RAISE}`);
     expect(result.rows[1].detail?.field).toBe('resolution');
   });
 

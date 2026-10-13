@@ -239,7 +239,7 @@ describe('thoughtFromMaterial', () => {
 });
 
 describe('the call', () => {
-  it('lets the model search first and forces the report only after it stops without one', async () => {
+  it('lets the model search first and asks for the report after it stops without one', async () => {
     const calls: Record<string, unknown>[] = [];
     const out = await thoughtFromMaterial(exampleMaterial(), {
       client: fakeClient(
@@ -257,7 +257,8 @@ describe('the call', () => {
     expect(calls[0]!.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: 'web_search_20260209', name: 'web_search' })]),
     );
-    expect(calls[1]!.tool_choice).toEqual({ type: 'tool', name: 'report_thought' });
+    // Opus rejects a forced tool, so the ending is asked for rather than forced.
+    expect(calls[1]!.tool_choice).toEqual({ type: 'auto' });
     expect(calls[0]!.model).toBe(THOUGHT_MODEL);
     expect(THOUGHT_MODEL).toBe(DASH_MODELS.maya);
   });

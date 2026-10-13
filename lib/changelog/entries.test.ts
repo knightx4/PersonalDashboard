@@ -11,6 +11,7 @@ import {
   isChangelogModuleFilter,
   noteEntries,
   planEntries,
+  withOutlines,
   type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 
@@ -500,5 +501,24 @@ describe('isChangelogModuleFilter', () => {
   it('rejects anything else, so a hand-typed URL falls back to everything', () => {
     expect(isChangelogModuleFilter('nonsense')).toBe(false);
     expect(isChangelogModuleFilter('')).toBe(false);
+  });
+});
+
+describe('withOutlines', () => {
+  it('heads a step with its outline, reads stored refs in its detail as outlines, and keeps the number', () => {
+    const entries = changelogEntries({
+      plan: [step({ id: 'placed', number: 1084, detail: 'Follows #1080, as #1084 said.' })],
+      notes: [note({ id: 'n', resolutionNote: 'Fixed under #1084.' })],
+    });
+    const outlines = new Map([
+      [1084, '1073.4'],
+      [1080, '1073.1'],
+    ]);
+    const placed = withOutlines(entries, outlines);
+    const line = placed.find((entry) => entry.id === 'placed');
+    expect(line).toMatchObject({ number: 1084, outline: '1073.4', detail: 'Follows #1073.1, as #1073.4 said.' });
+    expect(placed.find((entry) => entry.id === 'n')).toMatchObject({ outline: null, detail: 'Fixed under #1073.4.' });
+    // Found by the name the line shows as well as by its number.
+    expect(filterChangelog(placed, '#1073.4').map((entry) => entry.id)).toContain('placed');
   });
 });

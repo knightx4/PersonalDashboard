@@ -22,7 +22,7 @@ interchangeable:
   passing: it is what the page shows as where the suggestion came from. One
   the user dismisses stops being listed, including by `ideas`, so do not
   write it again.
-- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+- **A raise** — `raised_items`, read on `/dev/inbox`. What a session ran into
   that belongs to none of those: a risk found in code it was only passing
   through, a question of taste, a thing it will not decide alone. Without it,
   that goes in the transcript, where it is only read by somebody who opens
@@ -83,8 +83,8 @@ session in the same press — right when the raise already says what the work is
 and the only question left is whether to do it, which is exactly what a yes
 answers. Both take the step's name as the text; the paragraph under it is the
 raise's own detail, and the workspace is the raise's unless you name another.
-`send_step` is for work already on the plan, named by number: `--consequence
-"send_step: #342"`.
+`send_step` is for work already on the plan, named by its outline:
+`--consequence "send_step: #1073.4"`.
 
 **A session never answers or dismisses a raise**, the same rule as never
 answering its own decision. Two things it does do. Replying to an answer the

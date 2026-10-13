@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Network, Plus } from 'lucide-react';
+import { Network, PenLine, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -39,6 +39,12 @@ import { QuizzesSection } from './quizzes';
 import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { latestBigFive, type BigFiveResult, type TypedResult } from '@/lib/learn/personality/model';
+import { loadPersonalityResults } from '@/lib/learn/personality/store';
+import { loadTraitThemes } from '@/lib/learn/personality/trait-themes-load';
+import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
+import { PersonalitySection } from './personality-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,6 +192,33 @@ export default async function KnowPage({
     quizzesFailed = true;
   }
 
+  // Your personality result (plan #1634), with the vault themes nearest each
+  // trait. A failed read leaves the section out rather than taking the page;
+  // themes that could not be matched are said inside it.
+  let personality: {
+    latest: BigFiveResult | null;
+    earlier: BigFiveResult[];
+    typed: TypedResult[];
+    themes: TraitThemes | null;
+  } | null = null;
+  try {
+    const results = await loadPersonalityResults(supabase);
+    const latest = latestBigFive(results);
+    personality = {
+      latest,
+      earlier: results.filter(
+        (r): r is BigFiveResult => r.kind === 'big_five' && r.id !== latest?.id,
+      ),
+      typed: results.filter((r): r is TypedResult => r.kind !== 'big_five'),
+      themes: latest
+        ? await loadTraitThemes(vault, user.id, latest.scores, { core: await createCoreClient() })
+        : null,
+    };
+  } catch (error) {
+    console.error('[learn personality]', error instanceof Error ? error.message : error);
+    personality = null;
+  }
+
   const courseCount = courseGroups.reduce(
     (sum, group) => sum + group.terms.reduce((n, term) => n + term.courses.length, 0),
     0,
@@ -202,12 +235,20 @@ export default async function KnowPage({
         title="Subjects"
         description="One graph per subject, and it grows every time you use it."
         actions={
-          making ? undefined : (
-            <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
-              <Plus className="size-4" strokeWidth={2} aria-hidden />
-              Make a subject
+          // Essays has no tab of its own: Learn keeps four (docs/CUT-BACK-SPEC.md,
+          // R1), so it is reached from here and lights the Subjects tab (plan #1865).
+          <>
+            <Link href="/learn/essays" className={buttonVariants({ variant: 'secondary' })}>
+              <PenLine className="size-4" strokeWidth={2} aria-hidden />
+              Essays
             </Link>
-          )
+            {!making && (
+              <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
+                <Plus className="size-4" strokeWidth={2} aria-hidden />
+                Make a subject
+              </Link>
+            )}
+          </>
         }
       />
 
@@ -278,6 +319,8 @@ export default async function KnowPage({
       {/* Quizzes are over notes you chose rather than over one subject, so
           they sit after the subjects and before the ways of making one. */}
       <QuizzesSection quizzes={quizzes} failed={quizzesFailed} open={params.open === 'quizzes'} />
+
+      {personality && <PersonalitySection {...personality} />}
 
       {/* Naming a goal is the other way a track comes into being: the chain
           for one question first, and the curriculum around it. */}

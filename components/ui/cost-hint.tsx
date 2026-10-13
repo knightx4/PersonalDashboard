@@ -5,7 +5,7 @@ import { CircleDollarSign } from 'lucide-react';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { cn } from '@/lib/cn';
-import { costHintText, type CostEstimate } from '@/lib/core/spend/estimate-types';
+import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spend/estimate-types';
 
 /**
  * The $ beside a button that costs money to press.
@@ -13,7 +13,8 @@ import { costHintText, type CostEstimate } from '@/lib/core/spend/estimate-types
  * It sits next to the button the way an info mark would, and says what one
  * press is expected to cost: "About $0.40, usually $0.30 to $0.76, from 12
  * runs" when the spend ledger has enough runs to know, "About $0.05,
- * uncertain" when it does not.
+ * uncertain" when it does not. A second line names the model the press
+ * calls, or every model when it runs several (note 17bae0c6).
  *
  * It takes the estimate already worked out (lib/core/spend/estimate-types.ts)
  * and fetches nothing, so a page that has several paid buttons asks for all
@@ -87,7 +88,9 @@ export function CostHint({
   }, [mode]);
 
   const text = costHintText(estimate, count);
-  const label = what ? `${what}: ${text}` : `Expected cost: ${text}`;
+  const models = costHintModels(estimate);
+  const spoken = models ? `${text}. ${models}` : text;
+  const label = what ? `${what}: ${spoken}` : `Expected cost: ${spoken}`;
 
   function peek() {
     if (mode === 'closed') setMode('peek');
@@ -139,7 +142,8 @@ export function CostHint({
           anchor={align === 'end' ? 'trigger-below-end' : 'trigger-below'}
           className="w-max max-w-64 px-3 py-2 text-small text-ink outline-none"
         >
-          {text}
+          <span className="block">{text}</span>
+          {models && <span className="block text-ink-muted">{models}</span>}
         </Popover>
       )}
     </span>

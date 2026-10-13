@@ -1,5 +1,6 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import type { TalkToolCall } from './talk';
+import { CHART_TOOL } from './chart';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -49,16 +50,27 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_goal',
   'add_goal_step',
   'close_goal_step',
+  'set_goal_done_when',
   'mark_returned',
   'add_role_note',
+  'add_job_lead',
+  'add_idea',
+  'change_items',
+  'move_roles',
 ];
 
 /**
- * Writes and proposals have their cards under the answer and a hand-off says
- * so in the answer, so the lines are the reads alone.
+ * Writes and proposals have their cards under the answer, a hand-off says so
+ * in the answer and a chart is drawn in it (plan #1655), so the lines are the
+ * reads alone.
  */
 export function isShownLookup(name: string): boolean {
-  return !name.startsWith('propose_') && name !== 'hand_off' && !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name);
+  return (
+    !name.startsWith('propose_') &&
+    name !== 'hand_off' &&
+    name !== CHART_TOOL &&
+    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
+  );
 }
 
 const MAX_QUOTED = 60;
@@ -118,7 +130,7 @@ export function lookupLabel(name: string, input: unknown): string {
     case 'read_dev_row': {
       const kind = field(input, 'kind');
       const ref = field(input, 'ref');
-      if (kind === 'step' && typeof ref === 'string' && /^#?\d+$/.test(ref.trim())) {
+      if (kind === 'step' && typeof ref === 'string' && /^#?\d+(?:\.\d+)*$/.test(ref.trim())) {
         return `Reading step #${ref.trim().replace(/^#/, '')}`;
       }
       return kind === 'idea' ? 'Reading an idea' : kind === 'note' ? 'Reading a note' : kind === 'raise' ? 'Reading a raise' : 'Reading a plan step';

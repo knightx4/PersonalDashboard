@@ -1,0 +1,109 @@
+import { createClient, requireUser } from '@/lib/auth/server';
+import { PageHeader } from '@/components/shell/page-header';
+import { loadRaised } from '@/lib/raised/load';
+import { planRefTitles } from '@/lib/plan/load';
+import { stepRef } from '@/lib/plan/ref';
+import { loadPlanForRequest } from '@/lib/plan/request-plan';
+import { loadPlanRunQuestions } from '@/lib/plan/run-answer';
+import { buildPlanTree, flattenSections, type PlanSection } from '@/lib/plan/tree';
+import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
+import { jevEnabledFor } from '@/lib/jev/enabled';
+import { loadOpenSpecChanges } from '@/lib/specs/changes';
+import { specBySlug } from '@/lib/specs/registry';
+import type { SnoozeState } from '@/lib/core/inbox-snoozes';
+import { RaisedView } from '@/app/dev/raised/raised-view';
+import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
+import { planRowRef, raiseRef, snoozedItems, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
+
+export const metadata = { title: 'Inbox' };
+
+/**
+ * The plan's rows waiting on you, with each blocked step's ask sorted into a
+ * job or a question by Jev (plan #1176). Falls back to the regex's guess, row
+ * by row inside sortAsksWithJev and wholesale here if the account setting or
+ * the ledger cannot be reached.
+ */
+async function readWaitingRows(
+  sections: readonly PlanSection[],
+  userId: string,
+  snoozes: SnoozeState,
+) {
+  // Snoozed rows are left out before Jev is asked about them (plan #1843).
+  const rows = withoutSnoozed(waitingOnYou(sections), (row) => planRowRef(row.id), snoozes);
+  try {
+    const core = await createCoreClient();
+    const spend: SpendReport[] = [];
+    const sorted = await sortAsksWithJev(rows, {
+      enabled: await jevEnabledFor(core, userId),
+      onSpend: (report) => spend.push(report),
+    });
+    await recordSpendReports(core, userId, { module: 'core', operation: 'sort-waiting' }, spend);
+    return sorted;
+  } catch (error) {
+    console.error(`The inbox could not sort the asks with Jev: ${(error as Error).message}`);
+    return rows;
+  }
+}
+
+/**
+ * Everything waiting on you in Dev, on a page of its own.
+ *
+ * Two halves in one list. The plan's own rows (a blocked step, an unanswered
+ * decision, a proposal nobody approved) are derived from the tree rather than
+ * filed by a session, so a step blocked on a credential reaches this page
+ * without anybody remembering to raise it as well. The raises are what a
+ * session ran into and could not settle alone. Changes Dash proposed to a spec
+ * wait under To approve (plan #1506).
+ *
+ * The tab's badge is counted from the same three sources in app/dev/layout.tsx,
+ * so the number on the tab is the number of rows on this page.
+ */
+export default async function DevInboxPage() {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const [queue, plan, specChanges, runQuestions, snoozes] = await Promise.all([
+    loadRaised(supabase, user.id),
+    loadPlanForRequest(user.id),
+    loadOpenSpecChanges(supabase, user.id),
+    // Runs held on a question they asked partway (plan #1824).
+    loadPlanRunQuestions(supabase, user.id),
+    // Rows put aside until a later day (plan #1843), in one query.
+    loadSnoozeState(supabase, user.id),
+  ]);
+
+  const sections = buildPlanTree(plan);
+  const groups = waitingGroups(
+    sections,
+    { open: withoutSnoozed(queue.open, (raise) => raiseRef(raise.id), snoozes) },
+    await readWaitingRows(sections, user.id, snoozes),
+    specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
+    runQuestions,
+  );
+
+  // What every "#494" on this page is called, built once rather than looked up
+  // where each one is drawn.
+  const titles = planRefTitles(plan, flattenSections(sections));
+
+  // What the list at the foot calls each snoozed row.
+  const numbered = new Map(flattenSections(sections).map((step) => [planRowRef(step.id), step]));
+  const raised = new Map(queue.open.map((raise) => [raiseRef(raise.id), raise]));
+  const snoozed = snoozedItems(snoozes, (ref) => {
+    const step = numbered.get(ref);
+    return step ? `${stepRef(step)} ${step.title}` : (raised.get(ref)?.title ?? null);
+  });
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader title="Inbox" />
+      <RaisedView
+        queue={queue}
+        groups={groups}
+        titles={titles}
+        snooze={{ back: [...snoozes.back], snoozed }}
+      />
+    </div>
+  );
+}

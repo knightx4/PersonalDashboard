@@ -18,6 +18,10 @@
  *  - `reshape`: rows written beneath the feature, or dropped there, while it
  *    ran; for a feature already closed, a new top-level row naming it.
  *  - `feature`: steps beneath the feature closed or blocked while it ran.
+ *  - `overhaul`: the same as `feature`, since it works the steps beneath one
+ *    overhaul in their phase order (plan #1514).
+ *  - `unstick`: any row at or beneath the feature changed while it ran, such
+ *    as a block written, a step re-opened or one added.
  *
  * The notes, shaping and check-back trails are the account's, not the run's:
  * nothing records which note a notes run closed. Two notes runs at once read
@@ -38,7 +42,15 @@ import type { RunEnd } from './run-end';
 export const WORK_WINDOW_MINUTES = 6 * 60;
 
 /** The jobs whose runs are judged by what they left behind. */
-export const WORK_JOBS = ['notes', 'check_back', 'shape', 'reshape', 'feature'] as const;
+export const WORK_JOBS = [
+  'notes',
+  'check_back',
+  'shape',
+  'reshape',
+  'feature',
+  'overhaul',
+  'unstick',
+] as const;
 export type WorkJob = (typeof WORK_JOBS)[number];
 
 export function readsWork(job: string | null | undefined): job is WorkJob {
@@ -51,11 +63,11 @@ export function readsWork(job: string | null | undefined): job is WorkJob {
  * Notes, shaping and check-back runs mostly write rows rather than commits,
  * and a re-shape never commits, so the push listing says nothing about them.
  * Read through it, the no-output mark wrote off re-shapes thirty minutes in
- * while they were still writing steps. A feature batch commits, so it keeps
- * the push reading.
+ * while they were still writing steps. A feature batch and an overhaul run
+ * commit, so they keep the push reading.
  */
 export function judgedOnClock(job: string | null | undefined): boolean {
-  return readsWork(job) && job !== 'feature';
+  return readsWork(job) && job !== 'feature' && job !== 'overhaul';
 }
 
 /** What one run's job left behind, as the sweep read it. */
@@ -119,6 +131,8 @@ const NOTHING_DONE: Record<WorkJob, string> = {
   shape: 'No idea was shaped into a proposal while it ran.',
   reshape: 'Nothing beneath the feature was added or dropped while it ran.',
   feature: 'No step beneath the feature closed or stopped on a question while it ran.',
+  overhaul: 'No step beneath the overhaul closed or stopped on a question while it ran.',
+  unstick: 'Nothing at or beneath the feature changed while it ran.',
 };
 
 /**
@@ -142,7 +156,39 @@ export type WorkRow = {
   updatedAt: string;
   completedAt: string | null;
   blockedAt: string | null;
+  /** Its place among its siblings, which the outline is counted by. */
+  position?: number;
 };
+
+/**
+ * Where a row sits ("1073.4"), counted the way `buildPlanTree` counts it:
+ * a top-level row is its number, and a child is its parent's outline and its
+ * place among its siblings by position, then age, then number. Null when a
+ * row on the way up has no number.
+ */
+export function outlineOf(rows: readonly WorkRow[], id: string): string | null {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const row = byId.get(id);
+  if (!row) return null;
+  if (!row.parentId || !byId.has(row.parentId)) {
+    return row.number === null ? null : String(row.number);
+  }
+  const above = outlineOf(rows, row.parentId);
+  if (above === null) return null;
+  const siblings = rows
+    .filter((other) => other.parentId === row.parentId)
+    .sort(
+      (a, b) =>
+        (a.position ?? 0) - (b.position ?? 0) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        (a.number ?? 0) - (b.number ?? 0),
+    );
+  return `${above}.${siblings.findIndex((other) => other.id === id) + 1}`;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /** Every row beneath a root, not counting the root. */
 export function beneath(rows: readonly WorkRow[], root: string): WorkRow[] {
@@ -202,7 +248,7 @@ export function featureWork(
  * A re-shape of a feature that has already closed writes nothing inside it
  * and raises a new top-level feature whose detail names it instead, so those
  * are counted too: `named` is the top-level rows written in the window whose
- * detail mentions the feature's number.
+ * detail names the feature, by its number or its outline.
  */
 export function reshapeWork(
   rows: readonly WorkRow[],
@@ -214,16 +260,39 @@ export function reshapeWork(
   const written = under.filter(
     (row) => within(row.createdAt, window) || (row.status === 'dropped' && within(row.updatedAt, window)),
   ).length;
+  // Named by its number in older text and by its outline in newer, and not
+  // by a step under it: `#1073` does not name 1073 when it is `#1073.4`.
   const number = rows.find((row) => row.id === root)?.number ?? null;
+  const outline = outlineOf(rows, root);
+  const refs = [number === null ? null : String(number), outline].filter(
+    (ref): ref is string => ref !== null,
+  );
+  const pattern = refs.length
+    ? new RegExp(`#(?:${[...new Set(refs)].map(escapeRegExp).join('|')})(?!\\.?\\d)`)
+    : null;
   const raised =
-    number === null
+    pattern === null
       ? 0
-      : named.filter(
-          (row) =>
-            within(row.createdAt, window) &&
-            new RegExp(`#${number}(?!\\d)`).test(row.detail ?? ''),
-        ).length;
+      : named.filter((row) => within(row.createdAt, window) && pattern.test(row.detail ?? ''))
+          .length;
   return { done: written + raised };
+}
+
+/**
+ * What a stall diagnosis did: rows at or beneath the feature changed in its
+ * window. A fix in code shows as the step it re-opened or re-wrote, a blocker
+ * as the step it blocked, and a wait as the check-back it added, which the
+ * caller counts into `checks`.
+ */
+export function unstickWork(
+  rows: readonly WorkRow[],
+  root: string,
+  window: { from: string; to: string },
+  checks = 0,
+): RunWork {
+  const own = rows.filter((row) => row.id === root);
+  const changed = [...own, ...beneath(rows, root)].filter((row) => within(row.updatedAt, window));
+  return { done: changed.length + checks };
 }
 
 /** What a check-back run did, from the check-backs it was woken for. */

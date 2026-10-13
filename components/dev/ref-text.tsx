@@ -26,7 +26,7 @@ import { LinkedText } from '@/components/ui/linked-text';
  * opens it.
  */
 export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles }) {
-  const parts = splitOnRefs(text);
+  const parts = splitOnRefs(text, titles);
   if (!parts.some((part) => part.ref !== null)) return <LinkedText text={text} />;
 
   return (

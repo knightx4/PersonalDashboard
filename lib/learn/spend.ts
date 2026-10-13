@@ -49,6 +49,10 @@ export const LEARN_OPERATIONS = [
   'propose-floor',
   'classify-note',
   'concepts-from-note',
+  // The second check on a note's concepts (plan #1718): one Haiku call per
+  // note that produced any, judging each keep, weak or drop. Apart from
+  // 'concepts-from-note' so the cost of the check can be read on its own.
+  'judge-note-concepts',
   'concepts-from-prior',
   'concepts-from-brief',
   // Proposing the ideas one transcript course covered (plan #1390), from the
@@ -140,6 +144,11 @@ export const LEARN_OPERATIONS = [
   // the person's notes nearest it (plan #1112). Once per distinct text: the
   // vector is kept in obsidian.text_embeddings by the text's hash.
   'embed-note-match',
+  // Embedding the passages of every vault note, split at its headings, for
+  // passage search (plan #1863.7). Recorded against the note's owner, from
+  // the vault sync and the map sweep's tick; a passage is embedded again only
+  // when its text or the note's path changes.
+  'embed-note-blocks',
   // Writing the sentence over each of the week's connections between new and
   // older vault notes (plan #1115). One Haiku call a week per person, from
   // the Monday cron, and none in a week with nothing to point out.
@@ -245,11 +254,18 @@ export const LEARN_OPERATIONS = [
   // answer.
   'mark-review-question',
   // Dash's reply in a conversation about a Learn now card (plan #1053), made
-  // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
+  // by lib/talk/reply.ts. One Sonnet call per question asked on a card. The
+  // chat on a reading's page (plan #1876.5) records here too, one Sonnet call
+  // per question over the reading's text (at most 200,000 characters, cached
+  // across a thread): the same kind of reply, kept to one operation by the
+  // conversational-model-paths count.
   'reply-about-card',
   // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
   // call per phrase per card; selecting it again reads the stored one.
   'explain-phrase',
+  // "In this video" on a Learn now card with a lecture clip (note
+  // cde86a10): two sentences about the clip, written by the hourly top-up.
+  'describe-card-clip',
   // Make it a card, under a phrase's explanation (plan #1057): the same call
   // as 'write-feed-card', made on the press while the person waits rather
   // than by the top-up, so what asked-for cards cost can be read on its own.
@@ -282,10 +298,58 @@ export const LEARN_OPERATIONS = [
   // #1398): one Haiku call per video, from the library run, reading the
   // transcript as numbered sentences and naming the clips in it.
   'cut-clips',
+  // Tagging the clips cut before #1695 with every subject they serve (plan
+  // #1696): one Haiku call per fifty clips, reading captions and ideas only.
+  'tag-clips',
   // Scoring a clip for the clip stream (plan #1401): one Jev score question
   // per clip, and one Haiku call for up to forty clips Jev could not answer.
   // Both recorded here, one row per model per person per run.
   'score-clips',
+  // Rating a clip on educational value, entertainment and quality: three Jev
+  // score questions in one request per clip, and one Haiku call for up to
+  // forty clips Jev could not rate. One row per model per person per run.
+  'rate-clips',
+  // Dash's read of a personality result against your notes (plan #1635): one
+  // Sonnet call when a result is saved, after the page has answered, and one
+  // more each time the button on the Know page asks for a fresh read. The
+  // notes are found with the cached trait sentences, under 'embed-note-match'.
+  'read-personality',
+  // Matching the subject names a Claude chat gives to the person's own
+  // subjects (plan #1809): one Haiku call per reading list or session added
+  // through the connector, made only when a name is not an exact match.
+  'match-subjects',
+  // Embedding each idea's claim as Learn saves it, from every route that
+  // writes one: a track's chain, a reading, the survey, a conversation and a
+  // rewritten claim (plan #1853). One Voyage call per write, about 65 tokens
+  // an idea, recorded against the idea's owner by whatever client wrote it.
+  'embed-idea',
+  // The next question of a new essay's interview (plan #1867): one Sonnet
+  // call per answer, four at most an essay, since the first question is
+  // written without one.
+  'word-essay-question',
+  // Rephrase on a selection in an essay (plan #1868): one Sonnet call per
+  // press, rewording the selected text only.
+  'rephrase-essay-selection',
+  // A named check on an essay (plan #1869): one Sonnet call per paragraph
+  // the check reads, or one for a check on the whole essay. Already Said
+  // also finds the notes to compare with, under 'embed-note-match'.
+  'check-essay-paragraph',
+  // Research on an essay, at the level whose button was pressed (plan
+  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // The deeper pass is one Haiku call with up to eight searches and five
+  // pages read, then one Sonnet call marking the draft's claims against the
+  // pages; apart, so each model's share can be read.
+  'research-essay-question',
+  'gather-essay-sources',
+  'judge-essay-claims',
+  // Finishing an essay (plan #1873): one Sonnet call naming the claims it
+  // argues, then one embedding per claim to find the notes that already hold
+  // it, under 'embed-note-match'.
+  'name-essay-claims',
+  // Summarize on a reading's page (plan #1876.4): one Sonnet call over the
+  // reading's text, at most 200,000 characters, per press of Summarize or
+  // Redo. Nothing is spent when the link cannot be read.
+  'summarize-reading',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

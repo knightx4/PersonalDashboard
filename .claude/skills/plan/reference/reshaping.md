@@ -29,7 +29,7 @@ feature and every feature is theirs to approve.
    answer can land under it long after it closed — but everything the re-shape
    turns up there is *new work*, so it goes at the top level:
    `add "…" --proposed` with no `--parent`, a detail that opens by saying it
-   came out of `#<n>`, and the steps and questions under **that**. Pass
+   came out of `#<outline>`, and the steps and questions under **that**. Pass
    `--proposed` every time: `add` without a parent writes a not-started row,
    and a new feature waits for the person like any other. The steps under it
    are then proposed without the flag, because the feature above them is.
@@ -52,7 +52,7 @@ feature and every feature is theirs to approve.
    rewritten into something vaguer is worse than one left alone. If part of it
    has cleared and part has not, `fog <n> --note "…"` with what is left.
 3. **Say what an answer invalidated.** A step an answer made pointless is
-   `drop <n> --note "…"`, naming the answer that did it and why: "#63's answer
+   `drop <n> --note "…"`, naming the answer that did it and why: "#95.2's answer
    settles this on the server, so the client half is not needed." A re-shape
    may drop, and must always say why. If you are not sure the step is dead,
    it is not: say so in the report and leave it alone.
@@ -69,14 +69,18 @@ feature and every feature is theirs to approve.
    a follow-on: file it with `idea "…"` and leave the feature alone. Same two
    tests as shaping, the same one patch of fog, and the same three parts to a
    decision — see **How a decision must be written**.
-5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
+5. **Write Dash's update on the feature** (plan #1666): `update <n> --health
+   on_track|at_risk|blocked --body "…"`, two or three sentences on what the
+   re-shape changed: what it added, dropped and asked, by outline. The health
+   rules are in step 7 of the Building section in `SKILL.md`.
+6. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not add again what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added,
    and everything under *Already dismissed*, which is what the person has
    turned down and is not to be written back in any form.
    Report what you added (saying which went in ready and which as
    proposals), what you dropped and why, what fog you cleared, and anything
-   you noticed and deliberately left alone, all **by number and title**.
+   you noticed and deliberately left alone, all **by outline and title**.
 
 The contract this rests on: the person approves a feature once, and the plan
 beneath it adapts without asking again. What makes that safe is that every
@@ -90,8 +94,9 @@ the repository.
 
 ## After a vision edit
 
-A second kind of re-shape starts when the person accepts a new vision for a
-workspace on the specs page (#1109 settled that it should). The turn names the
+A second kind of re-shape starts when a workspace's vision changes on the
+specs page: the person accepts an edit the weekly review proposed (#1109
+settled that it should), or saves a new vision by hand. The turn names the
 workspace, gives the new vision and the one it replaced, and lists every open
 feature there. One run reads them all.
 
@@ -104,7 +109,7 @@ run writes is ready to build and nothing is dropped by it.
    vision bears on it. Most features will read the same under the new vision;
    those get nothing.
 2. **Ask before any drop.** A step, or a whole feature, the new vision makes
-   pointless gets a decision under that feature: `add "Drop #<n> now that the
+   pointless gets a decision under that feature: `add "Drop #<outline> now that the
    vision says …?" --parent <the feature> --kind decision --detail "A — Drop
    it. … B — Keep it. … Recommend …"`, quoting the part of the vision that
    argues for dropping. Never `drop`.
@@ -117,5 +122,8 @@ run writes is ready to build and nothing is dropped by it.
 4. **Stop.** No approve, no answer, no start, no fog graduated or rewritten,
    and nothing added again that a feature already holds or that is listed as
    dismissed. The run changes rows, not code, so it does not commit. Report,
-   by number and title, what you proposed, which drops you asked about, and
+   by outline and title, what you proposed, which drops you asked about, and
    which features you read and left alone.
+5. **Mark the run finished**, as the last write, under job `vision_reshape`
+   (not `reshape`): the SQL is at the end of SKILL.md. The run is about no
+   step, so nothing else ends it.

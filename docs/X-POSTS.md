@@ -98,6 +98,23 @@ reading the draft.
 - **Images other than Surfaces-gallery screenshots.** The gallery draws sample
   data. A screenshot of a live page shows the person's rows.
 
+### Asks
+
+When the person types an ask on the Posts tab, they have chosen the subject,
+and two of the rules above give way to what they wrote:
+
+- **The workspace the ask is about is open.** An ask for a post about the
+  vault may cite vault steps and describe what the vault does. Every other
+  workspace stays closed, and the rest of this list still holds for the post
+  itself: no names, amounts, employers, contact details or identifiers, and no
+  quoting the person's notes, rows or messages.
+- **Real data in the picture, when the ask says so.** A run cannot sign in to
+  the app, so it cannot photograph a live page. It attaches the gallery
+  picture of that page if one fits, and says in its note that the person can
+  swap in their own screenshot with Add an image.
+
+A step named from a changelog line gets neither: it was not typed as an ask.
+
 A closed note (`feedback_items`) is a source only when it is about the app
 itself. Notes often quote what the person saw on a page, which can carry their
 data, so check a note's text against this list as strictly as a draft.

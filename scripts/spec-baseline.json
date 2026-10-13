@@ -1,9 +1,9 @@
 {
   "conversational-model-paths": 8,
-  "learn-nav-tabs": 4,
+  "learn-nav-tabs": 5,
   "link-tables-per-target-column": 4,
   "model-id-files": 1,
   "raw-motion-values": 0,
-  "routes-without-surface": 49,
+  "routes-without-surface": 0,
   "thread-tables": 1
 }

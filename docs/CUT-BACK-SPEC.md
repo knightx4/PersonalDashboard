@@ -9,8 +9,9 @@ Learn, and it slows the build loop while the cutting happens.
 Nothing in this spec deletes data. A cut page is hidden or merged into another;
 its tables stay, and anything frozen can be brought back.
 
-> **Status:** decisions answered 2 October 2026, and shaped into proposed
-> features on `/dev/plan`.
+> **Status:** decisions answered 2 October 2026. The plan steps for Parts 1 to 3
+> are done (#1482, #1493, #1494, #1502, #1691, #1693); Part 4 waits on 30 days of
+> page views.
 
 ## What the numbers say
 
@@ -174,9 +175,9 @@ notification, so its open count says nothing about whether it is read on Home.
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. The
 baseline was measured on main on 3 October 2026.
 
-**R1.** Learn has four tabs at most: Now, Subjects, Reading lists and, for the
-owner, Videos.
-Checked by: count `learn-nav-tabs`, baseline 4.
+**R1.** Learn has five tabs at most: Now, Subjects, Idea Space, Reading lists
+and, for the owner, Videos. Idea Space was added at your ask on 12 October 2026.
+Checked by: count `learn-nav-tabs`, baseline 5.
 
 **R2.** Every page opened is recorded in `core.page_views`, and a prefetch or
 an `/api` call is not.

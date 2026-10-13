@@ -120,12 +120,18 @@ describe('RLS coverage', () => {
       'concepts',
       'course_reads',
       'curriculum_units',
+      'essay_notes',
+      'essay_research',
+      'essays',
       'feed_cards',
       'goals',
       'imports',
+      'learning_log',
       'next_outcomes',
+      'note_reads',
       'opening_questions',
       'opening_sweeps',
+      'personality_results',
       'phrase_explanations',
       'piece_checks',
       'piece_practice',
@@ -137,6 +143,7 @@ describe('RLS coverage', () => {
       'quiz_questions',
       'quiz_sources',
       'quizzes',
+      'reading_subjects',
       'readings',
       'review_questions',
       'settings',
@@ -148,10 +155,65 @@ describe('RLS coverage', () => {
       'tracks',
       'transcript_calls',
       'video_clip_cuts',
+      'video_clip_subjects',
       'video_clips',
       'video_transcripts',
       'watch_list',
     ]);
+  });
+});
+
+describe('what a chat adds (plan #1807)', () => {
+  // A reading related to a subject, and a logged conversation, both A's. The
+  // join row's foreign key to the subject is composite, so B cannot relate
+  // A's reading to a subject of B's or the other way round.
+  let subjectA = '';
+  let subjectB = '';
+
+  beforeAll(async () => {
+    [{ id: subjectA }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Agentic AI Systems') returning id`;
+    [{ id: subjectB }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userB}, 'Bob studies things') returning id`;
+    await admin`
+      insert into reading_subjects (user_id, reading_id, subject_id)
+      values (${userA}, ${readingA}, ${subjectA})`;
+    await admin`
+      insert into learning_log (user_id, subject_id, topic, summary, ideas)
+      values (${userA}, ${subjectA}, 'Evals', 'Define good, build a set, read failures.', '[]'::jsonb)`;
+  });
+
+  it('shows the owner their rows and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from reading_subjects`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select id from learning_log`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from reading_subjects`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from learning_log`)).toHaveLength(0);
+  });
+
+  it('refuses a row written for another account', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userA}, ${readingA}, ${subjectA})`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into learning_log (user_id, topic, summary) values (${userA}, 'x', 'y')`),
+    ).rejects.toThrow();
+  });
+
+  it('cannot relate one account\'s reading to another account\'s subject', async () => {
+    await expect(
+      admin`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userA}, ${readingA}, ${subjectB})`,
+    ).rejects.toThrow();
+    // B's own subject, A's reading: the reading's key carries its owner too.
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userB}, ${readingA}, ${subjectB})`),
+    ).rejects.toThrow();
   });
 });
 
@@ -2195,6 +2257,75 @@ describe('clips cut from video transcripts', () => {
         (tx) => tx`insert into video_clip_cuts (user_id, video_id, came_from)
                    values (${userA}, 'abcdefghijk', 'channel')`,
       ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('personality test results', () => {
+  // 0092_personality_results.sql (plan #1631). One row per test taken or
+  // typed in; a retake is a second row, and Dash's read sits on the result.
+  const answers = admin.json(Array.from({ length: 50 }, (_, i) => (i % 5) + 1));
+
+  it('saves a result and reads it back, to its owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_results (user_id, kind, test_name, answers, extraversion,
+                   agreeableness, conscientiousness, emotional_stability, intellect, taken_at)
+                 values (${userA}, 'big_five', 'Big Five', ${answers}, 22, 38, 31, 27, 44,
+                         '2026-10-01')`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value, taken_at)
+                 values (${userA}, 'enneagram', 'Enneagram', '5w4', '2023-05-12')`,
+    );
+    const own = await asUser(
+      userA,
+      (tx) => tx`select kind, extraversion, intellect, typed_value, taken_at::text as taken_at,
+                        jsonb_array_length(answers) as n
+                 from personality_results order by taken_at desc`,
+    );
+    expect(own).toEqual([
+      { kind: 'big_five', extraversion: 22, intellect: 44, typed_value: null, taken_at: '2026-10-01', n: 50 },
+      { kind: 'enneagram', extraversion: null, intellect: null, typed_value: '5w4', taken_at: '2023-05-12', n: null },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from personality_results`)).toHaveLength(0);
+  });
+
+  it("does not let a user write or change another account's result", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value)
+                   values (${userA}, 'mbti', 'Myers-Briggs', 'ESTP')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update personality_results set typed_value = 'ESTP'`);
+    await asUser(userB, (tx) => tx`delete from personality_results`);
+    const left = await admin`select id from personality_results where user_id = ${userA}`;
+    expect(left).toHaveLength(2);
+  });
+
+  it('refuses a result of the wrong shape, and a half-written read', async () => {
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, typed_value)
+            values (${userA}, 'big_five', 'Big Five', 'high')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, answers, extraversion,
+              agreeableness, conscientiousness, emotional_stability, intellect)
+            values (${userA}, 'big_five', 'Big Five', ${answers}, 9, 38, 31, 27, 44)`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name)
+            values (${userA}, 'mbti', 'Myers-Briggs')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, typed_value)
+            values (${userA}, 'astrology', 'Stars', 'Leo')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
   });
 });

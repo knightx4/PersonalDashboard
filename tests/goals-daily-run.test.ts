@@ -47,6 +47,9 @@ function fakeClient(fixture: Fixture) {
         return { data: comments.map((c) => ({ ref: `goals.items:${c.item_id}`, created_at: c.created_at })), error: null };
       }
       if (table === 'progress_entries') return { data: fixture.progress ?? [], error: null };
+      if (table === 'periods' || table === 'records' || table === 'collection_goals') {
+        return { data: [], error: null };
+      }
       return { data: fixture.items, error: null };
     };
     const builder: Record<string, unknown> = {
@@ -66,7 +69,7 @@ function fakeClient(fixture: Fixture) {
         return Promise.resolve(result()).then(resolve);
       },
     };
-    for (const name of ['select', 'eq', 'in', 'is', 'not', 'gte', 'order', 'limit', 'single', 'like']) {
+    for (const name of ['select', 'eq', 'in', 'is', 'not', 'gt', 'gte', 'order', 'limit', 'single', 'like']) {
       builder[name] = () => builder;
     }
     return builder;

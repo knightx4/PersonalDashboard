@@ -30,9 +30,11 @@ never approves or declines a change, and never touches a vision.
 
 ## How it is fired
 
-By hand for now: a session told to audit the specs. The Monday schedule is
-plan #1524, which fires the routine whose prompt is
-`reference/routine-prompt.md`.
+Each Monday at 14:47 UTC, pg_cron calls `/api/cron/spec-audit`, which fires
+the routine whose prompt is `reference/routine-prompt.md` and records the
+fire in `plan_runs` with job `audit` (plan #1524). It fires nothing when an
+audit wrote findings or was started in the last six days. A session told to
+audit the specs runs the same skill by hand.
 
 ## Working without the CLI
 
@@ -139,9 +141,11 @@ file, row or commit; report only.
      table or routine, not a helper).
 4. A spec with a "Status" block naming plan steps describes work that may be
    planned rather than built. Before calling something missing, check the
-   plan: `select number, title, status from plan_items where user_id = '…'
-   and number in (…)` or search titles. Missing and planned is still
-   missing, with the step in the evidence.
+   plan: `select o.outline, p.title, p.status from plan_items p join
+   plan_item_outlines o on o.id = p.id where p.user_id = '…' and p.number in
+   (…)` (older Status blocks name steps by number) or search titles. Missing
+   and planned is still missing, with the step in the evidence, named by its
+   outline (`#1073.4`), the way the plan page heads it.
 
 Report as a list, one entry per finding, each with: section (the heading it
 is about, or null for the whole spec; "R3" style for a rule), kind,

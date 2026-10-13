@@ -4,12 +4,14 @@ import {
   isClosed,
   isDismissed,
   type PlanBlockKind,
+  type PlanCheckWait,
   type PlanData,
   type PlanItem,
   type PlanStatus,
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import { stepRef } from './ref';
 
 /**
  * The plan, read.
@@ -85,6 +87,14 @@ export type PlanNode = PlanItem & {
    * its steps, whether or not each one says so.
    */
   waitingOn: PlanRef[];
+  /**
+   * The check-backs it waits for, its own and those of every step above it:
+   * a session said to look again at a time because the work needs something
+   * that does not exist yet, such as two weeks of data. Held up until each is
+   * checked, the same as by an unfinished step, so the runner leaves it alone
+   * and the row says "Waiting on 26 Oct".
+   */
+  waitsUntil: PlanCheckWait[];
   /** Over the leaf steps beneath it. `live` is 0 on a step with none. */
   rollup: PlanProgress;
   /** Could be started now. See `isReady` for the rule. */
@@ -124,6 +134,10 @@ export const PLAN_VIEWS = [
   'blocked',
   'fog',
   'dismissed',
+  // Not a filter but a layout: every open feature as one row of a table,
+  // grouped by module (plan #1669). The tree under it is the whole plan, as
+  // on Everything, and lib/plan/feature-table.ts picks the rows.
+  'table',
 ] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
@@ -138,9 +152,10 @@ export function isPlanView(value: string): value is PlanView {
  * I pick up" or "what is waiting on me". These five answer those and give the
  * way back to the whole plan; the rest are a press further away in the menu
  * beside them, and the counts along the summary strip link to most of them
- * anyway.
+ * anyway. Table is the sixth: the same plan read one feature to a row
+ * (plan #1669), which is a way of reading it rather than a narrowing of it.
  */
-export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all'] as const;
+export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all', 'table'] as const;
 
 /** Every other view, in the menu at the end of the chip row. */
 export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
@@ -339,11 +354,13 @@ export function isBlocked(node: {
  *    parent's status standing in for all of them.
  */
 export function isReady(
-  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn' | 'blockKind'>,
+  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn' | 'blockKind'> & {
+    waitsUntil?: readonly PlanCheckWait[];
+  },
   ancestors: readonly Pick<PlanItem, 'status' | 'blockKind'>[],
 ): boolean {
   if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
-  if (node.waitingOn.length > 0) return false;
+  if (isWaiting(node)) return false;
   // A dismissed step is not one of the steps outstanding. Left in, a question
   // put aside would hold its feature open for good, which is the opposite of
   // what dismissing it was for.
@@ -351,6 +368,17 @@ export function isReady(
   if (ancestors.some((a) => a.status === 'dropped' || a.status === 'proposed')) return false;
   if (ancestors.some((a) => a.status === 'blocked' && !waitsOnItsSteps(a))) return false;
   return true;
+}
+
+/**
+ * Held up by something that is not the person: an unfinished step, its own or
+ * one above it, or a check-back not yet done.
+ */
+export function isWaiting(node: {
+  waitingOn: readonly unknown[];
+  waitsUntil?: readonly unknown[];
+}): boolean {
+  return node.waitingOn.length > 0 || (node.waitsUntil?.length ?? 0) > 0;
 }
 
 /**
@@ -391,6 +419,14 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
 
   const dependsOn = new Map<string, PlanLink[]>();
   const blocks = new Map<string, PlanRef[]>();
+  // Only a check-back on a row still open holds anything. One on a done step
+  // is usually the check that it landed, and holds nothing back.
+  const checksOn = new Map<string, PlanCheckWait[]>();
+  for (const check of data.checkWaits ?? []) {
+    const item = byId.get(check.planItemId);
+    if (!item || isClosed(item.status)) continue;
+    checksOn.set(item.id, [...(checksOn.get(item.id) ?? []), check]);
+  }
   for (const dep of data.dependencies) {
     const item = byId.get(dep.itemId);
     const target = byId.get(dep.dependsOnId);
@@ -406,6 +442,7 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
     item: PlanItem,
     ancestors: PlanItem[],
     inherited: PlanRef[],
+    inheritedChecks: PlanCheckWait[],
     outline: string,
   ): PlanNode {
     const own = (dependsOn.get(item.id) ?? [])
@@ -413,10 +450,13 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
       .filter((ref) => !isClosed(ref.status));
     const seen = new Set(inherited.map((ref) => ref.id));
     const waitingOn = [...inherited, ...own.filter((ref) => !seen.has(ref.id))];
+    const waitsUntil = [...inheritedChecks, ...(checksOn.get(item.id) ?? [])].sort((a, b) =>
+      a.dueAt.localeCompare(b.dueAt),
+    );
 
     const chain = [...ancestors, item];
     const children = (childrenOf.get(item.id) ?? []).map((child, index) =>
-      build(child, chain, waitingOn, `${outline}.${index + 1}`),
+      build(child, chain, waitingOn, waitsUntil, `${outline}.${index + 1}`),
     );
 
     const node: PlanNode = {
@@ -427,6 +467,7 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
       dependsOn: (dependsOn.get(item.id) ?? []).sort((a, b) => a.item.number - b.item.number),
       blocks: (blocks.get(item.id) ?? []).sort((a, b) => a.number - b.number),
       waitingOn,
+      waitsUntil,
       rollup: planProgress(leavesOf(children)),
       ready: false,
       matches: true,
@@ -436,7 +477,7 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
   }
 
   const roots = (childrenOf.get(null) ?? []).map((item) =>
-    build(item, [], [], String(item.number)),
+    build(item, [], [], [], String(item.number)),
   );
 
   // A chip names the step it points at the way that step's row reads, so the
@@ -730,6 +771,12 @@ export function healthOf(
     // read it alone drew a pulsing dot on a step nobody was working. The run
     // record can, and `claimLiveness` is where that is decided.
     case 'in_progress':
+      // A step a session put down to wait for a check-back is waiting, not
+      // underway, unless a session is pushing on it right now.
+      if ((node as { waitsUntil?: readonly unknown[] }).waitsUntil?.length &&
+        (node.id ? liveness?.[node.id] : undefined) !== 'working') {
+        return 'waiting';
+      }
       switch (node.id ? liveness?.[node.id] : undefined) {
         case 'working':
           return 'working';
@@ -747,7 +794,7 @@ export function healthOf(
     case 'dropped':
       return 'dropped';
     case 'not_started':
-      if (node.waitingOn.length > 0) return 'waiting';
+      if (isWaiting(node)) return 'waiting';
       // A feature is blocked when nothing beneath it can move.
       //
       // Since `isReady` stopped letting a feature's own blocked column hold
@@ -912,7 +959,7 @@ function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
   // A question to answer, a proposal to approve, or a step blocked on
   // something only you can supply. One rule, shared with the "On you" view.
   if (needsThePerson(node)) return 'on_you';
-  if (node.waitingOn.length > 0) return 'waiting';
+  if (isWaiting(node)) return 'waiting';
   // `assignee` says one thing now: you marked this and the runner will not
   // take it. That is true whether or not the step has been started, so it is
   // read before the status -- a step you kept and then began is still yours,
@@ -957,8 +1004,13 @@ export function moveOf(node: MoveInput, context?: MoveContext): PlanMove {
   return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
 
-/** How many steps are in each state. Every health has an entry, most of them 0. */
-export type PlanTally = Record<PlanHealth, number>;
+/**
+ * How many steps are in each state. Every health has an entry, most of them 0.
+ *
+ * `checkingBack` is the part of `waiting` held only by a check-back, which the
+ * heading draws as the clock rather than the dashed hexagon (note 5025f689).
+ */
+export type PlanTally = Record<PlanHealth, number> & { checkingBack: number };
 
 /**
  * The states of a module's steps, counted.
@@ -972,10 +1024,17 @@ export type PlanTally = Record<PlanHealth, number>;
  * asked about.
  */
 export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanTally {
-  const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
+  const tally = {
+    ...Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])),
+    checkingBack: 0,
+  } as PlanTally;
   for (const leaf of leavesOf(nodes)) {
     if (isDismissed(leaf)) continue;
-    tally[healthOf(leaf, liveness)] += 1;
+    const health = healthOf(leaf, liveness);
+    tally[health] += 1;
+    if (health === 'waiting' && leaf.waitingOn.length === 0 && leaf.waitsUntil.length > 0) {
+      tally.checkingBack += 1;
+    }
   }
   return tally;
 }
@@ -1158,7 +1217,7 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     case 'claude':
       return isClaudes(node) && !isClosed(node.status) && !isWaitingOnThePerson(node);
     case 'blocked':
-      return !isClosed(node.status) && (isBlocked(node) || node.waitingOn.length > 0);
+      return !isClosed(node.status) && (isBlocked(node) || isWaiting(node));
     // Closed steps included. A finished feature still carrying fog is the
     // case worth seeing: the work stopped and the gap it admitted to did not
     // get filled. Nothing else on the page shows that. A patch you have put
@@ -1170,6 +1229,9 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     // because a feature can be here for its fog while it is otherwise live.
     case 'dismissed':
       return isDismissed(node) || node.fogDismissedAt !== null;
+    // The table reads whole features, so nothing beneath one is pruned away.
+    case 'table':
+      return true;
   }
 }
 
@@ -1302,6 +1364,10 @@ function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
     // one step arrived at several.
     const number = /^#(\d+)$/.exec(term);
     if (number) return node.number === Number(number[1]);
+    // `#1073.4` the same way: the step the row heads itself with, and not
+    // #1073.41 or a child of it.
+    const outline = /^#(\d+(?:\.\d+)+)$/.exec(term);
+    if (outline) return node.outline === outline[1];
     return haystack.includes(term.replace(/^#/, ''));
   });
 }
@@ -1479,13 +1545,14 @@ export function isWaitingOnThePerson(
  */
 export function blockRefusal(
   node: Pick<PlanNode, 'number'> & {
+    outline?: string | null;
     dependsOn?: readonly PlanLink[];
     blockKind?: PlanBlockKind | null;
   },
 ): string {
   if (!waitsOnItsSteps(node)) {
     return (
-      `#${node.number} is blocked on something outside the repo. ` +
+      `${stepRef(node)} is blocked on something outside the repo. ` +
       'Clear what it is waiting on first -- its note says what.'
     );
   }
@@ -1497,16 +1564,16 @@ export function blockRefusal(
   const open = (node.dependsOn ?? []).filter((link) => !isClosed(link.item.status));
   if (open.length === 0) {
     return (
-      `#${node.number} is blocked on other steps, and none are recorded against it. ` +
+      `${stepRef(node)} is blocked on other steps, and none are recorded against it. ` +
       'Say what it is waiting for, or put it back to not started.'
     );
   }
 
-  const named = andList(open.map((link) => `#${link.item.number}`));
+  const named = andList(open.map((link) => stepRef(link.item)));
   return open.length === 1
-    ? `#${node.number} is blocked on ${named}, which is still open. ` +
+    ? `${stepRef(node)} is blocked on ${named}, which is still open. ` +
         'It clears itself when that step closes.'
-    : `#${node.number} is blocked on ${named}, which are still open. ` +
+    : `${stepRef(node)} is blocked on ${named}, which are still open. ` +
         'It clears itself when they close.';
 }
 
@@ -1547,7 +1614,7 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     onYou: outstanding.filter((node) => needsThePerson(node)).length,
     proposed: nodes.filter((node) => node.status === 'proposed').length,
     inProgress: open.filter((node) => node.status === 'in_progress').length,
-    waiting: open.filter((node) => isBlocked(node) || node.waitingOn.length > 0).length,
+    waiting: open.filter((node) => isBlocked(node) || isWaiting(node)).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
     claude: open.filter((node) => isClaudes(node) && !isWaitingOnThePerson(node)).length,

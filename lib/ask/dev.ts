@@ -2,6 +2,7 @@ import { SPECS, readSpec as readSpecFile, specBySlug, type SpecDoc } from '@/lib
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
 import { firstLine, planHref, raiseAnchor, waitingAnchor } from '@/lib/search/sources/dev-map';
 import { escapeLike } from '@/lib/search/sources/map';
+import { numberFromRef, readableRefs, refFor, type OutlineIndex } from '@/lib/plan/ref';
 import {
   AskInputError,
   clip,
@@ -249,6 +250,9 @@ export const MAX_DEV_COMMENTS = 40;
 /** The most characters of one comment a read returns. */
 export const DEV_COMMENT_CHARS = 2000;
 
+/** The most sessions sent at a step that one read returns: the newest. */
+export const MAX_STEP_RUNS = 5;
+
 /** Who wrote a comment or filed an idea, as the model is to name them. */
 export function writer(author: string | null | undefined): string {
   if (author === 'claude') return 'Dash';
@@ -256,11 +260,33 @@ export function writer(author: string | null | undefined): string {
   return author ?? 'unknown';
 }
 
-/** Long text for the model, newlines kept, cut at `max`. */
-function longText(text: string | null | undefined, max = SECTION_CHARS): string | null {
+/**
+ * Long text for the model, newlines kept, cut at `max`. Given the outlines,
+ * every stored `#1084` that is a step reads as the `#1073.4` the plan page
+ * shows, so Dash names steps as the person sees them.
+ */
+function longText(text: string | null | undefined, max = SECTION_CHARS, outlines?: OutlineIndex): string | null {
   const trimmed = text?.trim();
   if (!trimmed) return null;
-  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max).trimEnd()} …`;
+  const readable = outlines ? readableRefs(trimmed, outlines) : trimmed;
+  return readable.length <= max ? readable : `${readable.slice(0, max).trimEnd()} …`;
+}
+
+/**
+ * Every plan step's outline by its number, from the `plan_item_outlines` view
+ * (migration 0197), which places rows the way the plan page's tree does. A
+ * read that fails gives an empty index, and steps fall back to their numbers.
+ */
+export async function planOutlines(client: SchemaClient, ctx: AskContext): Promise<Map<number, string>> {
+  const index = new Map<number, string>();
+  try {
+    const { data, error } = await client.from('plan_item_outlines').select('number, outline').eq('user_id', ctx.userId);
+    if (error) return index;
+    for (const row of (data ?? []) as { number: number; outline: string }[]) index.set(Number(row.number), row.outline);
+  } catch {
+    // An index that could not be read names steps by number, which still finds them.
+  }
+  return index;
 }
 
 const UUID_IN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -272,16 +298,22 @@ function devKind(input: Input): DevRowKind {
   return resolved;
 }
 
-/** A step by its number ("#1248", "1248") or id; anything else by the id in the ref, a link included. */
-function devRef(kind: DevRowKind, input: Input): { column: 'id' | 'number'; value: string | number } {
+/**
+ * A step by its outline ("#1073.4", "1073.4"), its number ("#1248", "1248")
+ * or id; anything else by the id in the ref, a link included.
+ */
+function devRef(kind: DevRowKind, input: Input, outlines: OutlineIndex): { column: 'id' | 'number'; value: string | number } {
   const ref = optionalString(input, 'ref');
-  if (!ref) throw new AskInputError('Give the ref: the row\'s id, or a step\'s number.');
-  const number = ref.match(/^#?(\d+)$/)?.[1];
-  if (kind === 'step' && number) return { column: 'number', value: Number(number) };
+  if (!ref) throw new AskInputError('Give the ref: the row\'s id, or a step\'s outline or number.');
+  if (kind === 'step' && /^#?\d+(?:\.\d+)*$/.test(ref.trim())) {
+    const number = numberFromRef(ref, outlines);
+    if (number === null) throw new AskInputError(`${ref} names no step on the plan.`);
+    return { column: 'number', value: number };
+  }
   const id = ref.match(UUID_IN)?.[0];
   if (!id) {
     throw new AskInputError(
-      kind === 'step' ? `${ref} is neither a step number nor an id.` : `${ref} is not an id; search returns one for each row.`,
+      kind === 'step' ? `${ref} is neither a step's outline, its number nor an id.` : `${ref} is not an id; search returns one for each row.`,
     );
   }
   return { column: 'id', value: id.toLowerCase() };
@@ -290,11 +322,11 @@ function devRef(kind: DevRowKind, input: Input): { column: 'id' | 'number'; valu
 type DevComment = { author: string | null; body: string | null; created_at: string };
 
 /** The thread under a row as one block of text, each comment headed by its day and writer. */
-function thread(comments: DevComment[]): { text: string | null; count: number; dropped: number } {
+function thread(comments: DevComment[], outlines: OutlineIndex): { text: string | null; count: number; dropped: number } {
   const dropped = Math.max(0, comments.length - MAX_DEV_COMMENTS);
   const text = comments
     .slice(dropped)
-    .map((c) => `[${c.created_at.slice(0, 10)}, ${writer(c.author)}] ${longText(c.body, DEV_COMMENT_CHARS) ?? ''}`)
+    .map((c) => `[${c.created_at.slice(0, 10)}, ${writer(c.author)}] ${longText(c.body, DEV_COMMENT_CHARS, outlines) ?? ''}`)
     .join('\n\n');
   return { text: text || null, count: comments.length, dropped };
 }
@@ -314,7 +346,7 @@ function triageText(triage: unknown): string | null {
 type Detail = NonNullable<AskRow['detail']>;
 type Found = { id: string; title: string; href: string; detail: Detail };
 
-async function readIdea(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+async function readIdea(client: SchemaClient, ctx: AskContext, id: string, outlines: OutlineIndex): Promise<Found | null> {
   const { data, error } = await client
     .from('ideas')
     .select('id, body, module, source, triage, created_at, plan_item_id')
@@ -335,14 +367,14 @@ async function readIdea(client: SchemaClient, ctx: AskContext, id: string): Prom
       filed_by: writer(row.source),
       filed_on: row.created_at.slice(0, 10),
       workspace: row.module,
-      body: longText(row.body),
+      body: longText(row.body, SECTION_CHARS, outlines),
       triage_by_dash: triageText(row.triage),
       shaped_into_plan: row.plan_item_id !== null,
     },
   };
 }
 
-async function readNote(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+async function readNote(client: SchemaClient, ctx: AskContext, id: string, outlines: OutlineIndex): Promise<Found | null> {
   const { data, error } = await client
     .from('feedback_items')
     .select('id, body, kind, status, page_path, resolution_note, triage, created_at')
@@ -364,9 +396,9 @@ async function readNote(client: SchemaClient, ctx: AskContext, id: string): Prom
       kind: row.kind,
       status: row.status,
       page: row.page_path,
-      body: longText(row.body),
+      body: longText(row.body, SECTION_CHARS, outlines),
       triage_by_dash: triageText(row.triage),
-      resolution_by_dash: longText(row.resolution_note),
+      resolution_by_dash: longText(row.resolution_note, SECTION_CHARS, outlines),
     },
   };
 }
@@ -391,6 +423,7 @@ async function readStep(
   client: SchemaClient,
   ctx: AskContext,
   ref: { column: 'id' | 'number'; value: string | number },
+  outlines: OutlineIndex,
 ): Promise<Found | null> {
   const { data, error } = await client
     .from('plan_items')
@@ -405,7 +438,10 @@ async function readStep(
 
   // The questions put beneath it, which is where "what is decided so far" is
   // written: each answered one with its answer, each open one as waiting.
-  const [below, above] = await Promise.all([
+  // And the sessions sent at it, newest first, with how each ended and the
+  // line a session wrote on stopping (plan #1802), so "why did that one get
+  // skipped" has an answer on the row.
+  const [below, above, sent] = await Promise.all([
     client
       .from('plan_items')
       .select('number, title, status, resolution')
@@ -417,15 +453,24 @@ async function readStep(
     row.parent_id
       ? client.from('plan_items').select('number, title').eq('user_id', ctx.userId).eq('id', row.parent_id).limit(1)
       : Promise.resolve({ data: [], error: null }),
+    client
+      .from('plan_runs')
+      .select('status, error, stop_reason, stop_pieces, created_at')
+      .eq('user_id', ctx.userId)
+      .eq('plan_item_id', row.id)
+      .order('created_at', { ascending: false })
+      .limit(MAX_STEP_RUNS),
   ]);
   if (below.error) throw new Error(`plan_items: ${below.error.message}`);
   if (above.error) throw new Error(`plan_items: ${above.error.message}`);
+  if (sent.error) throw new Error(`plan_runs: ${sent.error.message}`);
+  const runs = ((sent.data ?? []) as StepRun[]).map(runLine);
   const decisions = ((below.data ?? []) as { number: number; title: string; status: string; resolution: string | null }[])
     .filter((d) => d.status !== 'dropped')
     .map((d) =>
       d.status === 'done' && d.resolution
-        ? `#${d.number} ${d.title} Answered: ${longText(d.resolution, DEV_COMMENT_CHARS)}`
-        : `#${d.number} ${d.title} Not answered yet.`,
+        ? `${refFor(d.number, outlines)} ${d.title} Answered: ${longText(d.resolution, DEV_COMMENT_CHARS, outlines)}`
+        : `${refFor(d.number, outlines)} ${d.title} Not answered yet.`,
     );
   const parent = ((above.data ?? []) as { number: number; title: string }[])[0];
 
@@ -433,26 +478,60 @@ async function readStep(
   const waiting = row.kind === 'decision' && row.status !== 'done' && row.status !== 'dropped';
   return {
     id: row.id,
-    title: `#${row.number} ${row.title}`,
-    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(row.number),
+    // Named by its outline, as the plan page heads the row; the number stays
+    // beside it as the identity commits and stored notes point at.
+    title: `${refFor(row.number, outlines)} ${row.title}`,
+    href: waiting ? `/dev/inbox#${waitingAnchor(row.id)}` : planHref(row.number),
     detail: {
+      step: refFor(row.number, outlines),
       number: row.number,
       kind: row.kind,
       status: row.status,
-      under: parent ? `#${parent.number} ${parent.title}` : null,
-      detail: longText(row.detail),
-      done_when: longText(row.acceptance),
-      resolution: longText(row.resolution),
-      fog: row.fog_dismissed_at ? null : longText(row.fog),
-      blocked_on: row.block_ask,
+      under: parent ? `${refFor(parent.number, outlines)} ${parent.title}` : null,
+      detail: longText(row.detail, SECTION_CHARS, outlines),
+      done_when: longText(row.acceptance, SECTION_CHARS, outlines),
+      resolution: longText(row.resolution, SECTION_CHARS, outlines),
+      fog: row.fog_dismissed_at ? null : longText(row.fog, SECTION_CHARS, outlines),
+      blocked_on: row.block_ask && readableRefs(row.block_ask, outlines),
       // Mostly dated lines sessions wrote as they started, blocked and closed it.
-      history: longText(row.comment),
+      history: longText(row.comment, SECTION_CHARS, outlines),
       decisions: decisions.length > 0 ? decisions.join('\n') : null,
+      sessions: runs.length > 0 ? runs.join('\n') : null,
     },
   };
 }
 
-async function readRaise(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+type StepRun = {
+  status: string;
+  error: string | null;
+  stop_reason: string | null;
+  stop_pieces: string[] | null;
+  created_at: string;
+};
+
+/**
+ * One session sent at a step, on one line: its day and how it ended, then the
+ * session's own reason for stopping and the split it proposed, or the app's
+ * note when the session gave none (a timeout, a refused fire).
+ */
+export function runLine(run: StepRun): string {
+  const parts = [`[${run.created_at.slice(0, 10)}] ${run.status}.`];
+  if (run.stop_reason) {
+    parts.push(`The session said why it stopped: ${run.stop_reason}`);
+    if (run.stop_pieces && run.stop_pieces.length > 0) {
+      parts.push(`It would split the work into: ${run.stop_pieces.join('; ')}.`);
+    }
+  }
+  if (run.error && run.error !== run.stop_reason) {
+    parts.push(`The app's note: ${run.error}`);
+  }
+  if (!run.stop_reason && !run.error && run.status !== 'started') {
+    parts.push('Nothing was written about how it ended.');
+  }
+  return parts.join(' ');
+}
+
+async function readRaise(client: SchemaClient, ctx: AskContext, id: string, outlines: OutlineIndex): Promise<Found | null> {
   // Not dismissed, and not a goal's flag, which lives on the Goals pages: the
   // raises the Dash tab draws and search finds.
   const { data, error } = await client
@@ -471,16 +550,16 @@ async function readRaise(client: SchemaClient, ctx: AskContext, id: string): Pro
   return {
     id: row.id,
     title: row.title,
-    href: `/dev/raised#${raiseAnchor(row.id)}`,
+    href: `/dev/inbox#${raiseAnchor(row.id)}`,
     detail: {
       raised_by: 'Dash',
       raised_on: row.created_at.slice(0, 10),
       from_run: row.source,
       workspace: row.module,
       status: row.status,
-      detail: longText(row.detail),
-      ask: row.ask,
-      outcome: longText(row.outcome),
+      detail: longText(row.detail, SECTION_CHARS, outlines),
+      ask: row.ask && readableRefs(row.ask, outlines),
+      outcome: longText(row.outcome, SECTION_CHARS, outlines),
     },
   };
 }
@@ -500,19 +579,21 @@ export async function readDevRowLookup(ctx: AskContext, input: Input): Promise<A
   if (!access.ok) return access;
 
   const kind = devKind(input);
-  const ref = devRef(kind, input);
   const client = await ctx.db('public');
+  const outlines = await planOutlines(client, ctx);
+  const ref = devRef(kind, input, outlines);
 
   const found =
     kind === 'step'
-      ? await readStep(client, ctx, ref)
+      ? await readStep(client, ctx, ref, outlines)
       : kind === 'idea'
-        ? await readIdea(client, ctx, String(ref.value))
+        ? await readIdea(client, ctx, String(ref.value), outlines)
         : kind === 'note'
-          ? await readNote(client, ctx, String(ref.value))
-          : await readRaise(client, ctx, String(ref.value));
+          ? await readNote(client, ctx, String(ref.value), outlines)
+          : await readRaise(client, ctx, String(ref.value), outlines);
   if (!found) {
-    return { ok: true, rows: [], note: `There is no ${kind} ${ref.value} to read: none of theirs has it, or it was dismissed.` };
+    const named = kind === 'step' && ref.column === 'number' ? refFor(Number(ref.value), outlines) : ref.value;
+    return { ok: true, rows: [], note: `There is no ${kind} ${named} to read: none of theirs has it, or it was dismissed.` };
   }
 
   // The thread from the shared store, under the row's ref (plan #1470).
@@ -523,7 +604,7 @@ export async function readDevRowLookup(ctx: AskContext, input: Input): Promise<A
     .eq('ref', `${DEV_ROW_TABLES[kind]}:${found.id}`)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`thread_turns: ${error.message}`);
-  const comments = thread((data ?? []) as DevComment[]);
+  const comments = thread((data ?? []) as DevComment[], outlines);
 
   return {
     ok: true,
@@ -606,7 +687,7 @@ type ColumnRead = {
   /** What the field is called for the model. */
   field: string;
   narrow: (query: Filter) => Filter;
-  hit: (row: Row) => { title: string; href: string; writtenBy: string | null };
+  hit: (row: Row, outlines: OutlineIndex) => { title: string; href: string; writtenBy: string | null };
 };
 
 type Row = Record<string, unknown> & { id: string };
@@ -621,11 +702,11 @@ function start(client: SchemaClient, ctx: AskContext, table: string, select: str
 
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-function stepHit(row: Row): { title: string; href: string } {
+function stepHit(row: Row, outlines: OutlineIndex): { title: string; href: string } {
   const waiting = row.kind === 'decision' && row.status !== 'done' && row.status !== 'dropped';
   return {
-    title: `#${String(row.number)} ${str(row.title)}`,
-    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(Number(row.number)),
+    title: `${refFor(Number(row.number), outlines)} ${str(row.title)}`,
+    href: waiting ? `/dev/inbox#${waitingAnchor(row.id)}` : planHref(Number(row.number)),
   };
 }
 
@@ -667,7 +748,7 @@ const COLUMN_READS: ColumnRead[] = [
     ([column, field, writtenBy]): ColumnRead => ({
       kind: 'step', table: 'plan_items', column, select: `${STEP_SELECT}, ${column}`, date: 'updated_at', field,
       narrow: notDismissed,
-      hit: (row) => ({ ...stepHit(row), writtenBy }),
+      hit: (row, outlines) => ({ ...stepHit(row, outlines), writtenBy }),
     }),
   ),
   ...(
@@ -679,7 +760,7 @@ const COLUMN_READS: ColumnRead[] = [
     ([column, field]): ColumnRead => ({
       kind: 'raise', table: 'raised_items', column, select: `id, title, ${column}, created_at`, date: 'created_at', field,
       narrow: openRaise,
-      hit: (row) => ({ title: str(row.title), href: `/dev/raised#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
+      hit: (row) => ({ title: str(row.title), href: `/dev/inbox#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
     }),
   ),
 ];
@@ -690,6 +771,7 @@ async function readColumn(
   read: ColumnRead,
   pattern: string,
   words: readonly string[],
+  outlines: OutlineIndex,
 ): Promise<TextHit[]> {
   const { data, error } = await read
     .narrow(start(client, ctx, read.table, read.select))
@@ -700,7 +782,7 @@ async function readColumn(
   return ((data ?? []) as unknown as Row[])
     .filter((row) => hasEveryWord(str(row[read.column]), words))
     .map((row) => {
-      const { title, href, writtenBy } = read.hit(row);
+      const { title, href, writtenBy } = read.hit(row, outlines);
       const table = `public.${read.table}`;
       return {
         key: `${table}:${row.id}`,
@@ -715,7 +797,7 @@ async function readColumn(
             field: read.field,
             written_by: writtenBy,
             on: str(row[read.date]).slice(0, 10),
-            excerpt: excerpt(str(row[read.column]), words),
+            excerpt: excerpt(readableRefs(str(row[read.column]), outlines), words),
           },
         },
       };
@@ -740,6 +822,7 @@ async function readComments(
   ctx: AskContext,
   pattern: string,
   words: readonly string[],
+  outlines: OutlineIndex,
 ): Promise<TextHit[]> {
   const { data, error } = await (await ctx.db('core'))
     .from('thread_turns')
@@ -773,7 +856,7 @@ async function readComments(
         .in('id', ids);
       if (parentError) throw new Error(`${read.table}: ${parentError.message}`);
       for (const row of (rows ?? []) as unknown as Row[]) {
-        const { title, href } = read.hit(row);
+        const { title, href } = read.hit(row, outlines);
         parents.set(row.id, { table: `public.${read.table}`, ref: row.id, title, href });
       }
     }),
@@ -818,7 +901,7 @@ async function readComments(
             field: 'comment',
             written_by: writer(comment.author as string | null),
             on: str(comment.created_at).slice(0, 10),
-            excerpt: excerpt(str(comment.body), words),
+            excerpt: excerpt(readableRefs(str(comment.body), outlines), words),
           },
         },
       },
@@ -882,10 +965,11 @@ export async function findDevTextLookup(ctx: AskContext, input: Input): Promise<
   const longest = words.reduce((a, b) => (b.length > a.length ? b : a));
   const pattern = `%${escapeLike(longest)}%`;
   const client = await ctx.db('public');
+  const outlines = await planOutlines(client, ctx);
 
   const [columns, comments, specs] = await Promise.all([
-    Promise.all(COLUMN_READS.filter((r) => kinds.has(r.kind)).map((r) => readColumn(client, ctx, r, pattern, words))),
-    kinds.has('comment') ? readComments(client, ctx, pattern, words) : Promise.resolve([]),
+    Promise.all(COLUMN_READS.filter((r) => kinds.has(r.kind)).map((r) => readColumn(client, ctx, r, pattern, words, outlines))),
+    kinds.has('comment') ? readComments(client, ctx, pattern, words, outlines) : Promise.resolve([]),
     kinds.has('spec') ? specHits(ctx, words) : Promise.resolve([]),
   ]);
 
@@ -932,7 +1016,7 @@ export async function devRecallHrefs(
   for (const { sourceTable: table, sourceRef: ref } of hits) {
     if (table === 'public.ideas') out.push([table, ref, `/dev/ideas#idea-${ref}`]);
     else if (table === 'public.feedback_items') out.push([table, ref, `/dev/bugs#note-${ref}`]);
-    else if (table === 'public.raised_items') out.push([table, ref, `/dev/raised#${raiseAnchor(ref)}`]);
+    else if (table === 'public.raised_items') out.push([table, ref, `/dev/inbox#${raiseAnchor(ref)}`]);
     else if (table === SPEC_TABLE) {
       const [slug, anchor] = ref.split('#');
       out.push([table, ref, `/dev/specs/${slug}${anchor ? `#${anchor}` : ''}`]);
@@ -942,7 +1026,7 @@ export async function devRecallHrefs(
     const client = await ctx.db('public');
     const { data, error } = await (start(client, ctx, 'plan_items', STEP_SELECT) as unknown as Filter).in('id', steps);
     if (error) throw new Error(`plan_items: ${error.message}`);
-    for (const row of (data ?? []) as unknown as Row[]) out.push(['public.plan_items', row.id, stepHit(row).href]);
+    for (const row of (data ?? []) as unknown as Row[]) out.push(['public.plan_items', row.id, stepHit(row, new Map()).href]);
   }
   return out;
 }

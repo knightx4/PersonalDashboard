@@ -8,6 +8,7 @@ import { ideaScoreView } from '@/lib/ideas/score';
 import { clockTime } from '@/lib/learn/youtube/format';
 import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
+import { stepRef } from '@/lib/plan/ref';
 import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
 import { TakeawayActions } from './takeaway-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -44,7 +45,7 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
       <Link href={planHref(cover.number)} className="hover:underline">
         <StateLabel
           glyph="dashed"
-          word={status === 'crafted' ? `In the plan as #${cover.number}` : `Already in the plan as #${cover.number}`}
+          word={status === 'crafted' ? `In the plan as ${stepRef(cover)}` : `Already in the plan as ${stepRef(cover)}`}
           tone="info"
         />
       </Link>

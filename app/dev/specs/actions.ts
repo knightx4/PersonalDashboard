@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { MODULE_IDS } from '@/lib/modules';
-import { APP_VISION } from '@/lib/specs/vision';
+import { APP_VISION, type VisionScope } from '@/lib/specs/vision';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadPlan } from '@/lib/plan/load';
 import { startRoutineRun } from '@/lib/plan/runs';
@@ -83,6 +83,16 @@ export async function saveModuleVision(
     return { message: 'Vision cleared.' };
   }
 
+  // Read before writing: the re-shape below is told what the vision replaced,
+  // and a save that changes nothing starts no run.
+  const { data: previous } = await supabase
+    .from('module_visions')
+    .select('body')
+    .eq('user_id', user.id)
+    .eq('module', scope.data)
+    .maybeSingle();
+  const before = (previous as { body: string } | null)?.body ?? null;
+
   const { error } = await supabase
     .from('module_visions')
     .upsert(
@@ -92,7 +102,15 @@ export async function saveModuleVision(
   if (error) return { error: error.message };
 
   revalidatePath('/dev/specs');
-  return { message: 'Vision saved.' };
+  if (before?.trim() === body.data) return { message: 'Vision saved.' };
+  return {
+    message: await reshapeAfterVisionChange(supabase, user.id, {
+      scope: scope.data as VisionScope,
+      before,
+      after: body.data,
+      lead: 'Vision saved.',
+    }),
+  };
 }
 
 /**
@@ -142,31 +160,37 @@ async function decide(formData: FormData, accept: boolean): Promise<Decided> {
   revalidatePath('/dev/specs');
   // The Dash tab counts the edits waiting.
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
   const state = { message: accept ? 'Vision replaced.' : 'Edit dismissed.' };
   return edit ? { state, edit, userId: user.id, supabase } : { state };
 }
 
 /**
- * Re-read the workspace's open features against the vision just accepted
+ * Re-read the workspace's open features against a vision just changed
  * (plan #1137, following #1109's answer).
+ *
+ * Accepting an edit the weekly review proposed and saving a new vision by hand
+ * both come here. Before 13 October only an accept did, so a vision rewritten
+ * on the specs page reached the plan only as each step was next briefed, and
+ * the open features filed under it were never read against it.
  *
  * One run of the plan routine for the whole workspace, however many features
  * are open in it, and a run that leaves only proposals and drop questions
  * (lib/plan/vision-reshape.ts says what it is told). The vision has already
- * been replaced by the time this runs, so a run that does not start loses
+ * been written by the time this runs, so a run that does not start loses
  * nothing but the re-read, and the message says so.
  */
-async function reshapeAfterAccept(
+async function reshapeAfterVisionChange(
   supabase: Db,
   userId: string,
-  edit: DecidedVisionEdit,
+  change: { scope: VisionScope; before: string | null; after: string; lead: string },
 ): Promise<string> {
-  const label = scopeLabel(edit.module);
-  if (!edit.proposedBody) return 'Vision replaced.';
+  const { scope, before, after, lead } = change;
+  const label = scopeLabel(scope);
 
-  const features = openFeaturesIn(buildPlanTree(await loadPlan(supabase, userId)), edit.module);
+  const features = openFeaturesIn(buildPlanTree(await loadPlan(supabase, userId)), scope);
   if (features.length === 0) {
-    return `Vision replaced. Nothing is open on the plan for ${label}, so there is nothing to re-shape.`;
+    return `${lead} Nothing is open on the plan for ${label}, so there is nothing to re-shape.`;
   }
 
   const result = await startRoutineRun({
@@ -174,19 +198,14 @@ async function reshapeAfterAccept(
     userId,
     job: 'vision_reshape',
     routine: planRoutine(),
-    text: visionReshapeText({
-      scope: edit.module,
-      before: edit.visionBody,
-      after: edit.proposedBody,
-      features,
-    }),
+    text: visionReshapeText({ scope, before, after, features }),
   });
   if (!result.ok) {
-    return `Vision replaced. The re-shape of the open features in ${label} did not start: ${result.error}`;
+    return `${lead} The re-shape of the open features in ${label} did not start: ${result.error}`;
   }
   revalidatePath('/dev/plan');
   const count = `${features.length} open ${features.length === 1 ? 'feature' : 'features'}`;
-  return `Vision replaced. Dash is re-reading the ${count} in ${label} against it; any changes come back as proposals on the plan.`;
+  return `${lead} Dash is re-reading the ${count} in ${label} against it; any changes come back as proposals on the plan.`;
 }
 
 // latency: pending
@@ -196,7 +215,16 @@ export async function acceptVisionEdit(
 ): Promise<VisionEditActionState> {
   const decided = await decide(formData, true);
   if (!decided.edit) return decided.state;
-  return { message: await reshapeAfterAccept(decided.supabase, decided.userId, decided.edit) };
+  const { edit } = decided;
+  if (!edit.proposedBody) return { message: 'Vision replaced.' };
+  return {
+    message: await reshapeAfterVisionChange(decided.supabase, decided.userId, {
+      scope: edit.module,
+      before: edit.visionBody,
+      after: edit.proposedBody,
+      lead: 'Vision replaced.',
+    }),
+  };
 }
 
 // latency: pending
@@ -236,6 +264,7 @@ async function decideChange(
   revalidatePath('/dev/specs');
   // Home lists the changes waiting on you and its tab counts them.
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
   if ('error' in result) return { state: { error: result.error } };
   return { state: { message: decision === 'approved' ? 'Approved.' : 'Declined.' }, change: result.change };
 }
@@ -305,6 +334,7 @@ export async function approveSpecChange(
     await reopenSpecChange(supabase, user.id, current.id);
     revalidatePath('/dev/specs');
     revalidatePath('/dev/raised');
+    revalidatePath('/dev/inbox');
     return { error: `Not approved: Dash could not start writing it into the spec. ${result.error}` };
   }
   revalidatePath('/dev/plan');

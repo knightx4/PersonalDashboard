@@ -45,6 +45,7 @@ vi.mock('@/app/dev/plan/actions', () => {
     setPlanItemPriority: noop,
     setPlanItemStatus: noop,
     updatePlanItem: noop,
+    workPlanOverhaul: noop,
   };
 });
 
@@ -130,7 +131,7 @@ function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
 const catalog = catalogOf(whole);
 
 function render(
-  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
+  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked' | 'table',
   empty = false,
   // The page folds every feature, and a folded row renders no children at all.
   // These tests are about how a nested row is laid out, so they ask for the
@@ -180,12 +181,36 @@ describe('PlanView', () => {
     // numbers they had -- a filter does not renumber the plan.
     expect(html).toContain('#1.2');
     expect(html).toContain('#1.3');
-    // Its own number is still the handle, on the button that opens it.
-    expect(html).toContain('Open #3');
+    // The button that opens it names it the same way.
+    expect(html).toContain('Open #1.2');
     // The done schema step is not on the open view; the feature that holds
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
+  });
+
+  it('lists the open features as a table, each row opening its feature page', () => {
+    // Plan #1669: one row per open feature, grouped by module.
+    const html = render('table');
+    expect(html).toContain('Open features by module');
+    expect(html).toContain('href="/dev/plan/1"');
+    expect(html).toContain('href="/dev/plan/5"');
+    expect(html).toContain('href="/dev/plan/6"');
+    // Features only: a step under one is not a row of its own.
+    expect(html).not.toContain('The anonymous page');
+    // Its columns: priority, size, open steps and done.
+    expect(html).toContain('>Next<');
+    expect(html).toContain('>L<');
+    expect(html).toContain('33%');
+    expect(html).toMatch(/>4<\/span> open/);
+  });
+
+  it("links a feature's title to its own page, and leaves a step's title the fold", () => {
+    // Plan #1664: the row stays as it is, and its title opens /dev/plan/<n>.
+    const html = render('open');
+    expect(html).toContain('href="/dev/plan/1"');
+    expect(html).not.toContain('href="/dev/plan/3"');
+    expect(html).toContain('Open #1.2');
   });
 
   it('makes priority a word on the row you click, not a form you open', () => {
@@ -230,9 +255,9 @@ describe('PlanView', () => {
     // already held offers the press that gives it back.
     expect(html).toContain('title="Mine"');
     expect(html).toContain('title="Not mine"');
-    // And the values those forms send are the two the action takes.
-    expect(html).toContain('name="assignee" value="me"');
-    expect(html).toContain('name="assignee" value=""');
+    // Pressed buttons, not forms: the row changes at once (plan #1850), so the
+    // press carries no hidden fields for the action to read.
+    expect(html).not.toContain('name="assignee"');
     expect(html).not.toContain('Hand to Dash');
   });
 
@@ -269,7 +294,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</span><span title="Yours. The runner will not take this one."',
+      '>Account deletion</a><span title="Yours. The runner will not take this one."',
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -299,7 +324,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</span><span title="Overhaul.');
+    expect(html).toContain('>Move threads onto the core</a><span title="Overhaul.');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });
@@ -508,11 +533,18 @@ describe('PlanView', () => {
     expect(html).toMatch(/>4<\/span> Dash/);
   });
 
-  it('draws five views as chips and leaves the rest to the menu', () => {
+  it('leaves a zero out of the count strip, except open', () => {
+    const html = render('open');
+    expect(html).not.toMatch(/>0<\/span> (on you|ready|proposed|waiting|not specified|underway|Dash|done)/);
+  });
+
+  it('draws five views and the table as chips and leaves the rest to the menu', () => {
     const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
     expect(row).not.toBe('');
-    expect([...row.matchAll(/<a /g)]).toHaveLength(5);
-    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', 'Everything']) {
+    expect([...row.matchAll(/<a /g)]).toHaveLength(6);
+    // The whole plan is "All" on this row, so the chips and More fit one
+    // line at 390 (plan #1542).
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', '>All<', '>Table<']) {
       expect(row).toContain(label);
     }
     // The menu holds the other four. Its panel is a portal opened on a press,
@@ -558,9 +590,9 @@ describe('PlanView', () => {
     expect((html.match(/answer:/g) ?? []).length).toBe(1);
   });
 
-  it('invites a step at the top of every module on the working view, and not on the narrow ones', () => {
-    expect(render('open')).toContain('Add a step');
-    expect(render('ready')).not.toContain('Add a step');
+  it('invites a feature at the top of every module on the working view, and not on the narrow ones', () => {
+    expect(render('open')).toContain('Add a feature');
+    expect(render('ready')).not.toContain('Add a feature');
   });
 
   it('says plainly when a narrow view has nothing in it', () => {
@@ -1099,7 +1131,8 @@ describe('what an opened step says its run has done', () => {
   it('names the run and when it started, not only that something is underway', () => {
     const html = drawRun(null);
     expect(html).toContain('Its run');
-    expect(html).toContain(`A feature batch started ${FIRED.replace('T', ' ').slice(0, 16)}`);
+    // Twelve-hour, in UTC (plan #1825).
+    expect(html).toContain('A feature batch started 17 Sep 2026, 11');
   });
 
   it('lists what it pushed, what it closed and what it raised', () => {

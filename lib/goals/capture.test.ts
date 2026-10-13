@@ -210,6 +210,25 @@ describe('parseFiling', () => {
     expect(parseFiling({ actions: [{ type: 'count', step: 's1' }] }, without)).toEqual([]);
   });
 
+  it('shows a rhythm that counts itself but refuses a count on it', () => {
+    const jobs = contextOf(
+      [goal('g')],
+      [
+        step('apply', 'g', {
+          kind: 'rhythm',
+          rhythmCount: 5,
+          rhythmPeriod: 'week',
+          countSource: 'applications',
+        }),
+      ],
+      new Map([['apply', { current: period('apply', { target: 5, count: 2 }), past: [], missed: 0 }]]),
+    );
+    expect(captureMessage(jobs, 'sent two applications', '2026-09-24')).toContain(
+      's1 [rhythm, 2 of 5 this week · from Jobs, counts itself, never count it]',
+    );
+    expect(parseFiling({ actions: [{ type: 'count', step: 's1' }] }, jobs)).toEqual([]);
+  });
+
   it('files a repeated move once, and no more than the cap', () => {
     const twice = parseFiling(
       {
@@ -340,6 +359,7 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
                   },
                 }
               : {}),
+            ...(action.done ? { done: true } : {}),
             undone_at: null,
           };
         }
@@ -1174,5 +1194,66 @@ describe('asking once how far along a step is (plan #1280)', () => {
     };
     expect(estimateAsked(old)).toBeNull();
     expect(withEstimate([old], 0, 'half')).toBeNull();
+  });
+});
+
+describe('logging what you did, from Home and a goal (plan #1740)', () => {
+  const home = contextOf(
+    [
+      goal('apartment', { title: 'Keep the apartment clean' }),
+      goal('city', { title: 'Know the city' }),
+    ],
+    [step('kitchen', 'apartment', { title: 'Clean the kitchen' })],
+  );
+
+  it('adds finished work no step fits as a step already closed, carrying no progress', async () => {
+    const reply = {
+      actions: [
+        { type: 'add', parent: 'g1', title: 'Clean the bathroom', kind: 'mine', done: true, text: 'cleaned it' },
+      ],
+    };
+    const { deps, saved, applied } = stubs(reply, { context: async () => home });
+    await fileCapture('cleaned the bathroom', '2026-10-11', deps);
+    expect(applied[0]).toMatchObject({ kind: 'add', title: 'Clean the bathroom', done: true, progress: null });
+    expect(saved[0]!.map(describeFiled)).toEqual([
+      'Added "Clean the bathroom" in Keep the apartment clean as done',
+    ]);
+  });
+
+  it('never adds a step for Dash as done', () => {
+    const [action] = parseFiling(
+      { actions: [{ type: 'add', parent: 'g1', title: 'Find a cleaner', kind: 'claude', done: true }] },
+      home,
+    );
+    expect(action).toMatchObject({ kind: 'add', stepKind: 'claude' });
+    expect((action as { done?: boolean }).done).toBeUndefined();
+  });
+
+  it('Undo on a step added as done archives it', () => {
+    expect(
+      undoMove({
+        kind: 'add',
+        step_id: 'new',
+        title: 'Clean the bathroom',
+        step_kind: 'mine',
+        goal_title: 'Keep the apartment clean',
+        done: true,
+        undone_at: null,
+      }),
+    ).toEqual({ move: 'archive', stepId: 'new' });
+  });
+
+  it('tells filing which goal’s page the line was written on', async () => {
+    const { deps, asked } = stubs({ actions: [] }, { context: async () => home });
+    await fileCapture('cleaned the bathroom', '2026-10-11', deps, null, 'apartment');
+    expect(asked[0]).toContain(
+      'This was written on the page of g1 (Keep the apartment clean). File it against that goal unless the sentence plainly concerns another.',
+    );
+  });
+
+  it('says nothing about a goal that is not open', async () => {
+    const { deps, asked } = stubs({ actions: [] }, { context: async () => home });
+    await fileCapture('cleaned the bathroom', '2026-10-11', deps, null, 'gone');
+    expect(asked[0]).not.toContain('written on the page');
   });
 });

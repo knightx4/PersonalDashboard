@@ -73,7 +73,7 @@ describe('conversationsFrom', () => {
 
     expect(conversations.map((conversation) => conversation.about)).toEqual(['Newer', 'Middle', 'Older']);
     expect(conversations.map((conversation) => conversation.href)).toEqual([
-      '/dev/raised',
+      '/dev/inbox#raise-r1',
       '/dev/bugs',
       '/dev/ideas',
     ]);
@@ -107,6 +107,14 @@ describe('conversationsFrom', () => {
       'A plan step',
       'A raise',
     ]);
+  });
+
+  it('names a step by its outline where the plan places it', () => {
+    const [conversation] = conversationsFrom([
+      comment({ plan_item_id: 'p1', step: { number: 1084, outline: '1073.4', title: 'Name steps by outline' } }),
+    ]);
+
+    expect(conversation.about).toBe('#1073.4 Name steps by outline');
   });
 
   it('keeps a step with a number but no title', () => {

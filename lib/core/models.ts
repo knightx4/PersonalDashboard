@@ -3,31 +3,35 @@
  *
  * Changing which model a part of the app uses is a one-line change here: each
  * call site reads its entry in `MODELS` by name, and no other file spells a
- * model id (lib/core/models.test.ts checks that). The four tiers below are the
- * only strings; the entries name a tier.
+ * model id (lib/core/models.test.ts checks that). The three tiers below are the
+ * only strings the entries name.
  *
- * The dated Haiku id is the same model as the Haiku alias. The call sites
- * that were pinned to it keep it, so the ids recorded in the spend ledger
- * stay as they were.
+ * The retired ids below are no longer called. They stay so that the rows the
+ * spend ledger recorded under them can still be priced (lib/core/spend/pricing.ts).
  */
 
-export const OPUS = 'claude-opus-5';
-export const SONNET = 'claude-sonnet-5';
-export const HAIKU = 'claude-haiku-4-5';
-export const HAIKU_DATED = 'claude-haiku-4-5-20251001';
+export const OPUS = 'claude-opus-5-5';
+export const SONNET = 'claude-sonnet-5-5';
+export const HAIKU = 'claude-haiku-5-5';
+
+/** Retired: the models the ledger recorded before the move to the 5.5 models. */
+export const OPUS_5 = 'claude-opus-5';
+export const SONNET_5 = 'claude-sonnet-5';
+export const HAIKU_4_5 = 'claude-haiku-4-5';
+export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 
 /** The model each call site uses, keyed by what the call does. Grouped by the file that makes it. */
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
   /** app/shopping/inventory/add/photo-actions.ts */
-  shoppingBookPhoto: HAIKU_DATED,
+  shoppingBookPhoto: HAIKU,
   /** inngest/dev/suggest.ts */
   devDigestSuggest: HAIKU,
   /** lib/books/paste-list.ts */
-  booksPasteList: HAIKU_DATED,
+  booksPasteList: HAIKU,
   /** lib/books/receipt-photo.ts */
-  booksReceiptPhoto: HAIKU_DATED,
+  booksReceiptPhoto: HAIKU,
   /** lib/comments/ask.ts, Dash's reply on a dev row (lib/dash/models.ts devThread) */
   devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
@@ -41,7 +45,7 @@ export const MODELS = {
   /** lib/drafts/model.ts */
   drafts: SONNET,
   /** lib/email/extract/extract-order.ts */
-  emailOrderExtract: HAIKU_DATED,
+  emailOrderExtract: HAIKU,
   /** lib/games/shelf-photo.ts */
   gamesShelfPhoto: OPUS,
   /** lib/capture/sort-model.ts, where a typed capture belongs */
@@ -63,7 +67,7 @@ export const MODELS = {
   /** lib/jobs/evidence/propose.ts */
   jobsEvidencePropose: OPUS,
   /** lib/jobs/inbox/tier-b.ts */
-  jobsInboxTierB: HAIKU_DATED,
+  jobsInboxTierB: HAIKU,
   /** lib/jobs/interview/prep.ts */
   jobsInterviewPrep: OPUS,
   /** lib/jobs/learning/suggest.ts */
@@ -74,6 +78,8 @@ export const MODELS = {
   rowCommentReply: SONNET,
   /** lib/jobs/suggest/model.ts */
   jobsSuggest: SONNET,
+  /** lib/jobs/discover/shortlist-run.ts; one call a week over about 1,400 startups */
+  jobsDiscoverShortlist: SONNET,
   /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
   learnAreaPlace: SONNET,
   /** lib/learn/catalogue/judge.ts */
@@ -82,6 +88,8 @@ export const MODELS = {
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
   learnWriteCard: SONNET,
+  /** lib/learn/feed/clip-note.ts; two sentences about a lecture clip, hourly */
+  learnClipNote: HAIKU,
   /** lib/learn/graph/applied.ts */
   learnApplied: HAIKU,
   /** lib/learn/graph/curriculum.ts */
@@ -92,8 +100,12 @@ export const MODELS = {
   learnGraphFromBrief: SONNET,
   /** lib/learn/graph/from-course.ts */
   learnGraphFromCourse: SONNET,
+  /** lib/learn/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
+  learnPersonalityRead: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
+  /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
+  learnNoteConceptJudge: HAIKU,
   /** lib/learn/graph/from-prior.ts */
   learnGraphFromPrior: SONNET,
   /** lib/learn/graph/generate.ts */
@@ -106,10 +118,12 @@ export const MODELS = {
   learnOpeningProbe: HAIKU,
   /** lib/learn/graph/probe.ts */
   learnProbe: HAIKU,
+  /** lib/learn/chat/subjects.ts */
+  learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */
   learnImportAreas: SONNET,
   /** lib/learn/import/parse.ts */
-  learnImportParse: HAIKU_DATED,
+  learnImportParse: HAIKU,
   /** lib/learn/import/plan-topic.ts */
   learnImportPlanTopic: OPUS,
   /** lib/learn/import/resolve.ts */
@@ -119,11 +133,31 @@ export const MODELS = {
   /** lib/learn/lessons/write-lesson.ts */
   learnWriteLesson: SONNET,
   /** lib/learn/locate/locate.ts */
-  learnLocate: HAIKU_DATED,
+  learnLocate: HAIKU,
+  /** lib/learn/tracks/reading-summary-model.ts, Summarize on a reading's page */
+  learnReadingSummary: SONNET,
+  /** lib/learn/tracks/reading-chat-model.ts, the chat with Dash on a reading's page */
+  learnReadingChat: SONNET,
   /** lib/learn/quiz/generate.ts */
   learnQuiz: HAIKU,
   /** lib/learn/survey/goal-idea.ts */
   learnSurveyGoalIdea: HAIKU,
+  /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
+  learnEssayInterview: SONNET,
+  /** lib/learn/essays/rephrase-model.ts, Rephrase on a selected sentence of an essay */
+  learnEssayRephrase: SONNET,
+  /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */
+  learnEssayCheck: SONNET,
+  /** lib/learn/essays/finish-model.ts, the claims a finished essay argues */
+  learnEssayClaims: SONNET,
+  /**
+   * lib/learn/essays/research-model.ts, an essay's first research pass and
+   * the deeper pass's gathering: Haiku with the basic web search and fetch
+   * tools, since the dynamic-filtering versions are for Opus and Sonnet only
+   */
+  learnEssayResearch: HAIKU,
+  /** lib/learn/essays/research-model.ts, the deeper pass marking each claim against the pages read */
+  learnEssayJudge: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */
@@ -138,10 +172,16 @@ export const MODELS = {
   newsDigest: HAIKU,
   /** lib/news/issues/importance.ts */
   newsImportance: HAIKU,
+  /** lib/news/review/write.ts */
+  newsDailyReview: SONNET,
   /** lib/news/recommend/make.ts */
   newsRecommend: OPUS,
   /** lib/recurring/extract.ts */
-  recurringExtract: HAIKU_DATED,
+  recurringExtract: HAIKU,
+  /** lib/dash/interview.ts, Dash's questions when it interviews you for a workspace's spec (lib/dash/models.ts interview) */
+  specInterview: SONNET,
+  /** lib/dash/interview-draft.ts, the vision and spec Dash drafts when an interview ends (lib/dash/models.ts interviewDraft) */
+  specInterviewDraft: SONNET,
   /** lib/sell/web-estimate.ts */
   sellWebEstimate: HAIKU,
   /** lib/talk/reply.ts */
@@ -151,7 +191,7 @@ export const MODELS = {
   /** lib/timeline/year-review-model.ts */
   timelineYearReview: SONNET,
   /** lib/todo/appointments/extract.ts */
-  appointmentsExtract: HAIKU_DATED,
+  appointmentsExtract: HAIKU,
   /** lib/vault/map/classify.ts */
   vaultMapClassify: HAIKU,
   /** lib/vault/map/extract.ts */

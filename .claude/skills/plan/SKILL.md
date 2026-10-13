@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -28,6 +28,8 @@ npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
 npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
+              # the ask names what the person does; "nothing needed from you" is refused.
+              # A step that waits on data, time or a run gets a check-back --from <n>, which holds it.
                                                # cannot proceed; the ask is the one sentence
                                                # saying what it needs, rewritten each time.
                                                # --on-steps: it clears itself when the steps it
@@ -37,6 +39,10 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # an account. Writes a setup step of theirs under
                                                # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
+npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
+                                               # ending without closing or blocking <n>:
+                                               # one line on why, onto the run. Too big?
+                                               # name the pieces it would split into
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--from <n>]
                                                # ready under an approved feature, a
@@ -49,6 +55,8 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
                                                # finishing this feature, one patch;
                                                # --clear once it can be seen
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # a line on your run (see building.md, run lines)
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # file a follow-on on /dev/ideas; it lands
                                                # marked as your suggestion, under the
@@ -65,7 +73,23 @@ npx tsx scripts/plan.ts raises                 # open raises, and answers no ses
                                                # a closed one is finished with and is not listed
 ```
 
-Steps are named by number — the `#12` on the page. Numbers are never reused.
+### Naming a step
+
+Every `<n>` and `<m>` above is a step's outline, the `1073.4` its row on the
+page heads itself with: the fourth step under feature #1073. A top-level
+feature's outline is its number. `plan.ts` takes `1073.4` or `#1073.4`, and
+prints every step that way.
+
+Name a step by its outline in everything you write: replies and reports,
+notes, comments, asks, details, raise text, commit and merge subjects, and the
+prompts you give subagents. Write `#1073.4`, with no number beside it. Each
+step also has a number (#1084), which is its identity in the database and
+never changes, but the person reads the outline. Sessions that wrote "#1081"
+for the step the page showed as "1073.1" left them translating one into the
+other. Text written before this rule still names steps by number; `plan.ts`
+shows it with the outline, and you leave it as it is. Querying the database
+directly, join `plan_item_outlines` on `id` to get the outline
+(`reference/offline.md`).
 
 If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
@@ -82,6 +106,12 @@ writes are not recorded yet.
   person. `next` never lists one, `start` refuses one, and nothing in this
   skill moves one out of `proposed` — that is the person's move, on the page.
 
+  **Auto approve.** When the person has turned on auto approve (the switch on
+  the Plan row on Home, `plan_overnight_runs.auto_approve`), a trigger writes
+  every proposed row as `not_started`. A row you insert as proposed then comes
+  back approved and ready. That is the person's standing yes, not a session
+  approving: write proposals exactly as you would otherwise.
+
   **Approval is per feature.** The person approves a feature once, and that
   approves every step beneath it. A step a session adds under an approved
   feature later, while building or re-shaping, goes in ready to build and
@@ -93,7 +123,7 @@ writes are not recorded yet.
   repository** in `reference/building.md` defines.
 - A step **assigned to Claude** is yours to pick up on your own. `next --claude`
   lists them in order.
-- A step **named by the user** ("do #12", or a routine fired from the page with
+- A step **named by the user** ("do #1073.4", or a routine fired from the page with
   a brief) is yours whoever it is assigned to.
 - A **decision** is never yours, however it is assigned and whoever named it.
   It is a question put to the person, and it closes on their answer. `next
@@ -128,9 +158,10 @@ you close when they are all done.
 
 ## Building
 
-**One step, on its own** — "do #12", or one step named in a brief. Read
+**One step, on its own** — "do #1073.4", or one step named in a brief. Read
 `reference/building.md` and follow it yourself, then put the commit on main as
-in step 4 below. A subagent for a single step is pure overhead.
+in step 4 below. A subagent for a single step is pure overhead, except on a
+Sonnet session for a step sized `m` or `l` (step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -154,24 +185,58 @@ thousand tokens, and gets to the end.
    to do about each answer"` rather than a routine on the account: it shows on
    the Dash tab, any session can finish it, and the tick wakes one an hour past
    due if none has.
+
+   A step whose history ends in an `Answered …` or `Accepted …` line is acted
+   on in this batch. An answer that asks for no change ("It's fine", "yes",
+   "ok") is an accept: merge and close. An answer that picks no direction
+   takes the option the ask recommended. A new question goes out only when no
+   direction can be chosen, and never the same one twice
+   (`reference/building.md`, "An answer always moves the step").
 2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
    and what waits on what. List the steps you are going to build, in dependency
    order. Steps that wait on nothing come first; a step whose dependency is
    still open is not in this batch.
-3. **Send each step to a subagent, one at a time.** The prompt is short:
+3. **Send the ready steps to subagents, up to three at once.** Every step
+   that is ready now and does not wait on another step in the batch goes out
+   together, each to its own subagent with `isolation: "worktree"`, so each
+   builds in its own copy of the repository. When one reports, merge it (step
+   4) and send whatever its close made ready, keeping up to three going. One
+   step at a time left a twelve-step feature taking most of a day while steps
+   that waited on nothing sat in the queue.
 
-   > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
-   > follow it exactly.
+   Hold a step back from the round when it changes the same screen as
+   another step going out, judged from the two details: two builders editing
+   one page conflict at the merge and the second rebuilds. Send it when the
+   first has merged.
+
+   The prompt is short:
+
+   > Build plan step #<outline>. Read `.claude/skills/plan/reference/building.md` and
+   > follow it exactly. You are in a worktree: give it a hard-linked copy of
+   > node_modules first (`cp -al <the main checkout>/node_modules .`) and use
+   > `PREVIEW_PORT=<3400 + 1, 2 or 3>` for the preview.
    >
    > What earlier steps in this batch worked out: <the carry-forward, below>
 
+   **Pick the builder's model by the step's size.** A step sized `s` goes to
+   a subagent with `model: "sonnet"`; `m`, `l` and a step with no size go to
+   `model: "opus"`. Name the model every time, because a subagent without one
+   takes this session's, and this session may be running on Sonnet. The
+   `ui-critic` agent names its own model and is not changed by this.
+
    **Do not read the step's source files yourself, and do not make the edit.**
    Every file you open is a file you carry for the rest of the batch. Reading
-   "just to check" is how the batch runs out of room.
+   "just to check" is how the batch runs out of room. The same holds for a
+   single step named on its own when this session is on Sonnet and the step
+   is sized `m` or `l`: send it to an Opus subagent rather than building it
+   here.
 4. **Put the step on main before it closes.** A subagent commits and stops
    there, so the merge is yours, and it runs as soon as the subagent reports
    its commit:
 
+   - Merge the subagent's worktree branch (its result names it) into the
+     working branch. Do this for one step at a time even while others are
+     still building: each step merges and runs the gate on its own.
    - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
      when one of them is missing, which is the normal state of a branch nobody
      has pushed yet, and leaves `origin/main` stale.
@@ -184,17 +249,17 @@ thousand tokens, and gets to the end.
      build, and every failure that kept main red on 23 September 2026 came
      through what that left out.
    - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
-     step #N: <title>`, and push.
+     step #<outline>: <title>`, and push.
    - Then close the step: `done <n> --note "…"`, with the note the subagent
      wrote. `done` refuses a commit that is not on main, so the merge comes
      first; a subagent cannot close its own step and does not try. It also
      refuses a step that changed a screen while one of its gallery surfaces
      has no passing design check (plan #1534), so before the merge run
-     `npm run ui-guard -- <n> --commit <the branch's head>` and send a step
+     `npm run ui-guard -- <outline> --commit <the branch's head>` and send a step
      it refuses back to the critic rather than merging it.
 
    Anything that fails belongs to whichever step broke it: fix it, and amend or
-   add a commit against that step's number, before the merge. That includes
+   add a commit against that step's outline, before the merge. That includes
    a failure another session merged: main is what you are about to push, so
    it is yours to get passing, and a step that merges onto red makes it
    worse. Running the gate before every merge costs about three minutes a step
@@ -205,7 +270,9 @@ thousand tokens, and gets to the end.
    **When the merge will not go through** — a conflict you cannot resolve from
    what you have read, or a check you cannot get passing — push the working
    branch first, so what the step built survives this session, then `block <n>
-   --ask "…"` with that branch named in the ask. Stop the batch there: do not
+   --ask "…" --note "…"` with that branch named in the note. The ask never
+   names it: the person cannot open branches, and `block` refuses an ask that
+   names one. Stop the batch there: do not
    send the next step, and do not close the blocked one, because its commit is
    on a branch and that is what the guard on `done` is for. Decisions #685 and
    #695 are why. The next session starts from main as it then stands, and can
@@ -220,12 +287,30 @@ thousand tokens, and gets to the end.
    written a decision and blocked its step. Do not build around it and do not
    send a later step that depends on it. Other steps in the batch that do not
    depend on it are still yours to send.
-7. **Report when the batch ends**: every step closed **by number and title**,
+7. **Write Dash's update on each feature the batch worked**, once its steps
+   are closed or blocked and before the report (plan #1666):
+
+   ```
+   npx tsx scripts/plan.ts update <the feature> --health on_track|at_risk|blocked \
+     --body "<two or three sentences on what moved>"
+   ```
+
+   The feature's page shows the latest one at the top of its Overview, with
+   the health and a line saying how many of its steps are done now and how
+   many were done at the update before; the command works out those counts
+   from the plan. `on_track` when the feature is moving and nothing open
+   threatens it, `at_risk` when something might stop it landing as written (a
+   critic stop, a failing merge, a step that keeps growing), `blocked` when it
+   cannot move until the person answers or sets something up. The body is
+   for the person: what closed, what is next, and what is waiting on them,
+   by outline and title, in the writing guide's terms. One update per feature
+   per batch, not one per step.
+8. **Report when the batch ends**: every step closed **by outline and title**,
    what became ready, what is blocked and on what, and anything raised on
-   `/dev/raised`, by title. A report that says "closed four steps" makes the
+   `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed
    step is on main already, and a step blocked on a failed merge is on the
-   branch the block names, which the report names too.
+   branch its history names, which the report names too.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.
@@ -241,6 +326,7 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
 | `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
+| `reference/unsticking.md` | Finding out why a feature stalled, and fixing it or writing what it waits on. |
 | `reference/overhaul.md` | Working an overhaul: the design session, the three phases, the review against the Contract. |
 | `reference/overhaul-routine.md` | The standing prompt for the routine that works an overhaul, and how to set it up. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |
@@ -249,19 +335,22 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
 | `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
 
-A shaping run and a re-shape each have a row in `plan_runs` (job `shape` or
-`reshape`) that nothing else marks finished until the sweep reads what they
-wrote. As the last write of the run, mark yours:
+A shaping run, a re-shape and a re-shape after a vision edit each have a row
+in `plan_runs` (job `shape`, `reshape` or `vision_reshape`) that nothing else
+marks finished. As the last write of the run, mark yours, under its own job
+name: a row marked under the wrong one leaves yours `started`, and it is
+written back as failed hours later however well the run went.
 
 ```sql
 update plan_runs set status = 'finished', error = null
 where id = (select id from plan_runs
-            where job = '<shape or reshape>' and status = 'started'
+            where job = '<shape, reshape or vision_reshape>' and status = 'started'
             order by created_at desc limit 1);
 ```
 
 For a re-shape, add `and plan_item_id = '<the feature's id>'` inside the
-select. A build run needs nothing: closing or blocking its step ends it.
+select. A re-shape after a vision edit is about no feature, so it adds
+nothing. A build run needs nothing: closing or blocking its step ends it.
 
 ## Statuses
 
@@ -269,7 +358,7 @@ select. A build run needs nothing: closing or blocking its step ends it.
 |---|---|
 | `proposed` | Waiting on the person's approve. Never built. A new feature and the steps shaped under it, or a step that acts outside the repository. |
 | `not_started` | Decided on, not begun. |
-| `in_progress` | Claimed right now. At most one at a time. |
+| `in_progress` | Claimed right now. Up to three at once under one feature run, one per builder. |
 | `blocked` | Needs an answer or something outside the repo. Reason required. |
 | `done` | Shipped, verified against its done-when. Carries the commit. |
 | `dropped` | Decided against. Reason required. |

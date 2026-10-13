@@ -1,14 +1,22 @@
 import type { ComponentProps } from 'react';
+import { GoalsInboxView } from '@/app/goals/inbox/inbox-view';
+import { goalInboxGroups } from '@/lib/goals/inbox';
 import { PageHeader } from '@/components/shell/page-header';
+import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
+import { SONNET } from '@/lib/core/models';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
 import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
+import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
+import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
+import { GoalSuggestions } from '@/app/goals/[goalId]/goal-suggestions';
+import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
@@ -25,6 +33,15 @@ import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
+import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
+import { closedSteps, goalStages } from '@/lib/goals/goal-page';
+import { goalProgress } from '@/lib/goals/status';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { MONTH_DAYS } from './burn-up-surfaces';
+import { goalMapWith } from './goal-surfaces';
+import { SetTab } from './set-tab';
+import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -71,6 +88,10 @@ const cards = goal('g-cards', 'a-money', 'Pay off the credit cards', {
   acceptance: 'Every card at a zero balance.',
   unit: '$',
   target: 0,
+  // A quarter, not a day: it reads "Q2 2027" wherever the date appears (plan #1840).
+  dueOn: '2027-06-30',
+  duePrecision: 'quarter',
+  createdAt: '2026-06-02T09:00:00Z',
 });
 const fund = goal('g-fund', 'a-money', 'Build an emergency fund', {
   acceptance: 'Three months of spending in the savings account.',
@@ -81,13 +102,34 @@ const job = goal('g-job', 'a-career', 'Move into a quant research role', {
 });
 const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
   fog: 'Whether to aim for a time or just to finish.',
+  createdAt: '2026-09-25T07:30:00Z',
 });
+
+/** The areas a goal can be moved to, for the menu in the page's header. */
+const PLACES = [
+  { id: 'a-money', name: 'Money' },
+  { id: 'a-career', name: 'Career' },
+  { id: 'a-health', name: 'Health' },
+];
 
 const cardsProgress = progress({
   bands: { on_you: 3, waiting: 1, with_dash: 1, done: 2 },
   move: 'on_you',
   questions: 1,
 });
+
+const cardsReview: GoalReview = {
+  id: 'rev-1',
+  goalId: cards.id,
+  verdict: 'waiting_on_you',
+  reason: 'Two steps closed this week and the next one is yours.',
+  nextMove: 'Answer “Which card first?” so Dash can plan the payments.',
+  nextOn: null,
+  stepId: null,
+  waitsOnId: null,
+  runId: null,
+  createdAt: '2026-09-21T08:00:00Z',
+};
 
 /* ------------------------------------------------------------------ home */
 
@@ -110,7 +152,7 @@ function review(
 }
 
 const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
-  today: [
+  onYou: [
     {
       kind: 'question',
       id: 'which',
@@ -121,6 +163,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Answer',
       unblocks: 3,
       on: null,
+      backFromSnooze: true,
     },
     {
       kind: 'step',
@@ -132,6 +175,17 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Done',
       unblocks: 0,
       on: '2026-10-01',
+      prepared: {
+        text: [
+          '**Standing order** from the current account to the savings account.',
+          '',
+          '- Amount: $200',
+          '- Day: the 28th, the day after payday',
+          '- Reference: Emergency fund',
+          '',
+          'In the app: Payments, then Standing orders, then New.',
+        ].join('\n'),
+      },
     },
     {
       kind: 'rhythm',
@@ -168,8 +222,6 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       on: '2026-10-01',
       url: 'https://example.com/meetup',
     },
-  ],
-  later: [
     {
       kind: 'plan',
       id: 'a-health',
@@ -243,6 +295,22 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       next: null,
       hasSteps: false,
     },
+    {
+      goal: goal('g-boiler', 'a-money', 'Book the boiler service', {
+        errand: true,
+        dueOn: '2026-10-20',
+        position: 30,
+      }),
+      areaName: 'Money',
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 1, done: 0 },
+        move: 'with_dash',
+      }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: true,
+    },
   ],
   done: {
     since: '2026-09-24T19:30:00Z',
@@ -253,7 +321,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
         title: 'Draft what to say on the call',
         goalId: cards.id,
         goalTitle: cards.title,
-        href: `/goals/${cards.id}#step-script`,
+        href: `/goals/${cards.id}/s/script`,
         unread: true,
         runId: 'run-1',
         undo: null,
@@ -262,33 +330,13 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     ],
     more: 0,
   },
-  health: { dashFinished: 4, waitingOnYou: 3, stuck: 1, daysVisited: 2 },
   todayOn: TODAY,
   areas: [
     { id: 'a-money', name: 'Money' },
     { id: 'a-career', name: 'Career' },
+    { id: 'a-health', name: 'Health' },
+    { id: 'a-city', name: 'The city and the people in it' },
   ],
-  holders: {
-    [cards.id]: { onYou: 2, dashOpen: 1, working: null, lastDashAt: `${TODAY}T06:00:00Z` },
-    [fund.id]: { onYou: 1, dashOpen: 0, working: null, lastDashAt: null },
-    [job.id]: {
-      onYou: 1,
-      dashOpen: 0,
-      working: {
-        id: 'run-live',
-        job: 'goal',
-        status: 'started',
-        createdAt: `${TODAY}T09:10:00Z`,
-        endedAt: null,
-        summary: null,
-        error: null,
-        lastSeenAt: `${TODAY}T09:14:00Z`,
-        nowOn: 'Find quant research openings in London',
-        item: { id: job.id, title: job.title, level: 'goal' },
-      },
-      lastDashAt: `${TODAY}T09:10:00Z`,
-    },
-  },
   working: [
     {
       id: 'run-live',
@@ -349,8 +397,28 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       dueOn: null,
     },
   ],
+  // Seven of Dash's files not opened (plan #1861): the line lists five and links the rest.
+  filesToRead: [
+    ['f-rates', 'Which card to pay first', 'Paying the 27% card first saves about $310 over paying the smaller balance first.', 2],
+    ['f-letter', 'A letter asking Chase to lower the rate on the Sapphire Preferred card it has charged 27% on since March', 'Asks for the rate to drop to the 19% offered to new cardholders.', 1],
+    ['f-firms', 'Firms hiring FP&A analysts in Boston this month', null, 1],
+    ['f-recruiters', 'What the three recruiters said, and when each will reply', 'Two reply by Monday; the third wants a call first.', 3],
+    ['f-race', 'Half marathons in the spring within two hours of home', null, 1],
+    ['f-fund', 'How long the emergency fund takes at $300 a month', null, 1],
+    ['f-gyms', 'Gyms near the new office', null, 1],
+  ].map(([id, title, summary, version], index) => ({
+    id: id as string,
+    title: title as string,
+    summary: summary as string | null,
+    madeBy: 'claude' as const,
+    version: version as number,
+    origin: null,
+    createdAt: '2026-09-20T09:00:00Z',
+    updatedAt: new Date(Date.parse('2026-09-25T08:00:00Z') - index * 5 * 3_600_000).toISOString(),
+    readAt: null,
+  })),
   brief: {
-    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
+    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
   },
 };
@@ -359,7 +427,22 @@ export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" />
+      <HomeView {...home} timeZone="Europe/London" canRun />
+    </div>
+  );
+}
+
+/** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
+export function GoalsInboxSurface() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader title="Inbox" />
+      <GoalsInboxView
+        groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
+        laterOn={home.laterOn ?? []}
+        preparable={home.preparable ?? []}
+        canRun
+      />
     </div>
   );
 }
@@ -388,7 +471,7 @@ const areas: AreaWithGoals[] = [
 export function GoalsAllSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="All goals" />
+      <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
       <GoalsView
         areas={areas}
         view="open"
@@ -399,7 +482,75 @@ export function GoalsAllSurface() {
           [job.id]: home.goals[2].progress!,
         }}
         areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
         canRun
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- area page */
+
+const moneyArea: AreaWithGoals = {
+  id: 'a-money',
+  name: 'Money',
+  note: 'Out of card debt by spring, with three months of rent put by and nothing left to chance.',
+  position: 10,
+  goals: [
+    cards,
+    fund,
+    goal('g-pension', 'a-money', 'Move the old workplace pension into one account', {
+      status: 'proposed',
+      position: 30,
+      acceptance: 'Both old pensions are in the one account, with the transfer letters filed.',
+    }),
+    goal('g-insurance', 'a-money', 'Get contents insurance for the flat', {
+      status: 'proposed',
+      position: 40,
+    }),
+  ],
+};
+
+/** An area's own page (plan #1619): the Money area alone, two goals open and two Dash proposed. */
+export function GoalsAreaSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <GoalsView
+        areas={[moneyArea, ...areas.slice(1)]}
+        areaId="a-money"
+        view="open"
+        onYou={{ [cards.id]: 1 }}
+        progress={{ [cards.id]: cardsProgress, [fund.id]: home.goals[1].progress! }}
+        areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
+        canRun
+        planCost={{
+          lowMicros: 380_000,
+          medianMicros: 520_000,
+          highMicros: 910_000,
+          runs: 6,
+          basis: 'measured',
+          per: 'run',
+          models: [SONNET],
+        }}
       />
     </div>
   );
@@ -493,6 +644,16 @@ const cardFiles = [
     fileId: 'f-rates',
     title: 'Which card to pay first',
     summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+    meta: 'Written by Dash for “Compare the two cards’ rates” · version 2',
+    byDash: true,
+    unread: true,
+  },
+  {
+    fileId: 'f-letter',
+    title: 'A letter asking Chase to lower the rate on the Sapphire card',
+    summary: 'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
+    meta: 'Written by Dash for “Draft the letter asking for a lower rate”',
+    byDash: true,
   },
 ];
 
@@ -538,20 +699,115 @@ export function FileSurface() {
   );
 }
 
+/** What Dash suggests on the cards goal (plan #1739). */
+const CARD_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'sg-autopay',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Set autopay on the 27% card to $300 a month',
+    detail: 'The comparison found paying it first saves about $310.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+  {
+    id: 'sg-rate',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Ask the bank for a lower rate on the smaller card',
+    detail: null,
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+];
+
 /**
- * The top of a goal page that has something in each section: the Claude
- * line, the number with four monthly readings, and one Learn goal linked. The
- * page header is the real one; the back link above it is the page's own and
- * is left out.
+ * The top of a goal page that has something in each part of its header
+ * (plan #1078): Dash's verdict and the status line, the next move, Dash's
+ * note folded, Ask Dash, the number with four monthly readings, and Waiting
+ * on you with a question to answer in place and a result to read. Under it,
+ * one Learn goal linked and a file, as More holds them. The page header is
+ * the real one, with the path above it (plan #1622).
  */
 export function GoalTopSurface() {
+  const which = {
+    ...step('which', {
+      title: 'Which card first?',
+      kind: 'decision',
+      detail:
+        'A — The 27% card. Saves the most interest.\nB — The smaller balance. Closes one card soonest.\nRecommend A.',
+    }),
+    children: [],
+  };
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title={cards.title} description={cards.acceptance ?? undefined} />
+    <GoalDetail
+      goal={cards}
+      areaName="Money"
+      places={PLACES}
+      review={cardsReview}
+      progress={cardsProgress}
+      timeZone="UTC"
+      pace={{ known: true, activeDays: 9, typicalGap: 5, lastOn: '2026-10-09', daysSince: 2, slower: false }}
+    >
       <div className="space-y-6">
-        <GoalStatusCard
-          status={{
-            yourMove: [
+        <GoalDoneWhen goal={cards} />
+        <div className="space-y-4">
+          <GoalStatusCard
+            line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
+            brief={{
+              id: 'brief-1',
+              itemId: cards.id,
+              runId: null,
+              body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+              createdAt: '2026-09-25T08:00:00Z',
+            }}
+            briefWhen="today"
+            current
+            change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
+            review={cardsReview}
+            ask={
+              <GoalShaping
+                goalId={cards.id}
+                approval={approvalLine({
+                  goalStatus: 'open',
+                  approvedAt: '2026-09-01T09:00:00Z',
+                  proposed: 0,
+                  questions: 1,
+                })}
+                runs={cardRuns}
+                moreRuns={false}
+                running={null}
+                canRun
+                quiet
+              />
+            }
+          />
+          <GoalLogDone goalId={cards.id} />
+          <GoalNumber
+            goalId={cards.id}
+            unit="$"
+            target={0}
+            dueOn={cards.dueOn}
+            duePrecision={cards.duePrecision}
+            readings={readings}
+            today={TODAY}
+          />
+          <WaitingOnYou
+            rows={[
               {
                 id: 'which',
                 kind: 'question',
@@ -573,88 +829,27 @@ export function GoalTopSurface() {
                 title: 'Call the card company',
                 href: '#step-call',
               },
-            ],
-            moreSteps: 2,
-            claudeReady: 1,
-            claudeHeld: 0,
-          }}
-          brief={{
-            id: 'brief-1',
-            itemId: cards.id,
-            runId: null,
-            body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
-            createdAt: '2026-09-25T08:00:00Z',
-          }}
-          briefWhen="today"
-          current
-          stages={[
-            {
-              id: 's1',
-              title: 'Know what you owe',
-              index: 1,
-              state: 'done',
-              done: 3,
-              live: 3,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's2',
-              title: 'Pay the dearest card first',
-              index: 2,
-              state: 'current',
-              done: 1,
-              live: 4,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's3',
-              title: 'Both cards at zero',
-              index: 3,
-              state: 'waiting',
-              done: 0,
-              live: 2,
-              waitsOn: [2],
-              waitsElsewhere: false,
-            },
-          ]}
-          review={{
-            id: 'rev-1',
-            goalId: cards.id,
-            verdict: 'waiting_on_you',
-            reason: 'Two steps closed this week and the next one is yours.',
-            nextMove: 'Answer “Which card first?” on the goal.',
-            nextOn: null,
-            stepId: null,
-            waitsOnId: null,
-            runId: null,
-            createdAt: '2026-09-21T08:00:00Z',
-          }}
-        />
-        <GoalShaping
+            ]}
+            flags={[]}
+            questions={{ which }}
+          />
+        </div>
+        <BurnUpChart days={MONTH_DAYS} />
+        <GoalSuggestions
           goalId={cards.id}
-          approval={approvalLine({
-            goalStatus: 'open',
-            approvedAt: '2026-09-01T09:00:00Z',
-            proposed: 0,
-            questions: 1,
-          })}
-          runs={cardRuns}
-          moreRuns={false}
-          running={null}
-          canRun
+          suggestions={CARD_SUGGESTIONS}
+          helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
         />
-        <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
             Files
+            <span className="ml-2 font-normal text-ink-muted">1 not read</span>
           </h2>
           <FileLinks files={cardFiles} />
         </section>
       </div>
-    </div>
+    </GoalDetail>
   );
 }
 
@@ -666,10 +861,22 @@ export function GoalTopSurface() {
 export function GoalBareSurface() {
   const number = { goalId: marathon.id, unit: null, target: null, readings: [], today: TODAY };
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title={marathon.title} />
-      <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
+    <GoalDetail
+      goal={marathon}
+      areaName="Health"
+      places={PLACES}
+      review={null}
+      progress={progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
+        move: 'settled',
+      })}
+      timeZone="UTC"
+      pace={{ known: false, activeDays: 1, lastOn: '2026-10-08', daysSince: 3 }}
+    >
       <div className="space-y-6">
+        <GoalDoneWhen goal={marathon}>
+          <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
+        </GoalDoneWhen>
         <GoalShaping
           goalId={marathon.id}
           approval={approvalLine({
@@ -682,6 +889,7 @@ export function GoalBareSurface() {
           moreRuns={false}
           running={null}
           canRun
+          quiet
         />
         <GoalAddRow
           number={number}
@@ -694,7 +902,7 @@ export function GoalBareSurface() {
           }}
         />
       </div>
-    </div>
+    </GoalDetail>
   );
 }
 
@@ -957,5 +1165,97 @@ export function GoalLinkingSurface() {
         startAdding
       />
     </div>
+  );
+}
+
+/* ------------------------------------------------ the goal page's tabs */
+
+/**
+ * The credit-card goal from the steps' fixtures (goal-surfaces.tsx), with
+ * the times its closed steps were closed, for the Steps and Activity tabs
+ * (plan #1671).
+ */
+export const tabbedMap = goalMapWith({
+  list: { closedAt: '2026-09-18T10:00:00Z' },
+  script: { closedAt: '2026-09-23T07:15:00Z' },
+  overdraft: { closedAt: '2026-09-10T16:40:00Z' },
+});
+const tabbedGoal: Goal = {
+  ...tabbedMap.goal,
+  createdAt: '2026-09-02T09:00:00Z',
+  dueOn: '2027-06-30',
+};
+
+/** The goal's page frame, open or closed, for the Steps tab and its moments. */
+export function TabbedGoal({
+  children,
+  closed = false,
+}: {
+  children: React.ReactNode;
+  closed?: boolean;
+}) {
+  return (
+    <GoalDetail
+      goal={closed ? { ...tabbedGoal, status: 'done' } : tabbedGoal}
+      areaName={tabbedMap.areaName}
+      places={PLACES}
+      review={cardsReview}
+      progress={goalProgress(tabbedMap.steps)}
+      timeZone="UTC"
+      pace={
+        closed
+          ? null
+          : { known: true, activeDays: 6, typicalGap: 4, lastOn: '2026-10-01', daysSince: 10, slower: true }
+      }
+    >
+      {children}
+    </GoalDetail>
+  );
+}
+
+/** A goal's page on its Steps tab: the step tree with its stages and rhythm. */
+export function GoalStepsTabSurface() {
+  return (
+    <>
+      <SetTab tab="steps" />
+      <TabbedGoal>
+        <StepTree map={tabbedMap} stages={goalStages(tabbedMap.steps)} todoOn={false} />
+      </TabbedGoal>
+    </>
+  );
+}
+
+/**
+ * The same goal on its Activity tab: the steps closed, newest first, one of
+ * them Dash's and one dropped, the goal's runs, and its comments.
+ */
+export function GoalActivitySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <TabbedGoal>
+        <GoalActivity
+          goalId={tabbedGoal.id}
+          closed={closedSteps(tabbedMap.steps)}
+          runs={cardRuns}
+          moreRuns
+          thread={[
+            {
+              id: 'turn-1',
+              author: 'me',
+              body: 'The card company said to call back after the statement on the 3rd.',
+              createdAt: '2026-09-24T17:20:00Z',
+            },
+            {
+              id: 'turn-2',
+              author: 'claude',
+              body: 'Noted. I have moved the call to after 3 Oct and kept the script as it is.',
+              createdAt: '2026-09-24T17:22:00Z',
+            },
+          ]}
+          timeZone="UTC"
+        />
+      </TabbedGoal>
+    </>
   );
 }

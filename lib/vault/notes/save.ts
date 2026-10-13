@@ -65,6 +65,13 @@ export type SaveNoteInput = {
   text: string;
   /** The blob SHA the editor opened the note at. */
   expectedBlobSha: string;
+  /**
+   * Builds the file from the blob the editor opened and the new body. Left
+   * out, the frontmatter is kept byte for byte (withEditedBody); an essay
+   * passes its own, which also rewrites its `title` and `updated` (plan
+   * #1866). Null when the file cannot be rebuilt safely.
+   */
+  rewrite?: (raw: string, body: string) => string | null;
 };
 
 export type SaveNoteFailure =
@@ -158,10 +165,13 @@ export async function saveNote(
     const body = matchLineEndings(input.text, raw);
     if (body === note.body) return { ok: true, blobSha: note.blobSha, commitSha: null };
 
-    const text = withEditedBody(raw, note.path, body);
+    const text = input.rewrite ? input.rewrite(raw, body) : withEditedBody(raw, note.path, body);
     if (text === null) {
       return failed('error', `Could not separate the frontmatter of ${note.path} from its body.`);
     }
+    // The stored body can differ from the editor's while the file does not:
+    // an essay's authorship block is in the file but not in the editor.
+    if (text === raw) return { ok: true, blobSha: note.blobSha, commitSha: null };
     const sizeBytes = new TextEncoder().encode(text).byteLength;
     if (sizeBytes > MAX_NOTE_BYTES) {
       return failed('too-large', `${note.path} would be ${sizeBytes} bytes.`);

@@ -1,6 +1,7 @@
 import { MODULES } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
 import { APP_VISION, visionAnchor } from '@/lib/specs/vision';
+import { stepRef } from '@/lib/plan/ref';
 
 /**
  * Dev rows into hits, apart from the reads so the hrefs can be tested without
@@ -19,12 +20,16 @@ import { APP_VISION, visionAnchor } from '@/lib/specs/vision';
  */
 
 export type DevRows = {
-  plan: { id: string; number: number; title: string; parent_id: string | null; status: string }[];
+  /**
+   * `outline` is where the plan page places the row, `1073.4`, and is what a
+   * hit names it by; without it, the number.
+   */
+  plan: { id: string; number: number; outline?: string | null; title: string; parent_id: string | null; status: string }[];
   ideas: { id: string; body: string; module: string | null }[];
   notes: { id: string; body: string; kind: string; status: string }[];
   specs: readonly { slug: string; title: string; blurb: string }[];
   /** Decisions still waiting on an answer, dismissed ones already left out. */
-  questions?: { id: string; number: number; title: string; detail: string | null }[];
+  questions?: { id: string; number: number; outline?: string | null; title: string; detail: string | null }[];
   /** Raises from the Dash tab's queue, dismissed ones already left out. */
   raises?: {
     id: string;
@@ -118,8 +123,8 @@ export function devHits(rows: DevRows): SearchHit[] {
       id: row.id,
       ref: `public.plan_items:${row.id}`,
       title: row.title,
-      subtitle: `${row.parent_id ? 'Step' : 'Feature'} #${row.number} · ${row.status.replace('_', ' ')}`,
-      match: `#${row.number}`,
+      subtitle: `${row.parent_id ? 'Step' : 'Feature'} ${stepRef(row)} · ${row.status.replace('_', ' ')}`,
+      match: row.outline ? `${stepRef(row)} #${row.number}` : `#${row.number}`,
       href: planHref(row.number),
     });
   }
@@ -131,11 +136,11 @@ export function devHits(rows: DevRows): SearchHit[] {
       id: row.id,
       ref: `public.plan_items:${row.id}`,
       title: row.title,
-      subtitle: `Question #${row.number} · waiting on you`,
-      // The number, as a step is quoted, and the options beneath the title:
-      // the word you remember from a question is as often in an option.
-      match: `#${row.number} ${row.detail ?? ''}`.trim(),
-      href: `/dev/raised#${waitingAnchor(row.id)}`,
+      subtitle: `Question ${stepRef(row)} · waiting on you`,
+      // The outline and number, as a step is quoted, and the options beneath
+      // the title: the word you remember from a question is as often in an option.
+      match: `${row.outline ? `${stepRef(row)} ` : ''}#${row.number} ${row.detail ?? ''}`.trim(),
+      href: `/dev/inbox#${waitingAnchor(row.id)}`,
     });
   }
 
@@ -148,7 +153,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       title: row.title,
       subtitle: `Raised · ${row.status}`,
       match: `${row.ask ?? ''} ${row.detail ?? ''}`.trim() || undefined,
-      href: `/dev/raised#${raiseAnchor(row.id)}`,
+      href: `/dev/inbox#${raiseAnchor(row.id)}`,
     });
   }
 

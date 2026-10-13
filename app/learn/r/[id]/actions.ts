@@ -5,12 +5,23 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadReading } from '@/lib/learn/tracks/load';
+import { loadReading, type ReadingSummary } from '@/lib/learn/tracks/load';
+import { getReadingText } from '@/lib/learn/locate/reading-text';
+import { summarizeReadingText } from '@/lib/learn/tracks/reading-summary-model';
+import { answerAboutReading } from '@/lib/learn/tracks/reading-chat-model';
+import { answerWithCut, CHAT_UNREADABLE, readingMaterial } from '@/lib/learn/tracks/reading-chat';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { COMMENT_MAX } from '@/lib/goals/comments';
+import { questionFrom } from '@/lib/comments/mention';
+import { MAX_TURN } from '@/lib/talk/talk';
+import { threadRef, threadSubject } from '@/lib/thread/subjects';
+import { addThreadTurn, loadThread, THREAD_ROW_NOT_YOURS } from '@/lib/thread/store';
 import { locatePassage } from '@/lib/learn/locate/locate';
 import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { markNoteReadApproved, recordNoteRead } from '@/lib/learn/graph/note-reads';
 import { loadConcept, loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
 import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
 import { aimFor, aimSentence, type Aim } from '@/lib/learn/graph/aim';
@@ -22,8 +33,15 @@ import {
   setReadNow,
   setReadingLocation,
   setReadingNote,
+  setReadingText,
   setReadingStatus,
+  setReadingSummary,
 } from '@/lib/learn/tracks/save';
+import { cleanReadingText, MAX_READING_TEXT, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
+import { extractPdfText, ownsReadingPdfPath } from '@/lib/learn/tracks/reading-pdf';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
+import { RESUME_MAX_BYTES } from '@/lib/jobs/resume-file';
 import { recordOutcome } from '@/lib/learn/next/record';
 
 /**
@@ -305,6 +323,256 @@ export async function updateNote(
   return {};
 }
 
+const TextInput = z.object({
+  readingId: z.string().uuid(),
+  text: z.string().max(2_000_000),
+});
+
+/**
+ * Keep pasted text on the reading, replacing any it had.
+ *
+ * Dash reads this text instead of the link from then on. The row is found
+ * through the session client, so a reading that is not yours is not there.
+ */
+// latency: pending
+export async function saveReadingText(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  await requireUser();
+
+  const parsed = TextInput.safeParse({
+    readingId: formData.get('readingId'),
+    text: formData.get('text') ?? '',
+  });
+  if (!parsed.success) return { error: 'That text is far too long to keep. Paste the part you want Dash to read.' };
+
+  const cleaned = cleanReadingText(parsed.data.text);
+  if (!cleaned.ok) return { error: cleaned.error };
+
+  const supabase = await createLearnClient();
+  try {
+    const found = await setReadingText(supabase, parsed.data.readingId, {
+      text: cleaned.text,
+      label: PASTED_LABEL,
+    });
+    if (!found) return { error: 'That reading is not there any more.' };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not keep that text.' };
+  }
+
+  revalidatePath(`/learn/r/${parsed.data.readingId}`);
+  return {};
+}
+
+export type SummarizeResult =
+  | { ok: true; summary: ReadingSummary }
+  | {
+      ok: false;
+      error: string;
+      /** True when the reading's text could not be read: the page points to paste or upload. */
+      unreadable?: boolean;
+    };
+
+/**
+ * Summarize, and Redo (plan #1876.4): one model call over the reading's text,
+ * kept on the reading so it shows again on later visits.
+ *
+ * The text is what getReadingText returns: the text you gave the reading when
+ * there is some, its link otherwise. A link Dash cannot read costs nothing and
+ * comes back as the paste-or-upload message.
+ */
+// latency: pending
+export async function summarizeReading(readingId: string): Promise<SummarizeResult> {
+  const user = await requireUser();
+
+  const id = z.string().uuid().safeParse(readingId);
+  if (!id.success) return { ok: false, error: 'Could not work out which reading that was.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, error: 'Summarize needs the Anthropic key, which is not set on this deployment.' };
+
+  try {
+    const supabase = await createLearnClient();
+    const reading = await loadReading(supabase, id.data);
+    if (!reading) return { ok: false, error: 'That reading is not there any more.' };
+
+    const text = await getReadingText(supabase, {
+      id: reading.id,
+      url: reading.openUrl ?? reading.source?.canonicalUrl ?? null,
+    });
+    if (!text.ok) return { ok: false, error: text.message, unreadable: true };
+
+    const spend = collectSpend();
+    const result = await summarizeReadingText({
+      title: reading.subject,
+      why: reading.why,
+      text: text.text,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'summarize-reading', spend.reports);
+    if (!result.ok) {
+      console.error('[reading summary]', result.detail);
+      return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
+    }
+
+    const saved = { text: result.text, from: text.from, label: text.label, truncated: text.truncated };
+    const found = await setReadingSummary(supabase, reading.id, saved);
+    if (!found) return { ok: false, error: 'That reading is not there any more.' };
+
+    revalidatePath(`/learn/r/${reading.id}`);
+    return { ok: true, summary: { ...saved, writtenAt: new Date().toISOString() } };
+  } catch (error) {
+    console.error('[reading summary]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
+  }
+}
+
+export type ReadingCommentState = { error?: string; message?: string };
+
+const CommentBody = z.string().trim().min(1, 'Write something.').max(COMMENT_MAX);
+
+/**
+ * A question in the chat on a reading's page (plan #1876.5). The question is
+ * kept in the thread under the reading first, so a failed answer or a closed
+ * tab leaves it there; Dash answers before this returns, the way a question
+ * on a Learn now card is answered, and the answer goes in the same thread.
+ *
+ * Dash is given the reading's text as getReadingText returns it (the text you
+ * gave it, else its link), the summary when there is one, and the thread so
+ * far. A reading Dash cannot read gets an answer saying so and what to paste,
+ * and costs nothing. The first answer about a reading cut at 200,000
+ * characters says so.
+ */
+// latency: pending
+export async function addReadingComment(
+  _prev: ReadingCommentState,
+  formData: FormData,
+): Promise<ReadingCommentState> {
+  const user = await requireUser();
+  const subject = threadSubject(String(formData.get('subject') ?? ''));
+  if (
+    !subject ||
+    subject.target !== 'reading' ||
+    !z.string().uuid().safeParse(subject.id).success
+  ) {
+    return { error: 'Could not work out which reading that was.' };
+  }
+  const body = CommentBody.safeParse(formData.get('body') ?? '');
+  if (!body.success) return { error: body.error.issues[0].message };
+  const ref = threadRef('reading', subject.id);
+
+  const core = await createCoreClient();
+  let asked: string;
+  try {
+    asked = await addThreadTurn(core, { userId: user.id, ref, author: 'me', body: body.data });
+  } catch (error) {
+    if (error instanceof Error && error.message === THREAD_ROW_NOT_YOURS) {
+      return { error: 'That reading is not there any more.' };
+    }
+    return { error: 'Your question could not be saved. Try again.' };
+  }
+
+  const say = async (text: string) => {
+    await addThreadTurn(core, {
+      userId: user.id,
+      ref,
+      author: 'claude',
+      body: text.slice(0, MAX_TURN),
+    });
+  };
+
+  try {
+    const supabase = await createLearnClient();
+    const reading = await loadReading(supabase, subject.id);
+    if (!reading) return { message: 'That reading is not there any more.' };
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      await say(
+        'I cannot answer here: the Anthropic key is not set on this deployment. Your question is saved.',
+      );
+      return { message: 'Answered in the thread.' };
+    }
+
+    const text = await getReadingText(supabase, {
+      id: reading.id,
+      url: reading.openUrl ?? reading.source?.canonicalUrl ?? null,
+    });
+    if (!text.ok) {
+      await say(CHAT_UNREADABLE);
+      return { message: 'Answered in the thread.' };
+    }
+
+    const thread = await loadThread(core, ref, { userId: user.id });
+    const earlier = thread.filter((turn) => turn.id !== asked);
+    const spend = collectSpend();
+    const reply = await answerAboutReading({
+      material: readingMaterial({
+        title: reading.subject,
+        why: reading.why,
+        summary: reading.summary?.text ?? null,
+        text: text.text,
+        truncated: text.truncated,
+      }),
+      turns: [
+        ...earlier.map((turn) => ({
+          role: turn.author === 'claude' ? ('assistant' as const) : ('user' as const),
+          body: turn.body,
+        })),
+        { role: 'user' as const, body: questionFrom(body.data) },
+      ],
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'reply-about-card', spend.reports);
+    if (!reply.ok) {
+      console.error('[reading chat]', reply.detail);
+      await say('I could not answer this time. Your question is saved; ask again in a moment.');
+      return { message: 'Answered in the thread.' };
+    }
+
+    const earlierDash = earlier.filter((turn) => turn.author === 'claude').map((turn) => turn.body);
+    await say(answerWithCut(reply.text, { truncated: text.truncated, earlierDash }));
+    return { message: 'Answered in the thread.' };
+  } catch (error) {
+    // The question is in the thread already, so the failure is said there too
+    // rather than as an error, which would hand the words back to be sent twice.
+    console.error('[reading chat]', error instanceof Error ? error.message : error);
+    try {
+      await say('I could not answer this time. Your question is saved; ask again in a moment.');
+    } catch {
+      /* the message below is the only copy left */
+    }
+    return { message: 'Dash could not answer this time. Your question is saved.' };
+  } finally {
+    revalidatePath(`/learn/r/${subject.id}`);
+  }
+}
+
+/** Take the text off the reading; Dash goes back to the link. */
+// latency: pending
+export async function clearReadingText(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  if (!readingId.success) return { error: 'Could not work out which reading that was.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await setReadingText(supabase, readingId.data, null);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not clear the text.' };
+  }
+
+  revalidatePath(`/learn/r/${readingId.data}`);
+  return {};
+}
+
 /**
  * Open it — and, on the way, find the paragraph.
  *
@@ -338,6 +606,14 @@ export async function openReading(formData: FormData): Promise<void> {
   // page, which says so.
   const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
   if (!url) redirect(`/learn/r/${readingId.data}`);
+
+  // Text you gave this reading is what Dash reads; its link is never fetched.
+  if (reading.givenText) {
+    if (reading.status === 'queued') {
+      await setReadingStatus(supabase, reading.id, 'reading').catch(() => {});
+    }
+    redirect(url);
+  }
 
   // Already narrowed and checked: nothing to do but go.
   if (reading.locatorConfidence === 'verified' && reading.textAnchor) {
@@ -377,6 +653,8 @@ export type NoteGraphState = {
   /** Proposed, not saved. Nothing reaches the graph until it is approved. */
   chain?: ProposedChain;
   subjectId?: string;
+  /** The row counting this reading (learn.note_reads), sent back on approval. */
+  noteReadId?: string;
 };
 
 /**
@@ -417,6 +695,7 @@ export async function readNoteIntoGraph(
   if (!subject) return { error: 'That subject is not there any more.' };
 
   const spend = collectSpend();
+  const judgeSpend = collectSpend();
   const result = await conceptsFromNote({
     subject: subject.name,
     readingTitle: reading.subject,
@@ -424,16 +703,27 @@ export async function readNoteIntoGraph(
     existing: await existingConcepts(supabase, subject.id),
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
+    onJudgeSpend: judgeSpend.sink,
   });
   await recordLearnSpend(user.id, 'concepts-from-note', spend.reports);
+  await recordLearnSpend(user.id, 'judge-note-concepts', judgeSpend.reports);
 
   if (!result.ok) {
-    return result.reason === 'nothing-in-it'
-      ? { message: result.detail }
-      : { error: result.detail };
+    if (result.reason !== 'nothing-in-it') return { error: result.detail };
+    await recordNoteRead(supabase, user.id, {
+      readingId: reading.id,
+      subjectId: subject.id,
+      counts: result.counts,
+    });
+    return { message: result.detail };
   }
 
-  return { chain: result.chain, subjectId: subject.id };
+  const noteReadId = await recordNoteRead(supabase, user.id, {
+    readingId: reading.id,
+    subjectId: subject.id,
+    counts: result.counts,
+  });
+  return { chain: result.chain, subjectId: subject.id, ...(noteReadId ? { noteReadId } : {}) };
 }
 
 /** Attach what the note taught. The same writer as any other chain, minus the goal. */
@@ -460,11 +750,20 @@ export async function approveNoteConcepts(
   const safe = approvedChainSchema.safeParse(payload);
   if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
 
+  const noteReadId = z.string().uuid().safeParse(formData.get('noteReadId'));
+
   const supabase = await createLearnClient();
   try {
     await saveChain(supabase, user.id, safe.data as ProposedChain, safe.data.goalConcept, {
       goal: false,
     });
+    if (noteReadId.success) {
+      await markNoteReadApproved(
+        supabase,
+        noteReadId.data,
+        safe.data.nodes.filter((node) => !node.existingId).length,
+      );
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save that.' };
   }
@@ -510,4 +809,68 @@ export async function goDeeper(formData: FormData): Promise<void> {
   revalidatePath('/learn/lists');
   revalidatePath(`/learn/t/${reading.trackId}`);
   redirect(`/learn/t/${trackId}`);
+}
+
+export type ReadingPdfState = { error?: string; notice?: string };
+
+const PdfInput = z.object({
+  readingId: z.string().uuid(),
+  path: z.string().min(1).max(300),
+  name: z.string().max(500),
+});
+
+/**
+ * Keep the text of an uploaded PDF on the reading (plan #1876.2).
+ *
+ * The browser has already put the file in the person's own folder of the
+ * job-search bucket. This reads it, takes the text out, saves it the way
+ * pasting does, and deletes the file whatever happened, so only the text is
+ * kept. A scan, a file that is not a PDF, or a file over 10 MB is refused
+ * with a message saying which; text over the cap is cut there and says so.
+ */
+// latency: pending
+export async function saveReadingPdf(
+  _prev: ReadingPdfState,
+  formData: FormData,
+): Promise<ReadingPdfState> {
+  const user = await requireUser();
+
+  const parsed = PdfInput.safeParse({
+    readingId: formData.get('readingId'),
+    path: formData.get('path'),
+    name: formData.get('name') ?? '',
+  });
+  if (!parsed.success || !ownsReadingPdfPath(user.id, parsed.data.path)) {
+    return { error: 'Could not work out which file that was. Try the upload again.' };
+  }
+  const { readingId, path } = parsed.data;
+  const label = parsed.data.name.replace(/[\r\n]+/g, ' ').trim().slice(0, 120) || 'PDF';
+
+  const storage = (await createJobsClient()).storage.from(APP_STORAGE_BUCKET);
+  try {
+    const { data, error } = await storage.download(path);
+    if (error || !data) return { error: 'That PDF could not be read. Try the upload again.' };
+    if (data.size > RESUME_MAX_BYTES) return { error: 'That PDF is over 10 MB.' };
+    if (data.size === 0) return { error: 'That file is empty.' };
+
+    const extracted = await extractPdfText(new Uint8Array(await data.arrayBuffer()));
+    if (!extracted.ok) return { error: extracted.error };
+
+    const supabase = await createLearnClient();
+    try {
+      const found = await setReadingText(supabase, readingId, { text: extracted.text, label });
+      if (!found) return { error: 'That reading is not there any more.' };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Could not keep that text.' };
+    }
+
+    revalidatePath(`/learn/r/${readingId}`);
+    return extracted.cut
+      ? {
+          notice: `That PDF has more text than a reading keeps. Dash kept the first ${MAX_READING_TEXT.toLocaleString('en-GB')} characters and will read only those.`,
+        }
+      : {};
+  } finally {
+    await storage.remove([path]);
+  }
 }

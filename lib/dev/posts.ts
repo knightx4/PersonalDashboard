@@ -42,13 +42,17 @@ export type SocialPost = {
   droppedAt: string | null;
   /** The `plan_runs` row whose run drafted it. */
   runId: string | null;
+  /** The X post this draft was matched to (plan #1820). */
+  xPostId: string | null;
+  /** The X post a near match asks about ("Is this it?"). */
+  xCandidateId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export const SOCIAL_POST_COLUMNS =
   'id, platform, angle, status, draft, body, source_plan_item_ids, source_feedback_ids, ' +
-  'image_paths, posted_url, posted_at, dropped_at, run_id, created_at, updated_at';
+  'image_paths, posted_url, posted_at, dropped_at, run_id, x_post_id, x_candidate_id, created_at, updated_at';
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -72,6 +76,8 @@ export function socialPostFromRow(row: Record<string, unknown>): SocialPost {
     postedAt: (row.posted_at as string | null) ?? null,
     droppedAt: (row.dropped_at as string | null) ?? null,
     runId: (row.run_id as string | null) ?? null,
+    xPostId: (row.x_post_id as string | null) ?? null,
+    xCandidateId: (row.x_candidate_id as string | null) ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at ?? row.created_at),
   };
@@ -171,7 +177,7 @@ export const POSTS_RUN_HOLD_MINUTES = 45;
  * step, for the changelog's "Post about this" (#1420), or something the person
  * typed on the Posts tab (note 114ff495).
  */
-export type PostsRunFocus = { number: number } | { ask: string };
+export type PostsRunFocus = { number: number; outline?: string | null } | { ask: string };
 
 /** The longest ask the Posts tab sends, so a paste cannot swamp the turn. */
 export const MAX_POST_ASK = 1000;
@@ -182,14 +188,15 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
   }
   if ('number' in focus) {
     return (
-      `Write one draft about plan step #${focus.number} only, citing that step. ` +
+      `Write one draft about plan step ${focus.outline ? `#${focus.outline} (number ${focus.number})` : `#${focus.number}`} only, citing that step. ` +
       'Skip the search for what shipped, but still check the step is one a post may come from.'
     );
   }
   return (
     'Write one draft about what the person asked for, quoted below. Find the shipped steps ' +
-    'and closed notes it is about and cite them; every rule in the skill still holds, so if ' +
-    'it needs another workspace or nothing shipped bears on it, write no draft and say why.\n\n' +
+    'and closed notes it is about and cite them. An ask may be about any workspace, and may ' +
+    'allow a picture with real data, as the skill\'s section on asks says; the other rules ' +
+    'still hold. If nothing shipped bears on it, write no draft and say why.\n\n' +
     focus.ask
       .split('\n')
       .map((line) => `> ${line}`)
@@ -205,7 +212,8 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
     'Read .claude/skills/posts/SKILL.md first and follow it, and read docs/X-POSTS.md in ' +
       'full before drafting. Check every draft with `npx tsx scripts/posts-check.ts` and insert ' +
       'only the ones that pass, as suggested rows in social_posts carrying this run in run_id. ' +
-      'Then mark this run finished in plan_runs.',
+      'Then mark this run finished in plan_runs. If you insert no draft, write why in the ' +
+      "run's note column as you mark it finished, in a sentence or two the person reads on the Posts tab.",
     '',
     focusLine(input.focus),
     '',
@@ -221,6 +229,8 @@ export type PostsRun = {
   status: 'started' | 'finished' | 'failed';
   createdAt: string;
   error: string | null;
+  /** Why a run that finished wrote no draft, in Dash's words. */
+  note: string | null;
   /** The drafts in `social_posts` that carry this run's id. */
   drafts: number;
 };
@@ -271,14 +281,14 @@ export async function loadSocialPosts(supabase: Db, userId: string): Promise<Soc
 export async function loadLastPostsRun(supabase: Db, userId: string): Promise<PostsRun | null> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('id, status, created_at, error')
+    .select('id, status, created_at, error, note')
     .eq('user_id', userId)
     .eq('job', 'posts')
     .order('created_at', { ascending: false })
     .limit(1);
   if (error) throw new Error(`Could not read the posts runs: ${error.message}`);
   const row = (data ?? [])[0] as
-    | { id: string; status: string; created_at: string; error: string | null }
+    | { id: string; status: string; created_at: string; error: string | null; note: string | null }
     | undefined;
   if (!row) return null;
 
@@ -293,6 +303,7 @@ export async function loadLastPostsRun(supabase: Db, userId: string): Promise<Po
     status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
     createdAt: row.created_at,
     error: row.error,
+    note: row.note,
     drafts: count ?? 0,
   };
 }
@@ -311,6 +322,24 @@ export function cleanThread(posts: readonly string[]): string[] | null {
   const kept = posts.map((post) => post.trim()).filter((post) => post.length > 0);
   if (kept.length === 0 || kept.length > MAX_THREAD_POSTS) return null;
   return kept;
+}
+
+/** The table's limit on an angle (social_posts_angle_ck). */
+export const MAX_ANGLE = 300;
+
+/**
+ * The angle a post the person wrote themselves gets when they leave it blank:
+ * the first sentence of its first post, cut at a word before 120 characters.
+ * The angle is what the next run compares its ideas against, and a post's
+ * opening sentence is the nearest thing it has to one.
+ */
+export function angleFromPost(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  const sentence = flat.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? flat;
+  if (sentence.length <= 120) return sentence;
+  const cut = sentence.slice(0, 120);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 60 ? cut.slice(0, space) : cut).replace(/[,;:]$/, '')}…`;
 }
 
 /**
@@ -344,18 +373,61 @@ export function parsePostedUrl(
   return { ok: true, url: url.href };
 }
 
+/* -------------------------------------------------------------------------
+ * Images the person uploads (migration 0192)
+ * ---------------------------------------------------------------------- */
+
+/** The private bucket an uploaded image goes in, one folder per account. */
+export const POST_IMAGES_BUCKET = 'post-images';
+
+/** X takes up to four images on a post; a draft holds no more. */
+export const MAX_POST_IMAGES = 4;
+
+/** The bucket refuses anything larger. */
+export const POST_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The four image types X takes, which are the bucket's allowed types. */
+export const POST_IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 /**
- * Where the card's screenshot is drawn from, for one entry of `image_paths`.
+ * Where an upload is kept: your own folder, then a fresh id so two images
+ * with the same name do not collide. The name keeps letters, digits, dots,
+ * dashes and underscores, which storage accepts in any position.
+ */
+export function postImagePath(userId: string, id: string, name: string): string {
+  const cleaned = name
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|-+$/g, '')
+    .slice(-100);
+  return `${userId}/${id}-${cleaned || 'image'}`;
+}
+
+/** Whether a path is an upload of yours, in the shape postImagePath makes. */
+export function ownsPostImagePath(userId: string, path: string): boolean {
+  if (!path.startsWith(`${userId}/`)) return false;
+  return /^[0-9a-f-]{36}-[A-Za-z0-9._-]{1,100}$/.test(path.slice(userId.length + 1));
+}
+
+/** An entry of `image_paths` that is a path in the bucket, not a site path or link. */
+export function isUploadedPostImage(path: string): boolean {
+  return /^[0-9a-f-]{36}\/[0-9a-f-]{36}-[A-Za-z0-9._-]{1,100}$/.test(path);
+}
+
+/**
+ * Where the card's image is drawn from, for one entry of `image_paths`.
  *
  * A posts run photographs a Surfaces gallery fixture and commits the PNG
- * under public/posts/ (#1418), so an entry is a site path such as
+ * under public/posts/ (#1418), so its entry is a site path such as
  * `/posts/2026-10-02-dev-plan-tree.png`, served once that commit deploys.
- * Not a storage bucket: the run reaches the database only through SQL, which
- * cannot write a file, and the shots hold sample data meant for X anyway.
- * A full https link is drawn as it is too; anything else is not drawn, so a
- * malformed entry shows nothing rather than a broken image.
+ * An image the person uploaded is a path in the private bucket, drawn
+ * through the route that signs a short link to it on their session. A full
+ * https link is drawn as it is; anything else is not drawn, so a malformed
+ * entry shows nothing rather than a broken image.
  */
 export function postImageSrc(path: string): string | null {
+  if (isUploadedPostImage(path)) return `/dev/posts/image?path=${encodeURIComponent(path)}`;
   if (/^https:\/\//.test(path) || /^\/(?!\/)/.test(path)) return path;
   return null;
 }

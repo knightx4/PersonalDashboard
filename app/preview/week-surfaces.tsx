@@ -50,7 +50,7 @@ const REVIEW: ShownWeekReview = {
       events: [
         event('e1', '2026-10-02T15:00:00Z', 'jobs', 'interviewed', 'FP&A Analyst at Array', 'hiring manager'),
         event('e2', '2026-09-30T06:10:00Z', 'jobs', 'applied', 'Strategic Finance Associate at Check'),
-        event('e3', '2026-09-29T17:52:00Z', 'jobs', 'applied', 'Senior Financial Analyst, Revenue Operations and Planning at Ramp'),
+        event('e3', '2026-09-29T17:52:00Z', 'jobs', 'applied', 'Senior Financial Analyst, Revenue Operations and Planning at Copperline'),
       ],
     },
     {

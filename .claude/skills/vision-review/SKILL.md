@@ -80,11 +80,13 @@ select id, page_path, body, created_at from feedback_items
 where user_id = '…' and kind = 'like' and status = 'open'
 order by page_path, created_at;
 
--- steps finished and dropped in the window
-select number, title, status, completed_at from plan_items
-where user_id = '…' and module = '<workspace>' and kind = 'build'
-  and status in ('done', 'dropped') and updated_at >= '<window start>'
-order by updated_at;
+-- steps finished and dropped in the window, each named by its outline
+-- ("#1073.4") wherever the review cites it, the way the plan page heads it
+select o.outline, p.title, p.status, p.completed_at
+from plan_items p join plan_item_outlines o on o.id = p.id
+where p.user_id = '…' and p.module = '<workspace>' and p.kind = 'build'
+  and p.status in ('done', 'dropped') and p.updated_at >= '<window start>'
+order by p.updated_at;
 
 -- ideas the person dismissed in the window. A dismissal this review made
 -- carries a comment starting 'Dismissed by the vision review', so leave
@@ -345,6 +347,20 @@ where user_id = '…' and review_id = '<review_id>' order by module;
 select count(*) from feedback_items
 where user_id = '…' and kind = 'like' and status = 'open'
   and created_at <= '<when the run read them>';
+```
+
+## Ending the run
+
+The fire left a row in `plan_runs` with job `vision`, and nothing but the run
+marks it finished: it pushes nothing and closes no step. Left `started`, it
+is written back as failed two hours later however well the review went, as
+the review of 11 October was. As the run's last write:
+
+```sql
+update plan_runs set status = 'finished', error = null
+where id = (select id from plan_runs
+            where user_id = '…' and job = 'vision' and status = 'started'
+            order by created_at desc limit 1);
 ```
 
 Then report:

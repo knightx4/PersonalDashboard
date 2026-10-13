@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { embedIdeaClaim } from '@/lib/learn/embed/idea-embedding';
 import type { AimDepth } from '@/lib/learn/aims';
 import type { Depth } from '@/lib/learn/feed/depth';
 import { loadConcept } from '@/lib/learn/graph/load';
@@ -102,6 +103,7 @@ async function insertIdea(
   subjectId: string,
   idea: SurveyIdea,
 ): Promise<string> {
+  const vector = await embedIdeaClaim(supabase, userId, idea.claim);
   const { data, error } = await supabase
     .from('concepts')
     .insert({
@@ -113,6 +115,7 @@ async function insertIdea(
       origin: 'reading',
       mastery: idea.mastery,
       kind: idea.kind,
+      ...vector,
     })
     .select('id')
     .single();

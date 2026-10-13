@@ -18,9 +18,10 @@
 
 /**
  * Verdicts that let a surface through: the critic's `pass`, and `accepted`,
- * which the person writes from /dev/plan for a screen they let through after
- * the critic's last round (plan #1610, migration 0175). The critic never
- * writes `accepted`.
+ * written for a screen let through after the critic's last round (plan
+ * #1610, migration 0175): by the person from /dev/plan, or by the session
+ * that built it (`uiSettleSql`), whose notes open "Settled by Dash". The
+ * critic never writes `accepted`.
  */
 export const PASSING_VERDICTS: readonly string[] = ['pass', 'accepted'];
 
@@ -57,7 +58,7 @@ function lines(text: string): string[] {
  * The files a step changed, read from git.
  *
  * Two places, joined: the commit the close records, and every commit on its
- * history whose subject ends `(plan #<n>)`. The commit a close records is
+ * history whose subject ends `(plan #<n>)` or `(plan #<outline>)`. The commit a close records is
  * usually the merge that put the step on main, and a merge lists no files of
  * its own, so a merge is read against its first parent, which is everything
  * the branch brought in. The subject search catches a step whose close
@@ -66,7 +67,13 @@ function lines(text: string): string[] {
  * Throws when git cannot read the commit: a guard that cannot see the files
  * must not wave the close through.
  */
-export function filesOfStep(step: number, commit: string, git: GitRunner): string[] {
+export function filesOfStep(
+  step: number,
+  commit: string,
+  git: GitRunner,
+  /** The step's outline ("1073.4"), which newer subjects carry instead of the number. */
+  outline?: string | null,
+): string[] {
   if (!/^[0-9a-f]{7,40}$/i.test(commit)) throw new Error(`"${commit}" is not a commit sha.`);
   const parents = lines(git(['rev-list', '--parents', '-n', '1', commit]))[0]?.split(/\s+/) ?? [];
   if (parents.length === 0) throw new Error(`git does not know commit ${commit}.`);
@@ -80,6 +87,7 @@ export function filesOfStep(step: number, commit: string, git: GitRunner): strin
     '--no-merges',
     '--fixed-strings',
     `--grep=(plan #${step})`,
+    ...(outline && outline !== String(step) ? [`--grep=(plan #${outline})`] : []),
     '--name-only',
     '--format=',
   ]);
@@ -124,6 +132,8 @@ function describe(missing: UnpassedSurface): string {
  */
 export function uiCheckRefusal(input: {
   step: number;
+  /** The step's outline ("1073.4"), which the sentence names it by when given. */
+  outline?: string | null;
   files: readonly string[];
   surfaces: readonly string[];
   checks: readonly CheckRound[];
@@ -135,10 +145,12 @@ export function uiCheckRefusal(input: {
   const first = missing[0];
   const next = (first.round ?? 0) + 1;
   return (
-    `#${input.step} changed a screen, and the design critic has not passed ` +
+    `#${input.outline || input.step} changed a screen, and the design critic has not passed ` +
     `${missing.length === 1 ? 'its surface' : `${missing.length} of its surfaces`}: ${which}. ` +
     `Run the critic on ${missing.length === 1 ? 'it' : 'each'} and record the round ` +
     `(npm run ui-check -- ${input.step} ${first.surface} ${next}), then close it once it passes. ` +
+    `A surface still failing after round 3, or one reached only through a shared file, ` +
+    `is yours to settle: npm run ui-guard -- ${input.step} --settle "<why>". ` +
     `building.md, "Building a screen", has the loop.`
   );
 }
@@ -173,5 +185,102 @@ export function uiGuardSql(step: number, surfaces: readonly string[], userId?: s
     '  order by c.round desc limit 1',
     ') last on true',
     `where last.verdict is null or last.verdict not in (${passing});`,
+  ].join('\n');
+}
+
+/**
+ * The person's answer to a design-check block, written down where the close
+ * guard reads it (`npm run ui-guard -- <n> --accept`).
+ *
+ * The person answers a block on /dev/plan in words, and the answer lands on
+ * the step's thread and as an `Answered <date>: …` line on its comment. The
+ * guard reads only `ui_checks`, so an "Accept" there used to change nothing:
+ * the next session hit the same surfaces and asked again (#1702 asked twice).
+ * This writes one `accepted` round for each surface that has not passed,
+ * numbered on from its last round, with the answer quoted in the notes.
+ *
+ * It writes nothing unless the step's comment has an `Answered` line newer
+ * than its last `Blocked` line: the person has to have answered the block
+ * this is about, so a session cannot accept its own screens. Reading that
+ * answer as an accept, rather than as what to change, is the session's call,
+ * made by the rule in building.md.
+ */
+export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
+  const check = uiGuardSql(step, surfaces);
+  if (!check) return '';
+  const list = surfaces.map((s) => `'${s}'`).join(', ');
+  const passing = PASSING_VERDICTS.map((v) => `'${v}'`).join(', ');
+  return [
+    'with step as (',
+    '  select p.user_id, p.comment,',
+    "    substring(p.comment from '.*(Answered [0-9-]+: [^\\n]*)') as answer",
+    `  from plan_items p where p.number = ${step}`,
+    // The newest Answered line comes after the newest Blocked line.
+    "    and strpos(reverse(p.comment), reverse('Answered ')) > 0",
+    "    and (strpos(reverse(p.comment), reverse('Blocked ')) = 0",
+    "      or strpos(reverse(p.comment), reverse('Answered ')) < strpos(reverse(p.comment), reverse('Blocked ')))",
+    '  limit 1',
+    '), waiting as (',
+    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    `  from unnest(array[${list}]::text[]) as s(surface)`,
+    '  cross join step',
+    '  left join lateral (',
+    '    select c.round, c.verdict from ui_checks c',
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    '    order by c.round desc limit 1',
+    '  ) last on true',
+    `  where last.verdict is null or last.verdict not in (${passing})`,
+    ')',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
+    "  'Accepted by you: ' || step.answer, '{}'::text[]",
+    'from waiting cross join step',
+    'returning surface, round;',
+  ].join('\n');
+}
+
+/**
+ * A session's own settle of the surfaces still waiting, written where the
+ * close guard reads it (`npm run ui-guard -- <n> --settle "<why>"`).
+ *
+ * Design checks are not questions for the person (their answer of 12 October
+ * 2026, which replaces decision #1535's A). Two kinds of surface reached them
+ * and nothing else: one the critic would not pass after its third round, and
+ * one the step's files reach through a shared component that nobody sent to
+ * the critic. The builder now settles both itself, says why in `reason`, and
+ * closes the step; the open fixes go in its close note, where the person can
+ * overrule them.
+ *
+ * It writes an `accepted` round, numbered on from each surface's last, with
+ * notes opening "Settled by Dash", so the record still says who let the
+ * screen through.
+ */
+export function uiSettleSql(step: number, surfaces: readonly string[], reason: string): string {
+  const check = uiGuardSql(step, surfaces);
+  if (!check) return '';
+  const why = reason.trim();
+  if (!why) throw new Error('Say why the surfaces are settled.');
+  if (why.includes('$r$')) throw new Error('The reason cannot contain $r$.');
+  const list = surfaces.map((s) => `'${s}'`).join(', ');
+  const passing = PASSING_VERDICTS.map((v) => `'${v}'`).join(', ');
+  return [
+    'with step as (',
+    `  select p.user_id from plan_items p where p.number = ${step} limit 1`,
+    '), waiting as (',
+    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    `  from unnest(array[${list}]::text[]) as s(surface)`,
+    '  cross join step',
+    '  left join lateral (',
+    '    select c.round, c.verdict from ui_checks c',
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    '    order by c.round desc limit 1',
+    '  ) last on true',
+    `  where last.verdict is null or last.verdict not in (${passing})`,
+    ')',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
+    `  $r$Settled by Dash: ${why}$r$, '{}'::text[]`,
+    'from waiting cross join step',
+    'returning surface, round;',
   ].join('\n');
 }

@@ -17,10 +17,10 @@ describe('collecting what was spent', () => {
     const { sink, reports } = collectSpend();
     expect(reports).toEqual([]);
 
-    sink({ model: 'claude-opus-5', usage: { ...EMPTY_USAGE, inputTokens: 10 } });
-    sink({ model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, outputTokens: 3 } });
+    sink({ model: 'claude-opus-5-5', usage: { ...EMPTY_USAGE, inputTokens: 10 } });
+    sink({ model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, outputTokens: 3 } });
 
-    expect(reports.map((report) => report.model)).toEqual(['claude-opus-5', 'claude-haiku-4-5']);
+    expect(reports.map((report) => report.model)).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
   });
 });
 
@@ -55,6 +55,7 @@ describe('the operation names', () => {
       'propose-floor',
       'classify-note',
       'concepts-from-note',
+      'judge-note-concepts',
       'concepts-from-prior',
       'concepts-from-brief',
       'concepts-from-course',
@@ -82,6 +83,7 @@ describe('the operation names', () => {
       'embed-map',
       'embed-notes',
       'embed-note-match',
+      'embed-note-blocks',
       'write-note-connections',
       'write-maya-thought',
       'gate-maya-note',
@@ -111,6 +113,7 @@ describe('the operation names', () => {
       'mark-review-question',
       'reply-about-card',
       'explain-phrase',
+      'describe-card-clip',
       'write-asked-card',
       'mark-teach-back',
       'summarise-video',
@@ -119,7 +122,20 @@ describe('the operation names', () => {
       'find-channels',
       'judge-channel',
       'cut-clips',
+      'tag-clips',
       'score-clips',
+      'rate-clips',
+      'read-personality',
+      'match-subjects',
+      'embed-idea',
+      'word-essay-question',
+      'rephrase-essay-selection',
+      'check-essay-paragraph',
+      'research-essay-question',
+      'gather-essay-sources',
+      'judge-essay-claims',
+      'name-essay-claims',
+      'summarize-reading',
     ]);
   });
 });

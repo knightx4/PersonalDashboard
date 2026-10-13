@@ -30,11 +30,7 @@ export function OtherUsersFeedback({ rows }: { rows: OtherFeedbackRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <SectionFold
-      title="Other users"
-      count={rows.length}
-      hint="Filed by the other accounts. Read-only."
-    >
+    <SectionFold title="Other users" count={rows.length}>
       <ul
         className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}
       >

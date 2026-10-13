@@ -2,15 +2,16 @@
 
 The standing prompt for the Claude Code routine that works one overhaul: a
 feature on the plan with `track = 'overhaul'` (docs/SPEC-LAYER-SPEC.md,
-Part 4). The **Work this overhaul** button on an overhaul's row is to fire
-it (plan #1514), through `fireFeatureRoutine` in `lib/feedback/routine.ts`,
-and record the fire in `plan_runs` with job `overhaul`. #1514 is not built
-yet: no button fires this routine, neither environment variable below is
-read by the code, and `plan_runs` does not accept the job `overhaul`. Until
-it is built, the routine is started by hand with the turn described below.
-The overnight runner never fires it and never takes an overhaul's steps.
+Part 4). The **Work this overhaul** button on an overhaul's row fires it
+(plan #1514): `workPlanOverhaul` in `app/dev/plan/actions.ts` reads the two
+variables below through `overhaulRoutine()` in `lib/feedback/routine.ts`,
+fires it through `startRoutineRun`, and records the fire in `plan_runs` with
+job `overhaul` against the overhaul's row, which then says a run is going.
+The turn it appends is written by `overhaulTurn` in
+`lib/plan/overhaul-run.ts`. The overnight runner never fires it and never
+takes an overhaul's steps.
 
-The app appends a turn naming the overhaul by number and title, the
+The app appends a turn naming the overhaul by outline and title, the
 account's `user_id`, and the overhaul's brief as the plan holds it. The
 prompt below is what the routine carries when it starts. The prompt and the
 connectors are stored on claude.ai, not read from here, so a change to
@@ -29,8 +30,8 @@ either takes effect only once it is made on the routine itself.
    to the token, then redeploy. The token is scoped to this routine; another
    routine's token answers 401.
 
-Steps 3 and 4 wait on #1514, which adds the button and reads these two
-variables.
+With either variable unset, the button says which is missing and starts
+nothing. There is no fallback to the plan routine's id or token.
 
 ## The prompt
 
@@ -48,7 +49,7 @@ built by a subagent following .claude/skills/plan/reference/building.md,
 and you merge it as the Building section of .claude/skills/plan/SKILL.md
 says, running npm run gate first.
 
-The turn after this one names the overhaul by number, the user_id, and the
+The turn after this one names the overhaul by outline, the user_id, and the
 overhaul's brief. If there is no such turn, or the row it names is not on
 the overhaul track, stop and say so rather than choosing an overhaul.
 
@@ -58,7 +59,7 @@ proposed step) or on a block. Never accept the design for the person, close
 their try-it step, answer your own decision, or close a removal step or the
 overhaul while a count is above its target.
 
-Report every step you closed or blocked by number and title, each Design
+Report every step you closed or blocked by outline and title, each Design
 log line you wrote, each count with its value against its target, and what
 the overhaul now waits on.
 ```

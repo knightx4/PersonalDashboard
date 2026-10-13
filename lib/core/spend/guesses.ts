@@ -98,6 +98,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'propose-floor': run(SONNET, 3_000, 800),
   'classify-note': run(HAIKU, 1_200, 60),
   'concepts-from-note': run(HAIKU, 4_000, 1_000),
+  'judge-note-concepts': run(HAIKU, 2_000, 600),
   'concepts-from-prior': run(SONNET, 3_000, 2_000),
   'concepts-from-brief': run(SONNET, 3_000, 2_000),
   'concepts-from-course': run(SONNET, 3_000, 2_000),
@@ -130,6 +131,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-map': unit(VOYAGE_LITE, 1_000, 0),
   'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
   'embed-note-match': unit(VOYAGE_LITE, 300, 0),
+  // One passage of a note with its Folder > Note > Heading place in front.
+  'embed-note-blocks': background(unit(VOYAGE_LITE, 400, 0)),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
   // A note, its eight nearest notes cut to 1,500 characters, and up to
   // sixteen positions with quotes, plus up to two searches read back. The
@@ -198,6 +201,44 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'reply-about-card': run(SONNET, 4_000, 400),
   // The card and its passage in; a few sentences and an article's name out.
   'explain-phrase': run(SONNET, 4_000, 300),
+  // A card's idea and up to 6,000 characters of lecture transcript in; two
+  // sentences out. Written by the hourly top-up, a few cards a run.
+  'describe-card-clip': background(unit(HAIKU, 2_000, 120)),
+  'read-personality': run(SONNET, 7_000, 1_200),
+  // Every subject's name and up to three names from a chat in; a match each out.
+  'match-subjects': background(run(HAIKU, 2_000, 200)),
+  // A few ideas' claims at about 65 tokens each. Counted as background
+  // although a press can cause it: at a millionth of a dollar no hint is
+  // worth showing beside the button.
+  'embed-idea': background(unit(VOYAGE_LITE, 200, 0)),
+  // The interview's rules, the brief so far and the kind of question in; one
+  // sentence out.
+  'word-essay-question': run(SONNET, 900, 60),
+  // The rules, up to 1,800 characters of essay around the selection and the
+  // selection in; its rewording out.
+  'rephrase-essay-selection': run(SONNET, 1_200, 250),
+  // The rules and a reading's text in, up to 200,000 characters (about
+  // 50,000 tokens); a typical article or chapter is a fifth of that. Two
+  // short paragraphs out.
+  'summarize-reading': run(SONNET, 12_000, 300),
+  // The rules, the brief and an essay of about 1,200 words (read from the
+  // cache after a run's first call), and one paragraph in; at most one
+  // finding out. Per paragraph the check reads.
+  'check-essay-paragraph': unit(SONNET, 3_000, 200),
+  // An essay's first research pass (plan #1863.9): four searches at most.
+  // Search results come back as input and every round of the server's loop
+  // reads them again, so the prompt passes Haiku's 100,000-token line, past
+  // which the long-prompt rate applies, about $0.10 in all.
+  'research-essay-question': searching(run(HAIKU, 110_000, 5_000), 4),
+  // The deeper pass gathering: up to eight searches and five pages of about
+  // 6,000 tokens each, all read again on each round.
+  'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),
+  // The five pages' kept text (about 5,000 tokens each) and the draft in; a
+  // heading and a sentence or two per claim out, for up to six claims.
+  'judge-essay-claims': run(SONNET, 30_000, 3_000),
+  // The rules and an essay of up to 2,000 words (about 3,000 tokens) in; at
+  // most eight claims of a sentence or two out (plan #1873).
+  'name-essay-claims': run(SONNET, 3_500, 700),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a
@@ -221,9 +262,15 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One video's transcript as numbered sentences in, most of them half an
   // hour or less (about 8,000 tokens), and up to fifteen clips out.
   'cut-clips': background(unit(HAIKU, 9_000, 1_500)),
+  // Per fifty clips: the subject names and each clip's caption and point in,
+  // a list of subject names per clip out.
+  'tag-clips': background(unit(HAIKU, 4_000, 1_200)),
   // Per clip: the learner state and one clip's caption, point and up to
   // ninety seconds of transcript in, a score out. Haiku is the fallback.
   'score-clips': background(unit(JEV, 1_500, 0)),
+  // Per clip: its title, caption and up to ninety seconds of transcript in,
+  // three ratings out, in one Jev request. Haiku is the fallback.
+  'rate-clips': background(unit(JEV, 1_200, 0)),
 
   // Jobs.
   'enrich-company': searching(run(HAIKU, 10_000, 500), 2),
@@ -250,6 +297,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One role's requirements with their verdicts, 2,000 characters of the
   // description, the evidence titles and the history in; two answers out.
   'score-applications': unit(JEV, 3_000, 0),
+  // The person, then a few hundred hiring startups a line each in; 30 to 50
+  // picks with a reason and a score out, plus thinking. The Monday run and
+  // the Find startups button both make it.
+  'shortlist-startups': run(SONNET, 45_000, 9_500),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
@@ -320,7 +371,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // five-level score out, as score-idea.
   'score-inspiration-takeaway': background(unit(JEV, 600, 0)),
 
-  // News. All but the last two from the digest cron or a script.
+  // News. All but discuss-story and recommend-newsletters run on a cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
   'group-stories': background(unit(VOYAGE_LITE, 2_000, 0)),
   // About twenty stories a newsletter, each put to Jev on its own.
@@ -331,6 +382,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The story's summary and text, the discussion so far and the view in; a
   // counterpoint or a question out.
   'discuss-story': run(SONNET, 3_000, 300),
+  // Up to eleven stories' headlines and summaries in; a short overview and a
+  // line for each story out.
+  'daily-review': background(run(SONNET, 3_000, 700)),
 
   // Goals: one sentence filed against open goals and steps, which are
   // listed in the prompt. Grows with the size of the tree.

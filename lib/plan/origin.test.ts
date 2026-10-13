@@ -40,7 +40,28 @@ describe('reshapeStamp', () => {
 describe('reshapeOrigin', () => {
   it('reads back what the stamp wrote', () => {
     const origin = reshapeOrigin(reshapeStamp(63, 'On the server, not the client.'));
-    expect(origin).toEqual({ number: 63, gist: 'On the server, not the client.' });
+    expect(origin).toEqual({
+      number: 63,
+      written: '63',
+      ref: '#63',
+      gist: 'On the server, not the client.',
+    });
+  });
+
+  it('writes and reads a stamp that names the decision by its outline', () => {
+    const outlines = new Map([[1084, '1073.4']]);
+    const stamp = reshapeStamp('1073.4', 'Keep it.');
+    expect(stamp).toBe("From #1073.4's answer: Keep it.");
+    expect(reshapeOrigin(stamp, outlines)).toEqual({
+      number: 1084,
+      written: '1073.4',
+      ref: '#1073.4',
+      gist: 'Keep it.',
+    });
+    // An older stamp naming the number reads as the outline the step has now.
+    expect(reshapeOrigin("From #1084's answer: Keep it.", outlines)?.ref).toBe('#1073.4');
+    // An outline no step has now still reads, with no step behind it.
+    expect(reshapeOrigin(stamp)?.number).toBeNull();
   });
 
   it('still finds it under the dated lines a step collects afterwards', () => {

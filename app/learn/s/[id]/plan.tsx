@@ -13,6 +13,7 @@ import {
   type PlanPiece,
   type PlanUnit,
 } from '@/lib/learn/lessons/plan-view';
+import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import { AddUnitForm, UnitMenu } from './plan-edit';
 import { ProjectCard } from './project';
 
@@ -31,17 +32,21 @@ import { ProjectCard } from './project';
  *
  * The plan ends with its final project (plan #1146, `project.tsx`), open from
  * the start. The plan is finished once the project and every piece are
- * passed, and the progress line then says so.
+ * passed, and the progress line then says so, with "Write about this" to
+ * start an essay on the goal (plan #1867).
  */
 export function PlanSection({
   subjectId,
   units,
   project,
+  goal = null,
 }: {
   subjectId: string;
   units: readonly PlanUnit[];
   /** The final project, or null before its brief is written. */
   project: ProjectView | null;
+  /** The learning goal the plan is for, which a finished plan offers to write about. */
+  goal?: { aimId: string; name: string } | null;
 }) {
   const progress = planProgress(units);
   const finished = planFinished(progress, project?.passed ?? false);
@@ -80,6 +85,10 @@ export function PlanSection({
             <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
           </Link>
         </div>
+      ) : finished && goal ? (
+        // The line above already says it is finished, so the one thing left
+        // to offer is an essay on it (plan #1867).
+        <WriteAboutThis kind="goal" refId={goal.aimId} title={goal.name} className="mb-4" />
       ) : (
         <p className={cn(cardVariants(), 'mb-4 border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
           {progress.total === 0
@@ -174,7 +183,7 @@ function PieceRow({ piece, href, next }: { piece: PlanPiece; href: string; next:
   return (
     <li className="flex items-baseline gap-2 text-ui">
       <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
-      <Link href={href} className="min-w-0 text-accent hover:underline">
+      <Link href={href} className="inline-flex min-h-11 min-w-0 items-center text-accent hover:underline lg:min-h-0">
         {piece.title}
       </Link>
       {next && (

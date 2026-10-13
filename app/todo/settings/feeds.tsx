@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -20,7 +21,16 @@ import { formatClock } from '@/lib/clock';
  * characters is what tells two of them apart.
  */
 export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: string }) {
-  const [state, action, pending] = useActionState<AgendaSettingsState, FormData>(addFeed, {});
+  const [adding, setAdding] = useState(false);
+  const [state, action, pending] = useActionState<AgendaSettingsState, FormData>(
+    async (prev, formData) => {
+      const result = await addFeed(prev, formData);
+      // Closed on success; an error leaves the boxes open with what was typed.
+      if (!result.error) setAdding(false);
+      return result;
+    },
+    {},
+  );
 
   return (
     <CardSection
@@ -36,29 +46,50 @@ export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: st
         </ul>
       )}
 
-      <form action={action} className="mt-4 space-y-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <Field id="feed-name" label="Name" className="w-40">
-            <Input id="feed-name" name="name" placeholder="Work" required maxLength={200} />
-          </Field>
-          <Field id="feed-address" label="Address" className="min-w-60 flex-1">
-            <Input
-              id="feed-address"
-              name="address"
-              type="url"
-              inputMode="url"
-              placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
-              required
-            />
-          </Field>
-          <Button type="submit" disabled={pending}>
-            {pending ? 'Reading…' : 'Subscribe'}
-          </Button>
-        </div>
+      {adding ? (
+        <form action={action} className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field id="feed-name" label="Name" className="w-40">
+              <Input
+                id="feed-name"
+                name="name"
+                placeholder="Work"
+                required
+                maxLength={200}
+                autoFocus
+              />
+            </Field>
+            <Field id="feed-address" label="Address" className="min-w-60 flex-1">
+              <Input
+                id="feed-address"
+                name="address"
+                type="url"
+                inputMode="url"
+                placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+                required
+              />
+            </Field>
+            <Button type="submit" disabled={pending}>
+              {pending ? 'Reading…' : 'Subscribe'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setAdding(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+          </div>
 
-        {state.error && <FieldError>{state.error}</FieldError>}
-        {state.message && <p className="text-small text-ink-muted">{state.message}</p>}
-      </form>
+          {state.error && <FieldError>{state.error}</FieldError>}
+        </form>
+      ) : (
+        <div className="mt-3">
+          <AddTrigger label="Add calendar" onClick={() => setAdding(true)} />
+          {state.message && <p className="text-small text-ink-muted">{state.message}</p>}
+        </div>
+      )}
     </CardSection>
   );
 }
@@ -98,7 +129,7 @@ function FeedRow({ feed, timezone }: { feed: Feed; timezone: string }) {
       {error && <span className="text-small text-status-rejected">{error}</span>}
 
       <span className="ml-auto flex items-center gap-1">
-        <Button type="button" variant="ghost" size="sm" onClick={refresh} disabled={pending}>
+        <Button type="button" variant="ghost" size="sm" onClick={refresh} pending={pending}>
           <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
           {pending ? 'Reading…' : 'Refresh now'}
         </Button>

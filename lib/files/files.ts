@@ -20,14 +20,17 @@ export type FileListing = {
   summary: string | null;
   madeBy: FileAuthor;
   version: number;
+  /** Where it came from, as `schema.table:ref`: usually the step that asked for it. */
+  origin: string | null;
   createdAt: string;
   updatedAt: string;
+  /** When they last opened it; null while the current version is unread (plan #1861). */
+  readAt: string | null;
 };
 
 /** One file as its page shows it. */
 export type FileDoc = FileListing & {
   body: string;
-  origin: string | null;
   changeNote: string | null;
 };
 
@@ -47,10 +50,17 @@ export type LinkedFile = {
   title: string;
   summary: string | null;
   updatedAt: string;
+  /** The step or goal it was written for, as `goals.items:<id>` (plan #1860). */
+  origin?: string | null;
+  madeBy?: FileAuthor;
+  version?: number;
+  /** When they last opened it; null while unread (plan #1861). */
+  readAt?: string | null;
 };
 
-export const LISTING_COLUMNS = 'id, title, summary, made_by, version, created_at, updated_at';
-export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, origin, change_note`;
+export const LISTING_COLUMNS =
+  'id, title, summary, made_by, version, origin, created_at, updated_at, read_at';
+export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note`;
 export const VERSION_COLUMNS = 'version, title, made_by, change_note, created_at';
 
 export type ListingRow = {
@@ -59,11 +69,13 @@ export type ListingRow = {
   summary: string | null;
   made_by: string;
   version: number;
+  origin: string | null;
   created_at: string;
   updated_at: string;
+  read_at?: string | null;
 };
 
-export type DocRow = ListingRow & { body: string; origin: string | null; change_note: string | null };
+export type DocRow = ListingRow & { body: string; change_note: string | null };
 
 export type VersionRow = {
   version: number;
@@ -84,13 +96,15 @@ export function toListing(row: ListingRow): FileListing {
     summary: row.summary,
     madeBy: author(row.made_by),
     version: row.version,
+    origin: row.origin,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    readAt: row.read_at ?? null,
   };
 }
 
 export function toDoc(row: DocRow): FileDoc {
-  return { ...toListing(row), body: row.body, origin: row.origin, changeNote: row.change_note };
+  return { ...toListing(row), body: row.body, changeNote: row.change_note };
 }
 
 export function toVersion(row: VersionRow): FileVersion {
@@ -101,6 +115,15 @@ export function toVersion(row: VersionRow): FileVersion {
     changeNote: row.change_note,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * Whether a file is still to read (plan #1861): Dash wrote it and the current
+ * version has not been opened. A file they wrote themselves is never unread.
+ * core.files.read_at is cleared by each new version (migration 0203).
+ */
+export function isUnread(file: { madeBy?: FileAuthor; readAt?: string | null }): boolean {
+  return file.madeBy === 'claude' && !file.readAt;
 }
 
 /** Where a file opens. */

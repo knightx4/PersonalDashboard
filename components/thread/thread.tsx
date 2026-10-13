@@ -1,26 +1,28 @@
 'use client';
 
 import { useActionState, useOptimistic, useRef, useState } from 'react';
-import { ArrowUp, CircleUser, X } from 'lucide-react';
+import { ArrowUp, Check, CircleUser, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
 import { addRoleComment, deleteRoleComment } from '@/app/jobs/(app)/roles/[id]/comment-actions';
 import { addRowComment, deleteRowComment } from '@/app/thread-actions';
+import { addReadingComment } from '@/app/learn/r/[id]/actions';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
-import { awaitingDash } from '@/lib/comments/awaiting';
+import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash, withoutMention } from '@/lib/comments/mention';
 import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
-import { threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
+import { answersEvery, threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { cn } from '@/lib/cn';
 
 /**
  * The thread under one row, and the box for adding to it
@@ -95,6 +97,16 @@ const ROW_STORE: CommentStore = {
   paid: 'app/thread-actions.ts#addRowComment',
 };
 
+/**
+ * A reading's chat (plan #1876.5): everything written is answered, by Dash
+ * reading the reading's text, before the write returns.
+ */
+const READING_STORE: CommentStore = {
+  add: addReadingComment,
+  remove: deleteRowComment,
+  paid: 'app/learn/r/[id]/actions.ts#addReadingComment',
+};
+
 const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   idea: DEV_STORE,
   step: DEV_STORE,
@@ -111,6 +123,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   item: ROW_STORE,
   story: ROW_STORE,
   vault_note: ROW_STORE,
+  reading: READING_STORE,
 };
 
 function DeleteComment({
@@ -184,6 +197,7 @@ function Message({
   remove,
   grouped,
   titles,
+  onCard = false,
 }: {
   comment: DevComment;
   target: ThreadTarget;
@@ -192,15 +206,27 @@ function Message({
   grouped: boolean;
   /** What each step number in the body is called, for the hover text. */
   titles?: PlanRefTitles;
+  /** On the pattern's card: Dash's turns take the recessed ground. See Thread's `onCard`. */
+  onCard?: boolean;
 }) {
   const now = useClockNow();
   // The one thing still read off the pending id. A comment that has not been
   // written yet has no id to delete by, so the control waits for the real row;
   // everything else about it is drawn exactly as a comment that landed.
   const unsent = comment.id === PENDING;
+  // Whether the comment was already seen when this row first drew. One that
+  // was is shown at rest; one that is acknowledged while the thread is open
+  // gets the seen mark arriving (plan #1652).
+  const [seenAtMount] = useState(Boolean(comment.acknowledgedAt));
+  const arrivedSeen = Boolean(comment.acknowledgedAt) && !seenAtMount;
 
   return (
-    <li className="group flex gap-2">
+    <li
+      className={cn(
+        'group flex gap-2',
+        onCard && comment.author === 'claude' && '-mx-2 rounded-lg bg-canvas px-2 py-1.5',
+      )}
+    >
       {/* The strip the author mark stands in, and where a grouped message says
           when it was written. A run draws one header, so every message under
           the first had no time on it at all until #641; the short form fits
@@ -237,6 +263,31 @@ function Message({
         <div className="text-body text-ink">
           <CommentBody body={comment.body} titles={titles} />
         </div>
+        {/* Dash read it and had nothing to add (plan #1650). One mark for it,
+            in the muted text the thread uses for times, under the comment it
+            is about. It stands where "replying…" would have stood. */}
+        {comment.acknowledgedAt && (
+          <p className="flex items-center gap-1 text-small text-ink-muted">
+            {/* Dash's mark comes to rest beside the comment, level and idle,
+                and the seen mark arrives after it. Only when the acknowledgment
+                lands while the thread is open: a comment that was already seen
+                when the page loaded just stands there. */}
+            <DashMark size="2xs" decorative className="text-ink-ghost" />
+            <Check
+              className={cn('size-4 shrink-0', arrivedSeen && 'dash-seen-in')}
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span>Seen by Dash</span>
+            <time
+              dateTime={comment.acknowledgedAt}
+              title={exactTime(comment.acknowledgedAt)}
+              className="tabular"
+            >
+              {commentWhen(comment.acknowledgedAt, now)}
+            </time>
+          </p>
+        )}
       </div>
 
       {!unsent && (
@@ -288,6 +339,7 @@ export function Thread({
   composerOpen = false,
   titles,
   store,
+  onCard = false,
 }: {
   /** The row the thread is under, as `schema.table:id`: `threadRef(target, id)` builds one. */
   subject: string;
@@ -323,6 +375,16 @@ export function Thread({
    * them. Only a goal's flag needs it: a raise whose answer starts a goals run.
    */
   store?: CommentStore;
+  /**
+   * The caller has put the thread on a card of its own with the row's name
+   * above it: the thread pattern, components/patterns/thread.tsx (plan
+   * #1545). The turns then sit on the card's ground rather than in a well,
+   * which would be a second panel inside that card (law 11), and the well's
+   * ground moves to Dash's turns, so his words look different from yours at
+   * a glance (taste `no-bare-text`). Left off, the thread draws as it always
+   * has; a page takes it on when it moves onto the pattern.
+   */
+  onCard?: boolean;
 }) {
   const parsed = threadSubject(subject);
   if (!parsed) throw new Error(`Thread: ${subject} is not a row that has a thread`);
@@ -384,7 +446,7 @@ export function Thread({
   // A raise is a question put to you, so anything you write on one reaches
   // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
   // what does it.
-  const reaches = (body: string) => target === 'raise' || mentionsDash(body);
+  const reaches = (body: string) => answersEvery(target) || mentionsDash(body);
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
@@ -394,8 +456,13 @@ export function Thread({
   // to `pending` had it up for the wrong one of the two -- and gone entirely
   // after a reload. `awaitingDash` holds it until Dash answers or until the
   // wait has gone on longer than an answer ever takes.
+  //
+  // The line is also held back when the action's own answer is that Dash
+  // marked the comment seen: the refreshed thread carries the mark, and the
+  // message would otherwise be read as a reply.
+  const seen = !sending && !state.error && state.message === SEEN_MESSAGE;
   const asking =
-    awaitingReply || (!submit && awaitingDash(shown, target, now));
+    !seen && (awaitingReply || (!submit && awaitingDash(shown, target, now)));
   /** Whether what is in the box right now would reach Dash. */
   const tagged = reaches(draft);
 
@@ -417,6 +484,7 @@ export function Thread({
               // it has not already said.
               grouped={shown[index - 1]?.author === comment.author}
               titles={titles}
+              onCard={onCard}
             />
           ))}
 
@@ -426,9 +494,23 @@ export function Thread({
               wrote, left behind above the real answer forever. A line that is
               only there while you wait says the same thing and does not. */}
           {asking && (
-            <li className="flex gap-2" aria-live="polite">
+            <li
+              // On the pattern's card the answer still being written takes
+              // the same recessed ground as Dash's written turns.
+              className={cn('flex gap-2', onCard && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}
+              aria-live="polite"
+            >
               <div className="flex w-4 shrink-0 justify-center pt-1">
-                <AuthorMark author="claude" />
+                {/* Working while the answer is written. If Dash only
+                    acknowledges, this row goes and the mark comes to rest
+                    under your comment beside the seen mark. */}
+                <DashMark
+                  size="2xs"
+                  state="working"
+                  activity="reading"
+                  decorative
+                  className="text-ink-ghost"
+                />
               </div>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <span className="text-small font-semibold text-ink-muted">Dash</span>
@@ -440,7 +522,9 @@ export function Thread({
                 <p className="text-body text-ink-muted">
                   {!sending && state.message && !state.error
                     ? state.message
-                    : 'Reading the row and replying…'}
+                    : target === 'reading'
+                      ? 'Reading it and replying…'
+                      : 'Reading the row and replying…'}
                 </p>
               </div>
             </li>
@@ -596,13 +680,15 @@ export function Thread({
                 <p className="min-w-0 flex-1 text-small text-ink-muted">
                   {target === 'raise'
                     ? 'This is your answer. A session acts on it and replies in the thread.'
-                    : tagged
-                      ? target === 'file'
-                        ? 'Dash will read this and the file, and reply in the thread.'
-                        : 'Dash will read this and reply in the thread.'
-                      : target === 'file'
-                        ? 'A note on the file. Dash reads it before revising the file.'
-                        : 'A note on the row. Nothing reads it.'}
+                    : target === 'reading'
+                      ? 'Dash answers from the reading and its summary, here in the thread.'
+                      : tagged
+                        ? target === 'file'
+                          ? 'Dash will read this and the file, and reply in the thread.'
+                          : 'Dash will read this and reply in the thread.'
+                        : target === 'file'
+                          ? 'A note on the file. Dash reads it before revising the file.'
+                          : 'A note on the row. Nothing reads it.'}
                 </p>
               )}
               {/* Only a tagged comment is answered by Dash; the rest are free. */}
@@ -665,7 +751,7 @@ export function Thread({
   // last turn are the panel's heading instead of a line floating above it.
   return (
     <Disclosure
-      className="mt-1 rounded-lg bg-canvas card-pad-dense"
+      className={onCard ? 'mt-1' : 'mt-1 rounded-lg bg-canvas card-pad-dense'}
       defaultOpen
       title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
       meta={

@@ -20,7 +20,8 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * them ignored. Then, once a week, it fires the goals routine for the owner
  * with the run row written first and a brief that lists each goal with the
  * kinds of help it asks for (plan #1028) and every reaction from the last
- * few weeks under its kind, then asks for a note on every open goal. The
+ * few weeks under its kind, then asks for two to four suggested steps on
+ * every open goal (plan #1739) and a note on each. The
  * verdict on each goal (plan #1018) moved to the morning run, which writes
  * one every day (plan #1074; inngest/goals/daily.ts). It fires
  * nothing when the routine is not set, when a weekly run started in the last
@@ -77,7 +78,10 @@ export async function runGoalsWeekly(deps?: Partial<GoalsWeeklyDeps>): Promise<G
 
   const { goals, byGoal } = await loadLiveTree(client, { userId });
   const all = goals.map((g) => g.goal);
-  const open = all.filter((g) => g.status === 'open').length;
+  const openGoals = all
+    .filter((g) => g.status === 'open')
+    .map((g) => ({ id: g.id, title: g.title }));
+  const open = openGoals.length;
   if (open === 0) return { skipped: 'no open goal', ignored };
   const asking = helpGoals(all, liveRhythms(all, byGoal));
 
@@ -89,7 +93,7 @@ export async function runGoalsWeekly(deps?: Partial<GoalsWeeklyDeps>): Promise<G
     job: 'weekly',
     itemId: null,
     routine,
-    text: (runId) => weeklyRunText({ userId, runId, goals: asking, past }),
+    text: (runId) => weeklyRunText({ userId, runId, goals: asking, open: openGoals, past }),
     fetch: deps?.fetch,
   });
   if (!result.ok) {

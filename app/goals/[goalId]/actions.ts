@@ -96,7 +96,7 @@ export async function setStepStatusAction(form: FormData): Promise<StepActionSta
 }
 
 /**
- * Show on Todo, or take it off (plan #927). The step is not copied anywhere:
+ * Send to Todo, or take it off (plan #927). The step is not copied anywhere:
  * the flag is what the Todo agenda reads. Showing it again lifts any "Later"
  * or "Not this one" left on Todo from before, since pressing it is asking to
  * see it.
@@ -148,7 +148,7 @@ export async function countRhythmAction(form: FormData): Promise<StepActionState
   return saved();
 }
 
-// latency: pending
+// latency: optimistic -- the step row swaps with its neighbour at once and goes back, with the reason in a toast, if refused
 export async function moveStepAction(form: FormData): Promise<StepActionState> {
   await requireUser();
   const id = Id.safeParse(form.get('id'));

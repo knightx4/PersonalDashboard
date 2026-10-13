@@ -28,6 +28,7 @@ describe('lookupLabel', () => {
     expect(lookupLabel('open_row', { table: 'vault.notes', ref: 'x' })).toBe('Opening one of your notes');
     expect(lookupLabel('search_mail', { from: 'Anthony' })).toBe('Searching email from “Anthony”');
     expect(lookupLabel('read_dev_row', { kind: 'step', ref: '#1248' })).toBe('Reading step #1248');
+    expect(lookupLabel('read_dev_row', { kind: 'step', ref: '1073.4' })).toBe('Reading step #1073.4');
     expect(lookupLabel('made_up', {})).toBe('Looking something up');
   });
 

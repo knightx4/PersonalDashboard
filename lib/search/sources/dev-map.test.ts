@@ -43,6 +43,20 @@ describe('dev search hits', () => {
     });
   });
 
+  it('names a step by its outline where the read placed it, still linking by number', () => {
+    const [hit] = devHits({
+      plan: [{ id: 'p', number: 1084, outline: '1073.4', title: 'Name steps', parent_id: 'f', status: 'not_started' }],
+      ideas: [],
+      notes: [],
+      specs: [],
+    });
+    expect(hit).toMatchObject({
+      subtitle: 'Step #1073.4 · not started',
+      match: '#1073.4 #1084',
+      href: '/dev/plan?view=all&q=%231084',
+    });
+  });
+
   it('calls a step with no parent a feature', () => {
     const [hit] = devHits({
       plan: [{ id: 'p', number: 1, title: 'Plan', parent_id: null, status: 'done' }],
@@ -94,8 +108,8 @@ describe('dev search hits', () => {
       raises: [{ id: 'r1', title: 'Token expired', detail: 'It ran out.', ask: 'Renew it?', status: 'open' }],
     });
     expect(hits.map((hit) => [hit.kind, hit.href])).toEqual([
-      ['plan', '/dev/raised#waiting-q1'],
-      ['raise', '/dev/raised#raise-r1'],
+      ['plan', '/dev/inbox#waiting-q1'],
+      ['raise', '/dev/inbox#raise-r1'],
     ]);
     expect(hits[0].subtitle).toBe('Question #900 · waiting on you');
     expect(hits[0].match).toContain('JSON');

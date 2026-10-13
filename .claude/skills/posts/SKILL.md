@@ -94,13 +94,17 @@ notes quote what the person saw, which can carry their rows.
 
 When the turn names one step, read only that step. It still has to be `dev`
 or null and pass the source check below; if it does not, write no draft and
-say why in your reply.
+say why in the run's note.
 
 When the turn quotes an ask the person typed on the Posts tab, write one draft
-about that. Search the window above for the steps and closed notes it is
-about and cite them, as for any draft. The ask chooses the subject and changes
-none of the rules: if it needs another workspace's data, or nothing shipped
-bears on it, write no draft and say why in your reply.
+about that. The ask chooses the subject, and it opens the workspace it is
+about (`docs/X-POSTS.md`, "Asks"): an ask about the vault may cite vault
+steps, so drop the `module` filter for that one workspace, search all of
+`plan_items` rather than the window when the window holds nothing about it,
+and pass the workspace in `"workspaces"` in the check file. Every other rule
+holds for the post: it describes what the workspace does, never what the
+person keeps in it. If nothing shipped bears on the ask, write no draft and
+say why in the run's note.
 
 ## 4. Gather the terms to keep out
 
@@ -135,9 +139,13 @@ npx tsx scripts/posts-check.ts /tmp/posts.json
 {
   "avoid": ["…"],
   "sources": [{ "label": "#1234", "module": "dev", "text": "title, detail, close note" }],
-  "drafts": [{ "angle": "…", "posts": ["…"] }]
+  "drafts": [{ "angle": "…", "posts": ["…"] }],
+  "workspaces": []
 }
 ```
+
+`workspaces` stays empty unless the turn quotes an ask, and then names only
+the workspace the ask is about.
 
 A `FAIL` draft is dropped, not edited around. So is a draft citing a source
 the check refuses. A `~` warning means a post is within twenty characters of
@@ -155,6 +163,11 @@ picture comes from the Surfaces gallery (`/preview`), which renders the real
 components with typed sample data, so it never shows the person's rows. Never
 photograph a page of the running app, and never write a fixture in this run.
 
+An ask that says real data is fine changes the picture only through the
+person: a run cannot sign in to the app, so it still attaches the gallery
+picture if one fits, and the note says they can replace it with their own
+screenshot using Add an image on the draft.
+
 **Choose the surface.** Every surface is an entry in `SURFACES` in
 `app/preview/surfaces.tsx` (some render from the `*-surfaces.tsx` files beside
 it), with an `id`, a `label` and its `module`. A surface fits a draft when it
@@ -171,13 +184,24 @@ picture per draft.
 UI_PREVIEW=1 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
   NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
   NEXT_PUBLIC_APP_URL=http://localhost:3000 npx next dev -p 3400   # in the background
-SHOOT_WIDTHS=laptop SHOOT_THEMES=light npm run shoot -- <surface id>
+SHOOT_SHELL=<page path> SHOOT_WIDTHS=landscape SHOOT_THEMES=light npm run shoot -- <surface id>
 ```
 
+Every picture shows the whole app, never a panel on its own: the person asked
+for the sidebar and the top bar in every post's picture. `SHOOT_SHELL` puts
+the surface inside the shell (`app/preview/shell-frame.tsx`) and lights the
+row of the page it names, so set it to the route the surface stands for, such
+as `/shopping/dashboard` for `shopping-dashboard` or `/jobs/pipeline` for a
+pipeline surface. A surface whose `width` is `screen` is a page outside the
+shell and is shot without it.
+
 `scripts/shoot.ts` is the script the UI passes use; it writes
-`.preview-shots/<id>--laptop-light.png` and leaves out the dev badge. Use
-`SHOOT_WIDTHS=phone` instead for a surface whose `width` is `narrow`, or when
-the angle is about using the app on a phone. Open the PNG and look at it
+`.preview-shots/<id>--landscape-light.png` and leaves out the dev badge.
+Every post picture is horizontal, as the person asked: `landscape` is a 16:9
+window at 1440 by 810, shot as the screen shows it, so a long page shows its
+top rather than coming out as a tall strip. Choose the surface whose subject
+sits in that first screen. Use `SHOOT_WIDTHS=phone` only when the angle is
+about using the app on a phone. Open the PNG and look at it
 before using it: it has to show the thing the draft is about, readably.
 
 **Commit it.** Copy it to `public/posts/<YYYY-MM-DD>-<surface id>.png` (the
@@ -217,6 +241,18 @@ Then mark the run finished, which is what turns the button back on:
 
 ```sql
 update plan_runs set status = 'finished' where id = '<run id>';
+```
+
+When you insert no draft, or the drafts left something for the person to do
+(such as swapping in their own screenshot), write it in `note` in the same
+update. The Posts tab shows a run with no drafts under the button with this
+note, and nothing else the run says reaches the person. One or two plain
+sentences, as Dash, at most 1000 characters:
+
+```sql
+update plan_runs set status = 'finished',
+  note = 'Nothing shipped since the last post is about the gate, so there is nothing to cite.'
+where id = '<run id>';
 ```
 
 ## What to reply

@@ -17,6 +17,7 @@
  * here approves, answers, starts, assigns or dismisses anything. Asking is not
  * deciding, and those moves are made on the page.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -50,7 +51,7 @@ import {
   threadText,
 } from './context';
 import { type CommentTarget, type DevComment } from './load';
-import { addThreadTurn, loadThread, threadReplySql } from '@/lib/thread/store';
+import { acknowledgeThreadTurn, addThreadTurn, loadThread, threadReplySql } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { splitSections } from '@/lib/specs/sections';
@@ -58,6 +59,7 @@ import { SPEC_CHANGE_COLUMNS, sectionsTouched, specChangeFrom } from '@/lib/spec
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { actionSchema } from './reply-payload';
+import { stepRef } from '@/lib/plan/ref';
 import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,7 +178,7 @@ async function subjectRowOf(input: AskInput): Promise<Subject | null> {
     return {
       context: planBrief(sections, node, { visions: await loadVisionBodies(supabase, userId) }),
       thread: node.thread,
-      label: `#${node.number} ${node.title}`,
+      label: `${stepRef(node)} ${node.title}`,
     };
   }
 
@@ -499,6 +501,8 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
     dash: input.dashThread,
     acts,
     handOff,
+    acknowledge: () =>
+      acknowledgeThreadTurn(input.supabase, { userId: input.userId, ref: subjectRef, turnId: input.commentId }),
     anthropicApiKey: key,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
@@ -515,6 +519,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   // route a question took is not part of the conversation, so Dash's sentence
   // saying so is only written when it changed something as well.
   if (session && reply.made.length === 0) return { ok: true, message: session };
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
   await say(input, reply.body);
   checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);

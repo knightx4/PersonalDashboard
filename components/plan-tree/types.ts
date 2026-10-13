@@ -8,6 +8,19 @@
 import type { ThreadTarget } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import type { PlanKind, PlanStatus } from '@/lib/plan/load';
+import type { PlanRefTitles } from '@/lib/comments/refs';
+
+/**
+ * Every outline a page's `titles` knows, by number, so stored text naming a
+ * step `#1084` can be drawn as the `#1073.4` its row reads (`readableRefs`).
+ */
+export function outlinesOf(titles: PlanRefTitles | undefined): Map<number, string> {
+  const index = new Map<number, string>();
+  for (const [number, entry] of Object.entries(titles ?? {})) {
+    if (entry.outline) index.set(Number(number), entry.outline);
+  }
+  return index;
+}
 
 /** What a server action hands back to the form that ran it. */
 export type TreeActionState = { error?: string; message?: string };
@@ -85,6 +98,8 @@ export type TreeDependencyNode = {
   waitingOn: readonly Omit<TreeStepRef, 'status'>[];
   /** The steps declared to wait on this one. */
   blocks: readonly Omit<TreeStepRef, 'status'>[];
+  /** The check-backs it waits for, its own and above it. Absent reads as none. */
+  waitsUntil?: readonly { id: string; title: string; dueAt: string }[];
 };
 
 /** A step the dependency picker offers. */

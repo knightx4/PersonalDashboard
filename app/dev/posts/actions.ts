@@ -5,8 +5,25 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { sourceProblems } from '@/lib/dev/post-check';
-import { cleanThread, MAX_POST_ASK, MAX_THREAD_POSTS, parsePostedUrl } from '@/lib/dev/posts';
+import { stepRef } from '@/lib/plan/ref';
+import {
+  angleFromPost,
+  cleanThread,
+  isUploadedPostImage,
+  MAX_ANGLE,
+  MAX_POST_ASK,
+  MAX_POST_IMAGES,
+  MAX_THREAD_POSTS,
+  ownsPostImagePath,
+  parsePostedUrl,
+  POST_IMAGES_BUCKET,
+} from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
+import { decryptToken } from '@/lib/crypto/tokens';
+import { loadXAccount } from '@/lib/x/account';
+import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
+import { revokeXToken } from '@/lib/x/oauth';
+import { runXRead, xRunMessage } from '@/lib/x/read';
 
 /**
  * The Posts tab's writes (plan #1419). Each one refuses anybody but the
@@ -97,8 +114,17 @@ export async function suggestPostAbout(
   if (!step || step.status !== 'done' || step.kind !== 'build') {
     return { error: 'Only a step that has shipped can be posted about.' };
   }
+  // Where the plan page places it, `#1073.4`, which is how the step is named
+  // to the person and to the run. A failed read names it by number.
+  const { data: placed } = await supabase
+    .from('plan_item_outlines')
+    .select('outline')
+    .eq('user_id', user.id)
+    .eq('id', step.id)
+    .maybeSingle();
+  const outline = (placed as { outline: string } | null)?.outline ?? null;
   const problems = sourceProblems({
-    label: `#${step.number}`,
+    label: stepRef({ number: step.number, outline }),
     module: step.module ?? null,
     text: [step.title, step.detail, step.comment].filter(Boolean).join('\n'),
   });
@@ -119,7 +145,7 @@ export async function suggestPostAbout(
   const result = await startPostsRun({
     supabase,
     userId: user.id,
-    focus: { number: number.data },
+    focus: { number: number.data, outline },
   });
   revalidatePath(POSTS_PATH);
   if (!result.ok) return { error: result.error };
@@ -174,6 +200,167 @@ export async function editPostBody(
   return { message: 'Saved.' };
 }
 
+/**
+ * A post the person wrote themselves. It joins the drafts as a suggested row
+ * like any other, so it is edited, copied and marked posted the same way.
+ * `draft` starts equal to `body`, as for Dash's, and no run made it.
+ *
+ * The thread comes in as separate boxes (`post` repeated). The angle is
+ * optional: left blank it is the first post's opening sentence
+ * (angleFromPost), since the next run reads every angle to avoid repeating one.
+ *
+ * Images were uploaded to the person's folder of the bucket before the form
+ * was sent (upload-image.ts), so only their paths come in (`image`), each
+ * checked to be theirs.
+ */
+// latency: pending
+export async function writePost(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const posts = formData.getAll('post').map((value) => (typeof value === 'string' ? value : ''));
+  if (posts.length > MAX_THREAD_POSTS) return { error: `A thread is at most ${MAX_THREAD_POSTS} posts.` };
+  const body = cleanThread(posts);
+  if (!body) return { error: 'Write the post first.' };
+
+  const rawAngle = formData.get('angle');
+  const angle = (typeof rawAngle === 'string' ? rawAngle.trim() : '') || angleFromPost(body[0]!);
+  if (angle.length > MAX_ANGLE) return { error: `Keep what it is about under ${MAX_ANGLE} characters.` };
+
+  const images = formData.getAll('image').map(String);
+  if (images.length > MAX_POST_IMAGES) return { error: `A post takes at most ${MAX_POST_IMAGES} images.` };
+  if (images.some((path) => !ownsPostImagePath(user.id, path))) {
+    return { error: 'One of the images could not be found. Add it again.' };
+  }
+
+  const { error } = await supabase
+    .from('social_posts')
+    .insert({ user_id: user.id, angle, draft: body, body, image_paths: images });
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Added to your drafts.' };
+}
+
+/** Change what a suggested draft is about: its one-line angle. */
+// latency: pending
+export async function editPostAngle(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const angle = String(formData.get('angle') ?? '').trim();
+  if (!angle) return { error: 'Say what the post is about in a line.' };
+  if (angle.length > MAX_ANGLE) return { error: `Keep it under ${MAX_ANGLE} characters.` };
+
+  const { data, error } = await supabase
+    .from('social_posts')
+    .update({ angle })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Saved.' };
+}
+
+/**
+ * Add an image the person uploaded to a waiting draft, up to four. The file
+ * is already in their folder of the bucket; this records its path.
+ */
+// latency: pending
+export async function addPostImage(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const path = String(formData.get('path') ?? '');
+  if (!ownsPostImagePath(user.id, path)) return { error: 'That image could not be found. Add it again.' };
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('image_paths')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer waiting to be posted.' };
+  const current = (row.image_paths ?? []) as string[];
+  if (current.length >= MAX_POST_IMAGES) return { error: `A post takes at most ${MAX_POST_IMAGES} images.` };
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ image_paths: [...current, path] })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested');
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Image added.' };
+}
+
+/**
+ * Take an image off a waiting draft. An uploaded one is deleted from the
+ * bucket as well; a committed screenshot stays in the repository, since
+ * another draft may use it.
+ */
+// latency: pending
+export async function removePostImage(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const path = String(formData.get('path') ?? '');
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('image_paths')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer waiting to be posted.' };
+  const current = (row.image_paths ?? []) as string[];
+  if (!current.includes(path)) return {};
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ image_paths: current.filter((p) => p !== path) })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested');
+  if (error) return { error: error.message };
+
+  if (isUploadedPostImage(path) && ownsPostImagePath(user.id, path)) {
+    // A file left behind costs a few hundred kilobytes; the draft is right either way.
+    await supabase.storage.from(POST_IMAGES_BUCKET).remove([path]);
+  }
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Image removed.' };
+}
+
 /** Mark a suggested draft posted, with the link the person pasted back. */
 // latency: pending
 export async function markPostPosted(
@@ -190,7 +377,7 @@ export async function markPostPosted(
 
   const { data, error } = await supabase
     .from('social_posts')
-    .update({ status: 'posted', posted_url: link.url, posted_at: new Date().toISOString() })
+    .update({ status: 'posted', posted_url: link.url, posted_at: new Date().toISOString(), x_candidate_id: null })
     .eq('user_id', user.id)
     .eq('id', id.data)
     .eq('status', 'suggested')
@@ -200,6 +387,95 @@ export async function markPostPosted(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Marked posted.' };
+}
+
+/**
+ * "Is this it?", yes (plan #1820): mark the draft posted with the post a near
+ * match offered, its link and the day it went up. Only while the draft is
+ * still waiting or dropped, still asks about that post, and has no link of
+ * its own.
+ */
+// latency: pending
+export async function confirmXMatch(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  const xPostId = String(formData.get('x_post_id') ?? '');
+  if (!id.success || !/^\d+$/.test(xPostId)) return { error: 'Missing post.' };
+
+  const { data: post, error: postError } = await supabase
+    .from('x_posts')
+    .select('x_post_id, url, created_at')
+    .eq('user_id', user.id)
+    .eq('x_post_id', xPostId)
+    .maybeSingle();
+  if (postError) return { error: postError.message };
+  if (!post) return { error: 'That post is no longer stored.' };
+
+  const { data, error } = await supabase
+    .from('social_posts')
+    .update({
+      status: 'posted',
+      posted_url: post.url,
+      posted_at: post.created_at,
+      dropped_at: null,
+      x_post_id: post.x_post_id,
+      x_candidate_id: null,
+    })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId)
+    .in('status', ['suggested', 'dropped'])
+    .is('posted_url', null)
+    .select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'This draft is no longer asking about that post.' };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Marked posted.' };
+}
+
+/**
+ * "Is this it?", no (plan #1820): stop asking, and never offer that post for
+ * this draft again. The post is then listed under Posted on X.
+ */
+// latency: pending
+export async function dismissXMatch(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  const xPostId = String(formData.get('x_post_id') ?? '');
+  if (!id.success || !/^\d+$/.test(xPostId)) return { error: 'Missing post.' };
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('x_dismissed_ids')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer asking about that post.' };
+
+  const dismissed = Array.isArray(row.x_dismissed_ids) ? (row.x_dismissed_ids as string[]) : [];
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ x_candidate_id: null, x_dismissed_ids: [...new Set([...dismissed, xPostId])] })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId);
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Not that one.' };
 }
 
 /**
@@ -251,4 +527,66 @@ export async function restorePost(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Back with the drafts.' };
+}
+
+/**
+ * Disconnect X (plan #1818): remove the connection and its tokens. X is
+ * asked to revoke the refresh token first, best effort, so the grant does not
+ * outlive the row; the row goes whether or not X answers. Posts already read
+ * stay in x_posts, and Connect X starts a fresh sign-in.
+ */
+// latency: pending -- one call to X, then a delete
+export async function disconnectX(): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const account = await loadXAccount(supabase, user.id);
+  if (!account) {
+    revalidatePath(POSTS_PATH);
+    return { ok: true };
+  }
+
+  if (isXOAuthConfigured() && account.refresh_token) {
+    const env = xOAuthEnv();
+    try {
+      const token = decryptToken(account.refresh_token, env.TOKEN_ENCRYPTION_KEY);
+      await revokeXToken(xClient(env), token, 'refresh_token');
+    } catch (err) {
+      console.error('x revoke', err);
+    }
+  }
+
+  const { error } = await supabase.from('x_accounts').delete().eq('user_id', user.id).eq('id', account.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { ok: true };
+}
+
+/**
+ * Check X now (plan #1819): the daily read, run on demand for the person's
+ * account. A first read pages through every post X returns, which takes a
+ * minute or so; later ones are a request or two. A read X stops (rate limit,
+ * no credit) answers with the line the tab also keeps showing.
+ */
+// latency: pending -- reads X, a second to a minute
+export async function checkX(): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  if (!isXOAuthConfigured()) return { ok: false, error: 'The X keys are not set yet.' };
+
+  const env = xOAuthEnv();
+  try {
+    const result = await runXRead(supabase, user.id, {
+      trigger: 'manual',
+      client: xClient(env),
+      encryptionKey: env.TOKEN_ENCRYPTION_KEY,
+    });
+    revalidatePath(POSTS_PATH);
+    const said = xRunMessage(result);
+    return said.ok ? { ok: true, message: said.text } : { ok: false, error: said.text };
+  } catch {
+    revalidatePath(POSTS_PATH);
+    return { ok: false, error: 'Something went wrong reading X. Try again in a minute.' };
+  }
 }

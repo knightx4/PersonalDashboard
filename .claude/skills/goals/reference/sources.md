@@ -18,7 +18,7 @@ What the person is looking for in the next job and where they are now, in their 
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Opens at `/jobs/thoughts`
+- Opens at `/jobs/find`
 - A newer entry supersedes an older one where they disagree; read them newest first.
 
 ### `job_search.profiles` (Job search)
@@ -124,8 +124,9 @@ Notes they wrote on Learn cards and on ideas, in their own words.
 
 YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.
 
-- Search: `why`, `summary`
-- Name a row by `video_id`; link it by `id`
+- Search: `why`, `summary`, `key_points`, `verdict`
+- Name a row by `video_id`; link it by `video_id`
+- Opens at `/learn/videos/<video_id>`
 - item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.
 
 ### `news.preferences` (News)
@@ -159,6 +160,15 @@ Things they asked Dash to watch outside the app, such as a resale ticket price, 
 - Search: `title`, `url`
 - Name a row by `title`; link it by `id`
 - condition is what they are waiting for: {"below": 200} means they want to hear when the reading drops under 200 (in currency when set); {} means reports only. goal_item_id is the goals.items step it serves, when started from one. status 'running', 'ended' (ends_at passed) or 'stopped' (they stopped it). The readings are in core.watch_readings, joined by watch_id.
+
+### `public.spec_interviews` (Dev)
+
+Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.
+
+- Search: `summary`
+- Name a row by `module`; link it by `id`
+- Opens at `/dev/specs`
+- module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.
 
 ## What they did or have (read for progress and facts)
 
@@ -232,7 +242,7 @@ Stories of their own work and results, used as evidence in applications.
 
 - Search: `title`, `body`, `context`, `skills`
 - Name a row by `title`; link it by `id`
-- Opens at `/jobs/answers`
+- Opens at `/jobs/material?part=evidence`
 
 ### `job_search.resume_versions` (Job search)
 
@@ -240,6 +250,7 @@ Each version of their résumé, as text.
 
 - Search: `label`, `text_content`, `notes`
 - Name a row by `label`; link it by `id`
+- Opens at `/jobs/material?part=resumes`
 
 ### `job_search.cover_letters` (Job search)
 
@@ -261,6 +272,7 @@ Application questions they have met, with their standing answer.
 
 - Search: `text`, `canonical_answer`
 - Name a row by `text`; link it by `id`
+- Opens at `/jobs/material`
 
 ### `job_search.reminders` (Job search)
 
@@ -303,6 +315,14 @@ Things they read or mean to read, with why and their note.
 - Search: `title`, `why`, `note`
 - Name a row by `title`; link it by `id`
 - Opens at `/learn/r/<id>`
+
+### `learn.learning_log` (Learn)
+
+What a conversation with Claude covered: the topic, a summary and the ideas it named.
+
+- Search: `topic`, `question`, `summary`
+- Name a row by `topic`; link it by `id`
+- Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.
 
 ### `learn.sources` (Learn)
 
@@ -379,6 +399,24 @@ Lists they pasted in to learn from, as pasted.
 - Search: `raw_text`, `source_hint`
 - Name a row by `source_hint`; link it by `id`
 
+### `learn.personality_results` (Learn)
+
+Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
+
+- Search: `test_name`, `typed_value`, `note`, `read_points`
+- Name a row by `test_name`; link it by `id`
+- Opens at `/learn/know#personality`
+- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
+
+### `learn.essays` (Learn)
+
+Essays they are writing or have published: the draft, the brief (question, claim, reader) and the words.
+
+- Search: `path`, `draft_body`
+- Name a row by `path`; link it by `id`
+- Opens at `/learn/e/<id>`
+- Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.
+
 ### `todo.tasks` (Todo)
 
 Tasks they gave themselves, open and done.
@@ -448,12 +486,12 @@ Each charge, bill, renewal notice or price change read from their mail, one per 
 
 ### `core.files` (Files)
 
-Longer pieces written for them and kept as pages: research notes, breakdowns of their data, plans, drafts.
+What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
 
 - Search: `title`, `summary`, `body`
 - Name a row by `title`; link it by `id`
 - Opens at `/goals/files/<id>`
-- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'; origin 'goals.items:<id>' is the step it was written for, and each step has one file, revised in versions through goals.file_result. read_at is null while they have not read the current version. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.
 
 ### `core.conversations` (Learn)
 
@@ -463,6 +501,15 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
+### `core.attachments` (Home)
+
+Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.
+
+- Search: `name`
+- Name a row by `name`; link it by `id`
+- Opens at `/attachments/<id>`
+- ref is the row the file came with, as schema.table:id; the same path recorded against two refs is one file that went with both. The file itself is in the private attachments bucket at path, and /attachments/<id> opens it through a short signed link. Read the row it belongs to for what the file was about.
+
 ### `public.social_posts` (Dev)
 
 Posts about building this app that Dash drafted for X, and which ones they posted, with the link.
@@ -471,6 +518,15 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Name a row by `angle`; link it by `id`
 - Opens at `/dev/posts`
 - Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+
+### `public.x_posts` (Dev)
+
+Every post on their X account read by the dashboard, including ones they wrote themselves, with its link and public numbers.
+
+- Search: `text`
+- Name a row by `text`; link it by `id`
+- Opens at `/dev/posts`
+- created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.
 
 ## Mentions (leads only)
 

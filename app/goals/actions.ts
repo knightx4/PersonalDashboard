@@ -120,7 +120,7 @@ export async function setAreaNoteAction(
 
 /**
  * Plan this area: fire the goals routine to propose the goals an area needs.
- * Only the owner's account can, as with Work on this on a goal, because the
+ * Only the owner's account can, as with Ask Dash on a goal, because the
  * run spends the owner's routine allowance.
  */
 // latency: pending
@@ -304,7 +304,7 @@ export async function editGoal(_prev: GoalsActionState, form: FormData): Promise
   return saved();
 }
 
-// latency: pending
+// latency: optimistic -- the goal row swaps with its neighbour at once and goes back, with the reason in a toast, if refused
 export async function moveGoalAction(form: FormData): Promise<GoalsActionState> {
   await requireUser();
   const id = Id.safeParse(form.get('id'));
@@ -349,7 +349,7 @@ const MOVE_WORDS: Record<z.infer<typeof Move>, string> = {
  * (plan #1084). Always your own write: the database refuses Claude a change
  * to a goal's status.
  */
-// latency: pending
+// latency: optimistic -- Reopen on a goal row opens it at once and takes it back, with the reason in a toast, if refused; the answers on Today still wait for the server
 export async function settleGoalAction(
   _prev: GoalsActionState,
   form: FormData,

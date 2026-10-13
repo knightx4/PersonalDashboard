@@ -96,11 +96,27 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'learn',
   },
   {
+    slug: 'learn-levels',
+    title: 'Learn: topics and levels',
+    blurb:
+      'One shared map of topics, ten fixed levels on each, and the rule that showing a level shows what it rests on: how Learn records what you know and picks what is next.',
+    file: 'LEARN-LEVELS-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn-graph',
     title: 'Learn: what you know',
     blurb:
       'The second half of the learn module. Subjects and goals, probing the edge, misconceptions, and a progress bar that tells the truth.',
     file: 'LEARN-GRAPH-SPEC.md',
+    module: 'learn',
+  },
+  {
+    slug: 'learn-essays',
+    title: 'Learn: essays',
+    blurb:
+      'Short essays about what you learned, written by you in the app with Dash as a demanding first reader, saved to the vault and published to your website.',
+    file: 'LEARN-ESSAYS-SPEC.md',
     module: 'learn',
   },
   {

@@ -37,7 +37,6 @@ export default async function DevIdeasPage({
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Ideas"
-        description="Long-term ideas, for the app as a whole or for one workspace. Nothing here does anything on its own — it is a place to put the thought."
       />
       <IdeasView ideas={ideas} grouping={grouping} sort={sort} />
     </div>

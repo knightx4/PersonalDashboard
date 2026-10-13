@@ -1,6 +1,6 @@
 # Building one plan step
 
-You have been given one step from the build plan by number. Build it, verify
+You have been given one step from the build plan by its outline. Build it, verify
 it, commit it, close it, and report. You are not working the rest of the
 feature — the session that sent you is, and it will send the next step once
 you are done.
@@ -30,6 +30,11 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # setup step of theirs under the same feature and
                                                # makes <n> wait on it
 npx tsx scripts/plan.ts reopen <n>             # put it back to not started
+npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
+                                               # ending the run with <n> neither closed
+                                               # nor blocked: say why, in one line
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # one line on your run, shown live on its page
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -45,9 +50,34 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 ```
 
-Steps are named by number — the `#12` on the page. Numbers are never reused.
+Every `<n>` above is a step's outline, the `1073.4` its row on the page heads
+itself with. Name steps that way in everything you write, from the commit
+subject to the report, as `#1073.4` with no number beside it. The number each
+step also has (#1084) is its identity in the database; the person reads the
+outline. `SKILL.md`, **Naming a step**, has
+the rule in full.
 
 ## The loop
+
+**Write run lines as you go.** The run's page shows what you write with
+`activity <n>`: `--kind action` right after claiming ("Claimed #n"), after each
+commit ("Committed <sha>: <subject>"), and as the last line ("Finished #n" or
+what stopped it); `--kind thought` before a long stretch of work; `--kind
+error` when something fails. A question that needs the person takes `--kind
+question` with one to ten `--option`s and parks the run as waiting on them.
+With no run fired at the step the command says so and writes nothing; carry on.
+
+**Asking mid-run and waiting (plan #1824).** The question shows on the run's
+lines and in the person's inbox, with each option as a press. Ask only what
+the rules under "When you reach something you should not decide" let you ask;
+a question about the step that has to outlast the run is still a decision and
+a `block`. After asking, keep working on whatever does not depend on the
+answer and check with `npx tsx scripts/plan.ts response <n>`, which prints
+"Answered: …" or "No answer yet". An answer sets the run back to started; your
+next line carries on from it. If nothing is left to do without the answer,
+end with `stopped <n> --reason "Waiting on your answer: <the question>"` and
+stop. Answering then starts a new run whose brief opens with the question,
+the answer and your lines so far. Working offline, the query is in `offline.md`.
 
 1. **Claim it first.** `start <n>`, before reading anything. `start` refuses a
    proposal and refuses a decision, so claiming first is also the cheapest way
@@ -113,9 +143,17 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    - `npx vitest run <the test files covering what you changed>` — the ones for
      the code you touched, not the whole suite.
 
+   A step that changed a screen or added a page also runs `npm run
+   check:contrast`, `npm run check:ui` and `npm run check:phone`, and
+   a new route runs `npx vitest run lib/usage tests/sources-catalogue.test.ts`
+   for the page list and the catalogue. These are the gate's checks that
+   fail most often, and a failure found here costs a minute where the same
+   failure found at the merge costs a second gate run. Run them before the
+   critic, so the critic's shots are of the screen that will merge.
+
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
-   each of its surfaces. A third failed round blocks it instead (see
+   each of its surfaces. After a third failed round you settle it yourself (see
    **Building a screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
@@ -125,7 +163,7 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    about a test that the narrow run cannot reach: run what the done-when needs
    and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`. A step that changed a
+   the step's outline: `Add the anonymous share page (plan #1073.4)`. A step that changed a
    screen has each critic round recorded in `public.ui_checks` before it
    commits (see **Building a screen**). **Do not push and do
    not merge.** The session that sent you puts your commit on main and closes
@@ -157,7 +195,23 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    closes the step once it has merged. Write the note it should close with —
    what changed, in one sentence — and put it in your report. If nobody sent
    you, merge first and then close it yourself: `done <n> --note "…"`, which
-   records the commit from HEAD and names any steps that became ready.
+   records the commit from HEAD and names any steps that became ready. Then
+   write Dash's update on the feature, as step 7 of the Building section in
+   `SKILL.md` describes: `update <the feature> --health … --body "…"`. A
+   builder that was sent leaves the update to the session that sent it, which
+   writes one per feature when its batch ends.
+10. **Ending without closing, say why.** A run that ends with its step
+    neither closed nor blocked writes one line on why before it stops:
+    `stopped <n> --reason "…"`. The line goes on the run the step was sent
+    as, ends it, and shows on the plan page after "Last run stopped". When
+    two runs on a feature close nothing, the app sends a session to find out
+    why (`unsticking.md`) and quotes these lines to it, and to the person if
+    that does not get it moving, so write what they would need: "Too big for one sitting: the export, the import and the page are
+    three pieces of work", not "ran out of time". If the step is too big,
+    add the pieces you would split it into, in order, one `--piece` each
+    (two to twenty), titled as steps. Working offline, the SQL is in
+    `offline.md`. A step you hand back with a commit for the sender to
+    close is not a stop: that run did its work.
 
 ## What to report back
 
@@ -165,7 +219,7 @@ You are one step in a batch, and the session that sent you keeps none of what
 you read. Your report is the only thing that survives you, so write it for the
 session building the next step:
 
-- **The step, by number and title, and what you did to it** — committed, with
+- **The step, by outline and title, and what you did to it** — committed, with
   the sha and the note it should close with; blocked, and on what; or put back,
   and why.
 - **What changed**, as files and what each now does. Not a diff; the next
@@ -180,7 +234,7 @@ session building the next step:
   many rounds it took, and the last verdict. After a third failed round, the
   last verdict's fixes in full and where the shots are.
 - **Anything you wrote outside your own step**: a decision and its dependency
-  edge, fog graduated or cleared, an idea filed, a raise. By number and title.
+  edge, fog graduated or cleared, an idea filed, a raise. By outline and title.
 - **Any step that became ready** when you closed yours.
 
 Keep it to what the next session needs. A page is too long; three lines is too
@@ -210,7 +264,12 @@ a surface with no routes. A step that changes no surface skips this section.
    checkout's `node_modules`), shooting it as in 3 below, so the shots land
    in that worktree's `.preview-shots/`. Stop its preview server before
    starting your own, since both use port 3400. A new surface has no before
-   shots; the critic is told "none".
+   shots; the critic is told "none". Copy the worktree's
+   `.preview-shots/<id>--*.png` into this checkout's `.preview-shots/before/`:
+   the recorder uploads them beside each round as `before-<shot>`, and the
+   step's plan row shows them next to the after (plan #1541). Turbopack
+   refuses a `node_modules` symlink that points outside the worktree, so
+   give the worktree a hard-linked copy (`cp -al`) instead.
 2. **Draw it in the gallery.** Add or update the surface's entry in
    `app/preview/surfaces.tsx` with typed fixtures and the real components.
    Fixtures as long and as empty as real data gets: the longest name, the
@@ -225,9 +284,23 @@ a surface with no routes. A step that changes no surface skips this section.
    npm run shoot -- <id>      # one surface per run
    ```
 
+   When the session that sent you named a port (it does when it is building
+   several steps at once, each in its own worktree), export `PREVIEW_PORT`
+   to it before both commands; `preview` and `shoot` read it, and two
+   builders on 3400 would photograph each other's screens.
+
    Without the two placeholders the preview pages answer 500. The shots are
    `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280
    pixels, light and dark. Open them yourself before sending them on.
+   A phone page taller than the screen with a row fixed to its foot also
+   gets `<id>--phone-{light,dark}-end.png`, at the phone's own height and
+   scrolled to the end, since the full-page shot draws that row partway down
+   the content. Send those to the critic as well.
+
+   A surface whose gallery entry declares an `interaction` is recorded too,
+   with the same server running: `npm run record -- <id>` writes
+   `.preview-shots/strips/<id>--phone-light.png` and its `.json`, a second
+   of frames 50ms apart. The critic judges craft from it.
 4. **Hand them to the critic.** The `ui-critic` agent
    (`.claude/agents/ui-critic.md`) judges the pictures and nothing else. Run
    it as the subagent `ui-critic`, or, where you cannot start a subagent,
@@ -238,12 +311,29 @@ a surface with no routes. A step that changes no surface skips this section.
    ```
 
    The prompt names the surface id, the round (1, 2 or 3), the four after
-   shots, the before shots or "none", the step's done-when, the page pattern
-   when the brief names one, and on rounds 2 and 3 the fixes from the round
-   before. It answers with a paragraph and a fenced `json` verdict:
+   shots, the before shots or "none", the strip and its JSON or "none", the
+   moment from `app/dev/ui/moments.ts` the surface plays (its name and
+   `sees` line) or "none", the step's done-when, the page pattern, and on
+   rounds 2 and 3 the fixes from the round before. The
+   pattern is the name and rule under the brief's `## Pattern` section.
+   Working offline, take the name from the `Pattern:` line of the step's
+   detail and its rule from `lib/plan/patterns.ts`. A step that names none
+   uses the pattern that fits and says which in its close note. One whose
+   screen fits none blocks on a decision for the person (`shaping.md`).
+   The prompt also names the preferences the person has removed from
+   `/dev/ui`, which the critic must not cite: `select taste_id from
+   ui_taste_removals where user_id = '…'`, or "none". It answers with a paragraph and a fenced `json` verdict:
    `verdict` is `pass` or `fix`, and each fix names the shot, where, the
-   problem, what it breaks (`law <n>`, `taste:<id>`, `done-when` or
-   `regression`) and the change.
+   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`,
+   `regression` or `question:eye`) and the change. Every verdict also
+   answers three questions under `questions`, each with an `answer` and an
+   `ok`: `eye`, where the eye goes first and whether that is what the screen
+   is for; `competition`, whether anything such as a label, outline or
+   heading competes with the data; and `lines`, whether the lines are
+   lighter than the text (UI-QUALITY-SPEC Part 2, R19). A screen with no
+   clear answer to the first fails. The prompt asks for all three; a
+   verdict that comes back without them goes back to the critic, since the
+   recorder refuses it.
 5. **Record the round** (below), whatever the verdict.
 6. **On `fix`, make every change it asks for**, shoot again and start the next
    round. Most surfaces fail round 1. A fix you think is wrong is still the
@@ -257,34 +347,41 @@ a surface with no routes. A step that changes no surface skips this section.
 as it came back. You do not edit it, summarise it into a pass, or judge the
 pictures yourself in its place.
 
-**Three rounds, then the person.** If round 3 comes back `fix`, stop the
-loop: no fourth round, and no guess at what the critic would accept. A screen
-that fails three rounds is usually missing a decision, such as which pattern
-it should use, and that is the person's (decision #1535). So:
+**Three rounds, then settle it yourself.** If round 3 comes back `fix`, stop
+the loop: no fourth round. Design checks are not questions for the person.
+They said so on 12 October 2026, after a week of "accept it as it is"
+blocks, and that answer replaces decision #1535's A. So:
 
 1. Record round 3 like any other (below).
-2. Commit what you have and push your branch, so the work outlives the
-   session.
-3. Run `npm run ui-stop -- <step>`. It reads the recorded verdicts and prints
-   the ask: each surface that did not pass, how many fixes are open, where the
-   shots are and the branch, ending "accept it as it is, or say what to
-   change". It also prints the last fixes in full, and the block to write:
-   `plan.ts block <n> --ask "…"` with no `--on-steps`, or the statement for
-   the connector. Write that block. It waits on the person, not on other
-   steps.
-4. Report the block, with the last verdict's fixes and where the shots are.
+2. Make any of the open fixes you can make cheaply, without another round.
+3. Run `npm run ui-stop -- <step>`. It prints the last fixes in full and the
+   settle command: `npm run ui-guard -- <step> --settle "<why>"`. Run it, or
+   the statement it prints through the connector. It writes an `accepted`
+   round for each surface still waiting, with notes opening "Settled by
+   Dash", so the record keeps who let the screen through.
+4. Merge and close the step as usual. The close note names each surface
+   settled and the fixes still open, in a line, so the person can overrule
+   it from the step's row.
 
-The person either accepts the screen as it is or says what to change, from
-the step's row on /dev/plan, which shows the last fixes and shots (plan
-#1610). Either way the step comes back ready, and its history says which:
+**Surfaces a shared file reaches.** The close guard lists every surface a
+changed file serves, so a change to a shared row or folder can name dozens
+of screens nobody sent to the critic. Send the surfaces the step meant to
+change to the critic. Settle the rest with the same command, naming in the
+reason that the step did not set out to change them, and do not block on
+them. Findings the critic makes on a surface the step did not cause are not
+this step's: file them as a ready step if they are worth doing, and close
+this one.
 
-- **Accepted** (a dated `Accepted …` line naming the branch): the person has
-  written an `accepted` round for each surface that stopped, and the close
-  guard counts it as passed. Do not build it again or run more rounds: merge
-  the named branch and close the step.
-- **Said what to change** (their words on the step's thread, and an
-  `Answered …` line): the builder gets three fresh rounds, numbered on from
-  4, against their words; the stop then falls on round 6, and so on.
+A shared component that has a surface drawing it in every state belongs on
+`COMPONENT_SURFACES` in `lib/preview/routes.ts`, so the guard stops at that
+surface rather than every page under it.
+
+`block` refuses an ask that puts a design check to the person
+(`lib/plan/block-ask.ts`). Older steps blocked on one before the change: when
+the person answers, read any answer that names nothing to change as an accept
+(`npm run ui-guard -- <outline> --accept`), merge the branch the history names and
+close the step. When the answer says what to change, the builder gets three
+fresh rounds against their words, numbered on from 4.
 
 **Recording a round.** Every round goes on record, passed or failed, before
 you make its fixes:
@@ -299,11 +396,12 @@ you make its fixes:
    ```
 
    It checks the file is the critic's shape and is for that surface and
-   round, keeps a copy of the four shots beside it as
+   round, refusing one that leaves out any of the three questions or passes
+   a screen whose `eye` answer is not `ok`, keeps a copy of the four shots beside it as
    `<step>--<surface>--r<round>--<shot>.png` (the next shoot overwrites the
    originals), and writes one row to `public.ui_checks`: step, surface,
    round, verdict, the fixes and the `earlier` list as the critic wrote them,
-   its notes, and the shots' paths in the private `ui-shots` bucket. A round
+   its notes, the three answers in `questions`, and the shots' paths in the private `ui-shots` bucket. A round
    recorded twice is replaced, not duplicated.
 
 What the recorder can reach depends on the session:
@@ -325,7 +423,7 @@ the report rather than leaving it out.
 **The close checks the rounds.** `done` refuses a step whose commits change a
 `.tsx` file under `app/` or `components/` while the latest recorded round of
 any surface those files serve is not a `pass`, and names each such surface
-(plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <n>` runs
+(plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <outline>` runs
 the same check from your branch, and prints the SQL for the connector where
 there is no `DATABASE_URL`. Run it before you report a screen step: a
 surface it names is a round still to run or record.
@@ -347,14 +445,18 @@ Stop and ask only when at least one of these holds:
   changes what they see or do, and neither the design laws, the code, an
   earlier answer nor the brief already points one way.
 - **It changes the scope.** Whether to build something at all, or building
-  noticeably more or less than the step asked for.
+  noticeably more or less than the step asked for. Folding a few small fixes
+  in, or leaving them for a step of their own, is not a change of scope:
+  decide it.
 
 A fourth moment in one workspace always meets the second: the catalogue in
 `app/dev/ui/moments.ts` holds three at most, and choosing which three is the
 person's. `shaping.md` has the decision to write.
 
 Names, wording, layout within the design laws, defaults, thresholds, ordering,
-and which of two equivalent implementations to use are not on that list.
+which of two equivalent implementations to use, and anything the design critic
+said are not on that list. The person's questions are for direction: what to
+build, what it is for, and what it costs them.
 
 When one of them does hold, do not pick an answer and build on it. A guess
 built on looks exactly like a decision from the outside. Write it down
@@ -381,7 +483,7 @@ Then report the block. Do not move on to another step; that is not your call.
 
 The same two moves close out a merge that will not go through, when the merge
 was yours because nobody sent you: push the working branch before you block the
-step, and name that branch in the `--ask`. The work then outlives the session
+step, and name that branch in the `--note`, never the `--ask`. The work then outlives the session
 that wrote it, and whoever picks the step up reads it instead of building it
 twice. Leave the step open — its commit is on a branch, which is the thing
 `done` refuses.
@@ -415,6 +517,15 @@ in three parts:
 B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
+
+A block is for something the person does. `block` refuses an ask that says
+nothing is needed from them (without `--on-steps`), because a blocked step is
+listed under what they have to do. A step that waits on data that does not
+exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
+--at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as
+"Waiting on the check on <day>", and the runner does not send it until a session
+has done the check. Never leave such a step `in_progress` without one, and never
+block it on the person, since there is nothing for them to do.
 
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
@@ -504,6 +615,54 @@ involves, it is a setup step; if what you need is their opinion, it is a block.
 The ask is rewritten on every block, so it is what the step needs now; `--note`
 is for anything else worth recording, and that is appended to the history in
 the comment.
+
+### Write the ask for someone with no context
+
+The person reads an ask days later, on a phone, between other things, and
+does not remember what the step drew or which commit holds it. On #1600 and
+#1603 they were asked to accept "them as drawn" and could not tell which
+screens were meant, and the screens were on a branch they had no way to open
+(notes d3fc7228 and 6d61486b). So every ask, and above all one that asks them
+to look at screens:
+
+- **Names the screens as the app names them**, page by page: "the account
+  page, and these Dev pages: bugs, changelog, ideas". A surface id, a step
+  outline or a commit hash is never the only name for anything; when one is
+  given, the sentence also says what it covers.
+- **Says where to look, with a link for each screen**: `/preview?s=<id>`,
+  which opens that drawing in the gallery on the live site.
+- **Puts what it asks them to look at on main first.** A link only opens what
+  main has, and branch deployments are switched off (`vercel.json`). A
+  gallery drawing is safe to merge before it is accepted: `/preview` is the
+  owner's alone, and an entry changes no page anyone uses. So merge the
+  drawings, as the batch merge does, before writing the ask. Where the work
+  cannot reach main (the gate will not pass, or the drawing needs a page
+  change that is not ready), the ask says so and says where the shots are,
+  rather than offering a link to something they cannot open.
+- **Never names a branch.** The person cannot open one, and has said so many
+  times. They see pictures: a `/preview?s=<id>` link to a drawing merged to
+  main, or the shots on the step's row. The branch goes in `--note`, and
+  `block` refuses an ask that names one.
+- **Ends with the move wanted** in words they can answer in one line, such as
+  "accept these as drawn, or say what to change on which one".
+
+A hand-written ask is held to the same.
+
+### An answer always moves the step
+
+This holds for every block, design or not. Once the person has answered, the
+next session acts on the answer; the step never stays where it was.
+
+- When the answer picks a direction, build it.
+- When it does not ("It's fine", "I'll let you know if something comes up"),
+  take the option the ask recommended, or the one you would recommend, and
+  build it. Write `Took <option> on your answer '<their words>'` in the
+  history so they can overrule it.
+- Only when no direction can be chosen at all, block again with a new,
+  different question, whose options they can pick in one line.
+
+Never put the same question to them twice, and never end a run having
+changed nothing on an answered step.
 
 ## The other two files you may need
 

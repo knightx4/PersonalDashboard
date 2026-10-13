@@ -22,6 +22,7 @@
  */
 import { elapsedSince, isStalledClaim } from './elapsed';
 import { endsRun, RUN_QUIET_AFTER_MINUTES, type StoredRunReading } from './run-end';
+import { stepRef, type Nameable } from './ref';
 
 /**
  * Nothing pushed for this long and the run is shown as quiet. #524.
@@ -141,10 +142,11 @@ export function featureBetweenSteps(
 }
 
 /** The refusal for a press that lands between a feature session's steps. */
-export function betweenStepsRefusal(feature: { number: number }): string {
+export function betweenStepsRefusal(feature: Nameable): string {
+  const ref = stepRef(feature);
   return (
-    `#${feature.number} has a session working through its steps, between one and the next. ` +
-    `Wait for it to finish, or send again once nothing under #${feature.number} has changed ` +
+    `${ref} has a session working through its steps, between one and the next. ` +
+    `Wait for it to finish, or send again once nothing under ${ref} has changed ` +
     `for ${FEATURE_IDLE_AFTER_MINUTES} minutes.`
   );
 }
@@ -623,9 +625,9 @@ export function quietRunNote(run: QuietRun, now: number): string {
  * build, and "its run is quiet" on its own gives you nothing to tell those two
  * cases apart.
  */
-export function quietSendAsk(number: number, run: QuietRun, now: number): string {
+export function quietSendAsk(step: Nameable, run: QuietRun, now: number): string {
   return (
-    `#${number} is underway and its run has gone quiet. ${quietRunNote(run, now)} ` +
+    `${stepRef(step)} is underway and its run has gone quiet. ${quietRunNote(run, now)} ` +
     'Hand it to a fresh session?'
   );
 }
@@ -676,6 +678,8 @@ export type SendOverClaim =
 
 export function sendOverClaim(input: {
   number: number;
+  /** Where it sits ("1073.4"), which is how the sentence names it. */
+  outline?: string | null;
   liveness: ClaimLiveness | null;
   run: QuietRun | null | undefined;
   now: number;
@@ -686,12 +690,12 @@ export function sendOverClaim(input: {
 
   if (liveness === 'quiet' && run) {
     if (input.confirmed) return { send: true };
-    return { send: false, ask: quietSendAsk(input.number, run, input.now), confirmable: true };
+    return { send: false, ask: quietSendAsk(input, run, input.now), confirmable: true };
   }
 
   return {
     send: false,
-    ask: `#${input.number} is already underway. Put it back to not started first if the session that had it is gone.`,
+    ask: `${stepRef(input)} is already underway. Put it back to not started first if the session that had it is gone.`,
     confirmable: false,
   };
 }
@@ -735,6 +739,7 @@ export function underwayRefusal(input: {
   press: UnderwayPress;
   /** The step holding the feature. */
   number: number;
+  outline?: string | null;
   title: string;
   /** What its claim reads as, from `claimLiveness`. */
   liveness: ClaimLiveness | null;
@@ -746,7 +751,7 @@ export function underwayRefusal(input: {
   const silence =
     input.liveness === 'quiet' && input.run ? ` ${quietRunNote(input.run, input.now)}` : '';
   return (
-    `#${input.number} ${input.title} ${where}.${silence} ` +
+    `${stepRef(input)} ${input.title} ${where}.${silence} ` +
     'Wait for it, or put it back to not started if its session is gone.'
   );
 }

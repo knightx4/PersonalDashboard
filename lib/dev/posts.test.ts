@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { checkDraft, sourceProblems } from './post-check';
 import {
+  angleFromPost,
+  isUploadedPostImage,
+  ownsPostImagePath,
+  postImagePath,
+  postImageSrc,
   POSTS_RUN_HOLD_MINUTES,
   postsRunState,
   postsRunText,
@@ -104,6 +109,14 @@ describe('sourceProblems', () => {
     expect(sourceProblems({ label: '#3', module: 'jobs', text: 'Add a column' })).toHaveLength(1);
     expect(sourceProblems({ label: '#4', module: null, text: 'Track debt payoff' }).length).toBe(1);
   });
+  it('lets an ask open the workspace it is about, and no other', () => {
+    const vault = { label: '#5', module: 'vault', text: 'Sync the diary notes from Obsidian' };
+    expect(sourceProblems(vault, [], ['vault'])).toEqual([]);
+    expect(sourceProblems(vault, [], ['learn'])).toContain('#5 is in the vault workspace');
+    expect(sourceProblems(vault, ['Obsidian'], ['vault'])).toEqual([
+      '#5 names "Obsidian", which is on the never-in-a-post list',
+    ]);
+  });
 });
 
 describe('postsRunState', () => {
@@ -113,6 +126,7 @@ describe('postsRunState', () => {
     status: 'started',
     createdAt: new Date(now - 5 * 60_000).toISOString(),
     error: null,
+    note: null,
     drafts: 0,
     ...over,
   });
@@ -147,6 +161,7 @@ describe('postsRunText', () => {
 
   it('asks for one draft when a step is named', () => {
     expect(postsRunText({ userId: 'u', focus: { number: 639 } })).toContain('#639 only');
+    expect(postsRunText({ userId: 'u', focus: { number: 1084, outline: '1073.4' } })).toContain('plan step #1073.4 (number 1084) only');
   });
 
   it('quotes what the person asked for, line by line', () => {
@@ -173,5 +188,44 @@ describe('socialPostFromRow and sortPosts', () => {
     const suggested = socialPostFromRow({ ...base, id: '2', status: 'suggested' });
     expect(posted.sourceFeedbackIds).toEqual([]);
     expect(sortPosts([posted, suggested]).map((p) => p.id)).toEqual(['2', '1']);
+  });
+});
+
+describe('angleFromPost', () => {
+  it('takes the first sentence of a post the person wrote', () => {
+    expect(angleFromPost('Todo is one list. It has a calendar too.')).toBe('Todo is one list.');
+  });
+
+  it('keeps a post with no full stop whole, on one line', () => {
+    expect(angleFromPost('  a quick note\nabout the plan  ')).toBe('a quick note about the plan');
+  });
+
+  it('cuts a long first sentence at a word, under 120 characters', () => {
+    const long = EXAMPLE.replace('. ', ', and ');
+    const angle = angleFromPost(long);
+    expect(angle.length).toBeLessThanOrEqual(121);
+    expect(angle.endsWith('…')).toBe(true);
+    expect(long.startsWith(angle.slice(0, -1))).toBe(true);
+  });
+});
+
+describe('post image paths', () => {
+  const user = '0b1c2d3e-0000-4000-8000-000000000001';
+  const id = '9f8e7d6c-0000-4000-8000-000000000002';
+
+  it('keeps an upload in your own folder under a fresh id', () => {
+    const path = postImagePath(user, id, 'My screen shot (1).PNG');
+    expect(path).toBe(`${user}/${id}-My-screen-shot-1-.PNG`);
+    expect(ownsPostImagePath(user, path)).toBe(true);
+    expect(ownsPostImagePath('someone-else', path)).toBe(false);
+    expect(isUploadedPostImage(path)).toBe(true);
+  });
+
+  it('draws an upload through the signing route and a committed shot as it is', () => {
+    const path = postImagePath(user, id, 'shot.png');
+    expect(postImageSrc(path)).toBe(`/dev/posts/image?path=${encodeURIComponent(path)}`);
+    expect(postImageSrc('/posts/2026-10-09-home-page.png')).toBe('/posts/2026-10-09-home-page.png');
+    expect(postImageSrc('//elsewhere.example/x.png')).toBeNull();
+    expect(isUploadedPostImage('/posts/2026-10-09-home-page.png')).toBe(false);
   });
 });
