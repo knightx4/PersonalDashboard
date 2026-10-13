@@ -79,8 +79,8 @@ function Pill({
       aria-expanded={open}
       aria-controls={panel}
       onClick={onPress}
-      className={`flex min-h-11 min-w-0 items-start gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors ${
-        open ? 'border-accent bg-accent-soft' : 'border-border bg-sunken hover:border-border-strong'
+      className={`flex min-h-11 w-full min-w-0 items-start gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors ${
+        open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
       }`}
     >
       <DashMark
