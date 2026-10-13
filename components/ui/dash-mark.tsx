@@ -198,6 +198,9 @@ function visorPath(visor: Visor, cy: number): string {
 
 const GREEN = ['#4ade80', '#22c55e', '#16a34a'] as const;
 
+/** Every core ramp has three stops: light, middle, deep. */
+const RAMP_OFFSETS = [0, 0.5, 1] as const;
+
 /** Leaning forward, about the centre: the working pose and the app icon's. */
 const LEAN = 'translate(12 12) skewX(-11) translate(-12 -12) translate(1.2 0)';
 
@@ -370,7 +373,7 @@ export function DashGlyph({
         {coloured && (
           <linearGradient id={`${id}-core`} gradientUnits="userSpaceOnUse" x1={5} y1={0} x2={19} y2={0}>
             {stops.map((colour, index) => (
-              <stop key={index} offset={index / (stops.length - 1)} stopColor={colour} />
+              <stop key={index} offset={RAMP_OFFSETS[index]} stopColor={colour} />
             ))}
           </linearGradient>
         )}
