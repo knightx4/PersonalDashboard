@@ -2,7 +2,7 @@
  * The overnight runner's standing intention, and the reading of it.
  *
  * One button before bed starts a night; from then on a cron tick keeps up to
- * `OVERNIGHT_AT_ONCE` features going, each in a different module, until the
+ * `OVERNIGHT_AT_ONCE` features going, at most two to a module, until the
  * budget is spent, the stop time passes, or you stop or pause it. None of that
  * can live in the page: the tick runs with nobody's tab open, and the answer
  * has to survive the laptop closing. So it is a row -- one per account, in
@@ -32,8 +32,9 @@ type Db = SupabaseClient<any, 'public'>;
 export const OVERNIGHT_FEATURE_CAP = 100;
 
 /**
- * How many feature sessions the runner keeps going at once, each in a
- * different module.
+ * How many feature sessions the runner keeps going at once: one per module
+ * first, and a second in a module only to fill a slot nothing else could
+ * (lib/plan/module-share.ts).
  *
  * It was one until 23 September 2026. Sessions working at once in different
  * modules rarely touch the same files, and the merge gate (`npm run gate`)
