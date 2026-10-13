@@ -4,6 +4,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { NoPermission } from '@/components/shell/no-permission';
 import type { NavSection } from '@/components/shell/app-shell';
 import type { Notification } from '@/components/shell/notifications-button';
+import { loadDevBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
@@ -12,7 +13,6 @@ import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
 import { planRowRef, raiseRef, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
 import { countPlanRunQuestions } from '@/lib/plan/run-answer';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -74,21 +74,19 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     module: 'dev',
     user,
     sections: async ({ raised }) => devSections(raised, ...(await inboxReads)),
+    brief: async ({ raised }) => loadDevBrief(devWaiting(raised, ...(await inboxReads))),
     feedbackHref: '/dev/bugs',
-    // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
-    // (plan #918).
-    paidActions: paidActionsUnder('app/dev/'),
     children,
   });
 }
 
-function devSections(
+function devWaiting(
   raised: Notification[],
   plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
   specChanges: number,
   runQuestions: number,
   snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
-): NavSection[] {
+): number {
   /**
    * The badge is everything waiting on you, which is more than the raises.
    *
@@ -105,6 +103,17 @@ function devSections(
     snoozes,
   );
   const raisedAwake = withoutSnoozed(raised, (raise) => raiseRef(raise.id), snoozes);
+  return raisedAwake.length + waiting.length + specChanges + runQuestions;
+}
+
+function devSections(
+  raised: Notification[],
+  plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
+  specChanges: number,
+  runQuestions: number,
+  snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
+): NavSection[] {
+  const waiting = devWaiting(raised, plan, specChanges, runQuestions, snoozes);
 
   /**
    * Home is first because it is the page the day starts on: what is running,
@@ -146,7 +155,7 @@ function devSections(
       href: '/dev/inbox',
       label: 'Inbox',
       icon: 'inbox',
-      badge: raisedAwake.length + waiting.length + specChanges + runQuestions,
+      badge: waiting,
     },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },

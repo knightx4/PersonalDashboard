@@ -1,4 +1,3 @@
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { shellFor } from '@/lib/shell/shell-for';
 import { loadHomeForRequest } from '@/lib/goals/home-request';
 import { goalInboxCount } from '@/lib/goals/inbox';
@@ -35,9 +34,6 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
         { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
       ];
     },
-    // Every paid button's $ hint in Goals, from one read of the spend
-    // ledger: so far, reading a paste or a document into a form (#955).
-    paidActions: paidActionsUnder('app/goals/'),
     children,
   });
 }

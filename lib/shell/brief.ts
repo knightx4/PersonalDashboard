@@ -290,4 +290,14 @@ export async function loadNewsBrief(): Promise<Brief | null> {
   return { text: `${plural(count, 'unread newsletter')}`, href: '/news' };
 }
 
+/**
+ * The dev brief: how many things are waiting on you, the number the Inbox tab
+ * carries as its badge. Said with the caution colour, because a session that
+ * asked a question is stopped until it is read.
+ */
+export function loadDevBrief(waiting: number): Brief | null {
+  if (waiting <= 0) return null;
+  return { text: `${waiting} waiting on you`, href: '/dev/inbox', tone: 'caution' };
+}
+
 export type BriefFor = ModuleId | null;

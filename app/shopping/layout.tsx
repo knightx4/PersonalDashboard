@@ -1,14 +1,11 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import type { NavSection } from '@/components/shell/app-shell';
 import { loadShoppingBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
-import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
 import { countReviewItems } from '@/lib/review/load';
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for every signed-in section.
@@ -56,14 +53,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     settingsLabel: 'Shopping settings',
     feedbackHref: '/dev/bugs',
     brief: async ({ settings }) => loadShoppingBrief(user.id, settings.timezone, await reviewCount),
-    banner: async () => {
-      const { accountIds, initialJob } = await loadInboxBannerState(user.id);
-      return <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />;
-    },
-    // Every paid button's $ hint in Shopping, from one read of the spend
-    // ledger (plan #918). The inbox import posts to an API route rather than
-    // an action, so its entry is named on its own.
-    paidActions: [...paidActionsUnder('app/shopping/'), 'app/api/inbox/sync/route.ts#POST'],
     children,
   });
 }

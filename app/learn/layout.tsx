@@ -3,7 +3,6 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
-import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for the learn workspace.
@@ -21,11 +20,6 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     sections: async ({ owner }) =>
       learnSections(owner, await countReadNow(await createLearnClient())),
     brief: () => loadLearnBrief(),
-    // Every paid button's $ hint in Learn, from one read of the spend ledger
-    // (plan #917). Here rather than on each page because the buttons sit in
-    // forms several components deep, and the figures change slowly enough that
-    // one read per visit to the module is plenty.
-    paidActions: paidActionsUnder('app/learn/'),
     children,
   });
 }
