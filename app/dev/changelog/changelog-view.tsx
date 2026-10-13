@@ -148,8 +148,8 @@ export function ChangelogView({
               entry, and the line says how long a quiet stretch was. The other
               groupings keep their lists, which need the headings. */}
           {grouping === 'day' ? (
-            <Card>
-              <Timeline entries={timelineEntries(groups)} />
+            <Card padding="standard">
+              <Timeline entries={timelineEntries(groups, screens)} />
             </Card>
           ) : (
             <Card padding="dense" className="divide-y divide-border">
@@ -194,7 +194,10 @@ export function ChangelogView({
 }
 
 /** The matched entries as timeline entries; each closed at `at`, so each is done. */
-function timelineEntries(groups: ChangelogGroup[]): TimelineEntry[] {
+function timelineEntries(
+  groups: ChangelogGroup[],
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>,
+): TimelineEntry[] {
   return groups.flatMap((group) =>
     group.entries.map((entry) => ({
       id: entry.key,
@@ -205,11 +208,36 @@ function timelineEntries(groups: ChangelogGroup[]): TimelineEntry[] {
           ? entry.title
           : `${stepRef({ number: entry.number, outline: entry.outline })} ${entry.title}`,
       body: entry.detail || undefined,
+      children: <TimelineExtras entry={entry} screens={screensOf(screens, entry)} />,
       link: {
         href: entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs',
         label: `${moduleById(entry.module)?.label ?? 'The app as a whole'} · ${entry.source === 'plan' ? 'plan' : 'note'}`,
       },
     })),
+  );
+}
+
+/**
+ * What a list row carries beyond its title that the timeline has no slot for:
+ * the workspace's mark with the whole commit sha, the changed screens, and the
+ * button to post about the step.
+ */
+function TimelineExtras({
+  entry,
+  screens,
+}: {
+  entry: ChangelogEntry;
+  screens: readonly ScreenChangeView[];
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="flex items-center gap-2 text-micro text-ink-ghost">
+        <ModuleMark module={entry.module} size="sm" />
+        {entry.commitSha && <span className="font-mono break-all">{entry.commitSha}</span>}
+      </p>
+      {screens.length > 0 && <ScreenAfters changes={screens} />}
+      {postable(entry) && entry.number !== null && <PostAbout number={entry.number} />}
+    </div>
   );
 }
 

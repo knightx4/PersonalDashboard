@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -11,7 +12,7 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  *
  * Each entry is a mark on a thin line with its time, a title, and optionally a
  * body, a link and one action such as Undo. Where more than a day separates two
- * entries the line carries a label saying how long ("3 days later"), so a quiet
+ * entries the line carries a label saying how long ("3 days earlier"), so a quiet
  * week reads as a quiet week instead of two rows that look adjacent.
  *
  * The marks are the status hexagons (components/ui/status-glyph.tsx) in the
@@ -28,7 +29,14 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  * draw the same text). Pass the person's own zone wherever the page has it.
  */
 
-export type TimelineKind = 'done' | 'started' | 'waiting' | 'blocked' | 'dropped' | 'question' | 'note';
+export type TimelineKind =
+  | 'done'
+  | 'started'
+  | 'waiting'
+  | 'blocked'
+  | 'dropped'
+  | 'question'
+  | 'note';
 
 const KINDS: Record<TimelineKind, { glyph: GlyphName; tone: string; word: string }> = {
   done: { glyph: 'check', tone: 'text-positive', word: 'Done' },
@@ -48,6 +56,8 @@ export type TimelineEntry = {
   kind: TimelineKind;
   title: string;
   body?: string;
+  /** Anything else the row carries, drawn under the body and above the link: a mark, a picture, a button. */
+  children?: ReactNode;
   link?: { href: string; label: string };
   /** One press on the row, such as Undo. */
   action?: { label: string; onSelect: () => void; disabled?: boolean };
@@ -67,11 +77,11 @@ export function gapLabel(newer: Date | string, older: Date | string): string | n
   const span = ms(newer) - ms(older);
   if (!(span > DAY_MS)) return null;
   const days = Math.floor(span / DAY_MS);
-  if (days < 14) return `${days} ${days === 1 ? 'day' : 'days'} later`;
+  if (days < 14) return `${days} ${days === 1 ? 'day' : 'days'} earlier`;
   const weeks = Math.floor(days / 7);
-  if (days < 60) return `${weeks} weeks later`;
+  if (days < 60) return `${weeks} weeks earlier`;
   const months = Math.floor(days / 30);
-  return `${months} months later`;
+  return `${months} months earlier`;
 }
 
 function parts(time: Date | string, timeZone: string) {
@@ -132,12 +142,16 @@ export function Timeline({
               <div className={cn('min-w-0 flex-1', gap ? 'pb-2' : isLast ? '' : 'pb-4')}>
                 <p className="text-ui font-medium text-ink">{entry.title}</p>
                 <time
-                  dateTime={(entry.time instanceof Date ? entry.time : new Date(entry.time)).toISOString()}
+                  dateTime={(entry.time instanceof Date
+                    ? entry.time
+                    : new Date(entry.time)
+                  ).toISOString()}
                   className="tabular block text-small text-ink-muted"
                 >
                   {when}
                 </time>
                 {entry.body && <p className="mt-1 text-small text-ink-muted">{entry.body}</p>}
+                {entry.children && <div className="mt-1">{entry.children}</div>}
                 {(entry.link || entry.action) && (
                   <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-small">
                     {entry.link &&
@@ -146,12 +160,15 @@ export function Timeline({
                           href={entry.link.href}
                           target="_blank"
                           rel="noreferrer"
-                          className={linkVariants({ tone: 'quiet' })}
+                          className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}
                         >
                           {entry.link.label}
                         </a>
                       ) : (
-                        <Link href={entry.link.href} className={linkVariants({ tone: 'quiet' })}>
+                        <Link
+                          href={entry.link.href}
+                          className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}
+                        >
                           {entry.link.label}
                         </Link>
                       ))}
