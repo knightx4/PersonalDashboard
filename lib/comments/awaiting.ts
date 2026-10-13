@@ -21,7 +21,7 @@
  */
 import { mentionsDash } from './mention';
 import type { CommentAuthor } from './load';
-import type { ThreadTarget } from '@/lib/thread/subjects';
+import { answersEvery, type ThreadTarget } from '@/lib/thread/subjects';
 
 /** What an ask returns when Dash marked the comment seen and wrote no reply. */
 export const SEEN_MESSAGE = 'Dash marked your comment as seen.';
@@ -44,10 +44,11 @@ export function awaitingDash(
   // Dash saw it and chose to write nothing (plan #1648): that is its answer.
   if (last.acknowledgedAt) return false;
 
-  // A raise is a question put to you, so anything written on one reaches Dash
-  // whether or not it carries the tag -- #541. Everywhere else the tag is what
+  // A raise is a question put to you, and a reading's thread is a chat with
+  // Dash, so anything written on either reaches Dash whether or not it
+  // carries the tag -- #541, plan #1876.5. Everywhere else the tag is what
   // does it, and an untagged note is one nobody is going to answer.
-  if (target !== 'raise' && !mentionsDash(last.body)) return false;
+  if (!answersEvery(target) && !mentionsDash(last.body)) return false;
 
   // 0 is the clock's pre-mount value. Nothing is claimed at that instant --
   // the opposite of the rule the run readings follow, and deliberately: this

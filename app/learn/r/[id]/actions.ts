@@ -8,6 +8,14 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReading, type ReadingSummary } from '@/lib/learn/tracks/load';
 import { getReadingText } from '@/lib/learn/locate/reading-text';
 import { summarizeReadingText } from '@/lib/learn/tracks/reading-summary-model';
+import { answerAboutReading } from '@/lib/learn/tracks/reading-chat-model';
+import { answerWithCut, CHAT_UNREADABLE, readingMaterial } from '@/lib/learn/tracks/reading-chat';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { COMMENT_MAX } from '@/lib/goals/comments';
+import { questionFrom } from '@/lib/comments/mention';
+import { MAX_TURN } from '@/lib/talk/talk';
+import { threadRef, threadSubject } from '@/lib/thread/subjects';
+import { addThreadTurn, loadThread, THREAD_ROW_NOT_YOURS } from '@/lib/thread/store';
 import { locatePassage } from '@/lib/learn/locate/locate';
 import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -418,6 +426,128 @@ export async function summarizeReading(readingId: string): Promise<SummarizeResu
   } catch (error) {
     console.error('[reading summary]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
+  }
+}
+
+export type ReadingCommentState = { error?: string; message?: string };
+
+const CommentBody = z.string().trim().min(1, 'Write something.').max(COMMENT_MAX);
+
+/**
+ * A question in the chat on a reading's page (plan #1876.5). The question is
+ * kept in the thread under the reading first, so a failed answer or a closed
+ * tab leaves it there; Dash answers before this returns, the way a question
+ * on a Learn now card is answered, and the answer goes in the same thread.
+ *
+ * Dash is given the reading's text as getReadingText returns it (the text you
+ * gave it, else its link), the summary when there is one, and the thread so
+ * far. A reading Dash cannot read gets an answer saying so and what to paste,
+ * and costs nothing. The first answer about a reading cut at 200,000
+ * characters says so.
+ */
+// latency: pending
+export async function addReadingComment(
+  _prev: ReadingCommentState,
+  formData: FormData,
+): Promise<ReadingCommentState> {
+  const user = await requireUser();
+  const subject = threadSubject(String(formData.get('subject') ?? ''));
+  if (
+    !subject ||
+    subject.target !== 'reading' ||
+    !z.string().uuid().safeParse(subject.id).success
+  ) {
+    return { error: 'Could not work out which reading that was.' };
+  }
+  const body = CommentBody.safeParse(formData.get('body') ?? '');
+  if (!body.success) return { error: body.error.issues[0].message };
+  const ref = threadRef('reading', subject.id);
+
+  const core = await createCoreClient();
+  let asked: string;
+  try {
+    asked = await addThreadTurn(core, { userId: user.id, ref, author: 'me', body: body.data });
+  } catch (error) {
+    if (error instanceof Error && error.message === THREAD_ROW_NOT_YOURS) {
+      return { error: 'That reading is not there any more.' };
+    }
+    return { error: 'Your question could not be saved. Try again.' };
+  }
+
+  const say = async (text: string) => {
+    await addThreadTurn(core, {
+      userId: user.id,
+      ref,
+      author: 'claude',
+      body: text.slice(0, MAX_TURN),
+    });
+  };
+
+  try {
+    const supabase = await createLearnClient();
+    const reading = await loadReading(supabase, subject.id);
+    if (!reading) return { message: 'That reading is not there any more.' };
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      await say(
+        'I cannot answer here: the Anthropic key is not set on this deployment. Your question is saved.',
+      );
+      return { message: 'Answered in the thread.' };
+    }
+
+    const text = await getReadingText(supabase, {
+      id: reading.id,
+      url: reading.openUrl ?? reading.source?.canonicalUrl ?? null,
+    });
+    if (!text.ok) {
+      await say(CHAT_UNREADABLE);
+      return { message: 'Answered in the thread.' };
+    }
+
+    const thread = await loadThread(core, ref, { userId: user.id });
+    const earlier = thread.filter((turn) => turn.id !== asked);
+    const spend = collectSpend();
+    const reply = await answerAboutReading({
+      material: readingMaterial({
+        title: reading.subject,
+        why: reading.why,
+        summary: reading.summary?.text ?? null,
+        text: text.text,
+        truncated: text.truncated,
+      }),
+      turns: [
+        ...earlier.map((turn) => ({
+          role: turn.author === 'claude' ? ('assistant' as const) : ('user' as const),
+          body: turn.body,
+        })),
+        { role: 'user' as const, body: questionFrom(body.data) },
+      ],
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'reply-about-card', spend.reports);
+    if (!reply.ok) {
+      console.error('[reading chat]', reply.detail);
+      await say('I could not answer this time. Your question is saved; ask again in a moment.');
+      return { message: 'Answered in the thread.' };
+    }
+
+    const earlierDash = earlier.filter((turn) => turn.author === 'claude').map((turn) => turn.body);
+    await say(answerWithCut(reply.text, { truncated: text.truncated, earlierDash }));
+    return { message: 'Answered in the thread.' };
+  } catch (error) {
+    // The question is in the thread already, so the failure is said there too
+    // rather than as an error, which would hand the words back to be sent twice.
+    console.error('[reading chat]', error instanceof Error ? error.message : error);
+    try {
+      await say('I could not answer this time. Your question is saved; ask again in a moment.');
+    } catch {
+      /* the message below is the only copy left */
+    }
+    return { message: 'Dash could not answer this time. Your question is saved.' };
+  } finally {
+    revalidatePath(`/learn/r/${subject.id}`);
   }
 }
 
