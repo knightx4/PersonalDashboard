@@ -80,6 +80,8 @@ build. The critic is given:
 - the before shots, taken from main, and the after shots
 - the design laws and the person's preferences (Part 3)
 - the pattern the step uses (Part 4) and the step's done-when
+- a reference design, when the person has pointed at one they prefer for
+  this surface: its pictures, or a link the builder photographs
 
 It answers with pass, or with fixes. Each fix names what is wrong in the
 picture, at which width and theme, and the law or preference it breaks. The
@@ -89,6 +91,19 @@ itself and closes the step, with the critic's last fixes in its close note
 (decision 1, now answered B). Surfaces a step reaches only through a shared
 file are settled the same way. `npm run ui-stop` prints the fixes and the
 settle command, `npm run ui-guard -- <n> --settle "<why>"`.
+
+A reference is judged alongside the laws. A screen that keeps every law but
+reads worse than its reference fails, and the fixes say what the reference
+does better; where a reference breaks a law, the law wins and the fix says
+so. A reference stays with its surface, kept by surface id in
+`lib/preview/references.ts`, so later steps on that surface are judged
+against it too.
+
+Every round also answers three questions in its verdict. Where does the eye
+go first, and is that what the screen is for? Does anything compete with the
+data, such as a label, outline or heading heavier than what it frames? Are
+the lines lighter than the text? A screen with no clear answer to the first
+fails.
 
 The builder never writes the verdict. Each round is recorded in a table,
 `public.ui_checks`, with the step, the surface, the round, the verdict and the
@@ -364,6 +379,64 @@ takes.
 Other workspaces follow the same rule when a step next changes them. A step
 that adds a job to a workspace names which of the three it is.
 
+## Part 10: Diagrams and charts
+
+Laws 4 and 7 keep colour and expression out of the data. That suits a table
+of figures and leaves a chart with nothing to point with. Idea Space, built on
+12 October 2026, followed every law and read worse than the sketch it was
+built from: known ideas in black, unseen ideas as specks, labels heavier than
+the marks, and nothing faded when an idea was picked. This part says how a
+chart, a map or a diagram is drawn, and the critic reads it for any surface
+that has one.
+
+1. **One question, one accent.** A chart answers one question, and the
+   accent marks the answer: the series, marks or region the question is
+   about. Everything else is ink, gray or hollow. Inside a chart this is what
+   the accent means, an extension of law 4 written into `app/dev/ui/laws.ts`.
+2. **Absence is drawn.** Anything unknown, untested, empty or not visited is
+   a hollow outline at nearly the size of a filled mark, so empty ground
+   reads as ground. It is never left out and never shrunk to a speck.
+3. **Picking focuses.** Picking a mark fades every unrelated mark to about a
+   quarter of its strength and draws what relates to it in the accent.
+   Picking empty ground clears it.
+4. **Labels are quiet.** Chart text is a step smaller than body text, in
+   regular weight and the muted ink, and never sits on a mark. About seven
+   labels show at once; the rest show on hover or tap. A label heavier than
+   the data it names is a fault.
+5. **Axes say what they mean,** in words at each end, such as "economics"
+   against "history", as well as in units. An axis with no meaning, as in a
+   force layout, is named as such in the caption.
+6. **Structure sits under the data.** Gridlines, frames and guides are
+   dashed or dotted hairlines in the lightest border colour, beneath the marks.
+7. **A caption says what the chart shows** and how far to trust it, in one or
+   two sentences under it. That is a finding, so law 15 does not forbid it.
+8. **A hover or tap answers in the same frame,** from data already on the
+   page. The address updates after it (law 5).
+9. **Marks are big enough to see:** at least 4 pixels across at any width,
+   and the ones that matter most a step larger.
+10. **Past three categories, colour gets help.** The limit of three hues on
+    one chart, kept for readers with red-green colour blindness, stands. The
+    other categories are told apart by direct labels, shapes, or tapping a
+    legend entry to highlight its marks, rather than sharing one gray.
+
+The Idea Space sketch the person preferred, at
+https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.
+
+## Part 11: Quiet outlines on controls
+
+A button's words and fill already say it is a button, so its outline does
+not have to. Today every control is outlined in `--c-border-control`, a mid
+gray picked to meet the 3:1 contrast floor for control edges, and on a busy
+page those outlines are the darkest lines after the text. Buttons and
+segmented controls are outlined in `--c-border-strong` instead, the light
+border colour. The chosen segment of a segmented control is filled in the
+accent tint with accent text, so which one is on still stands apart at 3:1.
+Text inputs keep the stronger outline, since an empty box has no words to
+identify it, and so does the keyboard focus ring.
+
+The person asked for this on 12 October 2026, comparing the app's buttons
+with the thinner outlines on the Idea Space sketch.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -405,6 +478,24 @@ Checked by: audit.
 Checked by: audit.
 
 **R11.** A workspace page does not keep a chart that Dash made in a reply.
+Checked by: audit.
+
+**R12.** In a chart, the accent marks only what the chart's question is about.
+Checked by: audit.
+
+**R13.** A chart draws missing or unvisited items as hollow marks, and no label covers a mark.
+Checked by: audit.
+
+**R14.** Picking a mark in a chart fades the marks unrelated to it.
+Checked by: audit.
+
+**R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
+Checked by: audit.
+
+**R18.** A surface with a reference design is judged against it as well as the laws.
+Checked by: audit.
+
+**R19.** Every design check verdict answers the three questions of Part 2.
 Checked by: audit.
 
 ## Decisions
@@ -455,5 +546,6 @@ for is screens that need one round of the person's notes, not five.
 
 ## What this does not do
 
-It does not change the design laws, replace `check:ui`, or redesign existing
+Apart from Part 10 extending law 4 to charts, it does not change the design
+laws. It does not replace `check:ui` or redesign existing
 screens on its own. Existing screens improve as steps touch them.
