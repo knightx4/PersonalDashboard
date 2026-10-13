@@ -153,7 +153,7 @@ export function RenameForm({
         autoFocus
         onFocus={(event) => event.currentTarget.select()}
         // The title's own size and weight, in the title's place (law 12).
-        className="-mx-1 font-display text-title font-semibold tracking-tight sm:text-title"
+        className="-mx-1 min-h-11 font-display text-title font-semibold tracking-tight sm:text-title"
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={pending} disabled={!name.trim()}>

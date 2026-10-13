@@ -46,7 +46,7 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
 function PropertyValue({ text }: { text: string }) {
   if (!/^https?:\/\/\S+$/.test(text)) return <>{text}</>;
   return (
-    <a href={text} target="_blank" rel="noreferrer" className="text-accent underline underline-offset-2 hover:no-underline">
+    <a href={text} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-accent underline underline-offset-2 hover:no-underline">
       {text}
     </a>
   );
