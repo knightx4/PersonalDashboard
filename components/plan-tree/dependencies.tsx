@@ -101,11 +101,13 @@ export function Dependencies<E extends TreeCatalogEntry>({
               <input type="hidden" name="id" value={link.dependencyId} />
               <Chip
                 tone={isClosed(link.item.status) ? 'positive' : 'caution'}
-                className="pr-1"
+                className="max-w-full pr-1"
               >
-                {stepName(link.item)}
-                {isClosed(link.item.status) &&
-                  ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                <span className="min-w-0 truncate">
+                  {stepName(link.item)}
+                  {isClosed(link.item.status) &&
+                    ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                </span>
                 <button
                   type="submit"
                   disabled={removePending}
@@ -122,9 +124,9 @@ export function Dependencies<E extends TreeCatalogEntry>({
               key={ref.id}
               tone="caution"
               title="Through a step above this one"
-              className="opacity-80"
+              className="max-w-full opacity-80"
             >
-              {stepName(ref)} · above
+              <span className="min-w-0 truncate">{stepName(ref)} · above</span>
             </Chip>
           ))}
           {/* A check-back: the step needs something that does not exist yet,

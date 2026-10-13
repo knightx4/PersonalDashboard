@@ -517,7 +517,7 @@ export function CheckRow({
   hint?: React.ReactNode;
 }) {
   return (
-    <label className={cn('flex cursor-pointer items-start gap-2.5 py-1', className)}>
+    <label className={cn('flex cursor-pointer items-start gap-2.5 py-1 max-sm:min-h-11', className)}>
       <Checkbox className="mt-0.5" {...props} />
       <span className="min-w-0">
         <span className="block text-ui text-ink">{title}</span>

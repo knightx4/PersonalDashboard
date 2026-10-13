@@ -16,6 +16,9 @@ import { cn } from '@/lib/cn';
  * used `rounded-pill` drew square, because nothing defined it.
  *
  * Numbers line up (tabular). An icon goes first and is sized by the chip.
+ * A label that can run long goes in `<span className="min-w-0 truncate">`
+ * with `max-w-full` on the chip, so it ends in an ellipsis inside its row
+ * instead of pushing the page sideways.
  */
 export const chipVariants = cva(
   'tabular inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-pill font-medium [&_svg]:shrink-0',

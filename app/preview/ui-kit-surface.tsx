@@ -84,11 +84,17 @@ export function UiKit() {
             {/* ui-ok: the kit draws the field itself, not a composer over a list */}
             <Textarea id="ui-kit-textarea" defaultValue="Ask about the on-call rota." />
           </div>
-          <InlineInput aria-label="Salary" defaultValue="$185,000" />
-          <ChipSelect aria-label="Priority" defaultValue="high">
-            <option value="high">High</option>
-            <option value="low">Low</option>
-          </ChipSelect>
+          <label className="flex min-h-11 items-center justify-between gap-3">
+            <span className="text-small text-ink-muted">Salary</span>
+            <InlineInput defaultValue="$185,000" className="w-40 text-right" />
+          </label>
+          <label className="flex min-h-11 items-center justify-between gap-3">
+            <span className="text-small text-ink-muted">Priority</span>
+            <ChipSelect defaultValue="high">
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </ChipSelect>
+          </label>
         </div>
       </Group>
 
