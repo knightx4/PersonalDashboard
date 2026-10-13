@@ -123,6 +123,7 @@ import {
   LearnReadingSurface,
   LearnReadingTextSurface,
   LearnReadingSummarySurface,
+  LearnReadingChatSurface,
   LearnReadingUnreadableSurface,
   LearnVideoSurface,
   LearnVideosSurface,
@@ -6004,6 +6005,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnReadingSummarySurface />,
+  },
+  {
+    id: 'learn-reading-chat',
+    label: 'Reading · A chat with Dash about it',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingChatSurface />,
   },
   {
     id: 'learn-reading-unreadable',

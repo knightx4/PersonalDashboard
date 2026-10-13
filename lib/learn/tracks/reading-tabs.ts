@@ -1,7 +1,7 @@
 /**
  * The tabs on a reading's page (plan #1876.4): the reading itself, and what
- * Dash makes of its text. The chat (#1876.5) is meant to join Summary's tab
- * or sit beside it.
+ * Dash makes of its text. The Summary tab also holds the chat with Dash about
+ * the reading (#1876.5), under the summary.
  */
 export const READING_TABS = [
   { id: 'reading', label: 'Reading' },

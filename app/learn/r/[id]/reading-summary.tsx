@@ -19,8 +19,8 @@ import { READING_TEXT_ANCHOR, ReadingText } from './reading-text';
 export type SummaryFailure = { error: string; unreadable?: boolean };
 
 /**
- * The Summary tab of a reading (plan #1876.4): Dash's summary, then the text
- * Dash reads it from.
+ * The Summary tab of a reading (plan #1876.4): Dash's summary, the chat with
+ * Dash about the reading (plan #1876.5), then the text Dash reads both from.
  *
  * The summary is kept on the reading, so a later visit shows it again with
  * what it was written from and whether Dash read only the start. Redo writes
@@ -32,6 +32,7 @@ export function ReadingSummary({
   summary: saved,
   given,
   failure: initialFailure = null,
+  chat,
 }: {
   readingId: string;
   summary: Summary | null;
@@ -39,6 +40,8 @@ export function ReadingSummary({
   given: { label: string; addedAt: string } | null;
   /** A failed press, drawn by the gallery; the page starts with none. */
   failure?: SummaryFailure | null;
+  /** The chat with Dash about the reading (plan #1876.5), drawn between the summary and the text. */
+  chat?: React.ReactNode;
 }) {
   const [summary, setSummary] = useState<Summary | null>(saved);
   const [failure, setFailure] = useState<SummaryFailure | null>(initialFailure);
@@ -127,6 +130,8 @@ export function ReadingSummary({
           </div>
         )}
       </section>
+
+      {chat}
 
       <ReadingText readingId={readingId} given={given} unreadable={unreadable && !given} />
     </>

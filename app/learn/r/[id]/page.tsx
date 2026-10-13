@@ -5,6 +5,9 @@ import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
 import { loadSubjects } from '@/lib/learn/graph/load';
 import { READING_TABS, type ReadingTab } from '@/lib/learn/tracks/reading-tabs';
 import { tabFrom } from '@/lib/tabs';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { threadRef } from '@/lib/thread/subjects';
+import { loadThread } from '@/lib/thread/store';
 import { ReadingView } from './reading-view';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +42,20 @@ export default async function ReadingPage({
     ? ((await loadReadingOrigins([reading.newsStoryId])).get(reading.newsStoryId) ?? null)
     : null;
 
+  // The chat with Dash on the Summary tab (plan #1876.5), read only for that tab.
+  const thread =
+    tab === 'summary'
+      ? await loadThread(await createCoreClient(), threadRef('reading', reading.id))
+      : [];
+
   return (
-    <ReadingView reading={reading} subjects={subjects} alreadyRead={alreadyRead} origin={origin} tab={tab} />
+    <ReadingView
+      reading={reading}
+      subjects={subjects}
+      alreadyRead={alreadyRead}
+      origin={origin}
+      tab={tab}
+      thread={thread}
+    />
   );
 }
