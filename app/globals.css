@@ -2265,6 +2265,24 @@ button[aria-busy='true'] {
   }
 }
 
+@keyframes timeline-in {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A timeline entry (components/ui/timeline.tsx) rises into place once on
+ * mount. The reduced-motion block collapses the duration, and the component
+ * adds motion-reduce:animate-none as well. */
+@utility timeline-in {
+  animation: timeline-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 /* One entrance for the toast, and nothing on the way out. It springs, so it
  * arrives with a little give. */
 @utility toast-in {
