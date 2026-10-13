@@ -1,7 +1,8 @@
 /**
  * The Dash mark (plan #1335): five states and four kinds of work, each its own
- * still image, named for a screen reader, and with its motion switched off
- * under reduced motion.
+ * still image, named for a screen reader, moving in every state, and with its
+ * motion switched off under reduced motion. The runner card's four Dashes each
+ * have their own visor and colour.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DASH_ACTIVITIES,
   DASH_ACTIVITY_LABELS,
-  DASH_LOOKS,
+  DASH_RUNNERS,
   DASH_STATES,
   DASH_STATE_LABELS,
   DashMark,
@@ -22,32 +23,43 @@ const render = (props: Parameters<typeof DashMark>[0]) =>
 /** Every motion utility the mark uses, as named in app/globals.css. */
 const MOTIONS = [
   'blink',
-  'breathe',
+  'glance',
+  'glow',
+  'ember',
   'snooze',
-  'tip',
+  'pulse',
   'streak',
-  'rattle',
   'read',
   'sweep',
   'ping',
   'write',
   'caret',
   'ponder',
+  'bob',
+  'flicker',
+  'scan',
+  'tick',
+  'ask',
+  'settle',
+  'shake',
+  'hop',
   'flash',
-  'wave',
 ] as const;
 
 /**
  * What a still frame shows: the SVG body alone, so the label and data
- * attributes do not count, with the motion classes, their delays and the mask
- * ids taken out.
+ * attributes do not count, with the motion classes, their delays and the ids
+ * taken out.
  */
 const still = (html: string) =>
   html
     .slice(html.indexOf('<svg'))
     .replace(/ class="dash-mark-[a-z]+"/g, '')
     .replace(/ style="animation-delay:[^"]*"/g, '')
-    .replace(/dash-mark-[^")]*/g, 'MASK');
+    .replace(/dash-mark-[^")]*/g, 'ID');
+
+/** The outline of the visor: the first path the clip is cut from. */
+const visor = (html: string) => html.match(/<clipPath id="[^"]+"><path d="([^"]+)"/)?.[1];
 
 describe('DashMark', () => {
   it('draws every state and every kind of work differently with the motion taken away', () => {
@@ -58,12 +70,16 @@ describe('DashMark', () => {
     expect(new Set(frames).size).toBe(DASH_STATES.length + DASH_ACTIVITIES.length);
   });
 
-  it('keeps failed still, and moves everything else', () => {
-    expect(render({ state: 'working' })).toContain('dash-mark-streak');
-    expect(render({ state: 'done' })).toContain('dash-mark-flash');
-    expect(render({ state: 'done' })).toContain('dash-mark-wave');
+  it('moves in every state, resting by default', () => {
+    expect(render({})).toContain('data-dash-state="idle"');
+    expect(render({ state: 'idle' })).toContain('dash-mark-glow');
+    expect(render({ state: 'idle' })).toContain('dash-mark-glance');
     expect(render({ state: 'idle' })).toContain('dash-mark-blink');
-    expect(render({ state: 'failed' })).not.toMatch(/class="dash-mark-/);
+    expect(render({ state: 'working' })).toContain('dash-mark-streak');
+    expect(render({ state: 'working' })).toContain('dash-mark-pulse');
+    expect(render({ state: 'asleep' })).toContain('dash-mark-ember');
+    expect(render({ state: 'done' })).toContain('dash-mark-bob');
+    expect(render({ state: 'failed' })).toContain('dash-mark-flicker');
   });
 
   it('shows a kind of work only while working', () => {
@@ -71,6 +87,7 @@ describe('DashMark', () => {
     expect(render({ state: 'working', activity: 'searching' })).toContain('dash-mark-ping');
     expect(render({ state: 'working', activity: 'writing' })).toContain('dash-mark-write');
     expect(render({ state: 'working', activity: 'thinking' })).toContain('dash-mark-ponder');
+    expect(render({ state: 'working', activity: 'testing' })).toContain('dash-mark-tick');
     expect(still(render({ state: 'idle', activity: 'reading' }))).toBe(still(render({ state: 'idle' })));
     expect(render({ state: 'done', activity: 'searching' })).not.toContain('data-dash-activity');
   });
@@ -82,33 +99,33 @@ describe('DashMark', () => {
     expect(still(html)).not.toBe(still(render({ state: 'idle' })));
   });
 
-  it('wears the brand ramp only when asked, and never when failed', () => {
-    expect(render({})).not.toContain('linearGradient');
+  it('wears the brand ramp only when asked, and has no core when failed', () => {
+    expect(render({})).not.toContain('-core"');
     const brand = render({ tone: 'brand', state: 'working' });
-    expect(brand).toContain('<linearGradient');
-    expect(brand).toMatch(/fill="url\(#dash-mark-[^)]+-ramp\)"/);
+    expect(brand).toMatch(/<linearGradient id="[^"]+-core"/);
+    expect(brand).toMatch(/fill="url\(#dash-mark-[^)]+-core\)"/);
     expect(brand).toContain('data-dash-tone="brand"');
     const failed = render({ tone: 'brand', state: 'failed' });
-    expect(failed).not.toContain('linearGradient');
-    expect(failed).toContain('stroke="currentColor"');
+    expect(failed).not.toMatch(/fill="url\(#dash-mark-[^)]+-core\)"/);
+    expect(failed).toContain('stroke:currentColor');
   });
 
-  it('gives each mark its own mask', () => {
+  it('gives each mark its own ids', () => {
     const html = renderToStaticMarkup(
       <>
         <DashMark />
         <DashMark />
       </>,
     );
-    const ids = [...html.matchAll(/<mask id="([^"]+)"/g)].map((m) => m[1]);
+    const ids = [...html.matchAll(/<clipPath id="([^"]+)"/g)].map((m) => m[1]);
     expect(ids).toHaveLength(2);
     expect(new Set(ids).size).toBe(2);
   });
 
-  it('draws failed hollow', () => {
-    const html = render({ state: 'failed' });
-    expect(html).toContain('stroke="currentColor"');
-    expect(html).not.toContain('fill="currentColor" fill-opacity="0.32"');
+  it('tints its glass and draws its edge only on a light page', () => {
+    const html = render({ tone: 'brand' });
+    expect(html).toContain('light-dark(color-mix(in srgb');
+    expect(html).toContain('light-dark(rgb(255 255 255');
   });
 
   it('names itself by state, and says Dash rather than Claude', () => {
@@ -143,57 +160,50 @@ describe('DashMark', () => {
   });
 });
 
-describe('its looks', () => {
-  const STILL_STATES = ['idle', 'working', 'asleep'] as const;
-  const hatMask = (html: string) => html.match(/<mask id="[^"]+-hat"/g) ?? [];
+describe('asking and its moments', () => {
+  it('asks with a pulsing question mark', () => {
+    const html = render({ state: 'asking' });
+    expect(html).toContain('dash-mark-ask');
+    expect(html).toContain('aria-label="Dash is asking you something"');
+  });
 
-  it('draws nothing extra without a look', () => {
-    for (const state of DASH_STATES) {
-      const html = render({ state, tone: 'brand', size: 'lg' });
-      expect(hatMask(html)).toHaveLength(0);
-      expect(html).not.toContain('data-dash-look');
-      expect(html).not.toContain('dash-mark-tip');
+  it('eases into each state rather than snapping', () => {
+    for (const state of DASH_STATES) expect(render({ state })).toContain('dash-mark-settle');
+  });
+
+  it('winces and hops once, on top of the state', () => {
+    const wince = render({ state: 'working', moment: { kind: 'wince', id: 'e1' } });
+    expect(wince).toContain('dash-mark-shake');
+    expect(wince).toContain('dash-mark-flash');
+    const hop = render({ state: 'working', activity: 'writing', moment: { kind: 'hop', id: 'a1' } });
+    expect(hop).toContain('dash-mark-hop');
+    expect(render({ state: 'working' })).not.toContain('dash-mark-shake');
+  });
+});
+
+describe('the runners', () => {
+  it('keeps the capsule for Dash and gives each runner its own visor', () => {
+    const shapes = [visor(render({})), ...DASH_RUNNERS.map((runner) => visor(render({ runner })))];
+    expect(new Set(shapes).size).toBe(DASH_RUNNERS.length + 1);
+  });
+
+  it('wears its own colour in every state, whatever the tone', () => {
+    for (const runner of DASH_RUNNERS) {
+      for (const state of ['idle', 'working', 'asleep'] as const) {
+        const html = render({ state, runner, tone: 'current' });
+        expect(html).toContain(`data-dash-runner="${runner}"`);
+        expect(html).toMatch(/<linearGradient id="[^"]+-core"/);
+        expect(html).not.toContain('data-dash-tone');
+      }
     }
   });
 
-  it('wears each hat idle, working and asleep, and each reads differently in a still frame', () => {
-    for (const state of STILL_STATES) {
-      const frames = DASH_LOOKS.map((look) => {
-        const html = render({ state, look });
-        expect(hatMask(html)).toHaveLength(1);
-        expect(html).toContain(`data-dash-look="${look}"`);
-        return still(html);
-      });
-      frames.push(still(render({ state })));
-      expect(new Set(frames).size).toBe(DASH_LOOKS.length + 1);
+  it('moves in every state', () => {
+    for (const runner of DASH_RUNNERS) {
+      expect(render({ runner, state: 'idle' })).toContain('dash-mark-glow');
+      expect(render({ runner, state: 'asleep' })).toContain('dash-mark-ember');
+      expect(render({ runner, state: 'working' })).toContain('dash-mark-streak');
     }
-  });
-
-  it('wears the hat while working at any kind of work', () => {
-    for (const activity of DASH_ACTIVITIES) {
-      expect(hatMask(render({ state: 'working', activity, look: 'cowboy-hat' }))).toHaveLength(1);
-    }
-  });
-
-  it('leaves the hat off under the flag', () => {
-    for (const state of ['done', 'failed'] as const) {
-      const html = render({ state, look: 'top-hat' });
-      expect(hatMask(html)).toHaveLength(0);
-      expect(html).not.toContain('data-dash-look');
-    }
-  });
-
-  it('tips every hat but the ball cap while asleep', () => {
-    expect(render({ state: 'asleep', look: 'top-hat' })).toContain('dash-mark-tip');
-    expect(render({ state: 'asleep', look: 'cowboy-hat' })).toContain('dash-mark-tip');
-    expect(render({ state: 'asleep', look: 'newsboy-cap' })).toContain('dash-mark-tip');
-    expect(render({ state: 'asleep', look: 'ball-cap' })).not.toContain('dash-mark-tip');
-    expect(render({ state: 'idle', look: 'top-hat' })).not.toContain('dash-mark-tip');
-  });
-
-  it('draws the hat in the colour of its place on the brand ramp', () => {
-    const html = render({ state: 'idle', tone: 'brand', look: 'newsboy-cap' });
-    expect(html).toMatch(/<g fill="currentColor" mask="url\(#[^)]+-hat\)"/);
   });
 });
 
@@ -204,7 +214,6 @@ describe('its animations', () => {
     for (const motion of MOTIONS) {
       expect(css).toMatch(new RegExp(`@utility dash-mark-${motion} \\{[^}]*animation: dash-mark-${motion} `));
     }
-    expect(css).toMatch(/@utility dash-mark-flash \{[^}]*animation: dash-mark-flash var\(--motion-move\)/);
   });
 
   it('are entered in the reduced-motion block', () => {

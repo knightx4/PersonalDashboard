@@ -69,7 +69,7 @@ function Strip({ dark }: { dark: boolean }) {
 }
 
 const STYLE = `
- body{margin:0;padding:26px 30px 40px;background:#faf9f7;color:#16181d;
+ body{margin:0;padding:26px 30px 40px;background:#faf9f7;color:#16181d;color-scheme:light;
    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
  h1{font-size:19px;margin:0 0 4px} p.sub{color:#6b7280;margin:0 0 22px;font-size:13px}
  h2{font-size:13px;margin:0 0 9px}
@@ -77,13 +77,13 @@ const STYLE = `
    background:#fff;margin-bottom:20px}
  .band>.cell{flex:1;padding:18px 6px 12px;text-align:center;border-right:1px solid #e8e8e6}
  .band>.cell:last-child{border-right:0}
- .band.dk{border-color:#262a31;background:#12151b} .band.dk>.cell{border-right-color:#22262e}
+ .band.dk{border-color:#262a31;background:#12151b;color-scheme:dark} .band.dk>.cell{border-right-color:#22262e}
  .row{display:flex;align-items:center;justify-content:center;gap:10px;height:56px}
  .name{font-size:10.5px;color:#6b7280;margin-top:10px;letter-spacing:.03em}
  .dk .name{color:#868d97}
  .nav{display:flex;gap:6px;align-items:center;padding:9px 12px;border:1px solid #e8e8e6;
    border-radius:12px;background:#fff;width:max-content;margin-bottom:10px}
- .nav.dk{border-color:#262a31;background:#12151b}
+ .nav.dk{border-color:#262a31;background:#12151b;color-scheme:dark}
  .nav b{font-size:12px;font-weight:500;color:#4b5563;margin:0 8px 0 2px}
  .nav.dk b{color:#9aa1ab}
  svg{display:block}
