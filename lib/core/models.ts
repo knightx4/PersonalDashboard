@@ -158,6 +158,12 @@ export const MODELS = {
   learnEssayResearch: HAIKU,
   /** lib/learn/essays/research-model.ts, the deeper pass marking each claim against the pages read */
   learnEssayJudge: SONNET,
+  /** lib/learn/briefs/research-model.ts, a research brief's question split into sub-questions */
+  learnBriefFrame: SONNET,
+  /** lib/learn/briefs/research-model.ts, a brief's searches and pages read, on the basic web tools as the essay's are */
+  learnBriefSearch: HAIKU,
+  /** lib/learn/briefs/research-model.ts, a brief's positions and short answer, cited from the pages read */
+  learnBriefWrite: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */
