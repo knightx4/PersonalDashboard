@@ -511,14 +511,14 @@ export function OvernightControl({
     >
       {/* With a mark, the label and the mark under it are a column of their
           own, and the rest of the row starts on one edge beside them. */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 max-sm:flex-wrap max-sm:items-center max-sm:gap-y-2">
         {mark && (
-          <span className="flex shrink-0 flex-col items-start gap-1.5">
+          <span className="flex shrink-0 flex-col items-start gap-1.5 max-sm:contents">
             {labelText}
             {mark}
           </span>
         )}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 max-sm:contents">
           {!mark && labelText}
           {resting && (ready > 0 || goalsReady) ? (
             <StateLabel
@@ -548,7 +548,7 @@ export function OvernightControl({
           <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
           {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
             {autoApprove !== undefined && (
               <form action={autoAction}>
                 <input type="hidden" name="on" value={autoApprove ? 'false' : 'true'} />
@@ -564,7 +564,7 @@ export function OvernightControl({
                       : 'Approve every proposed feature and step now, and each new one as it is written.'
                   }
                 >
-                  <CheckCheck strokeWidth={1.75} className="size-3.5" aria-hidden />
+                  <CheckCheck strokeWidth={1.75} className="size-3.5 max-sm:hidden" aria-hidden />
                   {autoApprove ? 'Auto approve on' : 'Auto approve'}
                 </Button>
               </form>
@@ -640,13 +640,13 @@ export function OvernightControl({
                     <span className="text-small text-ink-muted">features, over</span>
                   </>
                 )}
-                {keepGoing && <span className="text-small text-ink-muted">Run</span>}
+                {keepGoing && <span className="text-small text-ink-muted max-sm:sr-only">Run</span>}
                 <Select
                   name="hours"
                   value={hours}
                   onChange={(event) => setHours(Number(event.target.value))}
                   aria-label="How long it may run for"
-                  className="min-h-11 w-auto sm:min-h-0"
+                  className="min-h-11 w-auto max-sm:pl-2 sm:min-h-0"
                 >
                   {/* First, because it is the default and the ordinary press. */}
                   <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>

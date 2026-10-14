@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { besideLine } from '@/lib/learn/map/next-topics';
 import { describeDepth, type Depth } from './depth';
 import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
 import { MODELS } from '@/lib/core/models';
@@ -88,6 +89,8 @@ export type CardToWrite = {
   /** The phrase it was asked for, and the card it was on; set for asked (plan #1057). */
   askedPhrase?: string | null;
   askedOn?: string | null;
+  /** For a card on a topic next to one they know: that known topic (plan #2016.6). */
+  besideTopic?: string | null;
   /** Null for a goal card whose goal is not placed in a field, and for an asked card. */
   field: { name: string; scope: string } | null;
   /**
@@ -178,10 +181,16 @@ export function researchWhy(question: string): string {
 
 /** The line under the card's title saying why it is in the feed. */
 export function whyLine(
-  card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn' | 'research'>,
+  card: Pick<
+    CardToWrite,
+    'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn' | 'research' | 'besideTopic'
+  >,
 ): string {
   if (card.reason === 'video') return 'From a video on your playlist.';
   if (card.reason === 'researched' && card.research) return researchWhy(card.research.question);
+  if (card.reason === 'goal' && card.aimName && card.besideTopic?.trim()) {
+    return `${besideLine(card.besideTopic)} For your goal: ${card.aimName.trim()}.`;
+  }
   if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
   if (card.reason === 'asked' && card.askedPhrase) {
     const on = card.askedOn?.trim();
@@ -318,6 +327,9 @@ export function describePick(card: CardToWrite): string {
         ' and want a card of its own on it. Write the ideas that explain it, and say the section does not serve only when it is not about it.'
       : card.reason === 'goal' && card.aimName
       ? `Picked for a goal they set themselves: ${card.aimName}.` +
+        (card.besideTopic?.trim()
+          ? ` It is a topic next to ${card.besideTopic.trim()}, which they already know, so build on that rather than restating it.`
+          : '') +
         (card.field ? ` The field it sits in: ${field}` : ' It sits in no one field.')
       : card.reason === 'interest' && card.themeName
       ? `Picked for a theme from their notes: ${card.themeName}. The field it sits in: ${field}`
