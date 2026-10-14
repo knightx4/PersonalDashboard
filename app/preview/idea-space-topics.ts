@@ -1,5 +1,6 @@
 import type { IdeaOnMap, FieldOnMap } from '@/lib/learn/map/load';
 import { buildTopicFrame, type TopicFrame, type TopicRows } from '@/lib/learn/map/topics';
+import type { NextTopic } from '@/lib/learn/map/next-topics';
 
 /**
  * Wikipedia's topics for the Idea Space fixtures (plan #2016.5).
@@ -112,3 +113,46 @@ export function topicsFor(ideas: readonly IdeaOnMap[], fields: readonly FieldOnM
     new Date(asOf),
   );
 }
+
+/**
+ * The topics next to what you know, for the rail (plan #2016.6): five, as
+ * many as the card names, with the longest titles and goal names the live
+ * lists hold, and one no goal ranks.
+ */
+export const NEXT_TOPICS_FIXTURE: NextTopic[] = [
+  {
+    id: 'n-world-economy',
+    title: 'World economy',
+    beside: { id: 't4-macro', title: 'Macroeconomics' },
+    similarity: 0.86,
+    aim: { id: 'aim-fs', name: 'Financial services industry landscape', closeness: 0.79 },
+  },
+  {
+    id: 'n-market',
+    title: 'Market (economics)',
+    beside: { id: 't4-supply', title: 'Supply and demand' },
+    similarity: 0.83,
+    aim: { id: 'aim-fs', name: 'Financial services industry landscape', closeness: 0.74 },
+  },
+  {
+    id: 'n-capital',
+    title: 'Capital (economics)',
+    beside: { id: 't4-profit', title: 'Profit (economics)' },
+    similarity: 0.81,
+    aim: { id: 'aim-model', name: 'Financial modeling in Excel for operators', closeness: 0.68 },
+  },
+  {
+    id: 'n-competition',
+    title: 'Competition (economics)',
+    beside: { id: 't4-monopoly', title: 'Monopoly' },
+    similarity: 0.8,
+    aim: { id: 'aim-strategy', name: 'Corporate strategy and competitive analysis', closeness: 0.66 },
+  },
+  {
+    id: 'n-epistemology',
+    title: 'Epistemology',
+    beside: { id: 't4-russell', title: "Russell's paradox" },
+    similarity: 0.71,
+    aim: null,
+  },
+];

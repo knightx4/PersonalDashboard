@@ -188,6 +188,94 @@ export async function fieldsDue(
   return (data ?? []).length > 0;
 }
 
+/** The text a learning goal is embedded from: its name and what the person means by it. */
+export function aimText(aim: { name: string; about: string | null }): string {
+  const about = aim.about?.trim();
+  return about ? `${aim.name.trim()}. ${about}` : aim.name.trim();
+}
+
+/**
+ * A store over one person's active learning goals (learn 0131, plan
+ * #2016.6), whose vectors rank the topics next to what they know. A rename
+ * clears the vector in the database, and a row is written only while its
+ * wording is what was read, as for the fields.
+ */
+export function aimStore(learn: LearnSupabaseClient, userId: string, model: EmbeddingModel): SegmentStore {
+  return {
+    async unembedded(limit) {
+      const { data, error } = await learn
+        .from('aims')
+        .select('id, name, about')
+        .eq('user_id', userId)
+        .is('archived_at', null)
+        .or(dueFilter(model))
+        .order('created_at')
+        .limit(limit);
+      if (error) throw new Error(`Reading goals without an embedding failed: ${error.message}`);
+      return ((data ?? []) as { id: string; name: string; about: string | null }[])
+        .filter((row) => row.name.trim())
+        .map((row) => ({ id: row.id, text: aimText(row) }));
+    },
+
+    async store(rows) {
+      let written = 0;
+      for (const row of rows) {
+        const { data: current, error: readError } = await learn
+          .from('aims')
+          .select('name, about')
+          .eq('id', row.id)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (readError) throw new Error(`Checking a goal before storing its embedding failed: ${readError.message}`);
+        if (!current || aimText(current as { name: string; about: string | null }) !== row.text) continue;
+        const { data, error } = await learn
+          .from('aims')
+          .update({ embedding: vectorLiteral(row.vector), embedding_model: row.model })
+          .eq('id', row.id)
+          .eq('user_id', userId)
+          .select('id');
+        if (error) throw new Error(`Storing a goal's embedding failed: ${error.message}`);
+        written += (data ?? []).length;
+      }
+      return written;
+    },
+  };
+}
+
+/** Embed this person's active goals that are due, billing them under 'embed-idea'. */
+export async function embedAimsOverRest(
+  learn: LearnSupabaseClient,
+  userId: string,
+  options: EmbedSweepOptions = {},
+): Promise<EmbedSweepResult> {
+  const model = options.model ?? DEFAULT_EMBEDDING_MODEL;
+  return runEmbedSweep(
+    {
+      store: aimStore(learn, userId, model),
+      embed: ({ texts, model: asked, onSpend }) =>
+        embedTexts({ texts, model: asked, inputType: 'document', onSpend }),
+      ledger: (report) => ledgerIdeaSpend(learn, userId, [report]),
+    },
+    { ...options, model },
+  );
+}
+
+/** The accounts with an active goal due. */
+export async function usersWithAimsDue(
+  learn: LearnSupabaseClient,
+  model: EmbeddingModel = DEFAULT_EMBEDDING_MODEL,
+): Promise<string[]> {
+  const { data, error } = await learn
+    .from('aims')
+    .select('user_id')
+    .is('archived_at', null)
+    .or(dueFilter(model))
+    .order('created_at')
+    .limit(1000);
+  if (error) throw new Error(`Listing goals without an embedding failed: ${error.message}`);
+  return [...new Set(((data ?? []) as { user_id: string }[]).map((row) => row.user_id))];
+}
+
 /** An account to bill for the fields when no idea is due: any one with ideas. */
 export async function anyIdeaOwner(learn: LearnSupabaseClient): Promise<string | null> {
   const { data, error } = await learn.from('concepts').select('user_id').order('created_at').limit(1);
