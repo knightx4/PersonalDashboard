@@ -120,6 +120,7 @@ describe('RLS coverage', () => {
       'concepts',
       'course_reads',
       'curriculum_units',
+      'briefs',
       'essay_notes',
       'essay_research',
       'essays',
