@@ -145,7 +145,13 @@ export function SettingSelect({
   );
 }
 
-/** Text or a number, saved when the field loses focus with a changed value. */
+/**
+ * Text, a number or a day, read first (law 14): the value is shown as text,
+ * pressing it opens it for editing in place, and leaving the field saves it
+ * when it changed. Enter saves and Escape puts it back. `format` words the
+ * value for reading, such as "21 days" for 21; it runs in the browser, so
+ * only a client component can pass one.
+ */
 export function SettingText({
   title,
   hint,
@@ -154,39 +160,95 @@ export function SettingText({
   type = 'text',
   placeholder,
   inputMode,
+  format,
+  titleHidden,
 }: {
   title: string;
   hint?: React.ReactNode;
   defaultValue: string;
   save: SaveSetting<string>;
-  type?: 'text' | 'number' | 'url' | 'email';
+  type?: 'text' | 'number' | 'url' | 'email' | 'date';
+  /** Shown in the field while it is empty, and in place of an empty value. */
   placeholder?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  format?: (value: string) => string;
+  /** Leave the title to a screen reader, when the section heading already names the value. */
+  titleHidden?: boolean;
 }) {
   const id = useId();
   const saved = useRef(defaultValue);
   const [value, setValue] = useState(defaultValue);
+  const [editing, setEditing] = useState(false);
   const { run } = useSettingSave(save);
-  return (
-    <Row title={title} hint={hint} htmlFor={id} stacked>
-      <Input
+
+  /** The value as text, or its editor while it is open. */
+  function control(look: string) {
+    if (editing) {
+      return (
+        <Input
+          id={id}
+          autoFocus
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          inputMode={inputMode}
+          className={type === 'text' || type === 'url' || type === 'email' ? undefined : 'w-44'}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={leave}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+            if (event.key === 'Escape') {
+              setValue(saved.current);
+              setEditing(false);
+            }
+          }}
+        />
+      );
+    }
+    const shown = value ? (format ? format(value) : value) : (placeholder ?? 'Not set');
+    return (
+      <button
         id={id}
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        inputMode={inputMode}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => {
-          const next = value.trim();
-          if (next === saved.current) return;
-          const previous = saved.current;
-          saved.current = next;
-          run(next, () => {
-            saved.current = previous;
-            setValue(previous);
-          });
-        }}
-      />
-    </Row>
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={`${title}: ${value ? shown : 'not set'}. Change`}
+        className={cn(
+          'press -mx-1 rounded-control px-1 text-left hover:bg-sunken',
+          look,
+          value ? 'text-ink' : 'text-ink-ghost',
+        )}
+      >
+        {shown}
+      </button>
+    );
+  }
+
+  function leave() {
+    setEditing(false);
+    const next = value.trim();
+    if (next === saved.current) return;
+    const previous = saved.current;
+    saved.current = next;
+    run(next, () => {
+      saved.current = previous;
+      setValue(previous);
+    });
+  }
+
+  return (
+    titleHidden ? (
+      // The section heading names the value, so the value sits straight
+      // under it, set as the thing the card is about.
+      <div>
+        <label htmlFor={id} className="sr-only">
+          {title}
+        </label>
+        {control('-my-2.5 inline-flex min-h-11 items-center text-body font-medium')}
+      </div>
+    ) : (
+      <Row title={title} hint={hint} htmlFor={id} stacked>
+        {control('text-ui max-sm:min-h-11')}
+      </Row>
+    )
   );
 }

@@ -517,8 +517,6 @@ const policies: MerchantPolicyRow[] = [
 export function ShoppingSettingsSurface() {
   return (
     <ShoppingSettingsView
-      email="alex.morgan.household@gmail.com"
-      settings={{ displayName: 'Alex Morgan', timezone: 'Europe/London', displayCurrency: 'USD' }}
       people={people}
       accounts={[
         {

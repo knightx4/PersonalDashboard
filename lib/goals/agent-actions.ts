@@ -120,4 +120,7 @@ export const goalsActions: ModuleActions = {
     estimateGoalCapture: none('page'),
     goalCaptureCosts: none('page'),
   },
+  'app/goals/settings/actions.ts': {
+    setGoalRun: none('setting'),
+  },
 };

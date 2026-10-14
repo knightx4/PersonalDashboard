@@ -21,35 +21,52 @@ export interface SettingsState {
 // Target titles and the industries never to suggest are saved from Find
 // (app/jobs/(app)/find/actions.ts saveAim, plan #1589).
 const profileSchema = z.object({
-  searchStartedOn: z.string().optional(),
-  ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
+  searchStartedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the day the search started.')
+    .optional(),
+  ghostThresholdDays: z.coerce
+    .number()
+    .int('Say a whole number of days.')
+    .min(7, 'Seven days is the shortest a silence can be before it counts as ghosting.')
+    .max(180, 'A hundred and eighty days is the longest.')
+    .optional(),
 });
 
-// latency: pending
-export async function updateProfile(
-  _prev: SettingsState,
-  formData: FormData,
-): Promise<SettingsState> {
-  const parsed = profileSchema.safeParse({
-    searchStartedOn: formData.get('searchStartedOn') ?? '',
-    ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
-  });
-
+/**
+ * One of the search's own settings, saved when its field is left: the day
+ * the search started, or the days of silence before a pursuit is ghosted.
+ */
+// latency: optimistic -- the field keeps what was typed, and a refused save puts it back with a toast
+export async function saveProfileField(
+  field: 'searchStartedOn' | 'ghostThresholdDays',
+  value: string,
+): Promise<{ error?: string }> {
+  const parsed = profileSchema.safeParse({ [field]: value || undefined });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await requireUser();
   const supabase = await createClient();
 
-  const patch: Record<string, unknown> = {};
-  if (parsed.data.searchStartedOn) patch.search_started_on = parsed.data.searchStartedOn;
-  if (parsed.data.ghostThresholdDays) patch.ghost_threshold_days = parsed.data.ghostThresholdDays;
+  const patch =
+    field === 'searchStartedOn'
+      ? { search_started_on: parsed.data.searchStartedOn }
+      : { ghost_threshold_days: parsed.data.ghostThresholdDays };
+  if (Object.values(patch)[0] === undefined) {
+    return {
+      error:
+        field === 'searchStartedOn'
+          ? 'Give the day the search started.'
+          : 'Say how many days, from 7 to 180.',
+    };
+  }
 
   const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
   if (error) return { error: error.message };
 
   // Changing the ghost threshold changes what is ghosted, so re-derive now
   // rather than waiting for tonight's sweep.
-  if (parsed.data.ghostThresholdDays) {
+  if (field === 'ghostThresholdDays') {
     await supabase.rpc('sweep_ghosted_applications', { p_user_id: user.id }).then(
       () => undefined,
       () => undefined,
@@ -58,7 +75,7 @@ export async function updateProfile(
 
   revalidatePath('/jobs/settings');
   revalidatePath('/jobs/pipeline');
-  return { message: 'Saved.' };
+  return {};
 }
 
 /**

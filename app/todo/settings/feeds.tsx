@@ -4,7 +4,6 @@ import { useActionState, useState, useTransition } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Field, FieldError, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -18,7 +17,8 @@ import { formatClock } from '@/lib/clock';
  * One way only: appointments arrive, nothing typed here is ever sent back, and
  * a subscribed appointment cannot be edited on the calendar page. The address
  * is a credential and is never drawn in full -- the host and the last few
- * characters is what tells two of them apart.
+ * characters is what tells two of them apart. The section around it is the
+ * settings page's (settings-view.tsx).
  */
 export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: string }) {
   const [adding, setAdding] = useState(false);
@@ -33,13 +33,9 @@ export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: st
   );
 
   return (
-    <CardSection
-      title="Subscribed calendars"
-      padding="standard"
-      hint="Paste the private address of a calendar you already keep and its appointments appear here beside your own. Nothing you type here is ever sent back to it."
-    >
+    <div>
       {feeds.length > 0 && (
-        <ul className="mt-2 divide-y divide-border">
+        <ul className="divide-y divide-border">
           {feeds.map((feed) => (
             <FeedRow key={feed.id} feed={feed} timezone={timezone} />
           ))}
@@ -90,7 +86,7 @@ export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: st
           {state.message && <p className="text-small text-ink-muted">{state.message}</p>}
         </div>
       )}
-    </CardSection>
+    </div>
   );
 }
 

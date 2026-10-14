@@ -5,6 +5,7 @@ import { checkWriteAccess, type WriteAccess } from '@/lib/vault/notes/write-acce
 import { syncProgress } from '@/lib/vault/sync/progress';
 import { VaultSettingsView } from './settings-view';
 
+export const metadata = { title: 'Vault settings' };
 export const dynamic = 'force-dynamic';
 
 export default async function VaultSettingsPage() {

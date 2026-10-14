@@ -74,7 +74,7 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
-import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
 import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
@@ -331,7 +331,6 @@ import {
   JobsAnswersSurface,
   JobsCasePageSurface,
   JobsOnboardingSurface,
-  JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
@@ -4331,10 +4330,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-settings',
-    label: 'Settings',
+    label: 'Jobs · Settings, the Search tab',
     module: 'jobs',
-    width: 'wide',
-    render: () => <SettingsView {...settings} />,
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} />,
   },
   {
     id: 'jobs-material',
@@ -6612,10 +6611,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-thoughts',
-    label: 'Jobs · Career goals',
+    label: 'Jobs · Settings, the Career goals tab',
     module: 'jobs',
     width: 'page',
-    render: () => <JobsThoughtsSurface />,
+    render: () => <JobsSettingsView {...settings} tab="career-goals" opensOn="career-goals" />,
   },
   {
     id: 'jobs-onboarding',
