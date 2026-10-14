@@ -1128,7 +1128,7 @@ function StarCard({
 
   return (
     <div
-      className="pointer-events-none absolute rounded-control p-3 text-small shadow-md ring-1"
+      className="pointer-events-none absolute rounded-control p-3 text-small ring-1"
       style={{
         background: SKY.panel,
         color: SKY.panelText,
