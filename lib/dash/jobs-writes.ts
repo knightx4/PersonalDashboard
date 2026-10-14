@@ -14,6 +14,7 @@ import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/li
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CAREER_WRITES } from './career-writes';
+import { INTERVIEW_EDIT_WRITES } from './interview-edit-writes';
 import { JobsRefused } from './jobs-refused';
 
 /**
@@ -2852,6 +2853,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   // From Material, Settings and Find (plan #1894.6.7), in lib/dash/career-writes.ts.
   ...CAREER_WRITES,
+  // A role's interviews, interviewers and rounds (plan #1894.6.9), in lib/dash/interview-edit-writes.ts.
+  ...INTERVIEW_EDIT_WRITES,
 ];
 
 /** Runs one Jobs write. Never throws: a refusal or a failure is the sentence the model reads. */

@@ -74,8 +74,9 @@ function sent(): { tables: FakeTables; files: Stored[] } {
 }
 
 describe('the career writes', () => {
-  it('run among the Jobs writes, last', () => {
-    expect(JOBS_WRITES.slice(-CAREER_WRITES.length)).toEqual([...CAREER_WRITES]);
+  it('run among the Jobs writes, together', () => {
+    const at = JOBS_WRITES.indexOf(CAREER_WRITES[0]);
+    expect(JOBS_WRITES.slice(at, at + CAREER_WRITES.length)).toEqual([...CAREER_WRITES]);
   });
 
   it('adds a story to the evidence bank, with its skills as the form keeps them', async () => {
