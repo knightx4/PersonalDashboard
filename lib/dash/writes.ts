@@ -19,12 +19,14 @@ import { detectPosting, isBoardVendor } from '@/lib/jobs/ats/detect';
 import { companyFromBoardToken } from '@/lib/jobs/ats/company';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
+import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
+import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -47,8 +49,9 @@ import { NEWS_WRITE_TOOLS } from './news-writes';
  *   add_job_lead     a role saved as a lead in Jobs, from a posting link or
  *                    a title and company.
  *   change_items     many owned items marked for sale or to return, taken
- *                    off either, or grouped as one item, with one Undo
- *                    (lib/dash/bulk-items.ts, plan #1656).
+ *                    off either, grouped, ungrouped, separated or disposed
+ *                    of, with one Undo (lib/dash/bulk-items.ts, plans #1656
+ *                    and #1894.5.1).
  *   move_roles       many job roles moved to one stage or archived, each
  *                    through the board's own move, with one Undo
  *                    (lib/dash/bulk-roles.ts, plan #1657).
@@ -64,6 +67,10 @@ import { NEWS_WRITE_TOOLS } from './news-writes';
  *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
+ *   Shopping's       change_item (one item's name, variant, notes, group
+ *                    name or sell price) and item_lists (items on or off a
+ *                    list, a list made or renamed), in
+ *                    lib/dash/shopping-writes.ts (plan #1894.5.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1018,11 +1025,17 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'change_items',
-    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more). Only items they still own are changed. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
+    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more), dispose (they sold, gave away, donated, threw out, recycled or used them up: give disposal_method, and proceeds for one item sold), ungroup (every copy in the groups those items are in stacks by its own details again), separate (hold each copy out of its stack as an item of its own). Only items they still own are changed, except that ungroup takes any. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
     {
       type: 'object',
       properties: {
         change: { type: 'string', enum: [...ITEM_CHANGES], description: 'Which change to make to every item.' },
+        disposal_method: {
+          type: 'string',
+          enum: [...DISPOSAL_METHODS],
+          description: 'For dispose: how they got rid of them. gifted is given away; trashed is thrown out; consumed is used up.',
+        },
+        proceeds: { type: 'number', description: 'For dispose of one item: what they got for it, in dollars.' },
         item_refs: {
           type: 'array',
           items: { type: 'string' },
@@ -1087,6 +1100,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...YOU_WRITE_TOOLS,
   // News's, and stopping a watch, which the connector offers too (plan #1894.9.4).
   ...NEWS_WRITE_TOOLS,
+  // Shopping's one-item and list changes, which the connector offers too (plan #1894.5.1).
+  ...SHOPPING_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

@@ -36,6 +36,7 @@ describe('runConnectorWrite', () => {
       'add_goal_step',
       'close_goal_step',
       'set_goal_done_when',
+      'change_items',
       'change_reading',
       'add_learn_track',
       'add_track_reading',
@@ -56,6 +57,8 @@ describe('runConnectorWrite', () => {
       'send_story_to_learn',
       'make_todo_from_story',
       'stop_watch',
+      'change_item',
+      'item_lists',
     ]);
   });
 

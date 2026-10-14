@@ -3,8 +3,10 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
-import { readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
+import { MANY_ROW_KINDS, readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
+import { undoShoppingChange } from '@/lib/dash/shopping-writes';
+import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { toRef } from '@/lib/core/refs';
 import {
@@ -228,7 +230,10 @@ function now(deps: ChangeDeps): string {
   return deps.now ? deps.now() : new Date().toISOString();
 }
 
-async function loadOne(deps: ChangeDeps, id: string, surface: 'ask' | 'thread' = 'ask'): Promise<DashChange | null> {
+/** The surfaces whose records Ask's undo takes back. */
+type ChangeSurface = 'ask' | 'thread' | 'routine';
+
+async function loadOne(deps: ChangeDeps, id: string, surface: ChangeSurface = 'ask'): Promise<DashChange | null> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS)
     .select(DASH_CHANGE_SELECT)
@@ -687,11 +692,20 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
 export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
   // A change a thread made with one of Dash's write tools is undone here too
   // (plan #1465; undoneByAsk in lib/core/dash-actions.ts).
-  let surface: 'ask' | 'thread' = 'ask';
+  // So is one the connector made that touched many rows (plan #1894.5.1;
+  // MANY_ROW_KINDS in lib/core/dash-actions.ts), recorded as a routine's.
+  let surface: ChangeSurface = 'ask';
   let change = await loadOne(deps, id);
   if (!change) {
     surface = 'thread';
     change = await loadOne(deps, id, surface);
+  }
+  if (!change) {
+    const routine = await loadOne(deps, id, 'routine');
+    if (routine && MANY_ROW_KINDS.includes(routine.kind)) {
+      surface = 'routine';
+      change = routine;
+    }
   }
   if (!change) return { ok: false, error: GONE, change: null };
   if (change.status !== 'done' || !change.writtenRef) {
@@ -761,9 +775,10 @@ export async function writeChange(
  * (undoDashAction), then reopen the items a ticked-off todo closed with it,
  * where they are still ticked. The record is marked undone by the rule.
  */
-async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
+async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
   if (change.kind === 'add_quick_note') return undoQuickNote(deps, change, surface);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
+  if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
@@ -794,7 +809,7 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 
  * the notes repository as well as its row, the way capture's Undo takes a note
  * back, so the generic rule, which only sees the row, cannot do it.
  */
-async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
+async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
   if (!deps.undoVaultNote) return { ok: false, error: 'The vault cannot be reached from here, so the note was left.', change };
   const undone = await deps.undoVaultNote({
     id: change.id,
@@ -816,7 +831,7 @@ async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: 'ask
 async function undoMany(
   deps: ChangeDeps,
   change: DashChange,
-  surface: 'ask' | 'thread',
+  surface: ChangeSurface,
   putBack: (
     deps: { userId: string; db: AskDb },
     recorded: Record<string, unknown> | null,

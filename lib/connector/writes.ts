@@ -23,6 +23,7 @@ import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
 import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
+import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/lib/dash/shopping-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -484,6 +485,40 @@ const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * Shopping's one-item and list changes (plan #1894.5.1,
+ * lib/dash/shopping-writes.ts), the same tools Ask has, run here on the
+ * service-role public client for the verified person. Each can touch several
+ * rows, so the record keeps them all in `undo`, and Home's Undo puts them
+ * back by Ask's rule (MANY_ROW_KINDS in lib/core/dash-actions.ts).
+ */
+const SHOPPING_TOOLS: readonly ConnectorWriteTool[] = SHOPPING_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    if (!shoppingOn(ctx.account.enabledModules)) throw new AskInputError(SHOPPING_OFF);
+    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public') }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo as unknown as Record<string, unknown>,
+      },
+    );
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
 type SharedWrite =
   | 'add_quick_note'
@@ -492,7 +527,8 @@ type SharedWrite =
   | 'add_goal'
   | 'add_goal_step'
   | 'close_goal_step'
-  | 'set_goal_done_when';
+  | 'set_goal_done_when'
+  | 'change_items';
 
 /**
  * The shared writes that name a goal or a step by its ref. Ask holds a ref to
@@ -501,6 +537,13 @@ type SharedWrite =
  * verified person, so a ref that is not theirs is refused as not found.
  */
 const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'close_goal_step', 'set_goal_done_when']);
+
+/**
+ * The shared writes that take any ref the same way: every read in them names
+ * the verified person. change_items reads each item and order by user id
+ * (plan #1894.5.1).
+ */
+const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([...NAMES_GOAL_ROWS, 'change_items']);
 
 /** The shared writes that change Goals, and so need the goals client. */
 const WRITES_GOALS: ReadonlySet<SharedWrite> = new Set(['add_goal', ...NAMES_GOAL_ROWS]);
@@ -533,7 +576,7 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         enabledModules: ctx.account.enabledModules,
         db,
         searchSources: [],
-        seen: () => NAMES_GOAL_ROWS.has(name),
+        seen: () => TAKES_ANY_REF.has(name),
         // Only the goal writes reach this; none of the others writes a goal or a todo.
         goals: goals && WRITES_GOALS.has(name) ? goals : async () => refuse(),
         createTask: async () => refuse(),
@@ -594,6 +637,11 @@ const closeGoalStep = sharedWrite(
   'Mark a step under one of the person\'s goals in Dash done, when they say it is done or ask you to. Name the step by the goals.items ref search (kinds ["step"]) or goal_status returned for it; look it up first. A goal itself is not closed this way. It is listed on Home with an Undo.',
 );
 
+const changeItems = sharedWrite(
+  'change_items',
+  `Change many of the items the person owns in Dash's Shopping workspace at once, when they ask: mark them for sale or to return, take them off either, group copies as one item, ungroup them, separate a copy from its stack, or say they sold, gave away, donated, threw out, recycled or used them up (dispose, with disposal_method). Name the items by the public.inventory_items refs lookups returned, or whole orders by public.orders refs. At most 100 items. Deleting is not something you can do. It is listed on Home with one Undo for the whole change.`,
+);
+
 const setGoalDoneWhen = sharedWrite(
   'set_goal_done_when',
   'Write, change or clear the done-when of one of the person\'s goals in Dash, when they ask: the line that says when the goal is finished ("the song is live on Spotify"). Name the goal by the goals.items ref search (kinds ["goal"]) or goal_status returned for it; look it up first. Write it in their words; an empty done_when clears it. It is listed on Home with an Undo.',
@@ -611,10 +659,12 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addGoalStep,
   closeGoalStep,
   setGoalDoneWhen,
+  changeItems,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,
   ...NEWS_TOOLS,
+  ...SHOPPING_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */
