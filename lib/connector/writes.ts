@@ -19,7 +19,8 @@ import {
   type ChatItem,
 } from '@/lib/learn/chat/readings';
 import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subjects';
-import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
+import { LEARN_WRITES, runLearnWrite, type LearnMade } from '@/lib/dash/learn-writes';
+import { briefStarter } from '@/lib/learn/briefs/start';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 
@@ -53,7 +54,11 @@ export type ConnectorWriteContext = {
   /** Runs work once the reply has gone: `after` from next/server. */
   later: (work: () => Promise<void>) => void;
   /** Records model spend against the person. */
-  recordSpend: (userId: string, operation: 'match-subjects' | 'resolve-reference', reports: SpendReport[]) => Promise<void>;
+  recordSpend: (
+    userId: string,
+    operation: 'match-subjects' | 'resolve-reference' | 'research-topic',
+    reports: SpendReport[],
+  ) => Promise<void>;
   anthropicApiKey: string | undefined;
   /** How long the lookups after the reply may run, as a Date.now() value. */
   lookupDeadline: number;
@@ -391,12 +396,45 @@ const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => (
     input_schema: write.input_schema,
   },
   async run(ctx, input) {
-    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn }, input);
+    // research_topic's run goes on after the reply, on this service-role
+    // client, with its spend recorded against the person (plan #2023.3).
+    const research = briefStarter({
+      learn: ctx.learn,
+      userId: ctx.userId,
+      recordSpend: (userId, reports) => ctx.recordSpend(userId, 'research-topic', reports),
+      later: ctx.later,
+      apiKey: ctx.anthropicApiKey,
+    });
+    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn, research }, input);
     if ('ok' in made) throw new AskInputError(made.error);
-    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    await recordLearn(ctx, made);
     return { ok: true, rows: [made.row], note: made.summary };
   },
 }));
+
+/**
+ * Record a Learn change as Dash's. One whose Undo needs more than the row
+ * (research_topic's, which archives) keeps that in `undo`, which
+ * core.record_dash_action does not take, so it is written from here.
+ */
+async function recordLearn(ctx: ConnectorWriteContext, made: LearnMade): Promise<void> {
+  if (!made.undo || !ctx.db) {
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return;
+  }
+  await recordDashAction(
+    { userId: ctx.userId, core: ctx.core, db: ctx.db },
+    {
+      surface: 'routine',
+      kind: made.kind,
+      subjectRef: made.subjectRef,
+      op: made.op,
+      summary: made.summary,
+      beforeValues: made.before,
+      undo: made.undo,
+    },
+  );
+}
 
 /**
  * Todo's changes beyond add, rename and tick off (plan #1894.9.1,

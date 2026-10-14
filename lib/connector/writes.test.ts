@@ -38,6 +38,7 @@ describe('runConnectorWrite', () => {
       'reword_concept',
       'add_concept_note',
       'change_video',
+      'research_topic',
       'edit_todo',
       'add_todo_item',
       'link_todo',

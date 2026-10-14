@@ -80,7 +80,7 @@ export type CardToWrite = {
   id: string;
   /** The catalogue segment, for finding the ideas already held near it. */
   segmentId?: string | null;
-  reason: 'interest' | 'gap' | 'goal' | 'asked' | 'video';
+  reason: 'interest' | 'gap' | 'goal' | 'asked' | 'video' | 'researched';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
   /** The goal it was picked for; set for a goal card (plan #900). */
@@ -109,7 +109,13 @@ export type CardToWrite = {
    * point the judge found in the stretch whose transcript is `text`.
    */
   video?: { title: string; channel: string | null; point: string } | null;
-  /** The most cards to keep from the section. MAX_IDEAS when unset; one for a video stretch. */
+  /**
+   * For a card from a research brief's source (plan #2023.6): the brief's
+   * question, its angle, and the source's title. `text` is the reading's
+   * fetched text or the summary the research run wrote of the page.
+   */
+  research?: { question: string; angle: string; source: string } | null;
+  /** The most cards to keep from the section. MAX_IDEAS when unset; one for a video stretch or a source. */
   maxIdeas?: number;
 };
 
@@ -164,11 +170,18 @@ function midSentence(name: string): string {
   return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
 }
 
+/** "For your research: How do SOX controls apply to AI?", with a stop only when the question has no mark of its own. */
+export function researchWhy(question: string): string {
+  const topic = question.replace(/\s+/g, ' ').trim();
+  return /[.?!]$/.test(topic) ? `For your research: ${topic}` : `For your research: ${topic}.`;
+}
+
 /** The line under the card's title saying why it is in the feed. */
 export function whyLine(
-  card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn'>,
+  card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn' | 'research'>,
 ): string {
   if (card.reason === 'video') return 'From a video on your playlist.';
+  if (card.reason === 'researched' && card.research) return researchWhy(card.research.question);
   if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
   if (card.reason === 'asked' && card.askedPhrase) {
     const on = card.askedOn?.trim();
@@ -285,8 +298,15 @@ const payloadSchema = z.object({
 export function describePick(card: CardToWrite): string {
   const field = card.field ? `${card.field.name}. ${card.field.scope}` : '';
   const video = card.video;
+  const research = card.research;
   const pick =
-    card.reason === 'video' && video
+    card.reason === 'researched' && research
+      ? `Picked from a source found while researching a question they asked: "${research.question.trim()}"` +
+        (research.angle.trim() ? `. Why they want to know: ${research.angle.trim()}` : '') +
+        `. The source: ${research.source.trim()}\n` +
+        'The section below is the text of that source, or a summary of it, not a Wikipedia section. ' +
+        'Write the one idea from it that best answers their question, as one card, and say it does not serve only when it holds nothing on the question.'
+      : card.reason === 'video' && video
       ? `Picked from a video they saved to watch: "${video.title}"` +
         (video.channel?.trim() ? ` by ${video.channel.trim()}` : '') +
         `. The part worth a card: ${video.point.trim()}\n` +
@@ -450,8 +470,8 @@ export function cardPrompt(card: CardToWrite): string {
           .join('\n')}`
       : 'They have met no ideas close to this section yet.',
     '',
-    `Article: ${card.article}`,
-    `Section: ${card.section ?? 'the lead, before the first heading'}`,
+    card.reason === 'researched' ? `Source: ${card.article}` : `Article: ${card.article}`,
+    card.reason === 'researched' ? '' : `Section: ${card.section ?? 'the lead, before the first heading'}`,
     cut ? `The section is long; these are its first ${MAX_SECTION_CHARS} characters.` : '',
     '',
     '<section>',

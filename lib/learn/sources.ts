@@ -203,6 +203,16 @@ export const learnSources: ModuleSources = {
       href: (id) => `/learn/e/${id}`,
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
+    {
+      table: 'learn.briefs',
+      module: 'Learn',
+      holds: 'Topics they asked Dash to research: the question, why they want it and the short answer.',
+      weight: 'intent',
+      search: ['question', 'angle', 'short_answer'],
+      title: 'question',
+      href: (id) => `/learn/b/${id}`,
+      note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
+    },
   ],
   notSources: [
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
