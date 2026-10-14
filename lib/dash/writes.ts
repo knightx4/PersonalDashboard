@@ -29,6 +29,7 @@ import { NEWS_WRITE_TOOLS } from './news-writes';
 import { GOALS_WRITE_TOOLS } from './goals-writes';
 import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 import { VAULT_WRITE_TOOLS } from './vault-writes';
+import { JOBS_WRITE_TOOLS } from './jobs-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -82,6 +83,9 @@ import { VAULT_WRITE_TOOLS } from './vault-writes';
  *                    filed from the Inbox, a theme or a Maya question
  *                    renamed, and a course corrected (lib/dash/vault-writes.ts,
  *                    plan #1894.9.3).
+ *   Jobs' two        a role's fields or company, and an application's
+ *                    excitement or channel (lib/dash/jobs-writes.ts, plan
+ *                    #1894.6.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1117,6 +1121,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...SHOPPING_WRITE_TOOLS,
   // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).
   ...VAULT_WRITE_TOOLS,
+  // Jobs' role and application edits, which the connector offers too (plan #1894.6.1).
+  ...JOBS_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

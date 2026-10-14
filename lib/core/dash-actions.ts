@@ -7,6 +7,7 @@ import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -181,6 +182,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...GOALS_CHANGE_KINDS,
   ...SHOPPING_CHANGE_KINDS,
   ...VAULT_CHANGE_KINDS,
+  ...JOBS_CHANGE_KINDS,
 ];
 
 /**

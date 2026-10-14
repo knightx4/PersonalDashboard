@@ -13,6 +13,7 @@ import { NEWS_CHANGE_KINDS, type NewsChangeInput, type NewsChangeKind } from '@/
 import { GOALS_CHANGE_KINDS, type GoalsChangeInput, type GoalsChangeKind } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS, type ShoppingChangeInput, type ShoppingChangeKind } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS, type VaultChangeInput, type VaultChangeKind } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS, type JobsChangeInput, type JobsChangeKind } from '@/lib/ask/jobs-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -65,6 +66,8 @@ export const DASH_CHANGE_KINDS = [
   ...SHOPPING_CHANGE_KINDS,
   // The Vault's, and a course, in the same shape (lib/ask/vault-changes.ts, plan #1894.9.3).
   ...VAULT_CHANGE_KINDS,
+  // Jobs' role and application edits, in the same shape (lib/ask/jobs-changes.ts, plan #1894.6.1).
+  ...JOBS_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -180,7 +183,8 @@ export type DashChangeInput = {
   Record<NewsChangeKind, NewsChangeInput> &
   Record<GoalsChangeKind, GoalsChangeInput> &
   Record<ShoppingChangeKind, ShoppingChangeInput> &
-  Record<VaultChangeKind, VaultChangeInput>;
+  Record<VaultChangeKind, VaultChangeInput> &
+  Record<JobsChangeKind, JobsChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];

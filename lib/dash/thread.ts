@@ -62,7 +62,7 @@ You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal and change_goal_step, and in Shopping change_item and item_lists, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
-change_course. This
+change_course, and in Jobs change_role and change_application. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

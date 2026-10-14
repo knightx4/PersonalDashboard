@@ -40,10 +40,10 @@ export const jobsActions: ModuleActions = {
     unacknowledgeEvents: GAP,
   },
   'app/jobs/(app)/pipeline/actions.ts': {
-    moveApplication: GAP,
-    setExcitement: GAP,
-    setChannel: GAP,
-    dismissPursuit: GAP,
+    moveApplication: tool('move_roles'),
+    setExcitement: tool('change_application'),
+    setChannel: tool('change_application'),
+    dismissPursuit: none('deletes', 'Removes the application, and the role and company with it when nothing else holds them.'),
   },
   'app/jobs/(app)/contacts/actions.ts': {
     createContact: GAP,
@@ -93,7 +93,7 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/roles/actions.ts': {
     createRole: tool('add_job_lead'),
     fetchJobDescription: none('page'),
-    updateRole: GAP,
+    updateRole: tool('change_role'),
     addQuestions: GAP,
     saveAnswer: GAP,
     promoteToCanonical: GAP,
@@ -104,8 +104,8 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/roles/[id]/actions.ts': {
     addNote: tool('add_role_note'),
     saveCoverLetter: tool('write_cover_letter'),
-    renameRole: GAP,
-    moveRoleToCompany: GAP,
+    renameRole: tool('change_role'),
+    moveRoleToCompany: tool('change_role'),
   },
   'app/jobs/(app)/roles/[id]/interview-actions.ts': {
     saveInterview: GAP,
