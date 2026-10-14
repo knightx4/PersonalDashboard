@@ -27,6 +27,9 @@ import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
+import { BriefsList } from './briefs-list';
+import { loadOpenBriefs } from '@/lib/learn/briefs/load';
+import type { BriefSummary } from '@/lib/learn/briefs/view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
 
@@ -163,7 +166,13 @@ export default async function NowPage({
     );
   }
 
-  const [cards, ready] = await Promise.all([loadFeedPage(supabase, []), countReadyCards(supabase)]);
+  // The topics Dash researched for you (plan #2023.4); a list that cannot be
+  // read is left off rather than failing the page.
+  const [cards, ready, briefs] = await Promise.all([
+    loadFeedPage(supabase, []),
+    countReadyCards(supabase),
+    loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
+  ]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
@@ -182,6 +191,8 @@ export default async function NowPage({
       )}
 
       {strip}
+
+      <BriefsList briefs={briefs} />
 
       {queued.length > 0 && (
         /* One surface with hairlines, not a card per reading. Law 13: the

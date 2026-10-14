@@ -82,6 +82,8 @@ export const MODELS = {
   learnAreaPlace: SONNET,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
+  /** lib/learn/places/name.ts; a few words for each place on Idea Space, daily */
+  learnPlaceNames: HAIKU,
   /** lib/learn/feed/name-material.ts; a reply of about 230 tokens */
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
@@ -156,6 +158,12 @@ export const MODELS = {
   learnEssayResearch: HAIKU,
   /** lib/learn/essays/research-model.ts, the deeper pass marking each claim against the pages read */
   learnEssayJudge: SONNET,
+  /** lib/learn/briefs/research-model.ts, a research brief's question split into sub-questions */
+  learnBriefFrame: SONNET,
+  /** lib/learn/briefs/research-model.ts, a brief's searches and pages read, on the basic web tools as the essay's are */
+  learnBriefSearch: HAIKU,
+  /** lib/learn/briefs/research-model.ts, a brief's positions and short answer, cited from the pages read */
+  learnBriefWrite: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */

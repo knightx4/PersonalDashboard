@@ -17,6 +17,13 @@ export const learnActions: ModuleActions = {
     },
     addConceptNote: tool('add_concept_note'),
   },
+  'app/learn/b/[id]/actions.ts': {
+    saveShortAnswer: none('own'),
+    setBriefWatch: none('setting'),
+    setBriefArchived: none('own'),
+    retryBrief: none('spends'),
+    startEssayOnBrief: none('own'),
+  },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
     clipShownAction: none('own'),
@@ -54,6 +61,9 @@ export const learnActions: ModuleActions = {
     flowStep: none('page'),
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
+  },
+  'app/learn/space/actions.ts': {
+    saveRecordingAction: none('setting'),
   },
   'app/learn/know/actions.ts': {
     proposeGoal: none('spends'),

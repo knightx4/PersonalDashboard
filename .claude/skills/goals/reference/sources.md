@@ -129,6 +129,15 @@ YouTube videos they chose to watch, saved to their playlist, or kept from a chan
 - Opens at `/learn/videos/<video_id>`
 - item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.
 
+### `learn.briefs` (Learn)
+
+Topics they asked Dash to research: the question, why they want it and the short answer.
+
+- Search: `question`, `angle`, `short_answer`
+- Name a row by `question`; link it by `id`
+- Opens at `/learn/b/<id>`
+- Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.
+
 ### `news.preferences` (News)
 
 The neighbourhood they want local news for.
@@ -389,6 +398,14 @@ Essays they are writing or have published: the draft, the brief (question, claim
 - Name a row by `path`; link it by `id`
 - Opens at `/learn/e/<id>`
 - Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.
+
+### `learn.evidence_links` (Learn)
+
+What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.
+
+- Search: `basis`
+- Name a row by `basis`; link it by `id`
+- target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
 
 ### `todo.tasks` (Todo)
 

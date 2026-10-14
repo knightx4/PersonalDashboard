@@ -13,6 +13,7 @@ import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
 import { runScopeDays } from '@/inngest/goals/scope-days';
+import { runBriefWatch } from '@/inngest/learn/brief-watch';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
 import { runXReadsForAll } from '@/inngest/x/read';
 
@@ -93,7 +94,12 @@ export async function GET(request: NextRequest) {
     // The person's own X posts, newest since the last read (plan #1819).
     // Before the embeddings so a slow model call cannot crowd it out.
     { name: 'x-posts', run: () => runXReadsForAll() },
-    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854).
+    // Research briefs with the watch switch on, checked for new sources once
+    // a week, or monthly once they go quiet (plan #2023.8). At most three a
+    // day, inside two minutes with their cards.
+    { name: 'learn-brief-watch', run: () => runBriefWatch() },
+    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854),
+    // then the places on Idea Space are worked out from them again (plan #1997.2).
     { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
   ];
 

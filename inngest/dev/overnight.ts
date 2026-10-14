@@ -228,7 +228,8 @@ function without(sections: readonly PlanSection[], featureId: string): PlanSecti
  * handful of common files (globals.css, components/ui, the test helpers), and
  * the merge gate is what catches a collision there.
  *
- * A feature with no module is its own group: two of them are not run at once.
+ * A feature with no module is its own group here, and a second one runs only
+ * through `besideRunning`, when the two name no path in common.
  * A running feature the tree no longer shows, closed or dropped since it was
  * fired, names no module and holds back only itself.
  */
@@ -1579,7 +1580,9 @@ export async function sweepQuietRuns(input: {
   const { data, error } = await supabase
     .from('plan_runs')
     .select('user_id, created_at')
-    .eq('status', 'started')
+    // Stale runs too: an account whose only open runs are stale still has
+    // runs to end (`STALE_RUN_ENDS_AFTER_MINUTES`).
+    .in('status', ['started', 'stale'])
     .limit(SWEEP_LIMIT);
   if (error) throw new Error(error.message);
 

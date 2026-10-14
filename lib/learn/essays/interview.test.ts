@@ -35,6 +35,15 @@ describe('opening the interview', () => {
     expect(readBrief(brief).pinned).toEqual([goal]);
     expect(readInterview(brief)).toEqual({ status: 'asking', field: 'question', ask: openingAsk([goal]) });
   });
+
+  it('starts from a research brief with its question filled in and the interview on the next one', () => {
+    const pin: EssayPin = { kind: 'brief', id: 'b1', title: 'Does remote work raise output?' };
+    const brief = newEssayBrief([pin], '  Does remote work raise output? ');
+    expect(readBrief(brief).question).toBe('Does remote work raise output?');
+    expect(readBrief(brief).claim).toBe('');
+    expect(readBrief(brief).pinned).toEqual([pin]);
+    expect(readInterview(brief)).toEqual({ status: 'asking', field: 'claim', ask: PLAIN_ASKS.claim });
+  });
 });
 
 describe('answering', () => {

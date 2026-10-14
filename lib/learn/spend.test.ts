@@ -136,6 +136,8 @@ describe('the operation names', () => {
       'judge-essay-claims',
       'name-essay-claims',
       'summarize-reading',
+      'name-places',
+      'research-topic',
     ]);
   });
 });

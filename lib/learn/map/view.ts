@@ -5,26 +5,36 @@ import type { Point } from './layout';
  * What the Idea Space page draws, worked out apart from the page (plan #1857)
  * so the gallery and the tests reach it without a database.
  *
- * The page's view state lives in the address (law 5): which layout, what the
- * colour means, whether the field names are on, and which idea is open.
+ * The page's view state lives in the address (law 5): which layout, which
+ * idea is open, and which domain is picked out.
  */
 
 export const SPACE_HREF = '/learn/space';
 
 export type MapLayout = 'neighbours' | 'axes';
-export type MapColour = 'state' | 'domain';
 
+/**
+ * Until 13 October the address also held what the colour meant and whether
+ * field names were on. The night sky (plan #1997.6) shows strength as
+ * brightness and domain as hue at once, and names by zoom, so both went; an
+ * old link carrying them still opens, without them.
+ */
 export type MapParams = {
   layout: MapLayout;
-  colour: MapColour;
-  labels: boolean;
   idea: string | null;
   /**
-   * The domain whose ideas stand out while the map is coloured by domain:
-   * pressing a legend entry fades the rest, so a domain that shares the gray
-   * can still be found (Part 10, rule 10).
+   * The domain whose ideas stand out: pressing a legend entry fades the rest,
+   * so a domain whose colour is close to another's can still be found
+   * (Part 10, rule 10).
    */
   domain: string | null;
+  /**
+   * The place opened as a graph of its own (plan #1997.7), by its id. An
+   * idea in no place opens its neighbourhood instead, held in `around` by the
+   * idea's id. At most one of the two is set.
+   */
+  place: string | null;
+  around: string | null;
 };
 
 /**
@@ -34,10 +44,10 @@ export type MapParams = {
  */
 export const DEFAULT_PARAMS: MapParams = {
   layout: 'neighbours',
-  colour: 'state',
-  labels: false,
   idea: null,
   domain: null,
+  place: null,
+  around: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -49,12 +59,14 @@ function one(value: string | string[] | undefined): string | undefined {
 export function parseMapParams(search: Search): MapParams {
   const idea = one(search.idea)?.trim();
   const domain = one(search.domain)?.trim();
+  const place = one(search.place)?.trim();
+  const around = one(search.around)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
-    colour: one(search.colour) === 'domain' ? 'domain' : 'state',
-    labels: one(search.labels) === 'on',
     idea: idea ? idea : null,
     domain: domain ? domain : null,
+    place: place ? place : null,
+    around: !place && around ? around : null,
   };
 }
 
@@ -63,10 +75,10 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   const next = { ...params, ...change };
   const query = new URLSearchParams();
   if (next.layout !== DEFAULT_PARAMS.layout) query.set('layout', next.layout);
-  if (next.colour !== DEFAULT_PARAMS.colour) query.set('colour', next.colour);
-  if (next.labels) query.set('labels', 'on');
   if (next.idea) query.set('idea', next.idea);
   if (next.domain) query.set('domain', next.domain);
+  if (next.place) query.set('place', next.place);
+  else if (next.around) query.set('around', next.around);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }
@@ -395,6 +407,13 @@ export function axisEnds(ideas: readonly PlacedIdea[], per = AXIS_END_IDEAS): Ax
  * A cosine similarity to two places, as the duplicate threshold is written
  * (0.86). Not a percentage: it is not a share of anything.
  */
+/** A count as the page writes it, with a comma for thousands: 10,000. */
+export function countText(n: number): string {
+  return COUNT.format(n);
+}
+
+const COUNT = new Intl.NumberFormat('en-GB');
+
 export function similarityText(similarity: number): string {
   return similarity.toFixed(2);
 }

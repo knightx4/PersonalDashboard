@@ -77,8 +77,10 @@ export function claimExpiredNote(
  *
  * A run that writes lines says itself whether it is alive, so the clock does
  * not take its claim back: while the run is started, waiting on your answer or
- * stale, the claim stands. A stale run is ended only by your acknowledging it,
- * and the claim is then released on the clock as before. A run with no lines,
+ * stale, the claim stands. A stale run is ended by your acknowledging it, or
+ * by the sweep once nothing under its feature has changed for two hours
+ * (`STALE_RUN_ENDS_AFTER_MINUTES`), and the claim is then released on the
+ * clock as before. A run with no lines,
  * or no run at all, holds nothing here and the clock and the pushes decide.
  */
 export function claimHeldByRun(

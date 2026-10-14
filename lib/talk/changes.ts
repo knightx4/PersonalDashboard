@@ -4,9 +4,21 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
 import type { RoleStage } from '@/lib/dash/bulk-roles';
+import type { ItemChange } from '@/lib/dash/bulk-items';
+import type { DisposalMethod } from '@/lib/inventory/status-actions';
 import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS, type TodoChangeInput, type TodoChangeKind } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS, type YouChangeInput, type YouChangeKind } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS, type NewsChangeInput, type NewsChangeKind } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS, type GoalsChangeInput, type GoalsChangeKind } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS, type ShoppingChangeInput, type ShoppingChangeKind } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS, type VaultChangeInput, type VaultChangeKind } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS, type JobsChangeInput, type JobsChangeKind } from '@/lib/ask/jobs-changes';
+import {
+  INTERVIEW_CHANGE_KINDS,
+  type InterviewChangeInput,
+  type InterviewChangeKind,
+} from '@/lib/ask/interview-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -51,6 +63,18 @@ export const DASH_CHANGE_KINDS = [
   ...TODO_CHANGE_KINDS,
   // You's places, in the same shape (lib/ask/you-changes.ts, plan #1991.5).
   ...YOU_CHANGE_KINDS,
+  // News's, and stopping a watch, in the same shape (lib/ask/news-changes.ts, plan #1894.9.4).
+  ...NEWS_CHANGE_KINDS,
+  // Goals' areas and goals, in the same shape (lib/ask/goals-changes.ts, plan #1894.7.1).
+  ...GOALS_CHANGE_KINDS,
+  // Shopping's one-item and list changes, in the same shape (lib/ask/shopping-changes.ts, plan #1894.5.1).
+  ...SHOPPING_CHANGE_KINDS,
+  // The Vault's, and a course, in the same shape (lib/ask/vault-changes.ts, plan #1894.9.3).
+  ...VAULT_CHANGE_KINDS,
+  // Jobs' role and application edits, in the same shape (lib/ask/jobs-changes.ts, plan #1894.6.1).
+  ...JOBS_CHANGE_KINDS,
+  // A round on a role, in the same shape (lib/ask/interview-changes.ts, plan #2044.1).
+  ...INTERVIEW_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -111,6 +135,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  added or changed (plan #1894.9.1), in the same shape.
  * You's two        a place they have lived added or changed (plan #1991.5),
  *                  in the same shape.
+ * add_interview_round  a round added to a role with its first conversation
+ *                  (plan #2044.1), in the same shape. The record keeps that
+ *                  conversation as it was made in `undo.interview`, so Undo
+ *                  can tell whether anything was written on it since.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -144,10 +172,12 @@ export type DashChangeInput = {
   add_idea: { body: string; module: string | null };
   add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
   change_items: {
-    change: 'for_sale' | 'not_for_sale' | 'to_return' | 'not_returning' | 'group';
+    change: ItemChange;
     count: number;
     titles: string[];
     left: number;
+    /** How they got rid of them, for dispose (plan #1894.5.1). */
+    method?: DisposalMethod;
   };
   move_roles: {
     stage: RoleStage;
@@ -160,7 +190,13 @@ export type DashChangeInput = {
   add_quick_note: { noteId: string; title: string; path: string; body: string };
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
-  Record<YouChangeKind, YouChangeInput>;
+  Record<YouChangeKind, YouChangeInput> &
+  Record<NewsChangeKind, NewsChangeInput> &
+  Record<GoalsChangeKind, GoalsChangeInput> &
+  Record<ShoppingChangeKind, ShoppingChangeInput> &
+  Record<VaultChangeKind, VaultChangeInput> &
+  Record<JobsChangeKind, JobsChangeInput> &
+  Record<InterviewChangeKind, InterviewChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];

@@ -3,10 +3,11 @@
  * under an answer and Ask's list of changes read them.
  *
  * The other kinds each keep the fields their card is drawn from, and
- * lib/ask/change-view.ts says each one in its own words. These six share one
- * shape instead: the tool that made the change wrote the sentence and the
- * link when it made it (lib/dash/learn-writes.ts), so a card here only reads
- * them back. No server imports, so the client cards can use it.
+ * lib/ask/change-view.ts says each one in its own words. These seven share
+ * one shape instead (research_topic joined the six in plan #2023.3): the tool
+ * that made the change wrote the sentence and the link when it made it
+ * (lib/dash/learn-writes.ts), so a card here only reads them back. No server
+ * imports, so the client cards can use it.
  */
 
 /** The Learn write tools, by name, which is the kind each change is kept under. */
@@ -17,6 +18,7 @@ export const LEARN_CHANGE_KINDS = [
   'reword_concept',
   'add_concept_note',
   'change_video',
+  'research_topic',
 ] as const;
 
 export type LearnChangeKind = (typeof LEARN_CHANGE_KINDS)[number];

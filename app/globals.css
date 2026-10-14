@@ -86,8 +86,8 @@
   --c-w-news-tint: #f6f1e2;
   --c-w-goals: #05734e;
   --c-w-goals-tint: #e3f7ec;
-  --c-w-you: #4d6f0b;
-  --c-w-you-tint: #edf6e3;
+  --c-w-you: #9f4f0d;
+  --c-w-you-tint: #fef0e8;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -322,8 +322,8 @@
   --c-w-news-tint: #281e03;
   --c-w-goals: #48dfa1;
   --c-w-goals-tint: #052619;
-  --c-w-you: #a6d561;
-  --c-w-you-tint: #19240a;
+  --c-w-you: #feb68b;
+  --c-w-you-tint: #381802;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -515,7 +515,7 @@
   --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
-  --c-w-you-lit: #b0dc75;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -624,8 +624,8 @@
   --c-w-news-tint: #ece4cf;
   --c-w-goals: #066544;
   --c-w-goals-tint: #d4efe0;
-  --c-w-you: #426200;
-  --c-w-you-tint: #e1edd4;
+  --c-w-you: #8f4401;
+  --c-w-you-tint: #ffe4d4;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -722,8 +722,8 @@
   --c-w-news-tint: #2c2205;
   --c-w-goals: #69e6ae;
   --c-w-goals-tint: #062c1d;
-  --c-w-you: #b2de78;
-  --c-w-you-tint: #1e290c;
+  --c-w-you: #fec4a2;
+  --c-w-you-tint: #3f1c03;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -826,7 +826,7 @@
   --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
-  --c-w-you-lit: #b0dc75;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets: smoked glass ----
@@ -894,8 +894,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #66e4ac;
   --c-w-goals-tint: #0e2c1f;
-  --c-w-you: #b0dc75;
-  --c-w-you-tint: #1f2a12;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -990,7 +990,7 @@
   --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
-  --c-w-you-lit: #b0dc75;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The glass ----
@@ -1048,8 +1048,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #66e4ac;
   --c-w-goals-tint: #0e2c1f;
-  --c-w-you: #b0dc75;
-  --c-w-you-tint: #1f2a12;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -1131,7 +1131,7 @@
   --c-w-learn-lit: #005c5d;
   --c-w-news-lit: #6e5600;
   --c-w-goals-lit: #066544;
-  --c-w-you-lit: #426200;
+  --c-w-you-lit: #8f4401;
   --c-w-dev-lit: #434e5f;
 
   /* ---- The glass: frosted white ---- */
@@ -1183,8 +1183,8 @@
   --c-w-news-tint: #ece4cf;
   --c-w-goals: #066544;
   --c-w-goals-tint: #d4efe0;
-  --c-w-you: #426200;
-  --c-w-you-tint: #e1edd4;
+  --c-w-you: #8f4401;
+  --c-w-you-tint: #ffe4d4;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -1356,8 +1356,8 @@
   --c-w-news-tint: #2a2410;
   --c-w-goals: #66e4ac;
   --c-w-goals-tint: #0e2c1f;
-  --c-w-you: #b0dc75;
-  --c-w-you-tint: #1f2a12;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
   --c-positive: #6fe0b0;
@@ -1437,8 +1437,8 @@
     --c-w-news-tint: #281e03;
     --c-w-goals: #48dfa1;
     --c-w-goals-tint: #052619;
-    --c-w-you: #a6d561;
-    --c-w-you-tint: #19240a;
+    --c-w-you: #feb68b;
+    --c-w-you-tint: #381802;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 

@@ -226,11 +226,11 @@ export const MODULES: readonly AppModule[] = [
     label: 'You',
     description: 'Personality, places, work and school',
     accent: '--color-w-you',
-    // Lime, in the widest gap left on the circle: OKLCH hue 128, midway
-    // between News' gold at 92 and Goals' emerald at 162, and nearly eighty
-    // degrees clear of the caution amber. Every cool hue from teal to violet
-    // is already taken, and the warm side is rose, delete red and caution.
-    key: { shape: 'person', from: '#b2e172', to: '#4d6f0b' },
+    // Orange, chosen over the lime it replaced. The workspace tokens are the
+    // lime turned to OKLCH hue 52 at the same lightness, which puts them by
+    // the caution amber at 49; the contrast check's accent-to-meaning
+    // distance is what keeps You's colour reading as a place, not a warning.
+    key: { shape: 'person', from: '#fb923c', to: '#c2410c' },
   },
   {
     id: 'dev',

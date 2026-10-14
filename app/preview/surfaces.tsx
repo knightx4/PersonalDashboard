@@ -25,7 +25,19 @@ import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
-import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
+import {
+  IdeaSpaceAroundSurface,
+  IdeaSpacePlaceSurface,
+  IdeaSpaceRecordingChooseSurface,
+  IdeaSpaceRecordingSurface,
+  IdeaSpaceReplaySurface,
+  IdeaSpaceCardSurface,
+  IdeaSpaceDenseSurface,
+  IdeaSpaceDomainsSurface,
+  IdeaSpaceLightsSurface,
+  IdeaSpaceEvidenceSurface,
+  IdeaSpaceSurface,
+} from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
@@ -125,6 +137,7 @@ import {
 } from './learn-course-surfaces';
 import {
   LearnConceptSurface,
+  LearnConceptEvidenceSurface,
   LearnListsSurface,
   LearnNewSurface,
   LearnOpeningSurface,
@@ -162,11 +175,21 @@ import {
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
+import {
+  LearnBriefFailedSurface,
+  LearnBriefQuoteSourceSurface,
+  LearnBriefResearchingSurface,
+  LearnBriefShortAnswerEditorSurface,
+  LearnBriefSurface,
+  LearnBriefNewSourcesSurface,
+  LearnNowBriefsSurface,
+} from './brief-surfaces';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
@@ -4828,6 +4851,63 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A research brief's quick read (plan #2023.6): the cards written from
+     * its sources, one at a time, with Not interested at the start of the
+     * forward row. Dismissing one here dismisses it in Learn now too. */
+    id: 'learn-brief-quick',
+    label: 'Brief · Quick read',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] h2',
+      direction: 'left',
+      shows: 'The card follows the finger left, then the next source’s card comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <BriefQuickPreview state="deck" />
+      </div>
+    ),
+  },
+  {
+    /* The quick read while the brief is still researching: no cards yet,
+     * and the way back to the brief. */
+    id: 'learn-brief-quick-empty',
+    label: 'Brief · Quick read, still researching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="researching" />,
+  },
+  {
+    /* The quick read after its last card: done, and back to the brief. */
+    id: 'learn-brief-quick-end',
+    label: 'Brief · Quick read, every card read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="end" />,
+  },
+  {
+    /* Learn now with a card from a research brief's source on top (plan
+     * #2023.6): the why line names the research, the source is named under
+     * the title, and Open the brief stands in for Save and Test me. */
+    id: 'learn-now-research-card',
+    label: 'Now · A card from your research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchPreview />,
+  },
+  {
+    /* The same card when a brief's weekly check found its source (plan
+     * #2023.8): marked as a new source until it is opened. */
+    id: 'learn-now-research-card-new',
+    label: 'Now · A new source from a watched topic',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchNewPreview />,
+  },
+  {
     /* The courses fold on Learn's Tracks page with no transcript saved: it
      * points to You's Work & school tab (plan #1391). */
     id: 'learn-courses-empty',
@@ -5175,10 +5255,10 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouPersonalityEmptySurface />,
   },
   {
-    /* Idea Space (plan #1857): the neighbour map coloured by what you know,
-     * field and domain names on, one idea open in the rail with its nearest
-     * six, the two lists below it, and ideas still waiting for a place.
-     * Fixtures in idea-space-surfaces.tsx. */
+    /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
+     * star as bright as you know it, places named, one idea open in the rail
+     * with its nearest six, the two lists below it, and ideas still waiting
+     * for a place. Fixtures in idea-space-surfaces.tsx. */
     id: 'learn-idea-space',
     label: 'Learn · Idea Space, an idea open',
     module: 'learn',
@@ -5186,13 +5266,101 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceSurface />,
   },
   {
-    /* The same map on its main axes, coloured by domain, with the fields not
-     * placed yet, as it is live until the daily run fills them. */
+    /* The same sky on its main axes with no place named yet, so the
+     * domains are named instead, and one domain picked out in the legend. */
     id: 'learn-idea-space-domains',
     label: 'Learn · Idea Space, by domain',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDomainsSurface />,
+  },
+  {
+    /* The card a pointer shows over a star (plan #1997.6), held open: its
+     * state, evidence, strength, when it was last shown and when it next halves. */
+    id: 'learn-idea-space-card',
+    label: 'Learn · Idea Space, pointing at a star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceCardSurface />,
+  },
+  {
+    /* The timeline under the map moved back seven weeks (plan #1997.8): ideas
+     * written since are left off, and the rest are lit as they were that day,
+     * with the counts for the day above the timeline. */
+    id: 'learn-idea-space-replay',
+    label: 'Learn · Idea Space, replaying an earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceReplaySurface />,
+  },
+  {
+    /* One place opened as a graph (plan #1997.7), with one idea pointed at
+     * so its links show their scores, and the ideas next door round the edge. */
+    id: 'learn-idea-space-place',
+    label: 'Learn · Idea Space, a place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpacePlaceSurface />,
+  },
+  {
+    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    id: 'learn-idea-space-around',
+    label: 'Learn · Idea Space, an idea in no place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* The moment An idea lights up (plan #1997.10): three ideas set in the
+     * last two days brighten from dark to their strength when the map opens.
+     * The button opens it again, which the recorder presses. */
+    id: 'learn-idea-space-lights',
+    label: 'Learn · Idea Space, an idea lighting up',
+    module: 'learn',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="lights-up"]',
+      shows:
+        'The map opens again with three stars dark, and after a beat they brighten together to the strength each is known at, while every other star and the camera hold still.',
+    },
+    render: () => <IdeaSpaceLightsSurface />,
+  },
+  {
+    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
+     * places and the ideas in them read "A private place" and "Private idea". */
+    id: 'learn-idea-space-recording',
+    label: 'Learn · Idea Space, recording mode on',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingSurface />,
+  },
+  {
+    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    id: 'learn-idea-space-recording-choose',
+    label: 'Learn · Idea Space, choosing places to hide',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingChooseSurface />,
+  },
+  {
+    /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
+    id: 'learn-idea-space-dense',
+    label: 'Learn · Idea Space, ten thousand ideas',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceDenseSurface />,
+  },
+  {
+    /* Evidence lighting the map (plan #2006.6): ideas backed by a note, a
+     * course or your work glow up to the ceiling, and one of them, never
+     * tested, is open in the rail and pointed at, so both cards say what
+     * backs it. */
+    id: 'learn-idea-space-evidence',
+    label: 'Learn · Idea Space, an idea your notes back',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceEvidenceSurface />,
   },
   {
     /* Clips before any are cut. */
@@ -6360,6 +6528,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnConceptSurface />,
   },
   {
+    /* An idea no question has been asked about, backed by a course, a note
+     * and your résumé (plan #2006.6): the three listed under where it stands. */
+    id: 'learn-concept-evidence',
+    label: 'Idea · One idea backed by your notes, courses and work',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptEvidenceSurface />,
+  },
+  {
     id: 'learn-lists',
     label: 'Reading lists · Topics and their branches',
     module: 'learn',
@@ -6486,6 +6663,57 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnYoutubeVideoSurface />,
   },
 
+  /* A researched topic on its own page, and Now's list of them (plan
+   * #2023.4). Fixtures in brief-surfaces.tsx. */
+  {
+    id: 'learn-brief',
+    label: 'Research brief · Ready, with cited answers',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefSurface />,
+  },
+  {
+    id: 'learn-brief-new-sources',
+    label: 'Research brief · New sources since you asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefNewSourcesSurface />,
+  },
+  {
+    id: 'learn-brief-researching',
+    label: 'Research brief · Still researching',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefResearchingSurface />,
+  },
+  {
+    id: 'learn-brief-failed',
+    label: 'Research brief · The run failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefFailedSurface />,
+  },
+  {
+    id: 'learn-brief-quote-source',
+    label: 'Research brief · A quote’s source showing',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefQuoteSourceSurface />,
+  },
+  {
+    id: 'learn-brief-short-answer-editor',
+    label: 'Research brief · Editing the short answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefShortAnswerEditorSurface />,
+  },
+  {
+    id: 'learn-now-briefs',
+    label: 'Now · Topics you asked Dash to research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowBriefsSurface />,
+  },
   /* Essays (plan #1865). Fixtures in essay-surfaces.tsx. */
   {
     id: 'learn-essays',

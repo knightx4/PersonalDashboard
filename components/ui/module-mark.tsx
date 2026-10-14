@@ -1,20 +1,20 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
 import { HOME_MARK, moduleById, type MarkShape, type ModuleId } from '@/lib/modules';
-import { DashGlyph, GlassEdgeStops, GlassSheenStops, glassOutline, glassTint } from './dash-mark';
+import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
 
 /**
  * One mark per module, all drawn the same way: two layers of one object.
  *
  * At the back is a solid shape in the module's hue, peeking out from the top
- * right. In front is a pane of frosted glass, and through it the back layer
- * shows blurred and a little displaced, which is what makes it read as glass.
- * The detail that names the object (the eyelet, the tick, the handle wheel) is
- * drawn on the pane in white.
+ * right. In front is a pane of glass tinted in the same hue, and through it
+ * the back layer shows blurred and a little displaced, which is what makes it
+ * read as glass. The detail that names the object (the eyelet, the tick, the
+ * dial) is drawn on the pane in white.
  *
- * On a light page the pane would vanish into the ground, so there it carries a
- * tint of the module's hue, a coloured edge, and the detail drawn in the deep
- * hue instead of white. CSS light-dark() makes that switch from the
+ * The tint is the same on every page, so on a light page the ground shows
+ * through and the pane reads paler. There the pane takes a coloured edge and
+ * the detail is drawn in the deep hue instead of white. CSS light-dark() makes that switch from the
  * color-scheme of wherever the mark sits, so one drawing serves every theme,
  * and the light sheets inside Lightbox get the light version on their own.
  *
@@ -36,6 +36,9 @@ const SIZES = {
   md: { box: 'size-8', px: 32 },
   lg: { box: 'size-11', px: 44 },
 } as const;
+
+/** How strongly the pane is tinted its hue, as a percentage of the colour over what is behind it. */
+const TINT = 48;
 
 /** The price tag, pointing left; drawn turned 45 degrees so it points up and left. */
 const TAG =
@@ -84,24 +87,25 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
     lines: <path d="M7 14.1l2.6 2.6 4.9-5.2" />,
   },
   safe: {
-    // A safe door: a three-spoke handle wheel, hinges on the left, feet below.
+    // A safe door: a combination dial, a handle beside it, and feet.
     back: <circle cx={16.8} cy={7} r={4.6} />,
     front:
       'M6 3.8h12a3.2 3.2 0 0 1 3.2 3.2v9.6a3.2 3.2 0 0 1-3.2 3.2H6a3.2 3.2 0 0 1-3.2-3.2V7A3.2 3.2 0 0 1 6 3.8Z',
     lines: (
       <>
-        <circle cx={11.6} cy={11.8} r={2.6} />
-        <path d="M11.6 9.2V7.3M13.85 13.1l1.65.95M9.35 13.1l-1.65.95M6.6 19.8v1.4M17.4 19.8v1.4" />
+        <circle cx={10.6} cy={11.8} r={3.6} />
+        <path d="M6.6 19.8v1.4M17.4 19.8v1.4" />
       </>
     ),
+    // The dial's knob and its four notches, and the handle beside it.
     dots: (
       <>
-        <circle cx={11.6} cy={11.8} r={1.1} />
-        <circle cx={11.6} cy={7.1} r={0.85} />
-        <circle cx={15.7} cy={14.15} r={0.85} />
-        <circle cx={7.5} cy={14.15} r={0.85} />
-        <rect x={2.3} y={6.8} width={1.5} height={2.6} rx={0.75} />
-        <rect x={2.3} y={14.2} width={1.5} height={2.6} rx={0.75} />
+        <circle cx={10.6} cy={11.8} r={1.25} />
+        <circle cx={10.6} cy={9.15} r={0.5} />
+        <circle cx={13.25} cy={11.8} r={0.5} />
+        <circle cx={10.6} cy={14.45} r={0.5} />
+        <circle cx={7.95} cy={11.8} r={0.5} />
+        <rect x={16.2} y={9.2} width={1.8} height={5.2} rx={0.9} />
       </>
     ),
   },
@@ -157,7 +161,7 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
 function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawing; from: string; to: string; px: number }) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
-  // White on dark, the deep hue on light, where white would vanish into the tint.
+  // White on dark, the deep hue on light, where white would not hold against the tint.
   const ink = `light-dark(${to}, #fff)`;
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
@@ -177,7 +181,14 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
           <GlassEdgeStops />
         </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <GlassSheenStops />
+          {/* The dark page's gentle sheen on every page: the light page's would wash the tint out. */}
+          <stop offset="0" stopColor="#fff" stopOpacity={0.28} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.06} />
+        </linearGradient>
+        {/* The glass itself in the hue, from the middle of the ramp down to the deep end. */}
+        <linearGradient id={`${id}-tint`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" style={{ stopColor: `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)` }} />
+          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} ${TINT}%, transparent)` }} />
         </linearGradient>
       </defs>
 
@@ -198,7 +209,7 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
           {back}
         </g>
       </g>
-      {pane({ style: { fill: glassTint(from, 30) } })}
+      {pane({ fill: `url(#${id}-tint)` })}
       {pane({ fill: `url(#${id}-sheen)` })}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
       {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55 })}

@@ -3,9 +3,14 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
-import { readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
+import { MANY_ROW_KINDS, readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
+import { undoShoppingChange } from '@/lib/dash/shopping-writes';
+import { JOBS_ROWS_KINDS } from './jobs-changes';
+import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
+import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -19,6 +24,7 @@ import {
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
 import { isWrittenCard, type WrittenCardKind } from './todo-changes';
+import { isVaultFileKind } from './vault-changes';
 
 /**
  * Confirming, declining and undoing a change Dash proposed in an Ask Dash
@@ -228,7 +234,10 @@ function now(deps: ChangeDeps): string {
   return deps.now ? deps.now() : new Date().toISOString();
 }
 
-async function loadOne(deps: ChangeDeps, id: string, surface: 'ask' | 'thread' = 'ask'): Promise<DashChange | null> {
+/** The surfaces whose records Ask's undo takes back. */
+type ChangeSurface = 'ask' | 'thread' | 'routine';
+
+async function loadOne(deps: ChangeDeps, id: string, surface: ChangeSurface = 'ask'): Promise<DashChange | null> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS)
     .select(DASH_CHANGE_SELECT)
@@ -687,11 +696,20 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
 export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
   // A change a thread made with one of Dash's write tools is undone here too
   // (plan #1465; undoneByAsk in lib/core/dash-actions.ts).
-  let surface: 'ask' | 'thread' = 'ask';
+  // So is one the connector made that touched many rows (plan #1894.5.1;
+  // MANY_ROW_KINDS in lib/core/dash-actions.ts), recorded as a routine's.
+  let surface: ChangeSurface = 'ask';
   let change = await loadOne(deps, id);
   if (!change) {
     surface = 'thread';
     change = await loadOne(deps, id, surface);
+  }
+  if (!change) {
+    const routine = await loadOne(deps, id, 'routine');
+    if (routine && MANY_ROW_KINDS.includes(routine.kind)) {
+      surface = 'routine';
+      change = routine;
+    }
   }
   if (!change) return { ok: false, error: GONE, change: null };
   if (change.status !== 'done' || !change.writtenRef) {
@@ -761,10 +779,27 @@ export async function writeChange(
  * (undoDashAction), then reopen the items a ticked-off todo closed with it,
  * where they are still ticked. The record is marked undone by the rule.
  */
-async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
-  if (change.kind === 'add_quick_note') return undoQuickNote(deps, change, surface);
+async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
+  // A note Dash wrote, edited, renamed or filed: the Undo is a commit too (plan #1894.9.3).
+  if (change.kind === 'add_quick_note' || isVaultFileKind(change.kind)) return undoQuickNote(deps, change, surface);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
+  if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  // A merge of roles puts back every row it moved or took out (plan #1894.6.2).
+  if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
+  // So does an email linked, turned down or unlinked (plan #1894.6.5).
+  if (change.kind === 'change_role_email') return undoMany(deps, change, surface, undoRoleEmail);
+  // A review queue change puts back each row it touched (plan #1894.6.4).
+  if ((JOBS_ROWS_KINDS as readonly string[]).includes(change.kind)) return undoMany(deps, change, surface, undoJobsRows);
+  // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).
+  if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
+    return undoMany(deps, change, surface, undoContactRows);
+  }
+  if (change.kind === 'add_interview_round') {
+    // The round's row is the record's; its interview is checked here.
+    const moved = await roundConversationMoved(deps.db, change.undo);
+    if (moved) return { ok: false, error: moved, change };
+  }
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,
@@ -794,7 +829,7 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 
  * the notes repository as well as its row, the way capture's Undo takes a note
  * back, so the generic rule, which only sees the row, cannot do it.
  */
-async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
+async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
   if (!deps.undoVaultNote) return { ok: false, error: 'The vault cannot be reached from here, so the note was left.', change };
   const undone = await deps.undoVaultNote({
     id: change.id,
@@ -816,7 +851,7 @@ async function undoQuickNote(deps: ChangeDeps, change: DashChange, surface: 'ask
 async function undoMany(
   deps: ChangeDeps,
   change: DashChange,
-  surface: 'ask' | 'thread',
+  surface: ChangeSurface,
   putBack: (
     deps: { userId: string; db: AskDb },
     recorded: Record<string, unknown> | null,
