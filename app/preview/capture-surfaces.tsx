@@ -1,8 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { popoverSurface } from '@/components/ui/popover';
+import { ToastProvider, useToast } from '@/components/ui/toast';
 import { FiledLines } from '@/components/shell/capture';
+import { AimedCaptureForm } from '@/components/shell/capture-aim';
+import { CAPTURE_KINDS } from '@/lib/capture/actions';
 import {
   CaptureFoot,
   CaptureHeader,
@@ -161,4 +165,63 @@ export function CaptureBoxSurface() {
       </Box>
     </div>
   );
+}
+
+/**
+ * Capture aimed at a kind (plan #1950.1), what an Add button on a list opens:
+ * a todo typed with Tomorrow picked, a note aimed at a role with a long title
+ * and nothing typed yet, and the toast an add leaves, with Undo. No sort line
+ * and no place chips, since pressing Add on the list already said where it
+ * goes.
+ */
+export function AimedCaptureSurface() {
+  return (
+    <ToastProvider>
+      <div className="space-y-8 py-4">
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS.todo}
+            text="Book the dentist for the week after next"
+            onText={nothing}
+            day="tomorrow"
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS['job-note']}
+            role={{
+              id: ROLE.id,
+              title: 'Senior Product Analyst, Payments Risk and Fraud Operations (EMEA)',
+              company: 'Lattice Pay',
+            }}
+            text=""
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <AddedToast />
+      </div>
+    </ToastProvider>
+  );
+}
+
+function Aimed({ children }: { children: React.ReactNode }) {
+  return <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>{children}</div>;
+}
+
+/** The toast one press leaves, held open for the shot. */
+function AddedToast() {
+  const toast = useToast();
+  useEffect(() => {
+    toast({ text: 'Added to Todo · Tomorrow.', undo: nothing, undone: 'Taken back.', duration: 600_000 });
+  }, [toast]);
+  return null;
 }

@@ -5,10 +5,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
-import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { recordAttachments } from '@/lib/attachments/store';
-import { fileCaptureParts, type CaptureFiled } from '@/lib/capture/file';
-import { captureFiling, offeredCapturePlaces } from '@/lib/capture/place';
+import { aimProblem, CAPTURE_KINDS, type CaptureKindId } from '@/lib/capture/actions';
+import { fileCaptureParts, makeCaptureKind, type CaptureFiled, type CaptureWriters } from '@/lib/capture/file';
+import { captureFiling, offeredCapturePlaces, type FiledCapture } from '@/lib/capture/place';
 import {
   CAPTURE_PLACES,
   MAX_CAPTURE_PARTS,
@@ -203,37 +204,91 @@ export async function fileCaptureBox(
     return { filed: [], errors: [], ask: { sort, places: context.places } };
   }
 
-  const deps = await requestDashDeps(user.id);
   const settings = await loadAccountSettings(user.id);
-  const result = await fileCaptureParts(filing.parts, {
-    todo: (text) => addTask({}, todoCaptureForm(text, 'today')),
-    goals: (text) => fileGoalCapture(text),
-    jobs: async (roleId, text) => {
-      const written = await writeRoleNote(
-        { userId: user.id, enabledModules: settings.enabledModules as ModuleId[], db: requestAskDb() },
-        roleId,
-        text,
-      );
-      return written.ok
-        ? { ok: true as const, subjectRef: written.subjectRef }
-        : { ok: false as const, error: written.error };
-    },
-    vault: (text) => fileVaultNote(user.id, text),
-    record: (entry) => recordDashAction(deps, entry),
-    ...(files.length > 0
-      ? {
-          attach: async (ref: string) => {
-            await recordAttachments(await createCoreClient(), user.id, ref, files);
-            return files.length;
-          },
-        }
-      : {}),
-  });
+  const writers = await writersFor(user.id, settings.enabledModules as ModuleId[], files);
+  const result = await fileCaptureParts(filing.parts, writers);
   if (files.length > 0) revalidatePath('/todo', 'layout');
   if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
   if (result.filed.some((item) => item.place === 'jobs')) revalidatePath('/jobs', 'layout');
   revalidatePath('/home');
   return result;
+}
+
+/**
+ * The writers capture makes rows with, bound to the signed-in person: the
+ * same ones for the one box and for an Add button aimed at a kind.
+ */
+async function writersFor(
+  userId: string,
+  modules: ModuleId[],
+  files: readonly UploadedAttachment[],
+): Promise<CaptureWriters> {
+  const deps = await requestDashDeps(userId);
+  return {
+    todo: (text, day = 'today') => addTask({}, todoCaptureForm(text, day)),
+    goals: (text) => fileGoalCapture(text),
+    jobs: async (roleId, text) => {
+      const written = await writeRoleNote({ userId, enabledModules: modules, db: requestAskDb() }, roleId, text);
+      return written.ok
+        ? { ok: true as const, subjectRef: written.subjectRef }
+        : { ok: false as const, error: written.error };
+    },
+    vault: (text) => fileVaultNote(userId, text),
+    record: (entry) => recordDashAction(deps, entry),
+    ...(files.length > 0
+      ? {
+          attach: async (ref: string) => {
+            await recordAttachments(await createCoreClient(), userId, ref, [...files]);
+            return files.length;
+          },
+        }
+      : {}),
+  };
+}
+
+const KIND_IDS = Object.keys(CAPTURE_KINDS) as [CaptureKindId, ...CaptureKindId[]];
+const Aimed = z.object({
+  kind: z.enum(KIND_IDS),
+  text: z.string().max(CAPTURE_BODY_MAX),
+  /** A todo's day: a word the chips send, or a date the field holds. */
+  day: z.string().max(10).optional(),
+  role: z.object({ id: z.string().uuid(), title: z.string().max(300), company: z.string().max(300).nullable() }).optional(),
+});
+export type CaptureAimedInput = z.infer<typeof Aimed>;
+
+export type CaptureMade = { ok: true; filed: FiledCapture; errors: string[] } | { ok: false; error: string };
+
+/**
+ * Make one row of the kind an Add button aimed capture at (plan #1950.1):
+ * the sort is skipped, since the person chose the kind by pressing Add on
+ * its list. The record marks it as theirs, so Undo in the toast takes it
+ * back by the same rule as the box and Home does not list it as Dash's.
+ */
+// latency: pending
+export async function makeAimedCapture(input: CaptureAimedInput): Promise<CaptureMade> {
+  const user = await requireUser();
+  const parsed = Aimed.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
+  const { kind: kindId, text, day, role } = parsed.data;
+  const kind = CAPTURE_KINDS[kindId];
+  const problem = aimProblem({ kind: kindId, role });
+  if (problem) return { ok: false, error: problem };
+
+  const settings = await loadAccountSettings(user.id);
+  const modules = settings.enabledModules as ModuleId[];
+  if (!modules.includes(kind.module)) {
+    return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
+  }
+  try {
+    const made = await makeCaptureKind(kindId, { text, day, role }, await writersFor(user.id, modules, []));
+    if (!made.ok) return { ok: false, error: made.error };
+    revalidatePath(kind.section, 'layout');
+    revalidatePath('/home');
+    return { ok: true, filed: made.filed, errors: made.errors };
+  } catch (error) {
+    console.error('capture: making an aimed row failed', kindId, error);
+    return { ok: false, error: 'That could not be added. Try again.' };
+  }
 }
 
 export type CaptureBoxUndo = { ok: true; undoneAt: string } | { ok: false; error: string };

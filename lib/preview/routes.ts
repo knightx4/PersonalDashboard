@@ -146,6 +146,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   ],
   'shell-search-bar': ['/home'],
   'shell-capture': ['/home'],
+  'shell-capture-aimed': ['/home'],
   'shell-note': ['/dev/bugs'],
   'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
@@ -422,6 +423,10 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The capture panels, which every shell mounts: the one box, and capture
+  // aimed at a kind by an Add button (plan #1950.1).
+  'shell-capture': ['components/shell/capture.tsx'],
+  'shell-capture-aimed': ['components/shell/capture-aim.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],
