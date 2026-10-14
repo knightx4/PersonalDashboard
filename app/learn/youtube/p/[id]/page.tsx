@@ -3,6 +3,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadPlaylistPage } from '@/lib/learn/youtube/load';
 import { PlaylistView } from './playlist-view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 // Transcribing a playlist fetches for up to two and a half minutes and queues
@@ -18,5 +19,13 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   const learn = await createLearnClient();
   const data = await loadPlaylistPage(learn, id);
   if (!data) notFound();
-  return <PlaylistView data={data} />;
+  return (
+    <PlaylistView
+      data={data}
+      path={sectionSubject('/learn/videos', 'Videos', {
+        label: data.playlist.title,
+        href: `/learn/youtube/p/${id}`,
+      })}
+    />
+  );
 }

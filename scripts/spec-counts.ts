@@ -292,13 +292,14 @@ function routesWithoutSurface(root: string): string[] {
  * a `page.tsx` whose route has a dynamic segment (`[id]`, `[...path]`). It
  * draws a path when it, or a file it imports from app/ or components/ (two
  * imports deep, which reaches a page's view and that view's header), passes
- * `crumbs` or a PageHeader `subject`, or draws a Breadcrumb itself. Pages
+ * `crumbs` or a PageHeader or TabbedDetail `subject`, or draws a Breadcrumb itself. Pages
  * that only send the visitor on are not counted, nor is /open/[ref], which is
  * one of those that reads a row first, nor the two pages for someone with no
  * account (a case page sent to an employer, a shared shelf), which sit in no
  * workspace and have nowhere to lead back to.
  */
-const DRAWS_PATH = /\bcrumbs=\{|<Breadcrumb\b|<PageHeader\b[\s\S]{0,2000}?\bsubject=\{/;
+const DRAWS_PATH =
+  /\bcrumbs=\{|<Breadcrumb\b|<(?:PageHeader|TabbedDetail)\b[\s\S]{0,2000}?\bsubject=\{/;
 const LOCAL_IMPORT = /\bfrom\s+'((?:\.{1,2}\/|@\/(?:app|components)\/)[^']+)'/g;
 const NOT_ROW_PAGES = new Set(['app/open/[ref]/page.tsx', 'app/jobs/p/[slug]/page.tsx', 'app/s/[token]/page.tsx']);
 /**

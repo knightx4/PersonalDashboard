@@ -13,6 +13,7 @@ import type { ChannelPage } from '@/lib/learn/youtube/load';
 import { Press } from '../press';
 import { VideoList } from '../video-list';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One channel: its playlists, then its videos newest first.
@@ -31,11 +32,14 @@ export function ChannelView({
   data,
   page,
   search,
+  path,
 }: {
   slug: string;
   data: ChannelPage;
   page: number;
   search: string;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const { channel, playlists, videos, more } = data;
 
@@ -75,6 +79,7 @@ export function ChannelView({
       </p>
 
       <PageHeader
+        subject={path}
         title={channel.name}
         description={
           <>

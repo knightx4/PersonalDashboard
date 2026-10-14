@@ -15,6 +15,8 @@ import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +67,7 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       </p>
 
       <PageHeader
+        subject={await rowSubject(toRef('learn.tracks', id))}
         actions={
           <ConfirmStep
             action={removeTrack}

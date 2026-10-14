@@ -341,11 +341,14 @@ function FeatureSteps() {
 function TabbedSurface() {
   return (
     <TabbedDetail
-      crumbs={[
-        { label: 'Dev', href: '#' },
-        { label: 'Plan', href: '#' },
-        { label: 'Give each feature its own…', href: '#' },
-      ]}
+      subject={{
+        ref: null,
+        path: [
+          { label: 'Dev', href: '#' },
+          { label: 'Plan', href: '#' },
+          { label: 'Give each feature its own…', href: '#' },
+        ],
+      }}
       title="Give each feature its own page with tabs"
       description="Feature #1660"
       glance={

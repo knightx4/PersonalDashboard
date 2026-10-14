@@ -25,6 +25,7 @@ import {
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Companies' };
 
@@ -119,6 +120,7 @@ export default async function CompaniesPage({
     return (
       <PageWide>
         <PageHeader
+          subject={sectionSubject('/jobs/companies', 'Companies')}
           title="Companies"
           description="The organisations you are pursuing. Separate from roles, because this page stays useful after a posting closes."
         />
@@ -135,6 +137,7 @@ export default async function CompaniesPage({
   return (
     <PageWide>
       <PageHeader
+        subject={sectionSubject('/jobs/companies', 'Companies')}
         title="Companies"
         description={
           terms.length

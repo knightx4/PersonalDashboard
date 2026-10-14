@@ -10,6 +10,7 @@ import { SaveLinkForm } from '../save/save-link-form';
 import type { TrackProgress } from '@/lib/learn/tracks/load';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The reading lists, which the database and the code still call tracks. They
@@ -66,6 +67,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
 export function ListsView({ rows, search }: { rows: NestedTrack[]; search: string }) {
   const header = (
     <PageHeader
+      subject={sectionSubject('/learn/lists', 'Reading lists')}
       title="Reading lists"
       actions={
         <Link href="/learn/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>

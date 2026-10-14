@@ -12,6 +12,7 @@ import { WritePost } from './write-post';
 import { XConnection } from './x-connection';
 import { XPostList } from './x-posts';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
@@ -77,6 +78,7 @@ export function PostsScreen({
     <PageColumn className="space-y-6">
       <div>
         <PageHeader
+          subject={sectionSubject('/dev/posts', 'Posts')}
           title="Posts"
           description="Drafts for X about building this app. Dash never posts; you do."
           actions={<SuggestPosts runState={page.runState} />}

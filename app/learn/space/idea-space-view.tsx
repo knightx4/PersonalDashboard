@@ -67,11 +67,14 @@ export function IdeaSpaceView({
   const view = useMemo(() => (whole ? viewFor(whole, recording) : null), [whole, recording]);
   const header = (
     <PageHeader
-      crumbs={[
-        { label: 'Learn', href: '/learn' },
-        { label: 'Know', href: '/learn/know' },
-        { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null }) },
-      ]}
+      subject={{
+        ref: null,
+        path: [
+          { label: 'Learn', href: '/learn' },
+          { label: 'Know', href: '/learn/know' },
+          { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null }) },
+        ],
+      }}
       title="Idea Space"
       description={view && view.ideas.length > 0 ? `${plural(view.ideas.length, 'idea')}.` : undefined}
     />

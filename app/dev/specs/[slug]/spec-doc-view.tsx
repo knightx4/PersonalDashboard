@@ -10,6 +10,7 @@ import { SpecRules } from './spec-rules';
 import { SpecFindings } from '../spec-findings';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One spec's page apart from its reads, so the surface gallery can draw it:
@@ -22,12 +23,15 @@ export function SpecDocView({
   orphans,
   states,
   audit,
+  path,
 }: {
   doc: SpecDoc;
   sections: LoadedSpec['sections'];
   orphans: LoadedSpec['orphans'];
   states: RuleState[];
   audit: LatestFindings;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   return (
     <PageColumn className="space-y-6">
@@ -41,7 +45,7 @@ export function SpecDocView({
         </Link>
       </p>
 
-      <PageHeader title={doc.title} description={`docs/${doc.file}`} />
+      <PageHeader subject={path} title={doc.title} description={`docs/${doc.file}`} />
 
       <SpecRules states={states} />
 

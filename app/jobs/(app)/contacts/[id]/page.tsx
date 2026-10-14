@@ -7,6 +7,8 @@ import { ContactDetail } from './contact-detail';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Contact' };
 
@@ -61,6 +63,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
         Contacts
       </Link>
       <PageHeader
+        subject={await rowSubject(toRef('job_search.contacts', id))}
         title={row.full_name}
         description={row.companies ? `at ${row.companies.name}` : 'Not attached to a company'}
       />

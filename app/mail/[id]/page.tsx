@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { BackButton, EmailFrame } from './reader';
 import { MessageHead } from './message-head';
 import { LinkedText } from '@/components/ui/linked-text';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Email' };
 
@@ -43,6 +44,10 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
     <>
       <BackButton />
       <PageHeader
+        subject={sectionSubject('/home', 'Home', {
+          label: conversation.ok ? subject : 'Email',
+          href: `/mail/${id}`,
+        })}
         title={conversation.ok ? subject : 'Email'}
         description={
           conversation.ok && messages.length > 1 ? `${messages.length} messages` : undefined

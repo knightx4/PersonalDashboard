@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
 import { countOpenAskHandoffs, loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
 import { AskConversation } from '../view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Question to Dash' };
 
@@ -40,8 +42,16 @@ export default async function AskConversationPage({
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
         Questions to Dash
       </Link>
-      <PageHeader title={askTitle(first.body)} />
-      <AskConversation conversationRef={ref} turns={turns} changes={changes} openHandoffs={openHandoffs} />
+      <PageHeader
+        subject={await rowSubject(toRef('core.conversations', ref))}
+        title={askTitle(first.body)}
+      />
+      <AskConversation
+        conversationRef={ref}
+        turns={turns}
+        changes={changes}
+        openHandoffs={openHandoffs}
+      />
     </>
   );
 }

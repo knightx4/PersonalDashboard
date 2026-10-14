@@ -11,7 +11,7 @@ import {
 } from '@/app/shopping/saved/actions';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Property } from '@/components/shell/detail-layout';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -80,10 +80,13 @@ export function SavedItemBody({
   item,
   subtitle,
   banner,
+  path,
 }: {
   item: EditableSavedItem;
   subtitle: string;
   banner?: React.ReactNode;
+  /** The path to the saved item, which the page read from the catalogue. */
+  path?: Subject;
 }) {
   // The last values the server accepted, to tell a change from a visit.
   const [lastSaved, setLastSaved] = useState<Fields>({
@@ -173,6 +176,7 @@ export function SavedItemBody({
       header={
         <>
           <PageHeader
+            subject={path}
             leading={
               lastSaved.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs

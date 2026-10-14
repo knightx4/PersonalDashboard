@@ -30,6 +30,7 @@ import type { DeliveryGap } from '@/lib/news/inbound/readiness';
 import { setSenderMuted } from '../actions';
 import { NeedsConfirming } from './needs-confirming';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The newsletter list, drawn from what the page read (app/news/all/page.tsx),
@@ -86,7 +87,7 @@ export function NewsListView({
      */
     return (
       <PageColumn className="space-y-6">
-        <PageHeader title="Newsletters" />
+        <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
         <EmptyState
           icon={Mail}
           title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
@@ -108,7 +109,9 @@ export function NewsListView({
     );
   }
 
-  const header = <PageHeader title="Newsletters" />;
+  const header = (
+    <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
+  );
 
   return (
     <PageColumn className="space-y-4">

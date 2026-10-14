@@ -13,6 +13,8 @@ import { MayaConversation } from './conversation';
 import { QuestionField } from './question-field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { PageColumn } from '@/components/shell/page-width';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One thread with Maya, drawn from what the page read (page.tsx), so the
@@ -22,9 +24,12 @@ import { PageColumn } from '@/components/shell/page-width';
 export function MayaThreadView({
   thread,
   cited,
+  path,
 }: {
   thread: MayaThreadDetail;
   cited: Map<string, MayaThreadNote>;
+  /** The path to the thread, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const thought = thread.messages.find((message) => message.kind === 'thought')?.thought ?? null;
   const turns: TalkTurn[] = thread.messages
@@ -39,14 +44,20 @@ export function MayaThreadView({
   return (
     <PageColumn>
     <article>
+      {/* The path, Vault › Maya › this page, is the way back too, so the
+        page draws it once (plan #1931.2). The gallery passes none. */}
       <div className="mb-4">
-        <Link
-          href="/vault/maya"
-          className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Maya
-        </Link>
+        {path ? (
+          <Breadcrumb crumbs={path.path} />
+        ) : (
+          <Link
+            href="/vault/maya"
+            className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
+          >
+            <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+            Maya
+          </Link>
+        )}
       </div>
 
       <header className="mb-6">

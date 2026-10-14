@@ -8,6 +8,8 @@ import { tabFrom } from '@/lib/tabs';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { threadRef } from '@/lib/thread/subjects';
 import { loadThread } from '@/lib/thread/store';
+import { toRef } from '@/lib/core/refs';
+import { rowSubject } from '@/lib/core/subject';
 import { ReadingView } from './reading-view';
 
 export const dynamic = 'force-dynamic';
@@ -56,6 +58,7 @@ export default async function ReadingPage({
       origin={origin}
       tab={tab}
       thread={thread}
+      path={await rowSubject(toRef('learn.readings', reading.id))}
     />
   );
 }

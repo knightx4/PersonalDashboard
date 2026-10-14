@@ -45,6 +45,8 @@ import {
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -317,6 +319,7 @@ export default async function SubjectPage({
       </p>
 
       <PageHeader
+        subject={await rowSubject(toRef('learn.subjects', id))}
         title={subject.name}
         description={
           counts.total === 0

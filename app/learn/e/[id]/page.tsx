@@ -5,6 +5,8 @@ import { loadEssay } from '@/lib/learn/essays/store';
 import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
 import { loadEssayResearch } from '@/lib/learn/essays/research-store';
 import { EssayView } from './essay-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,5 +37,12 @@ export default async function EssayPage({ params }: { params: Promise<{ id: stri
     readNotes(essay.id, essay.draftBody),
     createLearnClient().then((supabase) => loadEssayResearch(supabase, essay.id)),
   ]);
-  return <EssayView essay={essay} notes={notes} research={research} />;
+  return (
+    <EssayView
+      essay={essay}
+      notes={notes}
+      research={research}
+      path={await rowSubject(toRef('learn.essays', essay.id))}
+    />
+  );
 }

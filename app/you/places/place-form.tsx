@@ -42,13 +42,16 @@ export function PlaceForm({
     <PageColumn className="max-w-xl">
       <PageHeader
         title={place ? `Edit ${place.name}` : 'Add a place'}
-        crumbs={[
-          { label: 'You', href: '/you' },
-          { label: 'Places', href: '/you/places' },
-          place
-            ? { label: place.name, href: placeHref(place.id) }
-            : { label: 'Add a place', href: '/you/places/new' },
-        ]}
+        subject={{
+          ref: place ? `you.places:${place.id}` : null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Places', href: '/you/places' },
+            place
+              ? { label: place.name, href: placeHref(place.id) }
+              : { label: 'Add a place', href: '/you/places/new' },
+          ],
+        }}
       />
       <Card padding="standard">
         <form key={state.values ? JSON.stringify(state.values) : 'first'} action={action} className="space-y-5">

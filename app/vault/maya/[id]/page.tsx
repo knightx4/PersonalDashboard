@@ -3,6 +3,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadNoteLinks, loadThread } from '@/lib/vault/maya/store';
 import { MayaThreadView } from './thread-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,5 +30,11 @@ export default async function MayaThreadPage({ params }: { params: Promise<{ id:
     (thought?.points ?? []).flatMap((point) => point.notes.map((note) => note.noteId)),
   );
 
-  return <MayaThreadView thread={thread} cited={cited} />;
+  return (
+    <MayaThreadView
+      thread={thread}
+      cited={cited}
+      path={await rowSubject(toRef('obsidian.maya_threads', id))}
+    />
+  );
 }

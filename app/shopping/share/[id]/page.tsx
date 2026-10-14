@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { requestOrigin } from '@/lib/auth/origin';
 import { ShareDetailView, type ShareGroup } from './share-detail-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Shared form' };
 
@@ -59,6 +61,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
 
   return (
     <ShareDetailView
+      path={await rowSubject(toRef('public.share_links', id))}
       share={share}
       groups={page?.groups ?? []}
       tokens={tokens ?? []}

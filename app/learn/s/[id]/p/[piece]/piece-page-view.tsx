@@ -9,6 +9,7 @@ import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -16,10 +17,12 @@ export type PiecePageProps = {
   standing: { practicePassed: boolean; checkPassed: boolean };
   /** Ideas from this plan's passed pieces due for review, this piece's own left out. */
   reviews: DueReview[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 };
 
 /** One piece of a learning goal's plan, from what its page read (plan #1602). */
-export function PiecePageView({ page, practice, standing, reviews }: PiecePageProps) {
+export function PiecePageView({ page, practice, standing, reviews, path }: PiecePageProps) {
   const { piece, subject, unit, siblings } = page;
 
   return (
@@ -35,6 +38,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
       </p>
 
       <PageHeader
+        subject={path}
         title={piece.title}
         description={`Unit ${unit.ordinal}, ${unit.title} · piece ${piece.ordinal} of ${siblings.length}${
           piece.passedAt ? ' · passed' : ''

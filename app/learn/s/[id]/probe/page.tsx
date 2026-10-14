@@ -3,6 +3,8 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { subjectBarPercent } from '@/lib/learn/graph/session';
 import { ProbeView } from './probe-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +42,10 @@ export default async function ProbePage({
 
   return (
     <ProbeView
+      path={await rowSubject(toRef('learn.subjects', id), {
+        label: 'Questions',
+        href: `/learn/s/${id}/probe`,
+      })}
       subject={subject}
       ideas={graph.concepts.length}
       percent={percent}

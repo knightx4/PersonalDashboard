@@ -51,6 +51,8 @@ import { EssayFinishCard, type FinishView } from './essay-finish';
 import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -537,6 +539,7 @@ export function EssayView({
   finishView,
   finishStage,
   publishView,
+  path: subject,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -558,6 +561,8 @@ export function EssayView({
   finishView?: FinishView;
   /** The stage the gallery's finished essay is at. */
   finishStage?: EssayStage;
+  /** The path to the essay, from the page (rowSubject); the gallery passes none and keeps the link to Essays. */
+  path?: PageSubject;
   /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
   publishView?: PublishView;
 }) {
@@ -696,13 +701,19 @@ export function EssayView({
     <div className="flex max-w-2xl flex-col">
       <h1 className="sr-only">{title}</h1>
       <div className={cn('mb-6 flex min-h-11 items-center justify-between gap-3', quiet)}>
-        <Link
-          href="/learn/essays"
-          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          Essays
-        </Link>
+        {/* The path, workspace › Essays › this essay, is the way back to the
+            list too, so the page draws it once (plan #1931.2). */}
+        {subject ? (
+          <Breadcrumb crumbs={subject.path} className="min-w-0" />
+        ) : (
+          <Link
+            href="/learn/essays"
+            className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
+          >
+            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+            Essays
+          </Link>
+        )}
         <div className="flex items-center gap-1">
           <PaidHint action="app/learn/e/[id]/actions.ts#rephraseEssaySelection" what="Cost of a rephrase" />
           <Button

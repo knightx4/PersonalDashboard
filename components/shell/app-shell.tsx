@@ -326,14 +326,11 @@ export function AppShell({
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const active = sections.find(isActive);
-  // The top bar names the workspace, and the page's own heading names the
-  // page. It used to name the section, which on a section's first page is the
-  // heading's exact words a few inches lower: "Quick read" twice. Below that
-  // first page the section follows as a link back up to it, so a company or an
-  // order still says where it sits.
+  // The top bar names the workspace and nothing else (plan #1931.2). Where a
+  // page sits inside it is the page's own path, drawn once above its heading
+  // by PageHeader's `subject`; the bar used to add the section after a ›,
+  // which repeated the first part of that path a few inches lower.
   const title = moduleById(module)?.label ?? 'Home';
-  const crumb = active && pathname !== active.href ? active : undefined;
 
   useEffect(() => {
     if (!drawer) return;
@@ -764,19 +761,6 @@ export function AppShell({
                 title reads better than an account icon pushed off the edge. */}
                 <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
-                  {crumb && (
-                    <>
-                      <span className="px-1.5 font-normal text-shell-muted" aria-hidden>
-                        ›
-                      </span>
-                      <Link
-                        href={crumb.href}
-                        className="font-normal text-shell-muted transition-colors hover:text-shell-ink"
-                      >
-                        {crumb.label}
-                      </Link>
-                    </>
-                  )}
                 </h2>
 
                 {/* The one thing this workspace would say if it could say only

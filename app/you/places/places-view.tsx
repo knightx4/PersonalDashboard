@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import Link from '@/components/ui/link';
 import { isCurrent, placeHref, placeSpan, placeWhere, type Place } from '@/lib/you/places';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * You's Places tab (plan #1991.5): the places they have lived, newest first,
@@ -19,6 +20,7 @@ import { isCurrent, placeHref, placeSpan, placeWhere, type Place } from '@/lib/y
 export function PlacesView({ places }: { places: readonly Place[] }) {
   const header = (
     <PageHeader
+      subject={sectionSubject('/you/places', 'Places')}
       title="Places"
       actions={
         places.length > 0 ? (

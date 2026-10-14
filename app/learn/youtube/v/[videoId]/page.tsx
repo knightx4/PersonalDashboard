@@ -5,6 +5,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadVideoPage } from '@/lib/learn/youtube/load';
 import { paragraphsFromCues } from '@/lib/learn/youtube/paragraphs';
 import { LibraryVideoView } from './library-video-view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -37,6 +38,10 @@ export default async function VideoPage({
       paragraphs={paragraphs}
       start={start}
       stop={stop}
+      path={sectionSubject('/learn/videos', 'Videos', {
+        label: data.video.title,
+        href: `/learn/youtube/v/${encodeURIComponent(videoId)}`,
+      })}
     />
   );
 }

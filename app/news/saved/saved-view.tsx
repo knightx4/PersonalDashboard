@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { SavedList, type SavedListStory } from './saved-list';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export type SavedViewProps = {
   /** Newest saved first, each with its newsletter's arrival formatted. */
@@ -15,6 +16,7 @@ export function SavedView({ stories }: SavedViewProps) {
   return (
     <PageColumn>
       <PageHeader
+        subject={sectionSubject('/news/saved', 'Saved')}
         title="Saved"
         description="Stories you saved from your newsletters, the most recently saved first."
       />

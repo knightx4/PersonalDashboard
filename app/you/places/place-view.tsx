@@ -1,7 +1,7 @@
 import { House, Pencil } from 'lucide-react';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Property } from '@/components/shell/detail-layout';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -22,19 +22,27 @@ export function PlaceView({
   place,
   thisMonth,
   remove,
+  subject,
 }: {
   place: Place;
   thisMonth: string;
+  /** The path from the catalogue (rowSubject); the gallery passes none and gets it from the place. */
+  subject?: Subject;
   remove?: (form: FormData) => Promise<unknown>;
 }) {
   const header = (
     <PageHeader
       title={place.name}
-      crumbs={[
-        { label: 'You', href: '/you' },
-        { label: 'Places', href: '/you/places' },
-        { label: place.name, href: placeHref(place.id) },
-      ]}
+      subject={
+        subject ?? {
+          ref: `you.places:${place.id}`,
+          path: [
+            { label: 'You', href: '/you/personality' },
+            { label: 'Places', href: '/you/places' },
+            { label: place.name, href: placeHref(place.id) },
+          ],
+        }
+      }
       actions={
         <>
           <Link

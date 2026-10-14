@@ -42,6 +42,7 @@ import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { catalogOf } from './plan-catalog';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -268,6 +269,11 @@ export async function renderPlanPage({
   return (
     <PageColumn className="space-y-6">
       <PageHeader
+        subject={
+          project
+            ? sectionSubject('/dev/plan', 'Plan', { label: project.label, href: basePath })
+            : sectionSubject('/dev/plan', 'Plan')
+        }
         title={project ? project.label : 'Plan'}
         actions={
           <Link

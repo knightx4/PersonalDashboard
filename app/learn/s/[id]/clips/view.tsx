@@ -11,6 +11,7 @@ import { CLIPS_HREF } from '@/app/learn/videos/clips-section';
 import { cn } from '@/lib/cn';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One subject's Clips page (plan #1697): the player, holding only the clips
@@ -29,9 +30,17 @@ export type SubjectClipsProps = {
   clips: PlayerClip[];
   counts: SubjectClipCounts;
   fixed?: boolean;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 };
 
-export function SubjectClipsView({ subject, clips, counts, fixed = false }: SubjectClipsProps) {
+export function SubjectClipsView({
+  subject,
+  clips,
+  counts,
+  fixed = false,
+  path,
+}: SubjectClipsProps) {
   const header = (
     <>
       <p className="mb-3">
@@ -43,7 +52,7 @@ export function SubjectClipsView({ subject, clips, counts, fixed = false }: Subj
           {subject.name}
         </Link>
       </p>
-      <PageHeader title="Clips" />
+      <PageHeader subject={path} title="Clips" />
     </>
   );
 

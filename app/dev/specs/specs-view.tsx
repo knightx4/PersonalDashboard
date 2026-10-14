@@ -19,6 +19,7 @@ import { AgentActionsPanel } from './agent-actions-panel';
 import type { AgentActionSummary } from '@/lib/agent-actions/summary';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The specs page apart from its reads, so the surface gallery can draw it:
@@ -74,7 +75,7 @@ export function SpecsView({
 
   return (
     <PageColumn className="space-y-6">
-      <PageHeader title="Specs" />
+      <PageHeader subject={sectionSubject('/dev/specs', 'Specs')} title="Specs" />
 
       {/* Changes Dash proposes to the specs, above the documents they change
           (plan #1506). First because they are the one thing on the page
