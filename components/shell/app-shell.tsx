@@ -628,7 +628,7 @@ export function AppShell({
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
-      <AskDashProvider>
+      <AskDashProvider account={account} workspaces={workspaces}>
         <div
           className={cn(
             // The ground, not a container: the sidebar and the page pane are both

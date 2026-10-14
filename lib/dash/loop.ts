@@ -5,7 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
-import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
+import { MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
@@ -179,7 +179,18 @@ export type DashContext = {
   subject: { ref: string; title?: string | null } | null;
   /** The page the person is on; null when none is told. */
   page: PageContext | null;
+  /**
+   * The workspace the person kept the question to (plan #1899.5), by its
+   * name: told to the model, which is offered only that workspace's lookups.
+   * Absent or null: every workspace.
+   */
+  scope?: string | null;
 };
+
+/** What the model is told when the person keeps a question to one workspace (plan #1899.5). */
+export function scopeLine(workspace: string): string {
+  return `They kept this question to their ${workspace} workspace. Look only there: your lookups reach that workspace alone, so answer from what they find and say so if the answer is elsewhere.`;
+}
 
 /** "Sunday, 4 October 2026", from a YYYY-MM-DD day read as a calendar day. */
 function spelledDay(day: string): string {
@@ -273,10 +284,10 @@ const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what
  * Why the answer stopped. 'unfinished': the model wrote nothing usable, and
  * the answer was built from the lookups (answerFromLookups).
  */
-export type DashStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished';
+export type DashStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished' | 'stopped';
 
 /** The sentence an answer written under a limit ends with. */
-export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished'>): string {
+export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>): string {
   return stop === 'lookups'
     ? `I stopped after ${MAX_LOOKUPS} lookups, so this answer rests only on what those found.`
     : 'I stopped looking before I had checked everything, so this answer rests only on what I found by then.';
@@ -376,13 +387,21 @@ function keptResult(result: AskToolResult): unknown {
 
 /**
  * The conversation so far as the model is sent it. An earlier answer carries
- * the rows it cited, so a follow-up ("and the second one?") can name them.
+ * the rows it cited, so a follow-up ("and the second one?") can name them,
+ * and a question carries the rows the person added to it with @ (plan
+ * #1899.5), which are the rows it is about.
  */
-function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[]): Anthropic.MessageParam[] {
+export function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[]): Anthropic.MessageParam[] {
   return toModelMessages(
     turns.map((turn) => {
-      if (turn.role !== 'assistant' || !turn.citations?.length) return turn;
+      if (!turn.citations?.length) return turn;
       const rows = turn.citations.map((c) => `${c.table} ${c.ref} "${c.title}"`).join('; ');
+      if (turn.role === 'user') {
+        return {
+          role: turn.role,
+          body: `${turn.body}\n\n(Rows I added for you to read, as table, ref and title: ${rows}. Open each with open_row, or read_dev_row for a plan step, idea, note or raise, before answering about it.)`,
+        };
+      }
       return { role: turn.role, body: `${turn.body}\n\n(Rows cited: ${rows})` };
     }),
   );
@@ -579,14 +598,16 @@ async function callModel(
   params: Anthropic.MessageCreateParamsNonStreaming,
   onText: ((piece: string) => void) | undefined,
   finishName: string,
+  signal: AbortSignal | undefined,
 ): Promise<Anthropic.Message> {
-  if (!onText) return client.messages.create(params);
+  const options = signal ? { signal } : undefined;
+  if (!onText) return client.messages.create(params, options);
   const tools = params.tools?.map((tool) =>
     'name' in tool && tool.name === finishName && !('type' in tool && tool.type)
       ? ({ ...tool, eager_input_streaming: true } as Anthropic.Tool)
       : tool,
   );
-  const stream = client.messages.stream({ ...params, ...(tools ? { tools } : {}) });
+  const stream = client.messages.stream({ ...params, ...(tools ? { tools } : {}) }, options);
   // The answer call's input as it arrives, by content block index.
   const answering = new Map<number, string>();
   let told = '';
@@ -657,11 +678,18 @@ export type DashRun = {
    * written one failed). Whatever it throws is ignored.
    */
   onText?: (piece: string) => void;
+  /**
+   * Ends the answer when it aborts (plan #1899.5): the model call in flight
+   * is cancelled, no further call or lookup is started, and the answer is
+   * what `onText` had been told so far, with STOPPED_NOTE, stopped
+   * 'stopped'. Writes already made stay made. Absent: runs to its end.
+   */
+  signal?: AbortSignal;
 };
 
 /**
  * Dash's answer to the last of the turns, which is the person's. Calls the
- * model until it answers or a limit is reached. Never throws.
+ * model until it answers, a limit is reached or `signal` aborts. Never throws.
  */
 export async function runDash(input: DashRun): Promise<DashAnswer> {
   const { voice, context } = input;
@@ -690,8 +718,19 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       console.error('ask lookup listener failed', error);
     }
   };
+  // Everything onText has been told, which a stopped answer keeps.
+  let written = '';
+  const signal = input.signal;
+  const stoppedAnswer = (): DashAnswer => ({
+    ok: true,
+    body: stoppedBody(written),
+    toolCalls,
+    citations: [],
+    stop: 'stopped',
+  });
   const onText = input.onText
     ? (piece: string) => {
+        written += piece;
         try {
           input.onText?.(piece);
         } catch (error) {
@@ -735,6 +774,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   ];
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
+  if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
@@ -774,6 +814,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard.
   for (let round = 0; round <= MAX_LOOKUPS + 1; round++) {
+    if (signal?.aborted) return stoppedAnswer();
     const limit: DashStop | null =
       lookups >= MAX_LOOKUPS
         ? 'lookups'
@@ -798,8 +839,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         },
         onText,
         finishName,
+        signal,
       );
     } catch (error) {
+      if (signal?.aborted) return stoppedAnswer();
       return fail(error instanceof Error ? error.message : 'The answer failed.');
     }
 
@@ -964,8 +1007,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             },
             onText,
             finishName,
+            signal,
           );
         } catch (error) {
+          if (signal?.aborted) return stoppedAnswer();
           return fail(error instanceof Error ? error.message : 'The answer failed.');
         }
         input.onSpend?.({ model, usage: usageFrom(prose.usage) });

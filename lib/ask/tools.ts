@@ -456,6 +456,23 @@ async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Pr
   return { ok: true, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
 }
 
+/**
+ * Whether a lookup is offered when the person keeps a question to one
+ * workspace (plan #1899.5). A lookup bound to a workspace is offered in its
+ * own. The ones that range over every workspace (search, recall, open_row,
+ * list_rows) are offered too, since the context they run with is narrowed to
+ * that workspace and they leave out the rest themselves. Mail belongs to no
+ * workspace and the Dev lookups only to Dev, so neither is offered elsewhere.
+ * A chart reads nothing and is always offered.
+ */
+export function lookupInScope(name: string, scope: ModuleId): boolean {
+  if (!isAskToolName(name)) return true;
+  if (name === 'search_mail' || name === 'read_mail') return false;
+  if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text') return scope === 'dev';
+  const { module } = LOOKUPS[name];
+  return module === null || module === scope;
+}
+
 export function isAskToolName(name: string): name is AskToolName {
   return (ASK_TOOL_NAMES as readonly string[]).includes(name);
 }

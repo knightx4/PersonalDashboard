@@ -152,7 +152,7 @@ describe('an ask conversation', () => {
     });
   });
 
-  it('keeps what Dash looked up and cited on its own turn, and nothing on the person\'s', async () => {
+  it('keeps what Dash looked up on its own turn, and the rows added with @ on the person\'s', async () => {
     const citation = { table: 'job_search.applications', ref: 'app-1', title: 'Acme', href: '/job-search/app-1' };
     const toolCall = { name: 'search', input: { q: 'Acme' }, result: [citation] };
     const { client, calls } = fakeClient({
@@ -172,7 +172,7 @@ describe('an ask conversation', () => {
     expect(upsert?.args[0]).toMatchObject({ id: 'conv-1', subject_kind: 'ask', subject_ref: 'conv-1' });
     const insert = calls.find((call) => call.op === 'insert');
     expect(insert?.args[0]).toEqual([
-      { conversation_id: 'conv-1', user_id: 'user-1', role: 'user', body: 'Acme?' },
+      { conversation_id: 'conv-1', user_id: 'user-1', role: 'user', body: 'Acme?', citations: [citation] },
       {
         conversation_id: 'conv-1',
         user_id: 'user-1',

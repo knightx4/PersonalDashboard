@@ -19,6 +19,10 @@ import { Conversation } from '@/components/patterns/conversation';
 import { AskChats } from '@/app/ask/chats';
 import { ChatHeader, NewDashChat } from '@/app/ask/view';
 import type { AskChat } from '@/lib/talk/ask-chats';
+import type { SearchHit } from '@/lib/search/sources';
+import type { ModuleId } from '@/lib/modules';
+import type { AskBoxStart } from '@/components/talk/ask-box';
+import { stoppedBody } from '@/lib/talk/talk';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -222,8 +226,27 @@ async function writeOut(body: string, onText: ((piece: string) => void) | undefi
   }
 }
 
+/** The workspaces the box's chip offers in the gallery (plan #1899.5). */
+const BOX_WORKSPACES: readonly ModuleId[] = ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'];
+
+/** The rows @ finds in the gallery, as the top bar's search would list them. */
+const BOX_HITS: readonly SearchHit[] = [
+  { module: 'shopping', kind: 'order', id: 'o1', ref: 'public.orders:o1', title: 'Catan lot, eBay', subtitle: 'Order · Shopping', href: '/shopping/orders/o1' },
+  { module: 'shopping', kind: 'inventory', id: 'i1', ref: 'public.inventory_items:i1', title: 'Catan: Seafarers expansion', subtitle: 'Inventory · Shopping', href: '/shopping/inventory/i1' },
+  { module: 'shopping', kind: 'saved', id: 's1', ref: 'public.saved_items:s1', title: 'Catan 3D edition', subtitle: 'Saved · Shopping', href: '/shopping/saved' },
+  { module: 'todo', kind: 'task', id: 't1', ref: 'todo.tasks:t1', title: 'List the Catan lot', subtitle: 'Todo', href: '/todo/t/t1' },
+  { module: 'jobs', kind: 'company', id: 'c1', ref: 'job_search.companies:c1', title: 'Catalyst Health', subtitle: 'Company · Job search', href: '/jobs/companies/c1' },
+  { module: 'learn', kind: 'reading', id: 'r1', ref: 'learn.readings:r1', title: 'The Settlers of Catan and the economics of trade', subtitle: 'Reading · Learn', href: '/learn/readings/r1' },
+];
+
+/** What the gallery's question carried with @. */
+const BOX_ROWS = [
+  { kind: 'order' as const, id: 'o1', title: 'Catan lot, eBay', href: '/shopping/orders/o1' },
+  { kind: 'task' as const, id: 't1', title: 'List the Catan lot', href: '/todo/t/t1' },
+];
+
 const FIXTURES: AskSource = {
-  ask: async (question, _ref, _page, onLookup, _files, _list, onText) => {
+  ask: async (question, _ref, _page, onLookup, _files, _list, onText, more) => {
     // The lookups appear one by one, then the answer as it is written (plans #1438, #1902).
     const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const search = { id: 'l1', index: 0, name: 'search', input: { query: question.slice(0, 40) } };
@@ -241,9 +264,22 @@ const FIXTURES: AskSource = {
     }
     if (question === WRITING_QUESTION) {
       const body = answerTo(question)[1].body;
-      await writeOut(`${body.split('. ')[0]}. Two of them are still`, onText, wait);
-      // Held here, mid-answer, for the gallery's photograph.
-      return new Promise(() => {});
+      const written = `${body.split('. ')[0]}. Two of them are still`;
+      await writeOut(written, onText, wait);
+      // Held here, mid-answer, for the gallery's photograph, until Stop is
+      // pressed: then kept as far as it got (plan #1899.5).
+      return new Promise((resolve) => {
+        more?.signal?.addEventListener('abort', () =>
+          resolve({
+            conversation,
+            stop: 'stopped',
+            turns: [
+              { id: 'wq', role: 'user', body: question, createdAt: new Date().toISOString() },
+              { id: 'wa', role: 'assistant', body: stoppedBody(written), createdAt: new Date().toISOString() },
+            ],
+          }),
+        );
+      });
     }
     if (/^(add|remind)/i.test(question)) {
       const proposal = proposalTo(question);
@@ -314,12 +350,66 @@ export function AskDashSurface({
   children: React.ReactNode;
 }) {
   return (
-    <AskDashProvider source={FIXTURES} page={page}>
+    <AskDashProvider source={FIXTURES} page={page} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
       {children}
       {open && <OpenOnArrival question={question} rows={rows} />}
     </AskDashProvider>
   );
 }
+
+/**
+ * Dash's box with what plan #1899.5 adds, on the chat's card at reading
+ * width: a question that carried two rows added with @, an answer stopped
+ * part way and kept as far as it got, and the box open on `draft` with the
+ * menu its @ or / opens, or the scope chip's menu open.
+ */
+export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' }) {
+  const draft = open === 'rows' ? 'How much did the @Cat' : open === 'commands' ? '/' : '';
+  const start: AskBoxStart | undefined =
+    open === 'rows'
+      ? { rows: [BOX_ROWS[0]], scope: 'shopping' }
+      : open === 'scope'
+        ? { scope: 'learn', scopeOpen: true }
+        : undefined;
+  const at = '2026-10-14T09:00:00Z';
+  const turns: TalkTurn[] = [
+    {
+      id: 'b-q',
+      role: 'user',
+      body: 'What did I pay for these, and is the todo still open?',
+      createdAt: at,
+      citations: [
+        { table: 'public.orders', ref: 'o1', title: 'Catan lot, eBay', href: '/shopping/orders/o1' },
+        { table: 'todo.tasks', ref: 't1', title: 'List the Catan lot', href: '/todo/t/t1' },
+      ],
+    },
+    {
+      id: 'b-a',
+      role: 'assistant',
+      body: stoppedBody('You paid $186.00 for the Catan lot on 2 August, postage included. The todo to list it is'),
+      createdAt: at,
+    },
+  ];
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose pt-72">
+          <AskThread
+            id="ask-box-preview"
+            conversationRef="00000000-0000-4000-8000-000000000031"
+            turns={turns}
+            label="Ask a follow-up"
+            placeholder="Ask Dash. @ adds a row, / a command"
+            startWriting
+            initialDraft={draft}
+            boxStart={start}
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
 
 /**
  * A reopened question whose answers proposed changes (plan #1190), each card
