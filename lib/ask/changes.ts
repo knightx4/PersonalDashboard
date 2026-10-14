@@ -21,6 +21,7 @@ import {
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
 import { isWrittenCard, type WrittenCardKind } from './todo-changes';
+import { isVaultFileKind } from './vault-changes';
 
 /**
  * Confirming, declining and undoing a change Dash proposed in an Ask Dash
@@ -776,7 +777,8 @@ export async function writeChange(
  * where they are still ticked. The record is marked undone by the rule.
  */
 async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
-  if (change.kind === 'add_quick_note') return undoQuickNote(deps, change, surface);
+  // A note Dash wrote, edited, renamed or filed: the Undo is a commit too (plan #1894.9.3).
+  if (change.kind === 'add_quick_note' || isVaultFileKind(change.kind)) return undoQuickNote(deps, change, surface);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);

@@ -7,6 +7,7 @@ import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -76,6 +77,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...NEWS_CHANGE_KINDS,
   ...GOALS_CHANGE_KINDS,
   ...SHOPPING_CHANGE_KINDS,
+  ...VAULT_CHANGE_KINDS,
 ];
 
 /**

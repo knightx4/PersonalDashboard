@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { CONNECTOR_WRITE_TOOLS, runConnectorWrite, type ConnectorWriteContext } from './writes';
 
 /**
@@ -62,6 +63,7 @@ describe('runConnectorWrite', () => {
       'change_goal_step',
       'change_item',
       'item_lists',
+      ...VAULT_CHANGE_KINDS,
     ]);
   });
 

@@ -6,6 +6,7 @@ import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -140,6 +141,7 @@ const SCHEMAS: ReadonlySet<string> = new Set<AskSchema>([
   'learn',
   'news',
   'goals',
+  'you',
 ]);
 
 /**
@@ -178,6 +180,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...NEWS_CHANGE_KINDS,
   ...GOALS_CHANGE_KINDS,
   ...SHOPPING_CHANGE_KINDS,
+  ...VAULT_CHANGE_KINDS,
 ];
 
 /**

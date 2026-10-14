@@ -28,6 +28,7 @@ import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
 import { GOALS_WRITE_TOOLS } from './goals-writes';
 import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
+import { VAULT_WRITE_TOOLS } from './vault-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -77,6 +78,10 @@ import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
  *                    name or sell price) and item_lists (items on or off a
  *                    list, a list made or renamed), in
  *                    lib/dash/shopping-writes.ts (plan #1894.5.1).
+ *   The Vault's six and change_course  a note written, edited, renamed or
+ *                    filed from the Inbox, a theme or a Maya question
+ *                    renamed, and a course corrected (lib/dash/vault-writes.ts,
+ *                    plan #1894.9.3).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1110,6 +1115,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...GOALS_WRITE_TOOLS,
   // Shopping's one-item and list changes, which the connector offers too (plan #1894.5.1).
   ...SHOPPING_WRITE_TOOLS,
+  // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).
+  ...VAULT_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

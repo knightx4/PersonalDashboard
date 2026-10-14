@@ -131,7 +131,11 @@ reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, call change_goal_step. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
-item_lists. When they tell you about a place they have lived, or ask to
+item_lists. In the Vault, to write
+a note, change or rename one, file a quick note, or rename a theme or a
+thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
+file_quick_note, rename_theme or rename_maya_question; to keep a transcript
+or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
