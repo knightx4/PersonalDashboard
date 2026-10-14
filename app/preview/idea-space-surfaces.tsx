@@ -10,7 +10,7 @@ import { lightOn } from '@/lib/learn/map/sky';
 import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
-import { topicsFor } from './idea-space-topics';
+import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -486,7 +486,7 @@ const OPEN = VIEW.ideas.find((idea) => idea.name === 'Price elasticity of demand
 
 /** The neighbour map with its places named, one idea open with its nearest six. */
 export function IdeaSpaceSurface() {
-  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, idea: OPEN }} />;
+  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
 }
 
 /**
@@ -749,5 +749,5 @@ export function IdeaSpaceEvidenceSurface() {
  * strongest first, and the rest folded into a count under its name.
  */
 export function IdeaSpaceTopicsSurface() {
-  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" />;
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" nextTopics={NEXT_TOPICS_FIXTURE} />;
 }

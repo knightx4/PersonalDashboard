@@ -12,6 +12,7 @@ import {
   type ReturnAngleRequest,
 } from './level3';
 import type { NameResult } from './name-material';
+import { NEXT_TOPIC_PICKER } from './next-topics';
 import type { FeedTarget } from './targets';
 
 /**
@@ -381,6 +382,44 @@ describe('running the pass once', () => {
       // Each card is from the article's lead.
       expect(card.segment_id).toBe(`seg:${card.named_article}:0`);
     }
+  });
+
+  it('draws an open goal for the topics next to what you know, each card naming the topic beside it', async () => {
+    const near = (title: string, beside: string) => ({
+      id: `t-${title}`,
+      title,
+      beside: { id: `b-${beside}`, title: beside },
+      similarity: 0.8,
+      aim: { id: 'aim-fs', name: 'Financial services industry landscape', closeness: 0.7 },
+    });
+    const goal = {
+      id: 'aim-fs',
+      name: 'Financial services industry landscape',
+      about: null,
+      depth: 'working' as const,
+      field: null,
+      domain: null,
+      list: 'next' as const,
+      next: [near('World economy', 'Macroeconomics'), near('Commerce', 'Business'), near('Capital (economics)', 'Profit (economics)')],
+    };
+    const run = ports({
+      loaded: person({ goals: [goal], goalWindow: { goal: 0, total: 0 }, articlesHeld: ['Commerce'] }),
+    });
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 3, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+
+    // No naming call and no list read: the topics are the picks.
+    expect(run.named.some((entry) => entry.target.reason === 'goal')).toBe(false);
+    expect(run.listed).toHaveLength(0);
+    const goalCards = run.cards.filter((card) => card.reason === 'goal');
+    expect(goalCards.map((card) => [card.named_article, card.beside_topic])).toEqual([
+      ['World economy', 'Macroeconomics'],
+      ['Capital (economics)', 'Profit (economics)'],
+    ]);
+    for (const card of goalCards) {
+      expect(card).toMatchObject({ aim_id: 'aim-fs', named_section: null, pick_model: NEXT_TOPIC_PICKER });
+    }
+    // Every other card carries no topic beside it.
+    expect(run.cards.filter((card) => card.reason !== 'goal').every((card) => card.beside_topic === null)).toBe(true);
   });
 
   it('stops offering an untouched article once it has a Got it', async () => {

@@ -101,7 +101,7 @@ const CLIP_NOTE_OPERATION: LearnOperation = 'describe-card-clip';
  */
 const PICK_COLUMNS =
   'reason, theme_id, theme_name, field_id, reading_id, item_id, segment_id, named_article, named_section, ' +
-  'pick_basis, pick_model, depth, aim_id, aim_name, asked_phrase, asked_on, created_at';
+  'pick_basis, pick_model, depth, aim_id, aim_name, asked_phrase, asked_on, beside_topic, created_at';
 
 /** What a ready card's row holds for one idea. */
 function ideaColumns(idea: IdeaCard, index: number, conceptId: string | null, why: string, written_at: string) {
@@ -132,6 +132,7 @@ type PickedRow = {
   aim_name: string | null;
   asked_phrase: string | null;
   asked_on: string | null;
+  beside_topic: string | null;
   field_id: string | null;
   named_article: string | null;
   depth: Depth | null;
@@ -181,7 +182,7 @@ async function loadPicked(
   const { data, error } = await learn
     .from('feed_cards')
     .select(
-      'id, segment_id, reason, theme_name, aim_name, asked_phrase, asked_on, field_id, named_article, depth, ' +
+      'id, segment_id, reason, theme_name, aim_name, asked_phrase, asked_on, beside_topic, field_id, named_article, depth, ' +
         'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
         'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text), ' +
         'field:area_fields!feed_cards_field_id_fkey(name, scope)',
@@ -210,6 +211,7 @@ async function loadPicked(
         aimName: row.aim_name,
         askedPhrase: row.asked_phrase,
         askedOn: row.asked_on,
+        besideTopic: row.beside_topic,
         field: row.field,
         gap: row.reason === 'gap' ? (row.field_id && written.has(row.field_id) ? 'untested' : 'untouched') : null,
         article: row.item?.title ?? row.named_article ?? 'Wikipedia',
