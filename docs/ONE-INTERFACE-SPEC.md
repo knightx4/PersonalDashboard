@@ -473,7 +473,7 @@ Checked by: count `date-formatting-files`, baseline 122, target 0.
 
 **R7.** A row is closed with one of Done, Dropped, Later or Declined, and
 every workspace status maps onto one.
-Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
+Checked by: test `tests/lifecycle-words.test.ts`.
 
 **R8.** No section links to a page whose only job is a form.
 Checked by: count `form-only-pages`, baseline 9, target 0.
