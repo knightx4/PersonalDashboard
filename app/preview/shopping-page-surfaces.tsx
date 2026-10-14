@@ -1,12 +1,5 @@
-import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { MODELS } from '@/lib/core/models';
 import { DashboardView } from '@/app/shopping/dashboard/dashboard-view';
-import { AddBooksView } from '@/app/shopping/inventory/add/books/books-view';
-import { GamesEditionPickerDemo } from './shopping-games-edition-demo';
-import { AddGamesView } from '@/app/shopping/inventory/add/games/games-view';
 import { OrderDetailView, type OrderDetail } from '@/app/shopping/orders/[id]/order-detail-view';
-import { NewOrderView } from '@/app/shopping/orders/new/new-order-view';
-import { ReceiptView } from '@/app/shopping/orders/receipt/receipt-view';
 import { ReturnsPageView } from '@/app/shopping/returns/returns-view';
 import { SavedItemView } from '@/app/shopping/saved/[id]/saved-item-view';
 import { SavedQueueView, type SavedQueueItem } from '@/app/shopping/saved/saved-view';
@@ -19,7 +12,6 @@ import type { Person } from '@/lib/people/load';
 import type { ReturnsTrackerData, ReturnsTrackerRow } from '@/lib/returns/types';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 import type { PendingSuggestion } from '@/lib/share/families-store';
-import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
 
 /**
@@ -119,22 +111,15 @@ export function ShoppingDashboardSurface() {
   return <DashboardView range="this_month" personId={null} people={people} data={dashboard} />;
 }
 
-// ---- Add books and games ---------------------------------------------------
-
-export function ShoppingAddBooksSurface() {
-  return <AddBooksView mode="search" />;
-}
-
-export function ShoppingAddGamesSurface() {
-  // The Search tab with a result that has other editions, which is where the
-  // base-box and expansion note now sits (plan #1780).
+/** No orders yet: Add an order opens capture aimed at an order (plan #1950.3.4). */
+export function ShoppingDashboardEmptySurface() {
   return (
-    <div>
-      <AddGamesView mode="search" />
-      <PageColumn className="mt-4">
-        <GamesEditionPickerDemo />
-      </PageColumn>
-    </div>
+    <DashboardView
+      range="this_month"
+      personId={null}
+      people={people}
+      data={{ ...dashboard, orderCount: 0 }}
+    />
   );
 }
 
@@ -260,82 +245,6 @@ export function ShoppingOrderSurface() {
     href: `/shopping/orders/${order.order.id}`,
   });
   return <OrderDetailView {...order} path={path} />;
-}
-
-// ---- Add an order and the receipt photo ------------------------------------
-
-export function ShoppingOrderNewSurface() {
-  // The padding is the room the app shell keeps under a page for the dock, so
-  // Save order, pinned above the dock, sits where it does in the app.
-  return (
-    <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
-      <NewOrderView
-        people={people}
-        defaultPersonId="p1"
-        merchants={[
-          { id: 'm1', name: 'Amazon' },
-          { id: 'm2', name: 'Uniqlo' },
-          { id: 'm3', name: 'The Conran Shop and Kitchen Supplies' },
-        ]}
-        categories={[
-          { id: 'c1', name: 'Clothing' },
-          { id: 'c2', name: 'Electronics' },
-          { id: 'c3', name: 'Home' },
-        ]}
-        defaultDate={TODAY}
-        prefill={{
-          merchantId: 'm2',
-          merchantName: 'Uniqlo',
-          orderDate: '2026-10-06',
-          externalOrderNumber: 'UQ-77120934',
-          currency: 'USD',
-          lines: [
-            {
-              name: 'Merino crew-neck jumper',
-              variant: 'Navy, M',
-              quantity: '1',
-              unitPrice: '49.90',
-              categoryId: 'c1',
-            },
-            {
-              name: 'Ultra Light Down packable jacket with a longer name than most',
-              variant: 'Olive, L',
-              quantity: '2',
-              unitPrice: '79.90',
-              categoryId: 'c1',
-            },
-          ],
-          tax: '15.66',
-          shipping: '',
-          discount: '10.00',
-        }}
-        sourceMessageId="e9"
-        readError={null}
-      />
-    </div>
-  );
-}
-
-/* The shopping layout hands every paid press its estimate; the gallery has no
- * layout, so the receipt read gets a typical figure here and its hint draws. */
-export function ShoppingOrderReceiptSurface() {
-  return (
-    <PaidCostsProvider
-      costs={{
-        'app/shopping/orders/receipt/actions.ts#previewReceiptPhoto': {
-          lowMicros: 6_000,
-          medianMicros: 9_000,
-          highMicros: 18_000,
-          runs: 7,
-          basis: 'measured',
-          per: 'run',
-          models: [MODELS.booksReceiptPhoto],
-        },
-      }}
-    >
-      <ReceiptView />
-    </PaidCostsProvider>
-  );
 }
 
 // ---- Returns ---------------------------------------------------------------

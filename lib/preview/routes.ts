@@ -39,6 +39,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-pipeline-focus': ['/jobs/pipeline'],
   'jobs-pipeline-table': ['/jobs/pipeline'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
+  'shopping-item-details-catalogue': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
   'dev-comment-thread-seen': ['/dev/plan'],
   'dev-comment-thread-seen-moment': ['/dev/plan'],
@@ -363,11 +364,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-settings': ['/todo/settings'],
   'todo-waiting': ['/todo/waiting'],
   'shopping-dashboard': ['/shopping/dashboard'],
-  'shopping-add-books': ['/shopping/inventory/add/books'],
-  'shopping-add-games': ['/shopping/inventory/add/games'],
+  'shopping-dashboard-empty': ['/shopping/dashboard'],
   'shopping-order': ['/shopping/orders/[id]'],
-  'shopping-order-new': ['/shopping/orders/new'],
-  'shopping-order-receipt': ['/shopping/orders/receipt'],
   'shopping-returns': ['/shopping/returns'],
   'shopping-saved': ['/shopping/saved'],
   'shopping-list-adds': ['/shopping/orders', '/shopping/inventory'],
@@ -548,7 +546,7 @@ export function routeMatches(surfaceRoute: string, route: string, under = false)
  *
  * A route with no pattern in it that a surface lists exactly is that page and
  * no other: Next serves a static folder before a dynamic one, so
- * `/shopping/orders/new` is never `/shopping/orders/[id]` (plan #1783).
+ * `/shopping/share/families` is never `/shopping/share/[id]` (plan #1783).
  */
 export function surfacesForRoute(route: string, under = false): string[] {
   const entries = Object.entries(SURFACE_ROUTES);
