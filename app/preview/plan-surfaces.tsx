@@ -958,24 +958,3 @@ export function PlanFeatureStepsYoursSurface() {
 export function PlanFeatureEditSurface() {
   return <FeatureFixture editing />;
 }
-
-/**
- * The "New feature" surface open at the top of the plan (plan #1670): title,
- * summary, the module and property chips, then the description.
- */
-export function PlanNewFeatureSurface() {
-  return (
-    <PlanView
-      sections={applyView(whole, 'open')}
-      finished={[]}
-      summary={summarize(whole)}
-      view="open"
-      catalog={catalog}
-      empty={false}
-      canSend={false}
-      lastRuns={treeRuns}
-      commitChecks={{}}
-      newFeature={{ open: true }}
-    />
-  );
-}

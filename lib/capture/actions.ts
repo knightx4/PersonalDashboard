@@ -199,18 +199,36 @@ export function matchCaptureActions(
  * by the same ids, so this file stays free of server code and the panel can
  * import it.
  */
-export type CaptureKindId = 'todo' | 'goal-update' | 'job-note' | 'vault-note';
+export type CaptureKindId =
+  | 'todo'
+  | 'goal-update'
+  | 'job-note'
+  | 'vault-note'
+  // Goals and Dev (plan #1950.5): never chosen by the sort, only aimed.
+  | 'goal'
+  | 'goal-area'
+  | 'plan-feature'
+  | 'plan-step'
+  | 'idea'
+  | 'dev-note';
 
 /**
  * The one thing a kind may need besides its title. A todo takes a day; a
- * note on a job takes the role, which the page aiming it already knows.
+ * note on a job takes the role, which the page aiming it already knows. A
+ * goal takes its area and a plan step the row it goes under (`under`).
  */
-export type CaptureKindNeeds = 'day' | 'role' | null;
+export type CaptureKindNeeds = 'day' | 'role' | 'under' | null;
+
+/**
+ * The row a new one goes under, or the plan module a new feature goes in:
+ * its id and the name the panel shows ("In Health").
+ */
+export type CaptureUnder = { id: string; title: string };
 
 export type CaptureKind = {
   id: CaptureKindId;
-  /** The place Dash's sort files this kind as. */
-  place: CapturePlace;
+  /** The place Dash's sort files this kind as. Null: only an Add button makes it. */
+  place: CapturePlace | null;
   /** Whose workspace the row belongs to. */
   module: ModuleId;
   /** The panel's title when aimed: "Add a todo". */
@@ -229,6 +247,13 @@ export type CaptureKind = {
   section: string;
   /** The panel action that takes this kind unaimed, from the palette. */
   action: CaptureActionId;
+  /**
+   * Made by any account, whatever its workspaces: a note for Dev is how
+   * anyone reports a bug, though only the owner has the Dev workspace.
+   */
+  everyone?: boolean;
+  /** Takes files with it, as the header's note did (plan #1713). */
+  files?: boolean;
 };
 
 export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
@@ -282,6 +307,84 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     section: '/vault',
     action: 'vault',
   },
+  goal: {
+    id: 'goal',
+    place: null,
+    module: 'goals',
+    label: 'Add a goal',
+    placeholder: 'An outcome that ends, such as pay off the credit cards',
+    field: 'line',
+    needs: 'under',
+    makes: 'row',
+    section: '/goals',
+    action: 'anything',
+  },
+  'goal-area': {
+    id: 'goal-area',
+    place: null,
+    module: 'goals',
+    label: 'Add an area',
+    placeholder: 'A direction that never finishes, such as Career or The city',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/goals',
+    action: 'anything',
+  },
+  'plan-feature': {
+    id: 'plan-feature',
+    place: null,
+    module: 'dev',
+    label: 'Add a feature',
+    placeholder: 'Feature name',
+    field: 'line',
+    // `under` names the module when the page knows it; without it the
+    // feature is for the app as a whole.
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  'plan-step': {
+    id: 'plan-step',
+    place: null,
+    module: 'dev',
+    label: 'Add a step',
+    placeholder: 'What the step does',
+    field: 'line',
+    needs: 'under',
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  idea: {
+    id: 'idea',
+    place: null,
+    module: 'dev',
+    label: 'Add an idea',
+    placeholder: 'Something worth doing one day. It waits on the ideas page.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  'dev-note': {
+    id: 'dev-note',
+    place: null,
+    module: 'dev',
+    label: 'Report a bug or ask for a change',
+    placeholder: 'What went wrong, or what it should do.',
+    field: 'prose',
+    // The page it was filed from rides on the aim when there is one; a note
+    // filed on the queue itself has none worth saving.
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+    everyone: true,
+    files: true,
+  },
 };
 
 /** The kind Dash's sort files a part as, by its place. */
@@ -298,6 +401,10 @@ export function kindForPlace(place: CapturePlace): CaptureKind {
 export type CaptureAim = {
   kind: CaptureKindId;
   role?: CaptureSortRole;
+  /** The area a goal goes in, the row a step goes under, or a feature's module. */
+  under?: CaptureUnder;
+  /** The page a note for Dev was filed from. */
+  page?: string;
   seed?: string;
 };
 
@@ -310,5 +417,6 @@ export function aimProblem(aim: CaptureAim): string | null {
   const kind = CAPTURE_KINDS[aim.kind];
   if (!kind) return 'Capture cannot make that.';
   if (kind.needs === 'role' && !aim.role) return 'Open the role first, then add the note there.';
+  if (kind.needs === 'under' && !aim.under) return 'Open the place it goes under first, then add it there.';
   return null;
 }

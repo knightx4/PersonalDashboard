@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { ToggleChip } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { Kbd } from '@/components/ui/kbd';
 import { ModuleMark } from '@/components/ui/module-mark';
-import type { CaptureAim, CaptureKind } from '@/lib/capture/actions';
+import type { CaptureAim, CaptureKind, CaptureUnder } from '@/lib/capture/actions';
 import { isCalendarDay, type CaptureDay } from '@/lib/capture/todo';
 import { roleName, type CaptureSortRole } from '@/lib/capture/sort';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
@@ -95,6 +95,9 @@ export function DayChips({ day, onDay }: { day: CaptureDay; onDay: (day: Capture
 export function AimedCaptureForm({
   kind,
   role,
+  under,
+  page,
+  files,
   text,
   onText,
   day,
@@ -107,6 +110,12 @@ export function AimedCaptureForm({
   kind: CaptureKind;
   /** The role a note goes on, which the page aiming it already knew. */
   role?: CaptureSortRole;
+  /** The area, row or module it goes in, which the page aiming it knew. */
+  under?: CaptureUnder;
+  /** The page a note for Dev is about. */
+  page?: string;
+  /** "Add a file", for a kind that takes files. */
+  files?: ReactNode;
   text: string;
   onText: (text: string) => void;
   day: CaptureDay;
@@ -160,12 +169,29 @@ export function AimedCaptureForm({
 
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2">
         {kind.needs === 'day' && <DayChips day={day} onDay={onDay} />}
-        {kind.needs === 'role' && role && (
-          <span className="min-w-0 truncate text-small text-ink-muted">
-            On <span className="text-ink">{roleName(role)}</span>
-          </span>
+        {/* What it goes on, and any files, stacked on the panel's left edge
+            so they line up at every width; Add stays on the right. */}
+        {((kind.needs === 'role' && role) || under || page || files) && (
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+            {kind.needs === 'role' && role && (
+              <span className="min-w-0 max-w-full truncate text-small text-ink-muted">
+                On <span className="text-ink">{roleName(role)}</span>
+              </span>
+            )}
+            {under && (
+              <span className="min-w-0 max-w-full truncate text-small text-ink-muted">
+                {kind.id === 'plan-step' ? 'Under' : 'In'} <span className="text-ink">{under.title}</span>
+              </span>
+            )}
+            {page && (
+              <span className="min-w-0 max-w-full truncate text-small text-ink-muted">
+                From <span className="tabular text-ink">{page}</span>
+              </span>
+            )}
+            {files}
+          </div>
         )}
-        <span className="ml-auto flex items-center gap-2">
+        <span className="ml-auto flex items-center gap-2 self-end">
           <Button type="submit" size="sm" pending={pending}>
             <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
             {pending ? 'Adding…' : 'Add'}

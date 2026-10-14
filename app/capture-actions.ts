@@ -2,9 +2,11 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { recordAttachments } from '@/lib/attachments/store';
 import { aimProblem, CAPTURE_KINDS, type CaptureKindId } from '@/lib/capture/actions';
@@ -34,6 +36,13 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { CAPTURE_BODY_MAX } from '@/lib/goals/capture';
 import { CAPTURE_SORT_MIN_CHARS } from '@/lib/goals/capture-sort';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { insertArea, insertGoal } from '@/lib/goals/store';
+import { GOAL_TITLE_MAX, parseAreaName } from '@/lib/goals/tree';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { steerLearnAfterGoalSaved } from '@/lib/learn/goal-saved';
+import { isOwner } from '@/lib/dev/owner';
+import { writeDevNote, writeIdea } from '@/lib/feedback/file-note';
+import { writePlanItem } from '@/lib/plan/capture-write';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
@@ -205,7 +214,7 @@ export async function fileCaptureBox(
   }
 
   const settings = await loadAccountSettings(user.id);
-  const writers = await writersFor(user.id, settings.enabledModules as ModuleId[], files);
+  const writers = await writersFor(user, settings.enabledModules as ModuleId[], files);
   const result = await fileCaptureParts(filing.parts, writers);
   if (files.length > 0) revalidatePath('/todo', 'layout');
   if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
@@ -214,15 +223,34 @@ export async function fileCaptureBox(
   return result;
 }
 
+type SessionUser = Awaited<ReturnType<typeof requireUser>>;
+
+/** The writers for the kinds only an Add button makes (plan #1950.5). */
+type AimedOnlyWriters = Pick<CaptureWriters, 'goal' | 'goalArea' | 'planItem' | 'idea' | 'devNote'>;
+
+const NOT_SORTED = { ok: false as const, error: 'That is added from its own Add button, not from the one box.' };
+
+/** The one box's: Dash's sort never files into these kinds. */
+const NOT_FROM_THE_BOX: AimedOnlyWriters = {
+  goal: async () => NOT_SORTED,
+  goalArea: async () => NOT_SORTED,
+  planItem: async () => NOT_SORTED,
+  idea: async () => NOT_SORTED,
+  devNote: async () => NOT_SORTED,
+};
+
 /**
  * The writers capture makes rows with, bound to the signed-in person: the
- * same ones for the one box and for an Add button aimed at a kind.
+ * same ones for the one box and for an Add button aimed at a kind, with the
+ * kinds only an Add button makes passed in by the aimed add alone.
  */
 async function writersFor(
-  userId: string,
+  user: SessionUser,
   modules: ModuleId[],
   files: readonly UploadedAttachment[],
+  aimedOnly: AimedOnlyWriters = NOT_FROM_THE_BOX,
 ): Promise<CaptureWriters> {
+  const userId = user.id;
   const deps = await requestDashDeps(userId);
   return {
     todo: (text, day = 'today') => addTask({}, todoCaptureForm(text, day)),
@@ -234,6 +262,7 @@ async function writersFor(
         : { ok: false as const, error: written.error };
     },
     vault: (text) => fileVaultNote(userId, text),
+    ...aimedOnly,
     record: (entry) => recordDashAction(deps, entry),
     ...(files.length > 0
       ? {
@@ -246,6 +275,43 @@ async function writersFor(
   };
 }
 
+/** The writers for a goal, an area, a plan row, an idea and a note for Dev. */
+function aimedOnlyWriters(user: SessionUser): AimedOnlyWriters {
+  const userId = user.id;
+  // The plan and the ideas page are the owner's alone (#417); asked once,
+  // and only when one of those is being written.
+  let owner: Promise<boolean> | null = null;
+  const owned = async () => {
+    owner ??= createClient().then((supabase) => isOwner({ user, supabase }));
+    return owner;
+  };
+  const notOwner = { ok: false as const, error: 'Only the owner of this app can add to the plan and its ideas.' };
+  return {
+    goal: async (areaId, title) => {
+      const name = title.trim();
+      if (name.length > GOAL_TITLE_MAX) return { ok: false, error: `Keep the goal under ${GOAL_TITLE_MAX} characters.` };
+      const id = await insertGoal(await createGoalsClient(), userId, areaId, { title: name });
+      if (!id) return { ok: false, error: 'That area is no longer there.' };
+      // A goal in the Learn area is placed and given a plan (plan #1490),
+      // after the response, as one added on /goals always was.
+      after(async () => {
+        await steerLearnAfterGoalSaved(await createLearnClient(), userId, id);
+      });
+      return { ok: true, id };
+    },
+    goalArea: async (text) => {
+      const name = parseAreaName(text);
+      if (!name.ok) return { ok: false, error: name.error };
+      return { ok: true, id: await insertArea(await createGoalsClient(), userId, name.value) };
+    },
+    planItem: async (title, at) =>
+      (await owned()) ? writePlanItem(await createClient(), userId, title, at) : notOwner,
+    idea: async (body) => ((await owned()) ? writeIdea(await createClient(), userId, body) : notOwner),
+    devNote: async (body, pagePath) =>
+      writeDevNote(await createClient(), user, body, pagePath, (await headers()).get('user-agent')),
+  };
+}
+
 const KIND_IDS = Object.keys(CAPTURE_KINDS) as [CaptureKindId, ...CaptureKindId[]];
 const Aimed = z.object({
   kind: z.enum(KIND_IDS),
@@ -253,6 +319,10 @@ const Aimed = z.object({
   /** A todo's day: a word the chips send, or a date the field holds. */
   day: z.string().max(10).optional(),
   role: z.object({ id: z.string().uuid(), title: z.string().max(300), company: z.string().max(300).nullable() }).optional(),
+  /** The area a goal goes in, the row a step goes under, or a feature's module. */
+  under: z.object({ id: z.string().min(1).max(64), title: z.string().max(300) }).optional(),
+  /** The page a note for Dev was filed from. */
+  page: z.string().max(300).optional(),
 });
 export type CaptureAimedInput = z.infer<typeof Aimed>;
 
@@ -265,25 +335,33 @@ export type CaptureMade = { ok: true; filed: FiledCapture; errors: string[] } | 
  * back by the same rule as the box and Home does not list it as Dash's.
  */
 // latency: pending
-export async function makeAimedCapture(input: CaptureAimedInput): Promise<CaptureMade> {
+export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unknown = []): Promise<CaptureMade> {
   const user = await requireUser();
   const parsed = Aimed.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
-  const { kind: kindId, text, day, role } = parsed.data;
+  const { kind: kindId, text, day, role, under, page } = parsed.data;
   const kind = CAPTURE_KINDS[kindId];
-  const problem = aimProblem({ kind: kindId, role });
+  const problem = aimProblem({ kind: kindId, role, under });
   if (problem) return { ok: false, error: problem };
 
   const settings = await loadAccountSettings(user.id);
   const modules = settings.enabledModules as ModuleId[];
-  if (!modules.includes(kind.module)) {
+  if (!kind.everyone && !modules.includes(kind.module)) {
     return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
   }
+  // Files only for a kind that takes them (plan #1713): a note for Dev.
+  const files = kind.files ? parseUploadedAttachments(uploaded, user.id) : [];
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role }, await writersFor(user.id, modules, []));
+    const made = await makeCaptureKind(kindId, { text, day, role, under, page }, await writersFor(user, modules, files, aimedOnlyWriters(user)));
     if (!made.ok) return { ok: false, error: made.error };
-    revalidatePath(kind.section, 'layout');
-    revalidatePath('/home');
+    // A note for Dev refreshes nothing: any revalidation renders the page
+    // you are on again before answering, and a note is filed from every page,
+    // heavy ones included (notes a78502b0, 3abf5f41). The queue is read
+    // fresh when it is next opened.
+    if (kindId !== 'dev-note') {
+      revalidatePath(kind.section, 'layout');
+      revalidatePath('/home');
+    }
     return { ok: true, filed: made.filed, errors: made.errors };
   } catch (error) {
     console.error('capture: making an aimed row failed', kindId, error);

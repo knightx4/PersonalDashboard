@@ -75,6 +75,16 @@ export const coreActions: ModuleActions = {
   'app/capture-actions.ts': {
     sortCaptureBox: none('page'),
     fileCaptureBox: tool('add_quick_note', 'add_todo', 'add_role_note', 'add_goal_step'),
+    makeAimedCapture: tool(
+      'add_todo',
+      'add_role_note',
+      'add_quick_note',
+      'add_goal',
+      'change_goal_area',
+      'add_step',
+      'add_idea',
+      'file_note',
+    ),
     undoCaptureBox: none('theirs'),
     captureBoxCosts: none('page'),
   },

@@ -75,7 +75,6 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     user,
     sections: async ({ raised }) => devSections(raised, ...(await inboxReads)),
     brief: async ({ raised }) => loadDevBrief(devWaiting(raised, ...(await inboxReads))),
-    feedbackHref: '/dev/bugs',
     children,
   });
 }

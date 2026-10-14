@@ -42,7 +42,6 @@ import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
-import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -240,7 +239,6 @@ import {
   PlanOpenedSurface,
   PlanFeatureSurface,
   PlanFeatureEditSurface,
-  PlanNewFeatureSurface,
   PlanFeatureStepsSurface,
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
@@ -3075,7 +3073,6 @@ function PreviewShell({ children }: { children?: React.ReactNode }) {
       sections={shellSections}
       settingsHref="/jobs/settings"
       settingsLabel="Job search settings"
-      feedbackHref="/dev/bugs"
       displayName="Chris"
       email="chris@example.com"
       isOwner
@@ -3832,16 +3829,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanFeatureEditSurface />,
-  },
-  {
-    /* "New feature" pressed on the plan (plan #1670): one compose surface
-     * with the title, a summary, chips for module, priority, size and who
-     * holds it, then the description. */
-    id: 'dev-plan-new-feature',
-    label: 'Plan · writing a new feature',
-    module: 'dev',
-    width: 'page',
-    render: () => <PlanNewFeatureSurface />,
   },
   {
     /* The same page on its Activity tab (plan #1667): the feature's history
@@ -5028,25 +5015,6 @@ export const SURFACES: readonly Surface[] = [
   },
 
   {
-    /* The note button in the top bar, open on a note with a screenshot and
-     * a PDF added (plan #1713). */
-    id: 'shell-note',
-    label: 'Top bar · File a note with a screenshot',
-    module: 'dev',
-    width: 'page',
-    render: () => <NoteButtonSurface />,
-  },
-  {
-    /* The same panel once a note has saved and triage filed it as an idea,
-     * with the flip back and "Shape it now" (plans #1674, #1675). */
-    id: 'shell-note-saved',
-    label: 'Top bar · A note just saved and filed as an idea',
-    module: 'dev',
-    width: 'page',
-    render: () => <NoteSavedSurface />,
-  },
-
-  {
     /* Ask Dash (plan #1090): the sheet the Dash button in the top bar opens,
      * over the same shell as below, first on a new question with the earlier
      * ones under it, then with an answer and the rows it used. Fixtures
@@ -5556,7 +5524,6 @@ export const SURFACES: readonly Surface[] = [
         sections={shellSections}
         settingsHref="/jobs/settings"
         settingsLabel="Job search settings"
-        feedbackHref="/dev/bugs"
         displayName="Chris"
         email="chris@example.com"
         // The picture is of the owner's shell, which is the one with every
@@ -5584,7 +5551,6 @@ export const SURFACES: readonly Surface[] = [
         account="preview"
         module="you"
         sections={youSections}
-        feedbackHref="/dev/bugs"
         displayName="Chris"
         email="chris@example.com"
         isOwner

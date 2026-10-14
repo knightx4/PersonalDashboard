@@ -18,11 +18,14 @@
 
 import type { DashActionEntry } from '@/lib/core/dash-actions';
 import { refHref } from '@/lib/core/refs';
-import { kindForPlace, type CaptureKindId } from '@/lib/capture/actions';
+import { CAPTURE_KINDS, kindForPlace, type CaptureKindId, type CaptureUnder } from '@/lib/capture/actions';
 import { capturePartLabel, filedDestination, type FiledCapture } from '@/lib/capture/place';
 import { roleName, type CapturePart, type CaptureSortRole } from '@/lib/capture/sort';
 import type { CaptureDay } from '@/lib/capture/todo';
 import type { FiledEntry } from '@/lib/goals/capture';
+
+/** One row written, or the sentence saying why not. */
+export type CaptureRowWrite = { ok: true; id: string } | { ok: false; error: string };
 
 /** What each writer reports: the row it wrote, or the sentence saying why not. */
 export type CaptureWriters = {
@@ -39,6 +42,16 @@ export type CaptureWriters = {
   vault: (
     text: string,
   ) => Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }>;
+  /** A goal, by its title alone, in one of their areas (plan #1950.5). */
+  goal: (areaId: string, title: string) => Promise<CaptureRowWrite>;
+  /** A goals area, by its name. */
+  goalArea: (name: string) => Promise<CaptureRowWrite>;
+  /** A plan feature in a module (scope null: the app as a whole), or a step under a row. */
+  planItem: (title: string, at: { scope: string | null; parentId: string | null }) => Promise<CaptureRowWrite>;
+  /** An idea on the ideas page, about everything until it is triaged. */
+  idea: (body: string) => Promise<CaptureRowWrite>;
+  /** A note in Dev's queue, with the page it was filed from. */
+  devNote: (body: string, pagePath: string | null) => Promise<CaptureRowWrite>;
   /** recordDashAction, bound to the person. */
   record: (entry: DashActionEntry) => Promise<string | null>;
   /**
@@ -123,6 +136,10 @@ export type MakeInput = {
   day?: CaptureDay;
   /** The role a note on a job goes on. */
   role?: CaptureSortRole | null;
+  /** The area a goal goes in, the row a step goes under, or a feature's module. */
+  under?: CaptureUnder | null;
+  /** The page a note for Dev was filed from. */
+  page?: string | null;
 };
 
 export type MakeResult = { ok: true; filed: FiledCapture } | { ok: false; error: string };
@@ -136,6 +153,69 @@ type Maker = (input: MakeInput, writers: CaptureWriters, by: MadeBy, errors: str
 function aimedUndo(by: MadeBy, undo?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (by === 'dash') return undo;
   return { ...(undo ?? {}), aimed: true };
+}
+
+/** The record's sentence, in the words of whoever made it. */
+function said(by: MadeBy, what: string): string {
+  return by === 'dash' ? `Dash added ${what}.` : `You added ${what}.`;
+}
+
+/**
+ * The make shared by the kinds that write one row and nothing else (plan
+ * #1950.5): write it, keep the files with it, record it for Undo, and say
+ * where it went.
+ */
+async function makeOneRow(
+  kind: CaptureKindId,
+  written: CaptureRowWrite,
+  shape: {
+    text: string;
+    table: string;
+    /** The record's kind, which the undo and Home's list read. */
+    record: string;
+    /** What was added, for the record's sentence: `the goal "Run a marathon"`. */
+    what: string;
+    where: string;
+    href: string;
+    /** Whether the row's page opens once it is made. */
+    opens: boolean;
+  },
+  writers: CaptureWriters,
+  by: MadeBy,
+  errors: string[],
+): Promise<MakeResult> {
+  if (!written.ok) return { ok: false, error: written.error };
+  const subjectRef = `${shape.table}:${written.id}`;
+  const files = CAPTURE_KINDS[kind].files ? await attachTo(writers, [subjectRef], errors) : undefined;
+  const actionId = await writers.record({
+    surface: 'capture',
+    kind: shape.record,
+    subjectRef,
+    op: 'insert',
+    summary: said(by, shape.what),
+    undo: aimedUndo(by),
+  });
+  return {
+    ok: true,
+    filed: {
+      ...(files ? { files } : {}),
+      place: null,
+      module: CAPTURE_KINDS[kind].module,
+      text: shape.text,
+      where: shape.where,
+      href: shape.href,
+      actionId,
+      goals: null,
+      undoneAt: null,
+      ref: subjectRef,
+      page: shape.opens ? refHref(subjectRef) : null,
+    },
+  };
+}
+
+/** "Goals · Health", or the workspace alone when nothing is under it. */
+function within(workspace: string, under: CaptureUnder | null | undefined): string {
+  return under ? `${workspace} · ${under.title}` : workspace;
 }
 
 /**
@@ -277,6 +357,114 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
         page: refHref(subjectRef),
       },
     };
+  },
+
+  goal: async ({ text, under }, writers, by, errors) => {
+    if (!under) return { ok: false, error: 'Open an area first, then add the goal there.' };
+    const shape = { text, table: 'goals.items', record: 'add_goal', what: `the goal "${quoted(text)}"` };
+    return makeOneRow(
+      'goal',
+      await writers.goal(under.id, text),
+      { ...shape, where: within('Goals', under), href: '/goals', opens: true },
+      writers,
+      by,
+      errors,
+    );
+  },
+
+  'goal-area': async ({ text }, writers, by, errors) =>
+    makeOneRow(
+      'goal-area',
+      await writers.goalArea(text),
+      {
+        text,
+        table: 'goals.areas',
+        record: 'add_goal_area',
+        what: `the area "${quoted(text)}"`,
+        where: 'Goals',
+        href: '/goals',
+        opens: true,
+      },
+      writers,
+      by,
+      errors,
+    ),
+
+  'plan-feature': async ({ text, under }, writers, by, errors) =>
+    makeOneRow(
+      'plan-feature',
+      await writers.planItem(text, { scope: under?.id ?? null, parentId: null }),
+      {
+        text,
+        table: 'public.plan_items',
+        record: 'add_plan_item',
+        what: `the feature "${quoted(text)}" to the plan`,
+        where: within('Plan', under),
+        href: '/dev/plan',
+        opens: true,
+      },
+      writers,
+      by,
+      errors,
+    ),
+
+  'plan-step': async ({ text, under }, writers, by, errors) => {
+    if (!under) return { ok: false, error: 'Open the feature first, then add the step there.' };
+    return makeOneRow(
+      'plan-step',
+      await writers.planItem(text, { scope: null, parentId: under.id }),
+      {
+        text,
+        table: 'public.plan_items',
+        record: 'add_plan_item',
+        what: `the step "${quoted(text)}" to the plan`,
+        where: within('Plan', under),
+        href: '/dev/plan',
+        opens: true,
+      },
+      writers,
+      by,
+      errors,
+    );
+  },
+
+  idea: async ({ text }, writers, by, errors) =>
+    makeOneRow(
+      'idea',
+      await writers.idea(text),
+      {
+        text,
+        table: 'public.ideas',
+        record: 'add_idea',
+        what: `the idea "${quoted(text)}"`,
+        where: 'Dev · Ideas',
+        href: '/dev/ideas',
+        opens: true,
+      },
+      writers,
+      by,
+      errors,
+    ),
+
+  // The page stays where it is: a note is about the page you were on, and
+  // opening the note would take you off it.
+  'dev-note': async ({ text, page }, writers, by, errors) => {
+    return makeOneRow(
+      'dev-note',
+      await writers.devNote(text, page ?? null),
+      {
+        text,
+        table: 'public.feedback_items',
+        record: 'add_dev_note',
+        what: page ? `the note "${quoted(text)}" from ${page}` : `the note "${quoted(text)}"`,
+        where: 'Dev · Notes',
+        href: '/dev/bugs',
+        opens: false,
+      },
+      writers,
+      by,
+      errors,
+    );
   },
 };
 

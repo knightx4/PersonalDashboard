@@ -45,10 +45,11 @@ import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
 import { goalsPlaceName } from '@/lib/capture/destination';
 import {
+  filedModule,
   offeredCapturePlaces,
   type FiledCapture,
 } from '@/lib/capture/place';
-import { CAPTURE_PLACE_MODULE, type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
+import { type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
@@ -256,7 +257,7 @@ export function CaptureProvider({
       {aimed && (
         <AimedPanel
           // A fresh panel per aim, so a second Add starts empty.
-          key={`${aimed.kind}:${aimed.role?.id ?? ''}`}
+          key={`${aimed.kind}:${aimed.role?.id ?? aimed.under?.id ?? ''}`}
           aim={aimed}
           onClose={close}
         />
@@ -712,11 +713,9 @@ function AnythingPanel({
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
-      showLanding(
-        from,
-        { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where },
-        text,
-      );
+      // The box files only into places, so every row it filed has a workspace.
+      const workspace = filedModule(first);
+      if (workspace) showLanding(from, { module: workspace, href: first.href, name: first.where }, text);
     });
   }
 
@@ -1125,6 +1124,9 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const [day, setDay] = useState<CaptureDay>('today');
   const [error, setError] = useState<string | null>(aimProblem(aim));
   const [pending, start] = useTransition();
+  // A note for Dev takes files, as the header's note did (plan #1713).
+  const [uploads, setUploads] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
@@ -1137,13 +1139,22 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
       setError(problem);
       return;
     }
+    if (uploading) {
+      setError('Adding the file first.');
+      return;
+    }
     start(async () => {
-      const result = await makeAimedCapture({
-        kind: aim.kind,
-        text,
-        ...(kind.needs === 'day' ? { day } : {}),
-        ...(aim.role ? { role: aim.role } : {}),
-      });
+      const result = await makeAimedCapture(
+        {
+          kind: aim.kind,
+          text,
+          ...(kind.needs === 'day' ? { day } : {}),
+          ...(aim.role ? { role: aim.role } : {}),
+          ...(aim.under ? { under: aim.under } : {}),
+          ...(aim.page ? { page: aim.page } : {}),
+        },
+        uploads,
+      );
       if (!result.ok) {
         setError(result.error);
         return;
@@ -1175,7 +1186,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
       if (page) {
         carryToast(notice);
         router.push(page);
-      } else {
+      } else if (aim.kind !== 'dev-note') {
+        // A note for Dev leaves the page as it was: it is about this page.
         router.refresh();
       }
     });
@@ -1199,6 +1211,13 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
         <AimedCaptureForm
           kind={kind}
           role={aim.role}
+          under={aim.under}
+          page={aim.page}
+          files={
+            kind.files ? (
+              <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+            ) : undefined
+          }
           text={text}
           onText={(value) => {
             setText(value);

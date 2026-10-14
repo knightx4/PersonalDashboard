@@ -85,9 +85,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
-  // Only a goal added to the Learn area costs: it is placed and given a plan
-  // (plan #1490). The hint shows in that area alone.
-  'app/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [
     'generate-track-from-theme',
@@ -232,6 +229,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
+  'app/capture-actions.ts#makeAimedCapture':
+    "The Add in capture's panel when an Add button aimed it at a kind (plans #1950.1, #1950.5). Making the row is free. A goal added to the Learn area is then placed and given a plan (plan #1490), and a note for Dev is triaged (plan #1179), both after the response, as when they had forms of their own. A goal update reaches Goals' filing in the walk but is never sent here: aiming at one opens the one box, whose File it hint prices it.",
   'app/capture-actions.ts#sortCaptureBox':
     'Called by the one capture box when typing pauses, to say where the sentence will go (plan #1581). There is no button, only the field; the File it hint prices it under app/capture-actions.ts#fileCaptureBox.',
   'app/goals/actions.ts#editGoal':
