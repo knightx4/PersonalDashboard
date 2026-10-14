@@ -8,11 +8,11 @@
  * textarea rather than in it, and nothing reaches an employer that the person
  * did not put there themselves.
  *
- * What makes it worth having at all is the citation. Every sentence traces to
- * an item you wrote, the model reports what it could not ground, and an empty
- * evidence set is an error rather than an empty-context fallback — otherwise
- * this is a blank page with extra steps, which is the thing a chat window
- * already does.
+ * It aims at the best answer to the question, not a rearrangement of the
+ * bank: the bank supplies the facts about the person, the posting supplies
+ * why this company and role, and the model reports any claim about the
+ * person the bank does not carry (note ad554975, which found answers drawn
+ * only from evidence never said why this company or why they fit).
  */
 import 'server-only';
 
@@ -26,49 +26,52 @@ import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 /** Writing in someone else's voice off their own material. Judgment again. */
 const MODEL = MODELS.jobsEvidenceDraft;
 const TOOL_NAME = 'report_draft';
+/** How much of a posting is sent: the part that says what the role is. */
+const POSTING_CHARS = 8000;
 
-const SYSTEM = `You draft an application answer for someone, out of their own
-evidence bank, in their own voice.
+const SYSTEM = `You write the best answer you can to one application question,
+for one person, in their voice. They will paste it into the form themselves.
 
-You are given their evidence bank, then one question and the role it is being
-asked for. Write the answer they would write if they had an hour, and report:
-- answer: the draft itself. Plain prose, first person, no headings and no
-  bullet list unless the question asks for one.
-- evidence_item_ids: every bank item the answer draws on, copied exactly.
-- unsupported_claims: any factual claim in your answer that is not carried by
-  one of those items — a number, a scale, a timeline, a job title, a result.
+You are given their evidence bank (stories and results they wrote), then the
+role, what it asks for, the posting where there is one, and the question.
 
-Rules:
+What a good answer does:
+- Answers the question that was asked, directly, in the first sentence or two.
+  A "why us" question says why this company and why this role, using what the
+  posting says, and why they fit, using their own stories. A behavioural
+  question tells one story properly, not four listed.
+- Sounds like a capable person talking plainly: first person, short sentences,
+  concrete nouns, no corporate filler. Down to earth and to the point.
+- Uses their evidence where it carries the point: a real result, a real
+  situation, their own words and numbers. Pick the one or two items that fit
+  best and leave the rest. The bank is material to draw on, not a limit on
+  what the answer may say.
+- Stays under the word limit if one is given.
 
-Every sentence of substance must trace to an item. You are arranging their
-material for this question, not adding to it. Where a question needs a detail
-the bank does not have, either leave it out or write the sentence without it —
-and if you do state something the bank does not carry, it goes in
-unsupported_claims verbatim, as it appears in your answer. Reporting a claim
-there is not a failure; hiding one is.
+What it never does:
+- Invent facts about them. A number, a scale, a timeline, a job title, an
+  employer or a result about the person comes from the bank or is not stated.
+  If you do state something about them the bank does not carry, report it
+  verbatim in unsupported_claims. What you say about the company or the role
+  from the posting is not a claim about them and need not be reported.
+- Open by restating the question, call the role an exciting opportunity, or
+  close with a paragraph of enthusiasm.
 
-Their words, not yours. Reuse the vocabulary and the sentence rhythm of the
-items you are citing. A draft that reads better than the person writes is a
-draft they have to rewrite.
-
-Answer the question that was asked. A behavioural question wants one story
-told properly, not four listed. Respect the word limit if one is given — go
-under it rather than over.
-
-No throat-clearing. Do not open by restating the question, do not tell the
-employer what an exciting opportunity this is, and do not close with a
-paragraph about your enthusiasm.
-
-If the bank genuinely does not cover the question, say so in unsupported_claims
-and write the shortest honest answer you can from what is there. Do not
-manufacture a story.`;
+Report:
+- answer: the answer itself. Plain prose, no headings, no bullet list unless
+  the question asks for one.
+- evidence_item_ids: every bank item the answer draws on, copied exactly. Empty
+  when it draws on none.
+- unsupported_claims: as above.`;
 
 export type DraftInput = {
   question: string;
   /** Title and company, so the answer can be about this role. */
   roleLabel: string;
-  /** The shortlist for this question. Empty is refused upstream. */
+  /** The shortlist for this question. May be empty. */
   bank: readonly ShortlistItem[];
+  /** The posting's text, cut to a length worth sending. */
+  posting?: string | null;
   wordLimit?: number | null;
   /** `profiles.writing_style_notes`. */
   styleNotes?: string | null;
@@ -109,18 +112,12 @@ export async function draftAnswer(
   options: DraftOptions,
   input: DraftInput,
 ): Promise<DraftResult> {
-  if (input.bank.length === 0) {
-    return {
-      ok: false,
-      error: 'Your evidence bank is empty, so there is nothing to write from.',
-    };
-  }
-
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
 
   const context = [
     `Role: ${input.roleLabel}`,
     input.requirementSummary ? `What the role asks for: ${input.requirementSummary}` : null,
+    input.posting?.trim() ? `The posting:\n${input.posting.trim().slice(0, POSTING_CHARS)}` : null,
     input.wordLimit ? `Word limit: ${input.wordLimit}` : null,
     input.styleNotes?.trim() ? `How they write:\n${input.styleNotes.trim()}` : null,
     input.canonicalAnswer?.trim()
@@ -142,7 +139,9 @@ export async function draftAnswer(
         { type: 'text', text: SYSTEM },
         {
           type: 'text',
-          text: `The evidence bank:\n\n${renderBank(input.bank)}`,
+          text: input.bank.length
+            ? `The evidence bank:\n\n${renderBank(input.bank)}`
+            : 'The evidence bank is empty, so say nothing about them that is not general.',
           cache_control: { type: 'ephemeral' },
         },
       ],

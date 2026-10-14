@@ -26,7 +26,6 @@ import type { PanelProps } from './types';
 export function Answers({
   answers,
   applicationId,
-  bankSize,
   roleId,
   coverLetter,
   status,
@@ -126,7 +125,7 @@ export function Answers({
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} closed={closed} />
+            <AnswerCard key={answer.id} answer={answer} closed={closed} />
           ))}
         </div>
       )}
@@ -221,11 +220,9 @@ function CoverLetter({
 
 function AnswerCard({
   answer,
-  bankSize,
   closed,
 }: {
   answer: PanelProps['answers'][number];
-  bankSize: number;
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
 }) {
@@ -393,12 +390,6 @@ function AnswerCard({
               size="sm"
               variant="ghost"
               pending={drafting}
-              disabled={bankSize === 0}
-              title={
-                bankSize === 0
-                  ? 'Your evidence bank is empty, so there is nothing to draft from.'
-                  : undefined
-              }
               onClick={() => {
                 setDrafting(true);
                 setDraftError(null);
@@ -413,14 +404,12 @@ function AnswerCard({
                 });
               }}
             >
-              {drafting ? 'Drafting…' : 'Draft from my evidence'}
+              {drafting ? 'Drafting…' : 'Draft'}
             </Button>
-            {bankSize > 0 && (
-              <PaidHint
-                action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-                what="Cost of drafting"
-              />
-            )}
+            <PaidHint
+              action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+              what="Cost of drafting"
+            />
           </>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
@@ -434,7 +423,7 @@ function AnswerCard({
         // border inside the answer card. Law 11: a shared ground groups.
         <Note className="mt-3 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
+            <h4 className="text-small font-medium text-ink">A draft</h4>
             <span className="text-small text-ink-muted">
               Nothing is saved until you insert it and save.
             </span>
@@ -445,11 +434,9 @@ function AnswerCard({
           </p>
 
           <p className="mt-2 text-small text-ink-muted">
-            Draws on{' '}
-            {draft.evidenceItemIds.length === 1
-              ? 'one item'
-              : `${draft.evidenceItemIds.length} items`}{' '}
-            from your bank.
+            {draft.evidenceItemIds.length === 0
+              ? 'Draws on nothing from your bank.'
+              : `Draws on ${draft.evidenceItemIds.length === 1 ? 'one item' : `${draft.evidenceItemIds.length} items`} from your bank.`}
           </p>
 
           {draft.unsupportedClaims.length > 0 && (
