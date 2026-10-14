@@ -163,6 +163,7 @@ describe('RLS coverage', () => {
       'video_clips',
       'video_transcripts',
       'watch_list',
+      'work_passages',
     ]);
   });
 });
@@ -2418,6 +2419,111 @@ describe('evidence for ideas (plan #2006.1)', () => {
   it('goes with the idea', async () => {
     await admin`delete from concepts where id = ${ideaId}`;
     expect(await admin`select 1 from evidence_links where target_id = ${ideaId}`).toHaveLength(0);
+  });
+});
+
+describe('ideas linked to work history (plan #2006.5)', () => {
+  // learn 0124_work_evidence.sql. The daily run copies the Career notes'
+  // embedded blocks and the latest résumé's passages into work_passages,
+  // then links each idea to the passages it matches. The résumé and Career
+  // notes count fully and application notes 0.4.
+  const NEAR = `(array_fill(0.0::real, array[1023]) || array[1.0::real])::extensions.vector`;
+  let ideaId = '';
+  let resumeId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Work subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, embedding, embedding_model)
+      values (${userA}, ${subject.id}, 'Revenue testing', 'Testing all revenue beats sampling.',
+              'Written by hand for this test.', ${sql.unsafe(NEAR)}, 'voyage-4-lite')
+      returning id`;
+    ideaId = idea.id;
+    // One vault per account, which the dust tests above may already have made.
+    const [connection] = await admin<{ id: string }[]>`
+      insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userA}, 'a', 'work-vault', 'main', 'encrypted')
+      on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
+      returning id`;
+    const notes: [string, string][] = [
+      ['Career/EY.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
+      ['Career/Job Applications/Acme.md', '> [!NOTE] What they want\n> Someone who tests revenue in full.'],
+    ];
+    for (const [path, body] of notes) {
+      const [note] = await admin<{ id: string }[]>`
+        insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
+        values (${userA}, ${connection.id}, ${path}, ${path.split('/').pop()!.replace(/\.md$/, '')},
+                ${body}, ${`sha-${path}`}, ${body.length})
+        returning id`;
+      await admin`
+        insert into obsidian.note_blocks (note_id, user_id, position, start_offset, end_offset,
+                                          text_hash, source_hash, embedding, embedding_model)
+        values (${note.id}, ${userA}, 0, 0, ${body.length}, ${`hash-${path}`}, 'source',
+                ${sql.unsafe(NEAR)}, 'voyage-4-lite')`;
+    }
+    const [resume] = await admin<{ id: string }[]>`
+      insert into job_search.resume_versions (user_id, label, text_content)
+      values (${userA}, 'Résumé', 'EXPERIENCE') returning id`;
+    resumeId = resume.id;
+  });
+
+  const passages = [
+    {
+      position: 0,
+      body: 'EXPERIENCE\nBuilt an automated revenue testing system',
+      first_line: 'Built an automated revenue testing system',
+      text_hash: 'resume-hash',
+    },
+  ];
+
+  it('copies the Career notes and the résumé into passages, weighting application notes less', async () => {
+    const [synced] = await admin<{ n: number }[]>`
+      select learn.sync_work_passages(${userA}::uuid, ${resumeId}::uuid, 'Résumé',
+                                      ${sql.json(passages)}) as n`;
+    expect(synced!.n).toBe(3);
+    const rows = await admin<{ origin: string; weight: number; first_line: string; embedded: boolean }[]>`
+      select origin, weight, first_line, embedding is not null as embedded
+      from work_passages where user_id = ${userA} order by origin`;
+    expect(rows).toEqual([
+      { origin: 'application', weight: 0.4, first_line: 'Someone who tests revenue in full.', embedded: true },
+      { origin: 'career', weight: 1, first_line: 'Took the lead on the revenue testing tool at work.', embedded: true },
+      { origin: 'resume', weight: 1, first_line: 'Built an automated revenue testing system', embedded: false },
+    ]);
+  });
+
+  it('links the idea to every passage it matches, the résumé and role notes above application notes', async () => {
+    // What the daily run's embedding pass does for a résumé passage.
+    await admin`
+      update work_passages set embedding = ${sql.unsafe(NEAR)}, embedding_model = 'voyage-4-lite'
+      where user_id = ${userA} and origin = 'resume'`;
+    const [linked] = await admin<{ n: number }[]>`select learn.refresh_work_evidence(${userA}::uuid) as n`;
+    expect(linked!.n).toBe(3);
+    const links = await admin<{ weight: number; basis: string }[]>`
+      select weight, basis from evidence_links
+      where target_id = ${ideaId} and source_kind = 'work' order by weight desc, basis`;
+    expect(links).toEqual([
+      { weight: 1, basis: 'From your note EY: "Took the lead on the revenue testing tool at work."' },
+      { weight: 1, basis: 'From your résumé: "Built an automated revenue testing system"' },
+      { weight: 0.4, basis: 'From your application notes in Acme: "Someone who tests revenue in full."' },
+    ]);
+  });
+
+  it('shows the owner their passages and nobody else, and leaves the writing to the daily run', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from work_passages`)).toHaveLength(3);
+    expect(await asUser(userB, (tx) => tx`select id from work_passages`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`select learn.refresh_work_evidence(${userA}::uuid)`),
+    ).rejects.toThrow();
+  });
+
+  it('removes a passage that has gone, and its link with it', async () => {
+    await admin`select learn.sync_work_passages(${userA}::uuid, null, null, '[]'::jsonb)`;
+    await admin`select learn.refresh_work_evidence(${userA}::uuid)`;
+    expect(await admin`select 1 from work_passages where user_id = ${userA} and origin = 'resume'`).toHaveLength(0);
+    expect(
+      await admin`select 1 from evidence_links where target_id = ${ideaId} and source_kind = 'work'`,
+    ).toHaveLength(2);
   });
 });
 
