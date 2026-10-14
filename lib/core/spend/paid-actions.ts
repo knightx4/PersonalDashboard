@@ -160,9 +160,9 @@ export const PAID_ACTIONS = {
   // Not an action: "Import orders from Gmail" and "Sync now" in Shopping
   // settings post here, and the import reads each order confirmation it finds.
   'app/api/inbox/sync/route.ts#POST': ['extract-email-order'],
-  // Not an action either: "Add from this email" on the review list opens this page,
-  // which reads the confirmation into the order form as it renders.
-  'app/shopping/orders/new/page.tsx#NewOrderPage': ['extract-email-order'],
+  // "Add from this email" on the review list reads the confirmation and makes
+  // the order in one press (plan #1950.3.3), through the aimed capture.
+  'app/capture-actions.ts#makeAimedCapture:email': ['extract-email-order'],
 
   // Vault
   'app/vault/n/[...path]/actions.ts#proposeMap': ['map-note', 'embed-map'],
@@ -240,7 +240,7 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/goals/actions.ts#editGoal':
     'Saved when a goal\'s title or done-when loses focus after a change, or when it is moved to another area. Only a goal in the Learn area costs: it is placed again and, if it has no plan yet, given one (plan #1490). There is no button, only the field.',
   'app/shopping/review/actions.ts#readOrderFromEmail':
-    'Nothing calls it. "Add from this email" on the review list opens the order form, whose page makes the same read as it renders, so the hint sits on that link under app/shopping/orders/new/page.tsx#NewOrderPage.',
+    'Nothing calls it. "Add from this email" on the review list makes the order in one press through app/capture-actions.ts#makeAimedCapture, whose hint for that button is the key ending :email.',
   'app/api/inbox/sync/continue/route.ts#POST':
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
