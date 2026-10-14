@@ -127,7 +127,7 @@ export async function embedVideoMetadata(
     for (let at = 0; at < rows.length; at += STORE_CHUNK) {
       const stored = await learn.rpc('store_video_metadata_embeddings', {
         item_ids: rows.slice(at, at + STORE_CHUNK).map((row) => row.id),
-        vectors: embedded.vectors.slice(at, at + STORE_CHUNK).map(vectorLiteral),
+        vectors: embedded.vectors.slice(at, at + STORE_CHUNK).map((vector) => vectorLiteral(vector)),
         model: embedded.model,
       });
       if (stored.error) return { ...result, stopped: `storing video vectors: ${stored.error.message}` };
