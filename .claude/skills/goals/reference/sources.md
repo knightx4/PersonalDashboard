@@ -536,6 +536,14 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
+### `core.dash_handoffs` (Home)
+
+What they asked Dash that it handed to the backup routine, and how far that has got.
+
+- Search: `request`
+- Name a row by `request`; link it by `id`
+- status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.
+
 ### `core.attachments` (Home)
 
 Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.
