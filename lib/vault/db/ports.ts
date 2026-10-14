@@ -324,18 +324,18 @@ export function vaultPortsFor(opts: {
  */
 export function noteSavePorts(opts: {
   supabase: VaultSupabaseClient;
+  /** Whose vault, when `supabase` is the service-role client: every read and write names them. */
+  userId?: string;
   afterSave: (noteId: string) => void;
 }): SaveNotePorts {
-  const { supabase } = opts;
+  const { supabase, userId } = opts;
 
   return {
     async loadNote(path) {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, path, title, body, blob_sha')
-        .eq('path', path)
-        .is('deleted_at', null)
-        .maybeSingle();
+      const { data, error } = await mine(
+        supabase.from('notes').select('id, path, title, body, blob_sha').eq('path', path).is('deleted_at', null),
+        userId,
+      ).maybeSingle();
       if (error) throw new Error(`Reading ${path} failed: ${error.message}`);
       if (!data) return null;
       const row = data as {
@@ -355,21 +355,24 @@ export function noteSavePorts(opts: {
       return note;
     },
 
-    openSource: () => openConnectedSource(supabase),
+    openSource: () => openConnectedSource(supabase, userId),
 
     async storeNote(noteId, expectedBlobSha, row) {
-      const { error } = await supabase
-        .from('notes')
-        .update({
-          title: row.title,
-          body: row.body,
-          frontmatter: row.frontmatter,
-          blob_sha: row.blobSha,
-          size_bytes: row.sizeBytes,
-          git_updated_at: row.gitUpdatedAt,
-        })
-        .eq('id', noteId)
-        .eq('blob_sha', expectedBlobSha);
+      const { error } = await mine(
+        supabase
+          .from('notes')
+          .update({
+            title: row.title,
+            body: row.body,
+            frontmatter: row.frontmatter,
+            blob_sha: row.blobSha,
+            size_bytes: row.sizeBytes,
+            git_updated_at: row.gitUpdatedAt,
+          })
+          .eq('id', noteId)
+          .eq('blob_sha', expectedBlobSha),
+        userId,
+      );
       if (error) throw new Error(`Storing the saved note failed: ${error.message}`);
     },
 
@@ -481,16 +484,15 @@ export function noteCreatePorts(opts: {
 }
 
 /** The ports for taking a note capture wrote back out (plan #1582), over the session client. */
-export function noteRemovePorts(supabase: VaultSupabaseClient): RemoveNotePorts {
+export function noteRemovePorts(supabase: VaultSupabaseClient, userId?: string): RemoveNotePorts {
   return {
-    openSource: () => openConnectedSource(supabase),
+    openSource: () => openConnectedSource(supabase, userId),
 
     async loadNote(noteId) {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, path, title, blob_sha, deleted_at')
-        .eq('id', noteId)
-        .maybeSingle();
+      const { data, error } = await mine(
+        supabase.from('notes').select('id, path, title, blob_sha, deleted_at').eq('id', noteId),
+        userId,
+      ).maybeSingle();
       if (error) throw new Error(`Reading the note failed: ${error.message}`);
       if (!data) return null;
       const row = data as { id: string; path: string; title: string; blob_sha: string; deleted_at: string | null };
@@ -498,29 +500,30 @@ export function noteRemovePorts(supabase: VaultSupabaseClient): RemoveNotePorts 
     },
 
     async markDeleted(noteId, blobSha) {
-      const { error } = await supabase
-        .from('notes')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', noteId)
-        .eq('blob_sha', blobSha)
-        .is('deleted_at', null);
+      const { error } = await mine(
+        supabase
+          .from('notes')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', noteId)
+          .eq('blob_sha', blobSha)
+          .is('deleted_at', null),
+        userId,
+      );
       if (error) throw new Error(`Removing the note failed: ${error.message}`);
     },
   };
 }
 
 /** The ports for renaming a note from its page (note 69c302f1), over the session client. */
-export function noteRenamePorts(supabase: VaultSupabaseClient): RenameNotePorts {
+export function noteRenamePorts(supabase: VaultSupabaseClient, userId?: string): RenameNotePorts {
   return {
-    openSource: () => openConnectedSource(supabase),
+    openSource: () => openConnectedSource(supabase, userId),
 
     async loadNote(path) {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, path, blob_sha')
-        .eq('path', path)
-        .is('deleted_at', null)
-        .maybeSingle();
+      const { data, error } = await mine(
+        supabase.from('notes').select('id, path, blob_sha').eq('path', path).is('deleted_at', null),
+        userId,
+      ).maybeSingle();
       if (error) throw new Error(`Reading ${path} failed: ${error.message}`);
       if (!data) return null;
       const row = data as { id: string; path: string; blob_sha: string };
@@ -528,14 +531,26 @@ export function noteRenamePorts(supabase: VaultSupabaseClient): RenameNotePorts 
     },
 
     async moveNote(noteId, expectedBlobSha, row) {
-      const { error } = await supabase
-        .from('notes')
-        .update({ path: row.path, title: row.title, blob_sha: row.blobSha })
-        .eq('id', noteId)
-        .eq('blob_sha', expectedBlobSha);
+      const { error } = await mine(
+        supabase
+          .from('notes')
+          .update({ path: row.path, title: row.title, blob_sha: row.blobSha })
+          .eq('id', noteId)
+          .eq('blob_sha', expectedBlobSha),
+        userId,
+      );
       if (error) throw new Error(`Storing the renamed note failed: ${error.message}`);
     },
   };
+}
+
+/**
+ * A query narrowed to one person's rows when `userId` is given. The session
+ * client leaves that to RLS; the service-role client an agent's write runs on
+ * (lib/dash/vault-writes.ts) passes none, so every query names the person.
+ */
+function mine<Q>(query: Q, userId: string | undefined): Q {
+  return userId ? (query as unknown as { eq(column: string, value: string): Q }).eq('user_id', userId) : query;
 }
 
 /** The stored token, in usable form. Never logged, never returned to a client. */

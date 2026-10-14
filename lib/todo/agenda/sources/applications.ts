@@ -72,10 +72,10 @@ export const applicationsSource: AgendaSource = {
   async defer(ctx, key) {
     const until = new Date(ctx.now);
     until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-    await dismiss(ctx.userId, 'application', key, until);
+    await dismiss(ctx.userId, 'application', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
-    await dismiss(ctx.userId, 'application', key, null);
+    await dismiss(ctx.userId, 'application', key, null, ctx.clients);
   },
 };
