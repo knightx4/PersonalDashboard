@@ -56,3 +56,6 @@ __design_probe.ts
 
 # A note's files, downloaded by scripts/notes.ts files <id> (plan #1713).
 .notes-files/
+
+# builders' worktrees
+.claude/worktrees/
