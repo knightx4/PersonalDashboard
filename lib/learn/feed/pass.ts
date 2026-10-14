@@ -2,6 +2,7 @@ import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/
 import { contextFor, NO_PROGRESS, type Depth, type DepthContext, type DepthProgress } from './depth';
 import { LEVEL3_LIST_PICKER } from './level3';
 import type { NameResult, NamedSection } from './name-material';
+import { drawNextTopics, NEXT_TOPIC_PICKER } from './next-topics';
 import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedGoal, type FeedTarget } from './targets';
 
 /**
@@ -31,6 +32,10 @@ import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedGoal, type 
  * three and their swipes set its depth. A claimed Level 3 article due back
  * (plan #912) comes through the same port at a new section, and its pick
  * carries the model that named that section.
+ *
+ * An open goal drawn for the topics next to what you know (plan #2016.6,
+ * `next-topics.ts`) skips the naming call too: its picks are its topics, each
+ * from the lead, and each card carries the known topic it sits beside.
  */
 
 /** Targets drawn per person per call. At two or three picks each, about ten picks. */
@@ -70,6 +75,8 @@ export type FeedCardInsert = {
   pick_basis: string;
   pick_model: string;
   depth: Depth;
+  /** The known topic a next-topic card sits beside (plan #2016.6). Null otherwise. */
+  beside_topic: string | null;
 };
 
 export type FeedPickPorts = {
@@ -217,6 +224,7 @@ async function pickOne(
     pick_basis: named.basis,
     pick_model: model,
     depth,
+    beside_topic: named.beside ?? null,
   });
   if (outcome === 'duplicate') {
     summary.duplicates += 1;
@@ -255,11 +263,15 @@ export async function runFeedPicksFor(
     summary.targets.push({ reason: target.reason, name: targetName(target) });
 
     const depth = contextFor(person.progress ?? NO_PROGRESS, depthTarget(target));
-    const listGoal = target.reason === 'goal' && target.goal.list ? { ...target.goal, list: target.goal.list } : null;
-    const named = listGoal
-      ? await ports.drawFromList(listGoal, { avoid, pickedNow, depth })
-      : await ports.name(target, avoid, depth);
-    const model = listGoal ? LEVEL3_LIST_PICKER : options.model;
+    const goal = target.reason === 'goal' ? target.goal : null;
+    const named =
+      goal?.list === 'next'
+        ? drawNextTopics(goal.next ?? [], avoid)
+        : goal?.list === 'level3'
+          ? await ports.drawFromList({ ...goal, list: 'level3' }, { avoid, pickedNow, depth })
+          : await ports.name(target, avoid, depth);
+    const model =
+      goal?.list === 'next' ? NEXT_TOPIC_PICKER : goal?.list === 'level3' ? LEVEL3_LIST_PICKER : options.model;
     if (!named.ok) {
       summary.failed.push(`${targetName(target)}: ${named.detail}`);
       continue;

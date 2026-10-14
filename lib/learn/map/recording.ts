@@ -11,6 +11,7 @@ import type { IdeaMapView } from './load';
 
 export const PRIVATE_PLACE = 'A private place';
 export const PRIVATE_IDEA = 'Private idea';
+export const PRIVATE_TOPIC = 'A private topic';
 
 export type Recording = { on: boolean; hidden: string[] };
 
@@ -27,7 +28,15 @@ export function redactView(view: IdeaMapView, hidden: ReadonlySet<string>): Idea
       ? { ...idea, name: PRIVATE_IDEA, claim: '', track: null, field: null }
       : idea,
   );
-  return { ...view, places, ideas };
+  // A topic over an idea in a hidden place would name what the place is about.
+  const hiddenIdeas = new Set(view.ideas.filter((idea) => idea.placeId && hidden.has(idea.placeId)).map((idea) => idea.id));
+  const topics = view.topics && {
+    ...view.topics,
+    topics: view.topics.topics.map((topic) =>
+      topic.ideaIds.some((id) => hiddenIdeas.has(id)) ? { ...topic, title: PRIVATE_TOPIC } : topic,
+    ),
+  };
+  return { ...view, places, ideas, topics };
 }
 
 /** The view to draw: redacted while recording is on, whole otherwise. */

@@ -9,7 +9,7 @@ import { loadBriefForTrack } from '@/lib/learn/briefs/load';
 import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { AddForm } from './add-form';
+import { AimButton } from '@/components/shell/aim-button';
 import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
@@ -66,7 +66,13 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
             : undefined
         }
         actions={
-          <ConfirmStep
+          <>
+            <AimButton
+              aim={{ kind: 'track-reading', under: { id: track.id, title: track.title } }}
+              label="Add something to read"
+              variant="secondary"
+            />
+            <ConfirmStep
             action={removeTrack}
             fields={{ trackId: track.id }}
             prompt={
@@ -80,7 +86,8 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
             pendingLabel="Deleting…"
           >
             Delete reading list
-          </ConfirmStep>
+            </ConfirmStep>
+          </>
         }
         title={track.title}
         description={
@@ -133,7 +140,6 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
         </>
       )}
 
-      <AddForm trackId={track.id} />
     </PageColumn>
   );
 }

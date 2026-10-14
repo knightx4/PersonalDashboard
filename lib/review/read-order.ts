@@ -4,25 +4,25 @@ import { quotedOriginal } from '@/lib/email/extract/forwarded';
 import { displayNameFromAddress, extractOrderNumber } from '@/lib/email/extract/heuristic';
 import { extractedLineSchema, type ExtractedOrder } from '@/lib/email/extract/schema';
 import { isPlatformMerchantSlug, isPlatformSenderDomain } from '@/lib/merchants/platform';
-import { formatCentsAsDollarsInput, todayInTimezone } from '@/lib/money';
+import { todayInTimezone } from '@/lib/money';
 
-/** One line of an order draft, in the terms the order form's line rows take. */
+/** One line of an order draft. */
 export type OrderDraftLine = {
   name: string;
   variant: string | null;
   quantity: number;
   unitPriceCents: number;
-  /** A top-level category id, as the form's category select holds. */
+  /** A top-level category id. */
   categoryId: string | null;
 };
 
 /**
- * An order read out of an email and not saved: the fields of the order form
- * at app/shopping/orders/new, filled from the email.
+ * An order read out of an email and not saved. "Add from this email" on the
+ * review list makes the order from it through capture (plan #1950.3.3).
  *
  * Merchant and date are always there. The merchant is a known merchant's id
- * when the sender's domain matches one, and otherwise a name for the form's
- * "Other (type a name)" field. Everything else is whatever the email gave up.
+ * when the sender's domain matches one, and otherwise a name. Everything else
+ * is whatever the email gave up.
  */
 export type OrderDraft = {
   merchantId: string | null;
@@ -125,8 +125,8 @@ function salvage(raw: unknown): Partial<ExtractedOrder> & { lines: ExtractedOrde
 }
 
 /**
- * Turn an extractor's answer and the email it read into a draft for the order
- * form. What the extractor could not find comes from the email: the merchant
+ * Turn an extractor's answer and the email it read into an order draft. What
+ * the extractor could not find comes from the email: the merchant
  * from the sender, the date from the email's date, the order number from the
  * subject and body by pattern.
  */
@@ -189,69 +189,6 @@ export function draftFromExtraction(input: {
     reconciled: Boolean(ok),
     source: extraction && lines.length > 0 ? extraction.source : 'none',
     issues,
-  };
-}
-
-/** One line row of the order form, as the text its inputs hold. */
-export type OrderFormLine = {
-  name: string;
-  variant: string;
-  quantity: string;
-  unitPrice: string;
-  categoryId: string;
-};
-
-/**
- * The order form's starting values, in the strings its inputs hold. The form
- * at app/shopping/orders/new opens with these when it is reached from a review
- * email.
- */
-export type OrderFormPrefill = {
-  /** Set only when the merchant is one of the form's options. */
-  merchantId: string | null;
-  /** The name the merchant field starts with when `merchantId` is null. */
-  merchantName: string;
-  orderDate: string;
-  externalOrderNumber: string;
-  currency: string;
-  /** Empty when the email gave up no items; the form then shows one blank row. */
-  lines: OrderFormLine[];
-  tax: string;
-  shipping: string;
-  discount: string;
-};
-
-function moneyInput(cents: number): string {
-  return cents > 0 ? formatCentsAsDollarsInput(cents) : '';
-}
-
-/**
- * Put a draft in the form's terms. A merchant or category id the form does not
- * offer is dropped rather than sent as a value no option matches: the merchant
- * falls back to its name, the category to Uncategorized.
- */
-export function prefillFromDraft(
-  draft: OrderDraft,
-  options: { merchantIds: ReadonlySet<string>; categoryIds: ReadonlySet<string> },
-): OrderFormPrefill {
-  return {
-    merchantId:
-      draft.merchantId && options.merchantIds.has(draft.merchantId) ? draft.merchantId : null,
-    merchantName: draft.merchantName,
-    orderDate: draft.orderDate,
-    externalOrderNumber: draft.externalOrderNumber ?? '',
-    currency: draft.currency,
-    lines: draft.lines.map((line) => ({
-      name: line.name,
-      variant: line.variant ?? '',
-      quantity: String(line.quantity),
-      unitPrice: formatCentsAsDollarsInput(line.unitPriceCents),
-      categoryId:
-        line.categoryId && options.categoryIds.has(line.categoryId) ? line.categoryId : '',
-    })),
-    tax: moneyInput(draft.taxCents),
-    shipping: moneyInput(draft.shippingCents),
-    discount: moneyInput(draft.discountCents),
   };
 }
 

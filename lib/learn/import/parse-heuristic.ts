@@ -2,8 +2,7 @@
  * Line-heuristic parsing of a pasted reading list, with no model involved.
  *
  * Two reasons this exists rather than the LLM path being the only one. The
- * module has to be developable without `ANTHROPIC_API_KEY`, the same way
- * lib/books/paste-list-heuristic.ts lets the book flow run dry. And a pasted
+ * module has to be developable without `ANTHROPIC_API_KEY`. And a pasted
  * list is often already structured -- a bulleted reply, a syllabus, a set of
  * footnotes -- where splitting on lines is not a degraded answer, it is the
  * right one.

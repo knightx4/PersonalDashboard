@@ -1,8 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { popoverSurface } from '@/components/ui/popover';
+import { ToastProvider, useToast } from '@/components/ui/toast';
 import { FiledLines } from '@/components/shell/capture';
+import { AimedCaptureForm } from '@/components/shell/capture-aim';
+import { CAPTURE_KINDS } from '@/lib/capture/actions';
 import {
   CaptureFoot,
   CaptureHeader,
@@ -159,6 +163,188 @@ export function CaptureBoxSurface() {
           }
         />
       </Box>
+    </div>
+  );
+}
+
+/**
+ * Capture aimed at a kind (plan #1950.1), what an Add button on a list opens:
+ * a todo typed with Tomorrow picked, a note aimed at a role with a long title
+ * and nothing typed yet, and the toast an add leaves, with Undo. No sort line
+ * and no place chips, since pressing Add on the list already said where it
+ * goes.
+ */
+export function AimedCaptureSurface() {
+  return (
+    <ToastProvider>
+      <div className="space-y-8 py-4">
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS.todo}
+            text="Book the dentist for the week after next"
+            onText={nothing}
+            day="tomorrow"
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS['job-note']}
+            role={{
+              id: ROLE.id,
+              title: 'Senior Product Analyst, Payments Risk and Fraud Operations (EMEA)',
+              company: 'Lattice Pay',
+            }}
+            text=""
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        {/* Goals and Dev (plan #1950.5): a goal in the area its New goal was
+            pressed in, and the header's note with the page it is about and a
+            screenshot added. */}
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS.goal}
+            under={{ id: 'area-1', title: 'Health, fitness and getting back to a proper sleep routine' }}
+            text="Run the Brooklyn half marathon in under two hours"
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS['dev-note']}
+            page="/dev/plan/1950?tab=steps&view=tree"
+            files={<AddFile value={NOTE_FILES} onChange={nothing} />}
+            text="The step titles run off the side of the screen on my phone"
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <AddedToast />
+      </div>
+    </ToastProvider>
+  );
+}
+
+/** A screenshot already added to a note for Dev (plan #1713). */
+const NOTE_FILES: UploadedAttachment[] = [
+  { path: 'preview/plan-scrolls-sideways.png', name: 'plan-scrolls-sideways.png', contentType: 'image/png', size: 412_000 },
+];
+
+function Aimed({ children }: { children: React.ReactNode }) {
+  return <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>{children}</div>;
+}
+
+/** The toast one press leaves, held open for the shot. */
+function AddedToast() {
+  const toast = useToast();
+  useEffect(() => {
+    toast({ text: 'Added to Todo · Tomorrow.', undo: nothing, undone: 'Taken back.', duration: 600_000 });
+  }, [toast]);
+  return null;
+}
+
+/**
+ * Capture aimed at a place, from Add a place on You's Places (plan #1950.7):
+ * a home typed with its street, city and dates, and one with no date, which
+ * is refused with the sentence saying how to write it.
+ */
+export function AimedPlaceSurface() {
+  return (
+    <div className="space-y-8 py-4">
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS.place}
+          text="Flat 3, 41 Kerr Street, Glasgow, March 2019 to August 2021"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS.place}
+          text="Oak Street, Leeds"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error="Put the dates after the name, such as Leeds, 2019 to 2021."
+          onSubmit={nothing}
+        />
+      </Aimed>
+    </div>
+  );
+}
+
+/**
+ * Capture aimed at the Jobs and Learn kinds (plan #1950.4): Add a role with a
+ * posting link pasted, pressed and still reading the page, so the loading
+ * state is drawn; Start a topic with a reading list pasted under its name;
+ * and Start a quiz over a named note, refused because the vault has no note
+ * by that name.
+ */
+export function AimedJobsLearnSurface() {
+  return (
+    <div className="space-y-8 py-4">
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['job-role']}
+          text="https://boards.greenhouse.io/latticepay/jobs/7716204003"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['learn-topic']}
+          text={
+            'Central banking\n- Lords of Finance, Liaquat Ahamed: the chapters on 1927\n- The Alchemists by Neil Irwin\n- https://www.bankofengland.co.uk/explainers/how-does-monetary-policy-work'
+          }
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['learn-quiz']}
+          text="[[Monetary transmission]]"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error="There is no note called Monetary transmission in your vault."
+          onSubmit={nothing}
+        />
+      </Aimed>
     </div>
   );
 }

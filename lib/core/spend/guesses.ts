@@ -320,6 +320,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'estimate-resale-price': searching(unit(HAIKU, 6_000, 300), 1),
   'read-shelf-photo': run(OPUS, 2_100, 1_500),
   'read-receipt-photo': run(HAIKU, 2_000, 600),
+  'read-order-sentence': run(HAIKU, 700, 200),
   'parse-paste-list': run(HAIKU, 1_500, 1_000),
   'read-book-photo': run(HAIKU, 2_000, 600),
 

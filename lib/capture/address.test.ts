@@ -39,6 +39,11 @@ function writers(): CaptureWriters & { [K in keyof CaptureWriters]: ReturnType<t
     })),
     jobs: vi.fn(async () => ({ ok: true as const, subjectRef: 'core.conversation_turns:n1' })),
     vault: vi.fn(async () => ({ ok: true as const, noteId: 'note-1', title: 'An idea', blobSha: 'sha1' })),
+    goal: vi.fn(async () => ({ ok: true as const, id: 'goal-1' })),
+    goalArea: vi.fn(async () => ({ ok: true as const, id: 'area-1' })),
+    planItem: vi.fn(async () => ({ ok: true as const, id: 'item-1' })),
+    idea: vi.fn(async () => ({ ok: true as const, id: 'idea-1' })),
+    devNote: vi.fn(async () => ({ ok: true as const, id: 'note-1' })),
     record: vi.fn(async () => 'action-1'),
   } as never;
 }

@@ -401,11 +401,11 @@ Essays they are writing or have published: the draft, the brief (question, claim
 
 ### `learn.evidence_links` (Learn)
 
-What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.
+What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.
 
 - Search: `basis`
 - Name a row by `basis`; link it by `id`
-- target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
+- target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
 
 ### `todo.tasks` (Todo)
 
@@ -560,7 +560,7 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Search: `angle`, `body`
 - Name a row by `angle`; link it by `id`
 - Opens at `/dev/posts`
-- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread. image_paths are the pictures attached to it.
 
 ### `public.x_posts` (Dev)
 

@@ -44,3 +44,34 @@ export function StarSwatch({
     </svg>
   );
 }
+
+/**
+ * A topic as the legend and the rail show it (plan #2016.5): its diamond
+ * alone, on the page rather than on a patch of sky, so it sits no heavier than
+ * the words beside it. Lit is filled gold, unlocked is outlined, and a Level 3
+ * landmark nothing touches is outlined faintly.
+ */
+export function TopicSwatch({
+  kind,
+  className,
+}: {
+  kind: 'lit' | 'unlocked' | 'landmark';
+  className?: string;
+}) {
+  return (
+    <svg viewBox="-6 -6 12 12" className={cn('size-3.5 shrink-0', className)} aria-hidden>
+      <path
+        d="M0 -4 L4 0 L0 4 L-4 0 Z"
+        strokeWidth={1.2}
+        style={kind === 'lit' ? { fill: SKY.topicLitSwatch } : undefined}
+        className={
+          kind === 'lit'
+            ? 'stroke-none'
+            : kind === 'unlocked'
+              ? 'fill-none stroke-ink-muted'
+              : 'fill-none stroke-ink-muted opacity-50'
+        }
+      />
+    </svg>
+  );
+}

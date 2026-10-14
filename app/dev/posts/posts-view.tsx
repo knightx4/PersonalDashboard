@@ -23,11 +23,11 @@ import { sectionSubject } from '@/lib/core/section-path';
  * fixtures (app/preview/posts-surfaces.tsx).
  */
 
-export function PostList({ cards }: { cards: PostCard[] }) {
+export function PostList({ cards, postAs = null }: { cards: PostCard[]; postAs?: string | null }) {
   return (
     <ul className={cn(cardVariants(), 'divide-y divide-border')}>
       {cards.map((card) => (
-        <PostItem key={card.post.id} card={card} />
+        <PostItem key={card.post.id} card={card} postAs={postAs} />
       ))}
     </ul>
   );
@@ -74,13 +74,16 @@ export function PostsScreen({
   xNotice?: XConnectNotice | null;
 }) {
   const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
+  // Who a draft is posted as from the tab: only a sign-in that carries
+  // tweet.write (plan #2072). Without it the X row says how to get one.
+  const postAs = x?.state === 'connected' && x.canPost ? x.handle : null;
   return (
     <PageColumn className="space-y-6">
       <div>
         <PageHeader
           subject={sectionSubject('/dev/posts', 'Posts')}
           title="Posts"
-          description="Drafts for X about building this app. Dash never posts; you do."
+          description="Drafts for X about building this app. Nothing goes to X until you press Post on one."
           actions={<SuggestPosts runState={page.runState} />}
         />
         <div className="-mt-3 space-y-1">
@@ -96,10 +99,10 @@ export function PostsScreen({
         <EmptyState
           icon={Megaphone}
           title="No drafts yet"
-          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, copy it, post it on X yourself, then paste the link back here."
+          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, then press Post to send it to X, or post it yourself and paste the link back here."
         />
       ) : (
-        page.suggested.length > 0 && <PostList cards={page.suggested} />
+        page.suggested.length > 0 && <PostList cards={page.suggested} postAs={postAs} />
       )}
 
       {page.posted.length > 0 && (

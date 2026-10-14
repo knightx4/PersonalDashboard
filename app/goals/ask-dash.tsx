@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { Folder, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashMark } from '@/components/ui/dash-mark';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ChipInput, ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -41,18 +42,31 @@ export function AskDash({
     goals[0]?.id ?? (goalsOn ? GOAL : errandsOn ? ERRAND : ''),
   );
   const [body, setBody] = useState('');
+  // Closed until pressed (law 14): a button, not a box waiting for words.
+  const [open, setOpen] = useState(false);
   // The area picked for a new goal or errand, null until the chip is changed.
   const [areaPick, setAreaPick] = useState<string | null>(null);
   const [state, ask, asking] = useActionState(async (prev: AskDashState, form: FormData) => {
     const next = await askDashAction(prev, form);
     if (next.done) {
       setBody('');
+      setOpen(false);
       toast({ text: next.message ?? 'Asked.' });
     }
     return next;
   }, {} as AskDashState);
 
   if (!target) return null;
+  if (!open) {
+    return (
+      <div className={className}>
+        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          <DashMark size="2xs" tone="brand" decorative />
+          Ask Dash
+        </Button>
+      </div>
+    );
+  }
   const errand = target === ERRAND;
   const goal = target === GOAL;
   // A new errand or goal is saved and handed to Dash; an ask on a goal is a reply.
@@ -69,6 +83,7 @@ export function AskDash({
       <ComposeBox>
         <ComposeBody
           id="ask-dash"
+          autoFocus
           name="body"
           required
           rows={2}

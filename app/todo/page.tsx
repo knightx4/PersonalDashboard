@@ -17,7 +17,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
 import { DayClosed } from '@/components/todo/day-closed';
-import { AddTask } from '@/components/todo/task-form';
+import { AimButton } from '@/components/shell/aim-button';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
 import { formatClock } from '@/lib/clock';
@@ -75,12 +75,9 @@ export default async function TodoPage() {
     <PageColumn>
       <PageHeader
         title="Agenda"
-        description={empty ? 'Nothing on the list.' : 'What needs you, in the order it runs out.'}
+        actions={<AimButton aim={{ kind: 'todo' }} label="Add a todo" />}
+        description={empty ? 'Nothing on the list.' : undefined}
       />
-
-      {/* The account's own today, not the browser's: Today has to mean the day
-          the list is kept in. */}
-      <AddTask today={todayIn(agenda.timezone)} />
 
       {/* A source that failed is said out loud. Silently showing a shorter
           agenda would be the worst possible failure for this page: it looks

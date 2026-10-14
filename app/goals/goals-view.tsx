@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PaidHint } from '@/components/ui/paid-hint';
-import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
+import { InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
@@ -32,8 +31,6 @@ import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import {
   AREA_NAME_MAX,
   AREA_NOTE_MAX,
-  GOAL_ACCEPTANCE_MAX,
-  GOAL_TITLE_MAX,
   type AreaWithGoals,
   type Goal,
 } from '@/lib/goals/tree';
@@ -43,8 +40,6 @@ import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { OrderedSiblings, useMoveSelf, type SiblingMove } from '@/lib/use-sibling-order';
 import { approveGoalAction } from './[goalId]/shaping-actions';
 import {
-  addArea,
-  addGoal,
   approveAreaAction,
   archiveAreaAction,
   archiveGoalAction,
@@ -496,7 +491,7 @@ function AreaSection({
             cost={planCost}
           />
         )}
-        <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+        <GoalComposer areaId={area.id} areaName={area.name} />
       </div>
     </section>
   );
@@ -749,130 +744,16 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
 }
 
 /**
- * A new goal: a title, and a done-when if you know it. A goal you cannot
- * describe yet still goes in with the title alone.
+ * A new goal opens capture aimed at a goal in this area (plan #1950.5): the
+ * title, and one press makes it and opens its page, where the done-when is
+ * written. A goal in the Learn area is still placed and given a plan once it
+ * is made.
  */
-function GoalComposer({
-  areaId,
-  areaName,
-  learn,
-}: {
-  areaId: string;
-  areaName: string;
-  /** The Learn area, where a new goal is placed and given a plan, which costs. */
-  learn: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
-    const next = await addGoal(prev, form);
-    if (next.done) setOpen(false);
-    return next;
-  }, initial);
-
-  if (!open) return <AddTrigger label="New goal" onClick={() => setOpen(true)} />;
-
-  return (
-    <Card>
-      <form
-        action={add}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <input type="hidden" name="areaId" value={areaId} />
-        <div className="space-y-3 px-3 py-3">
-          <ComposeTitle
-            name="title"
-            required
-            autoFocus
-            maxLength={GOAL_TITLE_MAX}
-            placeholder="A goal: an outcome that ends, such as pay off the credit cards"
-            aria-label={`New goal in ${areaName}`}
-          />
-          <ComposeBody
-            key="acceptance"
-            name="acceptance"
-            rows={1}
-            maxLength={GOAL_ACCEPTANCE_MAX}
-            placeholder="Done when… (optional)"
-            aria-label="When it is done"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-          <span className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={adding}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={adding}>
-              {adding ? 'Adding…' : 'Add goal'}
-            </Button>
-            {learn && (
-              <PaidHint
-                action="app/goals/actions.ts#addGoal"
-                what="Cost of placing the goal and writing its plan"
-                align="end"
-              />
-            )}
-          </span>
-        </div>
-      </form>
-    </Card>
-  );
+function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }) {
+  return <AddTrigger label="New goal" aim={{ kind: 'goal', under: { id: areaId, title: areaName } }} />;
 }
 
+/** A new area, by its name alone, through capture (plan #1950.5). */
 function AreaComposer() {
-  const [open, setOpen] = useState(false);
-  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
-    const next = await addArea(prev, form);
-    if (next.done) setOpen(false);
-    return next;
-  }, initial);
-
-  if (!open) return <AddTrigger label="New area" onClick={() => setOpen(true)} />;
-
-  return (
-    <Card>
-      <form
-        action={add}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <div className="px-3 py-3">
-          <ComposeTitle
-            name="name"
-            required
-            autoFocus
-            maxLength={AREA_NAME_MAX}
-            placeholder="An area: a direction that never finishes, such as Career or The city"
-            aria-label="New area"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-          <span className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={adding}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={adding}>
-              {adding ? 'Adding…' : 'Add area'}
-            </Button>
-          </span>
-        </div>
-      </form>
-    </Card>
-  );
+  return <AddTrigger label="New area" aim={{ kind: 'goal-area' }} />;
 }

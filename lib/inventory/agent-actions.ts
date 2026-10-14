@@ -1,9 +1,8 @@
-import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the Shopping pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const shoppingActions: ModuleActions = {
   'app/shopping/orders/actions.ts': {
-    createManualOrder: tool('add_order'),
     excludeMerchantFromOrder: none('setting'),
     restoreMerchantExclusion: none('setting'),
     softDeleteOrder: none('deletes'),
@@ -11,10 +10,6 @@ export const shoppingActions: ModuleActions = {
     permanentlyDeleteOrder: none('deletes'),
     addOrderItemTag: tool('order_item_tags'),
     removeOrderItemTag: tool('order_item_tags'),
-  },
-  'app/shopping/orders/receipt/actions.ts': {
-    previewReceiptPhoto: none('page'),
-    saveReceiptPhotoOrder: tool('add_order'),
   },
   'app/shopping/share/actions.ts': {
     createShare: none('outside'),
@@ -37,7 +32,6 @@ export const shoppingActions: ModuleActions = {
     dismissEmailReview: tool('review_orders'),
     excludeSenderReview: none('setting'),
     attachEmailToOrder: tool('review_orders'),
-    readOrderFromEmail: none('spends'),
     confirmOrdersReview: tool('review_orders'),
     unconfirmOrdersReview: tool('review_orders'),
     discardOrdersReview: tool('review_orders'),
@@ -89,31 +83,20 @@ export const shoppingActions: ModuleActions = {
     ungroupItems: tool('change_items'),
     renameItemGroup: tool('change_item'),
   },
-  'app/shopping/inventory/add/actions.ts': {
+  'app/shopping/inventory/book-actions.ts': {
     searchOwnedBook: none('page'),
     saveOwnedBook: tool('add_items'),
-    previewPasteBookList: none('page'),
-    savePasteBookList: tool('add_items'),
     confirmBookEdition: tool('change_item'),
     updateBookCondition: tool('change_item'),
     switchBookEdition: none('page', 'Picks one of the runner-up editions the page lists from its catalog search; an agent confirms the edition with change_item or gives the right ISBN to add_items.'),
-    saveManualBook: tool('add_items'),
   },
-  'app/shopping/inventory/add/games/actions.ts': {
+  'app/shopping/inventory/game-actions.ts': {
     searchGame: none('page'),
     saveGame: tool('add_items'),
-    saveManualGame: tool('add_items'),
-    extractGamesFromPhoto: none('spends'),
-    saveGameBatch: tool('add_items'),
     confirmGameEdition: tool('change_item'),
     switchGameEdition: none('page', 'Picks one of the runner-up editions the page lists from its catalog search; an agent confirms the edition with change_item or gives the right ISBN to add_items.'),
-    saveScannedProduct: tool('add_items'),
-    saveUnmatchedGames: tool('add_items'),
   },
-  'app/shopping/inventory/add/photo-actions.ts': {
-    extractBooksFromPhoto: none('spends'),
-  },
-  'app/shopping/inventory/add/item-actions.ts': {
+  'app/shopping/inventory/item-actions.ts': {
     saveManualItem: tool('add_items'),
   },
   'app/shopping/recurring/actions.ts': {

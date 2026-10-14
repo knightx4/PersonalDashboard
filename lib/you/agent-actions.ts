@@ -26,7 +26,8 @@ export const youActions: ModuleActions = {
     removeTranscriptAction: none('deletes'),
   },
   'app/you/places/actions.ts': {
-    savePlace: tool('add_place', 'change_place'),
+    // A place is added through capture (plan #1950.7); the form only changes one.
+    savePlace: tool('change_place'),
     removePlace: none('deletes'),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).

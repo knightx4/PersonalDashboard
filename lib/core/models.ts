@@ -24,14 +24,12 @@ export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
-  /** app/shopping/inventory/add/photo-actions.ts */
-  shoppingBookPhoto: HAIKU,
   /** inngest/dev/suggest.ts */
   devDigestSuggest: HAIKU,
-  /** lib/books/paste-list.ts */
-  booksPasteList: HAIKU,
   /** lib/books/receipt-photo.ts */
   booksReceiptPhoto: HAIKU,
+  /** lib/orders/sentence-model.ts, an order from a sentence typed into capture */
+  shoppingOrderSentence: HAIKU,
   /** lib/comments/ask.ts, Dash's reply on a dev row (lib/dash/models.ts devThread) */
   devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
@@ -46,8 +44,6 @@ export const MODELS = {
   drafts: SONNET,
   /** lib/email/extract/extract-order.ts */
   emailOrderExtract: HAIKU,
-  /** lib/games/shelf-photo.ts */
-  gamesShelfPhoto: OPUS,
   /** lib/capture/sort-model.ts, where a typed capture belongs */
   captureSort: HAIKU,
   /** lib/goals/capture-model.ts */

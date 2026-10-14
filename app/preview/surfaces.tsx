@@ -15,6 +15,7 @@ import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
 import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
 import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
@@ -37,13 +38,15 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTopicsSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
+import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
+import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
+import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
-import { CaptureBoxSurface } from './capture-surfaces';
-import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -61,6 +64,7 @@ import { GotThroughDemo } from '@/app/dev/ui/got-through-demo';
 import { GotThrough } from '@/app/news/quick/got-through';
 import { HomeArrivalDemo } from '@/app/dev/ui/home-arrival-demo';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
+import { ShoppingItemCatalogueSurface } from './shopping-catalogue-surfaces';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
 import {
@@ -76,7 +80,6 @@ import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
-import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
 import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
@@ -119,6 +122,7 @@ import { NoteEditingPreview, NoteRenamePreview } from './note-edit-surfaces';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
+import { AimButton } from '@/components/shell/aim-button';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionHeading } from '@/components/ui/section-heading';
 import {
@@ -141,11 +145,9 @@ import {
   LearnConceptSurface,
   LearnConceptEvidenceSurface,
   LearnListsSurface,
-  LearnNewSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
   LearnProbeSurface,
-  LearnQuizNewSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
   LearnReadingSurface,
@@ -241,7 +243,6 @@ import {
   PlanOpenedSurface,
   PlanFeatureSurface,
   PlanFeatureEditSurface,
-  PlanNewFeatureSurface,
   PlanFeatureStepsSurface,
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
@@ -287,6 +288,7 @@ import {
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
+  PostsSendSurface,
   PostsSurface,
   PostsWriteSurface,
   PostsXSurface,
@@ -361,11 +363,8 @@ import {
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
 import {
-  ShoppingAddBooksSurface,
-  ShoppingAddGamesSurface,
+  ShoppingDashboardEmptySurface,
   ShoppingDashboardSurface,
-  ShoppingOrderNewSurface,
-  ShoppingOrderReceiptSurface,
   ShoppingOrderSurface,
   ShoppingReturnsSurface,
   ShoppingSavedItemSurface,
@@ -509,6 +508,15 @@ const rolePanels: PanelProps = {
       summary: 'From the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+    {
+      id: 'e4',
+      kind: 'screen_scheduled',
+      occurredAt: '2026-09-04T16:10:00.000Z',
+      source: 'email',
+      summary: 'Phone screen with Dana Okafor, 15 September',
+      needsReview: false,
+      gmailHref: null,
     },
     {
       id: 'e2',
@@ -3077,7 +3085,6 @@ function PreviewShell({ children }: { children?: React.ReactNode }) {
       sections={shellSections}
       settingsHref="/jobs/settings"
       settingsLabel="Job search settings"
-      feedbackHref="/dev/bugs"
       displayName="Chris"
       email="chris@example.com"
       isOwner
@@ -3458,6 +3465,26 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answer-draft',
+    label: 'Role · An answer with its draft',
+    module: 'jobs',
+    width: 'wide',
+    // The draft beside a question after Draft is pressed (note ad554975): one
+    // drawn from the posting alone, citing nothing from the bank.
+    render: () => (
+      <AnswerCard
+        answer={rolePanels.answers[0]}
+        closed={false}
+        initialDraft={{
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          evidenceItemIds: [],
+          unsupportedClaims: ['for two years'],
+          bannedFound: [],
+        }}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-interviews',
     label: 'Role · Interviews',
     module: 'jobs',
@@ -3647,6 +3674,15 @@ export const SURFACES: readonly Surface[] = [
         searchAvailable
       />
     ),
+  },
+  {
+    /* The catalogue part of the same Details box, for a book with its
+     * printing to confirm and a game from BoardGameGeek (plan #1950.3.4). */
+    id: 'shopping-item-details-catalogue',
+    label: 'Inventory · Item details, a book and a game',
+    module: 'shopping',
+    width: 'wide',
+    render: () => <ShoppingItemCatalogueSurface />,
   },
   {
     /* The thread on a dev row, in the middle of an exchange. The waiting line
@@ -3843,16 +3879,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanFeatureEditSurface />,
-  },
-  {
-    /* "New feature" pressed on the plan (plan #1670): one compose surface
-     * with the title, a summary, chips for module, priority, size and who
-     * holds it, then the description. */
-    id: 'dev-plan-new-feature',
-    label: 'Plan · writing a new feature',
-    module: 'dev',
-    width: 'page',
-    render: () => <PlanNewFeatureSurface />,
   },
   {
     /* The same page on its Activity tab (plan #1667): the feature's history
@@ -4356,20 +4382,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ContactDetail contact={contact} timezone="Europe/London" />,
   },
   {
-    id: 'jobs-role-new',
-    label: 'Role · New',
-    module: 'jobs',
-    width: 'wide',
-    // Opened on Referral, so the field naming who referred you is drawn too.
-    // The padding is the room the app shell keeps under a page for the dock,
-    // so Add role, pinned above the dock, sits where it does in the app.
-    render: () => (
-      <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
-        <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
-      </div>
-    ),
-  },
-  {
     id: 'jobs-find',
     label: 'Find',
     module: 'jobs',
@@ -4815,6 +4827,21 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The track opens with a button in its header, where the box used to sit
+     * at the foot (plan #1950.6). */
+    id: 'learn-track-header',
+    label: 'Track · Add something to read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <PageHeader
+        title="Central banking"
+        description="3 to go · 2 read"
+        actions={<AimButton aim={{ kind: 'track-reading' }} label="Add something to read" variant="secondary" />}
+      />
+    ),
+  },
+  {
     /* A track's readings, in the one surface the module is read on. The list
      * is the page: everything else on /learn/t/[id] is a header and a form. */
     id: 'learn-track-readings',
@@ -5027,24 +5054,54 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
   },
-
   {
-    /* The note button in the top bar, open on a note with a screenshot and
-     * a PDF added (plan #1713). */
-    id: 'shell-note',
-    label: 'Top bar · File a note with a screenshot',
-    module: 'dev',
-    width: 'page',
-    render: () => <NoteButtonSurface />,
+    /* Capture aimed at a kind (plan #1950.1), what an Add button on a list
+     * opens: a todo with its day, a note on a role, and the toast with Undo
+     * that one press leaves. */
+    id: 'shell-capture-aimed',
+    label: 'Capture · Aimed by an Add button',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AimedCaptureSurface />,
   },
   {
-    /* The same panel once a note has saved and triage filed it as an idea,
-     * with the flip back and "Shape it now" (plans #1674, #1675). */
-    id: 'shell-note-saved',
-    label: 'Top bar · A note just saved and filed as an idea',
-    module: 'dev',
+    /* Capture aimed at Shopping's three lists (plan #1950.3.1): an order
+     * from a sentence with its $ hint, an ISBN being added, a link missing,
+     * and the toast one press leaves. */
+    id: 'shell-capture-aimed-shopping',
+    label: 'Capture · Aimed at an order, an item or a link',
+    module: 'shopping',
+    width: 'narrow',
+    render: () => <ShoppingAimedSurface />,
+  },
+  {
+    /* The camera step inside capture aimed at Shopping (plan #1950.3.2): a
+     * receipt photo taken, the barcode viewfinder open, a scan being looked
+     * up, the book it named, and a barcode nothing lists. */
+    id: 'shell-capture-aimed-camera',
+    label: 'Capture · A receipt photo and a barcode scan',
+    module: 'shopping',
+    width: 'narrow',
+    render: () => <ShoppingAimedCameraSurface />,
+  },
+  {
+    /* The Add buttons on Orders and Inventory (plan #1950.3.1), in the
+     * header and on the empty list, each opening capture aimed at its kind. */
+    id: 'shopping-list-adds',
+    label: 'Shopping · Add on Orders and Inventory',
+    module: 'shopping',
     width: 'page',
-    render: () => <NoteSavedSurface />,
+    render: () => <ShoppingListAddsSurface />,
+  },
+  {
+    /* Capture aimed at the Jobs and Learn kinds (plan #1950.4): a role from
+     * a posting link while the page is read, a topic with a reading list
+     * pasted under it, and a quiz naming a note the vault does not have. */
+    id: 'shell-capture-aimed-jobs-learn',
+    label: 'Capture · Aimed at a role, a topic or a quiz',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AimedJobsLearnSurface />,
   },
 
   {
@@ -5375,6 +5432,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceEvidenceSurface />,
   },
   {
+    /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
+     * its Level 4 topics drawn and seven of them named, strongest first,
+     * with the rest counted under the Level 3 name. */
+    id: 'learn-idea-space-topics',
+    label: 'Learn · Idea Space, inside a topic',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTopicsSurface />,
+  },
+  {
     /* Clips before any are cut. */
     id: 'learn-clips-empty',
     label: 'Learn · Clips, none cut yet',
@@ -5461,6 +5528,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsMatchedSurface />,
+  },
+  {
+    /* Post pressed once (plan #2072): the confirm on a draft with a link,
+     * warning about X's URL rate, and on a thread whose first post is
+     * already up, sending the rest. */
+    id: 'dev-posts-send',
+    label: 'Dev · Posts, posting to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsSendSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
@@ -5557,7 +5634,6 @@ export const SURFACES: readonly Surface[] = [
         sections={shellSections}
         settingsHref="/jobs/settings"
         settingsLabel="Job search settings"
-        feedbackHref="/dev/bugs"
         displayName="Chris"
         email="chris@example.com"
         // The picture is of the owner's shell, which is the one with every
@@ -5585,7 +5661,6 @@ export const SURFACES: readonly Surface[] = [
         account="preview"
         module="you"
         sections={youSections}
-        feedbackHref="/dev/bugs"
         displayName="Chris"
         email="chris@example.com"
         isOwner
@@ -5618,6 +5693,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <PlacesView places={[]} />,
+  },
+  {
+    /* What Add a place opens (plan #1950.7): capture aimed at a place, a
+     * home typed with its dates, and one refused for having none. */
+    id: 'you-places-add',
+    label: 'You · Add a place, through capture',
+    module: 'you',
+    width: 'narrow',
+    render: () => <AimedPlaceSurface />,
   },
   {
     id: 'you-place',
@@ -6058,6 +6142,19 @@ export const SURFACES: readonly Surface[] = [
           alreadyDone={['Return the kettle']}
         />
       </div>
+    ),
+  },
+  {
+    /* The agenda opens with a button, not a box (plan #1950.6). */
+    id: 'todo-agenda-header',
+    label: 'Todo · Add a todo',
+    module: 'todo',
+    width: 'narrow',
+    render: () => (
+      <PageHeader
+        title="Agenda"
+        actions={<AimButton aim={{ kind: 'todo' }} label="Add a todo" />}
+      />
     ),
   },
   {
@@ -6604,13 +6701,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnListsSurface />,
   },
   {
-    id: 'learn-new',
-    label: 'Reading lists · Start one',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnNewSurface />,
-  },
-  {
     id: 'learn-opening',
     label: 'Before you start · The opening questions, answered',
     module: 'learn',
@@ -6630,13 +6720,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnQuizTakeSurface />,
-  },
-  {
-    id: 'learn-quiz-new',
-    label: 'Quiz · Start one',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnQuizNewSurface />,
   },
   {
     id: 'learn-reading',
@@ -6943,18 +7026,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ShoppingDashboardSurface />,
   },
   {
-    id: 'shopping-add-books',
-    label: 'Shopping · Add owned books',
+    id: 'shopping-dashboard-empty',
+    label: 'Shopping · Dashboard, no orders yet',
     module: 'shopping',
     width: 'page',
-    render: () => <ShoppingAddBooksSurface />,
-  },
-  {
-    id: 'shopping-add-games',
-    label: 'Shopping · Add board games',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingAddGamesSurface />,
+    render: () => <ShoppingDashboardEmptySurface />,
   },
   {
     id: 'shopping-order',
@@ -6962,20 +7038,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'page',
     render: () => <ShoppingOrderSurface />,
-  },
-  {
-    id: 'shopping-order-new',
-    label: 'Shopping · Add an order, filled in from an email',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingOrderNewSurface />,
-  },
-  {
-    id: 'shopping-order-receipt',
-    label: 'Shopping · Receipt photo',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingOrderReceiptSurface />,
   },
   {
     id: 'shopping-returns',

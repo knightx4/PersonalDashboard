@@ -6,7 +6,7 @@ import { insertMadeChange, type MadeDashChange } from '@/lib/talk/changes';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import type { DashWriteContext, DashWriteResult } from './registry';
-import { WRITE_TOOLS } from './writes';
+import { WRITE_TOOLS, writeJobLead } from './writes';
 
 /**
  * The changes Ask Dash makes straight away (plan #1440): each of the four
@@ -353,6 +353,19 @@ describe('add_job_lead', () => {
     tables['job_search.roles'][0].jd_url = POSTING;
     const result = await apply('add_job_lead', { url: POSTING, title: 'x', company: 'Acme' });
     expect(!result.ok && result.error).toContain('saved already');
+  });
+
+  it('saves a lead for capture, and words its refusals for the person rather than the model (plan #1950.4)', async () => {
+    const saved = await writeJobLead(reading('Data analyst'), { url: POSTING, title: '', company: 'Acme' });
+    expect(saved).toMatchObject({ ok: true, input: { roleTitle: 'Data analyst', companyName: 'Acme' } });
+
+    const unread = { ...context(), readPosting: async () => ({ ok: false as const, tier: 3 as const, reason: 'no', detected: {} as never }) };
+    const refused = await writeJobLead(unread, { url: 'https://jobs.example.com/1', title: '', company: '' });
+    expect(!refused.ok && refused.error).toBe(
+      'The posting at that link could not be read. Add the role and the company after it, such as Analyst at Ramp.',
+    );
+    const again = await writeJobLead(context(), { url: POSTING, title: 'x', company: 'Acme' });
+    expect(!again.ok && again.error).toBe('That posting is saved already, as Data analyst.');
   });
 });
 

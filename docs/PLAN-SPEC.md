@@ -862,19 +862,18 @@ press.
 
 ### Writing a feature
 
-*New feature* in the plan's header opens one compose surface at the top of
-the plan (plan #1670), and *Add a feature* at the foot of a module's section
-opens the same surface with the module set. It holds the title, a one-line
-summary, chips for the module, priority, size and who holds it, then the
-description and what the feature is done when. Saving writes a not-started
-feature with no session stamp, so it reads as yours, last in its module's
-section, and a line under the header links to its page for adding steps. The
-header's press is a link to `?new=feature`, so it works before the page's
-script has loaded. The summary is kept in `plan_items.summary`, one line of
-at most 200 characters, and shows under the title on the feature's page.
-*Edit* on that page opens the same surface filled in, without the module
-chip; the status, note and commit stay on the row's own Edit on the
-plan.
+*New feature* in the plan's header and *Add a feature* at the foot of a
+module's section open capture aimed at a feature (plan #1950.5), with the
+module set when the press knows it and the app as a whole otherwise. One
+press writes a not-started feature with the title alone and no session
+stamp, so it reads as yours, last in its module's section, and opens its
+page. A row's *Add a step* opens capture aimed at a step under that row the
+same way. The summary is kept in `plan_items.summary`, one line of at most
+200 characters, and shows under the title on the feature's page.
+*Edit* on that page opens one compose surface (plan #1670) holding the
+title, the summary, chips for priority, size and who holds it, then the
+description and what the feature is done when. The status, note and
+commit stay on the row's own Edit on the plan.
 
 ## The changelog
 

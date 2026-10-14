@@ -63,20 +63,21 @@ function account(over: Partial<XAccountRow> = {}): XAccountRow {
     last_synced_at: null,
     newest_post_id: null,
     read_problem: null,
+    scope: null,
     created_at: '2026-10-12T00:00:00Z',
     ...over,
   };
 }
 
 describe('the authorize link', () => {
-  it('asks for the three reading scopes with an S256 challenge of the verifier', () => {
+  it('asks for the reading scopes and tweet.write with an S256 challenge of the verifier', () => {
     const verifier = createCodeVerifier();
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43,128}$/);
     const url = new URL(
       xAuthorizationUrl({ clientId: 'cid', redirectUri: 'https://dash.example/api/x/callback', state: 's', verifier }),
     );
     expect(url.origin + url.pathname).toBe('https://x.com/i/oauth2/authorize');
-    expect(url.searchParams.get('scope')).toBe('tweet.read users.read offline.access');
+    expect(url.searchParams.get('scope')).toBe('tweet.read tweet.write users.read media.write offline.access');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.get('code_challenge')).toBe(
       createHash('sha256').update(verifier).digest('base64url'),
@@ -197,7 +198,24 @@ describe('what the tab shows', () => {
       handle: 'selvey',
       lastSyncedAt: null,
       problem: null,
+      canPost: false,
+      canPostImages: false,
     });
+  });
+
+  it('offers posting only to a sign-in that carries tweet.write (plan #2072)', () => {
+    const row = { handle: 'selvey', status: 'active' as const, last_synced_at: null };
+    const view = (scope: string | null) => xConnectionView({ ...row, scope }, true, 1816);
+    expect(view('tweet.read users.read offline.access')).toMatchObject({ canPost: false });
+    expect(view('tweet.read tweet.write users.read offline.access')).toMatchObject({ canPost: true });
+    expect(view(null)).toMatchObject({ canPost: false });
+  });
+
+  it('offers images only to a sign-in that also carries media.write', () => {
+    const row = { handle: 'selvey', status: 'active' as const, last_synced_at: null };
+    const view = (scope: string | null) => xConnectionView({ ...row, scope }, true, 1816);
+    expect(view('tweet.read tweet.write users.read offline.access')).toMatchObject({ canPost: true, canPostImages: false });
+    expect(view('tweet.read tweet.write users.read media.write offline.access')).toMatchObject({ canPostImages: true });
   });
 
   it('needs both keys and the encryption key to offer Connect X', () => {

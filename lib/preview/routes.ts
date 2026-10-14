@@ -31,6 +31,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
   'jobs-moment-forward': ['/jobs/pipeline'],
@@ -39,6 +40,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-pipeline-focus': ['/jobs/pipeline'],
   'jobs-pipeline-table': ['/jobs/pipeline'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
+  'shopping-item-details-catalogue': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
   'dev-comment-thread-seen': ['/dev/plan'],
   'dev-comment-thread-seen-moment': ['/dev/plan'],
@@ -57,7 +59,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
   'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
   'dev-plan-feature-edit': ['/dev/plan/[number]'],
-  'dev-plan-new-feature': ['/dev/plan', '/dev/projects/[id]'],
   'goals-steps-tree': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
@@ -95,7 +96,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-material-voice': ['/jobs/material'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
-  'jobs-role-new': ['/jobs/roles/new'],
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
@@ -125,6 +125,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-work-check': ['/you/work'],
   'you-work-list': ['/you/work'],
   'learn-track-readings': ['/learn/t/[id]'],
+  'learn-track-header': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
   'learn-now-subject-empty': ['/learn/now'],
   'learn-brief-quick': ['/learn/b/[id]/quick'],
@@ -147,8 +148,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   ],
   'shell-search-bar': ['/home'],
   'shell-capture': ['/home'],
-  'shell-note': ['/dev/bugs'],
-  'shell-note-saved': ['/dev/bugs'],
+  'shell-capture-aimed': ['/home'],
+  'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
+  'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
+  'shell-capture-aimed-jobs-learn': ['/home'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-writing': ['/ask', '/ask/[ref]'],
@@ -167,8 +170,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-shell': ['/you/personality', '/you/work'],
   'you-places': ['/you/places'],
   'you-places-empty': ['/you/places'],
+  'you-places-add': ['/you/places'],
   'you-place': ['/you/places/[id]'],
-  'you-place-form': ['/you/places/new', '/you/places/[id]/edit'],
+  'you-place-form': ['/you/places/[id]/edit'],
   'you-insights': ['/you/insights'],
   'you-personality-test': ['/you/personality/test'],
   'you-personality-scores': ['/you/personality/test'],
@@ -187,6 +191,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],
+  'learn-idea-space-topics': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -196,6 +201,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
+  'dev-posts-send': ['/dev/posts'],
   'home-page': ['/home'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
@@ -248,6 +254,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'usage-day-bars-empty': ['/dev/usage', '/account/spend'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
+  'todo-agenda-header': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
@@ -332,11 +339,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-concept-evidence': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
-  'learn-new': ['/learn/new'],
   'learn-opening': ['/learn/opening/[id]'],
   'learn-quiz': ['/learn/quiz/[id]'],
   'learn-quiz-take': ['/learn/quiz/[id]/take'],
-  'learn-quiz-new': ['/learn/quiz/new'],
   'learn-reading': ['/learn/r/[id]'],
   'learn-reading-text': ['/learn/r/[id]'],
   'learn-reading-summary': ['/learn/r/[id]'],
@@ -372,13 +377,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-settings': ['/todo/settings'],
   'todo-waiting': ['/todo/waiting'],
   'shopping-dashboard': ['/shopping/dashboard'],
-  'shopping-add-books': ['/shopping/inventory/add/books'],
-  'shopping-add-games': ['/shopping/inventory/add/games'],
+  'shopping-dashboard-empty': ['/shopping/dashboard'],
   'shopping-order': ['/shopping/orders/[id]'],
-  'shopping-order-new': ['/shopping/orders/new'],
-  'shopping-order-receipt': ['/shopping/orders/receipt'],
   'shopping-returns': ['/shopping/returns'],
   'shopping-saved': ['/shopping/saved'],
+  'shopping-list-adds': ['/shopping/orders', '/shopping/inventory'],
   'shopping-saved-item': ['/shopping/saved/[id]'],
   'shopping-settings': ['/shopping/settings'],
   'shopping-shares': ['/shopping/share'],
@@ -429,15 +432,21 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The capture panels, which every shell mounts: the one box, and capture
+  // aimed at a kind by an Add button (plan #1950.1) or the header's notes
+  // button (plan #1950.5).
+  'shell-capture': ['components/shell/capture.tsx'],
+  'shell-capture-aimed': ['components/shell/capture-aim.tsx', 'components/shell/feedback-button.tsx'],
+  // Shopping's Add buttons and the capture they aim (plan #1950.3.1).
+  'shopping-list-adds': ['app/shopping/list-adds.tsx', 'components/shell/aim-button.tsx'],
+  'shell-capture-aimed-jobs-learn': ['components/shell/capture-aim.tsx'],
+  // The receipt photo and barcode scan inside aimed capture (plan #1950.3.2).
+  'shell-capture-aimed-camera': ['components/shell/capture-camera.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],
   // A goal's Suggestions section (plan #1739), drawn full and empty.
   'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
-  // The note button's panel, open with files added (plan #1713).
-  'shell-note': ['components/shell/feedback-button.tsx'],
-  // The same panel once a note has saved, with its triage (plan #1674).
-  'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).
@@ -552,7 +561,7 @@ export function routeMatches(surfaceRoute: string, route: string, under = false)
  *
  * A route with no pattern in it that a surface lists exactly is that page and
  * no other: Next serves a static folder before a dynamic one, so
- * `/shopping/orders/new` is never `/shopping/orders/[id]` (plan #1783).
+ * `/shopping/share/families` is never `/shopping/share/[id]` (plan #1783).
  */
 export function surfacesForRoute(route: string, under = false): string[] {
   const entries = Object.entries(SURFACE_ROUTES);

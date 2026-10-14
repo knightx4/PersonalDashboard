@@ -242,6 +242,42 @@ export function checkPlace(draft: PlaceDraft): PlaceChecked {
   };
 }
 
+/** A rough date as it may be typed in a line: '2019', '2019-03', '3/2019', 'March 2019'. */
+const MONTH_WORD = `(?:${[...MONTHS, ...MONTHS.map((m) => m.slice(0, 3)), 'Sept'].join('|')})`;
+const DATE_IN_LINE = String.raw`(?:${MONTH_WORD}\.? \d{4}|\d{1,2}[-/.]\d{4}|\d{4}(?:[-/.]\d{1,2})?)`;
+const RANGE_AT_END = new RegExp(
+  String.raw`(?:^|[\s,])(?:from\s+)?(${DATE_IN_LINE})\s*(?:to|until|till|through|-|–|—)\s*(${DATE_IN_LINE}|now|today|present)\s*\.?$`,
+  'i',
+);
+const ONE_DATE_AT_END = new RegExp(String.raw`(?:^|[\s,])(?:(?:since|from|in)\s+)?(${DATE_IN_LINE})\s*\.?$`, 'i');
+
+/**
+ * A place from one typed line, as capture's Add a place takes it (plan
+ * #1950.7): what it is called, then when, at the end. '12 Oak Street,
+ * Leeds, 2019 to 2021' is a home they moved out of; 'Leeds since March
+ * 2019' or 'Leeds, 2019' one they live in now. Everything before the dates
+ * is the name; the city, region, country and note are set on the place's
+ * own page. The draft goes through checkPlace like the form's, so a bad
+ * date is refused in the same words.
+ */
+export function placeFromLine(text: string): PlaceDraft | { error: string } {
+  const line = text.trim().replace(/\s+/g, ' ');
+  const range = RANGE_AT_END.exec(line);
+  const one = range ? null : ONE_DATE_AT_END.exec(line);
+  const match = range ?? one;
+  if (!match) return { error: 'Put the dates after the name, such as Leeds, 2019 to 2021.' };
+
+  const out = range ? range[2] : '';
+  const draft = draftOf(null);
+  draft.movedIn = match[1];
+  draft.movedOut = /^(now|today|present)$/i.test(out) ? '' : out;
+  draft.name = line
+    .slice(0, match.index)
+    .replace(/[\s,;:–—-]+$/, '')
+    .trim();
+  return draft;
+}
+
 /** A place's fields as the form shows them, for editing. */
 export function draftOf(place: Place | null): PlaceDraft {
   return {

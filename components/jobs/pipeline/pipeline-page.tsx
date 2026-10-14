@@ -1,5 +1,6 @@
 import Link from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
+import { AimButton } from '@/components/shell/aim-button';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';
 import { PipelineFocus } from '@/components/jobs/pipeline/focus';
@@ -84,7 +85,7 @@ export function PipelinePage({
               ? 'Add a role by pasting a job link, or wait for the next inbox scan to find your confirmations.'
               : 'Add a role by pasting a job link, or capture one with the bookmarklet.'
           }
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
           secondaryAction={
             hasInbox
               ? { label: 'Inbox settings', href: '/jobs/settings' }
@@ -122,9 +123,7 @@ export function PipelinePage({
           <AskDashRowsButton filter={askFilter} count={filtered.length} className="max-sm:hidden" />
           <PipelineViewToggle view={state.view} params={params} />
           {state.view === 'table' && <DisplayMenu menu={menu} className="max-sm:hidden" />}
-          <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-            Add a role
-          </Link>
+          <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
         </>
       }
     />

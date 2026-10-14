@@ -6,9 +6,10 @@ description: Draft X posts about building this app from what shipped since the l
 # Suggesting X posts
 
 The Posts tab in Dev shows drafts of X posts about how this app is built. The
-person edits one, copies it, posts it themselves and pastes the link back.
-**Dash never posts**, never opens X, and never sends anything anywhere. A run
-writes rows into `social_posts` and stops.
+person edits one, then either presses Post on it, which sends it to X once
+they confirm (plan #2072), or copies it, posts it themselves and pastes the
+link back. **A run never posts**, never opens X, and never sends anything
+anywhere. It writes rows into `social_posts` and stops.
 
 The table is described in `supabase/migrations/0146_social_posts.sql`, the
 types and the counter in `lib/dev/posts.ts`, and the check in

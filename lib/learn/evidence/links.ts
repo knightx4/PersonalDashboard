@@ -12,7 +12,7 @@ import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from './model';
  */
 
 export const EVIDENCE_COLUMNS =
-  'id, target_kind, target_id, source_kind, source_id, similarity, weight, basis, found_at';
+  'id, target_kind, target_id, source_kind, source_id, similarity, weight, basis, found_at, matched_by';
 
 type LoadOptions = {
   /** Links kept per target. */

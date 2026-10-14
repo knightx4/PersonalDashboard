@@ -5,7 +5,8 @@
  * Two things are checked here, and both are checks rather than instructions:
  *
  * The citations, because a claim the model could not ground is the thing this
- * whole layer exists to surface. An id it invented is not evidence.
+ * whole layer exists to surface. An id it invented is not evidence. A draft
+ * that cites nothing is kept: it answers from the posting (note ad554975).
  *
  * The banned constructions, because an instruction not to use a phrase leaks —
  * the model reads "do not say passionate about" and writes around it for two
@@ -85,17 +86,6 @@ export function parseDraftPayload(
   const allowed = new Set(offeredIds);
   const cited = [...new Set(parsed.data.evidence_item_ids ?? [])].filter((id) => allowed.has(id));
   const invented = (parsed.data.evidence_item_ids ?? []).filter((id) => !allowed.has(id)).length;
-
-  // Generation with an empty evidence set is an error, not an empty-context
-  // fallback, and a draft that cites nothing is that error arriving late.
-  if (cited.length === 0) {
-    return {
-      ok: false,
-      error: invented
-        ? 'The draft cited evidence that does not exist, so it was discarded.'
-        : 'The draft grounded nothing in your bank, so it was discarded.',
-    };
-  }
 
   const unsupported = [...new Set(parsed.data.unsupported_claims ?? [])];
 

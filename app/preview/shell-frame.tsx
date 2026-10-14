@@ -115,7 +115,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         label: 'Reading lists',
         icon: 'tracks',
         exact: true,
-        alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
+        alsoMatches: ['/learn/t/', '/learn/r/'],
       },
       {
         href: '/learn/videos',
@@ -156,7 +156,6 @@ export function ShellFrame({
         sections={frame.sections}
         settingsHref={frame.settingsHref}
         settingsLabel={frame.settingsLabel}
-        feedbackHref="/dev/bugs"
         // The name the shopping fixtures already use, and nobody's real one:
         // these pictures go on X.
         displayName="Alex"
