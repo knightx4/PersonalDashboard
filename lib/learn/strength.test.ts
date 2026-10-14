@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { isMisconception, halvesOn, spillOver, strength, type StrengthInput } from './strength';
+import {
+  EVIDENCE_CEILING,
+  evidenceStrength,
+  isMisconception,
+  isUntested,
+  halvesOn,
+  spillOver,
+  strength,
+  strengthWithEvidence,
+  type StrengthInput,
+} from './strength';
 
 const T0 = '2026-01-01T00:00:00Z';
 const day = (n: number) => new Date(Date.parse(T0) + n * 86_400_000);
@@ -91,5 +101,56 @@ describe('spillOver', () => {
   it('counts only the six most similar', () => {
     const six = Array.from({ length: 6 }, () => ({ strength: 0.1, similarity: 0.5 }));
     expect(spillOver([...six, { strength: 1, similarity: 0.1 }])).toBeCloseTo(spillOver(six));
+  });
+});
+
+describe('evidence', () => {
+  it('sets the ceiling at a recognised idea held as inferred', () => {
+    expect(EVIDENCE_CEILING).toBeCloseTo(0.275);
+    expect(EVIDENCE_CEILING).toBeCloseTo(strength({ ...tested('recognised'), established: 'inferred', tested_at: null }, day(0)));
+  });
+
+  it('combines links as one minus the product of what each leaves out', () => {
+    // One clipping at a quarter weight: 0.25 x 0.6.
+    expect(evidenceStrength([{ weight: 0.25, similarity: 0.6 }])).toBeCloseTo(0.15);
+    // Two: 1 - (1 - 0.1)(1 - 0.1).
+    const two = [
+      { weight: 0.25, similarity: 0.4 },
+      { weight: 0.25, similarity: 0.4 },
+    ];
+    expect(evidenceStrength(two)).toBeCloseTo(0.19);
+  });
+
+  it('never passes the ceiling, however strong the evidence', () => {
+    const strong = Array.from({ length: 5 }, () => ({ weight: 1, similarity: 0.9 }));
+    expect(evidenceStrength(strong)).toBe(EVIDENCE_CEILING);
+    expect(strengthWithEvidence(null, strong, day(0))).toBe(EVIDENCE_CEILING);
+  });
+
+  it('leaves out a link found after the day asked about', () => {
+    const later = [{ weight: 1, similarity: 0.7, foundAt: day(10).toISOString() }];
+    expect(evidenceStrength(later, day(5))).toBe(0);
+    expect(evidenceStrength(later, day(10))).toBeCloseTo(EVIDENCE_CEILING);
+  });
+
+  it('lights an untested idea and leaves a tested one as its questions left it', () => {
+    const links = [{ weight: 1, similarity: 0.7 }];
+    expect(isUntested(null)).toBe(true);
+    expect(strengthWithEvidence({ ...tested('unknown'), established: 'inferred', tested_at: null }, links, day(0))).toBeCloseTo(
+      EVIDENCE_CEILING,
+    );
+    const shaky = tested('shaky');
+    expect(isUntested(shaky)).toBe(false);
+    expect(strengthWithEvidence(shaky, links, day(0))).toBeCloseTo(strength(shaky, day(0)));
+  });
+
+  it('keeps a declared idea above what evidence gives', () => {
+    const declared: StrengthInput = { ...tested('known'), established: 'declared', tested_at: null, declared_at: T0 };
+    expect(strengthWithEvidence(declared, [{ weight: 1, similarity: 0.9 }], day(0))).toBeCloseTo(0.6);
+  });
+
+  it('keeps a misconception at nought', () => {
+    const wrong = { ...tested('misconception'), established: 'inferred' as const, tested_at: null };
+    expect(strengthWithEvidence(wrong, [{ weight: 1, similarity: 0.9 }], day(0))).toBe(0);
   });
 });

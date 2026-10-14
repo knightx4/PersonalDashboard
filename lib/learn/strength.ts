@@ -129,3 +129,66 @@ export function spillOver(neighbours: readonly SpillNeighbour[]): number {
   }
   return Math.min(1, sum);
 }
+
+// -- Evidence (plan #2006.6) -------------------------------------------------------
+
+/**
+ * The most evidence alone can give an idea: the score of a recognised idea
+ * held as inferred, 0.55 times 0.5, about 0.28 (decision #2006.2, A). Notes,
+ * courses and work never make an idea known; the strongest of them make it
+ * glow faintly until a question confirms or clears it.
+ */
+export const EVIDENCE_CEILING = LEVEL_WEIGHT.recognised * EVIDENCE_WEIGHT.inferred;
+
+/** One link of learn.evidence_links as the score reads it. */
+export type EvidenceWeight = {
+  /** How much the link counts, 0 to 1. */
+  weight: number;
+  /** How close the match is, 0 to 1. */
+  similarity: number;
+  /** When the link was found; a link found after the day asked about does not count. */
+  foundAt?: string | null;
+};
+
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+/**
+ * What an idea's evidence is worth on `on`: the links combined as
+ * 1 - product(1 - weight x similarity), so each one adds to the rest without
+ * the total passing 1, then capped at EVIDENCE_CEILING. Without `on` every
+ * link counts. Evidence does not fade: it carries no day it was shown to you.
+ */
+export function evidenceStrength(links: readonly EvidenceWeight[], on?: Date): number {
+  const cutoff = on?.getTime();
+  let missing = 1;
+  for (const link of links) {
+    if (cutoff !== undefined && link.foundAt) {
+      const found = Date.parse(link.foundAt);
+      if (!Number.isNaN(found) && found > cutoff) continue;
+    }
+    missing *= 1 - clamp01(link.weight) * clamp01(link.similarity);
+  }
+  return Math.min(EVIDENCE_CEILING, 1 - missing);
+}
+
+/** An idea no question has been asked about: no state row, or one never tested. */
+export function isUntested(row: Pick<StrengthInput, 'established' | 'tested_at'> | null): boolean {
+  return row === null || (row.established !== 'tested' && row.tested_at === null);
+}
+
+/**
+ * The strength the map shows, evidence included. A tested idea keeps its own
+ * score, since a question outranks anything inferred. An untested one takes
+ * the larger of its own score and its evidence's, so declaring an idea still
+ * lights it more than a note does. A misconception stays at 0 whatever backs it.
+ */
+export function strengthWithEvidence(
+  row: StrengthInput | null,
+  evidence: readonly EvidenceWeight[],
+  on: Date,
+): number {
+  const own = row ? strength(row, on) : 0;
+  if (row && (row.state === 'misconception' || !isUntested(row))) return own;
+  if (evidence.length === 0) return own;
+  return Math.max(own, evidenceStrength(evidence, on));
+}

@@ -35,6 +35,7 @@ import {
   IdeaSpaceDenseSurface,
   IdeaSpaceDomainsSurface,
   IdeaSpaceLightsSurface,
+  IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
@@ -136,6 +137,7 @@ import {
 } from './learn-course-surfaces';
 import {
   LearnConceptSurface,
+  LearnConceptEvidenceSurface,
   LearnListsSurface,
   LearnNewSurface,
   LearnOpeningSurface,
@@ -5322,6 +5324,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceDenseSurface />,
   },
   {
+    /* Evidence lighting the map (plan #2006.6): ideas backed by a note, a
+     * course or your work glow up to the ceiling, and one of them, never
+     * tested, is open in the rail and pointed at, so both cards say what
+     * backs it. */
+    id: 'learn-idea-space-evidence',
+    label: 'Learn · Idea Space, an idea your notes back',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceEvidenceSurface />,
+  },
+  {
     /* Clips before any are cut. */
     id: 'learn-clips-empty',
     label: 'Learn · Clips, none cut yet',
@@ -6485,6 +6498,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnConceptSurface />,
+  },
+  {
+    /* An idea no question has been asked about, backed by a course, a note
+     * and your résumé (plan #2006.6): the three listed under where it stands. */
+    id: 'learn-concept-evidence',
+    label: 'Idea · One idea backed by your notes, courses and work',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptEvidenceSurface />,
   },
   {
     id: 'learn-lists',

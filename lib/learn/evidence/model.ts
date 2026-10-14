@@ -62,3 +62,35 @@ export function evidenceFromRows(rows: EvidenceRow[]): EvidenceLink[] {
         a.id.localeCompare(b.id),
     );
 }
+
+// -- As a card shows it (plan #2006.6) ---------------------------------------------
+
+/** How many links an idea's card and concept page list. */
+export const CARD_EVIDENCE_LIMIT = 3;
+
+/** The basis as a sentence on its own line: "You wrote about this in …". */
+export function basisSentence(basis: string): string {
+  const text = basis.trim();
+  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
+}
+
+const KIND_NOUN: Record<EvidenceSourceKind, [string, string]> = {
+  note: ['a note', 'notes'],
+  course: ['a course', 'courses'],
+  work: ['your work', 'work entries'],
+  reading: ['a reading', 'readings'],
+  video: ['a video', 'videos'],
+};
+
+/**
+ * What backs an idea in a few words, for the map's hover card:
+ * "2 notes and a course". Kinds in the order of their strongest link.
+ */
+export function backedByText(links: readonly Pick<EvidenceLink, 'sourceKind'>[]): string | null {
+  const counts = new Map<EvidenceSourceKind, number>();
+  for (const link of links) counts.set(link.sourceKind, (counts.get(link.sourceKind) ?? 0) + 1);
+  const parts = [...counts].map(([kind, n]) => (n === 1 ? KIND_NOUN[kind][0] : `${n} ${KIND_NOUN[kind][1]}`));
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}

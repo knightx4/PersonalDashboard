@@ -31,6 +31,8 @@ import { loadSubject } from '@/lib/learn/graph/load';
 import { isSettled, prerequisiteMap, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
+import { loadEvidenceForTargets } from '@/lib/learn/evidence/links';
+import { evidenceStrength } from '@/lib/learn/strength';
 
 /**
  * Asking, and answering.
@@ -122,7 +124,21 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
       supabase,
       graph.concepts.map((c) => c.id),
     );
-    concept = nextConcept(graph.concepts, asked, { answered, now: new Date() });
+    // What each idea's notes, courses and work are worth, so an idea they
+    // back and no question has tested comes up to be confirmed (plan #2006.6).
+    // A failed read asks in the usual order.
+    const evidence = new Map<string, number>();
+    try {
+      const links = await loadEvidenceForTargets(
+        supabase,
+        'idea',
+        graph.concepts.map((c) => c.id),
+      );
+      for (const [id, list] of links) evidence.set(id, evidenceStrength(list));
+    } catch (error) {
+      console.error('[learn probe] evidence', error instanceof Error ? error.message : error);
+    }
+    concept = nextConcept(graph.concepts, asked, { answered, now: new Date() }, evidence);
   }
 
   if (!concept) return { error: 'Nothing in this subject to ask about yet.' };

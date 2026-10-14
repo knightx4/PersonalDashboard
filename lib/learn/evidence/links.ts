@@ -11,7 +11,7 @@ import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from './model';
  * in ./model so the tests can reach them.
  */
 
-const COLUMNS =
+export const EVIDENCE_COLUMNS =
   'id, target_kind, target_id, source_kind, source_id, similarity, weight, basis, found_at';
 
 type LoadOptions = {
@@ -43,7 +43,7 @@ export async function loadEvidenceForTargets(
 
   let query = learn
     .from('evidence_links')
-    .select(COLUMNS)
+    .select(EVIDENCE_COLUMNS)
     .eq('target_kind', targetKind)
     .in('target_id', targetIds)
     .order('weight', { ascending: false });
