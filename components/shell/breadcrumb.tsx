@@ -42,7 +42,12 @@ export function Breadcrumb({
                   // The page itself gives way first: the heading under the
                   // path names it in full, while the part above is the way
                   // back and should keep its name (plan #1931.2).
-                  index === last && index > 0 && 'shrink-[1000]',
+                  // It keeps a few letters, so its separator and its press
+                  // area stay inside the line rather than past the edge.
+                  index === last && index > 0 && 'min-w-12 shrink-[1000]',
+                  // The parent is the way back: whole unless it is long, and
+                  // then cut only past most of the line.
+                  index === last - 1 && index > 0 && 'max-w-3/5 shrink-0',
                   middle && 'max-sm:hidden',
                 )}
               >

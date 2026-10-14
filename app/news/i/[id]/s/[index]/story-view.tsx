@@ -1,5 +1,4 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { formatArrival, issueHref, senderLabel, type NewsSender } from '@/lib/news/issues/list';
@@ -40,14 +39,9 @@ export function StoryView({
 
   return (
     <PageColumn>
-      <Link
-        href={back.href}
-        className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {back.label}
-      </Link>
       <PageHeader
         subject={path}
+        back={back}
         title={story.headline}
         description={`${from} · ${formatArrival(issue.receivedAt, timezone)}`}
       />

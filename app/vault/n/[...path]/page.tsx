@@ -35,7 +35,8 @@ import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
 import { NoteEdit } from './note-edit';
 import { PageWide } from '@/components/shell/page-width';
-import { Breadcrumb } from '@/components/shell/breadcrumb';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 
@@ -125,6 +126,7 @@ export default async function NotePage({
       (): DevComment[] => [],
     ),
   ]);
+  const notePath = (await rowSubject(toRef('obsidian.notes', note.id))).path;
 
   return (
     <PageWide>
@@ -156,12 +158,9 @@ export default async function NotePage({
               way into the same vault without leaving the note (#577). From lg up
               the same spot holds the way back to a folded column (#1380). */}
           <div className="mb-4 flex items-center justify-between gap-3">
-            {/* The note's path, Vault › the note, which leads back to every
-                note as well (plan #1931.2). */}
-            <Breadcrumb
-              crumbs={(await rowSubject(toRef('obsidian.notes', note.id))).path}
-              className="min-w-0"
-            />
+            {/* The note's path, Vault › the note, and the one back link
+                (plans #1931.2, #1931.3). */}
+            <PathLine crumbs={notePath} fallback={parentCrumb(notePath)} />
 
             {hasVault && (
               <>

@@ -42,3 +42,49 @@ export function readPaneScroll(path: string, store: Store | null = browserStore(
 export function openingOffset(path: string, popped: boolean, store: Store | null = browserStore()): number {
   return popped ? readPaneScroll(path, store) : 0;
 }
+
+const RETURN_KEY = 'pane-return';
+
+/**
+ * The back link (components/shell/back-link.tsx) is a link, not a Back press,
+ * but it returns to a list the person was on, so the list should open where
+ * they left it (plan #1931.3). It marks the path it is going to here, and the
+ * shell's next path change takes the mark and treats the visit as a return.
+ */
+export function markReturn(path: string, store: Store | null = browserStore()): void {
+  try {
+    store?.setItem(RETURN_KEY, path);
+  } catch {
+    /* Without the mark the list opens at the top, as any link does. */
+  }
+}
+
+/** Whether `path` was marked as a return, clearing the mark either way. */
+export function takeReturn(
+  path: string,
+  store: (Store & Partial<Pick<Storage, 'removeItem'>>) | null = browserStore(),
+): boolean {
+  try {
+    const marked = store?.getItem(RETURN_KEY) ?? null;
+    if (marked === null) return false;
+    if (store?.removeItem) store.removeItem(RETURN_KEY);
+    else store?.setItem(RETURN_KEY, '');
+    return marked === path;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the shell does when the path changes: the offset to open `path` at,
+ * and whether the visit was a return by the back link (which, being a push,
+ * the browser does not restore below lg on its own).
+ */
+export function arrival(
+  path: string,
+  popped: boolean,
+  store: (Store & Partial<Pick<Storage, 'removeItem'>>) | null = browserStore(),
+): { top: number; returned: boolean } {
+  const returned = takeReturn(path, store);
+  return { top: openingOffset(path, popped || returned, store), returned };
+}

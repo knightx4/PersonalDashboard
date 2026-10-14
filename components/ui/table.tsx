@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { cn } from '@/lib/cn';
 
 /**
@@ -146,12 +146,12 @@ export function TD({
 
   const body =
     primary && href ? (
-      <Link
+      <RowLink
         href={href}
         className="font-medium text-ink after:absolute after:inset-0 after:content-[''] hover:text-accent"
       >
         {children}
-      </Link>
+      </RowLink>
     ) : (
       children
     );

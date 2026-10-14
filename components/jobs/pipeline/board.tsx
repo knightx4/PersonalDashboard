@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -547,12 +547,12 @@ function PipelineCard({
             {/* Padded out to a finger's height and pulled back by the same
               * margin, so the title is a 44px target on a phone without the
               * card growing. */}
-            <Link
+            <RowLink
               href={`/jobs/roles/${row.roleId}`}
               className="-my-3.5 block min-w-0 truncate py-3.5 text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {row.roleTitle}
-            </Link>
+            </RowLink>
             {row.excitement !== null && (
               <Tooltip label={`How excited you are about this role, ${row.excitement} of 5`} align="end" className="shrink-0">
                 <span

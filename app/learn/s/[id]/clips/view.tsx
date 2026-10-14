@@ -1,5 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft, Clapperboard } from 'lucide-react';
+import { Clapperboard } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
@@ -43,15 +43,6 @@ export function SubjectClipsView({
 }: SubjectClipsProps) {
   const header = (
     <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
       <PageHeader subject={path} title="Clips" />
     </>
   );

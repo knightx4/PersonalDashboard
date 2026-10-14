@@ -1,6 +1,4 @@
-import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
 import { countOpenAskHandoffs, loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
@@ -35,13 +33,6 @@ export default async function AskConversationPage({
 
   return (
     <>
-      <Link
-        href="/ask"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Questions to Dash
-      </Link>
       <PageHeader
         subject={await rowSubject(toRef('core.conversations', ref))}
         title={askTitle(first.body)}

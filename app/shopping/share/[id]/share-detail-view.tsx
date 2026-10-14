@@ -1,5 +1,4 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -63,13 +62,6 @@ export function ShareDetailView({
 
   return (
     <PageColumn className="[&_a]:press-area">
-      <Link
-        href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
-      </Link>
-
       <PageHeader
         subject={path}
         title={share.title}

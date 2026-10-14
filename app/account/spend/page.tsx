@@ -1,5 +1,4 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
+import { sectionSubject } from '@/lib/core/section-path';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { shellFor, type ShellFrame } from '@/lib/shell/shell-for';
 import { PageHeader } from '@/components/shell/page-header';
@@ -150,17 +149,9 @@ async function spendContent({ user, settings, owner }: ShellFrame) {
 
   return (
     <>
-      <p className="mb-3">
-        <Link
-          href="/account"
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Account
-        </Link>
-      </p>
 
       <PageHeader
+        subject={sectionSubject('/account', 'Account', { label: 'Spend', href: '/account/spend' })}
         title="Spend"
         description="What the models have cost, per call, since this was switched on."
       />

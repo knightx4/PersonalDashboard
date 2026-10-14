@@ -1,4 +1,5 @@
-import { Breadcrumb } from '@/components/shell/breadcrumb';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
 import type { Subject } from '@/components/shell/page-header';
 import { PropertiesFold } from '@/components/patterns/properties-fold';
 import { DetailLayout } from '@/components/shell/detail-layout';
@@ -80,7 +81,7 @@ export function TabbedDetail({
       className={className}
       header={
         <header className="mb-5">
-          <Breadcrumb crumbs={subject.path} className="mb-2" />
+          <PathLine crumbs={subject.path} fallback={parentCrumb(subject.path)} className="mb-2" />
           {/* The title and its one line take what is left of the row, and
               the actions keep their width on the same line (plan #1688):
               with the row free to wrap, a title wider than the space beside

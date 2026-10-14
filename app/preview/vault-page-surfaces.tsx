@@ -368,7 +368,14 @@ export function VaultMayaThreadSurface() {
         },
       }}
     >
-      <MayaThreadView thread={thread} cited={cited} />
+      <MayaThreadView
+        thread={thread}
+        cited={cited}
+        path={sectionSubject('/vault/maya', 'Maya', {
+          label: thread.question,
+          href: `/vault/maya/${thread.id}`,
+        })}
+      />
     </PaidCostsProvider>
   );
 }

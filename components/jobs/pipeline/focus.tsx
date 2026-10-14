@@ -1,3 +1,4 @@
+import { RowLink } from '@/components/shell/back-link';
 import Link from '@/components/ui/link';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -200,7 +201,7 @@ function FocusLine({
 
   return (
     <li>
-      <Link
+      <RowLink
         href={`/jobs/roles/${row.roleId}`}
         // ui-ok: fixed-control-height -- a row, not a control: 44px on a
         // phone for a thumb, 40 above it so a screen holds what is open.
@@ -261,7 +262,7 @@ function FocusLine({
             {shortAge(row.lastActivityAt)}
           </span>
         </Tooltip>
-      </Link>
+      </RowLink>
     </li>
   );
 }

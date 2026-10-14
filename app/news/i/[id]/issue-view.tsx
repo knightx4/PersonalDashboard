@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import {
-  ArrowLeft,
   CircleDot,
   ExternalLink,
   FileText,
@@ -209,18 +208,9 @@ export function IssueView({
   };
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={back.href}
-          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {back.label}
-        </Link>
-      </p>
-
       <PageHeader
         subject={path}
+        back={back}
         title={subject ?? 'No subject'}
         description={byline}
         actions={<div className="contents max-sm:hidden">{actions(false)}</div>}

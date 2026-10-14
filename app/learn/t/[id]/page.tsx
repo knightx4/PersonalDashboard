@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -53,21 +52,19 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
 
   return (
     <PageColumn>
-      {/* A track that came out of another one points back at it rather than at
-          the list: you got here from economics, and that is where you are
-          going next. */}
-      <p className="mb-3">
-        <Link
-          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn/lists'}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Reading lists'}
-        </Link>
-      </p>
-
       <PageHeader
         subject={await rowSubject(toRef('learn.tracks', id))}
+        // A track that came out of another one goes back to it rather than
+        // to the list: you got here from economics, and that is where you
+        // are going next.
+        back={
+          track.branchedFrom
+            ? {
+                label: track.branchedFromTitle ?? 'The topic this came from',
+                href: `/learn/t/${track.branchedFrom}`,
+              }
+            : undefined
+        }
         actions={
           <ConfirmStep
             action={removeTrack}

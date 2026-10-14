@@ -36,7 +36,7 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
-import { openingOffset, savePaneScroll } from '@/lib/shell/pane-scroll';
+import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
@@ -227,22 +227,30 @@ export function AppShell({
    * press fires `popstate` before the new path renders, so that sets a flag
    * the path change reads. The offset is saved as the pane scrolls and again
    * at the moment of leaving, before the old content is replaced.
+   *
+   * The back link on a row page (components/shell/back-link.tsx) is a link
+   * to the list you came from, and marks the visit as a return so the list
+   * opens where you left it too (plan #1931.3). Below lg the window is what
+   * scrolls, so there the offset is the window's.
    */
   const poppedRef = useRef(false);
   const pathRef = useRef(pathname);
   useEffect(() => {
     const pane = paneRef.current;
     if (!pane) return;
-    const save = () => savePaneScroll(pathRef.current, pane.scrollTop);
+    const save = () =>
+      savePaneScroll(pathRef.current, windowScrolls(pane) ? window.scrollY : pane.scrollTop);
     const onPop = () => {
       save();
       poppedRef.current = true;
     };
     pane.addEventListener('scroll', save, { passive: true });
+    window.addEventListener('scroll', save, { passive: true });
     document.addEventListener('click', save, true);
     window.addEventListener('popstate', onPop, true);
     return () => {
       pane.removeEventListener('scroll', save);
+      window.removeEventListener('scroll', save);
       document.removeEventListener('click', save, true);
       window.removeEventListener('popstate', onPop, true);
     };
@@ -250,19 +258,24 @@ export function AppShell({
   useEffect(() => {
     const pane = paneRef.current;
     pathRef.current = pathname;
-    const popped = poppedRef.current;
+    const { top, returned } = arrival(pathname, poppedRef.current);
     poppedRef.current = false;
     if (!pane) return;
-    const top = openingOffset(pathname, popped);
     pane.scrollTo({ top });
+    // Below lg the browser restores the window itself on a Back press; a
+    // return by the back link is a push, so that one is restored here.
+    const viaWindow = returned && windowScrolls(pane);
+    if (viaWindow) window.scrollTo({ top });
     if (!top) return;
     // The page may still be filling in; keep asking for a moment until the
     // pane is long enough to hold the offset.
     let tries = 0;
     let frame = 0;
     const settle = () => {
-      if (Math.abs(pane.scrollTop - top) < 2 || ++tries > 30) return;
-      pane.scrollTo({ top });
+      const at = viaWindow ? window.scrollY : pane.scrollTop;
+      if (Math.abs(at - top) < 2 || ++tries > 30) return;
+      if (viaWindow) window.scrollTo({ top });
+      else pane.scrollTo({ top });
       frame = requestAnimationFrame(settle);
     };
     frame = requestAnimationFrame(settle);
@@ -949,4 +962,13 @@ export function AppShell({
       </CaptureProvider>
     </ToastProvider>
   );
+}
+
+/**
+ * Whether the window rather than the pane scrolls: below lg the pane is not a
+ * scroll container, so its own offset stays at zero.
+ */
+function windowScrolls(pane: HTMLElement): boolean {
+  const overflow = window.getComputedStyle(pane).overflowY;
+  return overflow !== 'auto' && overflow !== 'scroll';
 }

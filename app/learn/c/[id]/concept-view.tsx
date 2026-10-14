@@ -1,5 +1,4 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
@@ -200,15 +199,6 @@ export function ConceptPageView({
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
 
       <PageHeader subject={path} title={concept.name} />
 

@@ -1,12 +1,10 @@
 import Link from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { QUIZZES_HREF } from '@/app/learn/know/quizzes';
 import { outstandingCount, rightCount, type Quiz } from '@/lib/learn/quiz/model';
 import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
@@ -56,16 +54,6 @@ export function QuizView({
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={QUIZZES_HREF}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Quizzes
-        </Link>
-      </p>
-
       <PageHeader
         subject={path}
         title={quiz.title}

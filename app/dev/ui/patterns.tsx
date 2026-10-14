@@ -123,6 +123,14 @@ function DetailSurface() {
     <DetailPage
       header={
         <PageHeader
+          subject={{
+            ref: 'job_search.roles:00000000-0000-4000-8000-000000000301',
+            path: [
+              { label: 'Jobs', href: '/jobs' },
+              { label: 'Pipeline', href: '/jobs/pipeline' },
+              { label: ROLES[0]!.title, href: '/jobs/roles/00000000-0000-4000-8000-000000000301' },
+            ],
+          }}
           title={ROLES[0]!.title}
           description={ROLES[0]!.meta}
           actions={

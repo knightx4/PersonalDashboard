@@ -6,7 +6,7 @@ import { fetchConversation } from '@/lib/inbox/fetch-conversation';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
-import { BackButton, EmailFrame } from './reader';
+import { EmailFrame } from './reader';
 import { MessageHead } from './message-head';
 import { LinkedText } from '@/components/ui/linked-text';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -42,8 +42,10 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <BackButton />
+      {/* An email is opened from wherever it was mentioned, and its back
+          link returns there when the link said so, else Home (plan #1931.3). */}
       <PageHeader
+        back={{ label: 'Home', href: '/home' }}
         subject={sectionSubject('/home', 'Home', {
           label: conversation.ok ? subject : 'Email',
           href: `/mail/${id}`,

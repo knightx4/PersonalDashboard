@@ -1,5 +1,3 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import type { Subject } from '@/lib/learn/graph/load';
 import { ProbeSession } from './session';
@@ -23,16 +21,6 @@ export type ProbeViewProps = {
 export function ProbeView({ subject, ideas, percent, namedConcept, path }: ProbeViewProps) {
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
-
       <PageHeader subject={path} title={`Questions on ${subject.name}`} />
 
       {ideas === 0 ? (

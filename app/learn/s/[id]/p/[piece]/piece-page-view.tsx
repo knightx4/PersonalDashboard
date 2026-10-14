@@ -1,5 +1,4 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
@@ -27,15 +26,6 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
 
       <PageHeader
         subject={path}

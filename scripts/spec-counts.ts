@@ -339,6 +339,32 @@ function rowPagesWithoutPath(root: string): string[] {
     .sort();
 }
 
+/**
+ * Part 2 (plan #1931.3): a row page has one back link, drawn by PageHeader
+ * through components/shell/back-link.tsx, which keeps the list's filters and
+ * its scroll. A hand-rolled one is a link whose first child is a left arrow or
+ * chevron followed by its label, or a button that calls the router's or the
+ * history's back(). A chevron alone in a link, such as the day before on a
+ * calendar or a review, is a step through siblings and is not counted; nor is
+ * the gallery, which draws pages that are not the app's.
+ */
+const HAND_BACK_LINK =
+  /<(?:Link|a)\b[^>]*\bhref=[^>]*>\s*<(?:ArrowLeft|ChevronLeft)\b[^>]*\/>\s*(?![<\s])/g;
+const HISTORY_BACK = /\b(?:router|history)\.back\(\)/g;
+const BACK_LINK_HOME = new Set(['components/shell/back-link.tsx']);
+
+function handRolledBackLinks(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !BACK_LINK_HOME.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(HAND_BACK_LINK), ...text.matchAll(HISTORY_BACK)].map(
+        (m) => `${file}:${lineAt(text, m.index ?? 0)}`,
+      );
+    })
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -441,6 +467,12 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'pages for one row that draw no path to it',
     target: 0,
     measure: rowPagesWithoutPath,
+  },
+  {
+    name: 'hand-rolled-back-links',
+    counts: 'back links a page draws itself rather than through PageHeader',
+    target: 0,
+    measure: handRolledBackLinks,
   },
   {
     // Plan #1895: the actions a page lets the person do that an agent should

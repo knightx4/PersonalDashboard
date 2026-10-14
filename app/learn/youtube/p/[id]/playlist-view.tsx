@@ -1,5 +1,4 @@
-import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
+import { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PlaylistPage } from '@/lib/learn/youtube/load';
 import { transcribePlaylistAction } from '../../actions';
@@ -25,18 +24,9 @@ export function PlaylistView({ data, path }: { data: PlaylistPage; path?: PageSu
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/youtube/${channel.slug}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {channel.name}
-        </Link>
-      </p>
-
       <PageHeader
         subject={path}
+        back={{ label: channel.name, href: `/learn/youtube/${channel.slug}` }}
         title={playlist.title}
         description={
           <>

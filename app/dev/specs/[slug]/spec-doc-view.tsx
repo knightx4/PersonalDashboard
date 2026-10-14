@@ -1,5 +1,3 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import type { SpecDoc } from '@/lib/specs/registry';
 import type { LoadedSpec } from '@/lib/specs/load';
@@ -35,16 +33,6 @@ export function SpecDocView({
 }) {
   return (
     <PageColumn className="space-y-6">
-      <p>
-        <Link
-          href="/dev/specs"
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Specs
-        </Link>
-      </p>
-
       <PageHeader subject={path} title={doc.title} description={`docs/${doc.file}`} />
 
       <SpecRules states={states} />

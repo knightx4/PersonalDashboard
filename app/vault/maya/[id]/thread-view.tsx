@@ -1,7 +1,6 @@
 import { SectionHeading } from '@/components/ui/section-heading';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
-import { ChevronLeft } from 'lucide-react';
 import { MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MayaThreadDetail, MayaThreadNote } from '@/lib/vault/maya/store';
@@ -13,7 +12,8 @@ import { MayaConversation } from './conversation';
 import { QuestionField } from './question-field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { PageColumn } from '@/components/shell/page-width';
-import { Breadcrumb } from '@/components/shell/breadcrumb';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
@@ -44,21 +44,11 @@ export function MayaThreadView({
   return (
     <PageColumn>
     <article>
-      {/* The path, Vault › Maya › this page, is the way back too, so the
-        page draws it once (plan #1931.2). The gallery passes none. */}
-      <div className="mb-4">
-        {path ? (
-          <Breadcrumb crumbs={path.path} />
-        ) : (
-          <Link
-            href="/vault/maya"
-            className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-          >
-            <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Maya
-          </Link>
-        )}
-      </div>
+      {/* The path, Vault › Maya › this page, and the one back link
+        (plans #1931.2, #1931.3). */}
+      {path && (
+        <PathLine crumbs={path.path} fallback={parentCrumb(path.path)} className="mb-4" />
+      )}
 
       <header className="mb-6">
         <QuestionField

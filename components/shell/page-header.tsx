@@ -1,5 +1,7 @@
 import { cn } from '@/lib/cn';
-import { Breadcrumb, type Crumb } from './breadcrumb';
+import { parentCrumb } from '@/lib/core/back-from';
+import { PathLine } from './back-link';
+import type { Crumb } from './breadcrumb';
 
 /**
  * What a page is about: the ref of its row (null for a list page, or a page
@@ -53,6 +55,14 @@ export type Subject = { ref: string | null; path: readonly Crumb[] };
  * workspace › section. The path is resolved before it gets here, so the
  * header stays drawable from a client component. The header's margin moves
  * out to hold both, so a page without a subject is drawn exactly as before.
+ *
+ * With the path comes the one back link (plan #1931.3, components/shell/
+ * back-link.tsx): to the list named by the address's `from`, else to the
+ * path's parent. A row page has it always, as does any page three or more
+ * parts down; a list page (workspace › section) has it only when it was
+ * opened from somewhere with a `from`. `back` names where it goes for a page
+ * whose way back is not its parent, and draws it on a page that would not
+ * otherwise have one.
  */
 export function PageHeader({
   title,
@@ -61,6 +71,7 @@ export function PageHeader({
   leading,
   bulk,
   subject,
+  back,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -70,6 +81,8 @@ export function PageHeader({
   bulk?: React.ReactNode;
   /** What the page is about and the path to it, the last part this page. */
   subject?: Subject;
+  /** Where the back link goes when the address names no list. */
+  back?: Crumb;
 }) {
   const crumbs = subject?.path.length ? subject.path : null;
   const header = (
@@ -90,8 +103,15 @@ export function PageHeader({
   if (!crumbs) return header;
   return (
     <div className="mb-5">
-      <Breadcrumb crumbs={crumbs} className="mb-2" />
+      <PathLine crumbs={crumbs} fallback={backFallback(subject!, back)} className="mb-2" />
       {header}
     </div>
   );
+}
+
+/** Where a page's back link goes without a `from`, or null for none. */
+function backFallback(subject: Subject, back: Crumb | undefined): Crumb | null {
+  if (back) return back;
+  if (subject.ref === null && subject.path.length < 3) return null;
+  return parentCrumb(subject.path);
 }
