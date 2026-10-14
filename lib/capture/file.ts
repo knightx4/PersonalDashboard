@@ -70,6 +70,8 @@ export type CaptureWriters = {
   role?: (input: RoleFromText) => Promise<{ ok: true; roleId: string; title: string } | { ok: false; error: string }>;
   /** saveLink: a link on Saved links, or the reading it is already. */
   reading?: (url: string) => Promise<LearnReadingWritten>;
+  /** addManualReading: one thing to read, at the end of a track (plan #1950.6). */
+  trackReading?: (trackId: string, title: string) => Promise<CaptureRowWrite>;
   /** createTrack, with the readings pasted under the name. */
   topic?: (input: TopicFromText) => Promise<LearnTopicWritten>;
   /** createQuiz over pasted material and named notes. */
@@ -642,6 +644,27 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
       ok: true,
       filed: made(text, null, 'Learn · Saved links', '/learn/lists', actionId, subjectRef, `/learn/r/${result.readingId}`),
     };
+  },
+
+  'track-reading': async ({ text, under }, writers, by, errors) => {
+    if (!writers.trackReading) return { ok: false, error: CANNOT_HERE };
+    if (!under) return { ok: false, error: 'Open the reading list first, then add to it there.' };
+    return makeOneRow(
+      'track-reading',
+      await writers.trackReading(under.id, text),
+      {
+        text,
+        table: 'learn.readings',
+        record: 'add_reading',
+        what: `"${quoted(text)}" to ${quoted(under.title)}`,
+        where: within('Learn', under),
+        href: `/learn/t/${under.id}`,
+        opens: false,
+      },
+      writers,
+      by,
+      errors,
+    );
   },
 
   'learn-topic': async ({ text }, writers, by) => {

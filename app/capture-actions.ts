@@ -31,7 +31,7 @@ import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actio
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { writeJobLead, writeRoleNote } from '@/lib/dash/writes';
-import { writeQuiz, writeReading, writeTopic } from '@/lib/capture/learn';
+import { writeQuiz, writeReading, writeTrackReading, writeTopic } from '@/lib/capture/learn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { serverEnv } from '@/lib/env';
@@ -279,6 +279,8 @@ async function rowWriters(
       return { ok: true as const, roleId: lead.roleId, title: `${lead.roleTitle} at ${lead.companyName}` };
     },
     reading: async (url) => writeReading(await createLearnClient(), userId, url),
+    trackReading: async (trackId, title) =>
+      writeTrackReading(await createLearnClient(), userId, trackId, title),
     topic: async (input) => writeTopic(await createLearnClient(), userId, input),
     quiz: async (input) =>
       writeQuiz(await createLearnClient(), modules.includes('vault') ? createVaultClient : null, userId, input),

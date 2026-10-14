@@ -508,6 +508,25 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(await makeCaptureKind('learn-reading', { text: 'no link here' }, writers)).toMatchObject({ ok: false });
   });
 
+  it('adds one thing to read on the track the page is open on, and stays there (plan #1950.6)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const reading = fakeId();
+    const track = { id: fakeId(), title: 'Central banking' };
+    const writers: CaptureWriters = {
+      ...world.writers,
+      trackReading: async (trackId, title) => {
+        asked.push([trackId, title]);
+        return { ok: true, id: reading };
+      },
+    };
+    const made = await makeCaptureKind('track-reading', { text: 'How rates are set', under: track }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([[track.id, 'How rates are set']]);
+    expect(made.filed).toMatchObject({ ref: `learn.readings:${reading}`, href: `/learn/t/${track.id}`, page: null });
+    expect(await makeCaptureKind('track-reading', { text: 'No track' }, writers)).toMatchObject({ ok: false });
+  });
+
   it('starts a quiz over named notes and pasted text, and opens it (plan #1950.4)', async () => {
     const world = setup();
     const asked: unknown[] = [];

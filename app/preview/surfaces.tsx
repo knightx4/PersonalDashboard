@@ -118,6 +118,7 @@ import { NoteEditingPreview, NoteRenamePreview } from './note-edit-surfaces';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
+import { AimButton } from '@/components/shell/aim-button';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionHeading } from '@/components/ui/section-heading';
 import {
@@ -4776,6 +4777,21 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The track opens with a button in its header, where the box used to sit
+     * at the foot (plan #1950.6). */
+    id: 'learn-track-header',
+    label: 'Track · Add something to read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <PageHeader
+        title="Central banking"
+        description="3 to go · 2 read"
+        actions={<AimButton aim={{ kind: 'track-reading' }} label="Add something to read" variant="secondary" />}
+      />
+    ),
+  },
+  {
     /* A track's readings, in the one surface the module is read on. The list
      * is the page: everything else on /learn/t/[id] is a header and a form. */
     id: 'learn-track-readings',
@@ -6009,6 +6025,19 @@ export const SURFACES: readonly Surface[] = [
           alreadyDone={['Return the kettle']}
         />
       </div>
+    ),
+  },
+  {
+    /* The agenda opens with a button, not a box (plan #1950.6). */
+    id: 'todo-agenda-header',
+    label: 'Todo · Add a todo',
+    module: 'todo',
+    width: 'narrow',
+    render: () => (
+      <PageHeader
+        title="Agenda"
+        actions={<AimButton aim={{ kind: 'todo' }} label="Add a todo" />}
+      />
     ),
   },
   {
