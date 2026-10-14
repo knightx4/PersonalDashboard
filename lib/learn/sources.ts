@@ -254,7 +254,7 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.area_check_articles',
       reason:
-        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases and the embedding columns are bookkeeping for matching them.",
+        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
@@ -267,6 +267,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
+    { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
     { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
     { table: 'learn.work_passages', reason: 'Passages of the résumé and Career notes, copied and embedded daily to link ideas to work history; the résumé and the notes are the sources.' },
     { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },
