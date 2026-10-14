@@ -1,6 +1,12 @@
 import { notFound } from 'next/navigation';
 import { askTitle } from '@/lib/talk/talk';
-import { countOpenAskHandoffs, loadAskChanges, loadAskChatCost, loadAskConversation } from '@/lib/talk/ask-request';
+import {
+  countOpenAskHandoffs,
+  loadAskChanges,
+  loadAskChatCost,
+  loadAskChatMetaInRequest,
+  loadAskConversation,
+} from '@/lib/talk/ask-request';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import { AskConversation } from '../view';
 
@@ -22,10 +28,12 @@ export default async function AskConversationPage({
 }) {
   const { ref } = await params;
   if (!UUID.test(ref)) notFound();
-  const [turns, changes, openHandoffs] = await Promise.all([
+  const [turns, changes, openHandoffs, meta] = await Promise.all([
     loadAskConversation(ref),
     loadAskChanges(ref),
     countOpenAskHandoffs(ref).catch(() => 0),
+    // The name it was given in the list (plan #1899.6); a failed read keeps the question's.
+    loadAskChatMetaInRequest(ref).catch(() => null),
   ]);
   // Not there, or not theirs: RLS answers both with nothing.
   if (turns.length === 0) notFound();
@@ -34,7 +42,8 @@ export default async function AskConversationPage({
 
   return (
     <AskConversation
-      title={askTitle(first.body)}
+      title={meta?.title?.trim() || askTitle(first.body)}
+      archived={Boolean(meta?.archivedAt)}
       conversationRef={ref}
       turns={turns}
       changes={changes}

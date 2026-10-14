@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { chatChips, chatGroup, chatWorkspaces, dayIn, groupChats, type AskChat } from './ask-chats';
+import {
+  chatChips,
+  chatGroup,
+  chatQuery,
+  chatTitleFrom,
+  chatWorkspaces,
+  chipsThatFit,
+  containsPattern,
+  dayIn,
+  groupChats,
+  matchSnippet,
+  MAX_CHAT_TITLE,
+  splitArchived,
+  type AskChat,
+} from './ask-chats';
 
 const chat = (over: Partial<AskChat>): AskChat => ({
   id: 'c',
@@ -64,6 +78,69 @@ describe('the day groups', () => {
       ['Today', ['b', 'a']],
       ['Earlier', ['old']],
     ]);
+  });
+});
+
+describe('pinned and archived chats (plan #1899.6)', () => {
+  it('puts pinned chats first, the one pinned last at the top, and out of their day', () => {
+    const groups = groupChats(
+      [
+        chat({ id: 'a', lastAt: '2026-10-14T10:00:00Z' }),
+        chat({ id: 'p1', day: '2026-09-01', lastAt: '2026-09-01T09:00:00Z', pinnedAt: '2026-10-10T09:00:00Z' }),
+        chat({ id: 'p2', pinnedAt: '2026-10-12T09:00:00Z' }),
+      ],
+      '2026-10-14',
+    );
+    expect(groups.map((g) => [g.group, g.chats.map((c) => c.id)])).toEqual([
+      ['Pinned', ['p2', 'p1']],
+      ['Today', ['a']],
+    ]);
+  });
+
+  it('splits archived chats from the list', () => {
+    const { listed, archived } = splitArchived([chat({ id: 'a' }), chat({ id: 'b', archivedAt: '2026-10-14T09:00:00Z' })]);
+    expect(listed.map((c) => c.id)).toEqual(['a']);
+    expect(archived.map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('cuts a new name to one line and refuses an empty one', () => {
+    expect(chatTitleFrom('  Lisbon\n flights ')).toBe('Lisbon flights');
+    expect(chatTitleFrom('   ')).toBeNull();
+    expect(chatTitleFrom('x'.repeat(200))).toHaveLength(MAX_CHAT_TITLE);
+  });
+});
+
+describe('searching the chats (plan #1899.6)', () => {
+  it('searches from two characters', () => {
+    expect(chatQuery(' a ')).toBeNull();
+    expect(chatQuery(' Catan  lot ')).toBe('Catan lot');
+  });
+
+  it('takes the wildcards in what was typed literally', () => {
+    expect(containsPattern('50%_off')).toBe('%50\\%\\_off%');
+  });
+
+  it('shows the words around the match, whole words at each end', () => {
+    const body = 'You spent a lot this quarter. Two of them are still unsold, and your todo to list the Catan lot is five days overdue.';
+    const snippet = matchSnippet(body, 'catan', 20);
+    expect(snippet).toContain('Catan');
+    expect(snippet?.startsWith('…')).toBe(true);
+    expect(snippet?.endsWith('…')).toBe(true);
+    expect(matchSnippet(body, 'Lisbon')).toBeNull();
+    expect(matchSnippet('Catan', 'catan')).toBe('Catan');
+  });
+});
+
+describe('chipsThatFit', () => {
+  it('shows every chip when they all fit, without More', () => {
+    expect(chipsThatFit([50, 50, 50], 162, 40, 6)).toBe(3);
+  });
+
+  it('shows the whole chips that fit beside More, and none cut', () => {
+    expect(chipsThatFit([50, 50, 50], 152, 40, 6)).toBe(2);
+    expect(chipsThatFit([50, 50, 50], 151, 40, 6)).toBe(1);
+    expect(chipsThatFit([50, 50, 50], 100, 40, 6)).toBe(1);
+    expect(chipsThatFit([120], 100, 40, 6)).toBe(0);
   });
 });
 

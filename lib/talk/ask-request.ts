@@ -46,7 +46,19 @@ import {
   type DashChange,
   type MadeChange,
 } from './changes';
-import { appendTurns, listAskChats, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
+import {
+  appendTurns,
+  editAskChat,
+  listAskChats,
+  listConversations,
+  loadAskChatMeta,
+  loadConversation,
+  searchAskChats,
+  startAsk,
+  type AskChatEdit,
+  type AskChatHit,
+  type ConversationSummary,
+} from './store';
 import type { AskChat } from './ask-chats';
 import { chatCostMicros, chatSpan } from './chat-trail';
 import { RECALL_OPERATION } from '@/lib/memory/search';
@@ -272,6 +284,24 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
 export async function listAskChatsInRequest(timezone: string, limit = 200): Promise<AskChat[]> {
   await requireUser();
   return listAskChats(await createCoreClient(), timezone, limit);
+}
+
+/** Rename, pin or archive one of the person's chats (plan #1899.6); false when it is not theirs or not there. */
+export async function editAskChatInRequest(ref: string, edit: AskChatEdit): Promise<boolean> {
+  await requireUser();
+  return editAskChat(await createCoreClient(), ref, edit);
+}
+
+/** The person's chats in which `query` was said, by them or by Dash (plan #1899.6). */
+export async function searchAskChatsInRequest(query: string): Promise<AskChatHit[]> {
+  await requireUser();
+  return searchAskChats(await createCoreClient(), query);
+}
+
+/** One chat's own name and whether it is archived, or null when it is not theirs or not there. */
+export async function loadAskChatMetaInRequest(ref: string) {
+  await requireUser();
+  return loadAskChatMeta(await createCoreClient(), ref);
 }
 
 /** One past question's turns, oldest first, with each answer's lookups and citations; empty when it is not theirs or not there. */
