@@ -91,8 +91,9 @@ export const coreActions: ModuleActions = {
         'add_step',
         'add_idea',
         'file_note',
+        'add_place',
       ],
-      note: 'An Add button aimed at one kind (plan #1950.1, #1950.4, #1950.5). Dash makes each with its own tool; a quiz it does not start, since the questions written next are paid.',
+      note: 'An Add button aimed at one kind (plan #1950.1, #1950.4, #1950.5, #1950.7). Dash makes each with its own tool; a quiz it does not start, since the questions written next are paid.',
     },
   },
 };

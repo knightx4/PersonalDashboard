@@ -368,7 +368,7 @@ function handRolledBackLinks(root: string): string[] {
 /**
  * Part 3, R8 (plan #1950.3.4): a page whose only job is a form. Such a page
  * takes the address of the thing it adds, so every `page.tsx` whose route has
- * a `new` or `add` segment is counted (`/you/places/new`, and what was
+ * a `new` or `add` segment is counted (what were `/you/places/new` and
  * `/shopping/inventory/add/books`). A page there that only sends the visitor
  * on draws no form and is not counted. An add belongs in capture, aimed at
  * the kind from the list's Add button.

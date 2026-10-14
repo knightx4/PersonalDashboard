@@ -26,6 +26,7 @@ import type { FiledEntry } from '@/lib/goals/capture';
 import { findLink } from '@/lib/learn/tracks/link-meta';
 import { quizFromText, topicFromText, type QuizFromText, type TopicFromText } from '@/lib/capture/learn-text';
 import { roleFromText, type RoleFromText } from '@/lib/capture/role';
+import { checkPlace, placeFromLine, placeSpan, type PlaceRow } from '@/lib/you/places';
 
 /** One row written, or the sentence saying why not. */
 export type CaptureRowWrite = { ok: true; id: string } | { ok: false; error: string };
@@ -72,6 +73,8 @@ export type CaptureWriters = {
   reading?: (url: string) => Promise<LearnReadingWritten>;
   /** addManualReading: one thing to read, at the end of a track (plan #1950.6). */
   trackReading?: (trackId: string, title: string) => Promise<CaptureRowWrite>;
+  /** insertPlace: a place they have lived, already checked (plan #1950.7). */
+  place?: (row: Omit<PlaceRow, 'id'>) => Promise<CaptureRowWrite>;
   /** createTrack, with the readings pasted under the name. */
   topic?: (input: TopicFromText) => Promise<LearnTopicWritten>;
   /** createQuiz over pasted material and named notes. */
@@ -712,6 +715,34 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
       ok: true,
       filed: made(text, null, 'Learn · Quizzes', '/learn/know', actionId, subjectRef, `/learn/quiz/${result.quizId}`),
     };
+  },
+
+  // You (plan #1950.7): a place from one line, its name then its dates. The
+  // checks are the place form's, so a date it cannot read is refused in the
+  // same words; the place's page opens for where it is and a note.
+  place: async ({ text }, writers, by, errors) => {
+    if (!writers.place) return { ok: false, error: CANNOT_HERE };
+    const draft = placeFromLine(text);
+    if ('error' in draft) return { ok: false, error: draft.error };
+    const checked = checkPlace(draft);
+    if (!checked.ok) return { ok: false, error: Object.values(checked.errors)[0] ?? 'That place could not be read.' };
+    const { row } = checked;
+    return makeOneRow(
+      'place',
+      await writers.place(row),
+      {
+        text,
+        table: 'you.places',
+        record: 'add_place',
+        what: `the place "${quoted(row.name)}", lived in ${placeSpan({ movedIn: row.moved_in, movedOut: row.moved_out })}`,
+        where: 'You · Places',
+        href: '/you/places',
+        opens: true,
+      },
+      writers,
+      by,
+      errors,
+    );
   },
 };
 

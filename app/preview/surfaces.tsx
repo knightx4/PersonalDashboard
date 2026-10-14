@@ -43,7 +43,7 @@ import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
-import { AimedJobsLearnSurface } from './capture-surfaces';
+import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -5630,6 +5630,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <PlacesView places={[]} />,
+  },
+  {
+    /* What Add a place opens (plan #1950.7): capture aimed at a place, a
+     * home typed with its dates, and one refused for having none. */
+    id: 'you-places-add',
+    label: 'You · Add a place, through capture',
+    module: 'you',
+    width: 'narrow',
+    render: () => <AimedPlaceSurface />,
   },
   {
     id: 'you-place',

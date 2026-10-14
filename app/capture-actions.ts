@@ -34,6 +34,8 @@ import { writeJobLead, writeRoleNote } from '@/lib/dash/writes';
 import { writeQuiz, writeReading, writeTrackReading, writeTopic } from '@/lib/capture/learn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
+import { insertPlace } from '@/lib/you/places-store';
 import { serverEnv } from '@/lib/env';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { CAPTURE_BODY_MAX } from '@/lib/goals/capture';
@@ -281,6 +283,7 @@ async function rowWriters(
     reading: async (url) => writeReading(await createLearnClient(), userId, url),
     trackReading: async (trackId, title) =>
       writeTrackReading(await createLearnClient(), userId, trackId, title),
+    place: async (row) => ({ ok: true, id: String((await insertPlace(await createYouClient(), userId, row)).id) }),
     topic: async (input) => writeTopic(await createLearnClient(), userId, input),
     quiz: async (input) =>
       writeQuiz(await createLearnClient(), modules.includes('vault') ? createVaultClient : null, userId, input),
