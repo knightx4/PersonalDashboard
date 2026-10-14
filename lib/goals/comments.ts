@@ -282,6 +282,42 @@ export function resolveGoalTarget(goals: Map<string, ReplyGoal>, ref: unknown, n
   return { ok: true, goal };
 }
 
+/** An area an errand can go in. */
+export type ReplyArea = { id: string; name: string };
+
+/**
+ * The area a new errand goes in (plan #2035.2): the one the comment names,
+ * else `fallback`, the area of the goal the step sits under. Words that fit
+ * no area, or more than one, give the sentence saying so instead, so a guess
+ * never files an errand in the wrong place.
+ */
+export function resolveArea(
+  areas: ReplyArea[],
+  named: unknown,
+  fallback: string,
+): { ok: true; area: ReplyArea } | { ok: false; error: string } {
+  const words = nameWords(typeof named === 'string' ? named.replace(/\barea\b/gi, ' ') : '');
+  if (words.size === 0) {
+    const area = areas.find((a) => a.id === fallback);
+    return area ? { ok: true, area } : { ok: false, error: 'The goal\'s area is no longer on the page, so nothing was changed. Ask them which area the errand goes in.' };
+  }
+  const all = areas.map((area) => ({ area, words: nameWords(area.name) }));
+  const exact = all.filter((a) => sameWords(a.words, words));
+  const fits = (exact.length > 0 ? exact : all.filter((a) => within(words, a.words) || within(a.words, words))).map(
+    (a) => a.area,
+  );
+  if (fits.length === 1) return { ok: true, area: fits[0] };
+  const list = (fits.length > 1 ? fits : areas).map((a) => `"${a.name}"`);
+  const choices = list.length > 1 ? `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}` : list.join('');
+  return {
+    ok: false,
+    error:
+      fits.length > 1
+        ? `"${String(named).trim()}" could be ${choices}, so nothing was changed. Ask them which area they mean.`
+        : `"${String(named).trim()}" is not one of their areas (${choices}), so nothing was changed. Ask them which area they mean.`,
+  };
+}
+
 /** How many steps sit beneath a step, at any depth. */
 export function stepsBeneath(node: StepNode): number {
   return node.children.reduce((sum, child) => sum + 1 + stepsBeneath(child), 0);

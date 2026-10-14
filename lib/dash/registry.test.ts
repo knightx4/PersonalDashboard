@@ -64,6 +64,7 @@ describe('DASH_TOOLS', () => {
       'schedule_goal_step',
       'move_goal_step',
       'archive_goal_step',
+      'promote_step_to_errand',
       'write_cover_letter',
       'file_close',
       'file_count',
@@ -105,6 +106,7 @@ describe('DASH_TOOLS', () => {
       'schedule_goal_step',
       'move_goal_step',
       'archive_goal_step',
+      'promote_step_to_errand',
       'take_step',
       'pass_to_routine',
     ]);
