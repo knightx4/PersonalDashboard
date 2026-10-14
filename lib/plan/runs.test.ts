@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FEATURE_ROUTINE_ID } from '@/lib/feedback/routine';
+import { ABANDONED_STALE_ERROR } from '@/lib/core/run-activities';
 import {
   endQuietRuns,
   endRunsOnStep,
@@ -468,7 +469,7 @@ describe('endQuietRuns', () => {
       expect(updates).toEqual([{ values: { status: 'stale' }, ids: ['run-1'] }]);
     });
 
-    it('stays stale however long it is silent, until it is acknowledged', async () => {
+    it('stays stale while something under its feature keeps changing', async () => {
       const { supabase, updates } = db([
         { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 30), status: 'stale' } as never,
       ]);
@@ -478,10 +479,68 @@ describe('endQuietRuns', () => {
         userId: 'user-1',
         now: NOW,
         readLines: lines({ 'run-1': minutesAgo(60 * 29) }),
+        readTouched: async () => new Map([['step-1', minutesAgo(15)]]),
       });
 
       expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
       expect(updates).toEqual([]);
+    });
+
+    it('stays stale for its first two hours of silence', async () => {
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(200), status: 'stale' } as never,
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(119) }),
+        readTouched: async () => new Map([['step-1', minutesAgo(180)]]),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
+      expect(updates).toEqual([]);
+    });
+
+    it('is ended once two hours pass with no line and nothing changed under its feature', async () => {
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 4), status: 'stale' } as never,
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(60 * 3) }),
+        readTouched: async () => new Map([['step-1', minutesAgo(130)]]),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 1, stale: 0, error: null });
+      expect(updates).toEqual([
+        { values: { status: 'failed', error: ABANDONED_STALE_ERROR }, ids: ['run-1'] },
+      ]);
+    });
+
+    it('stays stale when its feature could not be read', async () => {
+      const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 4), status: 'stale' } as never,
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(60 * 3) }),
+        readTouched: async () => {
+          throw new Error('plan_items: down');
+        },
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
+      expect(updates).toEqual([]);
+      quiet.mockRestore();
     });
 
     it('finishes when its step closes, stale or not', async () => {
