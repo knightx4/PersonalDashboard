@@ -1,6 +1,7 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
 import { cn } from '@/lib/cn';
+import { LiveDot } from '@/components/ui/live-dot';
 import { stepAnchor } from '@/lib/goals/goal-page';
 
 /**
@@ -16,13 +17,11 @@ export function DashWork({ items }: { items: DashWorkItem[] }) {
     <ul aria-label="Dash’s work" className="space-y-1">
       {items.map((item) => (
         <li key={item.runId} className="flex items-baseline gap-2 text-small">
-          <span
-            className={cn(
-              'size-2 shrink-0 translate-y-[-1px] rounded-full',
-              item.state === 'running' ? 'animate-pulse bg-accent' : 'bg-positive',
-            )}
-            aria-hidden
-          />
+          {item.state === 'running' ? (
+            <LiveDot className="translate-y-[-1px]" />
+          ) : (
+            <span className="size-2 shrink-0 translate-y-[-1px] rounded-full bg-positive" aria-hidden />
+          )}
           <span className="min-w-0 flex-1">
             <span className={item.state === 'running' ? 'text-accent' : 'text-positive'}>
               {item.state === 'running' ? 'Dash is on ' : 'Dash finished '}
@@ -34,7 +33,7 @@ export function DashWork({ items }: { items: DashWorkItem[] }) {
           </span>
           <Link
             href={`/goals/runs/${item.runId}`}
-            className="press-area shrink-0 text-ink-muted underline underline-offset-2 hover:text-ink"
+            className={cn('press-area shrink-0', linkVariants({ tone: 'quiet' }))}
           >
             Details
           </Link>

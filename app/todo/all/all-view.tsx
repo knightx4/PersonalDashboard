@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ListChecks } from 'lucide-react';
 import type { Anchor } from '@/lib/todo/agenda/anchors';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -7,6 +7,7 @@ import { SearchField } from '@/components/shell/search-field';
 import { PageHeader } from '@/components/shell/page-header';
 import { ListPage } from '@/components/patterns/list-detail';
 import { EmptyState } from '@/components/ui/empty-state';
+import { toggleChipClass } from '@/components/ui/chip';
 import { QueueCleared } from '@/components/motion/clear';
 import { TaskRow } from '@/components/todo/task-row';
 import type { DevComment } from '@/lib/comments/load';
@@ -14,6 +15,8 @@ import type { TaskFile } from '@/components/attachments/task-files';
 import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const FILTERS = [
   { id: 'open', label: 'Open' },
@@ -61,7 +64,7 @@ export function AllTasksView({
   // No line under the title: the tabs below already say what the list covers.
   const header = (
     <>
-      <PageHeader title="All tasks" />
+      <PageHeader subject={sectionSubject('/todo/all', 'All')} title="All tasks" />
       {focus && <FocusTask id={focus} />}
     </>
   );
@@ -79,12 +82,7 @@ export function AllTasksView({
               key={filter.id}
               href={href}
               aria-current={filter.id === status ? 'page' : undefined}
-              className={cn(
-                'press-area rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-quick',
-                filter.id === status
-                  ? 'bg-accent-tint text-accent'
-                  : 'text-ink-muted hover:bg-canvas hover:text-ink',
-              )}
+              className={toggleChipClass(filter.id === status)}
             >
               {filter.label}
             </Link>
@@ -101,7 +99,7 @@ export function AllTasksView({
     // clear.
     <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
       {tasks.length === 0 ? (
-        <div className="mx-auto max-w-3xl">
+        <PageColumn>
           {header}
           {tools}
           {search ? (
@@ -109,7 +107,7 @@ export function AllTasksView({
           ) : (
             <AllTasksEmpty status={status} seed={seed} />
           )}
-        </div>
+        </PageColumn>
       ) : (
         <ListPage header={header} tools={tools} foot={countLine(tasks.length, status, search)}>
           {tasks.map((task) => (

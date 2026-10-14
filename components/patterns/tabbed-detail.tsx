@@ -1,7 +1,10 @@
-import { Breadcrumb, type Crumb } from '@/components/shell/breadcrumb';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject } from '@/components/shell/page-header';
 import { PropertiesFold } from '@/components/patterns/properties-fold';
 import { DetailLayout } from '@/components/shell/detail-layout';
 import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/cn';
 import type { Tab } from '@/lib/tabs';
@@ -35,7 +38,7 @@ import type { Tab } from '@/lib/tabs';
  * tabs read the same parameter from the address, so the two agree.
  */
 export function TabbedDetail({
-  crumbs,
+  subject,
   title,
   description,
   actions,
@@ -47,8 +50,8 @@ export function TabbedDetail({
   children,
   className,
 }: {
-  /** The path down to this page, the last part this page. */
-  crumbs: readonly Crumb[];
+  /** What the page is about and the path down to it, as PageHeader takes it. */
+  subject: Subject;
   title: React.ReactNode;
   /** One line under the title: what kind of thing this is, or its state. */
   description?: React.ReactNode;
@@ -78,7 +81,7 @@ export function TabbedDetail({
       className={className}
       header={
         <header className="mb-5">
-          <Breadcrumb crumbs={crumbs} className="mb-2" />
+          <PathLine crumbs={subject.path} fallback={parentCrumb(subject.path)} className="mb-2" />
           {/* The title and its one line take what is left of the row, and
               the actions keep their width on the same line (plan #1688):
               with the row free to wrap, a title wider than the space beside
@@ -138,7 +141,7 @@ export function DetailPart({ label, children }: { label?: string; children: Reac
   return (
     <section className="space-y-1">
       {label && (
-        <h2 className="text-small font-semibold uppercase tracking-wide text-ink-muted">{label}</h2>
+        <SectionLabel as="h2">{label}</SectionLabel>
       )}
       {children}
     </section>

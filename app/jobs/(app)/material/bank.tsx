@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
+import { Chip, toggleChipClass } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { promoteToCanonical } from '@/app/jobs/(app)/roles/actions';
@@ -125,9 +126,7 @@ function QuestionMeta({
 }) {
   return (
     <span className={cn('shrink-0 items-baseline gap-2', className)}>
-      <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
-        {question.kind}
-      </span>
+      <Chip>{question.kind}</Chip>
       <span className="tabular text-small text-ink-muted">seen {question.timesSeen}×</span>
     </span>
   );
@@ -149,10 +148,7 @@ export function KindChips({
           key={item.label}
           href={item.href}
           aria-current={item.active ? 'page' : undefined}
-          className={cn(
-            'press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-small',
-            item.active ? 'bg-accent-tint font-medium text-accent' : 'bg-sunken text-ink-muted hover:text-ink',
-          )}
+          className={toggleChipClass(item.active)}
         >
           {item.label}
           <span className="tabular">{item.count}</span>

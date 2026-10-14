@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useActionState, useRef } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   noteListingIntent,
   priceSellItems,
@@ -18,7 +18,8 @@ import {
 } from '@/app/shopping/inventory/actions';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { FieldError, InlineInput, Input } from '@/components/ui/field';
+import { Checkbox, FieldError, InlineInput, Input } from '@/components/ui/field';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { SellQueueRow } from '@/lib/sell/load-for-sale';
 import type { SellPath } from '@/lib/sell/route';
@@ -250,7 +251,7 @@ function RowActions({
           href={row.buyback.url}
           target="_blank"
           rel="noreferrer"
-          className="self-center text-ui text-accent underline"
+          className={cn('self-center text-ui', linkVariants())}
         >
           Open {row.buyback.vendor}
         </a>
@@ -332,22 +333,21 @@ function SellRow({
 }) {
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
         onChange={() => onToggle(row.inventoryItemId)}
         aria-label={`Select ${row.shortName || row.name}`}
-        className="mt-1 size-4 shrink-0 rounded border-border text-accent focus:ring-accent/30"
+        className="mt-1"
       />
       {row.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
         <img
           src={row.imageUrl}
           alt=""
-          className="h-16 w-12 shrink-0 rounded bg-canvas object-cover"
+          className="h-16 w-12 shrink-0 rounded-card bg-canvas object-cover"
         />
       ) : (
-        <div className="h-16 w-12 shrink-0 rounded bg-canvas" />
+        <div className="h-16 w-12 shrink-0 rounded-card bg-canvas" />
       )}
       <div className="min-w-0 flex-1">
         <Link
@@ -380,7 +380,7 @@ function SellRow({
             Edition not confirmed, so this is priced on its title —{' '}
             <Link
               href={`/shopping/inventory/${row.inventoryItemId}`}
-              className="underline underline-offset-2 hover:text-accent"
+              className={linkVariants({ tone: 'quiet' })}
             >
               confirm it
             </Link>{' '}
@@ -512,10 +512,7 @@ export function SellQueue({
         return (
           <section key={group.key} className="space-y-3">
             <div>
-              <h2 className="text-body font-semibold text-ink">
-                {group.title}{' '}
-                <span className="font-normal text-ink-muted">({groupRows.length})</span>
-              </h2>
+              <SectionHeading title={group.title} count={groupRows.length} />
               {group.note && <p className="text-ui text-ink-muted">{group.note}</p>}
             </div>
             <ul className={cn(cardVariants(), 'divide-y divide-border')}>
@@ -539,9 +536,7 @@ export function SellQueue({
       {donate.length > 0 && (
         <section className="space-y-3 border-t border-border pt-6">
           <div>
-            <h2 className="text-body font-semibold text-ink">
-              Donate <span className="font-normal text-ink-muted">({donate.length})</span>
-            </h2>
+            <SectionHeading title="Donate" count={donate.length} />
             <p className="text-ui text-ink-muted">
               Near-zero after fees, shipping and effort — worth more as a donation than as a
               listing. The FMV hint is a rough number, not tax advice.

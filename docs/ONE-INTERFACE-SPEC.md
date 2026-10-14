@@ -460,13 +460,13 @@ Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 43, target 0, pending #1932.
+Checked by: count `row-pages-without-path`, baseline 33, target 0.
 
 **R4.** There is one back-link component.
-Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending #1934.
+Checked by: count `hand-rolled-back-links`, baseline 32, target 0.
 
 **R5.** Back from a row lands on the list at the same scroll offset.
-Checked by: test `tests/flows/search-open-back.test.ts`, pending #1934.
+Checked by: test `tests/flows/search-open-back.test.ts`.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
 Checked by: count `date-formatting-files`, baseline 116, target 1, pending #1961.
@@ -479,14 +479,14 @@ Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
 Checked by: count `form-only-pages`, baseline 9, target 0, pending #1953.
 
 **R9.** The shell is mounted in one place.
-Checked by: count `shell-mounts`, baseline 15, target 1, pending #1928.
+Checked by: count `shell-mounts`, baseline 15, target 1.
 
 **R10.** Every route group has `error.tsx`, `not-found.tsx` and
 `loading.tsx`.
-Checked by: test `tests/route-states.test.ts`, pending #1923.
+Checked by: test `tests/route-states.test.ts`.
 
 **R11.** Opening `/` while signed in is one redirect, to Home.
-Checked by: test `tests/proxy-launch.test.ts`, pending #1920.
+Checked by: test `tests/proxy-launch.test.ts`.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.
@@ -495,17 +495,17 @@ Checked by: count `ai-on-controls`, baseline 1, target 0, pending #1965.
 **R13.** There is one thread component.
 Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
 
-**R14.** A radius class is one of the three tokens or `rounded-full`.
-Checked by: count `off-token-radius`, baseline 199, target 0, pending #1922.
+**R14.** A radius class is one of the four tokens (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`), `rounded-full` or `rounded-none`.
+Checked by: count `off-token-radius`, baseline 199, target 0.
 
 **R15.** Lucide icons are drawn at one stroke weight.
-Checked by: count `icon-stroke-off`, baseline 184, target 0, pending #1926.
+Checked by: count `icon-stroke-off`, baseline 31, target 0.
 
 **R16.** The phone top bar holds at most four controls.
 Checked by: audit.
 
 **R17.** Every page view records the device it came from.
-Checked by: test `tests/proxy-device.test.ts`, pending #1925.
+Checked by: test `tests/proxy-device.test.ts`.
 
 ## Decisions
 

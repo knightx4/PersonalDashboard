@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { UsageScreen } from '@/app/dev/usage/usage-view';
+import { UsageScreen, unpricedText } from '@/app/dev/usage/usage-view';
+import { fillDays } from '@/lib/usage/per-day';
 import { functionSpendRows } from '@/lib/usage/function-spend';
 import type { PageOpens } from '@/lib/usage/opens';
 import { PAGE_ROUTES } from '@/lib/usage/pages';
@@ -94,5 +95,47 @@ describe('UsageScreen', () => {
     const html = renderToStaticMarkup(<UsageScreen report={usageReport([])} functions={[]} now={now} />);
     expect(html).toContain('No model calls in the last 30 days');
     expect(html).toContain('No page has been opened since recording started');
+  });
+
+  it('shows the share of opens from a phone, and nothing before a device is recorded', () => {
+    const report = usageReport(opened);
+    const withShare = renderToStaticMarkup(
+      <UsageScreen report={report} functions={functions} phoneShare={{ phone: 1, total: 4 }} now={now} />,
+    );
+    expect(withShare).toContain('25% of opens in 30 days were on a phone (1 of 4).');
+    const without = renderToStaticMarkup(
+      <UsageScreen report={report} functions={functions} phoneShare={{ phone: 0, total: 0 }} now={now} />,
+    );
+    expect(without).not.toContain('on a phone');
+  });
+
+  it('opens on the views and spend per day, above Views by workspace, with the unpriced calls named', () => {
+    const days = {
+      today: '2026-10-02',
+      span: 30,
+      views: fillDays([{ day: '2026-10-01', value: 37 }], '2026-10-02', 30),
+      spend: { values: fillDays([{ day: '2026-10-02', value: 8_890_000 }], '2026-10-02', 30), calls: 56, unpriced: 1 },
+    };
+    const html = renderToStaticMarkup(
+      <UsageScreen report={usageReport(opened)} functions={functions} days={days} now={now} />,
+    );
+    expect(html.indexOf('Page views')).toBeLessThan(html.indexOf('Model spend'));
+    expect(html.indexOf('Model spend')).toBeLessThan(html.indexOf('Views by workspace'));
+    expect(html).toContain('37 in 30 days');
+    expect(html).toContain('$8.89 in 30 days');
+    expect(html).toContain('1 call not priced, so not in the bars.');
+    expect(unpricedText(0)).toBeNull();
+  });
+
+  it('leaves the charts out when the 30 days hold nothing', () => {
+    const days = {
+      today: '2026-10-02',
+      span: 30,
+      views: fillDays([], '2026-10-02', 30),
+      spend: { values: fillDays([], '2026-10-02', 30), calls: 0, unpriced: 0 },
+    };
+    const html = renderToStaticMarkup(<UsageScreen report={usageReport([])} functions={[]} days={days} now={now} />);
+    expect(html).not.toContain('Page views');
+    expect(html).not.toContain('Model spend');
   });
 });

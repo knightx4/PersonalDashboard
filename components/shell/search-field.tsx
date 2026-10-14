@@ -1,11 +1,13 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
+import { iconButtonVariants } from '@/components/ui/icon-button';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Input, PressLabel } from '@/components/ui/field';
 import { otherParams, searchHref, SEARCH_PARAM } from '@/lib/list-search';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The box above a list, on every list.
@@ -97,19 +99,21 @@ export function SearchField({
           aria-hidden
         />
         {value && (
-          <Link
-            href={searchHref(pathname, params, '', paramName)}
-            onClick={(event) => {
-              event.preventDefault();
-              typing.current = true;
-              setValue('');
-            }}
-            // Sized to sit inside the field, so smaller than the standard size-8 icon button.
-            className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-          >
-            <X className="size-3.5" strokeWidth={2} aria-hidden />
-            <span className="sr-only">Clear search</span>
-          </Link>
+          <Tooltip label="Clear search" align="end" className="absolute right-1 top-1/2 -translate-y-1/2">
+            <Link
+              href={searchHref(pathname, params, '', paramName)}
+              onClick={(event) => {
+                event.preventDefault();
+                typing.current = true;
+                setValue('');
+              }}
+              // Sized to sit inside the field, so smaller than the standard icon button.
+              className={iconButtonVariants({ size: 'sm' })}
+            >
+              <X strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Clear search</span>
+            </Link>
+          </Tooltip>
         )}
       </div>
       {otherParams(params, paramName).map(([key, entry], index) => (

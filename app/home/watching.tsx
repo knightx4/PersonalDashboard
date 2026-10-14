@@ -1,6 +1,7 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowDown, ArrowUp, Eye } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/watch/format';
 import { whenLabel } from '@/lib/shell/home-model';
@@ -30,10 +31,7 @@ export function WatchingSection({
 }) {
   return (
     <Card id="watching" padding="standard" className="scroll-mt-bar">
-      <h2 className="flex items-center gap-2 text-ui font-semibold text-ink">
-        <Eye className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
-        Watching
-      </h2>
+      <SectionHeading title="Watching" />
       <ul className="mt-2 divide-y divide-border">
         {rows.map((row) => (
           <WatchRow key={row.id} row={row} now={now} timezone={timezone} />
@@ -46,7 +44,7 @@ export function WatchingSection({
 /** The mark an Updates line from a watch carries, in place of a workspace's. */
 export function WatchMark() {
   return (
-    <span className="flex size-6 shrink-0 items-center justify-center rounded-[6px] bg-accent-tint">
+    <span className="flex size-6 shrink-0 items-center justify-center rounded-control bg-accent-tint">
       <Eye className="size-3.5 text-accent" strokeWidth={1.75} aria-hidden />
     </span>
   );
@@ -63,7 +61,7 @@ function WatchRow({ row, now, timezone }: { row: WatchingRow; now: Date; timezon
         className={cn(
           'flex items-start gap-3',
           // A watch that fired is the one thing here asking you to act.
-          row.fired && '-mx-2 rounded-lg bg-positive-tint px-2 py-2',
+          row.fired && '-mx-2 rounded-control bg-positive-tint px-2 py-2',
         )}
       >
         <div className="min-w-0 flex-1 space-y-0.5">
@@ -96,8 +94,8 @@ function WatchRow({ row, now, timezone }: { row: WatchingRow; now: Date; timezon
                     direction.tone === 'down' && 'text-positive',
                   )}
                 >
-                  {direction.tone === 'down' && <ArrowDown className="size-3" aria-hidden />}
-                  {direction.tone === 'up' && <ArrowUp className="size-3" aria-hidden />}
+                  {direction.tone === 'down' && <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />}
+                  {direction.tone === 'up' && <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />}
                   {direction.text}
                 </span>
               )}
@@ -113,7 +111,7 @@ function WatchRow({ row, now, timezone }: { row: WatchingRow; now: Date; timezon
           {row.goal && (
             <p className="text-small text-ink-muted">
               For{' '}
-              <Link href={row.goal.href} className="font-medium text-accent hover:underline">
+              <Link href={row.goal.href} className={linkVariants()}>
                 {row.goal.title}
               </Link>
             </p>

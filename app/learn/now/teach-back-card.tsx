@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { TalkThread } from '@/components/talk/talk-thread';
@@ -70,7 +70,7 @@ export function TeachBackCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <MessageSquareQuote className="size-3.5" strokeWidth={2} aria-hidden />
+        <MessageSquareQuote className="size-3.5" strokeWidth={1.75} aria-hidden />
         {card.why}
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">{card.title}</h2>
@@ -98,7 +98,7 @@ export function TeachBackCard({
           {stateLine(card.title, teach.state)}{' '}
           <Link
             href={`/learn/c/${teach.conceptId}`}
-            className="text-ink-muted underline underline-offset-2 hover:text-ink"
+            className={linkVariants({ tone: 'quiet' })}
           >
             See it on its page
           </Link>

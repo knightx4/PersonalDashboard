@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -8,6 +8,7 @@ import { Tag } from 'lucide-react';
 import { loadSellQueue } from '@/lib/sell/load-for-sale';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/price-run';
 import { SellQueue, SellSettingsForm, TestEbayConnectionButton } from './sell-ui';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Sell assistant' };
 
@@ -26,7 +27,7 @@ export default async function SellPage() {
     await loadSellQueue({ supabase, userId: user.id });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader
         title="Sell assistant"
         description="Everything you marked for sale, priced and sorted by what it nets you. Drafts only — nothing posts without you."
@@ -80,6 +81,6 @@ export default async function SellPage() {
           hasPriceSource={priceSource !== 'none'}
         />
       )}
-    </div>
+    </PageColumn>
   );
 }

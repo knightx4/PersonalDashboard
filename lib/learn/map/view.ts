@@ -5,26 +5,36 @@ import type { Point } from './layout';
  * What the Idea Space page draws, worked out apart from the page (plan #1857)
  * so the gallery and the tests reach it without a database.
  *
- * The page's view state lives in the address (law 5): which layout, what the
- * colour means, whether the field names are on, and which idea is open.
+ * The page's view state lives in the address (law 5): which layout, which
+ * idea is open, and which domain is picked out.
  */
 
 export const SPACE_HREF = '/learn/space';
 
 export type MapLayout = 'neighbours' | 'axes';
-export type MapColour = 'state' | 'domain';
 
+/**
+ * Until 13 October the address also held what the colour meant and whether
+ * field names were on. The night sky (plan #1997.6) shows strength as
+ * brightness and domain as hue at once, and names by zoom, so both went; an
+ * old link carrying them still opens, without them.
+ */
 export type MapParams = {
   layout: MapLayout;
-  colour: MapColour;
-  labels: boolean;
   idea: string | null;
   /**
-   * The domain whose ideas stand out while the map is coloured by domain:
-   * pressing a legend entry fades the rest, so a domain that shares the gray
-   * can still be found (Part 10, rule 10).
+   * The domain whose ideas stand out: pressing a legend entry fades the rest,
+   * so a domain whose colour is close to another's can still be found
+   * (Part 10, rule 10).
    */
   domain: string | null;
+  /**
+   * The place opened as a graph of its own (plan #1997.7), by its id. An
+   * idea in no place opens its neighbourhood instead, held in `around` by the
+   * idea's id. At most one of the two is set.
+   */
+  place: string | null;
+  around: string | null;
 };
 
 /**
@@ -34,10 +44,10 @@ export type MapParams = {
  */
 export const DEFAULT_PARAMS: MapParams = {
   layout: 'neighbours',
-  colour: 'state',
-  labels: false,
   idea: null,
   domain: null,
+  place: null,
+  around: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -49,12 +59,14 @@ function one(value: string | string[] | undefined): string | undefined {
 export function parseMapParams(search: Search): MapParams {
   const idea = one(search.idea)?.trim();
   const domain = one(search.domain)?.trim();
+  const place = one(search.place)?.trim();
+  const around = one(search.around)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
-    colour: one(search.colour) === 'domain' ? 'domain' : 'state',
-    labels: one(search.labels) === 'on',
     idea: idea ? idea : null,
     domain: domain ? domain : null,
+    place: place ? place : null,
+    around: !place && around ? around : null,
   };
 }
 
@@ -63,10 +75,10 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   const next = { ...params, ...change };
   const query = new URLSearchParams();
   if (next.layout !== DEFAULT_PARAMS.layout) query.set('layout', next.layout);
-  if (next.colour !== DEFAULT_PARAMS.colour) query.set('colour', next.colour);
-  if (next.labels) query.set('labels', 'on');
   if (next.idea) query.set('idea', next.idea);
   if (next.domain) query.set('domain', next.domain);
+  if (next.place) query.set('place', next.place);
+  else if (next.around) query.set('around', next.around);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }
@@ -139,39 +151,64 @@ export function markOf(state: KnowledgeState): StateMark {
 }
 
 /**
- * The domain colours, in fixed order, light and dark.
+ * The domain colours, one per domain of the area catalogue, light and dark.
  *
- * Three, because on a scatter every pair of colours sits beside every other,
- * and past three no set of hues stays apart for a reader with red-green
- * colour blindness (checked with the dataviz palette validator, all pairs:
- * worst ΔE 8.1 light, 10.8 dark). The three domains with the most ideas
- * take them; the rest share the muted ink and are counted in the legend.
- * Green, red and amber are left out because each already means something
- * here (law 4). These colours mean "this domain" on this map and nowhere
- * else.
+ * Ten, one for each domain, decided with the person on 13 October 2026; until
+ * then three hues went to the three domains with the most ideas and the rest
+ * shared gray, which hid most of the map. Ten hues cannot all stay apart for
+ * every reader, so colour is never the only cue (Part 10, rule 10): the map
+ * names its domains and the legend picks one out when pressed.
+ *
+ * A domain keeps its colour for good, keyed by its catalogue name, so its
+ * colour does not change as ideas arrive. The catalogue changes only by
+ * migration; a domain added later takes a colour by its name's hash.
  */
 export const DOMAIN_HUES: readonly { light: string; dark: string }[] = [
-  { light: '#2a78d6', dark: '#3987e5' },
-  { light: '#eb6834', dark: '#d95926' },
-  { light: '#c04aa8', dark: '#c04aa8' },
+  { light: '#5b5fc7', dark: '#8f93f0' },
+  { light: '#2a7fc4', dark: '#5aaef0' },
+  { light: '#2e9254', dark: '#5cc786' },
+  { light: '#c8414f', dark: '#f0727e' },
+  { light: '#0b8f97', dark: '#3fc4cc' },
+  { light: '#c27d0e', dark: '#e8a945' },
+  { light: '#9c4f2c', dark: '#d38a63' },
+  { light: '#8a55c4', dark: '#b78cf0' },
+  { light: '#c95a86', dark: '#ef8fb5' },
+  { light: '#6f8a1f', dark: '#a6c552' },
 ];
 
-/** A hue as CSS that follows the theme's colour scheme. */
+/** The catalogue's domains in the order of their colours (migration learn 0027). */
+const DOMAIN_ORDER = [
+  'Mathematics and logic',
+  'Physical sciences',
+  'Life sciences',
+  'Health and medicine',
+  'Technology and engineering',
+  'Social sciences',
+  'History',
+  'Philosophy and religion',
+  'Language and literature',
+  'Arts and culture',
+];
+
 export function hueFill(slot: number): string {
   const hue = DOMAIN_HUES[slot]!;
   return `light-dark(${hue.light}, ${hue.dark})`;
 }
 
-/**
- * The colour slot of each domain that gets one: the domains with the most
- * ideas on the map, most first, ties by name. A domain with no ideas gets
- * none, since nothing on the map would wear it.
- */
-export function domainSlots(domains: readonly { id: string; name: string; ideaCount: number }[]): Map<string, number> {
-  const ranked = domains
-    .filter((domain) => domain.ideaCount > 0)
-    .sort((a, b) => b.ideaCount - a.ideaCount || a.name.localeCompare(b.name));
-  return new Map(ranked.slice(0, DOMAIN_HUES.length).map((domain, slot) => [domain.id, slot]));
+/** The colour slot of a domain, by its catalogue name: the same on every visit. */
+export function domainSlot(name: string): number {
+  const at = DOMAIN_ORDER.indexOf(name);
+  if (at >= 0) return at;
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash % DOMAIN_HUES.length;
+}
+
+/** The colour slot of each domain on the map. Every domain gets one. */
+export function domainSlots(
+  domains: readonly { id: string; name: string; ideaCount: number }[],
+): Map<string, number> {
+  return new Map(domains.map((domain) => [domain.id, domainSlot(domain.name)]));
 }
 
 // -- Labels ------------------------------------------------------------------
@@ -370,6 +407,13 @@ export function axisEnds(ideas: readonly PlacedIdea[], per = AXIS_END_IDEAS): Ax
  * A cosine similarity to two places, as the duplicate threshold is written
  * (0.86). Not a percentage: it is not a share of anything.
  */
+/** A count as the page writes it, with a comma for thousands: 10,000. */
+export function countText(n: number): string {
+  return COUNT.format(n);
+}
+
+const COUNT = new Intl.NumberFormat('en-GB');
+
 export function similarityText(similarity: number): string {
   return similarity.toFixed(2);
 }

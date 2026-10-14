@@ -60,8 +60,8 @@ describe('the page-view record in proxy.ts', () => {
     expect(second.waited).toHaveLength(1);
 
     expect(inserts).toEqual([
-      { schema: 'core', table: 'page_views', user_id: 'user-1', route: '/learn/s/[id]', workspace: 'learn', via: 'load' },
-      { schema: 'core', table: 'page_views', user_id: 'user-1', route: '/goals/[goalId]', workspace: 'goals', via: 'navigation' },
+      { schema: 'core', table: 'page_views', user_id: 'user-1', route: '/learn/s/[id]', workspace: 'learn', via: 'load', device: 'laptop' },
+      { schema: 'core', table: 'page_views', user_id: 'user-1', route: '/goals/[goalId]', workspace: 'goals', via: 'navigation', device: 'laptop' },
     ]);
     releaseWrite();
   });

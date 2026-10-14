@@ -93,7 +93,7 @@ export function DayClosed({
                   index === 0 ? 'relative' : 'absolute inset-x-0 top-0',
                 )}
               >
-                <Check className="size-3.5 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+                <Check className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
                 <span className="truncate line-through decoration-ink-ghost">{task.title}</span>
               </Card>
             ))

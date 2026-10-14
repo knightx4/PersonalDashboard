@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
@@ -13,6 +13,7 @@ import { canWriteReview, currentYear, parseYear, yearTotals, yearWindow } from '
 import { readYearReview } from '@/lib/timeline/year-review-load';
 import { showYearReview } from '@/lib/timeline/year-review-view';
 import { YearReviewView } from './view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 // "Write the review" runs on this page: a year of the timeline and one
 // Sonnet call, which can take most of a minute.
@@ -68,10 +69,14 @@ export default async function YearReviewPage({ params }: { params: Promise<{ yea
   return (
     <>
       <PageHeader
+        subject={sectionSubject('/timeline', 'Timeline', {
+          label: `${year} in review`,
+          href: `/timeline/year/${year}`,
+        })}
         title={`${year} in review`}
         description="What the year held, counted from the timeline and written up by Dash."
         actions={
-          <Link href="/timeline" className="text-ui text-accent hover:underline">
+          <Link href="/timeline" className={`text-ui ${linkVariants()}`}>
             Timeline
           </Link>
         }

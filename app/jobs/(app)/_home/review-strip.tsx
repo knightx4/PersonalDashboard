@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Inbox } from 'lucide-react';
 import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import { buttonVariants } from '@/components/ui/button';

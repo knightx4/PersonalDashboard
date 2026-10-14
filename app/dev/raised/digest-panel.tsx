@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { groupHappened, type DigestEvent, type DigestGroup } from '@/lib/digest/
 import type { Digest } from '@/lib/digest/load';
 import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
 import { LinkedText } from '@/components/ui/linked-text';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * The morning summary, at the top of the page.
@@ -68,9 +69,9 @@ function formatDay(day: string): string {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="shrink-0 text-micro font-semibold uppercase tracking-wide text-ink-ghost">
+    <SectionLabel as="span" className="shrink-0 text-ink-ghost">
       {children}
-    </span>
+    </SectionLabel>
   );
 }
 
@@ -154,7 +155,7 @@ function Night({ night }: { night: DigestNight }) {
     <section aria-label="The overnight runner" className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
-          <Moon className="size-4 text-ink-muted" aria-hidden />
+          <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
           Overnight
         </span>
         <OvernightState standing={night.standing} />
@@ -234,7 +235,7 @@ function IdeasFiled({ count }: { count: number }) {
     <p className="text-body text-ink">
       {count === 1 ? 'One new idea was' : `${count} new ideas were`} filed overnight.{' '}
       {count === 1 ? 'It is' : 'They are'} on the{' '}
-      <Link href="/dev/ideas" className="underline underline-offset-2 hover:text-ink">
+      <Link href="/dev/ideas" className={linkVariants({ tone: 'quiet' })}>
         ideas page
       </Link>
       .
@@ -308,7 +309,7 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
                   {more} more closed.{' '}
                   <Link
                     href="/dev/changelog"
-                    className="underline underline-offset-2 hover:text-ink"
+                    className={linkVariants({ tone: 'quiet' })}
                   >
                     See the changelog
                   </Link>

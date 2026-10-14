@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { loadIdeas } from '@/lib/ideas/load';
 import { parseIdeaGrouping, parseIdeaSort } from '@/lib/ideas/view';
 import { IdeasView } from './ideas-view';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Ideas' };
 
@@ -34,11 +36,9 @@ export default async function DevIdeasPage({
   const ideas = await loadIdeas(supabase, user.id);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Ideas"
-      />
+    <PageColumn className="space-y-6">
+      <PageHeader subject={sectionSubject('/dev/ideas', 'Ideas')} title="Ideas" />
       <IdeasView ideas={ideas} grouping={grouping} sort={sort} />
-    </div>
+    </PageColumn>
   );
 }

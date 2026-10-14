@@ -6,6 +6,7 @@ import { loadHomeForRequest } from '@/lib/goals/home-request';
 import { goalInboxGroups } from '@/lib/goals/inbox';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { GoalsInboxView } from './inbox-view';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Inbox' };
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ export default async function GoalsInboxPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
         groups={goalInboxGroups(home.onYou, home.dash, home.waitingRuns)}
@@ -36,6 +37,6 @@ export default async function GoalsInboxPage() {
         preparable={home.preparable}
         canRun={owner}
       />
-    </div>
+    </PageColumn>
   );
 }

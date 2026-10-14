@@ -1,16 +1,17 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import Link from '@/components/ui/link';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { QUIZZES_HREF } from '@/app/learn/know/quizzes';
 import { outstandingCount, rightCount, type Quiz } from '@/lib/learn/quiz/model';
 import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
 import { WriteQuestions } from './write-questions';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One quiz: what it was over, how it went, and every question with what you
@@ -36,25 +37,25 @@ const GLYPH: Record<keyof typeof MARK, GlyphName> = {
 };
 
 /** One quiz from its rows and its material, as read by the page (plan #1602). */
-export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMaterial[] }) {
+export function QuizView({
+  quiz,
+  material,
+  path,
+}: {
+  quiz: Quiz;
+  material: QuizMaterial[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
+}) {
   const from = new Map(material.map((piece) => [piece.sourceId, piece]));
   const left = outstandingCount(quiz);
   const right = rightCount(quiz);
   const answered = quiz.questions.filter((question) => question.outcome !== null).length;
 
   return (
-    <>
-      <p className="mb-3">
-        <Link
-          href={QUIZZES_HREF}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Quizzes
-        </Link>
-      </p>
-
+    <PageColumn>
       <PageHeader
+        subject={path}
         title={quiz.title}
         description={
           answered > 0
@@ -66,7 +67,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
       />
 
       <div className="max-w-2xl">
-        <h2 className="mb-2 text-body font-semibold text-ink">What it is over</h2>
+        <SectionHeading title="What it is over" className="mb-2" />
 
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {material.map((piece) => (
@@ -107,7 +108,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
 
             {answered > 0 && (
               <>
-                <h2 className="mb-2 mt-8 text-body font-semibold text-ink">How it went</h2>
+                <SectionHeading title="How it went" className="mb-2 mt-8" />
 
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                   {quiz.questions
@@ -145,6 +146,6 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
           </>
         )}
       </div>
-    </>
+    </PageColumn>
   );
 }

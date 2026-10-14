@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 

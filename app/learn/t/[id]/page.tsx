@@ -1,11 +1,11 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTrack, loadTracks } from '@/lib/learn/tracks/load';
 import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
+import { loadBriefForTrack } from '@/lib/learn/briefs/load';
 import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -13,6 +13,9 @@ import { AddForm } from './add-form';
 import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
+import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,27 +41,30 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
   const progress = rollUpAll(await loadTracks(supabase)).get(track.id) ?? track.progress;
   const remaining = progress.remaining;
 
-  // Which newsletter each story sent from News was in (plan #1368).
-  const origins = await loadReadingOrigins(
-    track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
-  );
+  // Which newsletter each story sent from News was in (plan #1368),
+  // and the research brief that made this list, when one did (plan #2023.4).
+  const [origins, brief] = await Promise.all([
+    loadReadingOrigins(
+      track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
+    ),
+    loadBriefForTrack(supabase, track.id),
+  ]);
 
   return (
-    <>
-      {/* A track that came out of another one points back at it rather than at
-          the list: you got here from economics, and that is where you are
-          going next. */}
-      <p className="mb-3">
-        <Link
-          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn/lists'}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Reading lists'}
-        </Link>
-      </p>
-
+    <PageColumn>
       <PageHeader
+        subject={await rowSubject(toRef('learn.tracks', id))}
+        // A track that came out of another one goes back to it rather than
+        // to the list: you got here from economics, and that is where you
+        // are going next.
+        back={
+          track.branchedFrom
+            ? {
+                label: track.branchedFromTitle ?? 'The topic this came from',
+                href: `/learn/t/${track.branchedFrom}`,
+              }
+            : undefined
+        }
         actions={
           <ConfirmStep
             action={removeTrack}
@@ -85,6 +91,15 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
               }`
         }
       />
+
+      {brief && (
+        <p className="mb-3 text-ui text-ink-muted">
+          Sources Dash found researching{' '}
+          <Link href={`/learn/b/${brief.id}`} className={linkVariants()}>
+            {brief.question}
+          </Link>
+        </p>
+      )}
 
       {track.question && (
         <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">
@@ -119,6 +134,6 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       )}
 
       <AddForm trackId={track.id} />
-    </>
+    </PageColumn>
   );
 }

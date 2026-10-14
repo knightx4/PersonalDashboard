@@ -17,6 +17,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { agendaLookup } from './agenda';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
@@ -48,6 +49,7 @@ export const ASK_TOOL_NAMES = [
   'spend_by_merchant',
   'job_applications',
   'todos',
+  'agenda',
   'goal_status',
   'vault_notes',
   'note_positions',
@@ -128,7 +130,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'open_row',
-    description: `Read one row in full: its title and the text columns worth reading, with the link to its page. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
+    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -215,6 +217,18 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'agenda',
+    description:
+      "The rows other workspaces have put on the person's Todo agenda: job reminders, goal steps they sent to Todo, drafts waiting to be sent, return deadlines, bills and the like, as the Todo page shows them now. Each says in can which of finish, put_off and dismiss it takes. Use it to find the agenda_source and agenda_key that change_agenda_row needs; their own todos are in todos and search.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        words: { type: 'string', description: 'Only rows whose title or detail holds all of these words.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'goal_status',
     description:
       'Each of the person\'s open goals with its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. Each links to the goal\'s page.',
@@ -259,7 +273,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'courses',
     description:
-      'The courses on the academic transcripts the person saved on the vault\'s Education tab: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
+      'The courses on the academic transcripts the person saved on the Work & school tab in You: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
     input_schema: {
       type: 'object',
       properties: {
@@ -324,7 +338,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'read_dev_row',
     description:
-      'Read one row from the Dev pages in full, with the thread of comments under it oldest first: an idea (its text, who filed it, its triage), a note (a bug report or request, with its status and how it was resolved), a plan step, feature or question (its detail, done-when, history, answer, fog, the questions beneath it with their answers, and the last five sessions sent at it with how each ended and why it stopped) or a raise (its story and its ask). Every comment and every idea says who wrote it: "me" is the person, "Dash" is you, from an earlier session. Use it for "what did Dash suggest under this idea", "what is decided so far on step #1073.4" or "why did the sessions on #1172 close nothing". A step is named by its outline (#1073.4, the fourth step under feature #1073, as the plan page heads it), its number or its id; the others by the id search returned. When you name a step to the person, use its outline as the row\'s title gives it, never its bare number. A dismissed idea, step or raise is not returned. Only for the owner of the app, with the Dev workspace on.',
+      'Read one row from the Dev pages in full, with the thread of comments under it oldest first: an idea (its text, who filed it, its triage), a note (a bug report or request, with its status and how it was resolved), a plan step, feature or question (its detail, done-when, history, answer, the questions beneath it with their answers, and the last five sessions sent at it with how each ended and why it stopped) or a raise (its story and its ask). Every comment and every idea says who wrote it: "me" is the person, "Dash" is you, from an earlier session. Use it for "what did Dash suggest under this idea", "what is decided so far on step #1073.4" or "why did the sessions on #1172 close nothing". A step is named by its outline (#1073.4, the fourth step under feature #1073, as the plan page heads it), its number or its id; the others by the id search returned. When you name a step to the person, use its outline as the row\'s title gives it, never its bare number. A dismissed idea, step or raise is not returned. Only for the owner of the app, with the Dev workspace on.',
     input_schema: {
       type: 'object',
       properties: {
@@ -413,10 +427,11 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
+  agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },
-  courses: { run: coursesLookup, module: 'vault' },
+  courses: { run: coursesLookup, module: 'you' },
   reading_list: { run: readingListLookup, module: 'learn' },
   learning_covered: { run: learningCoveredLookup, module: 'learn' },
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
@@ -453,6 +468,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   learn: 'Learn',
   news: 'News',
   goals: 'Goals',
+  you: 'You',
   dev: 'Dev',
 };
 

@@ -65,7 +65,7 @@ function Submit() {
   // nothing beside it at any density.
   return (
     <Button type="submit" variant="secondary" pending={pending}>
-      <Check className="size-3.5" strokeWidth={2} aria-hidden />
+      <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
       {pending ? 'Marking…' : 'Read it'}
     </Button>
   );

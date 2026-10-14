@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Disclosure } from '@/components/ui/disclosure';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * Mail that describes an interview rather than merely mentioning one.
@@ -137,7 +138,7 @@ export function CollapsibleField({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-1 text-left text-micro font-semibold uppercase tracking-wider text-ink-muted"
+        className="flex w-full items-center gap-1 text-left text-ink-muted"
       >
         <ChevronDown
           className={cn(
@@ -147,7 +148,7 @@ export function CollapsibleField({
           strokeWidth={1.75}
           aria-hidden
         />
-        {label}
+        <SectionLabel as="span">{label}</SectionLabel>
       </button>
       {open && <div className="mt-1">{children}</div>}
     </div>

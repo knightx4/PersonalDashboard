@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { GraduationCap } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
@@ -233,7 +233,7 @@ function AddLinks({
             defaultValue=""
             placeholderValue=""
             aria-label="A Learn goal to link"
-            icon={<GraduationCap className="size-3.5" strokeWidth={2} />}
+            icon={<GraduationCap className="size-3.5" strokeWidth={1.75} />}
           >
             <option value="" disabled>
               A Learn goal…

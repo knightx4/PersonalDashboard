@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StoryRating } from './story-rating';
 import { gridSpans, type GridSpan } from '@/lib/news/story-grid';
@@ -191,10 +192,10 @@ function StoryGridCard({
                   href={story.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+                  className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
                 >
                   Read the article
-                  <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+                  <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </a>
               ) : (
                 <span aria-hidden />

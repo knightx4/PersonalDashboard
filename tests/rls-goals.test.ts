@@ -509,8 +509,8 @@ describe('approval once per goal (plan #932)', () => {
   /** A goal Claude proposed, the one kind that is not approved: yours are approved as you add them. */
   async function newGoal(title: string): Promise<string> {
     const [row] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, area_id, title, fog, status)
-      values (${userA}, 'goal', ${areaA}, ${title}, 'Not sure what good looks like yet', 'proposed')
+      insert into items (user_id, level, area_id, title, status)
+      values (${userA}, 'goal', ${areaA}, ${title}, 'proposed')
       returning id`);
     return row.id;
   }
@@ -828,7 +828,7 @@ describe('questions from Claude carry options (plan #962)', () => {
   });
 });
 
-describe('one proposal at a time, and fog put aside (plan #960)', () => {
+describe('one proposal at a time (plan #960)', () => {
   async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {
       await tx.unsafe(`set local goals.actor = 'claude'`);
@@ -901,25 +901,6 @@ describe('one proposal at a time, and fog put aside (plan #960)', () => {
       old_values: { status: 'proposed' },
       new_values: { status: 'dropped' },
     });
-  });
-
-  it('lets only you put fog aside, and brings it back when the fog is rewritten', async () => {
-    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, area_id, title, fog)
-      values (${userA}, 'goal', ${areaA}, 'Get fit', 'Strength or endurance?') returning id`);
-
-    await expect(
-      asClaude((tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`),
-    ).rejects.toThrow(/may not put fog aside/);
-    await expect(
-      asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goalA}`),
-    ).rejects.toThrow(/items_fog_dismissed_ck/);
-
-    await asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`);
-    await asClaude((tx) => tx`update items set fog = 'Where are you starting from?' where id = ${goal.id}`);
-    const [row] = await admin<{ fog_dismissed_at: string | null }[]>`
-      select fog_dismissed_at from items where id = ${goal.id}`;
-    expect(row.fog_dismissed_at).toBeNull();
   });
 });
 

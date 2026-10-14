@@ -39,13 +39,13 @@ export const LAWS: readonly Law[] = [
   },
   {
     n: 5,
-    title: 'View state lives in the URL.',
-    body: 'Filters, search, sort, grouping, tabs, pagination — query parameters, all of them. A narrowed view survives a refresh, the back button, and being pasted into a note. Component state is for the genuinely ephemeral: an open menu, a confirm step, an unsent draft.',
+    title: 'View state lives in the URL, and changing it is instant.',
+    body: 'Filters, search, sort, grouping, tabs, layout, the open item and pagination are query parameters, all of them, so a narrowed view survives a refresh, the back button, and being pasted into a note. When the page already holds the data a change needs, the view redraws in the browser and the address follows it; only a change that needs new data goes back to the server. Component state is for the genuinely ephemeral: an open menu, a confirm step, an unsent draft.',
   },
   {
     n: 6,
-    title: 'It works before JavaScript does.',
-    body: 'Search and filters are GET forms and links. Server components render data. Client components exist for interaction, not fetching. A slow connection degrades to a working page, not a spinner.',
+    title: 'It works before JavaScript does, and is instant once it has.',
+    body: 'Controls start as real links and GET forms, and server components render the data, so a slow connection degrades to a working page, not a spinner. Once the script has loaded the same controls answer in the browser: a press whose data is already on the page never waits for the server. Client components exist for interaction, not fetching.',
   },
   {
     n: 7,

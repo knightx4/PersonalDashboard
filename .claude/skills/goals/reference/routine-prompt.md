@@ -7,7 +7,7 @@ starts each:
 
 | Job | Started by |
 |---|---|
-| `goal` | **Ask Dash** on a goal, a new goal or errand saved from the home, or the night run mapping a goal with no map or with changed fog (`inngest/goals/overnight.ts`) |
+| `goal` | **Ask Dash** on a goal, a new goal or errand saved from the home, or the night run mapping a goal with no map (`inngest/goals/overnight.ts`) |
 | `area` | **Plan this area** on All goals (`app/goals/actions.ts`) |
 | `step`, `phase` | **Ask Dash** on a Dash step or a phase, an `@dash` comment that hands over the step, or the night run working ready Dash steps one at a time (`lib/goals/handover-store.ts`) |
 | `prepare` | **Ask Dash** on one of the person's own steps with nothing under it, or an `@dash` comment asking for the same |
@@ -54,7 +54,7 @@ and how every write is labelled with goals.actor and goals.run_id.
 The turn after this one names the job (goal, area, step, phase, prepare,
 reshape, raise, daily or weekly), what to work, which user_id and which
 goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
-the skill says and work every open goal that is new or has fog.
+the skill says and work every open goal that has no map yet.
 
 You change rows, not code. Do not commit or push. Close the run row with a
 summary before you stop.

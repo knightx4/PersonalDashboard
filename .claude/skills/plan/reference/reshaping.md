@@ -2,9 +2,9 @@
 
 The third job, and the return trip. Shaping runs once, before anything is
 built; from then on the feature is a fixed drawing of a thing that is still
-moving. An answer settles a question and changes nothing else, fog written at
-shaping is never read again, and a step the answer made pointless goes on
-looking live until somebody notices.
+moving. An answer settles a question and changes nothing else: the work it
+made specifiable is never written, and a step the answer made pointless goes
+on looking live until somebody notices.
 
 So when the user says "re-shape #95", or a routine is fired from the
 **Re-shape** button with a re-shape turn, the job is to read the feature
@@ -18,9 +18,9 @@ the person (**Steps that act outside the repository** in `building.md`), and
 so does new work out of a finished feature (step 1), because that is a new
 feature and every feature is theirs to approve.
 
-1. **Read the feature.** `show <n>`: its done-when, its fog, its open steps,
-   and *Decided so far* — every question settled beneath it. Then read the
-   code those answers touch. An answer changes what is buildable only if you
+1. **Read the feature.** `show <n>`: its done-when, its open steps, and
+   *Decided so far*, every question settled beneath it. Then read the code
+   those answers touch. An answer changes what is buildable only if you
    know what is there.
 
    **A feature that is already `done` or `dropped` takes no new rows.** Its
@@ -33,13 +33,13 @@ feature and every feature is theirs to approve.
    `--proposed` every time: `add` without a parent writes a not-started row,
    and a new feature waits for the person like any other. The steps under it
    are then proposed without the flag, because the feature above them is.
-   The one write a re-shape may still make to the closed feature is
-   `fog <n> --clear`, and only once the new feature that dispels the fog
-   exists.
-2. **Graduate the fog.** If an answer, or the code, has made the fog
-   specifiable, write those steps now: `add "…" --parent <n> --done-when "…"
-   --size s|m|l --from <the decision>`, and clear the patch in the same breath
-   with `fog <n> --clear`. Under an approved feature they go in ready to build;
+2. **Write what the answers made specifiable.** Read each answer against the
+   feature and the code. Work an answer has made clear enough to build
+   becomes steps now: `add "…" --parent <n> --done-when "…" --size s|m|l
+   --from <the decision>`. A step that was waiting on the question to decide
+   something is settled the same way: write the steps it called for, then
+   drop it with a note naming them. Under an approved feature they go in
+   ready to build;
    a step that acts outside the repository (sending an email or a message,
    submitting, buying, changing records elsewhere such as a Vercel setting or
    DNS) takes `--proposed` and waits for the person, as **Steps that act
@@ -48,9 +48,8 @@ feature and every feature is theirs to approve.
    step appearing under a feature somebody approved last week is confusing
    until it says why it is there. The gist is read off the
    decision's own answer, so it cannot be paraphrased into something nobody
-   said. Fog that is *still* fog stays exactly as it is — a patch
-   rewritten into something vaguer is worse than one left alone. If part of it
-   has cleared and part has not, `fog <n> --note "…"` with what is left.
+   said. A waiting step the answers have not settled stays exactly as it is:
+   one rewritten into something vaguer is worse than one left alone.
 3. **Say what an answer invalidated.** A step an answer made pointless is
    `drop <n> --note "…"`, naming the answer that did it and why: "#95.2's answer
    settles this on the server, so the client half is not needed." A re-shape
@@ -64,11 +63,13 @@ feature and every feature is theirs to approve.
    it and can be phrased sharply is a decision: `add "…?" --parent <n>
    --kind decision --from <the decision it came out of> --detail "<the real
    options, lettered from A, one per line, each with its cost; then your
-   recommendation>"`. If it cannot, it is fog on the feature — but only if the
-   feature is unfinished without it. A question the feature can ship without is
-   a follow-on: file it with `idea "…"` and leave the feature alone. Same two
-   tests as shaping, the same one patch of fog, and the same three parts to a
-   decision — see **How a decision must be written**.
+   recommendation>"`. If it cannot be decided until part of the feature
+   exists, it is a step that waits on that part (`depends`) and says what it
+   will decide, but only if the feature is unfinished without it. A question
+   the feature can ship without is a follow-on: file it with `idea "…"` and
+   leave the feature alone. These are the same two tests as shaping, and a
+   decision has the same three parts (see **How a decision must be
+   written**).
 5. **Write Dash's update on the feature** (plan #1666): `update <n> --health
    on_track|at_risk|blocked --body "…"`, two or three sentences on what the
    re-shape changed: what it added, dropped and asked, by outline. The health
@@ -79,8 +80,8 @@ feature and every feature is theirs to approve.
    and everything under *Already dismissed*, which is what the person has
    turned down and is not to be written back in any form.
    Report what you added (saying which went in ready and which as
-   proposals), what you dropped and why, what fog you cleared, and anything
-   you noticed and deliberately left alone, all **by outline and title**.
+   proposals), what you dropped and why, and anything you noticed and
+   deliberately left alone, all **by outline and title**.
 
 The contract this rests on: the person approves a feature once, and the plan
 beneath it adapts without asking again. What makes that safe is that every
@@ -119,8 +120,8 @@ run writes is ready to build and nothing is dropped by it.
    naming the part of the vision it serves, with its steps under it. Work that
    belongs inside a listed feature is a step under it, and it takes
    `--proposed` too, although the feature is approved.
-4. **Stop.** No approve, no answer, no start, no fog graduated or rewritten,
-   and nothing added again that a feature already holds or that is listed as
+4. **Stop.** No approve, no answer, no start, no step written ready to
+   build, and nothing added again that a feature already holds or that is listed as
    dismissed. The run changes rows, not code, so it does not commit. Report,
    by outline and title, what you proposed, which drops you asked about, and
    which features you read and left alone.

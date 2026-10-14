@@ -277,7 +277,7 @@ export type ReadOutcome =
 
 export type ReadSummary = {
   total: number;
-  /** Drafts with at least one item. The number the feature's fog asks for. */
+  /** Drafts with at least one item. */
   withItems: number;
   /** Of those, the ones whose items and charges add up to the stated total. */
   reconciled: number;

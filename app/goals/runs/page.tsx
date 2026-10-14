@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { JOB_LABELS, runMeta, type RunListing, type RunOutcome } from '@/lib/goals/runs';
 import { loadRuns } from '@/lib/goals/runs-store';
 import { LinkedText } from '@/components/ui/linked-text';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Runs' };
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export default async function GoalRunsPage() {
   const views = runViews(runs, account.timezone);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Runs" />
       {views.length === 0 ? (
         <EmptyState
@@ -60,7 +61,7 @@ export default async function GoalRunsPage() {
           </ul>
         </Card>
       )}
-    </div>
+    </PageColumn>
   );
 }
 
@@ -69,14 +70,14 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
   return (
     <li className="card-pad-x row-pad space-y-1">
       <p className="text-ui break-words text-ink">
-        <Link href={`/goals/runs/${run.id}`} className="font-semibold underline-offset-2 hover:underline">
+        <Link href={`/goals/runs/${run.id}`} className="font-semibold hover:underline">
           {JOB_LABELS[run.job]}
         </Link>
         {run.item && (
           <>
             {' on '}
             {run.item.level === 'goal' ? (
-              <Link href={`/goals/${run.item.id}`} className="underline-offset-2 hover:underline">
+              <Link href={`/goals/${run.item.id}`} className={linkVariants()}>
                 {run.item.title}
               </Link>
             ) : (
@@ -87,7 +88,7 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
         {run.area && (
           <>
             {' on '}
-            <Link href="/goals/all" className="underline-offset-2 hover:underline">
+            <Link href="/goals/all" className={linkVariants()}>
               {run.area.name}
             </Link>
           </>

@@ -140,6 +140,12 @@ vi.mock('@/inngest/dev/claims', () => ({
 vi.mock('@/inngest/dev/digest', () => ({
   runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
 }));
+vi.mock('@/inngest/learn/embeddings-daily', () => ({
+  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, aims: [], parents: { topics: 0, ideas: 0, calls: 1, stoppedEarly: false }, places: [], dust: [], noteEvidence: [], courses: [], work: [], topics: [] })),
+}));
+vi.mock('@/inngest/learn/brief-watch', () => ({
+  runBriefWatch: vi.fn(async () => ({ due: 1, checked: [], cards: 0 })),
+}));
 vi.mock('@/inngest/dev/idea-scores', () => ({
   runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),
 }));
@@ -156,6 +162,7 @@ const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
 const { runGoalsRhythms } = await import('@/inngest/goals/rhythms');
 const { runDevDigest } = await import('@/inngest/dev/digest');
 const { runIdeaScoreCatchUp } = await import('@/inngest/dev/idea-scores');
+const { runBriefWatch } = await import('@/inngest/learn/brief-watch');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -214,6 +221,11 @@ describe('the daily cron route', () => {
     expect(runGoalsDaily).toHaveBeenCalled();
     expect(runGoalsWeekly).toHaveBeenCalled();
     expect(body.results['goals-weekly']).toMatchObject({ started: true, ignored: 2 });
+
+    // Watched research briefs are checked for new sources by this cron too
+    // (plan #2023.8), each keeping its own week.
+    expect(runBriefWatch).toHaveBeenCalled();
+    expect(body.results['learn-brief-watch']).toEqual({ due: 1, checked: [], cards: 0 });
 
     // Goal runs that stopped reporting are closed before the morning run
     // reads what is still going (plan #1002).

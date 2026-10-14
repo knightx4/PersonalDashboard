@@ -238,7 +238,7 @@ describe('read_dev_row', () => {
     ],
     plan_items: [
       { id: FEATURE, user_id: ME, number: 1319, title: 'Let Dash read your Dev pages in full', kind: 'build', status: 'not_started', parent_id: null, position: 1, dismissed_at: null },
-      { id: STEP, user_id: ME, number: 1248, title: 'Read a row', kind: 'build', status: 'in_progress', detail: 'Read one row.', acceptance: 'It reads.', comment: 'Added by a session.', resolution: null, fog: 'Unclear', fog_dismissed_at: at, block_ask: null, parent_id: FEATURE, position: 2, dismissed_at: null },
+      { id: STEP, user_id: ME, number: 1248, title: 'Read a row', kind: 'build', status: 'in_progress', detail: 'Read one row.', acceptance: 'It reads.', comment: 'Added by a session.', resolution: null, block_ask: null, parent_id: FEATURE, position: 2, dismissed_at: null },
       { id: QUESTION, user_id: ME, number: 1250, title: 'Which shape?', kind: 'decision', status: 'done', resolution: 'B, JSON.', parent_id: STEP, position: 1, dismissed_at: null },
       { id: OPEN_QUESTION, user_id: ME, number: 1251, title: 'Which name?', kind: 'decision', status: 'not_started', resolution: null, detail: 'A — one.\nB — two.', parent_id: STEP, position: 2, dismissed_at: null },
       { id: DISMISSED_STEP, user_id: ME, number: 1252, title: 'Put aside', kind: 'build', status: 'not_started', parent_id: FEATURE, position: 3, dismissed_at: at },
@@ -303,14 +303,13 @@ describe('read_dev_row', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1248 Read a row',
-        href: '/dev/plan?view=all&q=%231248',
+        href: '/dev/plan/1248',
       });
       expect(row.detail).toMatchObject({
         under: '#1319 Let Dash read your Dev pages in full',
         detail: 'Read one row.',
         done_when: 'It reads.',
         history: 'Added by a session.',
-        fog: null,
         comments: '[2026-09-01, me] Keep it small.',
       });
       expect(row.detail?.decisions).toBe('#1250 Which shape? Answered: B, JSON.\n#1251 Which name? Not answered yet.');
@@ -338,7 +337,7 @@ describe('read_dev_row', () => {
       const [row] = result.rows;
       expect(row.title).toBe('#1319.1 Read a row');
       // The link still carries the number, the step's identity.
-      expect(row.href).toBe('/dev/plan?view=all&q=%231248');
+      expect(row.href).toBe('/dev/plan/1248');
       expect(row.detail).toMatchObject({
         step: '#1319.1',
         number: 1248,
@@ -500,7 +499,7 @@ describe('find_dev_text', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1400 Show counts',
-        href: '/dev/plan?view=all&q=%231400',
+        href: '/dev/plan/1400',
         detail: {
           kind: 'comment',
           field: 'comment',
@@ -523,7 +522,7 @@ describe('find_dev_text', () => {
     const result = await find({ query: 'drop step', kinds: ['comment'] }, { tables: outlined });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: '#1390.2 Show counts',
-      href: '/dev/plan?view=all&q=%231400',
+      href: '/dev/plan/1400',
       detail: { excerpt: 'Drop this step, #1320.3 covers it.' },
     });
   });

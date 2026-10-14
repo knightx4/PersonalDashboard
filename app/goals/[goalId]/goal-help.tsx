@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { InlineInput } from '@/components/ui/field';
+import { Checkbox, InlineInput } from '@/components/ui/field';
 import {
   HELP_KINDS,
   HELP_KIND_LABELS,
@@ -149,8 +149,7 @@ function HelpForm({
           {HELP_KINDS.map((kind) => (
             <li key={kind} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
               <label className="flex w-44 cursor-pointer items-center gap-2 text-body text-ink">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="kind"
                   value={kind}
                   checked={ticked.has(kind)}
@@ -160,7 +159,6 @@ function HelpForm({
                     else next.delete(kind);
                     setTicked(next);
                   }}
-                  className="size-4 rounded border-border text-accent focus:ring-accent/30"
                 />
                 {HELP_KIND_LABELS[kind]}
               </label>

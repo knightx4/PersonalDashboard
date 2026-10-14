@@ -1,4 +1,12 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of the job search's nav its rows sit under (app/jobs/(app)/layout.tsx). */
+const TODAY: Section = { href: '/jobs', label: 'Today' };
+const PIPELINE: Section = { href: '/jobs/pipeline', label: 'Pipeline' };
+const COMPANIES: Section = { href: '/jobs/companies', label: 'Companies' };
+const CONTACTS: Section = { href: '/jobs/contacts', label: 'Contacts' };
+const MATERIAL: Section = { href: '/jobs/material', label: 'Material' };
+const SETTINGS: Section = { href: '/jobs/settings', label: 'Settings' };
 
 /**
  * The job search's tables, as Goals reads them (lib/sources/types.ts). A new
@@ -14,6 +22,7 @@ export const jobsSources: ModuleSources = {
       search: ['body'],
       title: 'body',
       href: () => '/jobs/settings#career-goals',
+      section: SETTINGS,
       note: 'A newer entry supersedes an older one where they disagree; read them newest first.',
     },
     {
@@ -25,6 +34,7 @@ export const jobsSources: ModuleSources = {
       title: 'display_name',
       owner: 'id',
       href: () => '/jobs/settings',
+      section: SETTINGS,
     },
     {
       table: 'job_search.roles',
@@ -34,6 +44,8 @@ export const jobsSources: ModuleSources = {
       search: ['title', 'jd_text', 'location', 'seniority', 'requirements'],
       title: 'title',
       href: (id) => `/jobs/roles/${id}`,
+      section: PIPELINE,
+      parent: parentBy('company_id', 'job_search.companies'),
     },
     {
       table: 'job_search.applications',
@@ -43,6 +55,15 @@ export const jobsSources: ModuleSources = {
       search: ['next_action'],
       title: 'next_action',
       href: () => '/jobs/pipeline',
+      // An application is known by its role, so a path walks through it to
+      // the role rather than naming it.
+      page: {
+        title: 'next_action',
+        href: () => '/jobs/pipeline',
+        section: PIPELINE,
+        parent: parentBy('role_id', 'job_search.roles'),
+        passThrough: true,
+      },
       note: 'Name one by its role (role_id → roles.title). Count them for a job-search goal rather than copying them.',
     },
     {
@@ -62,6 +83,8 @@ export const jobsSources: ModuleSources = {
       search: ['notes', 'prep_notes', 'questions_asked'],
       title: 'notes',
       href: () => '/jobs/interviews',
+      section: PIPELINE,
+      parent: parentBy('application_id', 'job_search.applications'),
       note: 'Name one by its application’s role (application_id → applications.role_id → roles.title).',
     },
     {
@@ -73,6 +96,7 @@ export const jobsSources: ModuleSources = {
       title: 'name',
       ref: 'slug',
       href: (slug) => `/jobs/companies/${encodeURIComponent(slug)}`,
+      section: COMPANIES,
     },
     {
       table: 'job_search.contacts',
@@ -82,6 +106,8 @@ export const jobsSources: ModuleSources = {
       search: ['full_name', 'title', 'how_we_connect', 'notes'],
       title: 'full_name',
       href: (id) => `/jobs/contacts/${id}`,
+      section: CONTACTS,
+      parent: parentBy('company_id', 'job_search.companies'),
     },
     {
       table: 'job_search.contact_touches',
@@ -107,6 +133,7 @@ export const jobsSources: ModuleSources = {
       search: ['title', 'body', 'context', 'skills'],
       title: 'title',
       href: () => '/jobs/material?part=evidence',
+      section: MATERIAL,
     },
     {
       table: 'job_search.resume_versions',
@@ -116,6 +143,7 @@ export const jobsSources: ModuleSources = {
       search: ['label', 'text_content', 'notes'],
       title: 'label',
       href: () => '/jobs/material?part=resumes',
+      section: MATERIAL,
     },
     {
       table: 'job_search.cover_letters',
@@ -141,6 +169,7 @@ export const jobsSources: ModuleSources = {
       search: ['text', 'canonical_answer'],
       title: 'text',
       href: () => '/jobs/material',
+      section: MATERIAL,
     },
     {
       table: 'job_search.reminders',
@@ -150,6 +179,7 @@ export const jobsSources: ModuleSources = {
       search: ['body'],
       title: 'body',
       href: () => '/jobs',
+      section: TODAY,
     },
   ],
   notSources: [

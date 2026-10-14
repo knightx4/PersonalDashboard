@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { cn } from '@/lib/cn';
 
 /**
  * Hold ⌘ (or Alt) and every shortcut appears on the thing it drives.
@@ -47,39 +46,5 @@ export function KeyHintsProvider() {
   return null;
 }
 
-/**
- * A shortcut, shown only while a modifier is held. Hidden from the
- * accessibility tree: the control it sits on already has a name, and the
- * shortcut is announced nowhere else either, which is the honest state of it.
- */
-/**
- * `text-micro`, which is the bottom of the scale, and not the 10px this was
- * written at. A tenth size in a mono face is a size nobody chose -- it was one
- * step below the floor because a keycap felt like it wanted to be small -- and
- * the cap is 18px tall with `leading-none`, so the extra pixel changes nothing
- * about the box and only makes ⌥ and ⌘ legible at the size they are actually
- * read at.
- */
-export function Kbd({
-  children,
-  className,
-  always = false,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  /** Show regardless of the modifier -- inside a menu that is already open. */
-  always?: boolean;
-}) {
-  return (
-    <kbd
-      aria-hidden
-      className={cn(
-        !always && 'keyhint',
-        'inline-flex h-4.5 min-w-4.5 items-center justify-center rounded border border-border-strong border-b-2 px-1 font-mono text-micro leading-none text-ink-muted',
-        className,
-      )}
-    >
-      {children}
-    </kbd>
-  );
-}
+/** Moved to components/ui/kbd.tsx; re-exported for callers not yet moved. */
+export { Kbd } from '@/components/ui/kbd';

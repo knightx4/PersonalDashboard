@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { hitHref } from '@/lib/core/back-from';
 import { hitPoints, mergeRanked, paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
@@ -637,7 +638,9 @@ export function useSearchRows({
     (row: SearchRow | undefined) => {
       if (!row) return;
       if (row.kind === 'command') row.command.run();
-      else router.push(row.hit.href);
+      // The hit carries the page it was found from, so the row's back link
+      // returns there (plan #1931.3).
+      else router.push(hitHref(row.hit.href, window.location));
     },
     [router],
   );

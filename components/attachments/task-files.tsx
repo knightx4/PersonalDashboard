@@ -1,5 +1,6 @@
 import { FileText, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { chipVariants } from '@/components/ui/chip';
 import { attachmentSize, isImageAttachment } from '@/lib/attachments/rules';
 
 /**
@@ -64,7 +65,7 @@ export function TaskFiles({ files, className }: { files: readonly TaskFile[]; cl
                 target="_blank"
                 rel="noreferrer"
                 title={file.name}
-                className="press block size-20 overflow-hidden rounded-control border border-border bg-sunken" /* ui-ok: the edge of a photo, which keeps a white page apart from the surface; it groups nothing */
+                className="press block size-20 overflow-hidden rounded-card border border-border bg-sunken" /* ui-ok: the edge of a photo, which keeps a white page apart from the surface; it groups nothing */
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={file.href} alt={file.name} loading="lazy" className="size-full object-cover" />
@@ -81,9 +82,12 @@ export function TaskFiles({ files, className }: { files: readonly TaskFile[]; cl
                 href={file.href}
                 target="_blank"
                 rel="noreferrer"
-                className="press press-area flex min-w-0 items-center gap-1.5 rounded-control bg-sunken px-2 py-1 text-small text-ink transition-colors duration-quick hover:text-accent"
+                className={cn(
+                  chipVariants({ size: 'md' }),
+                  'press press-area min-w-0 max-w-full text-ink transition-colors duration-quick hover:text-accent',
+                )}
               >
-                <FileText className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                <FileText className="shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
                 <span className="min-w-0 truncate">{file.name}</span>
                 <span className="shrink-0 text-ink-muted">{attachmentSize(file.size)}</span>
               </a>

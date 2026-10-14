@@ -1,11 +1,12 @@
 import { PageHeader } from '@/components/shell/page-header';
-import { BigFiveTest } from '@/app/learn/know/personality/big-five-test';
-import { OtherTests } from '@/app/learn/know/personality/other-tests';
-import { PersonalitySection } from '@/app/learn/know/personality-section';
+import { BigFiveTest } from '@/app/you/personality/big-five-test';
+import { OtherTests } from '@/app/you/personality/other-tests';
+import { PersonalitySection } from '@/app/you/personality/personality-section';
 import { MODELS } from '@/lib/core/models';
-import { IPIP_ITEM_COUNT } from '@/lib/learn/personality/ipip';
-import type { BigFiveResult, PersonalityRead, TypedResult } from '@/lib/learn/personality/model';
-import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
+import { formatDay } from '@/lib/goals/dates';
+import { IPIP_ITEM_COUNT } from '@/lib/you/personality/ipip';
+import type { BigFiveResult, PersonalityRead, TypedResult } from '@/lib/you/personality/model';
+import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 
 /**
  * The Big Five test (plan #1632) in the surface gallery: the list with the
@@ -20,11 +21,13 @@ const TODAY = '2026-10-07';
 function Header() {
   return (
     <PageHeader
-      crumbs={[
-        { label: 'Learn', href: '/learn' },
-        { label: 'Know', href: '/learn/know' },
-        { label: 'Personality test', href: '/learn/know/personality' },
-      ]}
+      subject={{
+        ref: null,
+        path: [
+          { label: 'Personality', href: '/you/personality' },
+          { label: 'Personality test', href: '/you/personality/test' },
+        ],
+      }}
       title="Personality test"
     />
   );
@@ -173,7 +176,7 @@ const EARLIER: BigFiveResult[] = [
 const NOW = Date.parse('2026-10-07T18:40:00Z');
 
 const READ: PersonalityRead = {
-  model: MODELS.learnPersonalityRead,
+  model: MODELS.youPersonalityRead,
   at: '2026-10-07T18:21:10Z',
   points: [
     {
@@ -215,7 +218,7 @@ const TYPED_READ: TypedResult[] = [
   {
     ...TYPED[0]!,
     read: {
-      model: MODELS.learnPersonalityRead,
+      model: MODELS.youPersonalityRead,
       at: '2026-10-07T18:31:40Z',
       points: [
         {
@@ -233,31 +236,52 @@ const TYPED_READ: TypedResult[] = [
   TYPED[1]!,
 ];
 
-export function KnowPersonalitySurface() {
+/** The Personality tab's header, as app/you/personality/page.tsx draws it. */
+function TabHeader({ takenAt }: { takenAt: string | null }) {
   return (
-    <PersonalitySection
-      latest={{ ...RESULT, read: READ }}
-      earlier={EARLIER}
-      typed={TYPED_READ}
-      themes={THEMES}
-      now={NOW}
+    <PageHeader
+      title="Personality"
+      description={takenAt ? `Big Five, taken ${formatDay(takenAt, true)}` : undefined}
     />
+  );
+}
+
+export function YouPersonalitySurface() {
+  return (
+    <>
+      <TabHeader takenAt={RESULT.takenAt} />
+      <PersonalitySection
+        latest={{ ...RESULT, read: READ }}
+        earlier={EARLIER}
+        typed={TYPED_READ}
+        themes={THEMES}
+        now={NOW}
+      />
+    </>
   );
 }
 
 /* Straight after saving: the read is still running. */
-export function KnowPersonalityReadingSurface() {
+export function YouPersonalityReadingSurface() {
   return (
-    <PersonalitySection
-      latest={{ ...RESULT, createdAt: '2026-10-07T18:38:30Z' }}
-      earlier={[]}
-      typed={[]}
-      themes={THEMES}
-      now={NOW}
-    />
+    <>
+      <TabHeader takenAt={RESULT.takenAt} />
+      <PersonalitySection
+        latest={{ ...RESULT, createdAt: '2026-10-07T18:38:30Z' }}
+        earlier={[]}
+        typed={[]}
+        themes={THEMES}
+        now={NOW}
+      />
+    </>
   );
 }
 
-export function KnowPersonalityEmptySurface() {
-  return <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} now={NOW} />;
+export function YouPersonalityEmptySurface() {
+  return (
+    <>
+      <TabHeader takenAt={null} />
+      <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} now={NOW} />
+    </>
+  );
 }

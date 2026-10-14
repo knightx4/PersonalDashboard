@@ -29,7 +29,7 @@ select id, name, note from goals.areas
 where id = '<area id>' and user_id = '<user>';
 
 -- every goal the area has had, including the ones turned down
-select id, title, acceptance, fog, detail, status, archived_at
+select id, title, acceptance, detail, status, archived_at
 from goals.items
 where area_id = '<area id>' and user_id = '<user>' and level = 'goal';
 
@@ -96,7 +96,8 @@ reading it serves. Turning down the ones that do not fit is how the person
 answers. Settle what shape each goal takes yourself, as "Decide first, ask
 last" says, and name the choice in its `detail`; a question under a goal
 passes that test or is not asked. Where you cannot write a goal's done-when
-even provisionally, write it with `fog` instead.
+even provisionally, write the goal with its title alone and ask what is not
+known as a question beneath it.
 
 Use web search where current facts make a goal concrete: the organisations,
 groups, meetings and publications that exist in the person's city for this

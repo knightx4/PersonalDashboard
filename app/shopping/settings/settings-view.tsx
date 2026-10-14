@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import { MutedMerchantsSection, MutedMerchantsTitle, type MutedMerchant } from '
 import { PeopleSection, PeopleTitle } from './people-section';
 import { ReturnPoliciesSection } from './return-policies-section';
 import { TagsSection, type SettingsTag } from './tags-section';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** Stripe Payment Link — customers choose what to pay. Override via env if needed. */
 const DONATE_URL =
@@ -58,7 +60,7 @@ export function ShoppingSettingsView({
   returnPolicies: MerchantPolicyRow[];
 }) {
   return (
-    <div className="mx-auto max-w-3xl [&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
+    <PageColumn className="[&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
       <PageHeader title="Settings" />
 
       <div className="space-y-4">
@@ -106,7 +108,7 @@ export function ShoppingSettingsView({
             <p className="pt-1">
               <Link
                 href="/account"
-                className="text-ui font-medium text-accent underline underline-offset-2"
+                className={cn('text-ui', linkVariants())}
               >
                 Change these under Account
               </Link>
@@ -234,6 +236,6 @@ export function ShoppingSettingsView({
           </CardBody>
         </Card>
       </div>
-    </div>
+    </PageColumn>
   );
 }

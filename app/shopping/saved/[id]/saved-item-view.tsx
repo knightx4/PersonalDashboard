@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
+import Link, { linkVariants } from '@/components/ui/link';
 import { formatMoney } from '@/lib/money';
 import { Banner } from '@/components/ui/banner';
 import { SavedItemBody } from './item-forms';
@@ -32,13 +33,17 @@ export function SavedItemView({
   item,
   merchant,
   ownedMatches,
+  path,
 }: {
   item: SavedItemDetail;
   merchant: { name: string } | null;
   ownedMatches: OwnedMatch[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   return (
     <SavedItemBody
+      path={path}
       item={{
         id: item.id,
         url: item.url,
@@ -62,7 +67,7 @@ export function SavedItemView({
                 <li key={match.id}>
                   <Link
                     href={`/shopping/inventory/${match.id}`}
-                    className="text-accent hover:underline"
+                    className={linkVariants()}
                   >
                     {match.name}
                     {match.variant ? ` · ${match.variant}` : ''}

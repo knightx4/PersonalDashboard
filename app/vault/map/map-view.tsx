@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Waypoints } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -9,6 +9,8 @@ import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
 import { MergeLog } from './merge-log';
 import { SweepAction, SweepPanel } from './sweep-panel';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
@@ -29,8 +31,12 @@ export function VaultMapView({
 
   if (themes.length === 0) {
     return (
-      <>
-        <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
+      <PageColumn>
+        <PageHeader
+          subject={sectionSubject('/vault/map', 'Map')}
+          title="Map"
+          actions={<SweepAction sweep={sweep} />}
+        />
         <SweepPanel sweep={sweep} />
         {/* Themes arrive two ways: the sweep above, and one note's own Map
             section. The empty state names both. */}
@@ -40,13 +46,17 @@ export function VaultMapView({
           description="The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Sweep every note to fill it, or open one note and use its Map section. What the sweep reads and what you accept on a note appear here."
           action={{ label: 'Open your notes', href: '/vault' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
   return (
-    <>
-      <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
+    <PageColumn>
+      <PageHeader
+        subject={sectionSubject('/vault/map', 'Map')}
+        title="Map"
+        actions={<SweepAction sweep={sweep} />}
+      />
       <SweepPanel sweep={sweep} />
 
       <p className="mb-3 text-body text-ink-muted">
@@ -55,7 +65,7 @@ export function VaultMapView({
         {mergeTotal > 0 && (
           <>
             {' · '}
-            <a href="#merges" className="text-ink underline-offset-2 hover:underline">
+            <a href="#merges" className={linkVariants()}>
               {mergeTotal.toLocaleString('en-GB')} {mergeTotal === 1 ? 'merge' : 'merges'} below
             </a>
           </>
@@ -86,7 +96,7 @@ export function VaultMapView({
       <div className="[&_a]:press-area max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11">
         <MergeLog log={mergeLog} />
       </div>
-    </>
+    </PageColumn>
   );
 }
 

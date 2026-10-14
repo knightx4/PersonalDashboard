@@ -37,7 +37,7 @@ export function SendScreenBack({
         className="-ml-2.5 gap-1.5"
         onClick={() => setOpen(true)}
       >
-        <ThumbsDown className="size-4" strokeWidth={2} aria-hidden />
+        <ThumbsDown className="size-4" strokeWidth={1.75} aria-hidden />
         Send back
       </Button>
     );

@@ -17,6 +17,13 @@ export const learnActions: ModuleActions = {
     },
     addConceptNote: tool('add_concept_note'),
   },
+  'app/learn/b/[id]/actions.ts': {
+    saveShortAnswer: none('own'),
+    setBriefWatch: none('setting'),
+    setBriefArchived: none('own'),
+    retryBrief: none('spends'),
+    startEssayOnBrief: none('own'),
+  },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
     clipShownAction: none('own'),
@@ -55,6 +62,9 @@ export const learnActions: ModuleActions = {
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
   },
+  'app/learn/space/actions.ts': {
+    saveRecordingAction: none('setting'),
+  },
   'app/learn/know/actions.ts': {
     proposeGoal: none('spends'),
     approveChain: none('theirs'),
@@ -69,16 +79,6 @@ export const learnActions: ModuleActions = {
       'spends',
       'Making a subject writes its curriculum and places it among the areas with a model. A reading list with no model run is add_learn_track.',
     ),
-  },
-  'app/learn/know/personality/actions.ts': {
-    saveBigFiveAction: none('own'),
-    saveTypedAction: none(
-      'own',
-      "A type from another test is the person's own result, entered by them as their Big Five scores are, and saving it starts a read of it.",
-    ),
-    deleteTypedAction: none('deletes'),
-    restoreTypedAction: none('theirs'),
-    readAgainAction: none('spends'),
   },
   'app/learn/know/move-actions.ts': {
     moveTheme: none('setting', 'Where a theme sits on the areas grid is how the person arranges their own map.'),
@@ -96,6 +96,12 @@ export const learnActions: ModuleActions = {
     confirmImport: {
       tool: ['add_learn_track', 'add_track_reading'],
       note: 'Dash starts the list and adds each work to it, where the page reads a pasted list first.',
+    },
+  },
+  'app/learn/save/actions.ts': {
+    saveReadingLink: {
+      tool: 'add_track_reading',
+      note: 'Dash adds the work by its title and link to a list it is told, where the page reads the title from the link and puts it on "Saved links".',
     },
   },
   'app/learn/now/actions.ts': {

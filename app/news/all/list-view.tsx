@@ -1,10 +1,11 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { BellOff, Mail } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Tooltip } from '@/components/ui/tooltip';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { TopicChips } from '@/components/news/topic-chips';
 import { topicHrefs } from '@/lib/news/topic-hrefs';
@@ -28,6 +29,8 @@ import type { NewsTopic } from '@/lib/news/issues/topics';
 import type { DeliveryGap } from '@/lib/news/inbound/readiness';
 import { setSenderMuted } from '../actions';
 import { NeedsConfirming } from './needs-confirming';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The newsletter list, drawn from what the page read (app/news/all/page.tsx),
@@ -83,8 +86,8 @@ export function NewsListView({
      * test message get lost before anyone looks at a log.
      */
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
-        <PageHeader title="Newsletters" />
+      <PageColumn className="space-y-6">
+        <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
         <EmptyState
           icon={Mail}
           title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
@@ -102,14 +105,16 @@ export function NewsListView({
             href: listHref({ from: null, topic: null, view: 'recommended' }),
           }}
         />
-      </div>
+      </PageColumn>
     );
   }
 
-  const header = <PageHeader title="Newsletters" />;
+  const header = (
+    <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
+  );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       {header}
 
       <NeedsConfirming signups={waiting} senders={byId} timezone={timezone} />
@@ -214,7 +219,7 @@ export function NewsListView({
           <p className="mt-3 text-small text-ink-muted">{countLabel(shown.length)}</p>
         </div>
       )}
-    </div>
+    </PageColumn>
   );
 }
 
@@ -295,17 +300,19 @@ function NewsletterList({
             <form action={setSenderMuted} className="shrink-0 pr-2 pl-1">
               <input type="hidden" name="senderId" value={sender.id} />
               <input type="hidden" name="muted" value={sender.muted ? 'false' : 'true'} />
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                aria-label={sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`}
-              >
-                <BellOff
-                  className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
-                  strokeWidth={1.75}
-                />
-              </Button>
+              <Tooltip label={sender.muted ? 'Bring this newsletter back into Latest' : 'Keep this newsletter out of Latest'} align="end">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  aria-label={sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`}
+                >
+                  <BellOff
+                    className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
+                    strokeWidth={1.75}
+                  />
+                </Button>
+              </Tooltip>
             </form>
           </li>
         ))}
@@ -335,13 +342,7 @@ export function ViewSwitch({ view, topic }: { view: ListView; topic: NewsTopic |
           })}
           scroll={false}
           aria-current={view === option.key ? 'true' : undefined}
-          className={cn(
-            'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-            view === option.key
-              ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
+          className={segmentClass(view === option.key)}
         >
           {option.label}
         </Link>

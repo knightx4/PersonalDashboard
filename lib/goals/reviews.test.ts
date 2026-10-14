@@ -30,7 +30,6 @@ function goal(over: Partial<Goal>): Goal {
     areaId: 'a',
     title: 'Pay off the cards',
     acceptance: 'Both cards at zero.',
-    fog: null,
     status: 'open',
     position: 10,
     unit: null,

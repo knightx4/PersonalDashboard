@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { FileText, FolderTree } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
@@ -17,6 +17,7 @@ import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export default async function VaultPage({
 
   if (!connection) {
     return (
-      <>
+      <PageColumn>
         <PageHeader title="Vault" description="Your Obsidian notes, mirrored here." />
         <EmptyState
           icon={FolderTree}
@@ -52,7 +53,7 @@ export default async function VaultPage({
           description="Point this at the GitHub repository your Obsidian vault lives in and it will mirror every markdown file — and nothing else. Images, PDFs and attachments are never fetched."
           action={{ label: 'Connect a vault', href: '/vault/settings' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -67,7 +68,7 @@ export default async function VaultPage({
   const waiting = notes.filter((note) => note.folder === INBOX_FOLDER).length;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
         title="Vault"
         description={`${connection.repoOwner}/${connection.repoName} · ${connection.branch}`}
@@ -110,7 +111,7 @@ export default async function VaultPage({
             {groups.map((group) => (
               <section key={group.folder || '(root)'}>
                 <h2 className="mb-2 flex items-center gap-1.5 text-ui font-semibold text-ink-muted">
-                  <FolderTree className="size-3.5" strokeWidth={2} aria-hidden />
+                  <FolderTree className="size-3.5" strokeWidth={1.75} aria-hidden />
                   {group.folder || 'Vault root'}
                 </h2>
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -135,6 +136,6 @@ export default async function VaultPage({
           </div>
         </>
       )}
-    </>
+    </PageColumn>
   );
 }

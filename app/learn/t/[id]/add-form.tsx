@@ -22,7 +22,7 @@ function AddButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      <Plus className="size-4" strokeWidth={2} aria-hidden />
+      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Adding…' : 'Add'}
     </Button>
   );

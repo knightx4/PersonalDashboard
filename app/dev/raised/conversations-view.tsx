@@ -1,7 +1,8 @@
 'use client';
 
+import { Tooltip } from '@/components/ui/tooltip';
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { markConversationRead } from './actions';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
@@ -84,12 +85,14 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
             {/* Ink and a shape, no tint: whether you have read something is
                 none of the five things colour is allowed to claim. */}
             {unread && (
-              <span
-                title="Dash has written here since you last opened it"
-                className="inline-flex size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-ink"
+              <Tooltip
+                label="Dash has written here since you last opened it. Open it to read the reply."
+                className="shrink-0 translate-y-[-1px]"
               >
-                <span className="sr-only">Unread</span>
-              </span>
+                <span className="inline-flex size-1.5 rounded-full bg-ink">
+                  <span className="sr-only">Unread</span>
+                </span>
+              </Tooltip>
             )}
             {conversation.about}
           </span>

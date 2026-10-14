@@ -14,8 +14,10 @@ export const maxDuration = 300;
  * X posts Dash drafted about building this app (plan #1419, feature #1414).
  *
  * Suggest posts starts a run that drafts a few from what shipped since the
- * last posted one. Each draft is edited here, copied, posted on X by the
- * person, and marked posted with its link; or dropped. Dash never posts.
+ * last posted one. Each draft is edited here, then either sent to X with
+ * Post and a confirm (plan #2072), or copied, posted by the person and
+ * marked posted with its link; or dropped. Nothing is posted unless the
+ * person presses Post on that draft.
  *
  * Above the drafts sits the X connection (plan #1818): Connect X signs in to
  * the person's own account so what they posted can be read back. `?x=` is

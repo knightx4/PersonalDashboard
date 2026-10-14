@@ -413,8 +413,6 @@ type PlanRow = {
   acceptance: string | null;
   comment: string | null;
   resolution: string | null;
-  fog: string | null;
-  fog_dismissed_at: string | null;
   block_ask: string | null;
   parent_id: string | null;
 };
@@ -427,7 +425,7 @@ async function readStep(
 ): Promise<Found | null> {
   const { data, error } = await client
     .from('plan_items')
-    .select('id, number, title, kind, status, detail, acceptance, comment, resolution, fog, fog_dismissed_at, block_ask, parent_id')
+    .select('id, number, title, kind, status, detail, acceptance, comment, resolution, block_ask, parent_id')
     .eq('user_id', ctx.userId)
     .eq(ref.column, ref.value)
     .is('dismissed_at', null)
@@ -491,7 +489,6 @@ async function readStep(
       detail: longText(row.detail, SECTION_CHARS, outlines),
       done_when: longText(row.acceptance, SECTION_CHARS, outlines),
       resolution: longText(row.resolution, SECTION_CHARS, outlines),
-      fog: row.fog_dismissed_at ? null : longText(row.fog, SECTION_CHARS, outlines),
       blocked_on: row.block_ask && readableRefs(row.block_ask, outlines),
       // Mostly dated lines sessions wrote as they started, blocked and closed it.
       history: longText(row.comment, SECTION_CHARS, outlines),

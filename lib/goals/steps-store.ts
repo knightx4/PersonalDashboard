@@ -63,8 +63,6 @@ type ItemRow = {
   title: string;
   detail: string | null;
   acceptance: string | null;
-  fog: string | null;
-  fog_dismissed_at: string | null;
   resolution: string | null;
   dismissed_at: string | null;
   due_on: string | null;
@@ -123,7 +121,7 @@ async function loadDependencies(
 }
 
 const ITEM_COLUMNS =
-  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
+  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, ' +
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
@@ -175,8 +173,6 @@ const toGoal = (row: ItemRow): Goal => ({
   areaId: row.area_id as string,
   title: row.title,
   acceptance: row.acceptance,
-  fog: row.fog,
-  fogDismissedAt: row.fog_dismissed_at,
   // Only a step can be blocked; the database refuses it on a goal.
   status: row.status as GoalStatus,
   position: row.position,
@@ -197,8 +193,12 @@ export type GoalMap = {
   steps: StepNode[];
   /** Steps under other goals that also count towards this one. */
   linked: LinkedStep[];
-  /** Every other live goal, for linking a step to one of them. */
-  otherGoals: { id: string; title: string }[];
+  /**
+   * Every other live goal, for linking a step to one of them. The status,
+   * area and errand flag are for Dash's thread, which moves a step only under
+   * an open one (plan #2035.1); fixtures may leave them out.
+   */
+  otherGoals: { id: string; title: string; status?: GoalStatus; areaName?: string; errand?: boolean }[];
   /** For each step shown, the other goals it is linked to. */
   linksOf: Record<string, { linkId: string; goalId: string; title: string }[]>;
   /** Each rhythm step's current period and the closed ones before it (plan #928). */
@@ -303,7 +303,15 @@ export async function loadGoalMap(
     areaName: areaNames.get(goal.area_id as string) ?? '',
     steps,
     linked,
-    otherGoals: goals.filter((g) => g.id !== goalId).map((g) => ({ id: g.id, title: g.title })),
+    otherGoals: goals
+      .filter((g) => g.id !== goalId)
+      .map((g) => ({
+        id: g.id,
+        title: g.title,
+        status: g.status as GoalStatus,
+        areaName: areaNames.get(g.area_id as string) ?? '',
+        errand: g.errand ?? false,
+      })),
     linksOf,
     rhythms: Object.fromEntries(
       shown.flatMap((id) => {
@@ -489,6 +497,60 @@ export async function setStepArchived(
   const { data, error } = await query.select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Put a step under another goal, last among that goal's steps (plan #2035.1).
+ * Its sub-steps follow, since they hang from it. A link counting the step
+ * towards that goal is archived, because a step cannot count separately
+ * towards the goal it sits under (goals.item_goals_check). Null when the step
+ * or the goal is not live, or the step already sits directly under that goal.
+ */
+export async function moveStepToGoal(
+  client: GoalsSupabaseClient,
+  stepId: string,
+  goalId: string,
+): Promise<{ unlinked: boolean } | null> {
+  const { data: goal, error: goalError } = await client
+    .from('items')
+    .select('id')
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .is('archived_at', null)
+    .maybeSingle();
+  if (goalError) throw new Error(goalError.message);
+  if (!goal) return null;
+
+  const { data: siblings, error: readError } = await client
+    .from('items')
+    .select('position')
+    .eq('parent_id', goalId)
+    .is('archived_at', null);
+  if (readError) throw new Error(readError.message);
+
+  const { data: moved, error } = await client
+    .from('items')
+    .update({
+      parent_id: goalId,
+      position: nextPosition((siblings ?? []).map((row) => row.position as number)),
+    })
+    .eq('id', stepId)
+    .eq('level', 'step')
+    .neq('parent_id', goalId)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  if ((moved ?? []).length === 0) return null;
+
+  const { data: unlinked, error: linkError } = await client
+    .from('item_goals')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('item_id', stepId)
+    .eq('goal_id', goalId)
+    .is('archived_at', null)
+    .select('id');
+  if (linkError) throw new Error(linkError.message);
+  return { unlinked: (unlinked ?? []).length > 0 };
 }
 
 /** One place up or down among its siblings. False when already at that end. */

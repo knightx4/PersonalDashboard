@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
 import { countOpenAskHandoffs, loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
 import { AskConversation } from '../view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Question to Dash' };
 
@@ -33,15 +33,16 @@ export default async function AskConversationPage({
 
   return (
     <>
-      <Link
-        href="/ask"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-        Questions to Dash
-      </Link>
-      <PageHeader title={askTitle(first.body)} />
-      <AskConversation conversationRef={ref} turns={turns} changes={changes} openHandoffs={openHandoffs} />
+      <PageHeader
+        subject={await rowSubject(toRef('core.conversations', ref))}
+        title={askTitle(first.body)}
+      />
+      <AskConversation
+        conversationRef={ref}
+        turns={turns}
+        changes={changes}
+        openHandoffs={openHandoffs}
+      />
     </>
   );
 }

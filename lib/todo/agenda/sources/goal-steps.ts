@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
-import { createGoalsClient } from '@/lib/goals/auth/server';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
 import { todoSuggestions } from '@/lib/goals/suggestions';
@@ -99,7 +98,7 @@ export const goalStepsSource: AgendaSource = {
   },
 
   async complete(ctx, key) {
-    const client = await createGoalsClient();
+    const client = await (ctx.clients ?? sessionClients).goals();
     if (key.startsWith(SUGGESTION_PREFIX)) {
       await recordAttended(client, key.slice(SUGGESTION_PREFIX.length), true, todayIn(ctx.timezone, ctx.now));
     } else if (key.startsWith(PREFIX)) await setStepStatus(client, idOf(key), 'done');
@@ -112,11 +111,11 @@ export const goalStepsSource: AgendaSource = {
   async defer(ctx, key) {
     const until = new Date(ctx.now);
     until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-    await dismiss(ctx.userId, 'goal_step', key, until);
+    await dismiss(ctx.userId, 'goal_step', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
-    await dismiss(ctx.userId, 'goal_step', key, null);
+    await dismiss(ctx.userId, 'goal_step', key, null, ctx.clients);
   },
 };
 

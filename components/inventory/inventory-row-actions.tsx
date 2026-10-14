@@ -120,7 +120,7 @@ export function InventoryRowActions({
         <ActionMenu
           label="Add to list"
           align="end"
-          trigger={<ListPlus className="size-4" strokeWidth={2} aria-hidden />}
+          trigger={<ListPlus className="size-4" strokeWidth={1.75} aria-hidden />}
           items={listItems}
         />
 
@@ -132,7 +132,7 @@ export function InventoryRowActions({
             label={returnPlanned ? 'Unmark to return' : 'Mark for return'}
             active={returnPlanned}
           >
-            <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+            <RotateCcw className="size-4" strokeWidth={1.75} aria-hidden />
           </IconActionButton>
         </form>
 
@@ -144,14 +144,14 @@ export function InventoryRowActions({
             label={forSale ? 'Not for sale' : 'Mark for sale'}
             active={forSale}
           >
-            <Tag className="size-4" strokeWidth={2} aria-hidden />
+            <Tag className="size-4" strokeWidth={1.75} aria-hidden />
           </IconActionButton>
         </form>
 
         <ActionMenu
           label="Mark as disposed"
           align="end"
-          trigger={<Trash2 className="size-4" strokeWidth={2} aria-hidden />}
+          trigger={<Trash2 className="size-4" strokeWidth={1.75} aria-hidden />}
           items={disposeItems}
         />
 

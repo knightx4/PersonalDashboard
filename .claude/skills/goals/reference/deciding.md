@@ -109,6 +109,5 @@ waiting steps"). Answering closes the question, so until then the step reads
 Waiting and stays out of the morning run, and the person has nothing to
 approve. Put it where it belongs on the path, not under the question.
 
-This replaces leaving such steps out. Use the goal's `fog` only for what you
-cannot write even provisionally, in one or two plain sentences, and clear the
-fog once the map covers it.
+This replaces leaving such steps out. What you cannot write even
+provisionally becomes a question under the goal, if it passes the test above.

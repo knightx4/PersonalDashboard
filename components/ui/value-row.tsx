@@ -41,6 +41,8 @@ export function ValueRow({
   label,
   labelView,
   value,
+  align = 'start',
+  total = false,
   className,
 }: {
   label: string;
@@ -48,10 +50,38 @@ export function ValueRow({
   labelView?: React.ReactNode;
   /** A string, or a rendered value -- a link, a chip, a formatted number. */
   value: React.ReactNode;
+  /**
+   * `end` is for a short value read against its label: money, a count, a
+   * date. Label and value stay on one line at every width, the value at the
+   * far end and tabular, so a column of amounts lines up. `start` (the
+   * default) is for a value that can run long, and puts it under the label on
+   * a phone.
+   */
+  align?: 'start' | 'end';
+  /** The line that sums the ones above it: a hairline over it, the value semibold. */
+  total?: boolean;
   className?: string;
 }) {
   const empty =
     value === null || value === undefined || (typeof value === 'string' && !value.trim());
+  if (align === 'end' || total) {
+    return (
+      <div
+        className={cn(
+          'flex items-baseline justify-between gap-4',
+          total && 'border-t border-border pt-2',
+          className,
+        )}
+      >
+        <dt className={cn('min-w-0 text-small', total ? 'font-medium text-ink' : 'text-ink-muted')}>
+          {labelView ?? label}
+        </dt>
+        <dd className={cn('tabular shrink-0 text-ui text-ink', total && 'font-semibold')}>
+          {empty ? <span className="text-ink-ghost">Not set</span> : value}
+        </dd>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('@md:flex @md:items-baseline @md:gap-3', className)}>

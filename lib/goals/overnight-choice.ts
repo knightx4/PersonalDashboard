@@ -124,14 +124,12 @@ export type NightGoal = {
   /** When you approved its map, or null before you have. */
   approvedAt: string | null;
   createdAt: string;
-  /** When its fog was last written or cleared by anyone but Claude, or null for never. */
-  fogChangedAt: string | null;
   /** The due date of an errand, so its map run is briefed as one (plan #1263). */
   errandDueOn?: string | null;
 };
 
-/** Why a goal is mapped tonight: it has never been mapped, or its fog changed since it was. */
-export type NightMapReason = 'new' | 'fog';
+/** Why a goal is mapped tonight: it has never been mapped. */
+export type NightMapReason = 'new';
 
 export type NightMapSkipReason = 'goal_running' | 'mapped_tonight';
 
@@ -142,32 +140,22 @@ export type NightMapChoice = {
   skipped: { goal: NightGoal; reason: NightMapSkipReason }[];
 };
 
-const after = (a: string | null, b: string | null) =>
-  a !== null && (b === null || Date.parse(a) > Date.parse(b));
-
 /**
  * Whether a goal wants a map, and why; null when it does not.
  *
  * Only an open goal: a goal Claude proposed waits for you to take it before
  * anything is built under it. A goal with no finished mapping run wants one,
- * unless you approved it anyway. After that only a change to its fog brings
- * it back, and on an approved goal only a change made since you approved it.
- * Claude writing its own fog is not a change: that is the map's output.
+ * unless you approved it anyway. After that the night leaves it alone: a
+ * re-shape is asked for from the goal's page.
  */
 function mapReason(goal: NightGoal, lastMappedAt: string | null): NightMapReason | null {
-  if (goal.status !== 'open') return null;
-  if (goal.approvedAt !== null) {
-    return after(goal.fogChangedAt, goal.approvedAt) && after(goal.fogChangedAt, lastMappedAt)
-      ? 'fog'
-      : null;
-  }
-  if (lastMappedAt === null) return 'new';
-  return after(goal.fogChangedAt, lastMappedAt) ? 'fog' : null;
+  if (goal.status !== 'open' || goal.approvedAt !== null) return null;
+  return lastMappedAt === null ? 'new' : null;
 }
 
 /**
- * Which goals a night tick maps (plan #1009): a goal never mapped, or one
- * whose fog changed since it was, at most one mapping run per goal per night.
+ * Which goals a night tick maps (plan #1009): a goal never mapped, at most
+ * one mapping run per goal per night.
  *
  * A mapping run is a goals.runs row with job `goal`, the same run "Work on
  * this" starts. Only a finished one counts as a map made, so a failed or
@@ -201,7 +189,7 @@ export function chooseNightMaps(input: {
     .filter((one): one is { goal: NightGoal; reason: NightMapReason } => one.reason !== null)
     .map((one) => ({
       ...one,
-      since: Date.parse(one.reason === 'new' ? one.goal.createdAt : (one.goal.fogChangedAt as string)),
+      since: Date.parse(one.goal.createdAt),
     }))
     .sort((a, b) => a.since - b.since);
 

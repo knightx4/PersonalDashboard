@@ -69,7 +69,7 @@ export function AddImage({
         disabled={room <= 0}
         onClick={() => input.current?.click()}
       >
-        <ImagePlus className="size-3.5" aria-hidden />
+        <ImagePlus strokeWidth={1.75} className="size-3.5" aria-hidden />
         {busy ? 'Uploading…' : 'Add an image'}
       </Button>
       <FieldError>{error}</FieldError>

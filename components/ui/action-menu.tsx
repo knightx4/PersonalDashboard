@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  forwardRef,
   useCallback,
   useEffect,
   useId,
@@ -12,9 +11,12 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { IconButton } from '@/components/ui/icon-button';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type ActionMenuItem = {
   id: string;
@@ -93,35 +95,12 @@ function buildFormData(fields: Record<string, string> | undefined): FormData {
   return formData;
 }
 
-/** Icon-sized ghost button used for row quick actions and menu triggers. */
-export const IconActionButton = forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    label: string;
-    active?: boolean;
-  }
->(function IconActionButton({ label, className, active, children, type = 'button', ...props }, ref) {
-  return (
-    <button
-      ref={ref}
-      type={type}
-      aria-label={label}
-      title={label}
-      className={cn(
-        'press inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted',
-        'transition-colors duration-quick',
-        'hover:bg-accent-tint hover:text-accent',
-        'focus-visible:outline-2 focus-visible:outline-offset-2',
-        'disabled:pointer-events-none disabled:opacity-40',
-        active && 'bg-accent-tint text-accent',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-});
+/**
+ * Icon-sized ghost button used for row quick actions and menu triggers. The
+ * shared IconButton at its default size; the name stays so its callers do
+ * not change.
+ */
+export const IconActionButton = IconButton;
 
 /**
  * Three-dot overflow menu. Renders the panel in a portal with fixed
@@ -223,25 +202,38 @@ export function ActionMenu({
     });
   }
 
+  const button = (
+    <IconActionButton
+      ref={triggerRef}
+      label={label}
+      // The browser's own title is off: the default trigger's name shows in
+      // the shared Tooltip, and a custom trigger is a word that says itself.
+      title={undefined}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-controls={open ? menuId : undefined}
+      active={open}
+      disabled={pending}
+      className={triggerClassName}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setMenuOpen(!open);
+      }}
+    >
+      {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
+    </IconActionButton>
+  );
+
   return (
     <div className={cn('relative', className)}>
-      <IconActionButton
-        ref={triggerRef}
-        label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        active={open}
-        disabled={pending}
-        className={triggerClassName}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setMenuOpen(!open);
-        }}
-      >
-        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
-      </IconActionButton>
+      {trigger ? (
+        button
+      ) : (
+        <Tooltip label={label} align={align} className="flex">
+          {button}
+        </Tooltip>
+      )}
 
       {open &&
         pos &&
@@ -252,18 +244,18 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className="popover-panel fixed z-overlay overflow-hidden rounded-lg border border-border bg-raised py-1 shadow-lg"
+            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1')}
           >
             {items.map((item) => {
               if (armed === item.id) {
                 return (
-                  <div key={item.id} role="none" className="px-3 py-2">
+                  <div key={item.id} role="none" className="px-2.5 py-1.5">
                     <p className="text-small leading-snug text-ink-muted">{item.confirm}</p>
                     <div className="mt-2 flex justify-end gap-1.5">
                       <button
                         type="button"
                         role="menuitem"
-                        className="press rounded-md px-2 py-1 text-ui text-ink-muted hover:bg-canvas hover:text-ink"
+                        className="press rounded-control px-2 py-1 text-ui text-ink-muted hover:bg-sunken hover:text-ink"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -277,7 +269,7 @@ export function ActionMenu({
                         role="menuitem"
                         autoFocus
                         className={cn(
-                          'press rounded-md px-2 py-1 text-ui font-medium',
+                          'press rounded-control px-2 py-1 text-ui font-medium',
                           item.destructive
                             ? 'bg-danger-tint text-danger hover:opacity-90'
                             : 'bg-accent-tint text-accent hover:opacity-90',
@@ -295,10 +287,7 @@ export function ActionMenu({
                 );
               }
               const itemClass = cn(
-                'flex w-full items-center px-3 py-2 text-left text-ui transition-colors',
-                item.destructive
-                  ? 'text-danger hover:bg-danger-tint'
-                  : 'text-ink hover:bg-canvas',
+                menuItemClass(item.destructive),
                 (item.disabled || pending) && 'pointer-events-none opacity-40',
               );
 

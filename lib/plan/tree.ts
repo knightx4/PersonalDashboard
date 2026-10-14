@@ -1,6 +1,5 @@
 import {
   DEFAULT_BLOCK_KIND,
-  hasLiveFog,
   isClosed,
   isDismissed,
   type PlanBlockKind,
@@ -132,7 +131,6 @@ export const PLAN_VIEWS = [
   'proposed',
   'claude',
   'blocked',
-  'fog',
   'dismissed',
   // Not a filter but a layout: every open feature as one row of a table,
   // grouped by module (plan #1669). The tree under it is the whole plan, as
@@ -192,9 +190,7 @@ export type PlanSummary = {
   done: number;
   /** Open steps handed to Claude. */
   claude: number;
-  /** Steps carrying a "not yet specified" note, closed ones included. */
-  fog: number;
-  /** Rows put aside, and rows whose fog was. The only count they appear in. */
+  /** Rows put aside. The only count they appear in. */
   dismissed: number;
 };
 
@@ -1218,17 +1214,10 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
       return isClaudes(node) && !isClosed(node.status) && !isWaitingOnThePerson(node);
     case 'blocked':
       return !isClosed(node.status) && (isBlocked(node) || isWaiting(node));
-    // Closed steps included. A finished feature still carrying fog is the
-    // case worth seeing: the work stopped and the gap it admitted to did not
-    // get filled. Nothing else on the page shows that. A patch you have put
-    // aside is not in it — that is what putting it aside meant.
-    case 'fog':
-      return hasLiveFog(node);
     // The one view that asks for what everything else hides: a question you
-    // are not answering now, and a row whose fog you have put aside. Both,
-    // because a feature can be here for its fog while it is otherwise live.
+    // are not answering now, or a step you have put aside.
     case 'dismissed':
-      return isDismissed(node) || node.fogDismissedAt !== null;
+      return isDismissed(node);
     // The table reads whole features, so nothing beneath one is pruned away.
     case 'table':
       return true;
@@ -1618,7 +1607,6 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
     claude: open.filter((node) => isClaudes(node) && !isWaitingOnThePerson(node)).length,
-    fog: nodes.filter((node) => hasLiveFog(node)).length,
-    dismissed: all.filter((node) => isDismissed(node) || node.fogDismissedAt !== null).length,
+    dismissed: all.filter((node) => isDismissed(node)).length,
   };
 }

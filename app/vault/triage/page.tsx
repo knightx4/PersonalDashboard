@@ -1,5 +1,5 @@
 import { FolderTree } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { vaultWritable } from '@/lib/capture/vault';
@@ -9,13 +9,17 @@ import { loadConnection, loadInboxNotes } from '@/lib/vault/notes/load';
 import { suggestedNotesForInbox } from '@/lib/vault/notes/related';
 import { noteHref } from '@/lib/vault/paths';
 import { QuickNoteTriage, type TriageNote } from './triage';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
-const TRIAGE_CRUMBS = [
-  { label: 'Vault', href: '/vault' },
-  { label: 'Quick note triage', href: '/vault/triage' },
-];
+const TRIAGE: Subject = {
+  ref: null,
+  path: [
+    { label: 'Vault', href: '/vault' },
+    { label: 'Quick note triage', href: '/vault/triage' },
+  ],
+};
 
 /**
  * Quick note triage (plan #1729, feature #1726): the quick notes waiting in
@@ -33,15 +37,15 @@ export default async function QuickNoteTriagePage() {
 
   if (!connection) {
     return (
-      <>
-        <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
+      <PageColumn>
+        <PageHeader subject={TRIAGE} title="Quick note triage" />
         <EmptyState
           icon={FolderTree}
           title="No vault connected"
           description="Quick notes are kept in your vault's Inbox folder, so triage needs a vault to read them from."
           action={{ label: 'Connect a vault', href: '/vault/settings' }}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -70,10 +74,10 @@ export default async function QuickNoteTriagePage() {
   }));
 
   return (
-    <>
-      <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
+    <PageColumn>
+      <PageHeader subject={TRIAGE} title="Quick note triage" />
       <QuickNoteTriage notes={notes} writable={writable} />
-    </>
+    </PageColumn>
   );
 }
 

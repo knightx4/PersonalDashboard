@@ -44,13 +44,15 @@ describe('pageView', () => {
       route: '/learn/s/[id]',
       workspace: 'learn',
       via: 'load',
+      device: 'laptop',
     });
     expect(pageView(request('/goals/g1', NAVIGATION))).toEqual({
       route: '/goals/[goalId]',
       workspace: 'goals',
       via: 'navigation',
+      device: 'laptop',
     });
-    expect(pageView(request('/timeline', DOCUMENT))).toEqual({ route: '/timeline', workspace: null, via: 'load' });
+    expect(pageView(request('/timeline', DOCUMENT))).toEqual({ route: '/timeline', workspace: null, via: 'load', device: 'laptop' });
   });
 
   it('skips prefetches', () => {

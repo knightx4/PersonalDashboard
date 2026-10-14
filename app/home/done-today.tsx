@@ -50,7 +50,7 @@ export function DoneTodayCard({
             const Icon = line.kind === 'progress' ? TrendingUp : Check;
             return (
               <li key={line.key} className="flex items-baseline gap-2 py-1.5">
-                <Icon className="size-3.5 shrink-0 translate-y-0.5 text-ink-muted" strokeWidth={2} aria-hidden />
+                <Icon className="size-3.5 shrink-0 translate-y-0.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
                 <Link href={line.href} className="press-area group min-w-0 flex-1">
                   <span className="block truncate text-ui text-ink group-hover:text-accent">{line.title}</span>
                   <span className="block truncate text-small text-ink-muted">{line.detail}</span>

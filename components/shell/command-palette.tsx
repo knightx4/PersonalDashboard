@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SearchMark } from '@/components/ui/search-mark';
 import { cn } from '@/lib/cn';
 import { popoverSurface, scrim } from '@/components/ui/popover';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { SearchRowLine } from '@/components/shell/search-row';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import {
@@ -197,7 +197,7 @@ export function CommandPalette({
             // global ring was drawn around the search bar permanently rather
             // than ever indicating anything. See globals.css.
             data-focus-ring="none"
-            className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
+            className="h-[calc(var(--control-h)+1rem)] w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
           {/* The chip naming what is being searched, in two states. It sits
               between the field and the keycap because it belongs to the field

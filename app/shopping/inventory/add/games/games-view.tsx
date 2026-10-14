@@ -1,10 +1,11 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { AddGameManualForm, GameSearchForm } from './game-forms';
 import { GameScanPanel } from './game-scan-panel';
 import { GameShelfPhotoPanel } from './game-photo-panel';
 import { PoweredByBgg } from './powered-by-bgg';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const GAME_MODES = [
   { id: 'photo', label: 'Shelf photo' },
@@ -21,7 +22,7 @@ export type GameMode = (typeof GAME_MODES)[number]['id'];
  */
 export function AddGamesView({ mode }: { mode: GameMode }) {
   return (
-    <div className="mx-auto max-w-3xl [&_a]:press-area">
+    <PageColumn className="[&_a]:press-area">
       <PageHeader
         title="Add board games"
         actions={
@@ -56,6 +57,6 @@ export function AddGamesView({ mode }: { mode: GameMode }) {
       {mode === 'manual' && <AddGameManualForm />}
 
       <PoweredByBgg />
-    </div>
+    </PageColumn>
   );
 }

@@ -1,4 +1,5 @@
 import { FileText } from 'lucide-react';
+import { chipVariants } from '@/components/ui/chip';
 import { attachmentSize, isImageAttachment } from '@/lib/attachments/rules';
 
 /**
@@ -23,7 +24,7 @@ export function AskTurnFiles({ files }: { files: readonly AskTurnFile[] }) {
                 href={file.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="press-area block overflow-hidden rounded-control bg-sunken"
+                className="press-area block overflow-hidden rounded-card bg-sunken"
                 title={file.name}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, private link; next/image cannot optimise it */}
@@ -34,12 +35,12 @@ export function AskTurnFiles({ files }: { files: readonly AskTurnFile[] }) {
         }
         const chip = (
           <>
-            <FileText aria-hidden className="size-3.5 shrink-0 text-ink-muted" strokeWidth={2} />
+            <FileText aria-hidden className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} />
             <span className="min-w-0 truncate">{file.name}</span>
             <span className="shrink-0 text-ink-muted">{attachmentSize(file.size)}</span>
           </>
         );
-        const style = 'flex min-w-0 max-w-full items-center gap-1 rounded-control bg-sunken px-2 py-0.5 text-small text-ink';
+        const style = `${chipVariants({ size: 'md' })} min-w-0 max-w-full text-ink`;
         return (
           <li key={key} className="min-w-0 max-w-full">
             {file.href ? (

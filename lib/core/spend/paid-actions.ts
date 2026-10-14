@@ -48,6 +48,8 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question'],
   // Learn: Rephrase on a selection in an essay (plan #1868)
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
+  // Learn: Try again on a research brief whose run failed (plan #2023.4)
+  'app/learn/b/[id]/actions.ts#retryBrief': ['research-topic'],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
   // Learn: a question in the chat on a reading's page (plan #1876.5)
@@ -71,9 +73,9 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#finishEssay': ['name-essay-claims', 'embed-note-match'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
-  'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
-  'app/learn/know/personality/actions.ts#saveTypedAction': ['read-personality', 'embed-note-match'],
-  'app/learn/know/personality/actions.ts#readAgainAction': ['read-personality', 'embed-note-match'],
+  'app/you/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
+  'app/you/personality/actions.ts#saveTypedAction': ['read-personality', 'embed-note-match'],
+  'app/you/personality/actions.ts#readAgainAction': ['read-personality', 'embed-note-match'],
   'app/learn/know/actions.ts#createCustomTrack': ['place-track', 'write-curriculum'],
   'app/learn/c/[id]/actions.ts#proposeBranch': ['branch-from-selection'],
   'app/learn/c/[id]/actions.ts#approveBranch': ['place-track'],
@@ -169,7 +171,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#acceptMap': ['embed-map'],
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
-  'app/vault/education/actions.ts#readTranscriptAction': ['read-transcript'],
+  'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],
@@ -219,9 +222,11 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/cron/daily/route.ts#GET':
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':
     "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
-  'app/learn/know/personality/actions.ts#restoreTypedAction':
+  'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',

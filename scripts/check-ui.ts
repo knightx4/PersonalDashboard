@@ -96,6 +96,11 @@ function unsafeTokens(): Set<string> {
 
 const UNSAFE = unsafeTokens();
 
+/** Every colour name the @theme block exposes as a utility (`--color-<name>`). */
+const COLOURS = new Set(
+  [...readFileSync(join(ROOT, 'app/globals.css'), 'utf8').matchAll(/--color-([\w-]+):/g)].map((m) => m[1]!),
+);
+
 // -- The rules --------------------------------------------------------------
 type Rule = {
   id: string;
@@ -242,6 +247,59 @@ const FULL_BORDER = /(?:^|\s)border(?=\s|$)/;
 const CLASS_STRING =
   /className=(?:"([^"]*)"|\{`([^`]*)`\})|'([^']*\b(?:rounded|border|bg)-[^']*)'/g;
 
+/**
+ * The element that opens at `column` on the line after `before`: the text of
+ * its opening tag and what sits between it and its closing tag. Null when it
+ * is self-closing or its closing tag is not found.
+ *
+ * Reads the opening tag by counting braces and quotes, so `onClick={() => a > b}`
+ * does not end the tag early. Not a parse; enough for the shapes JSX is written
+ * in here.
+ */
+function elementAt(
+  source: string,
+  before: string[],
+  column: number,
+  name: string,
+): { open: string; children: string } | null {
+  const start = before.reduce((sum, line) => sum + line.length + 1, 0) + column;
+  let at = start;
+  let depth = 0;
+  let quote = '';
+  for (; at < source.length; at += 1) {
+    const ch = source[at]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+    } else if (ch === '"' || ch === "'" || (ch === '`' && depth > 0)) quote = ch;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (ch === '>' && depth === 0) break;
+  }
+  if (at >= source.length || source[at - 1] === '/') return null;
+  const close = source.indexOf(`</${name}>`, at);
+  if (close === -1) return null;
+  return { open: source.slice(start, at + 1), children: source.slice(at + 1, close) };
+}
+
+/** Components that draw an icon in this codebase besides the lucide imports. */
+const ICON_NAME = /^(?:\w*Icon|Icon\w*|\w*Glyph|\w*Mark)$/;
+
+/** What names a control to a screen reader and to a mouse, or may, through a spread. */
+const LABELLED = /\b(?:aria-label|aria-labelledby|title|label)\s*=|\{\s*\.\.\./;
+
+/**
+ * Whether the children are one icon and nothing else: no text, no sr-only span,
+ * no second element. `lucide` is the names the file imports from lucide-react.
+ */
+function onlyAnIcon(children: string, lucide: Set<string>): boolean {
+  const text = children.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trim();
+  if (/^<svg\b[\s\S]*<\/svg>$/.test(text)) return !/aria-label|<title/.test(text);
+  const icon = /^<(\w+)\b([^<]*)\/>$/.exec(text);
+  if (!icon) return false;
+  if (!lucide.has(icon[1]!) && !ICON_NAME.test(icon[1]!)) return false;
+  return !/\b(?:aria-label|title)\s*=/.test(icon[2]!);
+}
+
 const RULES: Rule[] = [
   {
     id: 'hand-rolled-box',
@@ -286,7 +344,7 @@ const RULES: Rule[] = [
      * shape a control is written in. Everything with a prefix is a different
      * property.
      */
-    find: (line) => [...line.matchAll(/(?<![\w-])(h-(?:9|10|11))\b/g)].map((m) => m[1]!),
+    find: (line) => [...line.matchAll(/(?<![\w-])(h-(?:7|8|9|10|11|12))\b/g)].map((m) => m[1]!),
   },
   {
     id: 'scoped-token-in-var',
@@ -468,6 +526,181 @@ const RULES: Rule[] = [
       /(?:^\s*|[({]\s*|&&\s*|\?\s*)<details\b/.test(line) ? ['raw <details>'] : [],
   },
   {
+    id: 'fixed-radius',
+    law: '-',
+    says: 'a corner radius that does not follow the theme',
+    instead:
+      'rounded-control for anything pressed or typed in, rounded-card for anything holding content, rounded-pill for chips and dots',
+    /**
+     * `rounded-md`, `rounded-lg`, `rounded-xl` and friends are fixed sizes.
+     * The theme moves only the three named radii, so in Aurora and Dawn a
+     * `rounded-lg` button sat less round than the controls beside it, and in
+     * Poster, where everything is square, it stayed rounded. Eleven radius
+     * names were in use when this was written (the component overhaul,
+     * October 2026). Plain `rounded` is left alone: it is the keycap and the
+     * focus ring, and too common in prose to read safely.
+     */
+    find: (line) =>
+      [...line.matchAll(/(?<![\w-])rounded(?:-[tblrse]{1,2})?-(?:sm|md|lg|xl|2xl|3xl|\[[^\]]+\])(?![\w-])/g)].map(
+        (m) => m[0],
+      ),
+  },
+  {
+    id: 'undefined-colour',
+    law: '-',
+    says: 'a colour utility no token defines, which draws nothing',
+    instead: 'a token from the @theme block in app/globals.css',
+    /**
+     * Tailwind generates nothing for a colour it does not know, silently. So
+     * `bg-accent-soft` gave the "What you selected" chip in Learn no ground at
+     * all, and `text-page-ink` on the gallery index fell back to whatever it
+     * inherited. Asked only of names that start like one of this app's
+     * colours, so a size such as `text-small` is not mistaken for one.
+     */
+    find: (line) => {
+      const out: string[] = [];
+      for (const m of line.matchAll(
+        /(?<![\w-])(?:[\w-]+:)*(?:bg|text|border|ring|fill|stroke|divide|decoration|outline|from|to|via|accent|caret|placeholder)-((?:accent|ink|page|sheet|surface|sunken|canvas|raised|caution|danger|positive|shell|fill)[\w-]*)(?:\/\d+)?(?![\w-])/g,
+      )) {
+        if (!COLOURS.has(m[1]!)) out.push(m[0]);
+      }
+      return out;
+    },
+  },
+  {
+    id: 'hand-rolled-chip',
+    law: '4',
+    says: 'a chip written by hand',
+    instead: 'Chip (a label) or ToggleChip (a choice) from components/ui/chip.tsx',
+    find: (line) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
+        if (
+          /\brounded(?:-full|-pill|-md)?\b/.test(value) &&
+          /\bpx-(?:1\.5|2|2\.5)\b/.test(value) &&
+          /\bpy-(?:0\.5|1)(?![.\d])/.test(value) &&
+          /\btext-(?:micro|small)\b/.test(value) &&
+          /\bbg-/.test(value)
+        )
+          out.push(value.slice(0, 64));
+      }
+      return out;
+    },
+  },
+  {
+    id: 'hand-rolled-icon-button',
+    law: '-',
+    says: 'an icon button sized and shaped by hand',
+    instead: 'IconButton (sm or md) from components/ui/icon-button.tsx',
+    find: (line) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
+        if (
+          /\bsize-(?:4|5|6|7|8)\b/.test(value) &&
+          /\bitems-center\b/.test(value) &&
+          /\bjustify-center\b/.test(value) &&
+          /\bhover:(?:bg|text)-/.test(value)
+        )
+          out.push(value.slice(0, 64));
+      }
+      return out;
+    },
+  },
+  {
+    id: 'hand-rolled-label',
+    law: '-',
+    says: 'the small uppercase label, written by hand',
+    instead: 'SectionLabel from components/ui/section-heading.tsx',
+    find: (line) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
+        if (/\buppercase\b/.test(value) && /\btracking-(?:wide|wider|widest)\b/.test(value))
+          out.push(value.slice(0, 64));
+      }
+      return out;
+    },
+  },
+  {
+    id: 'hand-rolled-link',
+    law: '-',
+    says: 'an underlined link or text action styled by hand',
+    instead: 'linkVariants({ tone }) from components/ui/link.tsx, or Button variant="link"',
+    find: (line) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
+        if (/(?<![\w:-])underline\b/.test(value) && /\bunderline-offset-\d\b/.test(value))
+          out.push(value.slice(0, 64));
+      }
+      return out;
+    },
+  },
+  {
+    id: 'raw-checkbox',
+    law: '-',
+    says: 'a checkbox drawn by hand',
+    instead: 'Checkbox, CheckRow or Switch from components/ui/field.tsx',
+    only: /\.tsx$/,
+    find: (line) => (/type=["']checkbox["']/.test(line) ? ['<input type="checkbox">'] : []),
+  },
+  {
+    id: 'raw-kbd',
+    law: '-',
+    says: 'a keycap drawn by hand',
+    instead: 'Kbd from components/ui/kbd.tsx (`announce` when it is part of a sentence)',
+    only: /\.tsx$/,
+    find: (line) => (/(?:^\s*|[({>]\s*)<kbd\b/.test(line) ? ['raw <kbd>'] : []),
+  },
+  {
+    id: 'pulsing-dot',
+    law: '-',
+    says: 'a status dot that fades itself in and out',
+    instead: 'LiveDot from components/ui/live-dot.tsx, which stays solid and stops under reduced motion',
+    find: (line) =>
+      /\banimate-pulse\b/.test(line) && /\brounded-(?:full|pill)\b/.test(line) && /\bsize-(?:1|1\.5|2|2\.5)\b/.test(line)
+        ? ['animate-pulse dot']
+        : [],
+  },
+  {
+    id: 'dashed-without-width',
+    law: '-',
+    says: 'border-dashed with no border width, so no outline draws',
+    instead: 'EmptyState size="box", or `border border-dashed`',
+    find: (line) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
+        if (/\bborder-dashed\b/.test(value) && !FULL_BORDER.test(value) && !/\bborder-(?:[trblxy]|\d)\b/.test(value))
+          out.push(value.slice(0, 64));
+      }
+      for (const m of line.matchAll(/'([^']*\bborder-dashed\b[^']*)'/g)) {
+        const value = m[1]!;
+        if (!FULL_BORDER.test(value) && !/\bborder-(?:[trblxy]|\d)\b/.test(value) && !out.length) out.push(value.slice(0, 64));
+      }
+      return out;
+    },
+  },
+  {
+    id: 'heavy-stroke',
+    law: '-',
+    says: 'an icon drawn at stroke 2',
+    instead: 'strokeWidth={1.75}, the stroke every icon in the app is drawn at',
+    find: (line) =>
+      /strokeWidth=\{2\}/.test(line) && !/<(?:path|circle|line|polyline|polygon|rect|svg|ellipse)\b/.test(line)
+        ? ['strokeWidth={2}']
+        : [],
+  },
+  {
+    id: 'next-link',
+    law: '-',
+    says: 'next/link imported directly, so the link shows nothing while its page loads',
+    instead: "import Link from '@/components/ui/link'",
+    find: (line) => (/from\s+['"]next\/link['"]/.test(line) ? ["from 'next/link'"] : []),
+  },
+  {
     id: 'action-without-tier',
     law: '-',
     says: 'an action with no latency tier',
@@ -499,6 +732,46 @@ const RULES: Rule[] = [
       }
 
       return [`${declared[1]}() has no tier`];
+    },
+  },
+  {
+    id: 'icon-button-without-label',
+    law: '-',
+    says: 'a button or link whose only child is an icon, with no aria-label, title or Tooltip',
+    instead:
+      'aria-label on the control and a <Tooltip> around it (components/ui/tooltip), so a mouse and a screen reader both get the name',
+    /**
+     * `<button>`, `<Button>`, `<IconButton>`, `<a>` or `<Link>` whose children
+     * are one icon (plan #1985.2).
+     *
+     * An icon alone says nothing to a screen reader and little to a person who
+     * has not met it, and the written rules ask for a tooltip on every new
+     * control. The control is labelled when its opening tag has `aria-label`,
+     * `aria-labelledby` or `title`, when it spreads props that may carry one,
+     * or when a `<Tooltip>` encloses it. An icon is a name imported from
+     * lucide-react, an `<svg>`, or a component named *Icon, *Glyph or *Mark.
+     * An icon beside text, or with an sr-only span, is not icon-only.
+     *
+     * Existing ones sit in scripts/ui-baseline.json under this rule's id. A
+     * step that labels a file's controls lowers its count with
+     * `npm run check:ui -- --update`.
+     */
+    only: /\.tsx$/,
+    find: (line, { before, source }) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(/<(button|Button|IconButton|a|Link)\b/g)) {
+        const element = elementAt(source, before, match.index!, match[1]!);
+        if (!element || LABELLED.test(element.open)) continue;
+        const lucide = new Set(
+          [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g)].flatMap((m) =>
+            m[1]!.split(',').map((name) => name.split(/\s+as\s+/).pop()!.trim()),
+          ),
+        );
+        if (!onlyAnIcon(element.children, lucide)) continue;
+        if (encloses(line, before, /<Tooltip\b/)) continue;
+        out.push(`<${match[1]}> with only an icon`);
+      }
+      return out;
     },
   },
 ];

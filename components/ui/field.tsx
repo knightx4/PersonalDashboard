@@ -483,3 +483,74 @@ export function Field({
     </div>
   );
 }
+
+/**
+ * A checkbox, coloured by the accent through `accent-color`, so it follows the
+ * theme. It replaced three spellings, the commonest of which
+ * (`rounded border-border text-accent`) was written for a forms plugin this
+ * app does not have and so did nothing at all.
+ */
+export function Checkbox({ className, ref, ...props }: Omit<React.ComponentProps<'input'>, 'type'>) {
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className={cn('size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50', className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A checkbox with its title, and a line of hint under it when there is one:
+ * the shape about ten forms wrote by hand. The box sits on the title's first
+ * line. Everything else an input takes (name, value, checked, onChange) goes
+ * to the box.
+ */
+export function CheckRow({
+  title,
+  hint,
+  className,
+  ...props
+}: Omit<React.ComponentProps<'input'>, 'type' | 'title'> & {
+  title: React.ReactNode;
+  hint?: React.ReactNode;
+}) {
+  return (
+    <label className={cn('flex cursor-pointer items-start gap-2.5 py-1 max-sm:min-h-11', className)}>
+      <Checkbox className="mt-0.5" {...props} />
+      <span className="min-w-0">
+        <span className="block text-ui text-ink">{title}</span>
+        {hint && <span className="mt-0.5 block text-small text-ink-muted">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+/**
+ * A setting that takes effect the moment it is pressed, with no Save after it.
+ *
+ * Still a native checkbox, with `role="switch"`, so it posts with a form and
+ * works before JavaScript does (law 6); only its drawing is a track and a
+ * knob. Give it an aria-label, or put it inside a label.
+ */
+export function Switch({ className, ref, ...props }: Omit<React.ComponentProps<'input'>, 'type' | 'role'>) {
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      role="switch"
+      className={cn(
+        'press press-area relative inline-block h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-pill bg-border-strong',
+        'transition-colors duration-quick checked:bg-accent',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        // The knob is white in every theme: a surface-coloured knob vanishes
+        // into the off track in a dark theme, where both are dark.
+        'before:absolute before:top-0.5 before:left-0.5 before:size-4 before:rounded-pill before:bg-white',
+        'before:transition-transform before:duration-quick checked:before:translate-x-4',
+        className,
+      )}
+      {...props}
+    />
+  );
+}

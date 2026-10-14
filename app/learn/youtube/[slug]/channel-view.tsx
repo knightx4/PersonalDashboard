@@ -1,6 +1,4 @@
-import Link from 'next/link';
-import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
-import { ArrowLeft } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/shell/search-field';
 import { ActionMenu } from '@/components/ui/action-menu';
@@ -12,6 +10,8 @@ import { relistChannelAction, removeChannelAction, setAutoTranscribeAction } fro
 import type { ChannelPage } from '@/lib/learn/youtube/load';
 import { Press } from '../press';
 import { VideoList } from '../video-list';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One channel: its playlists, then its videos newest first.
@@ -30,11 +30,14 @@ export function ChannelView({
   data,
   page,
   search,
+  path,
 }: {
   slug: string;
   data: ChannelPage;
   page: number;
   search: string;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const { channel, playlists, videos, more } = data;
 
@@ -65,19 +68,13 @@ export function ChannelView({
   );
 
   return (
-    <>
-      <p className="mb-3">
-        <Link href={YOUTUBE_HREF} className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          YouTube library
-        </Link>
-      </p>
-
+    <PageColumn>
       <PageHeader
+        subject={path}
         title={channel.name}
         description={
           <>
-            <a href={channel.homeUrl} className="press-area hover:underline" target="_blank" rel="noreferrer">
+            <a href={channel.homeUrl} className={cn('press-area', linkVariants({ tone: 'quiet' }))} target="_blank" rel="noreferrer">
               {channel.handle ?? 'Open on YouTube'}
             </a>
           </>
@@ -163,6 +160,6 @@ export function ChannelView({
           )}
         </section>
       </div>
-    </>
+    </PageColumn>
   );
 }

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/dev/module-page';
 import { FEEDBACK_KIND_LABEL, type FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
+import { ShapeIdea } from '@/app/dev/ideas/ideas-view';
 import { formatMicroDollars } from '@/lib/money';
 import { featureHref } from '@/lib/plan/feature-page';
 import { PLAN_STATUS_LABEL, type PlanItem } from '@/lib/plan/load';
@@ -25,6 +26,8 @@ import { stepRef } from '@/lib/plan/ref';
 import { visionAnchor } from '@/lib/specs/vision';
 import type { Tab } from '@/lib/tabs';
 import { openedText } from '@/lib/usage/report';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The module index and one module's page in Dev. Server components, so the
@@ -51,11 +54,8 @@ function indexLine(summary: ModuleSummary): string {
 
 export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSummary[] }) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        crumbs={moduleCrumbs()}
-        title="Modules"
-      />
+    <PageColumn>
+      <PageHeader subject={{ ref: null, path: moduleCrumbs() }} title="Modules" />
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
         {summaries.map((summary) => (
           <li key={summary.module.id}>
@@ -72,7 +72,7 @@ export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSumm
           </li>
         ))}
       </ul>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -97,7 +97,7 @@ function tabHref(summary: ModuleSummary, tab: ModuleTab): string {
 }
 
 const rowLink = 'press-area text-body text-ink underline-offset-2 hover:underline';
-const moreLink = 'press-area text-small text-accent hover:underline';
+const moreLink = cn('press-area text-small', linkVariants());
 const list = cn(cardVariants(), 'divide-y divide-border overflow-hidden');
 
 /**
@@ -112,24 +112,24 @@ function Row({
   children,
   meta,
   flat = false,
+  action,
 }: {
   children: React.ReactNode;
   meta: React.ReactNode;
   flat?: boolean;
+  /** A move made on the row where it stands, under its meta line. */
+  action?: React.ReactNode;
 }) {
   return (
     <li className={cn('flex flex-col gap-0.5 py-3', flat ? 'first:pt-1 last:pb-0' : 'px-4')}>
       <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
       <span className="text-small text-ink-muted">{meta}</span>
+      {action && <div className="pt-2">{action}</div>}
     </li>
   );
 }
 
 /** A list with nothing in it, said in a sentence rather than left blank. */
-function Nothing({ children }: { children: React.ReactNode }) {
-  return <p className="text-body text-ink-muted">{children}</p>;
-}
-
 function FeatureRows({ items, flat }: { items: readonly PlanItem[]; flat?: boolean }) {
   return (
     <Rows flat={flat}>
@@ -169,6 +169,11 @@ function BugRows({ rows, flat }: { rows: readonly FeedbackRow[]; flat?: boolean 
   );
 }
 
+/**
+ * The Ideas tab carries the same Shape into a plan button as /dev/ideas, so an
+ * idea goes onto the plan from its workspace's page (note 2c0d63b2). The
+ * overview's short list stays links only.
+ */
 function IdeaRows({ ideas, flat }: { ideas: readonly IdeaRow[]; flat?: boolean }) {
   return (
     <Rows flat={flat}>
@@ -177,6 +182,7 @@ function IdeaRows({ ideas, flat }: { ideas: readonly IdeaRow[]; flat?: boolean }
           flat={flat}
           key={idea.id}
           meta={`${idea.source === 'me' ? 'Yours' : 'Suggested by Dash'} · ${idea.createdAt.slice(0, 10)}`}
+          action={flat ? undefined : <ShapeIdea idea={idea} />}
         >
           <Link href={`/dev/ideas#idea-${idea.id}`} className={rowLink}>
             {firstLine(idea.body)}
@@ -243,7 +249,7 @@ function Preview({
         ) : undefined
       }
     >
-      {total > 0 ? children : <Nothing>{empty}</Nothing>}
+      {total > 0 ? children : <EmptyState size="inline" title={empty} />}
     </CardSection>
   );
 }
@@ -316,7 +322,7 @@ function SpecTab({ summary }: { summary: ModuleSummary }) {
             <LinkedText text={summary.vision} />
           </p>
         ) : (
-          <Nothing>No vision written for this workspace yet.</Nothing>
+          <EmptyState size="inline" title="No vision written for this workspace yet." />
         )}
       </CardSection>
       {summary.specs.length > 0 ? (
@@ -330,7 +336,7 @@ function SpecTab({ summary }: { summary: ModuleSummary }) {
           ))}
         </Rows>
       ) : (
-        <Nothing>No spec describes this workspace yet.</Nothing>
+        <EmptyState size="inline" title="No spec describes this workspace yet." />
       )}
     </div>
   );
@@ -355,7 +361,7 @@ function UiTab({ summary }: { summary: ModuleSummary }) {
             <LinkedText text={review.note} />
           </p>
         ) : (
-          <Nothing>{review ? 'The pass left no note.' : 'Nobody has reviewed this workspace yet.'}</Nothing>
+          <EmptyState size="inline" title={review ? 'The pass left no note.' : 'Nobody has reviewed this workspace yet.'} />
         )}
       </CardSection>
       {findings.length > 0 && (
@@ -404,7 +410,7 @@ function UsageTab({ summary, now }: { summary: ModuleSummary; now: Date }) {
           ))}
         </Rows>
       ) : (
-        <Nothing>No page in this workspace has been recorded yet.</Nothing>
+        <EmptyState size="inline" title="No page in this workspace has been recorded yet." />
       )}
       <Link href="/dev/usage" className={moreLink}>
         Every workspace in Usage
@@ -419,19 +425,19 @@ function OpenTab({ summary, tab, now }: { summary: ModuleSummary; tab: ModuleTab
       return summary.features.length > 0 ? (
         <FeatureRows items={summary.features} />
       ) : (
-        <Nothing>No open features.</Nothing>
+        <EmptyState size="inline" title="No open features." />
       );
     case 'bugs':
       return summary.bugs.length > 0 ? (
         <BugRows rows={summary.bugs} />
       ) : (
-        <Nothing>Nothing outstanding was filed from this workspace.</Nothing>
+        <EmptyState size="inline" title="Nothing outstanding was filed from this workspace." />
       );
     case 'ideas':
       return summary.ideas.length > 0 ? (
         <IdeaRows ideas={summary.ideas} />
       ) : (
-        <Nothing>No live ideas for this workspace.</Nothing>
+        <EmptyState size="inline" title="No live ideas for this workspace." />
       );
     case 'spec':
       return <SpecTab summary={summary} />;
@@ -443,7 +449,7 @@ function OpenTab({ summary, tab, now }: { summary: ModuleSummary; tab: ModuleTab
       return summary.shipped.length > 0 ? (
         <ShippedRows items={summary.shipped} />
       ) : (
-        <Nothing>Nothing has shipped here yet.</Nothing>
+        <EmptyState size="inline" title="Nothing has shipped here yet." />
       );
     case 'overview':
     default:
@@ -485,7 +491,7 @@ export function ModuleView({
 
   return (
     <TabbedDetail
-      crumbs={moduleCrumbs(summary.module)}
+      subject={{ ref: null, path: moduleCrumbs(summary.module) }}
       title={summary.module.label}
       description={summary.module.description}
       glance={glance}

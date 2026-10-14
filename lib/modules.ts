@@ -20,6 +20,7 @@ export type ModuleId =
   | 'learn'
   | 'news'
   | 'goals'
+  | 'you'
   | 'dev';
 
 export type AppModule = {
@@ -76,38 +77,38 @@ export type AppModule = {
    * make that depend on where you happened to stop.
    */
   alwaysHome?: true;
+  /**
+   * The workspace's own settings page, and a line saying what is on it.
+   * Account's Workspaces tab builds its list of settings links from these, so
+   * a workspace that has a settings page is never left out of it (plan #1924).
+   * Absent means the workspace has no settings page.
+   */
+  settings?: { href: string; hint: string };
 };
 
 /**
  * The objects a mark can draw.
  *
- * Each is a picture of the thing the module is about, drawn chunky: one closed
- * form, generous radii, and exactly one detail held back for white. The detail
- * is always the thing that *names* the object -- the gap between a cart's
- * basket and its rail, the clasp on a case, the keyhole in a lock -- and never
- * a highlight. One detail each, in every mark, is most of why eight drawings
- * read as one set.
+ * Each is drawn in two layers (components/ui/module-mark.tsx): a solid shape in
+ * the module's hue at the back, and a pane of glass in front that blurs it,
+ * with the detail that names the object drawn on the glass. The price tag is
+ * there because Shopping covers resale; the safe because the vault is where
+ * the notes are kept; the summit because a goal is somewhere you are climbing
+ * to. Learn's own Goals tab draws a target, so Goals does not.
  *
- * What they are not: outlines. A stroked glyph at 18px is a smudge, and an
- * outline of a briefcase is indistinguishable from an outline of a bag -- the
- * confusion that sent the previous set's two rounded-rectangles-with-a-bump
- * back to the board. These are solids, told apart by silhouette first.
- *
- * 'dash' is the app itself and is the only abstract one, which is the point:
- * it is the whole rather than one of the parts. It is also the only object
- * with no white detail at all, and deliberately the flattest and widest thing
- * any mark contains, because on the home page and in a browser tab it is the
- * mark.
+ * 'dash' is the app itself: Dash's capsule visor on a dark plate, the same
+ * drawing as the app icon.
  */
 export type MarkShape =
   | 'dash'
-  | 'cart'
+  | 'tag'
   | 'briefcase'
-  | 'list'
-  | 'lock'
+  | 'check'
+  | 'safe'
   | 'book'
   | 'envelope'
-  | 'flag'
+  | 'summit'
+  | 'person'
   | 'terminal';
 
 export interface MarkKey {
@@ -134,7 +135,8 @@ export const MODULES: readonly AppModule[] = [
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
-    key: { shape: 'cart', from: '#fb7185', to: '#be123c' },
+    key: { shape: 'tag', from: '#fb7185', to: '#be123c' },
+    settings: { href: '/shopping/settings', hint: 'Connected mailbox, merchants and return windows' },
   },
   {
     id: 'jobs',
@@ -144,6 +146,7 @@ export const MODULES: readonly AppModule[] = [
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
     key: { shape: 'briefcase', from: '#a78bfa', to: '#7c3aed' },
+    settings: { href: '/jobs/settings', hint: 'Ghost threshold, résumés and evidence' },
   },
   {
     id: 'todo',
@@ -154,7 +157,8 @@ export const MODULES: readonly AppModule[] = [
     label: 'Todo',
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
-    key: { shape: 'list', from: '#38bdf8', to: '#0369a1' },
+    key: { shape: 'check', from: '#38bdf8', to: '#0369a1' },
+    settings: { href: '/todo/settings', hint: 'How far ahead the agenda looks, and what feeds it' },
   },
   {
     id: 'vault',
@@ -165,7 +169,8 @@ export const MODULES: readonly AppModule[] = [
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
-    key: { shape: 'lock', from: '#f0abfc', to: '#a21caf' },
+    key: { shape: 'safe', from: '#f0abfc', to: '#a21caf' },
+    settings: { href: '/vault/settings', hint: 'The repository this mirrors, and its token' },
   },
   {
     id: 'learn',
@@ -177,13 +182,10 @@ export const MODULES: readonly AppModule[] = [
     label: 'Learn',
     description: 'Questions until you stop, and what to read',
     accent: '--color-w-learn',
-    // Emerald into teal. The deep end is the workspace accent and sits at the
-    // cold end of the sweep the other four are on -- sky, violet, fuchsia,
-    // rose -- rather than somewhere else on the wheel, which is what keeps
-    // five differently-coloured workspaces reading as one product. The light
-    // end was pushed off teal and into green so that the open book has a green
-    // in it and is not a second cyan beside the terminal.
-    key: { shape: 'book', from: '#34d399', to: '#0f766e' },
+    // Teal leaning to cyan, halfway between Goals' emerald and Todo's sky, so
+    // the three cool workspaces sit evenly apart. The deep end is the
+    // workspace accent.
+    key: { shape: 'book', from: '#5ad8dc', to: '#046a6b' },
   },
   {
     id: 'news',
@@ -200,6 +202,7 @@ export const MODULES: readonly AppModule[] = [
     // from the warning colour in all four themes than rose sits from the
     // delete red, which is the distance this set already accepts.
     key: { shape: 'envelope', from: '#e8c760', to: '#846905' },
+    settings: { href: '/news/settings', hint: 'Your newsletter address, hidden topics and local area' },
   },
   {
     id: 'goals',
@@ -209,11 +212,25 @@ export const MODULES: readonly AppModule[] = [
     label: 'Goals',
     description: 'What you are working towards, and the next step on each',
     accent: '--color-w-goals',
-    // Lime, the yellow-green between news's gold and learn's emerald. Kept
-    // off the blue-green of the positive colour, which means money came back,
-    // so a goal's accent is never read as a refund. A flag rather than a
-    // target, because Learn's own Goals tab already draws the target.
-    key: { shape: 'flag', from: '#a3e635', to: '#4d7c0f' },
+    // Emerald, chosen over the lime it replaced. It sits near the positive
+    // colour, which means money came back, so it is checked against it in
+    // scripts/check-contrast.ts like every accent.
+    key: { shape: 'summit', from: '#5eeab0', to: '#05734e' },
+  },
+  {
+    id: 'you',
+    prefix: '/you',
+    // Personality, the first tab. /you redirects there too, but naming it
+    // here saves the switcher a redirect (plan #1991.1).
+    home: '/you/personality',
+    label: 'You',
+    description: 'Personality, places, work and school',
+    accent: '--color-w-you',
+    // Orange, chosen over the lime it replaced. The workspace tokens are the
+    // lime turned to OKLCH hue 52 at the same lightness, which puts them by
+    // the caution amber at 49; the contrast check's accent-to-meaning
+    // distance is what keeps You's colour reading as a place, not a warning.
+    key: { shape: 'person', from: '#fb923c', to: '#c2410c' },
   },
   {
     id: 'dev',
@@ -238,16 +255,10 @@ export const MODULES: readonly AppModule[] = [
  * The mark for the whole app: the topbar when no module is active, every
  * signed-out page, and the favicon.
  *
- * A dash, and nothing else. It is the one mark that draws no object, because
- * the app is not one of the six things -- it is the sheet they are written on.
- * Six marks say what room you are in by showing you a cart or a lock; this one
- * says "all of it" by showing you the stroke underneath them, and it is the
- * only mark with no white detail, because there is nothing to name.
- *
- * Being the widest and flattest thing in the whole set, it is also what the
- * eye reaches first at sixteen pixels, where every drawn object has already
- * given up its detail. That is the property a favicon needs and the reason
- * this is a bar rather than a picture of something.
+ * Dash at rest: the capsule visor with its glowing core, on a dark plate. It
+ * is the one mark that draws no object, because the app is not one of the
+ * modules; it is the assistant that works across all of them. The same
+ * drawing is the favicon and the home-screen icon (app/icon.svg).
  */
 export const HOME_MARK = {
   label: 'Home',
@@ -261,11 +272,8 @@ export const HOME_MARK = {
    * what this product has used for itself since before it had modules, and the
    * home mark is the only thing entitled to wear it.
    *
-   * The two end hexes are untouched -- they predate everything else in this
-   * file. `mid` is new, and only because the dash got much fatter: across
-   * nineteen units the straight blue-to-pink ramp spent its whole middle in a
-   * dead mauve, and putting the violet the brand already uses at the halfway
-   * mark turns that back into a ramp you can see three colours in.
+   * It is the glowing core inside Dash's capsule visor. The violet in the
+   * middle keeps the blue-to-pink ramp from passing through a dead mauve.
    */
   key: { shape: 'dash', from: '#6a82fb', mid: '#8b5cf6', to: '#ff6b9d' },
 } as const;

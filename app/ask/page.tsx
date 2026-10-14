@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { SectionFold } from '@/components/ui/disclosure';
@@ -10,6 +10,7 @@ import { listAskConversations, loadAskMadeChanges } from '@/lib/talk/ask-request
 import type { MadeChange } from '@/lib/talk/changes';
 import { AskButton, AskedWhen, AskMadeChanges } from './view';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Questions to Dash' };
 
@@ -59,7 +60,11 @@ export default async function AskPage() {
 
   return (
     <>
-      <PageHeader title="Questions to Dash" actions={<AskButton />} />
+      <PageHeader
+        subject={sectionSubject('/ask', 'Questions to Dash')}
+        title="Questions to Dash"
+        actions={<AskButton />}
+      />
       {made.failed && (
         <Banner tone="bad" className="mb-4">
           The changes Dash made could not be read, so they are missing from this page. Reload to try

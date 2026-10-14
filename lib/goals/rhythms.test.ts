@@ -368,7 +368,6 @@ describe('liveRhythms', () => {
     areaId: 'a',
     title: id,
     acceptance: null,
-    fog: null,
     status,
     position: 10,
     unit: null,

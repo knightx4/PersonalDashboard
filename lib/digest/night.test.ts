@@ -43,8 +43,6 @@ function step(over: Partial<PlanItem> & { id: string }): PlanItem {
     status: 'done',
     kind: 'build',
     track: 'feature',
-    fog: null,
-    fogDismissedAt: null,
     dismissedAt: null,
     resolution: null,
     thread: [],

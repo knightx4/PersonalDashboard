@@ -140,13 +140,23 @@ const renderBoundaries = {
  */
 const OFF_SCALE_TYPE = String.raw`\btext-(xs|sm|base|lg|xl|[2-9]xl)\b`;
 const ARBITRARY_WIDTH = String.raw`\bmax-w-\[(?!1400px\])`;
+/**
+ * A page frame written by hand: `mx-auto` with a named page-sized width, in
+ * either order. Pages take PageColumn or PageWide from
+ * components/shell/page-width.tsx instead. A breakpoint variant
+ * (`lg:max-w-3xl`) is something sized inside a page, not the page, so it is
+ * left alone.
+ */
+const OTHER_PAGE_WIDTH = String.raw`\bmx-auto\b.*(?<![\w:-])max-w-(2xl|3xl|4xl|5xl|6xl|7xl)\b|(?<![\w:-])max-w-(2xl|3xl|4xl|5xl|6xl|7xl)\b.*\bmx-auto\b`;
 const RAW_HEX = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|shadow|from|to|via)-\[#`;
 const RAW_PALETTE = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|decoration|from|to|via)-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d`;
 
 const TYPE_MESSAGE =
   "Off the type scale. Use the named steps in app/globals.css -- micro, small, ui, body, lead, title, figure, figure-lg, figure-xl. 13px is chrome, 14px is content; a hero figure is text-figure-lg.";
 const WIDTH_MESSAGE =
-  "An arbitrary width. Page widths are three: the shell is max-w-[1400px], a reading column is max-w-3xl, a single form is max-w-2xl. Anything narrower uses a named size (max-w-xs, max-w-sm, ...). See the Surfaces section of /dev/ui.";
+  "An arbitrary width. The shell is max-w-[1400px], and a page in it is PageColumn or PageWide (components/shell/page-width.tsx). Anything narrower inside a page uses a named size (max-w-xs, max-w-sm, max-w-prose, ...).";
+const PAGE_WIDTH_MESSAGE =
+  "A page's width comes from components/shell/page-width.tsx: PageColumn for one column, PageWide for a page with a second column beside the main one. Keep long text readable with max-w-prose rather than narrowing the page.";
 const HEX_MESSAGE =
   "A raw hex colour cannot follow the theme and is wrong in three of the four themes. Add a token to app/globals.css and use its utility.";
 const PALETTE_MESSAGE =
@@ -155,6 +165,24 @@ const PALETTE_MESSAGE =
 const stringRules = (pattern, message) => [
   { selector: `Literal[value=/${pattern}/]`, message },
   { selector: `TemplateElement[value.raw=/${pattern}/]`, message },
+];
+
+const derivedNumberRules = [
+  {
+    selector:
+      "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
+    message:
+      "Format money through formatMoney() in lib/money.ts so cents, rounding and locale stay in one place.",
+  },
+  {
+    selector: "BinaryExpression[operator='/'] MemberExpression[property.name='length']",
+    message:
+      "Compute funnel rates through lib/jobs/pipeline.ts so the denominator rules -- cohorting, the too-early window, per-source grouping -- stay in one tested place.",
+  },
+  ...stringRules(OFF_SCALE_TYPE, TYPE_MESSAGE),
+  ...stringRules(ARBITRARY_WIDTH, WIDTH_MESSAGE),
+  ...stringRules(RAW_HEX, HEX_MESSAGE),
+  ...stringRules(RAW_PALETTE, PALETTE_MESSAGE),
 ];
 
 /**
@@ -170,22 +198,34 @@ const derivedNumberBoundaries = {
   rules: {
     "no-restricted-syntax": [
       "error",
-      {
-        selector:
-          "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
-        message:
-          "Format money through formatMoney() in lib/money.ts so cents, rounding and locale stay in one place.",
-      },
-      {
-        selector: "BinaryExpression[operator='/'] MemberExpression[property.name='length']",
-        message:
-          "Compute funnel rates through lib/jobs/pipeline.ts so the denominator rules -- cohorting, the too-early window, per-source grouping -- stay in one tested place.",
-      },
-      ...stringRules(OFF_SCALE_TYPE, TYPE_MESSAGE),
-      ...stringRules(ARBITRARY_WIDTH, WIDTH_MESSAGE),
-      ...stringRules(RAW_HEX, HEX_MESSAGE),
-      ...stringRules(RAW_PALETTE, PALETTE_MESSAGE),
+      ...derivedNumberRules,
+      ...stringRules(OTHER_PAGE_WIDTH, PAGE_WIDTH_MESSAGE),
     ],
+  },
+};
+
+/**
+ * The files that may write a page frame by hand: the two wrappers themselves;
+ * the pages not in the shell (the front door, the legal pages, a share link's
+ * form, a jobs case page and jobs onboarding are drawn on the bare body); the
+ * gallery, which frames surfaces at the width they are judged at; and a vault
+ * note, a wide page whose note keeps a reading measure beside the list. Everything
+ * else in derivedNumberBoundaries still applies, repeated here because the
+ * last entry setting a rule for a file is the one ESLint keeps.
+ */
+const outsideShellPages = {
+  files: [
+    "app/page.tsx",
+    "app/(legal)/**",
+    "app/s/**",
+    "components/jobs/case-page.tsx",
+    "app/preview/page.tsx",
+    "app/vault/n/**",
+    "app/jobs/(onboarding)/**",
+    "components/shell/page-width.tsx",
+  ],
+  rules: {
+    "no-restricted-syntax": ["error", ...derivedNumberRules],
   },
 };
 
@@ -261,6 +301,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   renderBoundaries,
   derivedNumberBoundaries,
+  outsideShellPages,
   jdBoundary,
   // Must come after renderBoundaries: it narrows what that rule forbids.
   serviceRoleExceptions,

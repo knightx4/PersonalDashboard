@@ -15,6 +15,8 @@ import {
 import { useFormStatus } from 'react-dom';
 import { ArrowLeft, ArrowRight, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
+import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { BACK_PAGES, parseBack, passKey, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeBackFarEnough, swipeFarEnough } from '@/lib/news/quick/swipe';
@@ -106,7 +108,7 @@ function PreviousStoryButton() {
       pending={pending}
       aria-label="Previous story"
     >
-      {!pending && <ArrowLeft className="size-4" strokeWidth={2} aria-hidden />}
+      {!pending && <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />}
       {pending ? 'Loading…' : 'Back'}
     </Button>
   );
@@ -173,7 +175,7 @@ function NextButton() {
   return (
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next story'}
-      {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
+      {!pending && <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />}
     </Button>
   );
 }
@@ -347,7 +349,7 @@ function PreviousPageButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="lg" variant="secondary" pending={pending}>
-      {!pending && <ArrowLeft className="size-4" strokeWidth={2} aria-hidden />}
+      {!pending && <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />}
       {pending ? 'Loading…' : 'Previous page'}
     </Button>
   );
@@ -364,7 +366,7 @@ function NextPageButton() {
   return (
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next page'}
-      {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
+      {!pending && <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />}
     </Button>
   );
 }
@@ -393,40 +395,42 @@ export function ReactionButtons({
   const press = (thumb: Reaction) => run(shown === thumb ? null : thumb);
   return (
     <div className="flex items-center" role="group" aria-label="How was this story?">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-pressed={shown === 'up'}
-        aria-label="Thumbs up"
-        title={shown === 'up' ? 'Take back your thumbs up' : 'More stories like this'}
-        onClick={() => press('up')}
-        className={cn(shown === 'up' && 'text-accent', failed && 'text-danger')}
-      >
-        <ThumbsUp
-          className="size-4"
-          strokeWidth={1.75}
-          fill={shown === 'up' ? 'currentColor' : 'none'}
-          aria-hidden
-        />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-pressed={shown === 'down'}
-        aria-label="Thumbs down"
-        title={shown === 'down' ? 'Take back your thumbs down' : 'Fewer stories like this'}
-        onClick={() => press('down')}
-        className={cn(shown === 'down' && 'text-accent', failed && 'text-danger')}
-      >
-        <ThumbsDown
-          className="size-4"
-          strokeWidth={1.75}
-          fill={shown === 'down' ? 'currentColor' : 'none'}
-          aria-hidden
-        />
-      </Button>
+      <Tooltip label={shown === 'up' ? 'Take back your thumbs up' : 'More stories like this'}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown === 'up'}
+          aria-label="Thumbs up"
+          onClick={() => press('up')}
+          className={cn(shown === 'up' && 'text-accent', failed && 'text-danger')}
+        >
+          <ThumbsUp
+            className="size-4"
+            strokeWidth={1.75}
+            fill={shown === 'up' ? 'currentColor' : 'none'}
+            aria-hidden
+          />
+        </Button>
+      </Tooltip>
+      <Tooltip label={shown === 'down' ? 'Take back your thumbs down' : 'Fewer stories like this'} align="end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown === 'down'}
+          aria-label="Thumbs down"
+          onClick={() => press('down')}
+          className={cn(shown === 'down' && 'text-accent', failed && 'text-danger')}
+        >
+          <ThumbsDown
+            className="size-4"
+            strokeWidth={1.75}
+            fill={shown === 'down' ? 'currentColor' : 'none'}
+            aria-hidden
+          />
+        </Button>
+      </Tooltip>
     </div>
   );
 }
@@ -455,10 +459,10 @@ export function ArticleLink({
           void recordArticleOpened(issueId, storyIndex);
         });
       }}
-      className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+      className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
     >
       Read the article
-      <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+      <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
     </a>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { updateStatus, type ReadingActionState } from './actions';
 
@@ -35,26 +35,26 @@ function Option({
   const { pending } = useFormStatus();
 
   return (
-    <button
+    <Button
+      variant="secondary"
+      pressed={active}
       type="submit"
       name="status"
       value={value}
       disabled={pending || active}
-      aria-pressed={active}
       // Not Segmented, deliberately: these are submit buttons carrying their
       // own name and value, so the form still works with no JavaScript (law
       // 6), and Segmented is a client control with an onChange. What they do
       // take from the vocabulary is the button's shape, so four status
       // choices are four buttons at the density everything else is at.
       className={cn(
-        buttonVariants({ variant: 'secondary' }),
         'disabled:pointer-events-none',
-        active && 'border-accent bg-accent-tint text-accent disabled:opacity-100',
+        active && 'disabled:opacity-100',
         pending && !active && 'opacity-50',
       )}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

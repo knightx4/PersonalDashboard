@@ -91,7 +91,7 @@ function AddButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      <Plus className="size-4" strokeWidth={2} aria-hidden />
+      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Adding…' : 'Add unit'}
     </Button>
   );
@@ -120,7 +120,7 @@ export function AddUnitForm({ subjectId }: { subjectId: string }) {
     return (
       <div className="mt-3 flex items-center gap-2">
         <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:min-h-0" onClick={() => setOpen(true)}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden />
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Add a unit
         </Button>
         <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />

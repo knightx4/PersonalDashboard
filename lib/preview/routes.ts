@@ -31,6 +31,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
   'jobs-moment-forward': ['/jobs/pipeline'],
@@ -109,18 +110,28 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-quick-note-read-only': ['/vault'],
   'vault-triage': ['/vault/triage'],
   'vault-triage-empty': ['/vault/triage'],
+  'vault-triage-previous': ['/vault/triage'],
   'vault-triage-read-only': ['/vault/triage'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
   'vault-note-editing': ['/vault/n/[...path]'],
+  'vault-note-rename': ['/vault/n/[...path]'],
   'vault-note-attachments': ['/vault/n/[...path]'],
-  'vault-education-empty': ['/vault/education'],
-  'vault-education-upload': ['/vault/education'],
-  'vault-education-check': ['/vault/education'],
-  'vault-education-list': ['/vault/education'],
+  'you-work-jobs': ['/you/work'],
+  'you-work-jobs-empty': ['/you/work'],
+  'you-work-jobs-edit': ['/you/work'],
+  'you-work-empty': ['/you/work'],
+  'you-work-upload': ['/you/work'],
+  'you-work-check': ['/you/work'],
+  'you-work-list': ['/you/work'],
   'learn-track-readings': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
   'learn-now-subject-empty': ['/learn/now'],
+  'learn-brief-quick': ['/learn/b/[id]/quick'],
+  'learn-brief-quick-empty': ['/learn/b/[id]/quick'],
+  'learn-brief-quick-end': ['/learn/b/[id]/quick'],
+  'learn-now-research-card': ['/learn/now'],
+  'learn-now-research-card-new': ['/learn/now'],
   'learn-courses-empty': ['/learn/know'],
   'learn-courses-list': ['/learn/know'],
   'learn-course-check': ['/learn/know'],
@@ -153,14 +164,30 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
   'learn-subject-clips-empty': ['/learn/s/[id]/clips'],
-  'learn-personality-test': ['/learn/know/personality'],
-  'learn-personality-scores': ['/learn/know/personality'],
-  'learn-personality-add-type': ['/learn/know/personality'],
-  'learn-know-personality': ['/learn/know'],
-  'learn-know-personality-reading': ['/learn/know'],
-  'learn-know-personality-empty': ['/learn/know'],
+  'you-shell': ['/you/personality', '/you/work'],
+  'you-places': ['/you/places'],
+  'you-places-empty': ['/you/places'],
+  'you-place': ['/you/places/[id]'],
+  'you-place-form': ['/you/places/new', '/you/places/[id]/edit'],
+  'you-insights': ['/you/insights'],
+  'you-personality-test': ['/you/personality/test'],
+  'you-personality-scores': ['/you/personality/test'],
+  'you-personality-add-type': ['/you/personality/test'],
+  'you-personality': ['/you/personality'],
+  'you-personality-reading': ['/you/personality'],
+  'you-personality-empty': ['/you/personality'],
   'learn-idea-space': ['/learn/space'],
   'learn-idea-space-domains': ['/learn/space'],
+  'learn-idea-space-card': ['/learn/space'],
+  'learn-idea-space-dense': ['/learn/space'],
+  'learn-idea-space-place': ['/learn/space'],
+  'learn-idea-space-replay': ['/learn/space'],
+  'learn-idea-space-lights': ['/learn/space'],
+  'learn-idea-space-around': ['/learn/space'],
+  'learn-idea-space-recording': ['/learn/space'],
+  'learn-idea-space-recording-choose': ['/learn/space'],
+  'learn-idea-space-evidence': ['/learn/space'],
+  'learn-idea-space-topics': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -170,6 +197,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
+  'dev-posts-send': ['/dev/posts'],
   'home-page': ['/home'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
@@ -203,10 +231,23 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
+  'account-spend-overview': ['/account/spend'],
+  // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
+  'core-tooltip': ['/dev/ui'],
+  'dev-status-tips': ['/dev/plan', '/dev/ideas', '/dev/inbox', '/dev/bugs'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
+  'ui-kit': ['/dev/ui'],
+  // A ref link's preview held open (plan #1931.4): in comments, Dash's
+  // replies and plan details.
+  'ref-preview': ['/dev/plan', '/dev/inbox', '/goals'],
+  // The per-day bar chart (plan #2036.1), made for the two usage pages: drawn
+  // with data, the readout held on a day, and a period with nothing in it.
+  'usage-day-bars': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-readout': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-empty': ['/dev/usage', '/account/spend'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
@@ -239,6 +280,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'onboarding-gmail': ['/onboarding'],
   'share-form': ['/s/[token]'],
   'open-missing': ['/open/[ref]'],
+  // A workspace's not-found.tsx and error.tsx (plan #1923). They draw no page
+  // of their own, so they stand on /open, the one page whose whole content is
+  // a row that is no longer there.
+  'route-not-found': ['/open/[ref]'],
+  'route-error': ['/open/[ref]'],
   'account': ['/account'],
   'account-notifications': ['/account'],
   'account-workspaces': ['/account'],
@@ -266,6 +312,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-usage-empty': ['/dev/usage'],
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
+  'dev-module-ideas': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
@@ -275,8 +322,18 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-onboarding': ['/jobs/onboarding'],
   'jobs-case-page': ['/jobs/p/[slug]'],
   'mail-message': ['/mail/[id]'],
+  // A researched topic (plan #2023.4): ready, and its hidden parts.
+  'learn-brief': ['/learn/b/[id]'],
+  'learn-brief-new-sources': ['/learn/b/[id]'],
+  'learn-brief-researching': ['/learn/b/[id]'],
+  'learn-brief-failed': ['/learn/b/[id]'],
+  'learn-brief-quote-source': ['/learn/b/[id]'],
+  'learn-brief-short-answer-editor': ['/learn/b/[id]'],
+  'learn-now-briefs': ['/learn/now'],
   'learn-concept': ['/learn/c/[id]'],
-  'learn-lists': ['/learn/lists'],
+  'learn-concept-evidence': ['/learn/c/[id]'],
+  // /learn/save opened empty is the save box this surface draws above the lists.
+  'learn-lists': ['/learn/lists', '/learn/save'],
   'learn-new': ['/learn/new'],
   'learn-opening': ['/learn/opening/[id]'],
   'learn-quiz': ['/learn/quiz/[id]'],
@@ -368,6 +425,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
+  // The shared tooltip (plan #1985.1).
+  'core-tooltip': ['components/ui/tooltip.tsx'],
+  // A row's state with its tip (plan #1985.5), which every dev queue and
+  // Goals draw through the same label.
+  'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
@@ -380,6 +442,63 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
+  // A ref link with its preview open, loading and gone (plan #1931.4).
+  'ref-preview': ['components/ui/ref-link.tsx'],
+  // The per-day bar chart in each state it has (plan #2036.1).
+  'usage-day-bars': ['components/ui/day-bar-chart.tsx'],
+  // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
+  // Without this a change to Button or Card reached every surface in the
+  // gallery, and each had to be settled by hand. A new file in components/ui
+  // belongs here or on a surface of its own (lib/preview/ui-kit.test.ts).
+  'ui-kit': [
+    'components/ui/action-menu.tsx',
+    'components/ui/add-trigger.tsx',
+    'components/ui/banner.tsx',
+    'components/ui/burn-up-chart.tsx',
+    'components/ui/button.tsx',
+    'components/ui/card.tsx',
+    'components/ui/chip.tsx',
+    'components/ui/confirm-step.tsx',
+    'components/ui/cost-hint.tsx',
+    'components/ui/disclosure.tsx',
+    'components/ui/editable-prose.tsx',
+    'components/ui/empty-state.tsx',
+    'components/ui/field.tsx',
+    'components/ui/figure.tsx',
+    'components/ui/fold-details.tsx',
+    'components/ui/folding-markdown.tsx',
+    'components/ui/gmail-anchor.tsx',
+    'components/ui/icon-button.tsx',
+    'components/ui/kbd.tsx',
+    'components/ui/link-pending.tsx',
+    'components/ui/link.tsx',
+    'components/ui/linked-text.tsx',
+    'components/ui/live-dot.tsx',
+    'components/ui/markdown.tsx',
+    'components/ui/meter.tsx',
+    'components/ui/module-mark.tsx',
+    'components/ui/move-label.tsx',
+    'components/ui/note.tsx',
+    'components/ui/popover.tsx',
+    'components/ui/rating.tsx',
+    'components/ui/return-fuse.tsx',
+    'components/ui/route-error.tsx',
+    'components/ui/search-mark.tsx',
+    'components/ui/section-heading.tsx',
+    'components/ui/segmented.tsx',
+    'components/ui/selection.tsx',
+    'components/ui/sigil.tsx',
+    'components/ui/skeleton.tsx',
+    'components/ui/sparkline.tsx',
+    'components/ui/stat.tsx',
+    'components/ui/status-glyph.tsx',
+    'components/ui/table.tsx',
+    'components/ui/tabs.tsx',
+    'components/ui/timeline.tsx',
+    'components/ui/timezone-field.tsx',
+    'components/ui/toast.tsx',
+    'components/ui/value-row.tsx',
+  ],
   // The runner's card with its four Dashes, running and off (plan #1704).
   'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
   // A run's lines in every state, on a plan step and a goal run (plan #1826).
@@ -390,6 +509,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     // The presses that answer a waiting question (plan #1824).
     'components/runs/run-answer.tsx',
   ],
+  // What every workspace's not-found.tsx and error.tsx draw (plan #1923).
+  'route-not-found': ['components/shell/no-longer-there.tsx'],
+  'route-error': ['components/ui/route-error.tsx'],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */
@@ -446,7 +568,17 @@ export function surfacesForRoute(route: string, under = false): string[] {
 }
 
 /** Files a route can hold that frame every page beneath them. */
-const FRAMES = new Set(['layout', 'template', 'loading', 'error', 'not-found']);
+const FRAMES = new Set(['layout', 'template', 'loading']);
+
+/**
+ * Files that replace a page only when it fails or finds nothing, so they
+ * change none of the pages beneath them as those are normally seen: each is
+ * looked at on the surface that draws it (plan #1923).
+ */
+const STATE_SURFACES: Readonly<Record<string, string>> = {
+  'not-found': 'route-not-found',
+  error: 'route-error',
+};
 
 /**
  * The page a file under `app/` belongs to, as a route, or null for a file
@@ -478,9 +610,10 @@ function baseName(file: string): string {
 /**
  * The surfaces one file under `app/` serves.
  *
- * A page serves its own route. A layout, loading or error file frames every
- * page beneath it. Any other file is taken to serve the page of its folder;
- * when that folder is not a page of its own (`app/news/quick/`), the search
+ * A page serves its own route. A layout or loading file frames every page
+ * beneath it, and an error or not-found file serves the surface that draws
+ * it. Any other file is taken to serve the page of its folder; when that
+ * folder is not a page of its own (`app/news/quick/`), the search
  * moves up a folder at a time until a surface answers, stopping short of `/`
  * so that a stray file does not claim the whole gallery.
  */
@@ -489,6 +622,7 @@ function surfacesForAppFile(file: string): string[] {
   if (route === null) return [];
   const base = baseName(file);
   if (base === 'page' || base === 'route') return surfacesForRoute(route);
+  if (base in STATE_SURFACES) return [STATE_SURFACES[base]];
   if (FRAMES.has(base)) return surfacesForRoute(route, true);
 
   const segments = segmentsOf(route);

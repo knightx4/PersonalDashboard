@@ -1,4 +1,6 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { cn } from '@/lib/cn';
 import { notFound } from 'next/navigation';
 import { tabFrom } from '@/lib/tabs';
 import { createClient, requireUser } from '@/lib/auth/server';
@@ -76,7 +78,7 @@ import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
-import { GoalFog, GoalShaping } from './goal-shaping';
+import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
 import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
@@ -465,15 +467,7 @@ export default async function GoalMapPage({
   const burnUpDays = await scopeDays;
   const overview = (
     <div className="space-y-6">
-      <GoalDoneWhen goal={map.goal}>
-        {map.goal.fog && (
-          <GoalFog
-            goalId={map.goal.id}
-            fog={map.goal.fog}
-            aside={Boolean(map.goal.fogDismissedAt)}
-          />
-        )}
-      </GoalDoneWhen>
+      <GoalDoneWhen goal={map.goal} />
       <div className="space-y-4">
         <GoalStatusCard
           line={line}
@@ -507,20 +501,17 @@ export default async function GoalMapPage({
       {learnGoal && <GoalLearn {...learnGoal} />}
       {files.length > 0 && (
         <section aria-labelledby="files-heading" className="space-y-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
-            <h2 id="files-heading" className="text-ui font-semibold text-ink">
-              Files
-              {unreadWords(files) && (
-                <span className="ml-2 font-normal text-ink-muted">{unreadWords(files)}</span>
-              )}
-            </h2>
-            <Link
-              href="/goals/files"
-              className="press-area text-small text-accent underline-offset-2 hover:underline"
-            >
-              Files for every goal
-            </Link>
-          </div>
+          <SectionHeading
+            id="files-heading"
+            title="Files"
+            count={unreadWords(files) || undefined}
+            className="px-1"
+            action={
+              <Link href="/goals/files" className={cn('press-area text-small', linkVariants())}>
+                Files for every goal
+              </Link>
+            }
+          />
           <FileLinks files={files} />
         </section>
       )}

@@ -6,6 +6,7 @@ import {
   goalReplyMessage,
   parseGoalReply,
   replyBody,
+  resolveGoalTarget,
   type GoalReplyContext,
   type ReplyCollection,
 } from '@/lib/goals/comments';
@@ -62,7 +63,6 @@ function context(itemId = 'step-2'): GoalReplyContext {
       areaId: 'area-1',
       title: 'Pay off student debt',
       acceptance: 'Every loan at zero',
-      fog: null,
       status: 'open',
       position: 10,
       unit: '$',
@@ -107,6 +107,21 @@ describe('the goal written out for a reply', () => {
     expect(refs.collections.get('c2')?.id).toBe('col-profile');
   });
 
+  it('lists their other open goals under refs a move names', () => {
+    const { text, refs } = goalContext({
+      ...context(),
+      otherGoals: [
+        { id: 'g-house', title: 'Buy a house', areaName: 'Home', errand: false },
+        { id: 'g-dmv', title: 'Renew the licence', areaName: 'Admin', errand: true },
+      ],
+    });
+    expect(text).toContain('## Their other open goals');
+    expect(text).toContain('- g1: Buy a house (a goal in Home)');
+    expect(text).toContain('- g2: Renew the licence (an errand in Admin)');
+    expect(refs.goals.get('g2')?.id).toBe('g-dmv');
+    expect(goalContext(context()).text).toContain('None, so there is no other goal to move a step under.');
+  });
+
   it('puts the thread and the comment after the goal', () => {
     const { message } = goalReplyMessage(
       context(),
@@ -115,6 +130,32 @@ describe('the goal written out for a reply', () => {
     );
     expect(message.indexOf('# A goal')).toBeLessThan(message.indexOf('The person: How many loans?'));
     expect(message.trimEnd().endsWith('The Navient one is 12,450 at 6.8%')).toBe(true);
+  });
+});
+
+describe('the goal a move names (plan #2035.1)', () => {
+  const goals = new Map([
+    ['g1', { id: 'a', title: 'Buy a house', areaName: 'Home', errand: false }],
+    ['g2', { id: 'b', title: 'Fix up the house', areaName: 'Home', errand: false }],
+    ['g3', { id: 'c', title: 'Run a half marathon', areaName: 'Health', errand: false }],
+  ]);
+
+  it('takes the ref when the words fit it, or fit no title at all', () => {
+    expect(resolveGoalTarget(goals, 'g3', 'the half marathon')).toMatchObject({ ok: true, goal: { id: 'c' } });
+    expect(resolveGoalTarget(goals, 'g1', 'Buy a house!')).toMatchObject({ ok: true, goal: { id: 'a' } });
+    expect(resolveGoalTarget(goals, 'g3', 'running')).toMatchObject({ ok: true, goal: { id: 'c' } });
+  });
+
+  it('refuses an unknown ref, words that fit two goals, and words that fit another goal', () => {
+    expect(resolveGoalTarget(goals, 'g9', 'house')).toMatchObject({ ok: false });
+    const two = resolveGoalTarget(goals, 'g1', 'house');
+    expect(two).toEqual({
+      ok: false,
+      error: '"house" could be "Buy a house" or "Fix up the house", so nothing was moved. Ask them which one they mean.',
+    });
+    expect(resolveGoalTarget(goals, 'g1', 'the house goal')).toMatchObject({ ok: false });
+    expect(resolveGoalTarget(goals, 'g1', 'fix up the house')).toMatchObject({ ok: false });
+    expect(resolveGoalTarget(goals, 'g2', 'fix up the house')).toMatchObject({ ok: true, goal: { id: 'b' } });
   });
 });
 

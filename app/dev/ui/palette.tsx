@@ -68,6 +68,7 @@ export function ActivePalette() {
     <div className="space-y-4">
       <div className="space-y-1.5">
         <p className="text-ui font-medium text-ink">{theme ? describe(theme) : 'This theme'}</p>
+        {/* ui-ok: fixed-control-height -- a strip of colour swatches, not a control */}
         <div className="flex h-7 overflow-hidden rounded-control">
           {PALETTE_STRIP.map(([utility, token, label]) => (
             <span key={token} className={cn('flex-1', utility)} title={label} />
@@ -114,7 +115,7 @@ function HueSweep({ theme }: { theme: Theme }) {
               key={degrees}
               title={`${degrees}°`}
               className={cn(
-                'h-7 flex-1 rounded-control',
+                'h-7 flex-1 rounded-control', // ui-ok: fixed-control-height -- a hue swatch, not a control
                 near ? 'ring-2 ring-ink ring-offset-1 ring-offset-surface' : undefined,
               )}
               // ui-ok: raw-hex -- the generated colour itself, which is the one

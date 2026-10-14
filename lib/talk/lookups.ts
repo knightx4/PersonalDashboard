@@ -3,6 +3,13 @@ import type { TalkToolCall } from './talk';
 import { CHART_TOOL } from './chart';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
+import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
+import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -68,6 +75,13 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_quick_note',
   ...LEARN_CHANGE_KINDS,
   ...TODO_CHANGE_KINDS,
+  ...YOU_CHANGE_KINDS,
+  ...NEWS_CHANGE_KINDS,
+  ...GOALS_CHANGE_KINDS,
+  ...SHOPPING_CHANGE_KINDS,
+  ...VAULT_CHANGE_KINDS,
+  ...JOBS_CHANGE_KINDS,
+  ...INTERVIEW_CHANGE_KINDS,
 ];
 
 /**
@@ -124,6 +138,8 @@ export function lookupLabel(name: string, input: unknown): string {
       return 'Checking job applications';
     case 'todos':
       return 'Checking todos';
+    case 'agenda':
+      return 'Checking the Todo agenda';
     case 'goal_status':
       return 'Checking goals';
     case 'vault_notes': {

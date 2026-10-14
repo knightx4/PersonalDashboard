@@ -11,6 +11,8 @@ import { readListView } from '@/lib/news/issues/list';
 import { readTopic } from '@/lib/news/issues/topics';
 import { NewsListView, ViewSwitch } from './list-view';
 import { RecommendedNewsletters } from './recommended';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Newsletters' };
 export const dynamic = 'force-dynamic';
@@ -90,14 +92,14 @@ async function RecommendedPage({ userId }: { userId: string }) {
   const domain = newsDomainOrNull();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <PageHeader title="Newsletters" />
+    <PageColumn className="space-y-4">
+      <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters
         stored={stored}
         address={domain ? newsAddress(localPart, domain) : null}
         timezone={settings.timezone}
       />
-    </div>
+    </PageColumn>
   );
 }

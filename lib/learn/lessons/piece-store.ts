@@ -285,7 +285,8 @@ export async function loadAskedQuestions(
  * they were in: sharp stays sharp and everything else becomes known
  * (`passedState`). What changes with it is that the state now rests on an
  * answer, so the date you declared it goes and any misconception named on it
- * is cleared. Returns how many were marked.
+ * is cleared, and each goes on the review schedule if it was not already.
+ * Returns how many were marked.
  */
 export async function markPieceIdeasTested(
   learn: LearnSupabaseClient,
@@ -316,6 +317,7 @@ export async function markPieceIdeasTested(
     { onConflict: 'concept_id' },
   );
   if (writeError) throw new Error(`Marking the piece's ideas tested failed: ${writeError.message}`);
+  await scheduleIdeas(learn, userId, conceptIds);
   return conceptIds.length;
 }
 

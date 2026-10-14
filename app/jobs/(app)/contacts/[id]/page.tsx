@@ -1,11 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { ContactDetail } from './contact-detail';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
+import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Contact' };
 
@@ -51,16 +52,9 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    // One person, read top to bottom: a reading column.
-    <div className="mx-auto max-w-3xl">
-      <Link
-        href="/jobs/contacts"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-        Contacts
-      </Link>
+    <PageColumn>
       <PageHeader
+        subject={await rowSubject(toRef('job_search.contacts', id))}
         title={row.full_name}
         description={row.companies ? `at ${row.companies.name}` : 'Not attached to a company'}
       />
@@ -99,6 +93,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           })),
         }}
       />
-    </div>
+    </PageColumn>
   );
 }

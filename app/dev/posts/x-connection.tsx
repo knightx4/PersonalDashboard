@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
@@ -23,6 +23,10 @@ import { checkX, disconnectX } from './actions';
  * Connected, the row offers Check X now (plan #1819), the daily read run on
  * demand, and says why the last read stopped when X stopped it: a rate
  * limit, no credit left, or a refusal.
+ *
+ * A sign-in from before posting was added (plan #2072) lacks tweet.write, and
+ * X only adds a scope on a fresh sign-in, so the row says to disconnect and
+ * connect once more before the drafts can be posted.
  */
 
 function ConnectLink({ label }: { label: string }) {
@@ -78,7 +82,7 @@ export function XConnection({
           <p className="text-ui font-medium text-ink">X is not connected</p>
           <p className="text-small text-ink-muted">
             Connecting needs the X app&rsquo;s keys, which are not set yet.{' '}
-            <Link href={planHref(view.setupStep)} className="font-medium text-accent hover:underline">
+            <Link href={planHref(view.setupStep)} className={cn('font-medium', linkVariants())}>
               Step #{view.setupStep} says how to set them.
             </Link>
           </p>
@@ -90,7 +94,8 @@ export function XConnection({
         <>
           <p className="text-ui font-medium text-ink">X is not connected</p>
           <p className="text-small text-ink-muted">
-            Connect your X account so the drafts you post are marked posted without pasting the link.
+            Connect your X account to post drafts from here, and to mark the ones you post yourself without
+            pasting the link.
           </p>
         </>
       );
@@ -110,6 +115,12 @@ export function XConnection({
         <>
           <p className="text-ui font-medium text-ink">Connected to X as @{view.handle}</p>
           <p className="text-small text-ink-muted">{lastRead(view.lastSyncedAt)}</p>
+          {!view.canPost && (
+            <p className="text-small text-ink-muted">
+              To post drafts from this tab, press Disconnect, then Connect X once more. The sign-in you have was
+              made before posting was added, so it can read but not post.
+            </p>
+          )}
         </>
       );
       // What Check X now just said replaces the stored line it answers.

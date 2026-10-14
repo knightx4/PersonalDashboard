@@ -95,7 +95,7 @@ describe('goalRows', () => {
     );
     const row = find(rows, 'b');
     expect(row.health.name).toBe('waiting');
-    expect(row.health.title).toBe('Waits on #1 List balances');
+    expect(row.health.title).toMatch(/^Waits on #1 List balances\. /);
     expect(row.move.word).toBe('Waiting');
     expect(row.dependsOn).toEqual([
       {
@@ -392,7 +392,7 @@ describe('goalViewOf and goalViewHref', () => {
     expect(goalViewOf('you')).toBe('you');
     expect(goalViewOf(['all', 'you'])).toBe('all');
     expect(goalViewOf(undefined)).toBe('open');
-    expect(goalViewOf('fog')).toBe('open');
+    expect(goalViewOf('nonsense')).toBe('open');
   });
 
   it('keeps Open on the bare path', () => {

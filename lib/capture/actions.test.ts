@@ -53,6 +53,13 @@ describe('the capture actions', () => {
     expect(captureAction('anything')).toMatchObject({ module: null, field: 'prose', dated: false });
   });
 
+  it('offers a quick note for the vault to an account that has the vault (note 4a7935d3)', () => {
+    expect(availableCaptureActions(['vault']).map((action) => action.id)).toEqual(['anything', 'vault']);
+    expect(captureAction('vault')).toMatchObject({ module: 'vault', field: 'prose', dated: false });
+    const [match] = matchCaptureActions('quick note');
+    expect(match!.action.id).toBe('vault');
+  });
+
   it('finds logging what happened by the words for it', () => {
     for (const typed of ['log what happened', 'log progress']) {
       const [match] = matchCaptureActions(typed);

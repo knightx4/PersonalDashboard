@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
+import { insertInterview, insertInterviewRound } from '@/lib/jobs/interview/rounds';
 
 /**
  * When a round is, in the three states it can actually be in: an hour, a day
@@ -108,39 +109,8 @@ async function roundForNewInterview(
   opts: { userId: string; applicationId: string; groupId: string | null },
 ): Promise<{ groupId: string | null; error: string | null }> {
   if (opts.groupId) return { groupId: opts.groupId, error: null };
-
-  const { data: rounds } = await supabase
-    .from('interview_groups')
-    .select('round_number')
-    .eq('application_id', opts.applicationId)
-    .eq('user_id', opts.userId);
-
-  const highest = (rounds ?? []).reduce(
-    (top, row) => Math.max(top, (row.round_number as number | null) ?? 0),
-    0,
-  );
-
-  const { data, error } = await supabase
-    .from('interview_groups')
-    .insert({
-      user_id: opts.userId,
-      application_id: opts.applicationId,
-      round_number: highest + 1,
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) return { groupId: null, error: error?.message ?? 'Could not add the round.' };
-  return { groupId: data.id as string, error: null };
-}
-
-/** The next free place inside a round, so a superday reads in order. */
-async function positionInRound(supabase: AppSupabaseClient, groupId: string): Promise<number> {
-  const { count } = await supabase
-    .from('interviews')
-    .select('id', { count: 'exact', head: true })
-    .eq('group_id', groupId);
-  return (count ?? 0) + 1;
+  const round = await insertInterviewRound(supabase, opts);
+  return { groupId: round.id, error: round.error };
 }
 
 /**
@@ -179,17 +149,16 @@ export async function addInterview(input: {
   });
   if (!round.groupId) return { error: round.error };
 
-  const { error } = await supabase.from('interviews').insert({
-    user_id: user.id,
-    application_id: parsed.data.applicationId,
-    round: await positionInRound(supabase, round.groupId),
+  const { error } = await insertInterview(supabase, {
+    userId: user.id,
+    applicationId: parsed.data.applicationId,
+    groupId: round.groupId,
     kind: parsed.data.kind,
-    group_id: round.groupId,
-    scheduled_at: parsed.data.schedule.scheduledAt,
-    time_known: parsed.data.schedule.timeKnown,
+    scheduledAt: parsed.data.schedule.scheduledAt,
+    timeKnown: parsed.data.schedule.timeKnown,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
@@ -494,35 +463,16 @@ export async function createInterviewRound(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  let roundNumber = parsed.data.roundNumber;
-  if (roundNumber === undefined) {
-    const { data: rounds } = await supabase
-      .from('interview_groups')
-      .select('round_number')
-      .eq('application_id', parsed.data.applicationId)
-      .eq('user_id', user.id);
-    roundNumber =
-      (rounds ?? []).reduce(
-        (top, row) => Math.max(top, (row.round_number as number | null) ?? 0),
-        0,
-      ) + 1;
-  }
-
-  const { data, error } = await supabase
-    .from('interview_groups')
-    .insert({
-      user_id: user.id,
-      application_id: parsed.data.applicationId,
-      label: parsed.data.label || null,
-      round_number: roundNumber,
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) return { id: null, error: error?.message ?? 'Could not add the round.' };
+  const { id, error } = await insertInterviewRound(supabase, {
+    userId: user.id,
+    applicationId: parsed.data.applicationId,
+    label: parsed.data.label,
+    roundNumber: parsed.data.roundNumber,
+  });
+  if (error || !id) return { id: null, error: error ?? 'Could not add the round.' };
 
   revalidatePath('/jobs/roles/[id]', 'page');
-  return { id: data.id as string, error: null };
+  return { id, error: null };
 }
 
 /**

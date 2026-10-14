@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 
 /**
  * One section of Today: a heading, an optional hint, an optional link to the

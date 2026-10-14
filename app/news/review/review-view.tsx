@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronLeft, ChevronRight, Newspaper } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/cn';
 import { ReviewLines, type ReviewLine } from './review-lines';
+import { Tooltip } from '@/components/ui/tooltip';
+import { PageColumn } from '@/components/shell/page-width';
 
 /** A neighbouring day with a review: where its arrow goes and what it is called. */
 export type ReviewDayLink = { href: string; label: string };
@@ -44,7 +46,7 @@ export type ReviewViewProps = {
 export function ReviewView({ review, earlier, later, todayAt }: ReviewViewProps) {
   if (!review) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         <PageHeader title="Daily review" />
         <EmptyState
           icon={Newspaper}
@@ -52,12 +54,12 @@ export function ReviewView({ review, earlier, later, todayAt }: ReviewViewProps)
           description={`Each evening at ${todayAt ?? '8:00 PM'} Dash writes up the day's newsletters here: a few sentences on what happened, then the most important stories one line each.`}
           action={{ label: 'Go to Quick read', href: '/news' }}
         />
-      </div>
+      </PageColumn>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader
         title="Daily review"
         description={
@@ -92,7 +94,7 @@ export function ReviewView({ review, earlier, later, todayAt }: ReviewViewProps)
           </div>
         )}
       </Card>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -112,20 +114,24 @@ function DayArrows({
   return (
     <nav aria-label="Other days" className="flex items-center gap-2">
       {earlier ? (
-        <Link href={earlier.href} className={shape} aria-label={`Review for ${earlier.label}`} title={earlier.label}>
-          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          <LinkPending />
-        </Link>
+        <Tooltip label={`Review for ${earlier.label}`}>
+          <Link href={earlier.href} className={shape} aria-label={`Review for ${earlier.label}`}>
+            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+            <LinkPending />
+          </Link>
+        </Tooltip>
       ) : (
         <span aria-hidden className={cn(shape, 'opacity-40')}>
           <ChevronLeft className="size-4" strokeWidth={1.75} />
         </span>
       )}
       {later ? (
-        <Link href={later.href} className={shape} aria-label={`Review for ${later.label}`} title={later.label}>
-          <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
-          <LinkPending />
-        </Link>
+        <Tooltip label={`Review for ${later.label}`} align="end">
+          <Link href={later.href} className={shape} aria-label={`Review for ${later.label}`}>
+            <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
+            <LinkPending />
+          </Link>
+        </Tooltip>
       ) : (
         <span aria-hidden className={cn(shape, 'opacity-40')}>
           <ChevronRight className="size-4" strokeWidth={1.75} />

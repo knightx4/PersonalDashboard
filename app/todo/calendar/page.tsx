@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import Link from '@/components/ui/link';
+import { CalendarDays, Plus } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
 import { isMonth } from '@/lib/todo/calendar/month';
@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
 import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
@@ -27,6 +28,9 @@ import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
 import { EventForm, type EventDraft } from '@/components/todo/event-form';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import { CalendarPicker } from '@/components/todo/calendar-picker';
+import { StepLink } from './step-link';
+import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Calendar' };
 
@@ -127,10 +131,14 @@ export default async function TodoCalendarPage({
       : null;
 
   return (
-    // No width of its own: a calendar is a grid, and seven columns want every
-    // bit of the shell's 1400. The other todo pages are reading columns.
-    <div>
-      <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
+    // A wide page: a calendar is a grid, and seven columns want every bit of
+    // the shell's 1400.
+    <PageWide>
+      <PageHeader
+        subject={sectionSubject('/todo/calendar', 'Calendar')}
+        title="Calendar"
+        description="Everything with a date on it, laid out."
+      />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* The arrows sit either side of the thing they move, the way every
@@ -144,20 +152,16 @@ export default async function TodoCalendarPage({
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, -1)}
-            label={`Previous ${calendar.view}`}
-          >
-            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          </StepLink>
+            direction="previous"
+          />
           <h2 className="px-1 text-body font-semibold whitespace-nowrap text-ink">
             {title(calendar.view, calendar.days)}
           </h2>
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, 1)}
-            label={`Next ${calendar.view}`}
-          >
-            <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
-          </StepLink>
+            direction="next"
+          />
         </div>
 
         {/* Its own control, not the middle of the stepper. It is a jump rather
@@ -181,7 +185,7 @@ export default async function TodoCalendarPage({
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
-        <nav aria-label="View" className="ml-auto flex items-center gap-1">
+        <nav aria-label="View" className={cn(segmentedFrame, 'ml-auto')}>
           {CALENDAR_VIEWS.map((candidate) => (
             <Link
               key={candidate}
@@ -190,12 +194,7 @@ export default async function TodoCalendarPage({
                 query: { view: candidate, date: calendar.anchor },
               }}
               aria-current={candidate === calendar.view ? 'page' : undefined}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-                candidate === calendar.view
-                  ? 'bg-accent text-surface'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
+              className={segmentClass(candidate === calendar.view)}
             >
               {CALENDAR_VIEW_LABEL[candidate]}
             </Link>
@@ -275,7 +274,7 @@ export default async function TodoCalendarPage({
           </ul>
         </section>
       )}
-    </div>
+    </PageWide>
   );
 }
 
@@ -319,27 +318,4 @@ function title(view: CalendarView, days: readonly { day: string }[]): string {
   const to = format(last, { day: 'numeric', month: 'long', year: 'numeric' });
 
   return `${from} – ${to}`;
-}
-
-function StepLink({
-  view,
-  date,
-  label,
-  children,
-}: {
-  view: CalendarView;
-  date: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={{ pathname: '/todo/calendar', query: { view, date } }}
-      aria-label={label}
-      title={label}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-    >
-      {children}
-    </Link>
-  );
 }

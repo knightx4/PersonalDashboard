@@ -1,6 +1,10 @@
-import { courseHref, transcriptHref } from '@/lib/vault/education';
 import { noteHref } from '@/lib/vault/paths';
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of the vault's nav its rows sit under (app/vault/layout.tsx). */
+const NOTES: Section = { href: '/vault', label: 'Notes' };
+const MAP: Section = { href: '/vault/map', label: 'Map' };
+const MAYA: Section = { href: '/vault/maya', label: 'Maya' };
 
 /**
  * The vault's tables, as Goals reads them (lib/sources/types.ts). The notes
@@ -19,6 +23,7 @@ export const vaultSources: ModuleSources = {
       title: 'title',
       ref: 'path',
       href: noteHref,
+      section: NOTES,
       note:
         'Search with full text: `search_tsv @@ websearch_to_tsquery(\'english\', …)`. Rows with deleted_at set are gone from the vault. ' +
         'Find notes by meaning through the map as well: themes, then theme_notes.',
@@ -31,6 +36,7 @@ export const vaultSources: ModuleSources = {
       search: ['name', 'about'],
       title: 'name',
       href: (id) => `/vault/map/${id}`,
+      section: MAP,
       note:
         'The list is short enough to read whole and pick from by judgement. A chosen theme leads to its notes through theme_notes (theme_id, note_id) and to its positions through theme_positions.',
     },
@@ -62,6 +68,8 @@ export const vaultSources: ModuleSources = {
       search: ['question', 'summary'],
       title: 'question',
       href: (id) => `/vault/maya/${id}`,
+      section: MAYA,
+      parent: parentBy('note_id', 'obsidian.notes'),
       note:
         'note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. ' +
         "origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked. " +
@@ -85,29 +93,6 @@ export const vaultSources: ModuleSources = {
       weight: 'intent',
       search: ['crux'],
       title: 'crux',
-    },
-    {
-      table: 'obsidian.courses',
-      module: 'Vault',
-      holds: 'Every course on their academic transcripts: the school, code, title, term, credits and grade, as written.',
-      weight: 'record',
-      search: ['title', 'code', 'school', 'term'],
-      title: 'title',
-      href: courseHref,
-      note:
-        'transcript_id points at obsidian.transcripts. year is the year of the term where the transcript gives one. ' +
-        'grade is null for a course with no grade, such as transfer credit.',
-    },
-    {
-      table: 'obsidian.transcripts',
-      module: 'Vault',
-      holds: 'The academic transcripts they have uploaded, one per school record, with the original file kept.',
-      weight: 'record',
-      search: ['school', 'file_name'],
-      title: 'school',
-      newest: 'uploaded_at',
-      href: transcriptHref,
-      note: 'The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.',
     },
   ],
   notSources: [

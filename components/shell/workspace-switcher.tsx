@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -9,6 +9,7 @@ import { ModuleMark } from '@/components/ui/module-mark';
 import { Popover, scrim } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export type WorkspaceId = ModuleId;
 
@@ -210,57 +211,60 @@ export function WorkspaceSwitcher({
 
   return (
     <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          // Start on the current workspace rather than at the top, so the
-          // first arrow press moves somewhere useful.
-          if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => row.id === current)));
-          setOpen((v) => !v);
-        }}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        // Where capture flies an item filed into a workspace whose own nav
-        // row is not on screen (components/motion/settle.ts).
-        data-capture-switcher=""
-        // No shortcut on the button: ⌘K goes to the search, not here, and the
-        // chip saying otherwise was note e16311ad. ⌘1 to ⌘4 jump straight to a
-        // workspace without opening this at all.
-        title={compact ? active.label : 'Switch workspace'}
-        className={cn(
-          'press flex w-full items-center gap-2 rounded-lg py-1.5 transition-colors duration-quick',
-          compact ? 'justify-center px-1' : 'pl-1.5 pr-2',
-          onShell
-            ? open
-              ? 'bg-shell-hover'
-              : 'hover:bg-shell-hover'
-            : open
-              ? 'bg-accent-tint'
-              : 'hover:bg-sunken',
-        )}
+      <Tooltip label={compact ? `Switch from ${active.label} to another workspace` : 'Switch workspace'}
+        className="flex w-full"
       >
-        <ModuleMark module={current} size="md" />
-        <span
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => {
+            // Start on the current workspace rather than at the top, so the
+            // first arrow press moves somewhere useful.
+            if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => row.id === current)));
+            setOpen((v) => !v);
+          }}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          // Where capture flies an item filed into a workspace whose own nav
+          // row is not on screen (components/motion/settle.ts).
+          data-capture-switcher=""
+          // No shortcut on the button: ⌘K goes to the search, not here, and the
+          // chip saying otherwise was note e16311ad. ⌘1 to ⌘4 jump straight to a
+          // workspace without opening this at all.
           className={cn(
-            'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
-            onShell ? 'text-shell-ink' : 'text-ink',
-            compact && 'sr-only',
+            'press flex w-full items-center gap-2 rounded-control py-1.5 transition-colors duration-quick',
+            compact ? 'justify-center px-1' : 'pl-1.5 pr-2',
+            onShell
+              ? open
+                ? 'bg-shell-hover'
+                : 'hover:bg-shell-hover'
+              : open
+                ? 'bg-accent-tint'
+                : 'hover:bg-sunken',
           )}
         >
-          {active.label}
-        </span>
-        <ChevronsUpDown
-          className={cn(
-            'size-3.5 shrink-0',
-            onShell ? 'text-shell-muted' : 'text-ink-muted',
-            compact && 'hidden',
-          )}
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        <span className="sr-only">Switch workspace</span>
-      </button>
+          <ModuleMark module={current} size="md" />
+          <span
+            className={cn(
+              'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
+              onShell ? 'text-shell-ink' : 'text-ink',
+              compact && 'sr-only',
+            )}
+          >
+            {active.label}
+          </span>
+          <ChevronsUpDown
+            className={cn(
+              'size-3.5 shrink-0',
+              onShell ? 'text-shell-muted' : 'text-ink-muted',
+              compact && 'hidden',
+            )}
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <span className="sr-only">Switch workspace</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover
@@ -292,7 +296,7 @@ export function WorkspaceSwitcher({
                 onClick={() => setOpen(false)}
                 onFocus={() => setActiveIndex(index)}
                 className={cn(
-                  'flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors duration-quick',
+                  'flex items-start gap-2.5 rounded-control px-2 py-2 transition-colors duration-quick',
                   isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
                 )}
               >
@@ -343,7 +347,7 @@ function WorkspaceRowBody({
         )}
       </span>
       {isCurrent && (
-        <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+        <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
       )}
     </>
   );
@@ -420,7 +424,7 @@ export function WorkspaceSheet({
               aria-current={isCurrent ? 'true' : undefined}
               onClick={onClose}
               className={cn(
-                'flex items-start gap-2.5 rounded-lg px-2 py-3',
+                'flex items-start gap-2.5 rounded-control px-2 py-3',
                 isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
               )}
             >

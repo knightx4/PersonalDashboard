@@ -186,6 +186,18 @@ export const MOMENTS: readonly Moment[] = [
     },
   },
   {
+    workspace: 'learn',
+    name: 'An idea lights up',
+    trigger: 'Opening Idea Space after being tested on an idea, or saying you know one, in the last two days.',
+    sees: 'Those ideas, up to three, start dark and brighten together to the strength each is known at, while the rest of the sky holds still. A line under the map names them.',
+    reducedMotion: 'The sky is lit as it stands at once, and the line under the map names the same ideas.',
+    state: {
+      built: 'yes',
+      where:
+        'useLightsUp in app/learn/space/map-section.tsx, played on the whole map for the ideas lib/learn/map/lights-up.ts finds set in the last two days (no last-opened time is recorded, so the window stands in for it). Played in the gallery at /preview?s=learn-idea-space-lights.',
+    },
+  },
+  {
     workspace: 'shopping',
     name: 'A refund on time',
     trigger: 'A refund arriving inside its return window.',

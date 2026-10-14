@@ -158,6 +158,11 @@ export type WorkRow = {
   blockedAt: string | null;
   /** Its place among its siblings, which the outline is counted by. */
   position?: number;
+  /**
+   * In progress with a commit recorded: built on its feature's branch and
+   * waiting for the feature to land on main (`plan.ts built`).
+   */
+  built?: boolean;
 };
 
 /**
@@ -212,8 +217,10 @@ export function beneath(rows: readonly WorkRow[], root: string): WorkRow[] {
 }
 
 /**
- * What a feature batch did: steps beneath the feature closed or blocked in
- * its window, and whether its rows are still moving.
+ * What a feature batch did: steps beneath the feature closed, blocked or
+ * built in its window, and whether its rows are still moving. A built step is
+ * work done, and not a claim that keeps the run busy: it waits on the
+ * feature's one merge to main, which may come in a later session.
  *
  * The twenty minutes are the overnight tick's `FEATURE_IDLE_AFTER_MINUTES`,
  * handed in rather than imported so this file stays free of the liveness
@@ -228,11 +235,14 @@ export function featureWork(
 ): RunWork {
   const under = beneath(rows, root);
   const done = under.filter(
-    (row) => within(row.completedAt, window) || within(row.blockedAt, window),
+    (row) =>
+      within(row.completedAt, window) ||
+      within(row.blockedAt, window) ||
+      (row.built === true && within(row.updatedAt, window)),
   ).length;
   const own = rows.find((row) => row.id === root);
   const closed = own?.status === 'done' || own?.status === 'dropped';
-  const claimed = under.some((row) => row.status === 'in_progress');
+  const claimed = under.some((row) => row.status === 'in_progress' && row.built !== true);
   const touched = Math.max(
     new Date(window.from).getTime(),
     ...[own, ...under].map((row) => (row ? new Date(row.updatedAt).getTime() || 0 : 0)),

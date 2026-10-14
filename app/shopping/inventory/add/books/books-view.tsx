@@ -1,9 +1,10 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { AddBookManualForm, AddBookPasteForm, AddBookSearchForm } from '../add-book-forms';
 import { BarcodeScanPanel } from '../barcode-scan';
 import { PhotoCapturePanel } from '../photo-capture';
+import { PageColumn } from '@/components/shell/page-width';
 
 /*
  * One word each so the row fits one line at 390 wide; nowrap and the sideways
@@ -25,7 +26,7 @@ export type BookMode = (typeof BOOK_MODES)[number]['id'];
  */
 export function AddBooksView({ mode }: { mode: BookMode }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader
         title="Add owned books"
         actions={
@@ -67,6 +68,6 @@ export function AddBooksView({ mode }: { mode: BookMode }) {
       {mode === 'scan' && <BarcodeScanPanel />}
       {mode === 'photo' && <PhotoCapturePanel />}
       {mode === 'manual' && <AddBookManualForm />}
-    </div>
+    </PageColumn>
   );
 }

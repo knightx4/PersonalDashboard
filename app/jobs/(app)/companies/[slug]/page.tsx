@@ -1,12 +1,17 @@
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { Chip } from '@/components/ui/chip';
+import { linkVariants } from '@/components/ui/link';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { CompanyRoles } from './company-roles';
 import { loadTasksFor } from '@/lib/todo/links/load';
+import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Company' };
 
@@ -120,8 +125,9 @@ export default async function CompanyDetailPage({
   }));
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
+        subject={await rowSubject(toRef('job_search.companies', company.id as string))}
         leading={
           <CompanyAvatar
             company={{
@@ -131,7 +137,7 @@ export default async function CompanyDetailPage({
               website: company.website as string | null,
               careersUrl: company.careers_url as string | null,
             }}
-            className="size-11 rounded-xl"
+            className="size-11 rounded-control"
             imageClassName="size-7"
           />
         }
@@ -145,15 +151,13 @@ export default async function CompanyDetailPage({
         }
         actions={
           <div className="flex items-center gap-2 text-ui">
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-muted">
-              {company.priority as string}
-            </span>
+            <Chip>{company.priority as string}</Chip>
             {company.careers_url && (
               <a
                 href={company.careers_url as string}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
+                className={linkVariants({ tone: 'quiet' })}
               >
                 Careers
               </a>
@@ -229,6 +233,6 @@ export default async function CompanyDetailPage({
           createdAt: note.created_at as string,
         }))}
       />
-    </>
+    </PageColumn>
   );
 }

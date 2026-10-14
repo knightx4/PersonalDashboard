@@ -11,7 +11,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { CardSection, cardVariants } from '@/components/ui/card';
-import { Field, FieldError, Input, Select } from '@/components/ui/field';
+import { EmptyState } from '@/components/ui/empty-state';
+import { CheckRow, Field, FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { formatCentsAsDollarsInput } from '@/lib/money';
@@ -136,21 +137,21 @@ export function ItemListsForm({
           <ul className="space-y-2">
             {lists.map((list) => (
               <li key={list.id}>
-                <label className="flex cursor-pointer items-center gap-2 text-body text-ink">
-                  <input
-                    type="checkbox"
-                    name="list_id"
-                    value={list.id}
-                    defaultChecked={selected.has(list.id)}
-                    className="size-4 rounded border-border text-accent focus:ring-accent/30"
-                  />
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={listSwatchStyle(list.color)}
-                    aria-hidden
-                  />
-                  {list.name}
-                </label>
+                <CheckRow
+                  name="list_id"
+                  value={list.id}
+                  defaultChecked={selected.has(list.id)}
+                  title={
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={listSwatchStyle(list.color)}
+                        aria-hidden
+                      />
+                      {list.name}
+                    </span>
+                  }
+                />
               </li>
             ))}
           </ul>
@@ -162,7 +163,7 @@ export function ItemListsForm({
         </form>
       ) : (
         !creating && (
-          <p className="text-ui text-ink-muted">No lists yet — create one below.</p>
+          <EmptyState size="inline" title="No lists yet — create one below." />
         )
       )}
 

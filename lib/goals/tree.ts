@@ -3,7 +3,7 @@
  * (docs/GOALS-SPEC.md, "The three levels"; plan #924).
  *
  * The rules that need no database live here: what a valid name, title,
- * done-when and fog are, and how a list is reordered. The reads and writes
+ * done-when are, and how a list is reordered. The reads and writes
  * are in lib/goals/store.ts.
  */
 
@@ -14,7 +14,6 @@ import type { HelpKindChoice } from '@/lib/goals/help-kinds';
 export const AREA_NAME_MAX = 200;
 export const GOAL_TITLE_MAX = 500;
 export const GOAL_ACCEPTANCE_MAX = 4000;
-export const GOAL_FOG_MAX = 4000;
 /** supabase/migrations-goals/0029. */
 export const AREA_NOTE_MAX = 4000;
 
@@ -43,10 +42,6 @@ export type Goal = {
   title: string;
   /** The done-when. Null until one is written. */
   acceptance: string | null;
-  /** What is not known yet about a vague goal. Null once it is clear. */
-  fog: string | null;
-  /** When its fog was put aside with Not now (plan #960); null while it shows. Read on the goal page only. */
-  fogDismissedAt?: string | null;
   status: GoalStatus;
   position: number;
   /** When it was archived; null or absent while it is live. Read on All goals only (plan #1158). */
@@ -145,7 +140,6 @@ export function parseAreaNote(raw: unknown): Parsed<string | null> {
 export type GoalFields = {
   title?: string;
   acceptance?: string | null;
-  fog?: string | null;
   /**
    * The area to move the goal to (plan #1160). The store checks it is one of
    * your live areas; the goal's steps carry no area, so they go with it.
@@ -163,7 +157,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The goal fields present on a form. A field that is absent is left alone; a
- * done-when or fog sent empty is cleared, which is how a vague goal stops
+ * done-when sent empty is cleared, which is how a vague goal stops
  * being vague. The title is the one field that cannot be cleared, and an
  * area id moves the goal.
  */
@@ -194,15 +188,6 @@ export function parseGoalFields(
     }
     if (readsAsPractice(acceptance)) return { ok: false, error: PRACTICE_ERROR };
     fields.acceptance = acceptance;
-  }
-
-  const rawFog = get('fog');
-  if (rawFog !== null && rawFog !== undefined) {
-    const fog = clean(rawFog);
-    if (fog && fog.length > GOAL_FOG_MAX) {
-      return { ok: false, error: `Keep the note under ${GOAL_FOG_MAX} characters.` };
-    }
-    fields.fog = fog;
   }
 
   const rawAreaId = get('areaId');

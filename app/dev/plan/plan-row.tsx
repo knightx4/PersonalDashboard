@@ -13,7 +13,6 @@ import {
   sendPlanFeatureToClaude,
   workPlanOverhaul,
   dismissPlanDecision,
-  dismissPlanFog,
   sendPlanItemToClaude,
   setPlanItemAssignee,
   setPlanItemPriority,
@@ -27,6 +26,8 @@ import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
+import { chipVariants } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
 import { checkWaitName } from '@/lib/plan/check-backs';
 import {
@@ -75,6 +76,7 @@ import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { MoveLabel } from '@/components/ui/move-label';
 import { MOVE_TONE, waitingOnName, type Move } from '@/lib/core/move';
 import { StateLabel } from '@/components/dev/state-label';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   ASSIGNEE_LABEL,
   AddStep,
@@ -93,6 +95,7 @@ import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
 import { PlanPictures } from '@/components/dev/plan-pictures';
+import { linkVariants } from '@/components/ui/link';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -106,7 +109,6 @@ export const PLAN_TREE_ACTIONS: TreeActions = {
   ask: addPlanItem,
   addDependency: addPlanDependency,
   removeDependency: removePlanDependency,
-  dismissFog: dismissPlanFog,
 };
 
 /**
@@ -160,29 +162,31 @@ function AnswerDecision({
        box, and the caution hairline round it was a second claim on a grouping
        the ground had already made. The tint stays -- it is the thing saying a
        question is waiting on you. Law 11. */
-    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
-      {/* The question and its options, before the box that closes them. The
-          box used to come first with the options as a row of chips above it,
-          which put the form in front of the thing the form is about. */}
-      <TheQuestion outline={node.outline} title={node.title} />
-      <TheOptions
-        detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
-        onChoose={choose}
-      />
+    <Note tone="caution" glyph={false} role={undefined}>
+      <div className="space-y-2.5">
+        {/* The question and its options, before the box that closes them. The
+            box used to come first with the options as a row of chips above it,
+            which put the form in front of the thing the form is about. */}
+        <TheQuestion outline={node.outline} title={node.title} />
+        <TheOptions
+          detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
+          onChoose={choose}
+        />
 
-      {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}
-      <AnswerBox
-        id={node.id}
-        detail={node.detail}
-        resolution={node.resolution}
-        action={action}
-        pending={pending}
-        answer={answer}
-        onAnswer={setAnswer}
-        autoFocus={autoFocus}
-        hint
-      />
-    </div>
+        {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}
+        <AnswerBox
+          id={node.id}
+          detail={node.detail}
+          resolution={node.resolution}
+          action={action}
+          pending={pending}
+          answer={answer}
+          onAnswer={setAnswer}
+          autoFocus={autoFocus}
+          hint
+        />
+      </div>
+    </Note>
   );
 }
 
@@ -219,23 +223,25 @@ function SetupJob({
   outlines: OutlineIndex;
 }) {
   return (
-    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
-      <div className="space-y-0.5">
-        <QuestionPartLabel>What to set up</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-ui text-ink">
-          <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} />
-        </p>
+    <Note tone="caution" glyph={false} role={undefined}>
+      <div className="space-y-2.5">
+        <div className="space-y-0.5">
+          <QuestionPartLabel>What to set up</QuestionPartLabel>
+          <p className="whitespace-pre-wrap text-ui text-ink">
+            <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} refs="all" />
+          </p>
+        </div>
+        <form action={action} className="space-y-2">
+          <input type="hidden" name="id" value={node.id} />
+          <input type="hidden" name="status" value="done" />
+          <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
+          <Button type="submit" size="sm" pending={pending}>
+            I have set this up
+          </Button>
+          <FieldError>{error}</FieldError>
+        </form>
       </div>
-      <form action={action} className="space-y-2">
-        <input type="hidden" name="id" value={node.id} />
-        <input type="hidden" name="status" value="done" />
-        <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
-        <Button type="submit" size="sm" pending={pending}>
-          I have set this up
-        </Button>
-        <FieldError>{error}</FieldError>
-      </form>
-    </div>
+    </Note>
   );
 }
 
@@ -257,6 +263,18 @@ function sendLabel(node: PlanNode): string {
   return beneath === 0
     ? `Send ${stepRef(node)} to Dash`
     : `Send ${stepRef(node)} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
+}
+
+/** What a size means, for its Tooltip. */
+const SIZE_TIP: Record<NonNullable<PlanNode['size']>, string> = {
+  s: 'Small: a short sitting of work.',
+  m: 'Medium: about one sitting of work.',
+  l: 'Large: more than one sitting, so it is split into steps before it is built.',
+};
+
+/** What pressing Send does, for its Tooltip. */
+function sendTip(node: PlanNode): string {
+  return `${sendLabel(node)}: Dash starts building now, without waiting for the runner.`;
 }
 
 /**
@@ -345,7 +363,7 @@ function SendToClaude({
           title={held ?? quietAsk}
           onClick={onAskQuiet}
         >
-          <Play className="size-3.5" aria-hidden />
+          <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
           {sendLabel(node)}
         </Button>
       ) : (
@@ -359,7 +377,7 @@ function SendToClaude({
             disabled={resolving}
             title={held}
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {pending ? 'Sending…' : sendLabel(node)}
           </Button>
         </form>
@@ -383,7 +401,7 @@ function SendToClaude({
                 : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
             }
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {overhaulPending ? 'Starting…' : 'Work this overhaul'}
           </Button>
         </form>
@@ -1050,16 +1068,18 @@ export function usePlanRow({
            * nothing clears them. A mark, not a column: it appears on the few
            * steps you held back, which is what makes it worth reading. */}
           {mine && (
-            <span
-              title="Yours. The runner will not take this one."
-              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
+            <Tooltip
+              label="Yours, so the runner will not take it. Press Not mine to give it back."
+              className="shrink-0"
             >
-              {/* The head-and-shoulders from the assignee picker, the same
-                  icon the Mine press uses, so the mark and the press that
-                  sets it are recognisably one thing. */}
-              <CircleUser className="size-3" strokeWidth={2} aria-hidden />
-              <span className="sr-only">Marked yours</span>
-            </span>
+              <span className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'px-1')}>
+                {/* The head-and-shoulders from the assignee picker, the same
+                    icon the Mine press uses, so the mark and the press that
+                    sets it are recognisably one thing. */}
+                <CircleUser strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Marked yours</span>
+              </span>
+            </Tooltip>
           )}
           {/* An overhaul, on its feature row. It is built in its own order
            * by its own routine and the runner never fires it, which is the
@@ -1070,12 +1090,14 @@ export function usePlanRow({
            * title of six words ran to three lines (plan #1688); an overhaul's
            * summary line under the title says what it is. */}
           {node.track === 'overhaul' && (
-            <span
-              title="Overhaul. Built by its own routine; the runner will not take it."
-              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent max-sm:hidden"
+            <Tooltip
+              label="An overhaul: built in order by its own routine, which Work this overhaul starts. The runner will not take it."
+              className="shrink-0 max-sm:hidden"
             >
-              Overhaul
-            </span>
+              <span className={chipVariants({ tone: 'accent', size: 'sm' })}>
+                Overhaul
+              </span>
+            </Tooltip>
           )}
           {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
           {/* And whether the checks passed on what it shipped in. */}
@@ -1110,9 +1132,11 @@ export function usePlanRow({
           {/* At Normal the size leads, so it sits where Next or Someday would
               rather than after a word that is not drawn (plan #1747). */}
           {node.priority === 2 && node.size && (
-            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {node.size.toUpperCase()}{' '}
-            </span>
+            <>
+              <Tooltip label={SIZE_TIP[node.size]}>
+                <span className="text-ink-muted">{node.size.toUpperCase()}</span>
+              </Tooltip>{' '}
+            </>
           )}
           <ActionMenu
             label={`Priority of ${stepRef(node)} ${node.title}`}
@@ -1123,7 +1147,7 @@ export function usePlanRow({
             // the menu's block (plan #1688).
             className="inline-block align-baseline"
             triggerClassName={cn(
-              'h-auto w-auto rounded px-0.5 py-0 font-normal',
+              'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
               node.priority === 2 &&
                 'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
             )}
@@ -1139,10 +1163,12 @@ export function usePlanRow({
             }
           />
           {node.priority !== 2 && node.size && (
-            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {' · '}
-              {node.size.toUpperCase()}
-            </span>
+            <>
+              <span className="text-ink-muted">{' · '}</span>
+              <Tooltip label={SIZE_TIP[node.size]}>
+                <span className="text-ink-muted">{node.size.toUpperCase()}</span>
+              </Tooltip>
+            </>
           )}
         </span>
   );
@@ -1155,13 +1181,13 @@ export function usePlanRow({
               // is what sends. The icon has no room for a question of its
               // own, and a confirmation that appeared under the pointer and
               // vanished with it would be no confirmation at all.
-              <RowIconButton label={sendLabel(node)} onClick={() => setConfirmingSend(true)}>
+              <RowIconButton label={sendLabel(node)} tip={sendTip(node)} onClick={() => setConfirmingSend(true)}>
                 <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
               </RowIconButton>
             ) : (
               <form action={sendAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+                <RowIconButton type="submit" label={sendLabel(node)} tip={sendTip(node)} pending={sendPending}>
                   <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </RowIconButton>
               </form>
@@ -1170,6 +1196,11 @@ export function usePlanRow({
             <RowIconButton
               type="button"
               label={assignLabel}
+              tip={
+                mine
+                  ? `Give this back to Dash${beneath ? ', and the steps beneath it' : ''}, so the runner can take it again.`
+                  : `Keep this for yourself${beneath ? ', and the steps beneath it' : ''}, so the runner leaves it alone.`
+              }
               onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
             >
               {/* The head-and-shoulders the assignee picker uses for Me, and
@@ -1182,7 +1213,7 @@ export function usePlanRow({
               />
             </RowIconButton>
           </>
-          <RowIconButton label="Edit" onClick={() => setEditing(true)}>
+          <RowIconButton label="Edit" tip="Edit this step's title, detail and done-when." onClick={() => setEditing(true)}>
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           </RowIconButton>
         </>
@@ -1332,33 +1363,35 @@ export function usePlanRow({
   const sendShape = 'press-area max-sm:size-9 max-sm:px-0';
   const sendButton =
     closed || node.track === 'overhaul' ? null : quietAsk ? (
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        disabled={beingResolved}
-        title={quietAsk}
-        onClick={() => setConfirmingSend(true)}
-        className={sendShape}
-      >
-        <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-        <span className={sendWords}>Send to Dash</span>
-      </Button>
-    ) : (
-      <form action={sendAction}>
-        <input type="hidden" name="id" value={node.id} />
+      <Tooltip label={quietAsk} align="end">
         <Button
-          type="submit"
+          type="button"
           size="sm"
           variant="secondary"
-          pending={sendPending}
           disabled={beingResolved}
-          title={sendLabel(node)}
+          onClick={() => setConfirmingSend(true)}
           className={sendShape}
         >
           <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
+          <span className={sendWords}>Send to Dash</span>
         </Button>
+      </Tooltip>
+    ) : (
+      <form action={sendAction}>
+        <input type="hidden" name="id" value={node.id} />
+        <Tooltip label={sendTip(node)} align="end">
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={sendPending}
+            disabled={beingResolved}
+            className={sendShape}
+          >
+            <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
+          </Button>
+        </Tooltip>
       </form>
     );
 
@@ -1375,13 +1408,14 @@ export function usePlanRow({
         node.waitingOn.length === 1 ? (
           <a
             href={waitedOnHref(node, node.waitingOn[0])}
-            className="press-area underline underline-offset-2"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
           >
             <StateLabel
               glyph={null}
               word={afterWord(move.move)!}
               tone={MOVE_TONE.waiting}
               title={`${move.title} Opens ${stepRef(node.waitingOn[0])}.`}
+              focusable={false}
             />
           </a>
         ) : (
@@ -1521,26 +1555,26 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   const placeholder = 'hidden shrink-0 text-micro text-ink-muted sm:inline';
   if (!progress || progress.state === 'no-spec') {
     return (
-      <span className={placeholder} title="Its detail names no spec, so there are no rule counts to show.">
-        No rule counts yet
-      </span>
+      <Tooltip className={placeholder} label="Its detail names no spec, so there are no rule counts to show.">
+        <span>No rule counts yet</span>
+      </Tooltip>
     );
   }
   if (progress.state === 'missing') {
     return (
-      <span className={placeholder} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
-        No rule counts yet
-      </span>
+      <Tooltip className={placeholder} label={`${progress.spec} could not be read, so its counts cannot be shown.`}>
+        <span>No rule counts yet</span>
+      </Tooltip>
     );
   }
   if (progress.state === 'no-contract') {
     return (
-      <span
+      <Tooltip
         className={placeholder}
-        title={`${progress.spec} has no Contract naming the rules this overhaul brings to target yet.`}
+        label={`${progress.spec} has no Contract naming the rules this overhaul brings to target yet.`}
       >
-        No rule counts yet
-      </span>
+        <span>No rule counts yet</span>
+      </Tooltip>
     );
   }
   const unread =
@@ -1550,18 +1584,18 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   return (
     <>
       {progress.counts.map((count) => (
-        <span
+        <Tooltip
           key={count.counter}
-          title={`R${count.rule} of ${progress.spec}, counted by ${count.counter}. Now is the count at the last commit that passed the gate.${unread}`}
+          label={`R${count.rule} of ${progress.spec}, counted by ${count.counter}. Now is the count at the last commit that passed the gate.${unread}`}
           className={cn(quiet, 'tabular-nums', count.now <= count.target && 'text-positive')}
         >
-          {countPhrase(count)}
-        </span>
+          <span>{countPhrase(count)}</span>
+        </Tooltip>
       ))}
       {progress.counts.length === 0 && (
-        <span className={placeholder} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
-          No rule counts yet
-        </span>
+        <Tooltip className={placeholder} label={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
+        <span>No rule counts yet</span>
+      </Tooltip>
       )}
     </>
   );

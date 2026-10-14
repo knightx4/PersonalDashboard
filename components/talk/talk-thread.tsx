@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
 import { CommentBody } from '@/components/dev/comment-body';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
@@ -45,6 +45,26 @@ import type { UploadedAttachment } from '@/lib/attachments/rules';
 export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
 
 const PENDING = 'pending';
+
+/**
+ * The thread's own turns with any written elsewhere slotted in by time.
+ * A check-back that lands while a question is on its way reads that question
+ * as already kept, and the answer too if it has been written: those belong to
+ * the question still pending here, so they are left out until its answer
+ * lands, rather than drawing the question twice (note f94be0c9).
+ */
+export function withIncoming(own: readonly TalkTurn[], incoming: readonly TalkTurn[] | undefined): readonly TalkTurn[] {
+  if (!incoming?.length) return own;
+  const have = new Set(own.map((turn) => turn.id));
+  let added = incoming.filter((turn) => !have.has(turn.id));
+  const pending = own.find((turn) => turn.id === PENDING);
+  if (pending) {
+    const echo = added.findLastIndex((turn) => turn.role === 'user' && turn.body.trim() === pending.body.trim());
+    if (echo !== -1) added = added.filter((turn) => turn.createdAt < added[echo].createdAt);
+  }
+  if (added.length === 0) return own;
+  return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
 
 /**
  * Who answers in the thread: Dash unless the caller says otherwise. Maya's
@@ -109,7 +129,7 @@ function AuthorMark({
     );
   }
   const Glyph = role === 'assistant' ? assistant.Mark : CircleUser;
-  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
+  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />;
 }
 
 function Turn({
@@ -133,7 +153,7 @@ function Turn({
   return (
     <li
       className={
-        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-lg bg-canvas px-2 py-1.5' : 'flex gap-2'
+        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-control bg-canvas px-2 py-1.5' : 'flex gap-2'
       }
     >
       <div className="flex w-4 shrink-0 justify-center pt-1">
@@ -161,7 +181,7 @@ function Turn({
             you typed stays as you typed it. */}
         {turn.role === 'assistant' ? (
           <div className="text-body text-ink">
-            <CommentBody body={turn.body} refs={false} />
+            <CommentBody body={turn.body} refs="outlines" />
           </div>
         ) : (
           <p className="text-body whitespace-pre-wrap text-ink">
@@ -183,7 +203,7 @@ function Turn({
 // which draws no space of its own, so the rows stay one tight list at every
 // width (plan #1708). The truncation is on the words inside, since a clipping
 // link would clip the press area with them.
-const CITED_LINK = 'press-area flex min-w-0 text-ui text-accent underline-offset-2 hover:underline';
+const CITED_LINK = `press-area flex min-w-0 text-ui ${linkVariants({ tone: 'inline' })}`;
 
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).
@@ -200,7 +220,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
         >
           <CornerDownRight
             className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-hidden
           />
           {citation.href.startsWith('/') ? (
@@ -331,13 +351,7 @@ export function TalkThread({
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
-  const turns = useMemo(() => {
-    if (!incoming?.length) return own;
-    const have = new Set(own.map((turn) => turn.id));
-    const added = incoming.filter((turn) => !have.has(turn.id));
-    if (added.length === 0) return own;
-    return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }, [own, incoming]);
+  const turns = useMemo(() => withIncoming(own, incoming), [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
   const [draft, setDraft] = useState(initialDraft);
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
@@ -449,7 +463,7 @@ export function TalkThread({
                 {working}
                 {written && (
                   <div className="text-body text-ink">
-                    <CommentBody body={written} refs={false} />
+                    <CommentBody body={written} refs="outlines" />
                   </div>
                 )}
               </div>
@@ -540,7 +554,7 @@ export function TalkThread({
                   disabled={!draft.trim() || sending || uploading}
                   title="Send"
                 >
-                  <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                  <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
                   <span className="sr-only">Send</span>
                 </Button>
               </div>

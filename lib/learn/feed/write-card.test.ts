@@ -534,3 +534,57 @@ describe('a card from a video stretch (plan #1067)', () => {
     expect(result.outcome === 'ready' && result.ideas.map((idea) => idea.name)).toEqual([reported.name]);
   });
 });
+
+describe('a card from a research brief source (plan #2023.6)', () => {
+  const researched: CardToWrite = {
+    id: 'r1',
+    reason: 'researched',
+    themeName: null,
+    aimName: null,
+    field: null,
+    gap: null,
+    article: 'AI and internal control over financial reporting',
+    section: null,
+    text: 'Auditors expect a company using AI in a key control to show how the model was tested and who reviews its output.',
+    depth: null,
+    research: {
+      question: 'How do SOX controls apply to AI?',
+      angle: 'For interviews in audit.',
+      source: 'AI and internal control over financial reporting',
+    },
+    maxIdeas: 1,
+  };
+
+  it('names the topic on the why line, without doubling its question mark', () => {
+    expect(whyLine(researched)).toBe('For your research: How do SOX controls apply to AI?');
+    expect(whyLine({ ...researched, research: { ...researched.research!, question: 'SOX controls and AI' } })).toBe(
+      'For your research: SOX controls and AI.',
+    );
+  });
+
+  it('tells the writer it is reading a source for their question, not a Wikipedia section', () => {
+    const pick = describePick(researched);
+    expect(pick).toContain('"How do SOX controls apply to AI?"');
+    expect(pick).toContain('Why they want to know: For interviews in audit.');
+    expect(pick).toContain('not a Wikipedia section');
+    const prompt = cardPrompt(researched);
+    expect(prompt).toContain('Source: AI and internal control over financial reporting');
+    expect(prompt).not.toContain('Section:');
+  });
+
+  it('writes one card with the same parts as a section card', async () => {
+    const second = { ...reported, name: 'Reviewers own the output', claim: 'Someone has to own what the model decides.' };
+    const client = {
+      messages: {
+        create: async () => ({
+          content: [{ type: 'tool_use', name: 'report_ideas', input: { fit: 'Fits.', matches: true, ideas: [reported, second] } }],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 900, output_tokens: 150 },
+        }),
+      },
+    } as unknown as Anthropic;
+    const result = await writeCard({ card: researched, anthropicApiKey: 'unused', client });
+    expect(result).toMatchObject({ outcome: 'ready', why: 'For your research: How do SOX controls apply to AI?' });
+    expect(result.outcome === 'ready' && result.ideas).toEqual([stored]);
+  });
+});

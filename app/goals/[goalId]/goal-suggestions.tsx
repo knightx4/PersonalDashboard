@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -115,7 +115,7 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
           Added to the steps.{' '}
           <Link
             href={stepHref(goalId, added.stepId)}
-            className="press-area text-accent underline-offset-2 hover:underline"
+            className={`press-area ${linkVariants()}`}
           >
             Open it
           </Link>
@@ -140,10 +140,10 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
           href={s.url}
           target="_blank"
           rel="noreferrer"
-          className="press-area inline-flex items-start gap-1 text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
+          className="press-area inline-flex items-start gap-1 text-body font-semibold break-words text-ink hover:underline"
         >
           {s.title}
-          <ExternalLink className="mt-1.5 size-3 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          <ExternalLink className="mt-1.5 size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         </a>
       ) : (
         <p className="text-body font-semibold break-words text-ink">{s.title}</p>

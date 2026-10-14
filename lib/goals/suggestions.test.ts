@@ -164,7 +164,6 @@ describe('helpGoals', () => {
       areaId: 'a',
       title: 'A goal',
       acceptance: null,
-      fog: null,
       status: 'open',
       position: 10,
       unit: null,

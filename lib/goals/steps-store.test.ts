@@ -29,8 +29,6 @@ const base = {
   area_id: null,
   detail: null,
   acceptance: null,
-  fog: null,
-  fog_dismissed_at: null,
   resolution: null,
   dismissed_at: null,
   due_on: null,

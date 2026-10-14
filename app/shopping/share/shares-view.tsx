@@ -1,9 +1,12 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Share2 } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NewShareButton } from './share-ui';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /** One share as the list reads it, with only the counts it shows. */
 export type ShareListRow = {
@@ -44,12 +47,13 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
 
   const header = (
     <PageHeader
+      subject={sectionSubject('/shopping/share', 'Share')}
       title="Shared forms"
       actions={
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Link
             href="/shopping/share/families"
-            className="text-ui font-medium text-accent hover:underline"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
           >
             Grouping
           </Link>
@@ -61,7 +65,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl [&_a]:press-area">
+      <PageColumn className="[&_a]:press-area">
         {header}
         <EmptyState
           icon={Share2}
@@ -69,7 +73,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
           description="A shared form is a list someone can open and fill in without an account, and their answers land here. Make one with New form, put things on it from your inventory, then send the link."
           action={{ label: 'Open inventory', href: '/shopping/inventory' }}
         />
-      </div>
+      </PageColumn>
     );
   }
 

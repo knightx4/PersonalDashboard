@@ -1,8 +1,16 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { IdeaSpaceView } from '@/app/learn/space/idea-space-view';
-import type { KnowledgeState } from '@/lib/learn/graph/model';
-import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
+import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
+import type { IdeaMapView, IdeaOnMap, PlaceOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
+import { lightOn } from '@/lib/learn/map/sky';
+import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -255,6 +263,76 @@ const STATES: KnowledgeState[] = [
   'misconception',
 ];
 
+/** The day the fixtures are lit for, so every shot draws the same brightness. */
+const AS_OF = new Date('2026-10-13T12:00:00Z');
+const DAY_MS = 86_400_000;
+
+/** A state row for a fixture idea: tested or declared some days before AS_OF, a few with a review. */
+function stateRowFor(state: KnowledgeState, random: () => number): StrengthInput | null {
+  if (state === 'unknown') return null;
+  const established: StateBasis = random() < 0.55 ? 'tested' : random() < 0.8 ? 'declared' : 'inferred';
+  const at = new Date(AS_OF.getTime() - Math.floor(random() * 120) * DAY_MS).toISOString();
+  return {
+    state,
+    established,
+    tested_at: established === 'tested' ? at : null,
+    declared_at: established === 'declared' ? at : null,
+    review_interval_days: established === 'tested' && random() < 0.4 ? 21 : null,
+  };
+}
+
+/**
+ * When each fixture idea was written, for the timeline (plan #1997.8): a few
+ * days before its state was set, or any day in the last four months for an
+ * idea not known yet. A sequence of its own, so the map's layout is unchanged.
+ */
+function withCreated(ideas: IdeaOnMap[], seed: number): void {
+  const random = seeded(seed);
+  for (const idea of ideas) {
+    const set = idea.stateRow ? stateSetAt(idea.stateRow) : null;
+    const at = set ? set.getTime() - Math.floor(random() * 7) * DAY_MS : AS_OF.getTime() - Math.floor(random() * 125) * DAY_MS;
+    idea.createdAt = new Date(Math.min(at, AS_OF.getTime())).toISOString();
+  }
+}
+
+/** Strength and haze for every fixture idea, worked out as the page does. */
+function lit(ideas: IdeaOnMap[]): IdeaOnMap[] {
+  const light = lightOn(ideas, AS_OF);
+  return ideas.map((idea) => ({ ...idea, ...light.get(idea.id)! }));
+}
+
+/** A place for each field with four ideas or more, at the middle of its ideas. */
+const PLACE_NAMES: Record<string, string> = {
+  'f-econ': 'Incentives, prices and the long run',
+  'f-business': 'Recurring revenue and what it is worth',
+  'f-psych': 'How memory holds on',
+  'f-history': 'Empires and the trade that fed them',
+};
+
+function placesFor(ideas: IdeaOnMap[]): { places: PlaceOnMap[]; placeOf: Map<string, string> } {
+  const places: PlaceOnMap[] = [];
+  const placeOf = new Map<string, string>();
+  for (const field of FIELDS) {
+    const members = ideas.filter((idea) => idea.field?.id === field.id);
+    if (members.length < 4) continue;
+    const id = `place-${field.id}`;
+    for (const idea of members) placeOf.set(idea.id, id);
+    const size = members.length;
+    const mean = (pick: (idea: IdeaOnMap) => Point): Point => ({
+      x: members.reduce((sum, idea) => sum + pick(idea).x, 0) / size,
+      y: members.reduce((sum, idea) => sum + pick(idea).y, 0) / size,
+    });
+    places.push({
+      id,
+      name: PLACE_NAMES[field.id] ?? `${field.name} and what sits near it`,
+      ideaCount: members.length,
+      pca: mean((idea) => idea.pca),
+      neighbourMap: mean((idea) => idea.neighbourMap),
+    });
+  }
+  return { places, placeOf };
+}
+
 function fixture(): IdeaMapView {
   const random = seeded(1857);
   const jitter = (spread: number) => (random() - 0.5) * 2 * spread;
@@ -266,11 +344,18 @@ function fixture(): IdeaMapView {
     for (const name of field.ideas) {
       n += 1;
       const id = `idea-${String(n).padStart(3, '0')}`;
+      const state = STATES[Math.floor(random() * STATES.length)]!;
       ideas.push({
         id,
         name,
         claim: `${name}: the claim as Learn wrote it, one or two sentences long, which the rail shows under the name so the idea can be read without opening it.`,
-        state: STATES[Math.floor(random() * STATES.length)]!,
+        state,
+        stateRow: stateRowFor(state, random),
+        strength: 0,
+        haze: 0,
+        placeId: null,
+      createdAt: null,
+        evidence: [],
         pca: { x: clamp(1.3 * (field.axes.x + jitter(0.28))), y: clamp(1.3 * (field.axes.y + jitter(0.28))) },
         neighbourMap: { x: clamp(field.at.x + jitter(0.24)), y: clamp(field.at.y + jitter(0.24)) },
         neighbours: [],
@@ -288,6 +373,12 @@ function fixture(): IdeaMapView {
       name,
       claim: `${name}, as Learn wrote it.`,
       state: 'unknown',
+      stateRow: null,
+      strength: 0,
+      haze: 0,
+      placeId: null,
+      createdAt: null,
+      evidence: [],
       pca: { x: jitter(0.6), y: jitter(0.6) },
       neighbourMap: { x: 0.45 + jitter(0.1), y: -0.85 + jitter(0.1) },
       neighbours: [],
@@ -341,8 +432,15 @@ function fixture(): IdeaMapView {
     };
   });
 
+  withCreated(ideas, 1997_8);
+  const { places, placeOf } = placesFor(ideas);
+  const shown = lit(ideas).map((idea) => ({ ...idea, placeId: placeOf.get(idea.id) ?? null }));
+
   return {
-    ideas,
+    ideas: shown,
+    asOf: AS_OF.toISOString(),
+    places,
+    dust: dustFor(shown, 420, random),
     variance: { first: 0.087, second: 0.054 },
     projection: {
       mean: [],
@@ -369,28 +467,287 @@ function fixture(): IdeaMapView {
       .filter((row) => row.known.length >= 3)
       .sort((a, b) => b.known.length - a.known.length),
     areas: { fields, domains, fieldsMissing: 31 },
+    topics: topicsFor(shown, fields, AS_OF.toISOString()),
     missing: 3,
   };
+}
+
+/** Vault notes as dust, each beside a fixture idea. */
+function dustFor(ideas: readonly IdeaOnMap[], count: number, random: () => number): IdeaMapView['dust'] {
+  return Array.from({ length: count }, (_, i) => ({
+    noteId: `note-${i}`,
+    conceptId: ideas[Math.floor(random() * ideas.length)]!.id,
+    similarity: 0.3 + random() * 0.5,
+  }));
 }
 
 const VIEW = fixture();
 const OPEN = VIEW.ideas.find((idea) => idea.name === 'Price elasticity of demand')!.id;
 
-/** Neighbour map by state, field names on, one idea open with its nearest six. */
+/** The neighbour map with its places named, one idea open with its nearest six. */
 export function IdeaSpaceSurface() {
-  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, labels: true, idea: OPEN }} />;
+  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
 }
 
 /**
- * The map as it is live today: the fields not placed yet, so there are no
- * names to turn on, drawn on the axes layout and coloured by domain, with
- * one of the domains that share the gray pressed in the legend.
+ * The map as it is live until the daily run names its places: the domains
+ * named instead, drawn on the axes layout, with one domain picked out in the
+ * legend.
  */
 export function IdeaSpaceDomainsSurface() {
-  const view: IdeaMapView = {
+  const view: IdeaMapView = { ...VIEW, places: [], missing: 0 };
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, layout: 'axes', domain: 'life' }} />;
+}
+
+/** The card a pointer shows over a star, held open over a known idea that is fading. */
+export function IdeaSpaceCardSurface() {
+  const known = VIEW.ideas
+    .filter((idea) => idea.stateRow?.established === 'tested' && idea.strength > 0.2)
+    .sort((a, b) => a.name.localeCompare(b.name))[0]!;
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} pointingAt={known.id} />;
+}
+
+/**
+ * Ten thousand test ideas in sixty clusters, for the frame rate: the map has
+ * to stay smooth at this size (plan #1997.6). Neighbours are the next ideas
+ * in the same cluster, which is enough for the haze.
+ */
+function dense(count: number): IdeaMapView {
+  const random = seeded(1997);
+  const clusters = Array.from({ length: 60 }, () => ({
+    x: (random() - 0.5) * 1.9,
+    y: (random() - 0.5) * 1.9,
+    spread: 0.04 + random() * 0.1,
+    domain: Object.keys(DOMAINS)[Math.floor(random() * 10)]!,
+  }));
+  const ideas: IdeaOnMap[] = [];
+  for (let i = 0; i < count; i++) {
+    const c = i % clusters.length;
+    const cluster = clusters[c]!;
+    const angle = random() * Math.PI * 2;
+    const r = cluster.spread * Math.sqrt(random());
+    const at = { x: cluster.x + Math.cos(angle) * r, y: cluster.y + Math.sin(angle) * r };
+    const state = STATES[Math.floor(random() * STATES.length)]!;
+    ideas.push({
+      id: `dense-${i}`,
+      name: `Test idea ${i + 1}`,
+      claim: `Test idea ${i + 1}, for the frame rate.`,
+      state,
+      stateRow: stateRowFor(state, random),
+      strength: 0,
+      haze: 0,
+      placeId: null,
+      createdAt: null,
+      evidence: [],
+      pca: at,
+      neighbourMap: at,
+      neighbours: [1, 2, 3, 4, 5, 6].map((step) => ({
+        id: `dense-${(i + step * clusters.length) % count}`,
+        similarity: 0.6 + random() * 0.3,
+      })),
+      track: null,
+      field: null,
+      domain: { id: cluster.domain, name: DOMAINS[cluster.domain]! },
+    });
+  }
+  withCreated(ideas, 1997_8);
+  const shown = lit(ideas);
+  return {
     ...VIEW,
-    areas: { fields: [], domains: [], fieldsMissing: 47 },
+    ideas: shown,
+    places: clusters.slice(0, 30).map((cluster, i) => ({
+      id: `dense-place-${i}`,
+      name: `Test place ${i + 1}`,
+      ideaCount: Math.floor(count / 60),
+      pca: cluster,
+      neighbourMap: cluster,
+    })),
+    dust: dustFor(shown, 3000, random),
+    similarPairs: [],
+    untestedNearKnown: [],
+    areas: { fields: [], domains: [], fieldsMissing: 0 },
     missing: 0,
   };
-  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, layout: 'axes', colour: 'domain', domain: 'life' }} />;
+}
+
+/**
+ * One place opened as a graph (plan #1997.7): every idea in it named in
+ * full, its links drawn, the ideas next door round the edge, and one idea
+ * pointed at so all its links show with their scores.
+ */
+export function IdeaSpacePlaceSurface() {
+  const place = VIEW.places.find((p) => p.name === 'How memory holds on')!;
+  const pointed = VIEW.ideas.find((idea) => idea.name === 'Retrieval practice beats rereading')!.id;
+  return (
+    <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: place.id }} pointingAt={pointed} />
+  );
+}
+
+/**
+ * The timeline (plan #1997.8) moved back seven weeks: the ideas written since
+ * are not on the map yet, and the ones lit then shine as they did that day.
+ */
+export function IdeaSpaceReplaySurface() {
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} daysAgo={50} />;
+}
+
+/** An idea in no place opened as its neighbourhood: itself and its six nearest. */
+export function IdeaSpaceAroundSurface() {
+  const loose = VIEW.ideas.find((idea) => idea.name === 'Write the summary before the detail')!.id;
+  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, around: loose }} />;
+}
+
+export function IdeaSpaceDenseSurface() {
+  const view = useMemo(() => dense(10_000), []);
+  return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} />;
+}
+
+/**
+ * Recording mode on (plan #1997.9) with a place open as a graph: the place and
+ * the next one over are hidden, so the title, the ideas and the rail read
+ * "A private place" and "Private idea", and the places left show as they are.
+ */
+export function IdeaSpaceRecordingSurface() {
+  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
+  const open = VIEW.places.find((p) => p.name === 'How memory holds on')!;
+  return (
+    <IdeaSpaceView
+      view={VIEW}
+      params={{ ...DEFAULT_PARAMS, place: open.id }}
+      recording={{ on: true, hidden: hidden.map((p) => p.id) }}
+    />
+  );
+}
+
+/** Recording mode off with two places ticked to hide, in the rail's Recording mode card. */
+export function IdeaSpaceRecordingChooseSurface() {
+  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
+  return (
+    <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} recording={{ on: false, hidden: hidden.map((p) => p.id) }} chooseOpen />
+  );
+}
+
+/**
+ * An idea lights up (plan #1997.10): three ideas set in the last two days, one
+ * tested a few hours ago, one said to be known yesterday morning, one tested
+ * the day before, and the rest of the map as it stands. The view is mounted
+ * afresh on each press, so the recorder sees the stars brighten from dark.
+ */
+const LIT_FIXTURE = (() => {
+  const set: [string, StateBasis, number][] = [
+    ['Opportunity cost', 'tested', 3],
+    ['Spacing effect in memory', 'declared', 30],
+    ['Annual recurring revenue', 'tested', 40],
+  ];
+  const rows = new Map(
+    set.map(([name, established, hours]) => {
+      const at = new Date(AS_OF.getTime() - hours * 3_600_000).toISOString();
+      const row: StrengthInput = {
+        state: 'known',
+        established,
+        tested_at: established === 'tested' ? at : null,
+        declared_at: established === 'declared' ? at : null,
+        review_interval_days: null,
+      };
+      return [VIEW.ideas.find((idea) => idea.name === name)!.id, row] as const;
+    }),
+  );
+  const ideas = VIEW.ideas.map((idea) => {
+    const row = rows.get(idea.id);
+    return row ? { ...idea, state: row.state, stateRow: row } : idea;
+  });
+  return { ...VIEW, ideas: lit(ideas.map((idea) => ({ ...idea, createdAt: idea.createdAt }))).map((idea, i) => ({ ...idea, placeId: VIEW.ideas[i]!.placeId })) };
+})();
+
+export function IdeaSpaceLightsSurface() {
+  const [visit, setVisit] = useState(0);
+  return (
+    <div className="space-y-4">
+      <Button variant="secondary" size="sm" data-motion-demo="lights-up" onClick={() => setVisit((n) => n + 1)}>
+        Open the map again
+      </Button>
+      <IdeaSpaceView key={visit} view={LIT_FIXTURE} params={DEFAULT_PARAMS} />
+    </div>
+  );
+}
+
+/**
+ * Evidence lighting the map (plan #2006.6): about a third of the ideas not
+ * known yet are backed by a note, a course or your work, so they glow up to
+ * the ceiling a recognised idea held as inferred would have. One of them, a
+ * DCF idea no question has been asked about, is open in the rail with its
+ * three strongest links and pointed at, so its card says what backs it.
+ */
+const EVIDENCE_BASES: { sourceKind: EvidenceLink['sourceKind']; basis: string; weight: number; similarity: number }[] = [
+  { sourceKind: 'course', basis: 'from MGT 541 Corporate Finance, HH, 2026', weight: 0.95, similarity: 0.71 },
+  {
+    sourceKind: 'note',
+    basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
+    weight: 1,
+    similarity: 0.68,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
+    weight: 1,
+    similarity: 0.63,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your application notes in Stripe Strategy & Operations: "The team wants someone who has valued a business"',
+    weight: 0.4,
+    similarity: 0.62,
+  },
+  { sourceKind: 'note', basis: 'you wrote about this in Pricing power, clipped', weight: 0.25, similarity: 0.61 },
+];
+
+const EVIDENCE_OPEN_NAME = 'Terminal value dominates a DCF';
+
+function linksFor(ideaId: string, from: number, count: number): EvidenceLink[] {
+  return Array.from({ length: count }, (_, i) => {
+    const base = EVIDENCE_BASES[(from + i) % EVIDENCE_BASES.length]!;
+    return {
+      id: `${ideaId}-ev-${i}`,
+      targetKind: 'idea' as const,
+      targetId: ideaId,
+      sourceKind: base.sourceKind,
+      sourceId: `src-${(from + i) % EVIDENCE_BASES.length}`,
+      similarity: base.similarity,
+      weight: base.weight,
+      basis: base.basis,
+      foundAt: AS_OF.toISOString(),
+    };
+  }).sort((a, b) => b.weight - a.weight || b.similarity - a.similarity);
+}
+
+const EVIDENCE_FIXTURE: IdeaMapView = (() => {
+  let unknown = 0;
+  const ideas = VIEW.ideas.map((idea) => {
+    if (idea.name === EVIDENCE_OPEN_NAME) {
+      return { ...idea, state: 'unknown' as const, stateRow: null, evidence: linksFor(idea.id, 0, 5) };
+    }
+    if (idea.state !== 'unknown') return idea;
+    unknown += 1;
+    // Every third idea not known yet: some by a clipping alone, some by your own writing.
+    if (unknown % 3 !== 0) return idea;
+    return { ...idea, evidence: linksFor(idea.id, unknown % EVIDENCE_BASES.length, 1 + (unknown % 2)) };
+  });
+  return {
+    ...VIEW,
+    ideas: lit(ideas).map((idea, i) => ({ ...idea, placeId: VIEW.ideas[i]!.placeId })),
+  };
+})();
+
+export function IdeaSpaceEvidenceSurface() {
+  const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
+  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} />;
+}
+
+/**
+ * The map flown into one Level 3 topic (plan #2016.5): Economics, with
+ * twenty-two Level 4 topics unlocked inside it, seven of them named,
+ * strongest first, and the rest folded into a count under its name.
+ */
+export function IdeaSpaceTopicsSurface() {
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" nextTopics={NEXT_TOPICS_FIXTURE} />;
 }

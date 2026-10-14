@@ -21,7 +21,7 @@ import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { fileNightIdeas } from '@/lib/ideas/file';
 import { loadIdeas } from '@/lib/ideas/load';
 import { moduleById } from '@/lib/modules';
-import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
+import { isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { loadFeatureFires } from '@/lib/plan/runs';
 import { loadRaised } from '@/lib/raised/load';
@@ -92,8 +92,7 @@ function daysAgo(at: string, now: Date): number {
  * What the model is shown: the open state of the plan, and what closed
  * overnight so it does not report back what the page already says.
  *
- * Nothing dismissed is in it. A question put aside as not right now, or a
- * patch of fog put aside, is exactly the thing a summary must not raise again
+ * Nothing dismissed is in it. A question put aside as not right now is exactly the thing a summary must not raise again
  * -- that is what dismissing it was for. `workOrder` already drops them from
  * the ready list; these lists are read straight off the rows, so they say so
  * themselves.
@@ -131,10 +130,6 @@ async function contextFor(input: {
       .map((item) =>
         stated(`${ref(item)} — ${oneLine(item.blockAsk ?? item.comment ?? 'no reason recorded', 200)}`),
       ),
-    fogPatches: open
-      .filter((item) => hasLiveFog(item))
-      .slice(0, CONTEXT_LIMIT)
-      .map((item) => stated(`${ref(item)}: ${oneLine(item.fog as string, 300)}`)),
     inProgress: open
       .filter((item) => item.status === 'in_progress')
       .slice(0, CONTEXT_LIMIT)

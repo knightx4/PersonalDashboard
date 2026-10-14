@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it and the code, writing the work an answer made specifiable as steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -43,7 +43,7 @@ npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # ending without closing or blocking <n>:
                                                # one line on why, onto the run. Too big?
                                                # name the pieces it would split into
-npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                [--proposed] [--from <n>]
                                                # ready under an approved feature, a
                                                # proposal under a proposed one.
@@ -52,9 +52,6 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…
                                                # --from: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
-npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
-                                               # finishing this feature, one patch;
-                                               # --clear once it can be seen
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
                                                # a line on your run (see building.md, run lines)
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
@@ -95,8 +92,8 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
 **Writing by hand, record each write** to `plan_items` or `ideas` with
 `core.record_dash_action`, so Home lists it under what Dash did today with an
-Undo: a step or decision added, a step closed, blocked, dropped or given fog,
-an idea filed or linked. A claim (`in_progress`) is not recorded; the close
+Undo: a step or decision added, a step closed, blocked or dropped, an idea
+filed or linked. A claim (`in_progress`) is not recorded; the close
 that follows it is. `reference/offline.md` shows the calls. The CLI's own
 writes are not recorded yet.
 
@@ -165,7 +162,8 @@ Sonnet session for a step sized `m` or `l` (step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
-batch.
+batch. The steps of one feature go to main together, as one merge, once the
+feature is finished (step 4).
 
 This is the difference between a batch that finishes and one that stops
 halfway. A session that builds nine steps itself carries everything it read for
@@ -194,13 +192,15 @@ thousand tokens, and gets to the end.
    (`reference/building.md`, "An answer always moves the step").
 2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
    and what waits on what. List the steps you are going to build, in dependency
-   order. Steps that wait on nothing come first; a step whose dependency is
-   still open is not in this batch.
+   order. Steps that wait on nothing come first. A step that waits only on
+   steps in this batch is in it, and goes out once those are built on the
+   feature branch; a step that waits on anything else still open is not.
 3. **Send the ready steps to subagents, up to three at once.** Every step
    that is ready now and does not wait on another step in the batch goes out
    together, each to its own subagent with `isolation: "worktree"`, so each
-   builds in its own copy of the repository. When one reports, merge it (step
-   4) and send whatever its close made ready, keeping up to three going. One
+   builds in its own copy of the repository. When one reports, merge it into
+   the feature branch (step 4) and send whatever that made ready, keeping up
+   to three going. One
    step at a time left a twelve-step feature taking most of a day while steps
    that waited on nothing sat in the queue.
 
@@ -230,53 +230,73 @@ thousand tokens, and gets to the end.
    single step named on its own when this session is on Sonnet and the step
    is sized `m` or `l`: send it to an Opus subagent rather than building it
    here.
-4. **Put the step on main before it closes.** A subagent commits and stops
-   there, so the merge is yours, and it runs as soon as the subagent reports
-   its commit:
+4. **Build the feature on its own branch, and put it on main once.** Start
+   the batch on a branch named `plan/<feature number>`, cut from `origin/main`,
+   or continue it if an earlier session pushed one: its steps marked built are
+   already on it. Each step merges into that branch as its subagent reports,
+   and the whole feature goes to main in one merge at the end.
+
+   A feature merged one step at a time left the live app half-changed between
+   steps, with some screens moved and others not, and ran the three-minute
+   gate once a step. A step that only makes sense beside its siblings now
+   reaches main beside them, and the gate runs once a feature.
+
+   **As each step reports:**
 
    - Merge the subagent's worktree branch (its result names it) into the
-     working branch. Do this for one step at a time even while others are
-     still building: each step merges and runs the gate on its own.
+     feature branch.
+   - Run the fast checks on what it changed: `npx tsc --noEmit -p .`,
+     `npm run lint`, and `npx vitest run` on the test files beside the files
+     it touched. A step that breaks these goes back to its builder before the
+     next one merges on top of it.
+   - Run `npm run ui-guard -- <outline> --commit <the branch's head>` for a step
+     that changed a screen, and send a step it refuses back to the critic.
+   - `built <n> --note "…"`, with the note the subagent wrote. The step stays
+     in progress and records the commit and the branch; `done` would refuse it,
+     because the commit is not on main yet.
+   - `git push -u origin plan/<feature number>`. Every step pushed is a step
+     that outlives this session, which is what decision #674 asked of the
+     arrangement this one replaces.
+
+   **When the feature's steps are built:**
+
    - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
      when one of them is missing, which is the normal state of a branch nobody
      has pushed yet, and leaves `origin/main` stale.
-   - Merge `origin/main` into the working branch and resolve anything that
+   - Merge `origin/main` into the feature branch and resolve anything that
      conflicts.
    - `npm run gate`. It runs what CI runs on main: the test database,
      migrations, typecheck, lint, contrast, UI laws, the whole test suite
-     including tests/, and the build, in three lanes side by side, and
-     names every step that failed. The old gate here was lint, `vitest run lib` and the
-     build, and every failure that kept main red on 23 September 2026 came
-     through what that left out.
-   - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
-     step #<outline>: <title>`, and push.
-   - Then close the step: `done <n> --note "…"`, with the note the subagent
-     wrote. `done` refuses a commit that is not on main, so the merge comes
-     first; a subagent cannot close its own step and does not try. It also
-     refuses a step that changed a screen while one of its gallery surfaces
-     has no passing design check (plan #1534), so before the merge run
-     `npm run ui-guard -- <outline> --commit <the branch's head>` and send a step
-     it refuses back to the critic rather than merging it.
+     including tests/, and the build, in three lanes side by side, and names
+     every step that failed. Anything that fails belongs to whichever step
+     broke it: fix it with a commit against that step's outline. That includes
+     a failure another session merged, because main is what you are about to
+     push.
+   - Merge the feature branch into `main` with `--no-ff`, subject `Merge plan
+     feature #<outline>: <title>`, list the steps it carries in the body, and
+     push.
+   - `land <feature>`. It closes every step marked built under the feature,
+     each against its own commit and with the same checks `done` makes, and
+     names any it could not close and why.
 
-   Anything that fails belongs to whichever step broke it: fix it, and amend or
-   add a commit against that step's outline, before the merge. That includes
-   a failure another session merged: main is what you are about to push, so
-   it is yours to get passing, and a step that merges onto red makes it
-   worse. Running the gate before every merge costs about three minutes a step
-   (the first run in a session adds a minute to start the database). Decision #674
-   chose that over the old arrangement, where a closed step sat on an unpushed
-   branch until the batch ended.
+   A step sent on its own ("do #1073.4") is not a batch: it merges to main by
+   itself, after the gate, with subject `Merge plan step #<outline>: <title>`,
+   and closes with `done <n> --note "…"`.
 
-   **When the merge will not go through** — a conflict you cannot resolve from
-   what you have read, or a check you cannot get passing — push the working
-   branch first, so what the step built survives this session, then `block <n>
-   --ask "…" --note "…"` with that branch named in the note. The ask never
-   names it: the person cannot open branches, and `block` refuses an ask that
-   names one. Stop the batch there: do not
-   send the next step, and do not close the blocked one, because its commit is
-   on a branch and that is what the guard on `done` is for. Decisions #685 and
-   #695 are why. The next session starts from main as it then stands, and can
-   read the branch rather than build the step again.
+   **When the batch stops before the feature is finished** (a block, a stop,
+   or running short): the built steps stay on the pushed feature branch, in
+   progress, with their Built lines. Land what is built only if the app works
+   with the rest of the feature missing, and say in the report which you did.
+   Otherwise leave the branch for the next session, which continues it. The
+   rule against leaving a step in progress does not apply to a built step: its
+   Built line says where it is.
+
+   **When the merge to main will not go through** — a conflict you cannot
+   resolve from what you have read, or a check you cannot get passing — the
+   branch is already pushed. Block the step that broke it, `block <n> --ask
+   "…" --note "…"`, with the branch named in the note. The ask never names it:
+   the person cannot open branches, and `block` refuses an ask that names one.
+   Stop the batch there. Decisions #685 and #695 are why.
 
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
@@ -308,14 +328,14 @@ thousand tokens, and gets to the end.
 8. **Report when the batch ends**: every step closed **by outline and title**,
    what became ready, what is blocked and on what, and anything raised on
    `/dev/inbox`, by title. A report that says "closed four steps" makes the
-   person go and look. Say which steps reached main and which did not: a closed
-   step is on main already, and a step blocked on a failed merge is on the
-   branch its history names, which the report names too.
+   person go and look. Say whether the feature reached main. A closed step is
+   on main already; a built step, or one blocked on a failed merge, is on the
+   feature branch its history names, which the report names too.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.
 Do not close what was not built, and do not leave a step `in_progress` behind
-you.
+you unless it is marked built on the pushed feature branch.
 
 ## The other jobs
 
@@ -370,15 +390,14 @@ and it clears itself when the other step is done. Do not mark a step
 "Out of scope" is not a status either. It is `drop <n> --note "out of scope:
 …"`, which reads the same and needs no sixth column.
 
-## Kind and fog
+## Kind and dismissal
 
 Beside the status, two columns say what a step is rather than where it stands.
 
 | | Meaning |
 |---|---|
 | `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`; a setup step closes when the person says they have done the thing outside the repo, and carries no commit. It is a kind and not a status because all three move through the same states — not started, blocked, dropped — and differ only in what closing them means. |
-| `dismissed_at`, `fog_dismissed_at` | Put aside by the person as not right now — the row itself, and the patch of fog on it. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
-| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. `reference/reshaping.md` is what does that clearing. |
+| `dismissed_at` | Put aside by the person as not right now. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
 
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,

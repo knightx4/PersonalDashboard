@@ -65,7 +65,7 @@ export const DEFAULT_JUDGE_CONCURRENCY = 4;
  * A Wikipedia section is the long case and runs to a few thousand words; a
  * transcript window is three to six minutes and is nowhere near this. Past
  * this the segment is too broad to be about one claim, which is the question
- * the feature's own fog is about, and truncating is cheaper than refusing to
+ * the feature is about, and truncating is cheaper than refusing to
  * judge it.
  */
 export const MAX_SEGMENT_CHARS = 16_000;

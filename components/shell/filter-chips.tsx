@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { toggleChipClass } from '@/components/ui/chip';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -40,18 +41,21 @@ export function FilterChips({
         <Link
           key={`${chip.label}:${chip.value}`}
           href={chip.clearHref}
-          className="press group inline-flex items-center gap-1.5 rounded-full bg-accent-tint py-1 pl-2.5 pr-1.5 text-small font-medium text-accent transition-colors hover:bg-accent hover:text-fill-ink"
+          className={cn(
+            toggleChipClass(true),
+            'group gap-1.5 pl-2.5 pr-1.5 hover:bg-accent hover:text-fill-ink',
+          )}
         >
           <span className="text-accent/70 group-hover:text-fill-ink/70">{chip.label}</span>
           <span className="max-w-40 truncate">{chip.value}</span>
-          <X className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          <X className="shrink-0" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Remove the {chip.label} filter</span>
         </Link>
       ))}
       {chips.length > 1 && (
         <Link
           href={clearAllHref}
-          className="ml-1 text-small font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
+          className={cn(linkVariants({ tone: 'quiet' }), 'ml-1 text-small font-medium')}
         >
           Clear all
         </Link>

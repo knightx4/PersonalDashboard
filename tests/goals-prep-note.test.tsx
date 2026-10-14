@@ -49,7 +49,6 @@ function render(steps: Step[]) {
       areaId: 'work',
       title: 'Land your next role',
       acceptance: null,
-      fog: null,
       status: 'open',
       position: 10,
       unit: null,

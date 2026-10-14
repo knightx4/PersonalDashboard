@@ -100,9 +100,9 @@ describe('matchPage', () => {
   });
 
   it('finds no pattern in an href whose ref is only in the fragment', () => {
-    const courses = SOURCES.find((s) => s.table === 'obsidian.courses')!;
+    const courses = SOURCES.find((s) => s.table === 'you.courses')!;
     expect(patternOf(courses.table, courses.href!)).toBeNull();
-    expect(matchPage('/vault/education#course-abc').row).toBeNull();
+    expect(matchPage('/you/work#course-abc').row).toBeNull();
   });
 
   it('keeps the query and fragment off the path', () => {

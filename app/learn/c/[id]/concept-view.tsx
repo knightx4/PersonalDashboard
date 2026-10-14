@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
@@ -30,6 +29,10 @@ import { MaterialForClaim, NoMaterialNote } from './material';
 import { MapBranch, UnlocksMap } from './unlocks-map';
 import { isLit, litRecently } from '@/lib/learn/graph/lit';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
+import { EvidenceList } from '@/components/learn/evidence-list';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * What /learn/c/[id] draws, from what its page read: the page hands its reads
@@ -169,11 +172,23 @@ export type ConceptPageProps = {
   opening: OpeningQuestion | null;
   material: ClaimMaterialView;
   notes: CardNote[];
+  /** What backs the idea, strongest first, at most three (plan #2006.6). */
+  evidence?: EvidenceLink[];
   timezone: string;
   now: Date;
 };
 
-export function ConceptPageView({ view, probes, opening, material, notes, timezone, now }: ConceptPageProps) {
+export function ConceptPageView({
+  view,
+  probes,
+  opening,
+  material,
+  notes,
+  evidence = [],
+  timezone,
+  now,
+  path,
+}: ConceptPageProps & { path?: PageSubject }) {
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
 
   const connected =
@@ -183,18 +198,9 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
     referredToBy.length > 0;
 
   return (
-    <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
+    <PageColumn>
 
-      <PageHeader title={concept.name} />
+      <PageHeader subject={path} title={concept.name} />
 
       {/* The claim, the offer to branch off a phrase in it, and the way to
           write it yourself. */}
@@ -242,6 +248,14 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
         {/* Why the node is in this subject at all, which is a different claim
             from what you know about it. */}
         <p className="mt-2 text-small text-ink-muted">{concept.basis}</p>
+
+        {/* The notes, courses and work that back it (plan #2006.6), and how
+            far they light an idea nobody has asked about. */}
+        <EvidenceList
+          links={evidence}
+          untested={concept.testedAt === null && concept.established !== 'tested'}
+          className="mt-4"
+        />
 
         {/* Offered whatever state the claim is in: this page is where you ask
             for material on one claim, known or untested alike (#1070). */}
@@ -347,7 +361,7 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
             Nothing has been asked about this yet.{' '}
             <Link
               href={`/learn/s/${subject.id}/probe`}
-              className="underline underline-offset-2 hover:text-ink"
+              className={linkVariants({ tone: 'quiet' })}
             >
               Ask about this subject
             </Link>{' '}
@@ -361,6 +375,6 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
           </ul>
         )}
       </CardSection>
-    </>
+    </PageColumn>
   );
 }

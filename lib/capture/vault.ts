@@ -5,8 +5,9 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { forgetFiles, markDashActionUndone, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { parseRef } from '@/lib/core/refs';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { noteCreatePorts, noteRemovePorts, openConnectedSource } from '@/lib/vault/db/ports';
-import { createCapturedNote, removeCapturedNote } from '@/lib/vault/notes/create';
+import { noteCreatePorts, noteRemovePorts, noteRenamePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
+import { createCapturedNote } from '@/lib/vault/notes/create';
+import { readVaultUndo, undoVaultWrite } from '@/lib/vault/notes/undo';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { rebuildTriageNote } from '@/lib/vault/notes/triage-note-run';
 import { checkWriteAccess, type WriteAccess } from '@/lib/vault/notes/write-access';
@@ -79,8 +80,10 @@ export async function fileVaultNote(
 }
 
 /**
- * Undo a note capture wrote, from its record: commit the file's removal,
- * mark the stored note deleted, then mark the record undone.
+ * Undo a note Dash wrote or changed, from its record: commit the file's
+ * removal and mark the stored note deleted, or for an agent's edit, rename or
+ * filing (plan #1894.9.3) commit what the note was back
+ * (lib/vault/notes/undo.ts), then mark the record undone.
  */
 export async function undoVaultCapture(
   deps: DashActionDeps,
@@ -89,11 +92,22 @@ export async function undoVaultCapture(
   if (action.status !== 'done') return { ok: false, error: 'This change has already been undone.' };
   const parsed = action.subjectRef ? parseRef(action.subjectRef) : null;
   const blobSha = action.undo?.vault_blob_sha;
-  if (!parsed || parsed.schema !== 'obsidian' || parsed.name !== 'notes' || typeof blobSha !== 'string') {
+  const undo = readVaultUndo(action.undo);
+  if (!parsed || parsed.schema !== 'obsidian' || parsed.name !== 'notes' || typeof blobSha !== 'string' || !undo) {
     return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
   }
   const vault = await createVaultClient();
-  const removed = await removeCapturedNote(noteRemovePorts(vault), parsed.id, blobSha);
+  const removed = await undoVaultWrite(
+    {
+      remove: noteRemovePorts(vault),
+      save: noteSavePorts({ supabase: vault, afterSave: () => {} }),
+      rename: noteRenamePorts(vault),
+      create: noteCreatePorts({ supabase: vault, afterSave: () => {} }),
+    },
+    parsed.id,
+    blobSha,
+    undo,
+  );
   if (!removed.ok) return removed;
   after(() => rebuildTriageNote(vault));
   await markDashActionUndone(deps, action.id);

@@ -39,7 +39,7 @@ function Confidence({ row }: { row: ClaimMaterial }) {
   if (row.confidence === 'verified') {
     return (
       <span className="inline-flex items-center gap-1 text-small text-ink-muted">
-        <BadgeCheck className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        <BadgeCheck className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         {row.model ? `Judged by ${row.model}` : 'Judged'}
       </span>
     );
@@ -47,7 +47,7 @@ function Confidence({ row }: { row: ClaimMaterial }) {
 
   return (
     <span className="inline-flex items-center gap-1 text-small text-ink-muted">
-      <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={2} aria-hidden />
+      <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
       Near match, nothing has read it
     </span>
   );

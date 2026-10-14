@@ -4,10 +4,12 @@ import { useState, useTransition } from 'react';
 import { Mail, MoreHorizontal, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { completeReminder } from '@/app/jobs/(app)/_home/actions';
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { Tooltip } from '@/components/ui/tooltip';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -145,27 +147,28 @@ function TodoLine({
        * line under the words. */
       <div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Mark done"
-            disabled={finishing}
-            onClick={() => finish(() => void completeReminder(todo.id))}
-            className="press flex size-4 shrink-0 items-center justify-center text-ink-muted transition-colors duration-quick hover:text-accent"
-          >
-            <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
-          </button>
+          <Tooltip label="Mark this to-do done" className="-m-1 shrink-0">
+            <IconButton
+              size="sm"
+              label="Mark done"
+              disabled={finishing}
+              onClick={() => finish(() => void completeReminder(todo.id))}
+              className="hover:text-accent"
+            >
+              <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />
+            </IconButton>
+          </Tooltip>
           <span className="min-w-0 flex-1 truncate text-ui text-ink">{todo.body}</span>
           <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt)}</span>
-          <button
-            type="button"
-            aria-expanded={answering}
-            title={answering ? 'Close' : 'Edit, push back or finish it'}
-            onClick={() => setAnswering((value) => !value)}
-            className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-          >
-            <MoreHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">{answering ? 'Close' : 'Edit, push back or finish it'}</span>
-          </button>
+          <Tooltip label={answering ? 'Close' : 'Edit, push back or finish it'} align="end" className="shrink-0">
+            <IconButton
+              label={answering ? 'Close' : 'Edit, push back or finish it'}
+              aria-expanded={answering}
+              onClick={() => setAnswering((value) => !value)}
+            >
+              <MoreHorizontal strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
         </div>
         <TodoMail todo={todo} messages={messages} timezone={timezone} offer={false} />
         {answering && (
@@ -278,16 +281,11 @@ function TodoMail({
         )}
         {/* No confirm: re-linking is one pick away, so this is reversible.
             The same unlink glyph the task rows use for detaching. */}
-        <button
-          type="button"
-          title="Unlink the email"
-          disabled={pending}
-          onClick={() => save(null)}
-          className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <Unlink className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Unlink the email</span>
-        </button>
+        <Tooltip label="Unlink the email from this to-do" align="end" className="shrink-0">
+          <IconButton label="Unlink the email" disabled={pending} onClick={() => save(null)}>
+            <Unlink strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
         {error && <span className="text-danger">{error}</span>}
       </p>
     );

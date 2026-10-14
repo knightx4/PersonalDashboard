@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { CardSection, cardVariants } from '@/components/ui/card';
-import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { CheckRow, Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { APPLICATION_SOURCES, SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
 import { referrerLabel, type ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { createRole, fetchJobDescription, type RoleFormState } from '../actions';
@@ -213,10 +213,7 @@ export function RoleForm({
           * box rides with it, since it changes what the press does. */}
         <div className="card-pad-x sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] -mx-(--card-p) flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-surface py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
           <Submit label="Add role" />
-          <label className="flex items-center gap-2 text-ui text-ink">
-            <input type="checkbox" name="saveAsLead" className="size-4 rounded border-border" />
-            Save as a lead, not applied yet
-          </label>
+          <CheckRow name="saveAsLead" title="Save as a lead, not applied yet" />
         </div>
       </form>
     </div>

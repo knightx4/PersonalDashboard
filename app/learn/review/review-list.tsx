@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { nextDueLine, type DueReview, type ReviewQuestion } from '@/lib/learn/le
 import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult } from './actions';
 
 /**
- * Ideas from passed pieces that are due for review (plan #1145), in Learn now
+ * Ideas you have shown or said you know that are due for review (plan #1145), in Learn now
  * and at the top of a piece's page. One surface with a row an idea: Ask me
  * writes the question, Check my answer marks it and says when the idea comes
  * back. An answered row stays on the page until it is next opened.
@@ -26,7 +26,7 @@ export function ReviewList({
   reviews: readonly DueReview[];
   title: string;
   description: string;
-  /** Whether each row names the plan and piece it came from, for Learn now. */
+  /** Whether each row names its track, and the piece that taught it when one did, for Learn now. */
   showPlan: boolean;
 }) {
   if (reviews.length === 0) return null;
@@ -87,13 +87,12 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-body font-medium text-ink">{review.name}</h3>
-        {showPlan && (
+        {showPlan && (review.pieceId || review.trackName) && (
           <Link
-            href={`/learn/s/${review.subjectId}/p/${review.pieceId}`}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+            href={review.pieceId ? `/learn/s/${review.subjectId}/p/${review.pieceId}` : `/learn/s/${review.subjectId}`}
+            className={cn('text-small', linkVariants({ tone: 'quiet' }))}
           >
-            {review.trackName ? `${review.trackName} · ` : ''}
-            {review.pieceTitle}
+            {[review.trackName, review.pieceTitle].filter(Boolean).join(' · ')}
           </Link>
         )}
       </div>
@@ -137,9 +136,9 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
           {question.response && <p className="text-ui text-ink-muted">You wrote: {question.response}</p>}
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', question.correct ? 'text-ink' : 'text-ink-muted')}>
             {question.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {question.correct ? 'Right.' : 'Not this time.'}
           </p>

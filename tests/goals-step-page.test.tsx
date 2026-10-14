@@ -58,7 +58,6 @@ const map: GoalMap = {
     areaId: 'money',
     title: 'Pay off the credit cards',
     acceptance: null,
-    fog: null,
     status: 'open',
     position: 10,
     unit: null,

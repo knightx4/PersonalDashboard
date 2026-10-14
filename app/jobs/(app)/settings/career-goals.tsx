@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ComposeBody } from '@/components/ui/field';
@@ -118,9 +119,7 @@ function Entry({ thought, latest }: { thought: ThoughtView; latest: boolean }) {
       <header className="flex flex-wrap items-baseline gap-2">
         <h3 className="text-ui font-medium text-ink">{thought.written}</h3>
         {latest && (
-          <span className="rounded-full bg-accent-tint px-1.5 py-0.5 text-small text-accent">
-            Latest
-          </span>
+          <Chip tone="accent">Latest</Chip>
         )}
         {thought.edited && (
           <span className="text-small text-ink-muted">edited {thought.edited}</span>

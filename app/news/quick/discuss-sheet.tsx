@@ -6,6 +6,7 @@ import { MessagesSquare, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { TalkThread } from '@/components/talk/talk-thread';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { DISCUSS_ROUNDS, discussionClosed } from '@/lib/news/quick/discuss';
@@ -120,7 +121,7 @@ function DiscussSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
-        className="absolute inset-x-0 bottom-0 flex max-h-[75dvh] flex-col rounded-t-xl border-t border-border bg-surface md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(28rem,100vw)] md:rounded-none md:border-l md:border-t-0"
+        className="absolute inset-x-0 bottom-0 flex max-h-[75dvh] flex-col rounded-t-card border-t border-border bg-surface md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(28rem,100vw)] md:rounded-none md:border-l md:border-t-0"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
@@ -132,14 +133,9 @@ function DiscussSheet({
             </div>
             <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">{headline}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-          >
-            <X className="size-4" strokeWidth={2} aria-hidden />
-            <span className="sr-only">Close the discussion</span>
-          </button>
+          <IconButton label="Close the discussion" onClick={onClose}>
+            <X strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </div>
 
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3">

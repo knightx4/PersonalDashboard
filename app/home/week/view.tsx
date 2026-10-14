@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/week-review/view';
 import { EventRow } from '@/app/timeline/event-row';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The weekly review (plan #1233), apart from the reads. Whether last week's
@@ -27,10 +28,18 @@ export type WeekReviewViewProps =
   | { state: 'shown'; review: ShownWeekReview; weeks: string[]; timezone: string };
 
 const HOME_LINK = (
-  <Link href="/home" className="press-area text-ui text-accent hover:underline">
+  <Link href="/home" className={`press-area text-ui ${linkVariants()}`}>
     Home
   </Link>
 );
+
+/** One week's path: Home › the week (plan #1931.2). */
+function weekSubject(week: string) {
+  return sectionSubject('/home', 'Home', {
+    label: weekRangeLabel(week),
+    href: `/home/week/${week}`,
+  });
+}
 
 export function WeekReviewView(props: WeekReviewViewProps) {
   if (props.state === 'none') {
@@ -51,7 +60,11 @@ export function WeekReviewView(props: WeekReviewViewProps) {
   if (props.state === 'missing') {
     return (
       <>
-        <PageHeader title={weekRangeLabel(props.week)} actions={HOME_LINK} />
+        <PageHeader
+          subject={weekSubject(props.week)}
+          title={weekRangeLabel(props.week)}
+          actions={HOME_LINK}
+        />
         <EmptyState
           title="No review for this week"
           description="Dash wrote no review for this week. Reviews start from the first Sunday the weekly run reached you."
@@ -72,6 +85,7 @@ export function WeekReviewView(props: WeekReviewViewProps) {
   return (
     <>
       <PageHeader
+        subject={weekSubject(review.week)}
         title={weekRangeLabel(review.week)}
         description={
           review.source === 'plain' && review.observations.length > 0 ? (
@@ -107,7 +121,7 @@ export function WeekReviewView(props: WeekReviewViewProps) {
                 {observation.goal && (
                   <p className="text-small text-ink-muted">
                     {'Bears on '}
-                    <Link href={`/goals/${observation.goal.id}`} className="font-medium text-accent hover:underline">
+                    <Link href={`/goals/${observation.goal.id}`} className={linkVariants()}>
                       {observation.goal.title}
                     </Link>
                   </p>
@@ -165,14 +179,14 @@ function OtherWeeks({ week, weeks }: { week: string; weeks: string[] }) {
       {(earlier || later) && (
         <nav aria-label="Other weeks" className="flex items-center justify-between gap-3 text-ui">
           {earlier ? (
-            <Link href={`/home/week/${earlier}`} className="press-area text-accent hover:underline">
+            <Link href={`/home/week/${earlier}`} className={`press-area ${linkVariants()}`}>
               {weekShortLabel(earlier)}
             </Link>
           ) : (
             <span />
           )}
           {later && (
-            <Link href={`/home/week/${later}`} className="press-area text-accent hover:underline">
+            <Link href={`/home/week/${later}`} className={`press-area ${linkVariants()}`}>
               {weekShortLabel(later)}
             </Link>
           )}

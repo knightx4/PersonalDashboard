@@ -26,7 +26,8 @@ export default async function OnboardingPage({
     // Failed connect while aiming for "done" — send them back to the consent step.
     redirect(`/onboarding?step=gmail&inbox=${encodeURIComponent(params.inbox)}`);
   } else if (!(await onboardingNeeded(supabase, core, user)) && step !== 'done' && !params.inbox) {
-    redirect('/home');
+    // Through the route that sets pt_onboarded, so the next launch skips this page.
+    redirect('/api/onboarding/launch');
   }
 
   return <OnboardingSteps step={step} inbox={params.inbox} configured={configured} />;

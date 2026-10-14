@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { FilePlus2, Search } from 'lucide-react';
 import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { Banner } from '@/components/ui/banner';
@@ -61,7 +61,10 @@ export function QuickNoteTriage({
   notes,
   writable,
   actions = REAL_ACTIONS,
+  alreadyPassed,
 }: {
+  /** Ids of notes to start as already left for later; the gallery draws Previous with it. */
+  alreadyPassed?: readonly string[];
   notes: readonly TriageNote[];
   /** Whether the vault token can write; without it nothing can be filed. */
   writable: boolean;
@@ -133,6 +136,7 @@ export function QuickNoteTriage({
       <Deck
         key={pass}
         items={items}
+        alreadyPassed={alreadyPassed}
         forward="Leave for later"
         done={
           waiting.length === 0 ? (
@@ -223,7 +227,7 @@ function QuickNoteCard({
     <Card padding="standard" className="space-y-4">
       <div data-triage-text className="space-y-1.5">
         {note.written && <p className="text-small text-ink-muted">Written {note.written}</p>}
-        <h2 className="text-title font-semibold text-ink [overflow-wrap:anywhere]">{note.title}</h2>
+        <h2 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{note.title}</h2>
         <p className="whitespace-pre-wrap text-body text-ink [overflow-wrap:anywhere]">
           <LinkedText text={note.body} />
         </p>
@@ -253,7 +257,7 @@ function QuickNoteCard({
             disabled={pending && pressed !== ''}
             onClick={() => file(null)}
           >
-            <FilePlus2 className="size-4" strokeWidth={2} aria-hidden />
+            <FilePlus2 className="size-4" strokeWidth={1.75} aria-hidden />
             {pending && pressed === '' ? 'Making it a note…' : 'Make it a note of its own'}
           </Button>
           <FieldError>{error}</FieldError>
@@ -263,7 +267,7 @@ function QuickNoteCard({
           <p className="text-ui text-ink-muted">
             Your vault token can read notes but not write them, so a quick note cannot be filed from
             here.{' '}
-            <Link href="/vault/settings" className="font-medium text-accent hover:underline">
+            <Link href="/vault/settings" className={linkVariants()}>
               Vault settings
             </Link>
           </p>
@@ -273,7 +277,7 @@ function QuickNoteCard({
               {note.suggestions.map((place, i) => (
                 <span key={place.path}>
                   {i > 0 && (i === note.suggestions.length - 1 ? ' or ' : ', ')}
-                  <Link href={place.href} className="font-medium text-accent hover:underline">
+                  <Link href={place.href} className={linkVariants()}>
                     {place.title}
                   </Link>
                 </span>
@@ -336,7 +340,7 @@ function PlaceSearch({
       <div className="relative">
         <Search
           className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-muted"
-          strokeWidth={2}
+          strokeWidth={1.75}
           aria-hidden
         />
         <Input

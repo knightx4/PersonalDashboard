@@ -19,6 +19,8 @@ import type { Person } from '@/lib/people/load';
 import type { ReturnsTrackerData, ReturnsTrackerRow } from '@/lib/returns/types';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 import type { PendingSuggestion } from '@/lib/share/families-store';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The Shopping pages that had no picture (plan #1604), each drawn by the view
@@ -129,9 +131,9 @@ export function ShoppingAddGamesSurface() {
   return (
     <div>
       <AddGamesView mode="search" />
-      <div className="mx-auto mt-4 max-w-3xl">
+      <PageColumn className="mt-4">
         <GamesEditionPickerDemo />
-      </div>
+      </PageColumn>
     </div>
   );
 }
@@ -252,7 +254,12 @@ const order: OrderDetail = {
 };
 
 export function ShoppingOrderSurface() {
-  return <OrderDetailView {...order} />;
+  // The path the page reads from the catalogue: Shopping › Orders › the order.
+  const path = sectionSubject('/shopping/orders', 'Orders', {
+    label: order.order.title,
+    href: `/shopping/orders/${order.order.id}`,
+  });
+  return <OrderDetailView {...order} path={path} />;
 }
 
 // ---- Add an order and the receipt photo ------------------------------------

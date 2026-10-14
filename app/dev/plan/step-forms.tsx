@@ -77,7 +77,7 @@ export function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriorit
       name="priority"
       defaultValue={String(defaultValue)}
       aria-label="Priority"
-      icon={<Flag className="size-3.5" strokeWidth={2} />}
+      icon={<Flag className="size-3.5" strokeWidth={1.75} />}
     >
       {PLAN_PRIORITIES.map((priority) => (
         <option key={priority} value={priority}>
@@ -96,7 +96,7 @@ export function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null
       defaultValue={defaultValue ?? ''}
       placeholderValue=""
       aria-label="Size"
-      icon={<Scale className="size-3.5" strokeWidth={2} />}
+      icon={<Scale className="size-3.5" strokeWidth={1.75} />}
     >
       <option value="">Size</option>
       {PLAN_SIZES.map((size) => (
@@ -116,7 +116,7 @@ export function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssigne
       defaultValue={defaultValue ?? ''}
       placeholderValue=""
       aria-label="Who is on it"
-      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+      icon={<CircleUser className="size-3.5" strokeWidth={1.75} />}
     >
       <option value="">Nobody</option>
       {PLAN_ASSIGNEES.map((assignee) => (
@@ -134,7 +134,7 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
       name="status"
       defaultValue={defaultValue}
       aria-label="Status"
-      icon={<Circle className="size-3.5" strokeWidth={2} />}
+      icon={<Circle className="size-3.5" strokeWidth={1.75} />}
     >
       <StatusOptions />
     </ChipSelect>
@@ -207,14 +207,16 @@ function StepFields({
           </div>
         </>
       ) : (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => setShowMore(true)}
-          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
+          className="-ml-1.5 gap-1"
         >
           <span aria-hidden>+</span>
           Detail and acceptance
-        </button>
+        </Button>
       )}
 
       <div className="flex flex-wrap items-center gap-1">
@@ -336,27 +338,6 @@ export function EditStep({
     <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
       <StepFields prefix={prefix} node={node} status={node.status} />
-      {/* Not part of StepFields, because a step being added has nothing to be
-       * foggy about yet: fog is what you find once a feature is real and one
-       * half of it will not resolve into steps. */}
-      <div>
-        <Label htmlFor={`${prefix}-fog`}>Not yet specified</Label>
-        {/* ui-ok: composer-always-open -- EditStep only renders when a step is
-         * being edited, and the gate is at the call site rather than above
-         * this line, so the rule cannot see it. Law 14 is obeyed. */}
-        <Textarea
-          id={`${prefix}-fog`}
-          name="fog"
-          rows={2}
-          className="min-h-12"
-          defaultValue={node.fog ?? ''}
-          placeholder="The part nobody can see far enough into to write steps for yet."
-        />
-        <FieldHint>
-          Said plainly here rather than filled with plausible steps. Clear it once the steps beneath
-          say it.
-        </FieldHint>
-      </div>
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
         {/* ui-ok: composer-always-open -- same edit form as the field above. */}

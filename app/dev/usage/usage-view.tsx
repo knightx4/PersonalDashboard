@@ -4,12 +4,18 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars } from '@/lib/money';
 import { isModuleId, moduleById } from '@/lib/modules';
-import type { PageOpens } from '@/lib/usage/opens';
+import type { PageOpens, PhoneShare } from '@/lib/usage/opens';
 import { openedText, type FunctionSpend, type UsageGroup, type UsageReport } from '@/lib/usage/report';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageColumn } from '@/components/shell/page-width';
+import { DayBarChart } from '@/components/ui/day-bar-chart';
+import type { DayValue } from '@/lib/usage/day-bars';
+import type { SpendDays } from '@/lib/usage/per-day';
 
 /**
- * The Usage tab in Dev (plans #1482, #1693 and #1752). It opens on views per
- * workspace for 7 and 30 days, from core.page_views, then what each
+ * The Usage tab in Dev (plans #1482, #1693, #1752 and #2036.2). It opens on
+ * two charts of the last 30 days, page views and model spend per day, then
+ * views per workspace for 7 and 30 days, from core.page_views, then what each
  * function's model calls cost, from core.function_spend, biggest 30-day
  * spend first. The pages not opened in 30 days, which the cut-back
  * (docs/CUT-BACK-SPEC.md) is decided from, are a closed fold at the foot.
@@ -63,9 +69,11 @@ function FunctionRow({ row }: { row: FunctionSpend }) {
 function FunctionList({ functions }: { functions: readonly FunctionSpend[] }) {
   if (functions.length === 0) {
     return (
-      <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-        No model calls in the last 30 days. Each function appears here, with what it cost, from its first call.
-      </p>
+      <EmptyState
+        size="box"
+        title="No model calls in the last 30 days."
+        description="Each function appears here, with what it cost, from its first call."
+      />
     );
   }
   const total30 = functions.reduce((sum, row) => sum + row.spend30, 0);
@@ -130,8 +138,16 @@ function GroupRow({ group }: { group: UsageGroup }) {
   );
 }
 
-function OpensByWorkspace({ report }: { report: UsageReport }) {
+/** The share of opens from a phone, as one line under the workspace counts. */
+export function phoneShareText(share: PhoneShare | null | undefined): string | null {
+  if (!share || share.total === 0) return null;
+  const percent = Math.round((share.phone / share.total) * 100);
+  return `${percent}% of opens in 30 days were on a phone (${share.phone} of ${share.total}).`;
+}
+
+function OpensByWorkspace({ report, phoneShare }: { report: UsageReport; phoneShare?: PhoneShare | null }) {
   const groups = report.groups.filter((group) => group.pages.length > 0 || group.notOpened > 0);
+  const phoneText = phoneShareText(phoneShare);
   return (
     <section aria-labelledby="usage-by-workspace">
       <h2 id="usage-by-workspace" className="mb-2 text-ui font-semibold text-ink">
@@ -144,9 +160,61 @@ function OpensByWorkspace({ report }: { report: UsageReport }) {
           ))}
         </ul>
       ) : (
-        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-          No page has been opened since recording started. Opens appear here from the next page you load.
-        </p>
+        <EmptyState
+          size="box"
+          title="No page has been opened since recording started."
+          description="Opens appear here from the next page you load."
+        />
+      )}
+      {phoneText && <p className="mt-2 text-small text-ink-muted tabular-nums">{phoneText}</p>}
+    </section>
+  );
+}
+
+/** The last 30 days as the charts draw them: every day, today last. */
+export type UsageDays = {
+  /** Today in the person's timezone, YYYY-MM-DD. */
+  today: string;
+  span: number;
+  views: DayValue[];
+  spend: SpendDays;
+};
+
+const VIEWS = { kind: 'count', one: 'view', many: 'views' } as const;
+const SPEND = { kind: 'spend' } as const;
+
+/** What the spend bars leave out, or null when every call was priced. */
+export function unpricedText(unpriced: number): string | null {
+  if (unpriced === 0) return null;
+  return `${plural(unpriced, 'call', 'calls')} not priced, so not in the bars.`;
+}
+
+/**
+ * The two charts, each left out when its 30 days hold nothing (law 1): the
+ * empty states below already say so. Spend stays while there were calls, even
+ * all unpriced, so the line saying so has a chart to sit under.
+ */
+function DayCharts({ days }: { days: UsageDays }) {
+  const unpriced = unpricedText(days.spend.unpriced);
+  const anyViews = days.views.some((day) => day.value > 0);
+  const anySpend = days.spend.calls > 0 || days.spend.values.some((day) => day.value > 0);
+  if (!anyViews && !anySpend) return null;
+  return (
+    <section aria-label={`The last ${days.span} days`} className="mb-8 space-y-3">
+      {anyViews && (
+        <DayBarChart title="Page views" values={days.views} end={days.today} span={days.span} measure={VIEWS} />
+      )}
+      {anySpend && (
+        <div>
+          <DayBarChart
+            title="Model spend"
+            values={days.spend.values}
+            end={days.today}
+            span={days.span}
+            measure={SPEND}
+          />
+          {unpriced && <p className="mt-2 text-small text-ink-muted tabular-nums">{unpriced}</p>}
+        </div>
       )}
     </section>
   );
@@ -175,16 +243,22 @@ function NotOpenedFold({ report, now }: { report: UsageReport; now: Date }) {
 export function UsageScreen({
   report,
   functions,
+  phoneShare,
+  days,
   now,
 }: {
   report: UsageReport;
   functions: readonly FunctionSpend[];
+  phoneShare?: PhoneShare | null;
+  /** The per-day charts; left out, the page opens on the workspace views. */
+  days?: UsageDays | null;
   now: Date;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Usage" />
-      <OpensByWorkspace report={report} />
+      {days && <DayCharts days={days} />}
+      <OpensByWorkspace report={report} phoneShare={phoneShare} />
       <section aria-labelledby="usage-functions" className="mt-8">
         <h2 id="usage-functions" className="mb-2 text-ui font-semibold text-ink">
           Spend by function
@@ -192,6 +266,6 @@ export function UsageScreen({
         <FunctionList functions={functions} />
       </section>
       <NotOpenedFold report={report} now={now} />
-    </div>
+    </PageColumn>
   );
 }

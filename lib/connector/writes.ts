@@ -19,8 +19,15 @@ import {
   type ChatItem,
 } from '@/lib/learn/chat/readings';
 import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subjects';
-import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
+import { LEARN_WRITES, runLearnWrite, type LearnMade } from '@/lib/dash/learn-writes';
+import { briefStarter } from '@/lib/learn/briefs/start';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
+import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
+import { GOALS_WRITES, runGoalsWrite } from '@/lib/dash/goals-writes';
+import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
+import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/lib/dash/shopping-writes';
+import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
+import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -38,6 +45,9 @@ import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
  * The service role passes no RLS, so every query in lib/learn/chat names that
  * person.
  *
+ * Four more (plan #1894.3) add a goal, add a step under one, close a step and
+ * set a goal's done-when, by the same route.
+ *
  * Each change is recorded in core.dash_actions as Dash's, so it is listed on
  * Home with an Undo, and logged in core.connector_calls like a lookup.
  */
@@ -52,7 +62,11 @@ export type ConnectorWriteContext = {
   /** Runs work once the reply has gone: `after` from next/server. */
   later: (work: () => Promise<void>) => void;
   /** Records model spend against the person. */
-  recordSpend: (userId: string, operation: 'match-subjects' | 'resolve-reference', reports: SpendReport[]) => Promise<void>;
+  recordSpend: (
+    userId: string,
+    operation: 'match-subjects' | 'resolve-reference' | 'research-topic',
+    reports: SpendReport[],
+  ) => Promise<void>;
   anthropicApiKey: string | undefined;
   /** How long the lookups after the reply may run, as a Date.now() value. */
   lookupDeadline: number;
@@ -61,6 +75,12 @@ export type ConnectorWriteContext = {
    * (add_quick_note, add_idea, add_job_lead). Absent: those are refused.
    */
   db?: AskDb;
+  /**
+   * A service-role goals client recording its writes in goals.history as the
+   * history options say, for the goal writes (plan #1894.3). Absent: those
+   * are refused.
+   */
+  goals?: DashWriteContext['goals'];
   /** Writes a quick note into the person's vault Inbox. Absent: add_quick_note is refused. */
   fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
   /**
@@ -137,7 +157,7 @@ function subjectNames(input: Record<string, unknown>): string[] {
 async function record(
   ctx: ConnectorWriteContext,
   ref: string,
-  op: 'insert' | 'update',
+  op: 'insert' | 'update' | 'delete',
   kind: string,
   summary: string,
   before?: Record<string, unknown>,
@@ -390,12 +410,45 @@ const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => (
     input_schema: write.input_schema,
   },
   async run(ctx, input) {
-    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn }, input);
+    // research_topic's run goes on after the reply, on this service-role
+    // client, with its spend recorded against the person (plan #2023.3).
+    const research = briefStarter({
+      learn: ctx.learn,
+      userId: ctx.userId,
+      recordSpend: (userId, reports) => ctx.recordSpend(userId, 'research-topic', reports),
+      later: ctx.later,
+      apiKey: ctx.anthropicApiKey,
+    });
+    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn, research }, input);
     if ('ok' in made) throw new AskInputError(made.error);
-    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    await recordLearn(ctx, made);
     return { ok: true, rows: [made.row], note: made.summary };
   },
 }));
+
+/**
+ * Record a Learn change as Dash's. One whose Undo needs more than the row
+ * (research_topic's, which archives) keeps that in `undo`, which
+ * core.record_dash_action does not take, so it is written from here.
+ */
+async function recordLearn(ctx: ConnectorWriteContext, made: LearnMade): Promise<void> {
+  if (!made.undo || !ctx.db) {
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return;
+  }
+  await recordDashAction(
+    { userId: ctx.userId, core: ctx.core, db: ctx.db },
+    {
+      surface: 'routine',
+      kind: made.kind,
+      subjectRef: made.subjectRef,
+      op: made.op,
+      summary: made.summary,
+      beforeValues: made.before,
+      undo: made.undo,
+    },
+  );
+}
 
 /**
  * Todo's changes beyond add, rename and tick off (plan #1894.9.1,
@@ -413,7 +466,7 @@ const TODO_TOOLS: readonly ConnectorWriteTool[] = TODO_WRITES.map((write) => ({
     if (!ctx.account.enabledModules.includes('todo')) {
       throw new AskInputError('The Todo workspace is switched off, so nothing can be changed there.');
     }
-    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.account.timezone ?? 'UTC' };
+    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.account.timezone ?? 'UTC', db: ctx.db };
     const made = await runTodoWrite(write, env, input);
     if ('ok' in made) throw new AskInputError(made.error);
     await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
@@ -421,8 +474,258 @@ const TODO_TOOLS: readonly ConnectorWriteTool[] = TODO_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * You's places (plan #1991.5, lib/dash/you-writes.ts), the same tools Ask
+ * has, run here on the service-role you client for the verified person and
+ * recorded as Dash's.
+ */
+const YOU_TOOLS: readonly ConnectorWriteTool[] = YOU_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    if (!ctx.account.enabledModules.includes('you')) {
+      throw new AskInputError('The You workspace is switched off, so nothing can be changed there.');
+    }
+    const made = await runYouWrite(write, { userId: ctx.userId, you: await ctx.db('you') }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
+/**
+ * News's changes and stopping a watch (plan #1894.9.4, lib/dash/news-writes.ts),
+ * the same tools Ask has, run here on the service-role clients for the
+ * verified person and recorded as Dash's.
+ */
+const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    const off = switchedOff(write, ctx.account.enabledModules);
+    if (off) throw new AskInputError(`The ${off} workspace is switched off, so nothing can be changed there.`);
+    const env = {
+      userId: ctx.userId,
+      news: await ctx.db('news'),
+      learn: await ctx.db('learn'),
+      todo: await ctx.db('todo'),
+      core: await ctx.db('core'),
+    };
+    const made = await runNewsWrite(write, env, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
+/**
+ * Goals' area and goal changes (plan #1894.7.1, lib/dash/goals-writes.ts), the
+ * same tools Ask has, run here on the service-role goals clients for the
+ * verified person. Each is recorded with recordDashAction rather than the
+ * bare record above, since a move or an area's archive keeps the sentence
+ * saying why it has no Undo.
+ */
+const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account || !ctx.goals) refuse();
+    if (!ctx.account.enabledModules.includes('goals')) {
+      throw new AskInputError('The Goals workspace is switched off, so nothing can be changed there.');
+    }
+    const made = await runGoalsWrite(
+      write,
+      {
+        userId: ctx.userId,
+        goals: await ctx.db('goals'),
+        write: ctx.goals,
+        core: await ctx.db('core'),
+        today: ctx.account.today,
+        timezone: ctx.account.timezone,
+      },
+      input,
+    );
+    if ('ok' in made) throw new AskInputError(made.error);
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    if (!recorded) console.error('[connector write] record', made.kind);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
+/**
+ * Shopping's one-item and list changes (plan #1894.5.1,
+ * lib/dash/shopping-writes.ts), the same tools Ask has, run here on the
+ * service-role public client for the verified person. Each can touch several
+ * rows, so the record keeps them all in `undo`, and Home's Undo puts them
+ * back by Ask's rule (MANY_ROW_KINDS in lib/core/dash-actions.ts).
+ */
+const SHOPPING_TOOLS: readonly ConnectorWriteTool[] = SHOPPING_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    if (!shoppingOn(ctx.account.enabledModules)) throw new AskInputError(SHOPPING_OFF);
+    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public'), db: ctx.db }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo as unknown as Record<string, unknown>,
+      },
+    );
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
+/**
+ * The Vault's changes and correcting a course (plan #1894.9.3,
+ * lib/dash/vault-writes.ts), the same tools Ask has, run here on the
+ * service-role clients for the verified person. A note change keeps in `undo`
+ * what taking its commit back needs, which core.record_dash_action has no
+ * argument for, so these are recorded with recordDashAction, as a shared
+ * write is, and Home's Undo takes the file back (undoneByVault).
+ */
+const VAULT_TOOLS: readonly ConnectorWriteTool[] = VAULT_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    const off = vaultSwitchedOff(write, ctx.account.enabledModules);
+    if (off) throw new AskInputError(`The ${off} workspace is switched off, so nothing can be changed there.`);
+    const vault = await ctx.db('obsidian');
+    const env = {
+      userId: ctx.userId,
+      vault,
+      core: await ctx.db('core'),
+      you: await ctx.db('you'),
+      notes: vaultNotePorts(vault, ctx.userId),
+    };
+    const made = await runVaultWrite(write, env, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    return {
+      ok: true,
+      rows: [made.row],
+      note: recorded ? made.summary : `${made.summary} Its Undo could not be kept, so it is changed back on its page.`,
+    };
+  },
+}));
+
+/**
+ * Jobs' role and application edits (plan #1894.6.1, lib/dash/jobs-writes.ts),
+ * the same tools Ask has, run here on the service-role job_search client for
+ * the verified person and recorded as Dash's. Most change one row, so the
+ * bare record above keeps all its Undo needs. A merge of roles (plan
+ * #1894.6.2) touches many, so its record keeps them all in `undo`, and Home's
+ * Undo puts them back by Ask's rule (MANY_ROW_KINDS in lib/core/dash-actions.ts).
+ */
+const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    if (!ctx.account.enabledModules.includes('jobs')) throw new AskInputError(JOBS_OFF);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    if (!made.undo) {
+      await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+      return { ok: true, rows: [made.row], note: made.summary };
+    }
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    if (!recorded) console.error('[connector write] record', made.kind);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
-type SharedWrite = 'add_quick_note' | 'add_idea' | 'add_job_lead';
+type SharedWrite =
+  | 'add_quick_note'
+  | 'add_idea'
+  | 'add_job_lead'
+  | 'add_interview_round'
+  | 'add_goal'
+  | 'add_goal_step'
+  | 'close_goal_step'
+  | 'set_goal_done_when'
+  | 'change_items';
+
+/**
+ * The shared writes that name a goal or a step by its ref. Ask holds a ref to
+ * one a lookup in the conversation returned; the connector keeps no
+ * conversation, so it takes any ref, and every read in these tools names the
+ * verified person, so a ref that is not theirs is refused as not found.
+ */
+const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'close_goal_step', 'set_goal_done_when']);
+
+/**
+ * The shared writes that take any ref the same way: every read in them names
+ * the verified person. change_items reads each item and order by user id
+ * (plan #1894.5.1). add_interview_round reads the role and its application
+ * by user id too (plan #1894.6.9).
+ */
+const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([...NAMES_GOAL_ROWS, 'change_items', 'add_interview_round']);
+
+/** The shared writes that change Goals, and so need the goals client. */
+const WRITES_GOALS: ReadonlySet<SharedWrite> = new Set(['add_goal', ...NAMES_GOAL_ROWS]);
 
 function refuse(): never {
   throw new AskInputError('That change cannot be made through this connection.');
@@ -442,7 +745,9 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
     definition: { ...dash.definition, description },
     async run(ctx, input) {
       if (!ctx.db || !ctx.account) refuse();
+      if (WRITES_GOALS.has(name) && !ctx.goals) refuse();
       const db = ctx.db;
+      const goals = ctx.goals;
       const write = {
         userId: ctx.userId,
         today: ctx.account.today,
@@ -450,9 +755,9 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         enabledModules: ctx.account.enabledModules,
         db,
         searchSources: [],
-        // None of these three names a row it looked up, or writes a goal or a todo.
-        seen: () => false,
-        goals: async () => refuse(),
+        seen: () => TAKES_ANY_REF.has(name),
+        // Only the goal writes reach this; none of the others writes a goal or a todo.
+        goals: goals && WRITES_GOALS.has(name) ? goals : async () => refuse(),
         createTask: async () => refuse(),
         fileQuickNote: ctx.fileQuickNote,
       } satisfies DashWriteContext;
@@ -496,6 +801,36 @@ const addJobLead = sharedWrite(
   'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. It is listed on Home with an Undo.',
 );
 
+const addInterviewRound = sharedWrite(
+  'add_interview_round',
+  `Add an interview round to one of the person's roles in Dash's Jobs workspace, when they ask ("add a take-home round to the Stripe role"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref job_applications returned; look it up first. The round is numbered after the role's other rounds and holds one interview of the kind given. Give a label only when they named the round, and a date and time only when they gave them. It is listed on Home with an Undo.`,
+);
+
+const addGoal = sharedWrite(
+  'add_goal',
+  'Add a goal to the person\'s Goals workspace in Dash, under one of their areas, when they ask for a new goal ("add a goal to run a half marathon"). Name the area by its name as they have it; when none of theirs fits, pass new_area true with a short name for one. Write the goal as an outcome. A step under a goal they already have is add_goal_step. It is listed on Home with an Undo.',
+);
+
+const addGoalStep = sharedWrite(
+  'add_goal_step',
+  'Add a step to the end of one of the person\'s goals in Dash, when they ask you to. Name the goal by the goals.items ref goal_status or search (kinds ["goal"]) returned for it; look it up first. The step is theirs, and the goal must already be approved. It is listed on Home with an Undo.',
+);
+
+const closeGoalStep = sharedWrite(
+  'close_goal_step',
+  'Mark a step under one of the person\'s goals in Dash done, when they say it is done or ask you to. Name the step by the goals.items ref search (kinds ["step"]) or goal_status returned for it; look it up first. A goal itself is not closed this way. It is listed on Home with an Undo.',
+);
+
+const changeItems = sharedWrite(
+  'change_items',
+  `Change many of the items the person owns in Dash's Shopping workspace at once, when they ask: mark them for sale or to return, take them off either, group copies as one item, ungroup them, separate a copy from its stack, or say they sold, gave away, donated, threw out, recycled or used them up (dispose, with disposal_method). Name the items by the public.inventory_items refs lookups returned, or whole orders by public.orders refs. At most 100 items. Deleting is not something you can do. It is listed on Home with one Undo for the whole change.`,
+);
+
+const setGoalDoneWhen = sharedWrite(
+  'set_goal_done_when',
+  'Write, change or clear the done-when of one of the person\'s goals in Dash, when they ask: the line that says when the goal is finished ("the song is live on Spotify"). Name the goal by the goals.items ref search (kinds ["goal"]) or goal_status returned for it; look it up first. Write it in their words; an empty done_when clears it. It is listed on Home with an Undo.',
+);
+
 /** Every write the connector offers, in the order clients are sent them. */
 export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addToReadingList,
@@ -504,8 +839,20 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addQuickNote,
   addIdea,
   addJobLead,
+  addInterviewRound,
+  addGoal,
+  addGoalStep,
+  closeGoalStep,
+  setGoalDoneWhen,
+  changeItems,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
+  ...YOU_TOOLS,
+  ...NEWS_TOOLS,
+  ...GOALS_TOOLS,
+  ...SHOPPING_TOOLS,
+  ...VAULT_TOOLS,
+  ...JOBS_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */

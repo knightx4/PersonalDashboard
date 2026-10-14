@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
 import { StoryRating } from '@/components/news/story-rating';
@@ -29,6 +29,7 @@ import {
 } from './quick-controls';
 import { DiscussButton } from './discuss-sheet';
 import { GotThrough, type GotThroughSummary } from './got-through';
+import { PageColumn } from '@/components/shell/page-width';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -141,7 +142,7 @@ export function QuickReadView({
 
   if (!card) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <PageColumn>
         <PageHeader title="Quick read" />
         {chips}
         {/* Reading the last story draws the day's sigil in (plan #1340). The
@@ -181,7 +182,7 @@ export function QuickReadView({
         {/* What you got through (plan #1557). In the same place below, so it
             stays mounted as the last story goes and can tell the two apart. */}
         <GotThrough done summary={gotThrough} className="mt-4" />
-      </div>
+      </PageColumn>
     );
   }
 
@@ -201,7 +202,7 @@ export function QuickReadView({
         : 'hidden md:inline-flex';
 
   return (
-    <div className={cn('mx-auto max-w-2xl', grid && 'md:max-w-5xl')}>
+    <PageColumn>
       <PageHeader
         title="Quick read"
         actions={
@@ -301,7 +302,7 @@ export function QuickReadView({
         )}
       </QueueCleared>
       <GotThrough done={false} summary={gotThrough} />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -428,7 +429,7 @@ function PhoneCard({
                 />
               )}
               {issueHref && (
-                <Link href={issueHref} className="text-ui text-accent hover:underline">
+                <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
                   {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
                 </Link>
               )}
@@ -490,7 +491,7 @@ function gridStory(
       from,
       actions: (
         <>
-          <Link href={issueHref} className="text-ui text-accent hover:underline">
+          <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
             Read the newsletter
           </Link>
           <ReactionButtons

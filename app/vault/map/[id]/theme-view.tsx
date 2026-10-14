@@ -1,87 +1,98 @@
-import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Card } from '@/components/ui/card';
+import Link, { linkVariants } from '@/components/ui/link';
 import { MapPosition, MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MapSource, ThemeMap } from '@/lib/vault/map/read';
 import { noteHref } from '@/lib/vault/paths';
 import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
+import { PageColumn } from '@/components/shell/page-width';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One theme on the map, drawn from what the page read (page.tsx), so the
  * gallery can draw it from fixtures (plan #1605).
  */
-export function ThemeView({ map }: { map: ThemeMap }) {
+export function ThemeView({ map, path }: { map: ThemeMap; path?: PageSubject }) {
   const { theme, positions, notes } = map;
   const span = seenSpan(theme.firstSeen, theme.lastSeen);
 
   return (
-    <article className="mx-auto max-w-3xl">
-      <div className="mb-4">
-        <Link
-          href="/vault/map"
-          className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Map
-        </Link>
-      </div>
+    <PageColumn>
+      <article>
+        {/* The path, Vault › Map › this page, and the one back link
+        (plans #1931.2, #1931.3). */}
+        {path && <PathLine crumbs={path.path} fallback={parentCrumb(path.path)} className="mb-4" />}
 
-      <header className="mb-6">
-        <h1 className="font-display text-title font-semibold tracking-tight text-ink">
-          {theme.name}
-        </h1>
-        <p className="mt-1 text-body text-ink">{theme.about}</p>
-        <p className="mt-1 text-ui text-ink-muted">
-          {count(notes.length, 'note', 'notes')} · {count(positions.length, 'position', 'positions')}
-          {span && <> · {span}</>}
-        </p>
-        <WriteAboutThis kind="theme" refId={theme.id} title={theme.name} size="md" className="mt-3" />
-      </header>
+        <header className="mb-6">
+          <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+            {theme.name}
+          </h1>
+          <p className="mt-1 text-body text-ink-muted">{theme.about}</p>
+          <p className="mt-1 text-ui text-ink-muted">
+            {count(notes.length, 'note', 'notes')} ·{' '}
+            {count(positions.length, 'position', 'positions')}
+            {span && <> · {span}</>}
+          </p>
+          <WriteAboutThis
+            kind="theme"
+            refId={theme.id}
+            title={theme.name}
+            size="md"
+            className="mt-3"
+          />
+        </header>
 
-      {positions.length > 0 && (
-        <section aria-labelledby="positions-heading">
-          <h2 id="positions-heading" className="mb-1 text-body font-semibold text-ink">
-            Positions
-          </h2>
-          <ul className="divide-y divide-border">
-            {positions.map((position) => (
-              <li key={position.id} className="py-4">
-                <MapPosition
-                  name={position.name}
-                  statement={position.statement}
-                  kind={position.kind}
-                  stance={position.stance}
-                  basis={position.basis}
-                  tag={position.sources.length === 0 ? 'No sentence left in the notes' : null}
-                >
-                  {position.sources.map((source, i) => (
-                    <Source key={i} source={source} />
-                  ))}
-                </MapPosition>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {positions.length > 0 && (
+          <section aria-labelledby="positions-heading">
+            <SectionHeading id="positions-heading" title="Positions" className="mb-2" />
+            <Card padding="none">
+              <ul className="divide-y divide-border">
+                {positions.map((position) => (
+                  <li key={position.id} className="card-pad-x py-4">
+                    <MapPosition
+                      name={position.name}
+                      statement={position.statement}
+                      kind={position.kind}
+                      stance={position.stance}
+                      basis={position.basis}
+                      tag={position.sources.length === 0 ? 'No sentence left in the notes' : null}
+                    >
+                      {position.sources.map((source, i) => (
+                        <Source key={i} source={source} />
+                      ))}
+                    </MapPosition>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
 
-      {notes.length > 0 && (
-        <section aria-labelledby="notes-heading" className="mt-8">
-          <h2 id="notes-heading" className="mb-1 text-body font-semibold text-ink">
-            Notes
-          </h2>
-          <ul className="divide-y divide-border">
-            {notes.map((note) => (
-              <li key={note.path} className="py-3">
-                <Link href={noteHref(note.path)} className="text-body font-medium text-ink hover:underline">
-                  {note.title}
-                </Link>
-                <span className="mt-0.5 block text-ui text-ink-muted">{note.basis}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </article>
+        {notes.length > 0 && (
+          <section aria-labelledby="notes-heading" className="mt-8">
+            <SectionHeading id="notes-heading" title="Notes" className="mb-2" />
+            <Card padding="none">
+              <ul className="divide-y divide-border">
+                {notes.map((note) => (
+                  <li key={note.path} className="card-pad-x py-3">
+                    <Link
+                      href={noteHref(note.path)}
+                      className="text-body font-medium text-ink hover:underline"
+                    >
+                      {note.title}
+                    </Link>
+                    <span className="mt-0.5 block text-ui text-ink-muted">{note.basis}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
+      </article>
+    </PageColumn>
   );
 }
 
@@ -99,7 +110,7 @@ function Source({ source }: { source: MapSource }) {
                 the note at the top and look for an element with that id. */}
             <a
               href={`${noteHref(source.note.path)}${quoteFragment(source.quote)}`}
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className={linkVariants({ tone: 'quiet' })}
             >
               {source.note.title}
             </a>

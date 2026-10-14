@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { clockTime, durationLabel } from '@/lib/learn/youtube/format';
@@ -7,6 +6,8 @@ import type { VideoPage } from '@/lib/learn/youtube/load';
 import type { Paragraph } from '@/lib/learn/youtube/paragraphs';
 import { transcribeVideoAction } from '../../actions';
 import { Press } from '../../press';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One video: the player, and the transcript under it.
@@ -26,26 +27,23 @@ export type LibraryVideoViewProps = {
   stop: number | null;
 };
 
-export function LibraryVideoView({ data, language, paragraphs, start, stop }: LibraryVideoViewProps) {
+export function LibraryVideoView({
+  data,
+  language,
+  paragraphs,
+  start,
+  stop,
+  path,
+}: LibraryVideoViewProps & { path?: PageSubject }) {
   const { video, channel, segments } = data;
   const timed = segments.filter((segment) => segment.tStartSeconds !== null);
   const embedded = segments.filter((segment) => segment.embedded).length;
 
   return (
-    <>
-      {channel && (
-        <p className="mb-3">
-          <Link
-            href={`/learn/youtube/${channel.slug}`}
-            className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-          >
-            <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-            {channel.name}
-          </Link>
-        </p>
-      )}
-
+    <PageColumn>
       <PageHeader
+        subject={path}
+        back={channel ? { label: channel.name, href: `/learn/youtube/${channel.slug}` } : undefined}
         title={video.title}
         description={
           <>
@@ -53,7 +51,7 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
               .filter(Boolean)
               .join(' · ')}
             {video.durationSeconds !== null || language ? ' · ' : ''}
-            <a href={video.url} className="hover:underline" target="_blank" rel="noreferrer">
+            <a href={video.url} className={linkVariants({ tone: 'quiet' })} target="_blank" rel="noreferrer">
               Open on YouTube
             </a>
           </>
@@ -113,6 +111,6 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
           </div>
         )}
       </section>
-    </>
+    </PageColumn>
   );
 }

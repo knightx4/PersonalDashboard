@@ -12,6 +12,7 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { KindBadge } from '@/components/learn/kind-badge';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveChain, proposeGoal, type ApproveState, type ProposeState } from './actions';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * Name a goal, then look at what it proposes before any of it is real.
@@ -31,7 +32,7 @@ function AskButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Laying it out…' : 'Lay out the chain'}
     </Button>
   );
@@ -52,18 +53,18 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-body font-medium text-ink">{node.name}</span>
         {node.existingId ? (
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             Already in this subject
-          </span>
+          </Chip>
         ) : (
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             New
-          </span>
+          </Chip>
         )}
         {isGoal && (
-          <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
+          <Chip tone="accent">
             What you asked for
-          </span>
+          </Chip>
         )}
         {/* Only on a new node: approving writes nothing for one the subject
             already has, so the mark shown would not be the mark stored. */}

@@ -80,12 +80,14 @@
   --c-w-todo-tint: #e6f4fb;
   --c-w-vault: #a21caf;
   --c-w-vault-tint: #fcecfd;
-  --c-w-learn: #0f6b62;
-  --c-w-learn-tint: #e4f4f1;
+  --c-w-learn: #046a6b;
+  --c-w-learn-tint: #e3f4f4;
   --c-w-news: #806500;
   --c-w-news-tint: #f6f1e2;
-  --c-w-goals: #4a6f0c;
-  --c-w-goals-tint: #eef5e1;
+  --c-w-goals: #05734e;
+  --c-w-goals-tint: #e3f7ec;
+  --c-w-you: #9f4f0d;
+  --c-w-you-tint: #fef0e8;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -240,6 +242,7 @@
   --c-w-learn-lit: var(--c-w-learn);
   --c-w-news-lit: var(--c-w-news);
   --c-w-goals-lit: var(--c-w-goals);
+  --c-w-you-lit: var(--c-w-you);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -313,12 +316,14 @@
   --c-w-todo-tint: #0b2130;
   --c-w-vault: #e690f2;
   --c-w-vault-tint: #2a1430;
-  --c-w-learn: #4fd1c5;
-  --c-w-learn-tint: #0a2420;
+  --c-w-learn: #4ad0d2;
+  --c-w-learn-tint: #082424;
   --c-w-news: #d8b23d;
   --c-w-news-tint: #281e03;
-  --c-w-goals: #a3d65a;
-  --c-w-goals-tint: #1a2408;
+  --c-w-goals: #48dfa1;
+  --c-w-goals-tint: #052619;
+  --c-w-you: #feb68b;
+  --c-w-you-tint: #381802;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -507,9 +512,10 @@
   --c-w-jobs-lit: #c3b0ff;
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
-  --c-w-learn-lit: #6fdcd2;
+  --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
-  --c-w-goals-lit: #b0dc6e;
+  --c-w-goals-lit: #66e4ac;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -612,12 +618,14 @@
   --c-w-todo-tint: #d9e9f1;
   --c-w-vault: #891489;
   --c-w-vault-tint: #f2def2;
-  --c-w-learn: #0a5d54;
-  --c-w-learn-tint: #d8ebe7;
+  --c-w-learn: #005c5d;
+  --c-w-learn-tint: #d7ebeb;
   --c-w-news: #6e5600;
   --c-w-news-tint: #ece4cf;
-  --c-w-goals: #41610a;
-  --c-w-goals-tint: #e3ecd2;
+  --c-w-goals: #066544;
+  --c-w-goals-tint: #d4efe0;
+  --c-w-you: #8f4401;
+  --c-w-you-tint: #ffe4d4;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -708,12 +716,14 @@
   --c-w-todo-tint: #132833;
   --c-w-vault: #ec9df3;
   --c-w-vault-tint: #301a3a;
-  --c-w-learn: #74dccf;
-  --c-w-learn-tint: #102c29;
+  --c-w-learn: #70dbdc;
+  --c-w-learn-tint: #0f2c2c;
   --c-w-news: #dcb956;
   --c-w-news-tint: #2c2205;
-  --c-w-goals: #b2dd70;
-  --c-w-goals-tint: #1d2a0b;
+  --c-w-goals: #69e6ae;
+  --c-w-goals-tint: #062c1d;
+  --c-w-you: #fec4a2;
+  --c-w-you-tint: #3f1c03;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -813,9 +823,10 @@
   --c-w-jobs-lit: #c3b0ff;
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
-  --c-w-learn-lit: #6fdcd2;
+  --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
-  --c-w-goals-lit: #b0dc6e;
+  --c-w-goals-lit: #66e4ac;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets: smoked glass ----
@@ -877,12 +888,14 @@
   --c-w-todo-tint: #12283a;
   --c-w-vault: #eda6f6;
   --c-w-vault-tint: #2e1e3c;
-  --c-w-learn: #6fdcd2;
-  --c-w-learn-tint: #0f2b2e;
+  --c-w-learn: #6cdbdc;
+  --c-w-learn-tint: #0f2b2b;
   --c-w-news: #debf69;
   --c-w-news-tint: #2a2410;
-  --c-w-goals: #b0dc6e;
-  --c-w-goals-tint: #1f2a10;
+  --c-w-goals: #66e4ac;
+  --c-w-goals-tint: #0e2c1f;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -974,9 +987,10 @@
   --c-w-jobs-lit: #c3b0ff;
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
-  --c-w-learn-lit: #6fdcd2;
+  --c-w-learn-lit: #6cdbdc;
   --c-w-news-lit: #debf69;
-  --c-w-goals-lit: #b0dc6e;
+  --c-w-goals-lit: #66e4ac;
+  --c-w-you-lit: #ffc19c;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The glass ----
@@ -1028,12 +1042,14 @@
   --c-w-todo-tint: #12283a;
   --c-w-vault: #eda6f6;
   --c-w-vault-tint: #2e1e3c;
-  --c-w-learn: #6fdcd2;
-  --c-w-learn-tint: #0f2b2e;
+  --c-w-learn: #6cdbdc;
+  --c-w-learn-tint: #0f2b2b;
   --c-w-news: #debf69;
   --c-w-news-tint: #2a2410;
-  --c-w-goals: #b0dc6e;
-  --c-w-goals-tint: #1f2a10;
+  --c-w-goals: #66e4ac;
+  --c-w-goals-tint: #0e2c1f;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -1112,9 +1128,10 @@
   --c-w-jobs-lit: #6420cf;
   --c-w-todo-lit: #035b79;
   --c-w-vault-lit: #891489;
-  --c-w-learn-lit: #0a5d54;
+  --c-w-learn-lit: #005c5d;
   --c-w-news-lit: #6e5600;
-  --c-w-goals-lit: #41610a;
+  --c-w-goals-lit: #066544;
+  --c-w-you-lit: #8f4401;
   --c-w-dev-lit: #434e5f;
 
   /* ---- The glass: frosted white ---- */
@@ -1160,12 +1177,14 @@
   --c-w-todo-tint: #d9e9f1;
   --c-w-vault: #891489;
   --c-w-vault-tint: #f2def2;
-  --c-w-learn: #0a5d54;
-  --c-w-learn-tint: #d8ebe7;
+  --c-w-learn: #005c5d;
+  --c-w-learn-tint: #d7ebeb;
   --c-w-news: #6e5600;
   --c-w-news-tint: #ece4cf;
-  --c-w-goals: #41610a;
-  --c-w-goals-tint: #e3ecd2;
+  --c-w-goals: #066544;
+  --c-w-goals-tint: #d4efe0;
+  --c-w-you: #8f4401;
+  --c-w-you-tint: #ffe4d4;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -1331,12 +1350,14 @@
   --c-w-todo-tint: #12283a;
   --c-w-vault: #eda6f6;
   --c-w-vault-tint: #2e1e3c;
-  --c-w-learn: #6fdcd2;
-  --c-w-learn-tint: #0f2b2e;
+  --c-w-learn: #6cdbdc;
+  --c-w-learn-tint: #0f2b2b;
   --c-w-news: #debf69;
   --c-w-news-tint: #2a2410;
-  --c-w-goals: #b0dc6e;
-  --c-w-goals-tint: #1f2a10;
+  --c-w-goals: #66e4ac;
+  --c-w-goals-tint: #0e2c1f;
+  --c-w-you: #ffc19c;
+  --c-w-you-tint: #3d1f0a;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
   --c-positive: #6fe0b0;
@@ -1410,12 +1431,14 @@
     --c-w-todo-tint: #0b2130;
     --c-w-vault: #e690f2;
     --c-w-vault-tint: #2a1430;
-    --c-w-learn: #4fd1c5;
-    --c-w-learn-tint: #0a2420;
+    --c-w-learn: #4ad0d2;
+    --c-w-learn-tint: #082424;
     --c-w-news: #d8b23d;
     --c-w-news-tint: #281e03;
-    --c-w-goals: #a3d65a;
-    --c-w-goals-tint: #1a2408;
+    --c-w-goals: #48dfa1;
+    --c-w-goals-tint: #052619;
+    --c-w-you: #feb68b;
+    --c-w-you-tint: #381802;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -1494,6 +1517,11 @@
   --c-sheet-accent: var(--c-w-goals);
   --c-page-accent: var(--c-w-goals-lit);
   --c-accent-tint: var(--c-w-goals-tint);
+}
+[data-workspace='you'] {
+  --c-sheet-accent: var(--c-w-you);
+  --c-page-accent: var(--c-w-you-lit);
+  --c-accent-tint: var(--c-w-you-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -1662,6 +1690,8 @@ body,
   --color-w-news-tint: var(--c-w-news-tint);
   --color-w-goals: var(--c-w-goals);
   --color-w-goals-tint: var(--c-w-goals-tint);
+  --color-w-you: var(--c-w-you);
+  --color-w-you-tint: var(--c-w-you-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 
@@ -1733,6 +1763,9 @@ body,
   --radius-pane: 1rem;
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
+  /* Chips, toggle chips and dots: fully round, except where a theme squares
+   * everything (Poster), so a chip keeps the corners of the card it sits on. */
+  --radius-pill: 9999px;
 
   /* The easings (plan #1549), mirrored in lib/motion.ts. Soft ease-out for
    * everything that is not a spring; the spring for things arriving in their
@@ -2150,6 +2183,14 @@ body::before {
   box-shadow: var(--sheet-edge);
 }
 
+/* A keycap's corner: half a control's, so it follows the theme (square in
+ * Poster) without turning an 18px key into a coin where controls are rounder
+ * (Aurora's 12px on an 18px key is a circle). The one radius drawn from a
+ * token rather than being one, used by components/ui/kbd.tsx alone. */
+@utility keycap {
+  border-radius: calc(var(--radius-control) / 2);
+}
+
 /* Shortcut hints: invisible until a modifier is held. See components/shell/key-hints.tsx. */
 .keyhint {
   opacity: 0;
@@ -2252,6 +2293,24 @@ button[aria-busy='true'] {
     transform: none;
     opacity: 1;
   }
+}
+
+@keyframes timeline-in {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A timeline entry (components/ui/timeline.tsx) rises into place once on
+ * mount. The reduced-motion block collapses the duration, and the component
+ * adds motion-reduce:animate-none as well. */
+@utility timeline-in {
+  animation: timeline-in var(--motion-move) var(--ease-out-soft) both;
 }
 
 /* One entrance for the toast, and nothing on the way out. It springs, so it
@@ -2479,10 +2538,9 @@ button[aria-busy='true'] {
  * under reduced motion without the state being lost. Distances are in the
  * mark's 24-unit viewBox, where a CSS px is one unit.
  *
- * Idle blinks rarely, so a page of marks does not twinkle. Working leans and
- * rattles with speed lines streaming off the back, at one pace, since a run
- * reports no steps. Done swells once as it settles and its flag waves three
- * times, then holds. */
+ * Every state moves, idle included, but slowly enough that a page of marks
+ * does not twinkle. Working is the fastest: the core pulses and speed lines
+ * stream off the back, at one pace, since a run reports no steps. */
 @keyframes dash-mark-blink {
   0%,
   94%,
@@ -2500,21 +2558,50 @@ button[aria-busy='true'] {
   animation: dash-mark-blink calc(var(--motion-moment) * 12) var(--ease-sway) infinite;
 }
 
-/* Asleep: the visor breathes slowly and a z drifts up from its corner. */
-@keyframes dash-mark-breathe {
+/* Idle: the eyes look one way, then the other, then back. */
+@keyframes dash-mark-glance {
   0%,
+  38%,
   100% {
-    transform: scale(1, 1);
+    transform: translateX(0);
   }
-  50% {
-    transform: scale(1.03, 0.94);
+  44%,
+  56% {
+    transform: translateX(0.9px);
+  }
+  62%,
+  74% {
+    transform: translateX(-0.9px);
+  }
+  80% {
+    transform: translateX(0);
   }
 }
 
-@utility dash-mark-breathe {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: dash-mark-breathe calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
+@utility dash-mark-glance {
+  animation: dash-mark-glance calc(var(--motion-moment) * 18) var(--ease-sway) infinite;
+}
+
+/* Idle: the core breathes. */
+@keyframes dash-mark-glow {
+  50% {
+    opacity: 0.62;
+  }
+}
+
+@utility dash-mark-glow {
+  animation: dash-mark-glow calc(var(--motion-moment) * 9) var(--ease-sway) infinite;
+}
+
+/* Asleep: the core smoulders like an ember, and a z drifts up. */
+@keyframes dash-mark-ember {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@utility dash-mark-ember {
+  animation: dash-mark-ember calc(var(--motion-moment) * 11) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-snooze {
@@ -2536,23 +2623,15 @@ button[aria-busy='true'] {
   animation: dash-mark-snooze calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
 }
 
-/* A hat on a sleeping Dash (plan #1702) is already tipped over in its still
- * shape, and slips a little further with each breath. --dash-tip carries the
- * way it leans, so the newsboy cap slips forward and the others back. */
-@keyframes dash-mark-tip {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
+/* Working: the core pulses and speed lines stream off the back. */
+@keyframes dash-mark-pulse {
   50% {
-    transform: rotate(var(--dash-tip, -4deg));
+    opacity: 0.6;
   }
 }
 
-@utility dash-mark-tip {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: dash-mark-tip calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
+@utility dash-mark-pulse {
+  animation: dash-mark-pulse calc(var(--motion-moment) * 5.5) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-streak {
@@ -2573,40 +2652,27 @@ button[aria-busy='true'] {
   animation: dash-mark-streak var(--motion-moment) linear infinite;
 }
 
-@keyframes dash-mark-rattle {
-  0% {
-    transform: translateY(-0.3px);
-  }
-  100% {
-    transform: translateY(0.3px);
-  }
-}
-
-@utility dash-mark-rattle {
-  animation: dash-mark-rattle var(--motion-quick) steps(2) infinite;
-}
-
 /* Reading: the eyes jump along a line in short steps, then snap back. */
 @keyframes dash-mark-read {
   0%,
   15% {
-    transform: translateX(-2.4px);
+    transform: translateX(-2px);
   }
   22%,
   37% {
-    transform: translateX(-0.8px);
+    transform: translateX(-0.7px);
   }
   44%,
   59% {
-    transform: translateX(0.8px);
+    transform: translateX(0.7px);
   }
   66%,
   84% {
-    transform: translateX(2.4px);
+    transform: translateX(2px);
   }
   92%,
   100% {
-    transform: translateX(-2.4px);
+    transform: translateX(-2px);
   }
 }
 
@@ -2617,10 +2683,10 @@ button[aria-busy='true'] {
 /* Searching: the eyes sweep wide while a ring pings out from the visor. */
 @keyframes dash-mark-sweep {
   0% {
-    transform: translateX(-2.6px);
+    transform: translateX(-2px);
   }
   100% {
-    transform: translateX(2.6px);
+    transform: translateX(2px);
   }
 }
 
@@ -2630,11 +2696,11 @@ button[aria-busy='true'] {
 
 @keyframes dash-mark-ping {
   0% {
-    transform: scale(0.85);
+    transform: scale(0.7);
     opacity: 0.6;
   }
   100% {
-    transform: scale(1.55);
+    transform: scale(1.15);
     opacity: 0;
   }
 }
@@ -2677,22 +2743,23 @@ button[aria-busy='true'] {
   animation: dash-mark-caret calc(var(--motion-moment) * 1.5) steps(1) infinite;
 }
 
-/* Thinking: the eyes glance up to one corner, hold, then up to the other. */
+/* Thinking: the eyes glance up to one corner, hold, then up to the other. The
+ * still shape already looks up and right, so these are relative to it. */
 @keyframes dash-mark-ponder {
   0%,
   30% {
-    transform: translate(1.8px, -1.5px);
+    transform: translate(0, 0);
   }
   42%,
   72% {
-    transform: translate(-1.8px, -1.5px);
+    transform: translate(-2.8px, 0);
   }
   84%,
   92% {
-    transform: translate(0, 0);
+    transform: translate(-1.4px, 1.3px);
   }
   100% {
-    transform: translate(1.8px, -1.5px);
+    transform: translate(0, 0);
   }
 }
 
@@ -2700,14 +2767,103 @@ button[aria-busy='true'] {
   animation: dash-mark-ponder calc(var(--motion-moment) * 5) var(--ease-sway) infinite;
 }
 
-@keyframes dash-mark-flash {
-  0% {
-    opacity: 0.4;
-    transform: scale(0.9);
+/* Done: a gentle bob, smiling. */
+@keyframes dash-mark-bob {
+  50% {
+    transform: translateY(-0.7px);
   }
-  60% {
+}
+
+@utility dash-mark-bob {
+  animation: dash-mark-bob calc(var(--motion-moment) * 4) var(--ease-sway) infinite;
+}
+
+/* Failed: no core, and the glass flickers now and then like a dead light. */
+@keyframes dash-mark-flicker {
+  0%,
+  61%,
+  64%,
+  67%,
+  100% {
     opacity: 1;
-    transform: scale(1.06);
+  }
+  62% {
+    opacity: 0.5;
+  }
+  65% {
+    opacity: 0.7;
+  }
+}
+
+@utility dash-mark-flicker {
+  animation: dash-mark-flicker calc(var(--motion-moment) * 12) steps(1) infinite;
+}
+
+/* Testing: the eyes run down a short checklist, and each row ticks in turn. */
+@keyframes dash-mark-scan {
+  0%,
+  25% {
+    transform: translateY(0);
+  }
+  33%,
+  58% {
+    transform: translateY(0.6px);
+  }
+  66%,
+  92% {
+    transform: translateY(1.2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@utility dash-mark-scan {
+  animation: dash-mark-scan calc(var(--motion-moment) * 3) var(--ease-sway) infinite;
+}
+
+@keyframes dash-mark-tick {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  20%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility dash-mark-tick {
+  animation: dash-mark-tick calc(var(--motion-moment) * 3) var(--ease-out-soft) infinite;
+}
+
+/* Asking: the question mark pulses until the question is answered. */
+@keyframes dash-mark-ask {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.75;
+  }
+}
+
+@utility dash-mark-ask {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dash-mark-ask calc(var(--motion-moment) * 4) var(--ease-sway) infinite;
+}
+
+/* A change of state or kind eases in rather than snapping. */
+@keyframes dash-mark-settle {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.94);
   }
   100% {
     opacity: 1;
@@ -2715,9 +2871,69 @@ button[aria-busy='true'] {
   }
 }
 
-@utility dash-mark-flash {
+@utility dash-mark-settle {
+  transform-box: view-box;
   transform-origin: 12px 12px;
-  animation: dash-mark-flash var(--motion-move) var(--ease-out-soft) both;
+  animation: dash-mark-settle var(--motion-quick) var(--ease-out-soft) both;
+}
+
+/* The two moments, each played once: a wince for an error the work carries
+ * on from, a hop for a step finished. The flash lights the core red or green
+ * as it happens. */
+@keyframes dash-mark-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-1.2px);
+  }
+  40% {
+    transform: translateX(1.1px);
+  }
+  60% {
+    transform: translateX(-0.8px);
+  }
+  80% {
+    transform: translateX(0.5px);
+  }
+}
+
+@utility dash-mark-shake {
+  animation: dash-mark-shake var(--motion-move) var(--ease-sway) 1;
+}
+
+@keyframes dash-mark-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-2.4px);
+  }
+  60% {
+    transform: translateY(0.4px);
+  }
+}
+
+@utility dash-mark-hop {
+  animation: dash-mark-hop var(--motion-move) var(--ease-out-soft) 1;
+}
+
+@keyframes dash-mark-flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility dash-mark-flash {
+  animation: dash-mark-flash calc(var(--motion-move) * 2) var(--ease-out-soft) 1;
 }
 
 /* The seen mark arriving once Dash has only acknowledged a comment: it grows
@@ -2749,21 +2965,6 @@ button[aria-busy='true'] {
 
 @utility run-line-in {
   animation: run-line-in var(--motion-move) var(--ease-out-soft) both;
-}
-
-@keyframes dash-mark-wave {
-  0% {
-    transform: skewY(-6deg) scaleX(0.94);
-  }
-  100% {
-    transform: skewY(6deg) scaleX(1);
-  }
-}
-
-@utility dash-mark-wave {
-  transform-box: fill-box;
-  transform-origin: left center;
-  animation: dash-mark-wave calc(var(--motion-move) * 2) var(--ease-sway) 6 alternate;
 }
 
 @keyframes shimmer {
@@ -2851,6 +3052,10 @@ button[aria-busy='true'] {
     animation: none;
   }
 
+  .timeline-in {
+    animation: none;
+  }
+
   .puff {
     display: none;
     animation: none;
@@ -2879,19 +3084,27 @@ button[aria-busy='true'] {
   }
 
   .dash-mark-blink,
-  .dash-mark-breathe,
+  .dash-mark-glance,
+  .dash-mark-glow,
+  .dash-mark-ember,
   .dash-mark-snooze,
-  .dash-mark-tip,
+  .dash-mark-pulse,
   .dash-mark-streak,
-  .dash-mark-rattle,
   .dash-mark-read,
   .dash-mark-sweep,
   .dash-mark-ping,
   .dash-mark-write,
   .dash-mark-caret,
   .dash-mark-ponder,
+  .dash-mark-bob,
+  .dash-mark-flicker,
+  .dash-mark-scan,
+  .dash-mark-tick,
+  .dash-mark-ask,
+  .dash-mark-settle,
+  .dash-mark-shake,
+  .dash-mark-hop,
   .dash-mark-flash,
-  .dash-mark-wave,
   .dash-seen-in {
     animation: none;
   }
@@ -3341,7 +3554,9 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-workspace='jobs']     { --wash-a: 167 139 250; }
 [data-workspace='todo']     { --wash-a: 56 189 248; }
 [data-workspace='vault']    { --wash-a: 240 171 252; }
-[data-workspace='learn']    { --wash-a: 52 211 153; }
+[data-workspace='learn']    { --wash-a: 74 208 210; }
+[data-workspace='goals']    { --wash-a: 72 223 161; }
+[data-workspace='you']      { --wash-a: 166 213 97; }
 [data-workspace='dev']      { --wash-a: 148 163 184; }
 [data-workspace='news']     { --wash-a: 222 191 105; }
 
@@ -3855,6 +4070,7 @@ form[data-auto-submit] [data-fallback-submit] {
   --radius-pane: 0;
   --radius-card: 0;
   --radius-control: 0;
+  --radius-pill: 0;
 }
 
 :is([data-theme='poster'], [data-theme='poster-dark']) .sheet {

@@ -50,7 +50,7 @@ export function ClipPlayer({
     return (
       <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', className)}>
         <Button type="button" variant="secondary" size="sm" onClick={() => setPlaying(true)}>
-          <Play className="size-3.5" strokeWidth={2} aria-hidden />
+          <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
           {span ? `Watch ${span}` : 'Watch'}
         </Button>
         <span className="min-w-0 text-small break-words text-ink-muted">{title}</span>

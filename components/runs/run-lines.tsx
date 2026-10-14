@@ -6,6 +6,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
+import { runPose } from '@/lib/core/run-pose';
 import { choiceKey, openQuestion } from '@/lib/core/run-questions';
 import { RunAnswer, type AnswerRunAction } from './run-answer';
 import { exactTime, shortWhen } from '@/lib/comments/when';
@@ -40,9 +41,10 @@ const STATE_LINE: Record<Exclude<RunLinesState, 'ended'>, { text: string; glyph:
 
 /**
  * The mark beside the title follows the run (plan #1827). Going, it works in
- * the shape of the latest line: thinking after a thought, writing after an
- * action. Waiting, it stands level and blinks, since the work is yours now.
- * Gone quiet, it sleeps, because it has to be woken. Ended, it is still.
+ * the shape of the latest line, read the same way as the runner card's
+ * Dashes (lib/core/run-pose.ts): reading, searching, testing, writing or
+ * thinking. Waiting, it asks, since the work is yours now. Gone quiet, it
+ * sleeps, because it has to be woken. Ended, it rests.
  */
 function markFor(
   state: RunLinesState,
@@ -50,9 +52,9 @@ function markFor(
   lines: readonly RunActivity[],
 ): { state: DashState; activity?: DashActivity } {
   if (state === 'stale') return { state: 'asleep' };
+  if (state === 'waiting') return { state: 'asking' };
   if (state !== 'live' || connection === 'lost') return { state: 'idle' };
-  const last = lines[lines.length - 1]?.kind;
-  return { state: 'working', activity: last === 'thought' ? 'thinking' : last === 'action' ? 'writing' : undefined };
+  return runPose(lines[lines.length - 1]);
 }
 
 const LOST = {
@@ -201,7 +203,7 @@ function RunLine({
   const yours = line.kind === 'response';
 
   return (
-    <li className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}>
+    <li className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
       <p className="flex flex-wrap items-baseline gap-x-2 text-small">
         <span className={cn('font-medium', line.kind === 'error' ? 'text-danger' : 'text-ink-muted')}>
           {RUN_ACTIVITY_LABEL[line.kind]}

@@ -1,6 +1,4 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
 import {
@@ -36,6 +34,11 @@ import { threadRef } from '@/lib/thread/subjects';
 import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
 import { NoteEdit } from './note-edit';
+import { PageWide } from '@/components/shell/page-width';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,120 +126,119 @@ export default async function NotePage({
       (): DevComment[] => [],
     ),
   ]);
+  const notePath = (await rowSubject(toRef('obsidian.notes', note.id))).path;
 
   return (
-    <NoteListFold notePath={note.path} search={search}>
-      {/* Hidden below lg rather than stacked above the note: at that width the
-          same panel arrives as a sheet instead, from the button beside "All
-          notes" below. */}
-      {hasVault && (
-        <NoteListColumn>
-          {/* At the offset the filter rail uses. The box is pinned and only the
-              tree under it scrolls: a vault taller than the viewport must not
-              make either the search or the bottom of the note reachable only by
-              scrolling past a thousand titles. */}
-          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
-            <VaultPanel
-              groups={groups}
-              currentPath={note.path}
-              search={search}
-              beside={<FoldNoteListButton />}
+    <PageWide>
+      <NoteListFold notePath={note.path} search={search}>
+        {/* Hidden below lg rather than stacked above the note: at that width the
+            same panel arrives as a sheet instead, from the button beside "All
+            notes" below. */}
+        {hasVault && (
+          <NoteListColumn>
+            {/* At the offset the filter rail uses. The box is pinned and only the
+                tree under it scrolls: a vault taller than the viewport must not
+                make either the search or the bottom of the note reachable only by
+                scrolling past a thousand titles. */}
+            <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
+              <VaultPanel
+                groups={groups}
+                currentPath={note.path}
+                search={search}
+                beside={<FoldNoteListButton />}
+              />
+            </div>
+          </NoteListColumn>
+        )}
+
+        {/* Folded, the note takes the column's width and the gap beside it:
+            15rem and 2rem on top of max-w-3xl's 48rem is max-w-5xl. */}
+        <article className="mx-auto min-w-0 max-w-3xl flex-1 group-data-[folded=true]/note:max-w-5xl">
+          {/* The way back, and -- below lg, where the column is not drawn -- the
+              way into the same vault without leaving the note (#577). From lg up
+              the same spot holds the way back to a folded column (#1380). */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            {/* The note's path, Vault › the note, and the one back link
+                (plans #1931.2, #1931.3). */}
+            <PathLine crumbs={notePath} fallback={parentCrumb(notePath)} />
+
+            {hasVault && (
+              <>
+                <VaultSheet groups={groups} currentPath={note.path} search={search} />
+                <UnfoldNoteListButton />
+              </>
+            )}
+          </div>
+
+          {/* Edit swaps the rendered body for a text box in the same place
+              (#1425); the title and properties stay, since a save keeps the
+              frontmatter it opened with. */}
+          <NoteEdit
+            notePath={note.path}
+            body={note.body}
+            blobSha={note.blobSha}
+            heading={
+              <header>
+                <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+                  {note.title}
+                </h1>
+                <p className="mt-1 text-ui text-ink-muted">
+                  {folder ? `${folder}/` : 'Vault root'}
+                  {note.gitUpdatedAt && <> · updated {formatDay(note.gitUpdatedAt)}</>}
+                </p>
+              </header>
+            }
+            properties={<NoteProperties frontmatter={note.frontmatter} />}
+          >
+            <NoteBody
+              markdown={markdown}
+              notePath={note.path}
+              attachments={buildAttachmentIndex(attachments)}
+            />
+          </NoteEdit>
+
+          {/* Tasks ABOUT this note, which is not the same thing as the checkboxes
+            inside it -- those belong to Obsidian and are not read here at all.
+            This is the half of the integration that costs nothing: a note is a
+            row with an id, and a task can point at it. */}
+          <div className="mt-8">
+            <LinkedTasks
+              target="note"
+              targetId={note.id}
+              returnTo={noteHref(note.path)}
+              tasks={linkedTasks}
+              timezone={timezone}
             />
           </div>
-        </NoteListColumn>
-      )}
 
-      {/* Folded, the note takes the column's width and the gap beside it:
-          15rem and 2rem on top of max-w-3xl's 48rem is max-w-5xl. */}
-      <article className="mx-auto min-w-0 max-w-3xl flex-1 group-data-[folded=true]/note:max-w-5xl">
-        {/* The way back, and -- below lg, where the column is not drawn -- the
-            way into the same vault without leaving the note (#577). From lg up
-            the same spot holds the way back to a folded column (#1380). */}
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Link
-            href="/vault"
-            className="inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-          >
-            <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
-            All notes
-          </Link>
+          {/* Notes on the note, kept in the app rather than written into the
+              vault (plan #1471). One tagged @dash is answered from the note,
+              unless the map turns the note away, when Dash says so instead. */}
+          <section aria-label="Comments" className="mt-8">
+            <Thread
+              subject={threadRef('vault_note', note.id)}
+              turns={comments}
+              placeholder="A note on this note, or a question for Dash."
+            />
+          </section>
 
-          {hasVault && (
+          {/* Reading the note for the map (#763). A note the map never reads --
+              a journal, or one carrying what looks like a key -- says so in the
+              button's place rather than offering a press that can only refuse,
+              and nothing about it is sent to find that out. */}
+          {notRead ? (
+            <p className="mt-10 text-ui text-ink-muted">{notRead.detail}</p>
+          ) : (
             <>
-              <VaultSheet groups={groups} currentPath={note.path} search={search} />
-              <UnfoldNoteListButton />
+              {/* Maya reads what the map reads and nothing else (#1285): a note
+                  the map turns away shows no way to ask either. */}
+              <MayaAsk notePath={note.path} thread={mayaThread} />
+              <MapReview notePath={note.path} />
             </>
           )}
-        </div>
-
-        {/* Edit swaps the rendered body for a text box in the same place
-            (#1425); the title and properties stay, since a save keeps the
-            frontmatter it opened with. */}
-        <NoteEdit
-          notePath={note.path}
-          body={note.body}
-          blobSha={note.blobSha}
-          heading={
-            <header>
-              <h1 className="font-display text-title font-semibold tracking-tight text-ink">
-                {note.title}
-              </h1>
-              <p className="mt-1 text-ui text-ink-muted">
-                {folder ? `${folder}/` : 'Vault root'}
-                {note.gitUpdatedAt && <> · updated {formatDay(note.gitUpdatedAt)}</>}
-              </p>
-            </header>
-          }
-          properties={<NoteProperties frontmatter={note.frontmatter} />}
-        >
-          <NoteBody
-            markdown={markdown}
-            notePath={note.path}
-            attachments={buildAttachmentIndex(attachments)}
-          />
-        </NoteEdit>
-
-        {/* Tasks ABOUT this note, which is not the same thing as the checkboxes
-          inside it -- those belong to Obsidian and are not read here at all.
-          This is the half of the integration that costs nothing: a note is a
-          row with an id, and a task can point at it. */}
-        <div className="mt-8">
-          <LinkedTasks
-            target="note"
-            targetId={note.id}
-            returnTo={noteHref(note.path)}
-            tasks={linkedTasks}
-            timezone={timezone}
-          />
-        </div>
-
-        {/* Notes on the note, kept in the app rather than written into the
-            vault (plan #1471). One tagged @dash is answered from the note,
-            unless the map turns the note away, when Dash says so instead. */}
-        <section aria-label="Comments" className="mt-8">
-          <Thread
-            subject={threadRef('vault_note', note.id)}
-            turns={comments}
-            placeholder="A note on this note, or a question for Dash."
-          />
-        </section>
-
-        {/* Reading the note for the map (#763). A note the map never reads --
-            a journal, or one carrying what looks like a key -- says so in the
-            button's place rather than offering a press that can only refuse,
-            and nothing about it is sent to find that out. */}
-        {notRead ? (
-          <p className="mt-10 text-ui text-ink-muted">{notRead.detail}</p>
-        ) : (
-          <>
-            {/* Maya reads what the map reads and nothing else (#1285): a note
-                the map turns away shows no way to ask either. */}
-            <MayaAsk notePath={note.path} thread={mayaThread} />
-            <MapReview notePath={note.path} />
-          </>
-        )}
-      </article>
-    </NoteListFold>
+        </article>
+      </NoteListFold>
+    </PageWide>
   );
 }
 

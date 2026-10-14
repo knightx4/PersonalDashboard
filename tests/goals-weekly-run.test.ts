@@ -87,7 +87,6 @@ function item(row: Record<string, unknown>) {
     status: 'open',
     detail: null,
     acceptance: null,
-    fog: null,
     resolution: null,
     due_on: null,
     position: 10,

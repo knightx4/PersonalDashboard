@@ -2,10 +2,15 @@ import {
   planRefHref,
   planRefLabel,
   planRefText,
+  refTarget,
   splitOnRefs,
   type PlanRefTitles,
 } from '@/lib/comments/refs';
+import { planKey } from '@/lib/core/ref-preview';
 import { LinkedText } from '@/components/ui/linked-text';
+import { RefLink } from '@/components/ui/ref-link';
+import { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 
 /**
  * Plain text, with its step numbers turned into links.
@@ -27,26 +32,34 @@ import { LinkedText } from '@/components/ui/linked-text';
  */
 export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles }) {
   const parts = splitOnRefs(text, titles);
-  if (!parts.some((part) => part.ref !== null)) return <LinkedText text={text} />;
+  if (!parts.some((part) => refTarget(part) !== null)) return <LinkedText text={text} refs={false} />;
 
   return (
     <>
-      {parts.map((part, index) =>
-        part.ref === null ? (
-          <span key={index}>
-            <LinkedText text={part.text} />
-          </span>
-        ) : (
-          <a
+      {parts.map((part, index) => {
+        const target = refTarget(part);
+        if (target === null) {
+          return (
+            <span key={index}>
+              {/* The splitter has read every step reference already; an
+                  outline it left as words names no step on the plan. */}
+              <LinkedText text={part.text} refs={false} />
+            </span>
+          );
+        }
+        // Each previews its step on hover or hold (plan #1931.4).
+        return (
+          <RefLink
             key={index}
-            href={planRefHref(part.ref)}
-            className="comment-ref underline underline-offset-2 hover:text-accent"
-            title={planRefLabel(part.ref, titles)}
+            href={planRefHref(target)}
+            previewKey={planKey(target)}
+            className={cn('comment-ref', linkVariants())}
+            title={part.ref === null ? undefined : planRefLabel(part.ref, titles)}
           >
-            {planRefText(part.ref, titles)}
-          </a>
-        ),
-      )}
+            {part.ref === null ? part.text : planRefText(part.ref, titles)}
+          </RefLink>
+        );
+      })}
     </>
   );
 }

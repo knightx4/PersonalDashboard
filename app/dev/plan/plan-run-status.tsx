@@ -12,6 +12,7 @@
  */
 import { useMemo } from 'react';
 import { CircleAlert } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useClockNow } from '@/lib/use-clock-now';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { type ClaimLiveness } from '@/lib/plan/liveness';
@@ -30,7 +31,9 @@ import {
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import type { PlanNode } from '@/lib/plan/tree';
 import { subtreeOf, type PlanCatalogEntry } from './plan-catalog';
-import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
+import { LiveDot } from '@/components/ui/live-dot';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import type { RunLinesState } from '@/components/runs/run-lines';
@@ -56,7 +59,13 @@ export function Elapsed({ startedAt }: { startedAt: string }) {
  * clock here, so this line and the health column beside it cannot differ about
  * the same claim.
  */
-export function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
+export function RunningFor({
+  startedAt,
+  claim,
+}: {
+  startedAt: string;
+  claim: ClaimLiveness | undefined;
+}) {
   if (claim === 'abandoned') {
     return (
       <span className="text-caution">
@@ -105,22 +114,22 @@ export function CheckMark({ check }: { check: CommitCheck | undefined }) {
   const alarming = failed || check?.conclusion === 'unmerged';
   const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
   const title = failed
-    ? `The checks failed on ${merge}, the merge that put this on main.`
+    ? `The checks failed on ${merge}, the merge that put this on main. Look at what broke before building on it.`
     : merge
       ? `${checkLine(check)} on ${merge}, the merge that put this on main.`
       : `${checkLine(check)}.`;
 
   return (
-    <span
-      title={title}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 text-small font-semibold',
-        alarming ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
+    <Tooltip label={title} className="shrink-0">
+      {alarming ? (
+        <Chip tone="caution">
+          <CircleAlert strokeWidth={1.75} aria-hidden />
+          {word}
+        </Chip>
+      ) : (
+        <span className="inline-flex items-center text-small text-ink-ghost">{word}</span>
       )}
-    >
-      {alarming && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
-      {word}
-    </span>
+    </Tooltip>
   );
 }
 
@@ -187,7 +196,7 @@ export function RunWork({
 
   return (
     <div>
-      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
+      <SectionLabel>Its run</SectionLabel>
       <p className="text-ui text-ink">{runStartedLine(work, now, run.waiting === 'stale')}</p>
       {/* When a run that went quiet was last heard from (plan #1825); its
           Acknowledge sits with its lines below. */}
@@ -258,8 +267,9 @@ export function Underway({
   const silent = stopped || claim === 'quiet';
 
   return (
-    <span
-      title={
+    <Tooltip
+      className="shrink-0"
+      label={
         stopped
           ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
           : claim === 'quiet'
@@ -267,20 +277,15 @@ export function Underway({
             : // A session can start on anything approved, so an underway step
               // is a session's unless you kept it back. The column used to be
               // read the other way, when only a step handed over was Dash's.
-              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}`
+              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}. Nothing is needed from you.`
       }
-      className={cn(
-        'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
-        silent ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
-      )}
     >
-      <span
-        className={cn('size-1.5 rounded-full', silent ? 'bg-caution' : 'animate-pulse bg-accent')}
-        aria-hidden
-      />
-      <Elapsed startedAt={startedAt} />
-      {stopped && <span className="sr-only"> with no session on it</span>}
-      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
-    </span>
+      <Chip tone={silent ? 'caution' : 'accent'}>
+        <LiveDot tone={silent ? 'caution' : 'accent'} still={silent} />
+        <Elapsed startedAt={startedAt} />
+        {stopped && <span className="sr-only"> with no session on it</span>}
+        {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
+      </Chip>
+    </Tooltip>
   );
 }

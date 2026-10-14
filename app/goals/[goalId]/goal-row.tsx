@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
@@ -59,7 +60,6 @@ import {
 import { InformationStep, type InformationSeam } from './information-step';
 import {
   askDashStepAction,
-  setFogAsideAction,
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
@@ -80,6 +80,7 @@ import {
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * One goal step, drawn through the dev plan's shared row (plan #982) in its
@@ -102,9 +103,6 @@ const GOAL_TREE_ACTIONS: TreeActions = {
   ask: askGoalQuestion,
   addDependency: addGoalStepDependency,
   removeDependency: removeGoalStepDependency,
-  // Steps carry no fog; only the goal does, and it has its own note above
-  // the tree. Here for the shape, never pressed.
-  dismissFog: setFogAsideAction,
 };
 
 const GOAL_COMMENTS = { target: 'goal' as const };
@@ -239,7 +237,7 @@ function ProgressLine({
       Last progress {formatDate(beneath.on)} on{' '}
       <Link
         href={stepHref(goalId, beneath.stepId)}
-        className="press-area underline-offset-2 hover:underline"
+        className={cn('press-area', linkVariants({ tone: 'quiet' }))}
       >
         {beneath.title}
       </Link>
@@ -284,7 +282,7 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
  */
 function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSProperties }) {
   const details = (
-    <Link href={`/goals/runs/${run.runId}`} className="underline underline-offset-2">
+    <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
       Details
     </Link>
   );
@@ -315,7 +313,7 @@ function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSPropert
   if (!run.summary) return null;
   return (
     <li style={inset} className="pb-1.5 pr-3 text-small text-ink-muted">
-      <Link href={`/goals/runs/${run.runId}`} className="underline-offset-2 hover:underline">
+      <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
         Last run
       </Link>
       : {run.summary}
@@ -343,7 +341,7 @@ function BlockForm({
   }, {} as TreeActionState);
   return (
     <li style={inset} className="pb-2 pr-3">
-      <form action={action} className="space-y-2 rounded-lg bg-sunken px-3 py-2.5">
+      <form action={action} className="space-y-2 rounded-control bg-sunken px-3 py-2.5">
         <input type="hidden" name="id" value={node.id} />
         <InlineInput
           name="ask"
@@ -740,7 +738,15 @@ export function GoalRow({
       // 6d242e62). That is a different fact from the move, so it keeps its own
       // words rather than MoveLabel's; the goal's move is on GoalProgress.
       move={
-        <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
+        node.who.title ? (
+          <Tooltip label={node.who.title}>
+            <span className="inline-flex">
+              <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
+            </span>
+          </Tooltip>
+        ) : (
+          <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
+        )
       }
       layout="list"
       heading={page}
@@ -762,25 +768,28 @@ export function GoalRow({
       marks={
         <>
           {dashes && (
-            <span
-              ref={markRef}
-              title={
+            <Tooltip
+              label={
                 step.kind === 'claude'
                   ? STEP_KIND_LABELS.claude
                   : arrived
                     ? 'Finished by Dash'
-                    : node.who.title
+                    : node.who.title || 'Dash is on this step'
               }
-              className="inline-flex shrink-0 text-ink-muted"
+              className="shrink-0"
             >
-              <DashMark size="2xs" label="Dash's" />
-            </span>
+              <span ref={markRef} className="inline-flex text-ink-muted">
+                <DashMark size="2xs" label="Dash's" />
+              </span>
+            </Tooltip>
           )}
           {step.kind === 'rhythm' && (
-            <span title={STEP_KIND_LABELS.rhythm} className="inline-flex shrink-0 text-ink-muted">
-              <Repeat className="size-3" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
-            </span>
+            <Tooltip label={STEP_KIND_LABELS.rhythm} className="shrink-0">
+              <span className="inline-flex text-ink-muted">
+                <Repeat className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
+              </span>
+            </Tooltip>
           )}
         </>
       }

@@ -1,4 +1,4 @@
-import type { ModuleSources, Page } from '@/lib/sources/types';
+import type { ModuleSources, Page, PageRow, Section } from '@/lib/sources/types';
 import { stepHref } from '@/lib/goals/all-goals';
 
 /**
@@ -8,6 +8,17 @@ import { stepHref } from '@/lib/goals/all-goals';
  * the gate says so.
  */
 const OWN = 'Goals’ own table; the goals skill reads it directly.';
+
+/** Where every goal, area and step sits in Goals' nav (app/goals/layout.tsx). */
+const ALL_GOALS: Section = { href: '/goals/all', label: 'All goals' };
+
+function itemRef(id: PageRow[string]): string | null {
+  return typeof id === 'string' && id ? `goals.items:${id}` : null;
+}
+
+function areaRef(id: PageRow[string]): string | null {
+  return typeof id === 'string' && id ? `goals.areas:${id}` : null;
+}
 
 /**
  * The goals rows a ref can open (lib/core/refs.ts). A goal has its own page
@@ -22,12 +33,24 @@ const PAGES: Record<string, Page> = {
       row.level === 'goal' || !row.parent_id
         ? `/goals/${row.id}`
         : stepHref(String(row.parent_id), String(row.id)),
+    section: ALL_GOALS,
+    // A step sits under the step or goal above it, and a goal under its area.
+    parent: {
+      reads: ['parent_id', 'area_id'],
+      ref: (row) => itemRef(row.parent_id) ?? areaRef(row.area_id),
+    },
   },
   // An area has its own page (areaHref in lib/goals/all-goals.ts).
-  'goals.areas': { title: 'name', href: (row) => `/goals/area/${row.id}` },
+  'goals.areas': { title: 'name', href: (row) => `/goals/area/${row.id}`, section: ALL_GOALS },
+  // A run sits under the goal or step it worked on, else the area it planned.
   'goals.runs': {
     title: { reads: ['summary', 'job'], of: (row) => (row.summary as string | null) || (row.job as string | null) },
     href: (row) => `/goals/runs/${row.id}`,
+    section: null,
+    parent: {
+      reads: ['item_id', 'area_id'],
+      ref: (row) => itemRef(row.item_id) ?? areaRef(row.area_id),
+    },
   },
 };
 

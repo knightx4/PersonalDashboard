@@ -8,6 +8,13 @@ import { DEV_THREAD_TABLES, GOAL_THREAD_TABLE, ROLE_THREAD_TABLE, THREAD_TOOL_NA
 import { WRITE_TOOL_NAMES } from './writes';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
+import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
+import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
@@ -48,6 +55,13 @@ describe('DASH_TOOLS', () => {
       'add_quick_note',
       ...LEARN_CHANGE_KINDS,
       ...TODO_CHANGE_KINDS,
+      ...YOU_CHANGE_KINDS,
+      ...NEWS_CHANGE_KINDS,
+      ...GOALS_CHANGE_KINDS,
+      ...SHOPPING_CHANGE_KINDS,
+      ...VAULT_CHANGE_KINDS,
+      ...JOBS_CHANGE_KINDS,
+      ...INTERVIEW_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,
@@ -58,6 +72,11 @@ describe('DASH_TOOLS', () => {
       'build_step',
       'file_goal_record',
       'schedule_goal_step',
+      'move_goal_step',
+      'archive_goal_step',
+      'promote_step_to_errand',
+      'approve_goal',
+      'start_errand_run',
       'write_cover_letter',
       'file_close',
       'file_count',
@@ -94,7 +113,17 @@ describe('DASH_TOOLS', () => {
     expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.raise)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.change)).toEqual(['file_idea', 'file_note', 'reword', 'pass_to_session']);
-    expect(own(GOAL_THREAD_TABLE)).toEqual(['file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']);
+    expect(own(GOAL_THREAD_TABLE)).toEqual([
+      'file_goal_record',
+      'schedule_goal_step',
+      'move_goal_step',
+      'archive_goal_step',
+      'promote_step_to_errand',
+      'approve_goal',
+      'start_errand_run',
+      'take_step',
+      'pass_to_routine',
+    ]);
     expect(own(ROLE_THREAD_TABLE)).toEqual(['write_cover_letter']);
   });
 

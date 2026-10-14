@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadThemeMap } from '@/lib/vault/map/read';
 import { ThemeView } from './theme-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,5 +25,5 @@ export default async function ThemePage({ params }: { params: Promise<{ id: stri
   const map = await loadThemeMap(supabase, id);
   if (!map) notFound();
 
-  return <ThemeView map={map} />;
+  return <ThemeView map={map} path={await rowSubject(toRef('obsidian.themes', id))} />;
 }

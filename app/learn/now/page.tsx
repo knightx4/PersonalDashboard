@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
@@ -27,6 +27,11 @@ import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
+import { BriefsList } from './briefs-list';
+import { loadOpenBriefs } from '@/lib/learn/briefs/load';
+import type { BriefSummary } from '@/lib/learn/briefs/view';
+import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
@@ -112,7 +117,7 @@ export default async function NowPage({
     after(() => topUpFeedAfterResponse(user.id, subject.id));
     const related = relatedNotesForCards(supabase, user.id, cards);
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header()}
         <LearnNowFeed
           first={cards}
@@ -123,7 +128,7 @@ export default async function NowPage({
           low={READY_LOW}
           subjectId={subject.id}
         />
-      </div>
+      </PageColumn>
     );
   }
 
@@ -153,15 +158,21 @@ export default async function NowPage({
 
   if (practice) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
         {strip}
         <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
-      </div>
+      </PageColumn>
     );
   }
 
-  const [cards, ready] = await Promise.all([loadFeedPage(supabase, []), countReadyCards(supabase)]);
+  // The topics Dash researched for you (plan #2023.4); a list that cannot be
+  // read is left off rather than failing the page.
+  const [cards, ready, briefs] = await Promise.all([
+    loadFeedPage(supabase, []),
+    countReadyCards(supabase),
+    loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
+  ]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
@@ -172,7 +183,7 @@ export default async function NowPage({
   const queued = readings ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       {header(
         queued.length === 0
           ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
@@ -180,6 +191,8 @@ export default async function NowPage({
       )}
 
       {strip}
+
+      <BriefsList briefs={briefs} />
 
       {queued.length > 0 && (
         /* One surface with hairlines, not a card per reading. Law 13: the
@@ -199,7 +212,7 @@ export default async function NowPage({
                     <h3 className="text-body font-medium text-ink">{reading.subject}</h3>
                     <Link
                       href={`/learn/t/${reading.trackId}`}
-                      className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className={cn('text-small', linkVariants({ tone: 'quiet' }))}
                     >
                       {reading.trackTitle}
                     </Link>
@@ -214,7 +227,7 @@ export default async function NowPage({
                       <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
                         <Button type="submit" variant="primary" size="sm">
-                          <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden />
+                          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
                           Open
                         </Button>
                         <PaidHint
@@ -225,7 +238,7 @@ export default async function NowPage({
                     ) : (
                       <Link
                         href={`/learn/r/${reading.id}`}
-                        className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
+                        className={cn('text-ui', linkVariants({ tone: 'quiet' }))}
                       >
                         No source yet — find one
                       </Link>
@@ -241,7 +254,7 @@ export default async function NowPage({
 
                     <Link
                       href={`/learn/r/${reading.id}`}
-                      className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className={cn('ml-auto text-small', linkVariants({ tone: 'quiet' }))}
                     >
                       Everything about it
                     </Link>
@@ -257,12 +270,12 @@ export default async function NowPage({
         <ReviewList
           reviews={(reviews ?? []).slice(0, REVIEWS_IN_LEARN_NOW)}
           title="Due for review"
-          description="Ideas from pieces you passed. A right answer brings the next question later; a miss brings it back tomorrow."
+          description="Ideas you answered questions on or said you know. A right answer brings the next question later; a miss brings it back tomorrow."
           showPlan
         />
       </div>
 
       <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
-    </div>
+    </PageColumn>
   );
 }

@@ -1,4 +1,5 @@
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { toRef } from '@/lib/core/refs';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
 import type { GoalPace } from '@/lib/goals/pace';
@@ -46,7 +47,10 @@ export function GoalDetail({
   const tabs = GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t));
   return (
     <TabbedDetail
-      crumbs={goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' })}
+      subject={{
+        ref: toRef('goals.items', goal.id),
+        path: goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' }),
+      }}
       title={
         <span className="flex items-center gap-2.5">
           <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
@@ -97,20 +101,12 @@ export function GoalDetail({
  * the tabbed detail pattern no longer allows, and it is the Overview's to say
  * what the goal is for. Editable where it stands, as it was in the header.
  */
-export function GoalDoneWhen({
-  goal,
-  children,
-}: {
-  goal: Pick<Goal, 'id' | 'acceptance'>;
-  /** What is not settled yet about the goal, its fog, on the same card. */
-  children?: React.ReactNode;
-}) {
+export function GoalDoneWhen({ goal }: { goal: Pick<Goal, 'id' | 'acceptance'> }) {
   return (
     <DetailCard>
       <DetailPart label="Done when">
         <GoalHeadingField goalId={goal.id} field="acceptance" value={goal.acceptance} />
       </DetailPart>
-      {children}
     </DetailCard>
   );
 }

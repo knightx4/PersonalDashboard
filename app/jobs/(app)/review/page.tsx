@@ -7,6 +7,7 @@ import { loadReviewQueue, parseReviewView, type SearchableRole } from '@/lib/job
 import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { scoreCandidate, type LinkInput } from '@/lib/jobs/email/link';
 import { ReviewQueue } from './list';
+import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Review' };
 
@@ -120,7 +121,7 @@ export default async function ReviewPage({
 
   if (rows.length === 0) {
     return (
-      <>
+      <PageWide>
         <PageHeader
           title="Review"
           description="Everything the inbox could not decide on its own."
@@ -131,18 +132,20 @@ export default async function ReviewPage({
           description="When a message cannot be matched confidently, it is held here rather than guessed at. An empty queue means the pipeline is current."
           action={{ label: 'Back to the pipeline', href: '/jobs/pipeline' }}
         />
-      </>
+      </PageWide>
     );
   }
 
   return (
-    <ReviewQueue
-      rows={filtered}
-      counts={counts}
-      view={view}
-      timezone={(profile?.timezone as string) ?? 'UTC'}
-      companyNames={companies.map((company) => company.name).sort()}
-      allRoles={allRoles}
-    />
+    <PageWide>
+      <ReviewQueue
+        rows={filtered}
+        counts={counts}
+        view={view}
+        timezone={(profile?.timezone as string) ?? 'UTC'}
+        companyNames={companies.map((company) => company.name).sort()}
+        allRoles={allRoles}
+      />
+    </PageWide>
   );
 }

@@ -28,10 +28,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -166,6 +164,17 @@ export function DevModuleSurface() {
     <ModuleView
       summary={moduleSummary(moduleById('jobs')!, inputs)}
       tab="overview"
+      now={new Date('2026-10-08T12:00:00Z')}
+    />
+  );
+}
+
+/** The Ideas tab, where each idea carries Shape into a plan (note 2c0d63b2). */
+export function DevModuleIdeasSurface() {
+  return (
+    <ModuleView
+      summary={moduleSummary(moduleById('jobs')!, inputs)}
+      tab="ideas"
       now={new Date('2026-10-08T12:00:00Z')}
     />
   );

@@ -5,7 +5,7 @@ import { extractBooksFromPhoto } from './photo-actions';
 import { savePasteBookList, type BookActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
-import { FieldError, Label } from '@/components/ui/field';
+import { Checkbox, FieldError, Label } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
@@ -150,8 +150,7 @@ export function PhotoCapturePanel() {
               const payloadIndex = resolved.findIndex((e) => e.index === resultIndex);
               return (
                 <li key={resultIndex} className="card-pad-x row-pad flex items-start gap-3">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="selected"
                     value={String(payloadIndex)}
                     defaultChecked={false}
@@ -164,8 +163,7 @@ export function PhotoCapturePanel() {
                       {row.book.isbn13 ? ` · ${row.book.isbn13}` : ''}
                     </p>
                     <label className="mt-2 flex items-center gap-2 text-ui text-caution">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="confirmed"
                         value={String(payloadIndex)}
                         defaultChecked={!row.book.needsConfirmation}

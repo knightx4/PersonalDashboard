@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronRight, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { fileHref, isUnread, type FileAuthor } from '@/lib/files/files';

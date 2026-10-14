@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Building2 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -24,6 +24,8 @@ import {
 } from '@/lib/list-display';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
+import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Companies' };
 
@@ -116,8 +118,9 @@ export default async function CompaniesPage({
 
   if (companies.length === 0) {
     return (
-      <>
+      <PageWide>
         <PageHeader
+          subject={sectionSubject('/jobs/companies', 'Companies')}
           title="Companies"
           description="The organisations you are pursuing. Separate from roles, because this page stays useful after a posting closes."
         />
@@ -127,13 +130,14 @@ export default async function CompaniesPage({
           description="A company appears here the moment you add a role at it. You can also add a few up front so inbound mail has something to match against on the first inbox scan."
           action={{ label: 'Add a role', href: '/jobs/roles/new' }}
         />
-      </>
+      </PageWide>
     );
   }
 
   return (
-    <>
+    <PageWide>
       <PageHeader
+        subject={sectionSubject('/jobs/companies', 'Companies')}
         title="Companies"
         description={
           terms.length
@@ -227,7 +231,7 @@ export default async function CompaniesPage({
                                     website: company.website,
                                     careersUrl: company.careers_url,
                                   }}
-                                  className="size-5 rounded"
+                                  className="size-5 rounded-control"
                                   imageClassName="size-4"
                                 />
                                 <span className="min-w-0">
@@ -275,6 +279,6 @@ export default async function CompaniesPage({
           )}
         </div>
       </div>
-    </>
+    </PageWide>
   );
 }

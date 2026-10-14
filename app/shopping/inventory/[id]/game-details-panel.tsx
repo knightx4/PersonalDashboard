@@ -10,6 +10,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import type { GameEditionCandidate } from '@/lib/games/types';
 
 export type GameDetailsView = {
@@ -39,10 +40,10 @@ const SOURCE_LABEL: Record<string, string> = {
 
 function Fact({ label, value }: { label: string; value: string | number | null }) {
   return (
-    <div>
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className={value ? 'text-ink' : 'text-ink-muted'}>{value || 'Not listed'}</dd>
-    </div>
+    <ValueRow
+      label={label}
+      value={value || <span className="text-ink-muted">Not listed</span>}
+    />
   );
 }
 
@@ -77,10 +78,10 @@ function CandidateRow({
         <img
           src={candidate.imageUrl}
           alt=""
-          className="h-16 w-16 shrink-0 rounded bg-canvas object-cover"
+          className="h-16 w-16 shrink-0 rounded-card bg-canvas object-cover"
         />
       ) : (
-        <div className="h-16 w-16 shrink-0 rounded bg-canvas" />
+        <div className="h-16 w-16 shrink-0 rounded-card bg-canvas" />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-body font-medium text-ink">{candidate.title}</p>
@@ -131,7 +132,7 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
         <p className="text-small text-ink-muted">Imported from an order email</p>
       )}
 
-      <dl className="grid gap-2 text-body sm:grid-cols-2">
+      <ValueList>
         <Fact label="BGG id" value={game.bggId} />
         <Fact label="Publisher" value={game.publisher} />
         <Fact label="Year" value={game.yearPublished} />
@@ -139,16 +140,15 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
         {game.playingTimeMinutes != null && (
           <Fact label="Playing time" value={`${game.playingTimeMinutes} min`} />
         )}
-        <div>
-          <dt className="text-ink-muted">Resolved via</dt>
-          <dd className="text-ink">
-            {SOURCE_LABEL[game.resolutionSource] ?? game.resolutionSource.replace('_', ' ')}
-            {game.matchConfidence != null
+        <ValueRow
+          label="Resolved via"
+          value={`${SOURCE_LABEL[game.resolutionSource] ?? game.resolutionSource.replace('_', ' ')}${
+            game.matchConfidence != null
               ? ` · ${Math.round(Number(game.matchConfidence) * 100)}% match`
-              : ''}
-          </dd>
-        </div>
-      </dl>
+              : ''
+          }`}
+        />
+      </ValueList>
 
       {/* The gate is the app's own named shape for "something is wrong and
           only you can fix it, and here is the action": one warn Banner where
@@ -173,10 +173,10 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
                 <img
                   src={game.imageUrl}
                   alt=""
-                  className="h-16 w-16 shrink-0 rounded bg-canvas object-cover"
+                  className="h-16 w-16 shrink-0 rounded-card bg-canvas object-cover"
                 />
               ) : (
-                <div className="h-16 w-16 shrink-0 rounded bg-canvas" />
+                <div className="h-16 w-16 shrink-0 rounded-card bg-canvas" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-body font-medium text-ink">{game.title}</p>

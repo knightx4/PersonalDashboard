@@ -139,7 +139,7 @@ export const SPECS: readonly SpecDoc[] = [
     slug: 'plan',
     title: 'The plan',
     blurb:
-      'How /dev/plan works: the tree of features and steps, what a session may and may not do to it, and how decisions and fog are recorded.',
+      'How /dev/plan works: the tree of features and steps, what a session may and may not do to it, and how decisions are recorded.',
     file: 'PLAN-SPEC.md',
     module: 'dev',
   },

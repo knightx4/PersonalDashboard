@@ -4,6 +4,7 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedTexts } from '@/lib/learn/embed/embed';
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 import type { SwipeAction } from './card';
 import {
   DUPLICATE_SIMILARITY,
@@ -247,6 +248,7 @@ export async function settleIdeaFromSwipe(
       { onConflict: 'concept_id' },
     );
     if (error) throw new Error(error.message);
+    await scheduleIdeas(supabase, userId, [conceptId], { basis: 'declared' });
   } catch (error) {
     warn('recording the swipe on the idea', error);
   }

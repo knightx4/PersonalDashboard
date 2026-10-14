@@ -219,6 +219,7 @@ function inferRejectionStage(
           return 'hiring_manager';
         case 'technical':
         case 'case':
+        case 'take_home':
           return 'technical';
         case 'panel':
         case 'onsite':

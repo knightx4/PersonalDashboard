@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -10,8 +10,10 @@ import {
   Check,
   ExternalLink,
   Feather,
+  FileSearch,
   GraduationCap,
   Play,
+  Sparkle,
   Sprout,
   Weight,
   X,
@@ -19,9 +21,11 @@ import {
 import { CardNotes } from '@/components/learn/card-notes';
 import { TalkThread } from '@/components/talk/talk-thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { Field, Textarea } from '@/components/ui/field';
@@ -88,6 +92,8 @@ import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
 const SWIPE_X = 90;
 const SWIPE_Y = 110;
 const LEAVE_MS = SWIPE_RELEASE_MS;
+/** How many passed cards Previous can bring back, as in Quick read. */
+const BACK_LIMIT = 5;
 
 type Leaving = { id: string; swipe: SwipeAction } | null;
 
@@ -117,7 +123,10 @@ export function LearnNowFeed({
   ready: firstReady,
   low,
   subjectId = null,
+  earlier = [],
 }: {
+  /** Cards already passed this visit, which the gallery uses to draw Previous. */
+  earlier?: FeedCard[];
   first: FeedCard[];
   /**
    * Your notes on each of the first cards' ideas (plan #1113), by card, still
@@ -140,7 +149,14 @@ export function LearnNowFeed({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<Leaving>(null);
-  const [passed, setPassed] = useState(0);
+  const [passed, setPassed] = useState(earlier.length);
+  // The last few cards passed, newest last, for Previous. The ref lets
+  // `advance` read the deck it is passing a card out of.
+  const [back, setBack] = useState<FeedCard[]>(earlier);
+  const deckNow = useRef(deck);
+  useEffect(() => {
+    deckNow.current = deck;
+  }, [deck]);
   const loaded = useRef(first.map((card) => card.id));
   const busy = useRef(false);
   const top = useRef<HTMLDivElement>(null);
@@ -218,11 +234,26 @@ export function LearnNowFeed({
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
     setLeaving(null);
+    const gone = deckNow.current.find((card) => card.id === id);
+    if (gone) setBack((cards) => [...cards, gone].slice(-BACK_LIMIT));
     setDeck((cards) => cards.filter((card) => card.id !== id));
     setPassed((count) => count + 1);
     const box = top.current;
     if (box && box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
   }, []);
+
+  /**
+   * Previous: the card just passed comes back on top, drawn again as it was
+   * loaded. What its swipe recorded stays until it is passed again.
+   */
+  const previous = useCallback(() => {
+    const card = back.at(-1);
+    if (!card || leaving) return;
+    setError(null);
+    setBack((cards) => cards.slice(0, -1));
+    setDeck((cards) => [card, ...cards.filter((other) => other.id !== card.id)]);
+    setPassed((count) => Math.max(0, count - 1));
+  }, [back, leaving]);
 
   const swipe = useCallback(
     (swipeAs: SwipeAction) => {
@@ -310,10 +341,26 @@ export function LearnNowFeed({
             className="mb-2 flex items-baseline justify-between gap-3 text-small text-ink-muted"
             aria-live="polite"
           >
-            <span>
-              {passed > 0
-                ? `${passed} done this visit`
-                : 'Swipe down if you know it, right to work on it, left for later.'}
+            <span className="flex min-w-0 items-baseline gap-3">
+              {back.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={previous}
+                  disabled={leaving !== null}
+                  className="-my-1 shrink-0 active:bg-sunken active:text-ink"
+                  data-deck-previous
+                >
+                  <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Previous
+                </Button>
+              )}
+              <span>
+                {passed > 0
+                  ? `${passed} done this visit`
+                  : 'Swipe down if you know it, right to work on it, left for later.'}
+              </span>
             </span>
             <span className="shrink-0">
               {ahead > 0 ? `${ahead} more loaded` : loading ? 'Loading more…' : ''}
@@ -437,7 +484,7 @@ function UpNext({
               </span>
               {card.video && (
                 <span className="inline-flex shrink-0 items-center gap-1 text-small text-ink-muted">
-                  <Play className="size-3" strokeWidth={2} aria-hidden />
+                  <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                   Clip
                 </span>
               )}
@@ -686,20 +733,20 @@ function DeckCard({
         <article ref={body} className="card-pad min-w-0">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small text-ink-muted">
             <span>{card.why}</span>
+            {card.fresh && (
+              <Chip>
+                <Sparkle strokeWidth={1.75} aria-hidden />
+                New source
+              </Chip>
+            )}
             {card.depth && (
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-                {DEPTH_LABEL[card.depth]}
-              </span>
+              <Chip>{DEPTH_LABEL[card.depth]}</Chip>
             )}
             {card.returning === 'review' && (
-              <span className="rounded-pill bg-caution-tint px-1.5 py-0.5 text-small text-caution">
-                Back because you wanted to work on it
-              </span>
+              <Chip tone="caution">Back because you wanted to work on it</Chip>
             )}
             {card.returning === 'skipped' && (
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-                Back after you skipped it
-              </span>
+              <Chip>Back after you skipped it</Chip>
             )}
           </p>
           <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
@@ -767,11 +814,11 @@ function DeckCard({
               {/* What the clip says and why it is on this card (note
                   cde86a10), once the top-up has written it. */}
               {card.video.note && (
-                <div className="mt-2 rounded-control bg-sunken px-3 py-2.5">
+                <Note className="mt-2">
                   <h4 className="text-small font-semibold text-ink-muted">In this video</h4>
                   <p className="mt-1 text-body text-ink">{card.video.note.said}</p>
                   <p className="mt-1 text-small text-ink-muted">{card.video.note.why}</p>
-                </div>
+                </Note>
               )}
             </section>
           )}
@@ -857,18 +904,28 @@ function DeckCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => void openCardSource(card.id)}
-                className="inline-flex items-center gap-1 text-ink underline underline-offset-2 hover:text-accent"
+                className={cn('inline-flex min-h-11 items-center gap-1', linkVariants({ tone: 'quiet' }))}
               >
                 {card.article}
-                <ExternalLink className="size-3" strokeWidth={2} aria-hidden />
+                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               </a>
-              {` · ${card.site}`}
+              {' '}
+              <span className="whitespace-nowrap">{`· ${card.site}`}</span>
               {card.licence ? ` · ${card.licence}` : ''}
             </p>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {card.link && (
+            {/* A brief's source is on the brief's reading list already, and
+                has no section to start a subject from (plan #2023.6): its
+                card links back to the brief instead of Save and Test me. */}
+            {card.kind === 'research' && card.briefId && (
+              <Link href={`/learn/b/${card.briefId}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                <FileSearch className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Open the brief
+              </Link>
+            )}
+            {card.link && card.kind !== 'research' && (
               <Button
                 type="button"
                 variant="ghost"
@@ -878,21 +935,23 @@ function DeckCard({
                 disabled={saved !== null}
               >
                 {saved ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Bookmark className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Bookmark className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </Button>
             )}
-            <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
-              <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
-              {testing
-                ? card.kind === 'lesson'
-                  ? 'Opening the questions…'
-                  : 'Starting a subject…'
-                : 'Test me on this'}
-            </Button>
+            {card.kind !== 'research' && (
+              <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
+                <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
+                {testing
+                  ? card.kind === 'lesson'
+                    ? 'Opening the questions…'
+                    : 'Starting a subject…'
+                  : 'Test me on this'}
+              </Button>
+            )}
             {/* A lesson's track already exists, so testing on it costs nothing. */}
             {card.kind === 'section' && (
               <PaidHint
@@ -911,9 +970,9 @@ function DeckCard({
                   disabled={made !== null || testing}
                 >
                   {made ? (
-                    <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                   ) : (
-                    <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
                   )}
                   {made ? 'Subject made' : making ? 'Making a subject…' : 'Make this a subject'}
                 </Button>
@@ -936,7 +995,7 @@ function DeckCard({
                 onClick={onDismiss}
                 disabled={testing}
               >
-                <X className="size-3.5" strokeWidth={2} aria-hidden />
+                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
                 Not interested
               </Button>
               <Button
@@ -952,9 +1011,9 @@ function DeckCard({
                 )}
               >
                 {difficulty === 'too_hard' ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Weight className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Weight className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 <span className="sm:hidden">Hard</span>
                 <span className="max-sm:hidden">Too hard</span>
@@ -972,9 +1031,9 @@ function DeckCard({
                 )}
               >
                 {difficulty === 'too_easy' ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Feather className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Feather className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 <span className="sm:hidden">Easy</span>
                 <span className="max-sm:hidden">Too easy</span>
@@ -997,7 +1056,7 @@ function DeckCard({
           {saved && (
             <p className="mt-2 text-small text-ink-muted">
               On{' '}
-              <Link href={`/learn/t/${saved.id}`} className="text-ink underline underline-offset-2">
+              <Link href={`/learn/t/${saved.id}`} className={linkVariants()}>
                 {saved.title}
               </Link>
               .
@@ -1007,8 +1066,10 @@ function DeckCard({
         </article>
 
         {/* The three swipes as buttons, held at the foot of the screen while
-            a long card is read, so leaving a card never needs a scroll back. */}
-        <div className="sticky bottom-0 rounded-b-[inherit] border-t border-border bg-surface card-pad-x py-2">
+            a long card is read, so leaving a card never needs a scroll back.
+            On a phone they stop above the tab bar, as the deck pattern's
+            forward row does (components/patterns/deck.tsx). */}
+        <div className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:bottom-0 rounded-b-card border-t border-border bg-surface card-pad-x py-2">
           {/* A phrase selected on the card, and its explanation (plan
               #1057), above the swipes so it is on screen wherever the
               phrase was. */}
@@ -1025,7 +1086,7 @@ function DeckCard({
               onClick={() => onSwipe('skipped')}
               aria-keyshortcuts="ArrowLeft"
             >
-              <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
               Not now
             </Button>
             <Button
@@ -1034,7 +1095,7 @@ function DeckCard({
               onClick={() => onSwipe('known')}
               aria-keyshortcuts="ArrowDown"
             >
-              <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
               Got it
             </Button>
             <Button
@@ -1044,7 +1105,7 @@ function DeckCard({
               aria-keyshortcuts="ArrowRight"
             >
               Work on this
-              <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
             </Button>
           </div>
         </div>
@@ -1089,7 +1150,7 @@ function UnitCheckCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
+        <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
         {card.why}
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">{card.title}</h2>
@@ -1132,9 +1193,9 @@ function UnitCheckCard({
         <div className="mt-3 space-y-2" aria-live="polite">
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', marked.correct ? 'text-ink' : 'text-ink-muted')}>
             {marked.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {marked.correct ? 'Right.' : 'Not quite.'}
           </p>

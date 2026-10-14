@@ -7,7 +7,11 @@ import { loadConceptView } from '@/lib/learn/graph/concept';
 import { nextRung, probesFor } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import { loadConceptNotes } from '@/lib/learn/notes/store';
+import { loadEvidenceForIdea } from '@/lib/learn/evidence/links';
+import { CARD_EVIDENCE_LIMIT } from '@/lib/learn/evidence/model';
 import { ConceptPageView } from './concept-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +54,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
   const { concept, subject } = view;
   const probes = await probesFor(supabase, concept.id);
 
-  const [opening, material, notes] = await Promise.all([
+  const [opening, material, notes, evidence] = await Promise.all([
     // The question asked before any of this subject existed, when there was
     // one. It is where a state of known or shaky on a first chain came from,
     // so a page showing the state has to be able to show what established it.
@@ -69,6 +73,12 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
     }),
     // Your notes on this idea, from its cards and from this page (plan #1058).
     loadConceptNotes(supabase, concept.id),
+    // What backs it: your notes, courses and work (plan #2006.6). A failed
+    // read leaves the list off rather than losing the page.
+    loadEvidenceForIdea(supabase, concept.id, { limit: CARD_EVIDENCE_LIMIT }).catch((error: unknown) => {
+      console.error('[learn concept] evidence', error instanceof Error ? error.message : error);
+      return [];
+    }),
   ]);
 
   return (
@@ -78,8 +88,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       opening={opening}
       material={material}
       notes={notes}
+      evidence={evidence}
       timezone={settings.timezone}
       now={new Date()}
+      path={await rowSubject(toRef('learn.concepts', id))}
     />
   );
 }

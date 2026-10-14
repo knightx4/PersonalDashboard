@@ -129,8 +129,6 @@ export type GoalRowNode = {
   acceptance: string | null;
   blockAsk: string | null;
   comment: null;
-  fog: null;
-  fogDismissedAt: null;
   /** Under a view: whether this row matched or is only here for what is beneath it. */
   matches: boolean;
   rollup: PlanProgress;
@@ -391,8 +389,6 @@ export function goalRows(
       acceptance: step.acceptance,
       blockAsk: step.status === 'blocked' ? (step.blockAsk ?? null) : null,
       comment: null,
-      fog: null,
-      fogDismissedAt: null,
       matches: true,
       rollup: planProgress(leavesOf(asPlanList(shadow.children))),
       dependsOn: (step.dependsOn ?? []).map((link) => ({

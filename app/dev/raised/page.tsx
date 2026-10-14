@@ -35,8 +35,9 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
 import { goalsStatus } from '@/lib/goals/runner-status';
 import { loadGoalsNight } from '@/inngest/goals/overnight';
+import { PageColumn } from '@/components/shell/page-width';
 
-export const metadata = { title: 'Dash' };
+export const metadata = { title: 'Home' };
 
 /** How far back the pictures under the strip reach. */
 const SHIPPED_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -207,7 +208,7 @@ export default async function DevRaisedPage() {
     .slice(0, SHIPPED_SHOWN);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageColumn className="space-y-6">
       {/* No description: the page is the day, and says so by what is on it. */}
       <PageHeader title="Home" />
       <InboxRedirect />
@@ -240,6 +241,6 @@ export default async function DevRaisedPage() {
       <DigestPanel digest={digest} />
       <CheckBacksPanel rows={comingBack} now={now} />
       <ConversationsView conversations={conversations} titles={titles} now={now} />
-    </div>
+    </PageColumn>
   );
 }

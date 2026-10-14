@@ -4,6 +4,7 @@ import type {
   JobsOperation,
   NewsOperation,
   ShoppingOperation,
+  YouOperation,
 } from '@/lib/core/spend/operations';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
@@ -35,7 +36,8 @@ export type OperationName =
   | ShoppingOperation
   | CoreOperation
   | NewsOperation
-  | GoalsOperation;
+  | GoalsOperation
+  | YouOperation;
 
 export type OperationGuess = {
   model: string;
@@ -146,6 +148,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A transcript of three or four pages as PDF text and images, and about
   // fifty courses back at forty tokens each.
   'read-transcript': run(HAIKU, 10_000, 2_500),
+  // A two-page résumé as text, and about ten jobs back at sixty tokens each.
+  'read-work-history': run(HAIKU, 3_500, 700),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),
@@ -204,7 +208,6 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A card's idea and up to 6,000 characters of lecture transcript in; two
   // sentences out. Written by the hourly top-up, a few cards a run.
   'describe-card-clip': background(unit(HAIKU, 2_000, 120)),
-  'read-personality': run(SONNET, 7_000, 1_200),
   // Every subject's name and up to three names from a chat in; a match each out.
   'match-subjects': background(run(HAIKU, 2_000, 200)),
   // A few ideas' claims at about 65 tokens each. Counted as background
@@ -221,6 +224,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // 50,000 tokens); a typical article or chapter is a fifth of that. Two
   // short paragraphs out.
   'summarize-reading': run(SONNET, 12_000, 300),
+  // The rules and up to twelve ideas from each place to be named in; a short
+  // name for each out. Daily, a few places a run.
+  'name-places': background(run(HAIKU, 3_000, 300)),
   // The rules, the brief and an essay of about 1,200 words (read from the
   // cache after a run's first call), and one paragraph in; at most one
   // finding out. Per paragraph the check reads.
@@ -236,6 +242,11 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The five pages' kept text (about 5,000 tokens each) and the draft in; a
   // heading and a sentence or two per claim out, for up to six claims.
   'judge-essay-claims': run(SONNET, 30_000, 3_000),
+  // A research brief (plan #2023.2): the search call dominates, with about
+  // eight searches and five pages of about 6,000 tokens read again on each
+  // round, as the essay's gathering is. The two Sonnet calls (framing, and
+  // writing from the five pages) add about $0.15, folded into the tokens.
+  'research-topic': searching(run(HAIKU, 400_000, 10_000), 8),
   // The rules and an essay of up to 2,000 words (about 3,000 tokens) in; at
   // most eight claims of a sentence or two out (plan #1873).
   'name-essay-claims': run(SONNET, 3_500, 700),
@@ -409,4 +420,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A closed step's title and result, about three hundred tokens with the
   // question, for the two or three Claude steps a run closes.
   'check-run-acts': background(run(JEV, 3 * 300, 0)),
+
+  // You: a personality result, its trait themes and up to fifteen cut notes
+  // in, a few points out.
+  'read-personality': run(SONNET, 7_000, 1_200),
 };

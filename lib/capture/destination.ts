@@ -56,6 +56,11 @@ export function captureDestination(
 ): CaptureDestination | null {
   const workspace = moduleById(action.module);
   if (!workspace) return null;
-  const place = action.id === 'todo' ? todoDayName(filed.day) : goalsPlaceName(filed.entries ?? []);
+  const place =
+    action.id === 'todo'
+      ? todoDayName(filed.day)
+      : action.id === 'vault'
+        ? 'Quick note triage'
+        : goalsPlaceName(filed.entries ?? []);
   return { module: workspace.id, href: workspace.home, name: `${workspace.label} · ${place}` };
 }

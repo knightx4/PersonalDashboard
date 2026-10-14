@@ -46,10 +46,8 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -837,7 +835,6 @@ describe('summarize', () => {
       // Everything open that you did not keep: the feature itself, b, d and
       // f. c is blocked, so it is on you; g is a proposal.
       claude: 4,
-      fog: 0,
       dismissed: 0,
     });
   });
@@ -1220,32 +1217,6 @@ describe('the On you view', () => {
   });
 });
 
-describe('fog on the frontier', () => {
-  it('counts every step carrying fog, closed ones included', () => {
-    const sections = buildPlanTree({
-      items: [
-        item({ id: 'shipped', number: 1, status: 'done', fog: 'the reviewing is not settled' }),
-        item({ id: 'live', number: 2, status: 'not_started', fog: 'unclear where it lands' }),
-        item({ id: 'clear', number: 3, status: 'not_started' }),
-      ],
-      dependencies: [],
-    });
-    expect(summarize(sections).fog).toBe(2);
-  });
-
-  it('the fog view keeps a finished step that never had its gap filled', () => {
-    const sections = buildPlanTree({
-      items: [
-        item({ id: 'shipped', number: 1, status: 'done', fog: 'still open' }),
-        item({ id: 'clear', number: 2, status: 'done' }),
-      ],
-      dependencies: [],
-    });
-    const shown = flattenSections(applyView(sections, 'fog'));
-    expect(shown.map((node) => node.number)).toEqual([1]);
-  });
-});
-
 describe('put aside as not right now', () => {
   const fixture = () =>
     buildPlanTree({
@@ -1259,13 +1230,6 @@ describe('put aside as not right now', () => {
           dismissedAt: '2026-09-13T00:00:00Z',
         }),
         item({ id: 'step', number: 3, parentId: 'feature', status: 'not_started' }),
-        item({
-          id: 'foggy',
-          number: 4,
-          status: 'not_started',
-          fog: 'nobody can see the second half yet',
-          fogDismissedAt: '2026-09-13T00:00:00Z',
-        }),
       ],
       dependencies: [],
     });
@@ -1277,17 +1241,15 @@ describe('put aside as not right now', () => {
     }
   });
 
-  it('is listed under Dismissed, with the row whose fog was put aside', () => {
+  it('is listed under Dismissed', () => {
     const shown = flattenSections(applyView(fixture(), 'dismissed')).map((node) => node.number);
     expect(shown).toContain(2);
-    expect(shown).toContain(4);
   });
 
   it('is out of the counts, except the one that says how many there are', () => {
     const summary = summarize(fixture());
     expect(summary.onYou).toBe(0);
-    expect(summary.fog).toBe(0);
-    expect(summary.dismissed).toBe(2);
+    expect(summary.dismissed).toBe(1);
   });
 
   it('stops holding its feature open', () => {

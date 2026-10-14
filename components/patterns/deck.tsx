@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { follow, release, SWIPE_RELEASE_MS } from '@/components/motion/swipe';
@@ -46,10 +46,15 @@ export type DeckItem = {
 /** The space between the item going out and the one coming in. */
 const PEEK_GAP = '1rem';
 
+/** How many items Previous can take back, as many as Quick read keeps. */
+export const DECK_BACK_LIMIT = 5;
+
 export function Deck({
   items,
   forward = 'Next',
   onForward,
+  onPrevious,
+  alreadyPassed = [],
   done,
   className,
 }: {
@@ -59,18 +64,49 @@ export function Deck({
   forward?: string;
   /** Told when an item is passed, by the button or a swipe. The deck does not wait for it. */
   onForward?: (key: string) => void;
+  /**
+   * Told when Previous brings an item back. The deck keeps the last few items
+   * it passed and draws Previous beside the forward button once there is one.
+   * The item is drawn again from `items`, so a caller passes this only to take
+   * back what passing it recorded.
+   */
+  onPrevious?: (key: string) => void;
+  /** Keys of items to start with as already passed; the gallery draws Previous with it. */
+  alreadyPassed?: readonly string[];
   /** What shows once every item has been passed. */
   done: ReactNode;
   className?: string;
 }) {
-  const [index, setIndex] = useState(0);
-  const current = items[index] ?? null;
-  const next = items[index + 1] ?? null;
+  // Keys, oldest first: what has been passed, and what Previous has brought
+  // back and the forward press has not passed again (the last is on screen).
+  // Keys and not positions, since an item can leave `items` while it is on
+  // screen, as a filed note does.
+  const [passed, setPassed] = useState<readonly string[]>(alreadyPassed);
+  const [returned, setReturned] = useState<readonly string[]>([]);
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const behind = passed.filter((key) => byKey.has(key));
+  const back = returned.filter((key) => byKey.has(key));
+  const fresh = items.filter((item) => !passed.includes(item.key) && !returned.includes(item.key));
+  const current = (back.length > 0 ? byKey.get(back[back.length - 1]!) : fresh[0]) ?? null;
+  const next =
+    (back.length > 1
+      ? byKey.get(back[back.length - 2]!)
+      : back.length === 1
+        ? fresh[0]
+        : fresh[1]) ?? null;
+  const previousKey = back.length < DECK_BACK_LIMIT ? behind[behind.length - 1] : undefined;
 
   const advance = () => {
     if (!current) return;
     onForward?.(current.key);
-    setIndex((i) => i + 1);
+    setPassed((keys) => [...keys, current.key]);
+    setReturned((keys) => keys.filter((key) => key !== current.key));
+  };
+  const previous = () => {
+    if (!previousKey) return;
+    onPrevious?.(previousKey);
+    setPassed((keys) => keys.filter((key) => key !== previousKey));
+    setReturned((keys) => [...keys, previousKey]);
   };
   // Read by the touch handlers, which are attached once per item.
   const advanceRef = useRef(advance);
@@ -93,11 +129,24 @@ export function Deck({
           {current.actions}
         </div>
         <span className="tabular shrink-0 text-small text-ink-muted">
-          {index + 1} of {items.length}
+          {behind.length + 1} of {items.length}
         </span>
+        {previousKey && (
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={previous}
+            aria-label="Previous"
+            className="active:bg-sunken"
+            data-deck-previous
+          >
+            <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />
+            <span className="max-sm:sr-only">Previous</span>
+          </Button>
+        )}
         <Button size="lg" onClick={advance} data-deck-next>
           {forward}
-          <ArrowRight className="size-4" strokeWidth={2} aria-hidden />
+          <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
         </Button>
       </Card>
       {next?.image && (

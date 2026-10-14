@@ -28,7 +28,7 @@ import { steerLearnAfterGoalSaved } from '@/lib/learn/goal-saved';
 
 /**
  * The Goals home's writes for areas and goals (plan #924): add, rename,
- * reorder and archive both, write a goal's done-when or its fog, write what
+ * reorder and archive both, write a goal's done-when, write what
  * you want from an area, and ask Claude to plan an area's goals.
  *
  * Each returns a sentence to show rather than throwing, so a refused write
@@ -277,8 +277,8 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
 }
 
 /**
- * An edit sends only the field that changed: the title, the done-when, the
- * fog, or the area it moves to (plan #1160).
+ * An edit sends only the field that changed: the title, the done-when or the
+ * area it moves to (plan #1160).
  */
 // latency: pending
 export async function editGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {

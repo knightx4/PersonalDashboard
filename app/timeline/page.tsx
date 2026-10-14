@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -17,6 +17,7 @@ import {
 } from '@/lib/timeline/months';
 import { TIMELINE_MODULES } from '@/lib/timeline/timeline';
 import { TimelineView } from './view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Timeline' };
 
@@ -75,10 +76,11 @@ export default async function TimelinePage({
   return (
     <>
       <PageHeader
+        subject={sectionSubject('/timeline', 'Timeline')}
         title="Timeline"
         description="What you did across the app, month by month."
         actions={
-          <Link href={`/timeline/year/${current.slice(0, 4)}`} className="text-ui text-accent hover:underline">
+          <Link href={`/timeline/year/${current.slice(0, 4)}`} className={`text-ui ${linkVariants()}`}>
             {`${current.slice(0, 4)} in review`}
           </Link>
         }

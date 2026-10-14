@@ -3,6 +3,7 @@
 import { useActionState, useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { Note } from '@/components/ui/note';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { useToast } from '@/components/ui/toast';
 import { createClient } from '@/lib/auth/client';
@@ -400,8 +401,7 @@ function PreviewForm({
 /** The labels the reader warned do not mean what their name says. */
 function Cautions({ cautions, fields }: { cautions: Caution[]; fields: CollectionField[] }) {
   return (
-    <div className="space-y-1 rounded-control bg-caution-tint p-2">
-      <p className="text-small font-medium text-caution">Check these before saving</p>
+    <Note tone="caution" title="Check these before saving">
       <ul className="space-y-1">
         {cautions.map((caution, i) => {
           const field = caution.field ? fields.find((f) => f.key === caution.field) : undefined;
@@ -414,7 +414,7 @@ function Cautions({ cautions, fields }: { cautions: Caution[]; fields: Collectio
           );
         })}
       </ul>
-    </div>
+    </Note>
   );
 }
 

@@ -1,44 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The app's mark, as a file. (No double hyphens anywhere in these comments:
-  XML forbids them inside one, and the only symptom is a favicon that silently
-  does not load.)
-
-  This is components/ui/module-mark.tsx with module={null}, drawn out by hand:
-  the same generated superellipse ground, the same fat dash, the same
-  three-stop brand ramp across it. There is no build step tying the two
-  together and not enough here to justify one, so if the component changes,
-  change this.
-
-  Two deliberate differences from the component, both because a favicon is a
-  fixed object and a component is not:
-
-  1. The ground is opaque. In the app it is the module hue at 16% over
-     whatever is behind it, which is how one drawing serves four themes; a file
-     has nothing behind it, so this is that same tint composited once over the
-     app's own near-black. The icon therefore looks like the dark-theme
-     rendering, which is the right one to pick, because browser chrome is dark
-     more often than not and a near-white tile would vanish into the light one.
-  2. The glyph runs at 86% of the ground rather than 80%. The component's
-     margin is right for a 44px chip and wasteful at 16, where every pixel of
-     the dash is doing work.
+  The app's mark, as a file: components/ui/module-mark.tsx with module={null}.
+  Dash at rest, the capsule visor with its glowing core, on a dark plate. The
+  glass is resolved to its dark look, since the plate is always dark.
+  Regenerate from the component if it changes; there is no build step.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <defs>
-    <!-- Across the dash and slightly down it. Blue, the brand violet, then
-         pink: at this width a two-stop ramp spends its whole middle in a dead
-         mauve. userSpaceOnUse because the group below is scaled. -->
-    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="3" y1="18" x2="21" y2="6">
-      <stop offset="0" stop-color="#6A82FB"/>
-      <stop offset="0.5" stop-color="#8B5CF6"/>
-      <stop offset="1" stop-color="#FF6B9D"/>
-    </linearGradient>
-  </defs>
-
-  <!-- #6A82FB at 16% over #101216. -->
-  <path d="M32.00 16.00L31.99 20.89L31.94 22.60L31.87 23.86L31.76 24.89L31.63 25.77L31.46 26.54L31.26 27.22L31.03 27.84L30.77 28.39L30.47 28.89L30.13 29.35L29.76 29.76L29.35 30.13L28.89 30.47L28.39 30.77L27.84 31.03L27.22 31.26L26.54 31.46L25.77 31.63L24.89 31.76L23.86 31.87L22.60 31.94L20.89 31.99L16.00 32.00L11.11 31.99L9.40 31.94L8.14 31.87L7.11 31.76L6.23 31.63L5.46 31.46L4.78 31.26L4.16 31.03L3.61 30.77L3.11 30.47L2.65 30.13L2.24 29.76L1.87 29.35L1.53 28.89L1.23 28.39L0.97 27.84L0.74 27.22L0.54 26.54L0.37 25.77L0.24 24.89L0.13 23.86L0.06 22.60L0.01 20.89L0.00 16.00L0.01 11.11L0.06 9.40L0.13 8.14L0.24 7.11L0.37 6.23L0.54 5.46L0.74 4.78L0.97 4.16L1.23 3.61L1.53 3.11L1.87 2.65L2.24 2.24L2.65 1.87L3.11 1.53L3.61 1.23L4.16 0.97L4.78 0.74L5.46 0.54L6.23 0.37L7.11 0.24L8.14 0.13L9.40 0.06L11.11 0.01L16.00 0.00L20.89 0.01L22.60 0.06L23.86 0.13L24.89 0.24L25.77 0.37L26.54 0.54L27.22 0.74L27.84 0.97L28.39 1.23L28.89 1.53L29.35 1.87L29.76 2.24L30.13 2.65L30.47 3.11L30.77 3.61L31.03 4.16L31.26 4.78L31.46 5.46L31.63 6.23L31.76 7.11L31.87 8.14L31.94 9.40L31.99 11.11Z" fill="#1E243B"/>
-
-  <g transform="translate(16 16) scale(1.14667) translate(-12 -12)">
-    <rect x="2.6" y="9.2" width="18.8" height="5.6" rx="2.8" fill="url(#g)"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="none"><defs><linearGradient id="p" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="24"><stop offset="0" stop-color="#1a1b21"/><stop offset="1" stop-color="#0b0b0e"/></linearGradient><linearGradient id="s" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="24"><stop offset="0" stop-color="#fff" stop-opacity="0.07"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path d="M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z" fill="url(#p)"/><path d="M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z" fill="url(#s)"/><path d="M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z" stroke="#fff" stroke-opacity="0.14" stroke-width="0.5"/><g transform="translate(1.3 1.3) scale(.89)"><defs><linearGradient id="d-core" gradientUnits="userSpaceOnUse" x1="5" y1="0" x2="19" y2="0"><stop offset="0" stop-color="#6a82fb"></stop><stop offset="0.5" stop-color="#8b5cf6"></stop><stop offset="1" stop-color="#ff6b9d"></stop></linearGradient><filter id="d-blur" filterUnits="userSpaceOnUse" x="-10" y="-10" width="44" height="44"><feGaussianBlur stdDeviation="1.6"></feGaussianBlur></filter><clipPath id="d-clip"><path d="M7.6 7.6h8.8a4.4 4.4 0 0 1 0 8.8h-8.8a4.4 4.4 0 0 1 0-8.8Z"></path></clipPath><linearGradient id="d-edge" gradientUnits="userSpaceOnUse" x1="0" y1="5.5" x2="0" y2="18.5"><stop offset="0" stop-color="#fff" stop-opacity="0.95"></stop><stop offset="0.5" stop-color="#fff" stop-opacity="0.2"></stop><stop offset="1" stop-color="#fff" stop-opacity="0.6"></stop></linearGradient><linearGradient id="d-sheen" gradientUnits="userSpaceOnUse" x1="0" y1="5.5" x2="0" y2="18.5"><stop offset="0" style="stop-color:rgb(255 255 255 / 0.28)"></stop><stop offset="1" style="stop-color:rgb(255 255 255 / 0.06)"></stop></linearGradient></defs><g opacity="0.85"><g filter="url(#d-blur)"><rect x="6.4" y="9.2" width="11.2" height="5.6" rx="2.8" fill="url(#d-core)"></rect></g></g><path d="M7.6 7.6h8.8a4.4 4.4 0 0 1 0 8.8h-8.8a4.4 4.4 0 0 1 0-8.8Z" style="fill:transparent"></path><g clip-path="url(#d-clip)"><g opacity="1"><g filter="url(#d-blur)"><rect x="6.4" y="9.2" width="11.2" height="5.6" rx="2.8" fill="url(#d-core)"></rect><rect x="6.4" y="9.2" width="11.2" height="5.6" rx="2.8" fill="url(#d-core)"></rect></g></g></g><path d="M7.6 7.6h8.8a4.4 4.4 0 0 1 0 8.8h-8.8a4.4 4.4 0 0 1 0-8.8Z" fill="url(#d-sheen)"></path><path d="M7.6 7.6h8.8a4.4 4.4 0 0 1 0 8.8h-8.8a4.4 4.4 0 0 1 0-8.8Z" stroke-width="0.8" style="stroke:transparent" opacity="1"></path><path d="M7.6 7.6h8.8a4.4 4.4 0 0 1 0 8.8h-8.8a4.4 4.4 0 0 1 0-8.8Z" stroke="url(#d-edge)" stroke-width="0.55"></path><g><g fill="#fff"><rect x="9.4" y="10" width="1.9" height="4" rx="0.95"></rect><rect x="12.8" y="10" width="1.9" height="4" rx="0.95"></rect></g></g></g></svg>

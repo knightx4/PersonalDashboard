@@ -1,10 +1,12 @@
 'use client';
 
 import { useId, useState, type ComponentProps } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { toggleChipClass } from '@/components/ui/chip';
 import { ChipSelect } from '@/components/ui/field';
 import { SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
 import {
@@ -143,18 +145,14 @@ export function PipelineFilters({
         </PressChip>
       )}
       {anyTucked && (
-        <button
-          type="button"
-          onClick={() => setMore(true)}
-          className="press relative rounded-control px-1.5 py-0.5 text-ui text-ink-muted hover:bg-sunken hover:text-ink sm:hidden"
-        >
+        <Button type="button" variant="ghost" size="xs" onClick={() => setMore(true)} className="sm:hidden">
           More
-        </button>
+        </Button>
       )}
       <noscript>
-        <button type="submit" className="px-2 py-1 font-medium text-ink underline underline-offset-2">
+        <Button type="submit" variant="link">
           Apply
-        </button>
+        </Button>
       </noscript>
     </form>
   );
@@ -167,10 +165,10 @@ function ClearChip({ href, label }: { href: string; label: string }) {
       href={href}
       scroll={false}
       aria-label={`${label}: remove this filter`}
-      className="press press-area inline-flex items-center gap-1 rounded-full bg-accent-tint px-2 py-0.5 text-ui text-ink transition-colors duration-quick hover:bg-sunken"
+      className={toggleChipClass(true)}
     >
       {label}
-      <X className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <X strokeWidth={1.75} aria-hidden />
     </Link>
   );
 }

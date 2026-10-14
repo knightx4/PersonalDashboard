@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { acceptCriticStop, answerBlockedStep, type PlanActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
+import { Note } from '@/components/ui/note';
 import { QuestionPartLabel } from '@/components/dev/question';
 import type { CriticStopView, StopShot, StopSurfaceView } from '@/lib/plan/ui-check-stop';
 
@@ -22,14 +23,14 @@ function Shot({ surface, shot }: { surface: string; shot: StopShot }) {
       href={shot.url}
       target="_blank"
       rel="noreferrer"
-      className="press block space-y-1 rounded-md text-small text-ink-muted hover:text-accent"
+      className="press block space-y-1 rounded-control text-small text-ink-muted hover:text-accent"
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- signed links to the private ui-shots bucket */}
       <img
         src={shot.url}
         alt={`${surface}, ${label}`}
         // ui-ok: the edge of a photograph of a screen, so a dark shot keeps its outline on the panel
-        className="aspect-[3/4] w-full rounded-md border border-border bg-surface object-cover object-top"
+        className="aspect-[3/4] w-full rounded-card border border-border bg-surface object-cover object-top"
       />
       <span>{label}</span>
     </a>
@@ -98,59 +99,61 @@ export function CriticStop({ id, view }: { id: string; view: CriticStopView }) {
   const done = acceptState.message ?? redirectState.message;
 
   return (
-    <div className="space-y-3 rounded-lg bg-caution-tint/40 px-3 py-2.5">
-      <QuestionPartLabel>The critic&apos;s last round</QuestionPartLabel>
-      {view.surfaces.length > 0 ? (
-        view.surfaces.map((s) => <StoppedSurface key={s.surface} view={s} />)
-      ) : (
-        <p className="text-ui text-ink-muted">No round on record stopped this screen.</p>
-      )}
+    <Note tone="caution" glyph={false} role={undefined}>
+      <div className="space-y-3">
+        <QuestionPartLabel>The critic&apos;s last round</QuestionPartLabel>
+        {view.surfaces.length > 0 ? (
+          view.surfaces.map((s) => <StoppedSurface key={s.surface} view={s} />)
+        ) : (
+          <p className="text-ui text-ink-muted">No round on record stopped this screen.</p>
+        )}
 
-      {done ? (
-        <p className="text-small text-ink-muted">{done}</p>
-      ) : redirecting ? (
-        <form action={redirectAction} className="space-y-2">
-          <input type="hidden" name="id" value={id} />
-          <Label htmlFor={field}>What to change</Label>
-          <Textarea
-            id={field}
-            name="answer"
-            rows={2}
-            className="min-h-12"
-            autoFocus
-            value={words}
-            onChange={(event) => setWords(event.target.value)}
-            placeholder="What the screen should do instead. The next session builds against it."
-          />
-          <div className="flex flex-wrap items-center gap-1">
-            <Button type="submit" size="sm" pending={redirectPending}>
-              Send it back
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setRedirecting(false)}>
-              Cancel
-            </Button>
-            <FieldError>{redirectState.error}</FieldError>
-          </div>
-        </form>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <form action={acceptAction}>
+        {done ? (
+          <p className="text-small text-ink-muted">{done}</p>
+        ) : redirecting ? (
+          <form action={redirectAction} className="space-y-2">
             <input type="hidden" name="id" value={id} />
-            <Button
-              type="submit"
-              size="sm"
-              pending={acceptPending}
-              disabled={view.surfaces.length === 0}
-            >
-              Accept as it is
-            </Button>
+            <Label htmlFor={field}>What to change</Label>
+            <Textarea
+              id={field}
+              name="answer"
+              rows={2}
+              className="min-h-12"
+              autoFocus
+              value={words}
+              onChange={(event) => setWords(event.target.value)}
+              placeholder="What the screen should do instead. The next session builds against it."
+            />
+            <div className="flex flex-wrap items-center gap-1">
+              <Button type="submit" size="sm" pending={redirectPending}>
+                Send it back
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setRedirecting(false)}>
+                Cancel
+              </Button>
+              <FieldError>{redirectState.error}</FieldError>
+            </div>
           </form>
-          <Button type="button" size="sm" variant="secondary" onClick={() => setRedirecting(true)}>
-            Say what to change
-          </Button>
-          <FieldError>{acceptState.error}</FieldError>
-        </div>
-      )}
-    </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={acceptAction}>
+              <input type="hidden" name="id" value={id} />
+              <Button
+                type="submit"
+                size="sm"
+                pending={acceptPending}
+                disabled={view.surfaces.length === 0}
+              >
+                Accept as it is
+              </Button>
+            </form>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setRedirecting(true)}>
+              Say what to change
+            </Button>
+            <FieldError>{acceptState.error}</FieldError>
+          </div>
+        )}
+      </div>
+    </Note>
   );
 }

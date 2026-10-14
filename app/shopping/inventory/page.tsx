@@ -1,5 +1,5 @@
 import { Package, SearchX } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { InventoryBulkBar } from '@/components/inventory/inventory-selection';
@@ -46,6 +46,8 @@ import { loadShareOptions } from '@/lib/share/load-options';
 import { SendToShare } from '@/components/share/send-to-share';
 import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { askListFilter } from '@/lib/ask/list-filter';
+import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Inventory' };
 
@@ -577,7 +579,7 @@ export default async function InventoryPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <PageWide className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Acquired">
           {RANGES.map((entry) => (
@@ -674,6 +676,7 @@ export default async function InventoryPage({
           }))}
         >
           <PageHeader
+            subject={sectionSubject('/shopping/inventory', 'Inventory')}
             title="Inventory"
             description="Everything you currently own, so you can check before buying it again."
             bulk={<InventoryBulkBar total={finalItems.length} />}
@@ -772,6 +775,6 @@ export default async function InventoryPage({
           )}
         </SelectionProvider>
       </div>
-    </div>
+    </PageWide>
   );
 }

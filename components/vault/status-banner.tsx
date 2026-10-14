@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Banner } from '@/components/ui/banner';
 import type { VaultConnectionSummary } from '@/lib/vault/notes/load';
 

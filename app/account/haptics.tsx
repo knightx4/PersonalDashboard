@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cardVariants } from '@/components/ui/card';
+import { Switch as SwitchInput } from '@/components/ui/field';
 import {
   canBuzz,
   canClick,
@@ -86,13 +87,11 @@ function FeelSwitch({
 }) {
   return (
     <label className="row-pad flex items-start gap-3">
-      <input
-        type="checkbox"
-        role="switch"
+      <SwitchInput
         checked={state === 'on'}
         disabled={state === 'loading'}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 size-4 accent-accent"
+        className="mt-0.5"
       />
       <span className="min-w-0 flex-1">
         <span className="block text-ui font-medium text-ink">{label}</span>

@@ -1,5 +1,5 @@
 import { Receipt } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
@@ -47,6 +47,8 @@ import {
 } from '@/lib/orders/search';
 import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
+import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Orders' };
 
@@ -313,7 +315,7 @@ export default async function OrdersPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <PageWide className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Time range">
           {RANGES.map((entry) => (
@@ -435,6 +437,7 @@ export default async function OrdersPage({
 
       <div className="min-w-0 flex-1">
         <PageHeader
+          subject={sectionSubject('/shopping/orders', 'Orders')}
           title="Orders"
           description="Everything you have bought, newest first."
           actions={
@@ -540,6 +543,6 @@ export default async function OrdersPage({
           </div>
         )}
       </div>
-    </div>
+    </PageWide>
   );
 }

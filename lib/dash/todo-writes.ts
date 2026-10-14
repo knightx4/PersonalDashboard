@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { isUuid, type AskDb, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { loadAgendaItems, verbsOf } from '@/lib/ask/agenda';
 import type { TodoChangeInput, TodoChangeKind } from '@/lib/ask/todo-changes';
 import { toRef } from '@/lib/core/refs';
 import { eventInput, resolveSpan } from '@/lib/todo/events/write';
@@ -7,7 +8,10 @@ import { appointmentRefFor } from '@/lib/todo/links/load';
 import { APPOINTMENT_COLUMNS, isLinkTarget, LINK_TARGETS, TARGET_COLUMNS, type LinkTarget } from '@/lib/todo/links/model';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { taskInput } from '@/lib/todo/tasks/input';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { clientsOver } from '@/lib/todo/agenda/clients';
+import { sourceById } from '@/lib/todo/agenda/registry';
+import { isSourceId, SOURCE_IDS, type AgendaSource, type SourceContext, type SourceId } from '@/lib/todo/agenda/sources';
+import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -22,6 +26,8 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   add_event      an event on their own calendar.
  *   change_event   one of those events renamed, moved, or its place or
  *                  notes changed.
+ *   change_agenda_row  a row another workspace put on the agenda finished,
+ *                  put off or dismissed (plan #1894.9.2).
  *
  * Each is one row, inserted or updated, so the one undo rule in
  * lib/core/dash-actions.ts puts it back from the values kept (#1894.4: an
@@ -36,7 +42,13 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  */
 
 /** Who the change is for, their todo client, and their zone for times of day. */
-export type TodoWriteEnv = { userId: string; todo: SchemaClient; timezone: string };
+export type TodoWriteEnv = {
+  userId: string;
+  todo: SchemaClient;
+  timezone: string;
+  /** The person's client for any schema, for the agenda's rows in other workspaces. */
+  db: AskDb;
+};
 
 /** A Todo change as made, before a surface keeps it. */
 export type TodoMade = {
@@ -452,6 +464,115 @@ async function changeEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
 }
 
 // ---------------------------------------------------------------------------
+// change_agenda_row
+// ---------------------------------------------------------------------------
+
+const AGENDA_VERBS = {
+  finish: { method: 'complete', done: 'Finished', said: 'finished', cannot: 'finish' },
+  put_off: { method: 'defer', done: 'Put off', said: 'put off', cannot: 'put off' },
+  dismiss: { method: 'dismiss', done: 'Dismissed', said: 'dismissed', cannot: 'dismiss' },
+} as const;
+type AgendaVerb = keyof typeof AGENDA_VERBS;
+
+/** The value of todo.dismissals.source each overlay-using source writes under. */
+const DISMISSAL_SOURCE: Partial<Record<SourceId, string>> = {
+  return_deadlines: 'return_deadline',
+  goal_steps: 'goal_step',
+  bills: 'recurring_payment',
+  applications: 'application',
+  plan_steps: 'plan_item',
+  raised: 'raised_item',
+  threads: 'thread',
+};
+
+/** The one row a verb changes, which is what the Undo puts back. */
+type AgendaSubject = { schema: 'job_search' | 'core' | 'goals' | 'todo'; table: string; match: Record<string, string> };
+
+/**
+ * The row a source's verb writes. A job reminder and a draft carry the verb
+ * on their own row; a goal step is closed on its own row; everything else
+ * the agenda puts off or dismisses is an overlay row in todo.dismissals
+ * (lib/todo/agenda/dismissals.ts).
+ */
+function agendaSubject(source: SourceId, verb: AgendaVerb, key: string): AgendaSubject {
+  if (source === 'job_reminders') {
+    return { schema: 'job_search', table: 'reminders', match: { id: key.slice('job_reminders:'.length) } };
+  }
+  if (source === 'drafts') {
+    return { schema: 'core', table: 'drafted_messages', match: { id: key.slice('drafts:'.length) } };
+  }
+  if (source === 'goal_steps' && verb === 'finish') {
+    return { schema: 'goals', table: 'items', match: { id: key.slice('goal_steps:'.length) } };
+  }
+  const overlay = DISMISSAL_SOURCE[source];
+  if (!overlay) throw new TodoRefused('That row cannot be changed from here.');
+  return { schema: 'todo', table: 'dismissals', match: { source: overlay, source_key: key } };
+}
+
+async function subjectRow(env: TodoWriteEnv, subject: AgendaSubject): Promise<Row | null> {
+  const client = await env.db(subject.schema);
+  let query = client.from(subject.table).select('*').eq('user_id', env.userId);
+  for (const [column, value] of Object.entries(subject.match)) query = query.eq(column, value);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(`Reading the agenda row failed: ${error.message}`);
+  return (data as Row | null) ?? null;
+}
+
+async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
+  const sourceId = text(args, 'agenda_source');
+  const key = text(args, 'agenda_key');
+  const verbName = text(args, 'verb') as AgendaVerb;
+  if (!isSourceId(sourceId)) throw new TodoRefused(`agenda_source must be one of ${SOURCE_IDS.join(', ')}, as the agenda lookup returned it.`);
+  if (!key) throw new TodoRefused('agenda_key is missing: give the key the agenda lookup returned.');
+  if (!(verbName in AGENDA_VERBS)) throw new TodoRefused('verb must be finish, put_off or dismiss.');
+  const verb = AGENDA_VERBS[verbName];
+  const source = sourceById(sourceId) as AgendaSource;
+
+  // The row has to be on the agenda now: that is what makes the key real and
+  // names the row for the person. A forged key finds nothing here.
+  const item = (await loadAgendaItems(env.userId, env.db)).find((each) => each.source === sourceId && each.key === key);
+  if (!item) throw new TodoRefused('That row is not on their agenda now. Look at the agenda again.');
+  const title = named(item.title, 'the row');
+  if (!verbsOf(sourceId, item.completable).includes(verbName)) {
+    throw new TodoRefused(`${source.label}: nothing here can ${verb.cannot} that.`);
+  }
+  if (sourceId === 'goal_steps' && verbName === 'finish' && key.startsWith('goal_suggestions:')) {
+    // Whether they went is theirs to say; it also counts towards a rhythm on a second row.
+    throw new TodoRefused('Whether they went to that is theirs to say. Put it off or dismiss it instead.');
+  }
+
+  const subject = agendaSubject(sourceId, verbName, key);
+  const before = await subjectRow(env, subject);
+  if (!before && subject.table !== 'dismissals') throw new TodoRefused('That row is not theirs to change.');
+
+  const now = new Date();
+  const today = todayIn(env.timezone, now);
+  const ctx: SourceContext = { userId: env.userId, timezone: env.timezone, from: today, to: today, now, clients: clientsOver(env.db) };
+  await (source[verb.method] as (ctx: SourceContext, key: string) => Promise<void>)(ctx, key);
+
+  const after = await subjectRow(env, subject);
+  if (!after) throw new Error('Changing the agenda row failed: the row is gone.');
+  if (before && JSON.stringify(before) === JSON.stringify(after)) throw new TodoRefused('Nothing changed: it was already so.');
+
+  const id = after.id as string;
+  return {
+    kind: 'change_agenda_row',
+    input: { verb: verb.done, what: title, rest: ' on the Todo agenda', href: '/todo', where: 'Open Todo', paths: ['/todo', '/home'] },
+    subjectRef: toRef(`${subject.schema}.${subject.table}`, id),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    summary: `Dash ${verb.said} "${title}" on the Todo agenda.`,
+    row: {
+      table: `${subject.schema}.${subject.table}`,
+      ref: id,
+      title,
+      href: item.link?.href.startsWith('/') ? item.link.href : '/todo',
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The definitions
 // ---------------------------------------------------------------------------
 
@@ -552,6 +673,22 @@ export const TODO_WRITES: readonly TodoWrite[] = [
     },
     run: changeEvent,
   },
+  {
+    name: 'change_agenda_row',
+    description:
+      "Finish, put off or dismiss a row another workspace has put on the person's Todo agenda, such as a job reminder, a goal step sent to Todo, a draft waiting to be sent or a return deadline, when they ask. Find it with the agenda lookup and pass its agenda_source and agenda_key; the verbs a row takes are listed in its can. Finish is not offered for a date such as a return deadline. Their own todos are not changed with this tool: use close_todo and edit_todo.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        agenda_source: { type: 'string', enum: [...SOURCE_IDS], description: 'The agenda_source the agenda lookup returned.' },
+        agenda_key: { type: 'string', description: 'The agenda_key the agenda lookup returned for the row.' },
+        verb: { type: 'string', enum: Object.keys(AGENDA_VERBS), description: 'finish ticks it off, put_off moves it later, dismiss says not this one.' },
+      },
+      required: ['agenda_source', 'agenda_key', 'verb'],
+      additionalProperties: false,
+    },
+    run: changeAgendaRow,
+  },
 ];
 
 /** Runs one Todo write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -582,7 +719,7 @@ export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = TODO_
     if (!ctx.enabledModules.includes('todo')) {
       return { ok: false, error: 'The Todo workspace is switched off, so nothing can be changed there.' };
     }
-    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.timezone ?? 'UTC' };
+    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.timezone ?? 'UTC', db: ctx.db };
     const made = await runTodoWrite(write, env, input);
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: null };

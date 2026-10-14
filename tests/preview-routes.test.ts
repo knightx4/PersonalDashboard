@@ -195,6 +195,13 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
     expect(surfacesForFiles(['app/dev/plan/runner-crew.tsx'], using)).toEqual(['dev-runner-crew']);
   });
 
+  it("looks at a workspace's not-found and error files on their own surfaces (#1923)", () => {
+    expect(surfacesForFiles(['app/news/not-found.tsx', 'app/news/error.tsx'], using)).toEqual([
+      'route-not-found',
+      'route-error',
+    ]);
+  });
+
   it('does not follow a type-only import, which draws nothing', () => {
     // lib/raised/notifications.ts takes only the Notification type from the bell.
     expect(surfacesForFiles(['components/shell/notifications-button.tsx'], using)).toEqual([

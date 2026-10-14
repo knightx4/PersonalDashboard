@@ -1,6 +1,6 @@
-import Link from 'next/link';
+import type { ReactElement } from 'react';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
-  ArrowLeft,
   CircleDot,
   ExternalLink,
   FileText,
@@ -25,6 +25,9 @@ import type { StorySent } from '@/lib/news/saved/sent';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Tooltip } from '@/components/ui/tooltip';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 export type IssueViewProps = {
   issueId: string;
@@ -98,12 +101,12 @@ export function IssueView({
   savedHeadlines = [],
   sent = {},
   elsewhere = {},
-}: IssueViewProps) {
+  path,
+}: IssueViewProps & { path?: PageSubject }) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
   const sentOf = (story: NewsStory) => sent[story.headline.trim()];
-  // From md up a summarised issue's stories are a grid (plan #942), so the
-  // page widens to hold it. An essay, the original email and anything below
-  // md keep the one column they had.
+  // From md up a summarised issue's stories are a grid (plan #942). An essay,
+  // the original email and anything below md keep one column.
   const grid = showDigest && digest !== null && digest.stories.length > 0;
   /**
    * The issue's actions. `compact` is the phone's row, where every action but
@@ -112,6 +115,15 @@ export function IssueView({
   const actions = (compact: boolean) => {
     const label = compact ? 'sr-only' : undefined;
     const iconOnly = compact ? 'w-7 px-0' : undefined;
+    // Only the icon row names its buttons in a tip; the wide row says it in words.
+    const tip = (text: string, control: ReactElement<{ 'aria-describedby'?: string }>, end = false) =>
+      compact ? (
+        <Tooltip label={text} align={end ? 'end' : 'start'}>
+          {control}
+        </Tooltip>
+      ) : (
+        control
+      );
     const showPictures =
       showDigest || blockedImages === 0
         ? 'Show pictures'
@@ -139,25 +151,30 @@ export function IssueView({
             </Link>
           ))}
         {pictureCount > 0 && (
-          <Link
-            href={picturesHref}
-            title={pictures ? 'Hide pictures' : showPictures}
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
-          >
-            {pictures ? (
-              <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-            ) : (
-              <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-            )}
-            <span className={label}>{pictures ? 'Hide pictures' : showPictures}</span>
-          </Link>
+          tip(
+            pictures ? 'Hide pictures' : showPictures,
+            <Link
+              href={picturesHref}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+            >
+              {pictures ? (
+                <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
+              ) : (
+                <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+              )}
+              <span className={label}>{pictures ? 'Hide pictures' : showPictures}</span>
+            </Link>,
+          )
         )}
         <form action={markIssueUnread}>
           <input type="hidden" name="issueId" value={issueId} />
-          <Button type="submit" size="sm" variant="secondary" title="Mark unread" className={iconOnly}>
-            <CircleDot className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className={label}>Mark unread</span>
-          </Button>
+          {tip(
+            'Mark unread',
+            <Button type="submit" size="sm" variant="secondary" className={iconOnly}>
+              <CircleDot className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className={label}>Mark unread</span>
+            </Button>,
+          )}
         </form>
         {/*
           A plain link rather than a form, because nothing is sent on your
@@ -172,33 +189,28 @@ export function IssueView({
           header at all.
         */}
         {unsubscribeUrl && (
-          <a
-            href={unsubscribeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Unsubscribe"
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
-          >
-            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className={label}>Unsubscribe</span>
-          </a>
+          tip(
+            'Unsubscribe on the publisher’s page',
+            <a
+              href={unsubscribeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+            >
+              <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className={label}>Unsubscribe</span>
+            </a>,
+            true,
+          )
         )}
       </>
     );
   };
   return (
-    <div className={cn('mx-auto max-w-3xl', grid && 'md:max-w-5xl')}>
-      <p className="mb-3">
-        <Link
-          href={back.href}
-          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {back.label}
-        </Link>
-      </p>
-
+    <PageColumn>
       <PageHeader
+        subject={path}
+        back={back}
         title={subject ?? 'No subject'}
         description={byline}
         actions={<div className="contents max-sm:hidden">{actions(false)}</div>}
@@ -299,7 +311,7 @@ export function IssueView({
                         <h3 className="break-words text-body font-semibold text-ink">
                           {story.headline}
                         </h3>
-                        <StoryRating rating={story.rating} className="mt-0.5 block" />
+                        <StoryRating rating={story.rating} className="mt-0.5 flex w-fit" />
                         <p className="mt-1 text-body leading-relaxed text-ink-muted">
                           {story.summary}
                         </p>
@@ -353,7 +365,7 @@ export function IssueView({
           </CardBody>
         </Card>
       )}
-    </div>
+    </PageColumn>
   );
 }
 
@@ -391,10 +403,10 @@ function LeadStory({
         />
       )}
       <div className="card-pad">
-        <h2 className="break-words text-title font-semibold tracking-tight text-ink">
+        <h2 className="break-words font-display text-title tracking-tight text-ink">
           {story.headline}
         </h2>
-        <StoryRating rating={story.rating} className="mt-1 block" />
+        <StoryRating rating={story.rating} className="mt-1 flex w-fit" />
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
         <AlsoInLine alsoIn={alsoIn} pictures={pictures} className="mt-1.5" />
         <StoryText text={story.text} summary={story.summary} />
@@ -427,10 +439,10 @@ function StoryActions({
           href={story.link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+          className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
         >
           Read the article
-          <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
         </a>
       ) : (
         <span aria-hidden />

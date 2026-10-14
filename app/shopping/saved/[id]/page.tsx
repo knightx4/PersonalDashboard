@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { fingerprintLoose } from '@/lib/fingerprint';
 import { SavedItemView, type OwnedMatch } from './saved-item-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Saved item' };
 
@@ -50,6 +52,7 @@ export default async function SavedItemPage({
       item={{ ...item, status: item.status as 'saved' | 'purchased' | 'dismissed' }}
       merchant={merchant ?? null}
       ownedMatches={ownedMatches}
+      path={await rowSubject(toRef('public.saved_items', id))}
     />
   );
 }

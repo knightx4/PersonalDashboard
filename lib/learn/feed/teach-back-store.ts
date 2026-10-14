@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 import {
   isTeachBackRate,
   keptCutoff,
@@ -224,4 +225,5 @@ export async function settleTeachBackState(
     { onConflict: 'concept_id' },
   );
   if (error) throw new Error(`Recording what that showed failed: ${error.message}`);
+  await scheduleIdeas(learn, userId, [conceptId]);
 }

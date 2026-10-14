@@ -11,11 +11,11 @@ export default function Error({
 }) {
   return (
     <RouteError
-      what="this page"
+      what="your job search"
       error={error}
       reset={reset}
       backHref="/jobs"
-      backLabel="Back to Home"
+      backLabel="Back to Today"
     />
   );
 }

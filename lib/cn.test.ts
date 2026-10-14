@@ -33,4 +33,11 @@ describe('cn', () => {
     expect(cn('bg-surface', 'bg-sunken')).toBe('bg-sunken');
     expect(cn('border-border', 'border-control')).toBe('border-control');
   });
+
+  it('lets a later radius token win over an earlier one', () => {
+    expect(cn('rounded-control', 'rounded-card')).toBe('rounded-card');
+    expect(cn('rounded-control', 'rounded-pill')).toBe('rounded-pill');
+    expect(cn('rounded-control', 'rounded-none')).toBe('rounded-none');
+    expect(cn('rounded-t-card', 'rounded-b-card')).toBe('rounded-t-card rounded-b-card');
+  });
 });

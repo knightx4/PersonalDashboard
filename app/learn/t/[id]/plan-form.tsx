@@ -17,6 +17,9 @@ import {
   type PlanState,
   type TrackActionState,
 } from './actions';
+import { Chip } from '@/components/ui/chip';
+import { Checkbox } from '@/components/ui/field';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * A topic with nothing in it, and a way out of that.
@@ -51,7 +54,7 @@ function PlanButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Working it out…' : 'Plan this topic'}
     </Button>
   );
@@ -95,21 +98,20 @@ function StepRow({ step, index }: { step: PlanStep; index: number }) {
 
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         id={id}
         name="step"
         value={value}
         defaultChecked
-        className="mt-1 size-4 shrink-0 accent-accent"
+        className="mt-1"
       />
       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{step.subject}</span>
           {!source && (
-            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            <Chip>
               No source found
-            </span>
+            </Chip>
           )}
         </span>
 
@@ -121,9 +123,9 @@ function StepRow({ step, index }: { step: PlanStep; index: number }) {
               <span className="text-ui text-ink">{source.title}</span>
               {source.author && <span className="text-ui text-ink-muted">{source.author}</span>}
               {access && (
-                <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+                <Chip>
                   {price ? `${access} · ${price}` : access}
-                </span>
+                </Chip>
               )}
             </span>
 
@@ -157,13 +159,12 @@ function AreaRow({ area, index }: { area: Area; index: number }) {
 
   return (
     <li className="flex gap-3 px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         id={id}
         name="area"
         value={JSON.stringify({ name: area.name, covers: area.covers })}
         defaultChecked
-        className="mt-1 size-4 shrink-0 accent-accent"
+        className="mt-1"
       />
       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
         <span className="block text-body font-medium text-ink">{area.name}</span>
@@ -236,27 +237,24 @@ export function PlanForm({ trackId }: { trackId: string }) {
   }
 
   return (
-    <form action={plan} className={cn(cardVariants(), 'mt-6 border-dashed px-4 py-6 text-center')}>
+    <form action={plan} className="mt-6">
       <input type="hidden" name="trackId" value={trackId} />
-
-      <p className="text-body text-ink-muted">
-        Nothing in this reading list yet. Write down what you want to learn, or have the route worked out
-        for you.
-      </p>
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+      <EmptyState
+        size="box"
+        title="Nothing in this reading list yet."
+        description="Write down what you want to learn, or have the route worked out for you."
+      >
         <PlanButton />
         <PaidHint
           action="app/learn/t/[id]/actions.ts#planTrack"
           what="Cost of planning the reading list"
         />
         {planState.error && <span className="text-ui text-danger">{planState.error}</span>}
-      </div>
-
-      <p className="mt-2 text-small text-ink-muted">
-        Searches for the few things this topic is made of and where to read each. Takes a moment,
-        and saves nothing until you confirm.
-      </p>
+        <p className="w-full text-small text-ink-muted">
+          Searches for the few things this topic is made of and where to read each. Takes a moment,
+          and saves nothing until you confirm.
+        </p>
+      </EmptyState>
     </form>
   );
 }

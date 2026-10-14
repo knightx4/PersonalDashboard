@@ -227,10 +227,10 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('2 of 5 steps done');
   });
 
-  it('draws four Dashes in their four hats', () => {
+  it('draws four Dashes, each in its own visor', () => {
     const html = draw({ sessions: [SESSION] });
-    for (const look of ['top-hat', 'ball-cap', 'cowboy-hat', 'newsboy-cap']) {
-      expect(html).toContain(`data-dash-look="${look}"`);
+    for (const runner of ['feature-1', 'feature-2', 'feature-3', 'goals']) {
+      expect(html).toContain(`data-dash-runner="${runner}"`);
     }
     for (const label of ['Feature 1', 'Feature 2', 'Feature 3', 'Goals']) {
       expect(html).toContain(label);
@@ -249,7 +249,7 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('Add a payment method');
   });
 
-  it('puts every slot with nothing going to sleep, with the tick’s reason', () => {
+  it('puts every slot with nothing going to sleep, the reason left for when it is opened', () => {
     const html = draw({
       run: run({
         lastTickAt: '2026-09-17T04:28:00Z',
@@ -257,32 +257,37 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect((html.match(/Asleep, nothing to work on/g) ?? []).length).toBe(4);
-    expect(html).toContain('Waiting until something is ready. Nothing is handed to Dash.');
-    expect(html).toContain('No goal step is ready.');
+    expect((html.match(/Nothing ready/g) ?? []).length).toBe(4);
+    expect(html).not.toContain('Nothing is handed to Dash.');
     expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
   });
 
-  it('keeps the asleep reason folded, so the closed card shows only the line', () => {
-    const html = draw({
-      run: run({ lastTickNote: 'Waiting until something is ready. Nothing is handed to Dash.' }),
-      sessions: [],
-    });
-    // A closed disclosure draws no text for its body: strip every closed
-    // details body and the reason is gone from what the card reads.
-    expect(html).not.toMatch(/<details[^>]*\sopen/);
-    const visible = html.replace(/<details[^>]*>[\s\S]*?<\/details>/g, (d) =>
-      (d.match(/<summary[^>]*>[\s\S]*?<\/summary>/) ?? [''])[0],
-    );
-    expect(visible).not.toContain('Waiting until something is ready.');
-    expect(visible).toContain('Asleep, nothing to work on');
-    expect((html.match(/Asleep, nothing to work on<\/span><\/span><\/summary>/g) ?? []).length).toBe(4);
+  it('opens nothing to begin with: every slot is a closed pill', () => {
+    const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
+    expect((html.match(/aria-expanded="false"/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(html).not.toContain('id="runner-crew-focus"');
   });
 
   it('draws no disclosure for an asleep slot with only the default reason', () => {
     const html = draw({ run: run({ lastTickNote: null }), sessions: [] });
-    expect(html).toContain('Asleep, nothing to work on</span>');
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
     expect(html).not.toContain('Waiting for the next check.');
+  });
+
+  it('says a slot is free, not that nothing is ready, after a tick that started one', () => {
+    const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
+  });
+
+  it('says the ready work is in busy workspaces when that is why a slot waits', () => {
+    const html = draw({
+      run: run({
+        lastTickNote: 'Waiting: one session is running, and nothing else ready can run beside it.',
+      }),
+      sessions: [],
+    });
+    // The pill says only "Free"; the reason is in the panel it opens.
+    expect((html.match(/>Free</g) ?? []).length).toBe(3);
   });
 
   it('leaves all four idle when the runner is off', () => {
@@ -433,7 +438,6 @@ describe('the goals half on Dash', () => {
     expect(html).toContain('Working the goal step');
     expect(html).toContain('Find three courses');
     expect(html).toContain('20m');
-    expect(html).toContain('Reading the course pages');
     expect(html).toContain('2 goal steps ready');
   });
 

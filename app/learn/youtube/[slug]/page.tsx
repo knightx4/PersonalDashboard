@@ -3,6 +3,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadChannelPage } from '@/lib/learn/youtube/load';
 import { ChannelView } from './channel-view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 // Re-listing walks every playlist; transcribing a video can take a minute.
@@ -29,5 +30,16 @@ export default async function ChannelPage({
   const learn = await createLearnClient();
   const data = await loadChannelPage(learn, slug, { page, search });
   if (!data) notFound();
-  return <ChannelView slug={slug} data={data} page={page} search={search} />;
+  return (
+    <ChannelView
+      slug={slug}
+      data={data}
+      page={page}
+      search={search}
+      path={sectionSubject('/learn/videos', 'Videos', {
+        label: data.channel.name,
+        href: `/learn/youtube/${slug}`,
+      })}
+    />
+  );
 }

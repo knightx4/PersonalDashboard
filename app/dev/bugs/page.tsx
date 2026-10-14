@@ -9,6 +9,8 @@ import {
   loadOtherUsersFeedback,
   parseFeedbackKind,
 } from '@/lib/feedback/load';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Bugs and requests' };
 
@@ -39,12 +41,15 @@ export default async function DevBugsPage({
   await withNoteFiles(await createCoreClient(), queue.rows);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Bugs and requests" />
+    <PageColumn className="space-y-6">
+      <PageHeader
+        subject={sectionSubject('/dev/bugs', 'Bugs and requests')}
+        title="Bugs and requests"
+      />
       <FeedbackQueueView queue={queue} kind={kind} />
       {/* Below both of your sections, and gone entirely when nobody else has
           filed anything. Read-only, per #414. */}
       <OtherUsersFeedback rows={others} />
-    </div>
+    </PageColumn>
   );
 }

@@ -1,5 +1,7 @@
 import { cardVariants } from '@/components/ui/card';
+import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 
 /**
  * A note's frontmatter, as properties rather than as a code fence.
@@ -24,19 +26,21 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
   // `canvas` -- which is the page colour in three themes, so the border was
   // doing all of the work -- to the surface a distinct object sits on.
   return (
-    <dl
-      className={cn(
-        cardVariants({ padding: 'dense' }),
-        'mb-6 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui',
-      )}
-    >
+    <ValueList className={cn(cardVariants({ padding: 'dense' }), 'mb-6')}>
       {entries.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="font-medium text-ink-muted">{key}</dt>
-          <dd className="min-w-0 break-words text-ink">{formatValue(value)}</dd>
-        </div>
+        <ValueRow key={key} label={key} value={<PropertyValue text={formatValue(value)} />} />
       ))}
-    </dl>
+    </ValueList>
+  );
+}
+
+/** An address is a link, opened in a new tab; anything else stays text. */
+function PropertyValue({ text }: { text: string }) {
+  if (!/^https?:\/\/\S+$/.test(text)) return <>{text}</>;
+  return (
+    <a href={text} target="_blank" rel="noreferrer" className={cn(linkVariants(), 'inline-flex min-h-11 items-center')}>
+      {text}
+    </a>
   );
 }
 

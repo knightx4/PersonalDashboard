@@ -125,7 +125,7 @@ function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
     }) as unknown as SchemaClient;
 }
 
-const ALL_MODULES: ModuleId[] = ['shopping', 'jobs', 'vault', 'todo', 'learn', 'news', 'goals', 'dev'];
+const ALL_MODULES: ModuleId[] = ['shopping', 'jobs', 'vault', 'todo', 'learn', 'news', 'goals', 'you', 'dev'];
 
 function context(tables: Tables, extra: Partial<AskContext> = {}): AskContext {
   return {
@@ -249,6 +249,16 @@ describe('open_row', () => {
     expect(expectLinkedRows(task)[0].href).toBe('/todo/all?status=all&focus=t1');
   });
 
+  it('says whether a post went up, beside its text (note 5c73c50e)', async () => {
+    const posts: Tables = {
+      'public.social_posts': [
+        { id: 'p1', user_id: ME, angle: 'Todo, introduced', body: ['Todo is one list.'], status: 'dropped', image_paths: ['/posts/todo.png'], posted_url: null, posted_at: null, dropped_at: '2026-10-14T10:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool('open_row', { table: 'public.social_posts', ref: 'p1' }, context(posts));
+    expect(expectLinkedRows(result)[0].detail).toMatchObject({ status: 'dropped', image_paths: '["/posts/todo.png"]' });
+  });
+
   it('finds nothing of somebody else’s, even by its id', async () => {
     const result = await executeAskTool(
       'open_row',
@@ -256,6 +266,24 @@ describe('open_row', () => {
       context(tables),
     );
     expect(expectLinkedRows(result)).toEqual([]);
+  });
+
+  it('carries the newest comments under the row, so a reply from Dash can be found (notes 1527e0bf, ae78d95e)', async () => {
+    const note = '11111111-1111-4111-8111-111111111111';
+    const withThread: Tables = {
+      ...tables,
+      'core.thread_turns': [
+        { user_id: ME, ref: `obsidian.notes:${note}`, author: 'me', body: '@dash Help me prepare.', created_at: '2026-10-13T17:27:35Z' },
+        { user_id: ME, ref: `obsidian.notes:${note}`, author: 'claude', body: 'I added a to-do.', created_at: '2026-10-13T17:28:02Z' },
+        { user_id: THEM, ref: `obsidian.notes:${note}`, author: 'me', body: 'Not yours.', created_at: '2026-10-13T17:29:00Z' },
+      ],
+    };
+    const result = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(withThread));
+    expect(expectLinkedRows(result)[0].detail?.comments).toBe(
+      '[2026-10-13 17:27] You: @dash Help me prepare.\n[2026-10-13 17:28] Dash: I added a to-do.',
+    );
+    const bare = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(tables));
+    expect(expectLinkedRows(bare)[0].detail).not.toHaveProperty('comments');
   });
 
   it('refuses a table it cannot open', async () => {
@@ -566,7 +594,7 @@ describe('courses', () => {
     ...fields,
   });
   const tables: Tables = {
-    'obsidian.courses': [
+    'you.courses': [
       course('c1', ME, { code: 'ECON 101', title: 'Principles of Economics', term: 'Fall 2019', year: 2019, credits: '3.00', grade: 'A-' }),
       course('c2', ME, { title: 'Writing Seminar', term: 'Fall', year: 2019, credits: 1, position: 1 }),
       course('c3', ME, { code: 'ECON 201', title: 'Intermediate Micro', term: 'Spring 2020', year: 2020, position: 2 }),
@@ -575,14 +603,14 @@ describe('courses', () => {
     ],
   };
 
-  it('lists the courses of a term, each linked to its row on the Education tab', async () => {
+  it('lists the courses of a term, each linked to its row on the Work & school tab', async () => {
     const result = await executeAskTool('courses', { term: 'fall 2019' }, context(tables));
     const rows = expectLinkedRows(result);
     expect(rows.map((r) => r.ref)).toEqual(['c1', 'c2']);
     expect(rows[0]).toMatchObject({
-      table: 'obsidian.courses',
+      table: 'you.courses',
       title: 'ECON 101 Principles of Economics',
-      href: '/vault/education#course-c1',
+      href: '/you/work#course-c1',
       detail: { school: 'State University', term: 'Fall 2019', credits: 3, grade: 'A-' },
     });
     // A term written without its year is read with it.
@@ -607,7 +635,7 @@ describe('courses', () => {
     expect((await executeAskTool('courses', { year: 'soon' }, context(tables))).ok).toBe(false);
   });
 
-  it('needs the vault switched on', async () => {
+  it('needs You switched on', async () => {
     const off = await executeAskTool('courses', {}, context(tables, { enabledModules: ['jobs'] }));
     expect(off.ok).toBe(false);
   });
@@ -704,7 +732,7 @@ describe('recall', () => {
     expect(rows[0].ref).toBe(IDEA);
     expect(byRef.get(IDEA)?.href).toBe(`/dev/ideas#idea-${IDEA}`);
     expect(byRef.get(IDEA)?.detail?.passage_2_by).toBe('Dash');
-    expect(byRef.get(STEP)?.href).toBe('/dev/plan?view=all&q=%2312');
+    expect(byRef.get(STEP)?.href).toBe('/dev/plan/12');
     expect(byRef.get(QUESTION)?.href).toBe(`/dev/inbox#waiting-${QUESTION}`);
     expect(byRef.get('plan#ideas')?.href).toBe('/dev/specs/plan#ideas');
   });
@@ -796,11 +824,11 @@ describe('recall', () => {
     expect(refs).not.toContain('Home/Garden.md');
   });
 
-  it('links a transcript to its line on the Education tab', async () => {
+  it('links a transcript to its line on the Work & school tab', async () => {
     const TRANSCRIPT = 'f1000000-0000-4000-8000-000000000001';
     const courseTables: Tables = {
       'core.memory_chunks': [
-        passage(ME, 'obsidian.transcripts', TRANSCRIPT, 0,
+        passage(ME, 'you.transcripts', TRANSCRIPT, 0,
           'Transcript from State University\n\nECON 101 Principles of Economics, Fall 2019, 3 credits, grade A-', 0.6),
       ],
     };
@@ -809,7 +837,7 @@ describe('recall', () => {
     });
     const rows = expectLinkedRows(result);
     expect(rows.map((r) => [r.table, r.href])).toEqual([
-      ['obsidian.transcripts', `/vault/education#transcript-${TRANSCRIPT}`],
+      ['you.transcripts', `/you/work#transcript-${TRANSCRIPT}`],
     ]);
     expect(rows[0].detail?.passage).toContain('Principles of Economics');
   });

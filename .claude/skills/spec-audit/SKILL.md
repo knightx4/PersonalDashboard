@@ -146,6 +146,11 @@ file, row or commit; report only.
    (…)` (older Status blocks name steps by number) or search titles. Missing
    and planned is still missing, with the step in the evidence, named by its
    outline (`#1073.4`), the way the plan page heads it.
+5. For each screen the spec describes, check that it lists its hidden parts:
+   hover controls, popovers, drawers, the empty, loading and error states,
+   and comment indicators (the hidden-parts rule in docs/UI-QUALITY-SPEC.md).
+   A screen described with no such list is a finding; name the screen and
+   the section that describes it.
 
 Report as a list, one entry per finding, each with: section (the heading it
 is about, or null for the whole spec; "R3" style for a rule), kind,
@@ -176,6 +181,12 @@ the code is wrong. The exceptions say the code moved on for a reason:
   a spec that describes the code.
 - **none** for `holds`, and for `missing` work that an open plan step
   already covers.
+
+A described screen with no list of hidden parts is recorded as a `missing`
+finding with proposal `change_spec`, since the fix is the list in the spec.
+Evidence names the screen and its section. Its draft change adds the list,
+and every spec change the audit drafts that describes a screen includes one
+for that screen too.
 
 A `missing` finding that nothing on the plan covers is `change_code`: the
 person said they wanted it, and nobody is building it.

@@ -1,8 +1,9 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { sectionSubject } from '@/lib/core/section-path';
 import { PageHeader } from '@/components/shell/page-header';
 import { ImportForm } from './import-form';
 import { StartForm } from './start-form';
+import { SectionLabel, SectionHeading } from '@/components/ui/section-heading';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,36 +17,32 @@ export const dynamic = 'force-dynamic';
  */
 export default function NewTrackPage() {
   return (
-    <>
-      <p className="mb-3">
-        <Link
-          href="/learn/lists"
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Reading lists
-        </Link>
-      </p>
-
-      <PageHeader title="New reading list" />
+    <PageColumn>
+      <PageHeader
+        subject={sectionSubject('/learn/lists', 'Reading lists', {
+          label: 'New reading list',
+          href: '/learn/new',
+        })}
+        title="New reading list"
+      />
 
       <div className="max-w-2xl space-y-8">
         <section>
-          <h2 className="mb-3 text-body font-semibold text-ink">Start a topic</h2>
+          <SectionHeading title="Start a topic" className="mb-3" />
           <StartForm />
         </section>
 
         <div className="flex items-center gap-3" aria-hidden>
           <span className="h-px flex-1 bg-border" />
-          <span className="text-small uppercase tracking-wide text-ink-muted">or</span>
+          <SectionLabel as="span">or</SectionLabel>
           <span className="h-px flex-1 bg-border" />
         </div>
 
         <section>
-          <h2 className="mb-3 text-body font-semibold text-ink">Paste a reading list</h2>
+          <SectionHeading title="Paste a reading list" className="mb-3" />
           <ImportForm />
         </section>
       </div>
-    </>
+    </PageColumn>
   );
 }

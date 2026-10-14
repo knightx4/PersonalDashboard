@@ -62,7 +62,12 @@ export type GoalReplyContext = {
   itemId: string;
   /** YYYY-MM-DD, so "Oct 4" and "next Friday" can be turned into a date. */
   today?: string;
+  /** Their other open goals, which a step can be moved under (plan #2035.1). */
+  otherGoals?: ReplyGoal[];
 };
+
+/** A goal a step could be moved under, as the reply sees it. */
+export type ReplyGoal = { id: string; title: string; areaName: string; errand: boolean };
 
 /**
  * A change of date or of Todo the comment asks for, on the step it is on.
@@ -71,7 +76,11 @@ export type GoalReplyContext = {
 export type Schedule = { dueOn?: string | null; onTodo?: boolean };
 
 /** Refs the model answers with, so it never handles an id. */
-export type ReplyRefs = { collections: Map<string, ReplyCollection> };
+export type ReplyRefs = {
+  collections: Map<string, ReplyCollection>;
+  /** Their other open goals by ref (g1, g2), for moving a step. */
+  goals: Map<string, ReplyGoal>;
+};
 
 /** How a stored value is written for the model: in its stored form. */
 const STORED_FORM: Record<CollectionField['type'], string> = {
@@ -108,7 +117,7 @@ function stepLines(nodes: StepNode[], itemId: string, depth: number, out: string
   }
 }
 
-function findStep(nodes: StepNode[], id: string): StepNode | null {
+export function findStep(nodes: StepNode[], id: string): StepNode | null {
   for (const node of nodes) {
     if (node.id === id) return node;
     const found = findStep(node.children, id);
@@ -164,8 +173,8 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
     ...(context.today ? [`Today is ${context.today}.`, ''] : []),
     `Status: ${goal.status === 'parked' ? 'parked' : STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
   ];
+  if (goal.errand) out.push(`This goal is an errand${goal.dueOn ? `, due ${goal.dueOn}` : ''}.`);
   if (goal.acceptance) out.push(`Done when: ${goal.acceptance}`);
-  if (goal.fog) out.push(`Not known yet: ${goal.fog}`);
   if (goal.unit) {
     out.push(
       `Measured in: ${goal.unit}${goal.target !== null ? `, aiming for ${goal.target}` : ''}`,
@@ -182,13 +191,22 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
   if (context.steps.length === 0) out.push('No steps yet.');
   else stepLines(context.steps, context.itemId, 0, out);
 
-  const refs: ReplyRefs = { collections: new Map() };
+  const refs: ReplyRefs = { collections: new Map(), goals: new Map() };
   context.collections.forEach((collection, index) =>
     refs.collections.set(`c${index + 1}`, collection),
   );
   out.push('', '## Collections this goal fills');
   if (context.collections.length === 0) out.push('None yet, so there is nowhere to file facts.');
   else out.push(...collectionLines(context.collections));
+
+  const others = context.otherGoals ?? [];
+  out.push('', '## Their other open goals');
+  if (others.length === 0) out.push('None, so there is no other goal to move a step under.');
+  others.forEach((other, index) => {
+    const ref = `g${index + 1}`;
+    refs.goals.set(ref, other);
+    out.push(`- ${ref}: ${other.title} (${other.errand ? 'an errand' : 'a goal'} in ${other.areaName || 'no area'})`);
+  });
 
   return { text: out.join('\n') + '\n', refs };
 }
@@ -201,6 +219,115 @@ export function goalReplyMessage(
 ): { message: string; refs: ReplyRefs } {
   const { text, refs } = goalContext(context);
   return { message: askMessage({ context: text, thread, question }), refs };
+}
+
+/** Words that say nothing about which goal is meant. */
+const FILLER = new Set(['a', 'an', 'the', 'my', 'our', 'to', 'of', 'for', 'under', 'in', 'into', 'goal', 'errand', 'one']);
+
+/** The words of a name that tell goals apart: lower case, no punctuation, no filler. */
+function nameWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word !== '' && !FILLER.has(word)),
+  );
+}
+
+function within(small: Set<string>, large: Set<string>): boolean {
+  return small.size > 0 && [...small].every((word) => large.has(word));
+}
+
+function sameWords(a: Set<string>, b: Set<string>): boolean {
+  return a.size === b.size && within(a, b);
+}
+
+/** The goal a move goes to, or the sentence saying why it cannot be told. */
+export type GoalTarget = { ok: true; goal: ReplyGoal } | { ok: false; error: string };
+
+/**
+ * The goal a move names (plan #2035.1): the ref the model chose, checked
+ * against the words the comment used for it. An unknown ref is refused, and
+ * so are words that fit more than one listed goal, or fit one goal other than
+ * the ref, so a guess never moves a step. Words that fit none are left to the
+ * ref, since a comment often calls a goal by something other than its title.
+ */
+export function resolveGoalTarget(goals: Map<string, ReplyGoal>, ref: unknown, named: unknown): GoalTarget {
+  const goal = typeof ref === 'string' ? goals.get(ref.trim()) : undefined;
+  if (!goal) {
+    return { ok: false, error: 'That names none of their other goals listed, so nothing was moved. Ask them which goal they mean.' };
+  }
+  const words = nameWords(typeof named === 'string' ? named : '');
+  if (words.size === 0) return { ok: true, goal };
+
+  // A goal fits when every telling word of the comment is in its title, or
+  // every telling word of its title is in the comment.
+  const all = [...goals.values()].map((g) => ({ goal: g, words: nameWords(g.title) }));
+  const exact = all.filter((g) => sameWords(g.words, words));
+  const fits = (
+    exact.length > 0 ? exact : all.filter((g) => within(words, g.words) || within(g.words, words))
+  ).map((g) => g.goal);
+  if (fits.length > 1) {
+    const list = fits.map((g) => `"${g.title}"`);
+    return {
+      ok: false,
+      error: `"${String(named).trim()}" could be ${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}, so nothing was moved. Ask them which one they mean.`,
+    };
+  }
+  if (fits.length === 1 && fits[0].id !== goal.id) {
+    return {
+      ok: false,
+      error: `"${String(named).trim()}" reads as "${fits[0].title}", not "${goal.title}", so nothing was moved. Ask them which one they mean.`,
+    };
+  }
+  return { ok: true, goal };
+}
+
+/** An area an errand can go in. */
+export type ReplyArea = { id: string; name: string };
+
+/**
+ * The area a new errand goes in (plan #2035.2): the one the comment names,
+ * else `fallback`, the area of the goal the step sits under. Words that fit
+ * no area, or more than one, give the sentence saying so instead, so a guess
+ * never files an errand in the wrong place.
+ */
+export function resolveArea(
+  areas: ReplyArea[],
+  named: unknown,
+  fallback: string,
+): { ok: true; area: ReplyArea } | { ok: false; error: string } {
+  const words = nameWords(typeof named === 'string' ? named.replace(/\barea\b/gi, ' ') : '');
+  if (words.size === 0) {
+    const area = areas.find((a) => a.id === fallback);
+    return area ? { ok: true, area } : { ok: false, error: 'The goal\'s area is no longer on the page, so nothing was changed. Ask them which area the errand goes in.' };
+  }
+  const all = areas.map((area) => ({ area, words: nameWords(area.name) }));
+  const exact = all.filter((a) => sameWords(a.words, words));
+  const fits = (exact.length > 0 ? exact : all.filter((a) => within(words, a.words) || within(a.words, words))).map(
+    (a) => a.area,
+  );
+  if (fits.length === 1) return { ok: true, area: fits[0] };
+  const list = (fits.length > 1 ? fits : areas).map((a) => `"${a.name}"`);
+  const choices = list.length > 1 ? `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}` : list.join('');
+  return {
+    ok: false,
+    error:
+      fits.length > 1
+        ? `"${String(named).trim()}" could be ${choices}, so nothing was changed. Ask them which area they mean.`
+        : `"${String(named).trim()}" is not one of their areas (${choices}), so nothing was changed. Ask them which area they mean.`,
+  };
+}
+
+/** How many steps sit beneath a step, at any depth. */
+export function stepsBeneath(node: StepNode): number {
+  return node.children.reduce((sum, child) => sum + 1 + stepsBeneath(child), 0);
+}
+
+/** ", with its 2 sub-steps" for a step that has any, else nothing. */
+export function withSubSteps(node: StepNode): string {
+  const count = stepsBeneath(node);
+  return count === 0 ? '' : count === 1 ? ', with its sub-step' : `, with its ${count} sub-steps`;
 }
 
 /** One record the reply asks to file, by collection ref. */

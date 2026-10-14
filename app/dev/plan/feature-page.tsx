@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
@@ -11,9 +12,9 @@ import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
-import { FogNote } from '@/components/dev/fog-note';
 import { Thread } from '@/components/thread/thread';
 import { ColumnHeader } from '@/components/plan-tree/grid';
 import { ViewChips } from '@/components/plan-tree/view-chips';
@@ -61,7 +62,7 @@ import {
   type HeldBy,
 } from '@/lib/plan/split';
 import { TAB_PARAM, tabFrom } from '@/lib/tabs';
-import { dismissPlanFog, deletePlanItem, type PlanActionState } from './actions';
+import { deletePlanItem, type PlanActionState } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
@@ -182,7 +183,6 @@ export function FeaturePage({
   const outlines = useMemo(() => outlinesOf(parts.refTitles), [parts.refTitles]);
   const readable = (text: string) => readableRefs(text, outlines);
   const ref = stepRef(node);
-  const [fogState, fogAction, fogPending] = useActionState(dismissPlanFog, {} as PlanActionState);
 
   const crumbs = featureCrumbs(node, module, moduleLabel);
   const steps = node.children.filter((child) => child.kind !== 'decision');
@@ -262,7 +262,7 @@ export function FeaturePage({
             align="start"
             // Pulled up by the room the press target adds, so its word sits on
             // the same line as Health's and Progress's beside it.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{statusWord}</span>}
           />
         }
@@ -278,6 +278,7 @@ export function FeaturePage({
               glyph={health.glyph}
               word={health.word}
               tone={health.tone}
+              title={health.title}
               className={cn('text-ui', TONE_TEXT[health.tone])}
             />
           }
@@ -317,7 +318,7 @@ export function FeaturePage({
             items={parts.priorityMenu}
             align="start"
             // Pulled up as Status is, so the gap above it matches the others.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           />
         }
@@ -338,7 +339,7 @@ export function FeaturePage({
           // A workspace has a page of its own in Dev (/dev/modules); a
           // project's page is the crumb above the title.
           module && isModuleId(module) ? (
-            <Link href={`/dev/modules/${module}`} className="press-area hover:underline">
+            <Link href={`/dev/modules/${module}`} className={cn('press-area', linkVariants())}>
               {moduleLabel || scopeLabel(node.module)}
             </Link>
           ) : (
@@ -384,7 +385,7 @@ export function FeaturePage({
 
   return (
     <TabbedDetail
-      crumbs={crumbs}
+      subject={{ ref, path: crumbs }}
       // While the compose surface is open the title and summary are its
       // first two fields, so the header names what is being edited instead
       // of showing them twice.
@@ -400,13 +401,14 @@ export function FeaturePage({
             <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
               <span className="whitespace-nowrap">Feature {ref}</span>
               {parts.addedBy && (
-                <span
-                  className="whitespace-nowrap"
-                  title={parts.addedBy.session ? `Session ${parts.addedBy.session}` : undefined}
+                <Tooltip
+                  label={`Dash wrote this, rather than you.${parts.addedBy.session ? ` Session ${parts.addedBy.session}.` : ''}`}
                 >
-                  <DashCredit />
-                  Added by Dash on {parts.addedBy.date}
-                </span>
+                  <span tabIndex={0} className="whitespace-nowrap">
+                    <DashCredit />
+                    Added by Dash on {parts.addedBy.date}
+                  </span>
+                </Tooltip>
               )}
               {parts.origin && (
                 <span>
@@ -460,7 +462,7 @@ export function FeaturePage({
         />
       ) : row.editing ? (
         // The compose surface it can be written in from /dev/plan, filled in
-        // (plan #1670). Fog, the note and the commit stay on the row's own
+        // (plan #1670). The note and the commit stay on the row's own
         // Edit on /dev/plan, which is the whole row at once.
         <FeatureCompose node={node} onDone={() => row.setEditing(false)} />
       ) : (
@@ -468,39 +470,29 @@ export function FeaturePage({
         <div className="space-y-5">
           {overdueDays !== null && <UpdateOverdue days={overdueDays} />}
           {updates[0] && <FeatureUpdate update={updates[0]} earlier={updates[1]} />}
-          {/* The summary, the fog, the feature's own words, what it is done
+          {/* The summary, the feature's own words, what it is done
               when, what it needs and what it waits on, on one card (plan
               #1686): none of it sits bare on the page. */}
           <DetailCard>
             {node.summary && <p className="text-body font-medium text-ink">{node.summary}</p>}
-            {node.fog && node.fogDismissedAt === null && (
-              <FogNote
-                id={node.id}
-                fog={readable(node.fog)}
-                aside={false}
-                action={fogAction}
-                pending={fogPending}
-                error={fogState.error}
-              />
-            )}
             {node.detail && node.kind !== 'decision' && (
               <DetailPart>
                 <p className="whitespace-pre-wrap text-body text-ink">
-                  <LinkedText text={readable(node.detail)} />
+                  <LinkedText text={readable(node.detail)} refs="all" />
                 </p>
               </DetailPart>
             )}
             {node.acceptance && (
               <DetailPart label="Done when">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={readable(node.acceptance)} />
+                  <LinkedText text={readable(node.acceptance)} refs="all" />
                 </p>
               </DetailPart>
             )}
             {node.blockAsk && (
               <DetailPart label="Needs">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={readable(node.blockAsk)} />
+                  <LinkedText text={readable(node.blockAsk)} refs="all" />
                 </p>
               </DetailPart>
             )}
@@ -617,7 +609,7 @@ function FeatureSteps({
               <Link
                 href={stepsViewHref(node.number, view)}
                 scroll={false}
-                className="press-area text-ink underline underline-offset-2"
+                className={cn('press-area', linkVariants())}
               >
                 Show all steps
               </Link>
@@ -653,7 +645,7 @@ function FeatureSteps({
           </ul>
         </>
       ) : (
-        !adding && <p className="text-ui text-ink-muted">No steps under this feature yet.</p>
+        !adding && <EmptyState size="inline" title="No steps under this feature yet." />
       )}
       {adding ? (
         <div className={cn(cardVariants({ padding: 'dense' }))}>{addForm}</div>
@@ -693,7 +685,7 @@ function SplitLink({ href, count, who }: { href: string; count: number; who: Hel
       href={href}
       scroll={false}
       aria-label={`${count} open ${count === 1 ? 'step' : 'steps'} ${who === 'me' ? 'yours' : 'Dash’s'}, show them`}
-      className="-mx-1.5 inline-flex min-h-7 items-center max-sm:min-h-11 rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
+      className={cn('-mx-1.5 inline-flex min-h-7 items-center max-sm:min-h-11 rounded-control px-1.5 hover:bg-sunken', linkVariants())}
     >
       {count} open
     </Link>
@@ -742,7 +734,7 @@ function StepGroupRows({ group, children }: { group: StepGroup; children: React.
         >
           <ChevronRight
             className={cn('size-3.5 text-ink-muted transition-transform', open && 'rotate-90')}
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-hidden
           />
           {heading}

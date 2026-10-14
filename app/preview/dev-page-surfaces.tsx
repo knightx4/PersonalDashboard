@@ -3,7 +3,8 @@ import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
 import { IdeasView } from '@/app/dev/ideas/ideas-view';
-import { UsageScreen } from '@/app/dev/usage/usage-view';
+import { UsageScreen, type UsageDays } from '@/app/dev/usage/usage-view';
+import { fillDays } from '@/lib/usage/per-day';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
 import type { InterviewCardView } from '@/lib/specs/interview-view';
@@ -49,6 +50,7 @@ import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
 import type { AgentActionSummary } from '@/lib/agent-actions/summary';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Dev pages and the account page in the surface gallery (plan #1600),
@@ -56,7 +58,7 @@ import type { AgentActionSummary } from '@/lib/agent-actions/summary';
  * like the live rows. Each sits in the 3xl column its page draws.
  */
 
-const column = (children: React.ReactNode) => <div className="mx-auto max-w-3xl space-y-6">{children}</div>;
+const column = (children: React.ReactNode) => <PageColumn className="space-y-6">{children}</PageColumn>;
 
 // ---- Bugs and requests ----------------------------------------------------
 
@@ -320,13 +322,56 @@ const functions = functionSpendRows([
   },
 ]);
 
+/**
+ * `total` spread over the 30 days to 4 October by `weights`, the remainder on
+ * the last day, so the bars add up to the figures the fixtures above show:
+ * 434 views over the workspaces and $21.09 over the functions.
+ */
+function spread(total: number, weights: readonly number[]): UsageDays['views'] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const values = weights.map((weight) => Math.floor((total * weight) / sum));
+  values[values.length - 1] += total - values.reduce((a, b) => a + b, 0);
+  return fillDays(
+    values.map((value, index) => ({ day: new Date(Date.UTC(2026, 8, 5 + index)).toISOString().slice(0, 10), value })),
+    '2026-10-04',
+    30,
+  );
+}
+
+// Quiet weekends, a week away in the middle, and a busy last week.
+const VIEW_WEIGHTS = [9, 12, 14, 3, 2, 11, 13, 15, 12, 10, 1, 0, 0, 0, 0, 0, 0, 4, 12, 14, 16, 13, 5, 3, 18, 22, 25, 19, 16, 9];
+const SPEND_WEIGHTS = [6, 8, 9, 4, 3, 7, 9, 10, 8, 7, 2, 2, 2, 2, 2, 2, 2, 3, 8, 9, 11, 9, 4, 3, 13, 16, 30, 14, 11, 6];
+
+const days: UsageDays = {
+  today: '2026-10-04',
+  span: 30,
+  views: spread(434, VIEW_WEIGHTS),
+  spend: { values: spread(21_091_000, SPEND_WEIGHTS), calls: 783, unpriced: 5 },
+};
+
 export function DevUsageSurface() {
-  return <UsageScreen report={report} functions={functions} now={new Date('2026-10-04T12:00:00Z')} />;
+  return (
+    <UsageScreen
+      report={report}
+      functions={functions}
+      phoneShare={{ phone: 312, total: 1204 }}
+      days={days}
+      now={new Date('2026-10-04T12:00:00Z')}
+    />
+  );
 }
 
 /** The tab before any model call has been made and before any page was opened. */
 export function DevUsageEmptySurface() {
-  return <UsageScreen report={usageReport([])} functions={[]} now={new Date('2026-10-04T12:00:00Z')} />;
+  return (
+    <UsageScreen
+      report={usageReport([])}
+      functions={[]}
+      phoneShare={{ phone: 0, total: 0 }}
+      days={{ today: '2026-10-04', span: 30, views: [], spend: { values: [], calls: 0, unpriced: 0 } }}
+      now={new Date('2026-10-04T12:00:00Z')}
+    />
+  );
 }
 
 // ---- UI review ------------------------------------------------------------
@@ -1048,6 +1093,7 @@ export function AccountSurface({
           timezone: 'America/New_York',
           displayCurrency: 'USD',
           enabledModules: ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'],
+          theme: { kind: 'generated', mode: 'light', hue: 330, way: 'ember' },
         }}
         isOwner
         vapidPublicKey={null}
@@ -1123,7 +1169,7 @@ export function DevRunnerCrewSurface() {
             step: {
               number: 1700,
               ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own hat',
+              title: 'Show the four Dashes on the runner card, each in its own visor',
             },
             module: 'Dev',
             doing: null,

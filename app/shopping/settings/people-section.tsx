@@ -5,6 +5,7 @@ import { Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { FieldError, Input } from '@/components/ui/field';
 import {
   PERSON_COLOURS,
@@ -18,6 +19,7 @@ import {
   updatePerson,
   type PeopleState,
 } from './people-actions';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Who this account shops for.
@@ -146,9 +148,7 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
             {person.name}
           </span>
           {person.isDefault && (
-            <span className="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted">
-              default
-            </span>
+            <Chip>default</Chip>
           )}
         </button>
       </li>
@@ -182,8 +182,10 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
         {canRemove &&
           (confirming ? (
             <span className="ml-auto flex shrink-0 items-center gap-1">
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="xs"
                 disabled={pending}
                 onClick={() =>
                   startTransition(async () => {
@@ -191,26 +193,23 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
                     setError(result.error);
                   })
                 }
-                className="press rounded px-1.5 py-0.5 text-small font-medium text-danger hover:bg-danger-tint"
               >
                 Remove
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="press rounded px-1 py-0.5 text-small text-ink-muted hover:text-ink"
-              >
+              </Button>
+              <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming(false)}>
                 Keep
-              </button>
+              </Button>
             </span>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => setConfirming(true)}
-              className="press ml-auto shrink-0 rounded px-1.5 py-0.5 text-small text-ink-muted hover:text-danger"
+              className="ml-auto shrink-0 hover:text-danger"
             >
               Remove
-            </button>
+            </Button>
           ))}
       </div>
       {confirming && (
@@ -233,18 +232,19 @@ function ColourPicker({
   return (
     <span className="flex shrink-0 items-center gap-1" role="group" aria-label="Colour">
       {PERSON_COLOURS.map((entry) => (
-        <button
-          key={entry}
-          type="button"
-          onClick={() => onChange(entry)}
-          aria-label={entry}
-          aria-pressed={value === entry}
-          className={cn(
-            'size-4 rounded-full ring-offset-1 transition-shadow',
-            PERSON_DOT_CLASS[entry],
-            value === entry ? 'ring-2 ring-ink' : 'hover:ring-2 hover:ring-border-strong',
-          )}
-        />
+        <Tooltip key={entry} label={entry}>
+          <button
+            type="button"
+            onClick={() => onChange(entry)}
+            aria-label={entry}
+            aria-pressed={value === entry}
+            className={cn(
+              'size-4 rounded-full ring-offset-1 transition-shadow',
+              PERSON_DOT_CLASS[entry],
+              value === entry ? 'ring-2 ring-ink' : 'hover:ring-2 hover:ring-border-strong',
+            )}
+          />
+        </Tooltip>
       ))}
     </span>
   );

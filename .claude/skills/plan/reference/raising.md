@@ -16,8 +16,7 @@ interchangeable:
 - **An idea** — `ideas`, read on `/dev/ideas`, written with
   `idea "…" [--module <id>] [--from <n>]`. Work worth doing later that the
   feature in front of you can be finished without. This is where a follow-on
-  goes; fog is not, and neither is a step invented under a feature nobody
-  proposed it for. Anything the CLI files is marked as your suggestion and
+  goes, and a step invented under a feature nobody proposed it for is not. Anything the CLI files is marked as your suggestion and
   listed under the user's own ideas, so `--from <the feature>` is worth
   passing: it is what the page shows as where the suggestion came from. One
   the user dismisses stops being listed, including by `ideas`, so do not

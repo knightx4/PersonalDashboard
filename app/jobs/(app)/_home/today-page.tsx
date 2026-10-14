@@ -10,6 +10,7 @@ import { LiveSection } from './live-section';
 import { ReviewStrip } from './review-strip';
 import { SinceList } from './since-list';
 import { ThisWeekSection } from './this-week-section';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Today, where Jobs opens (plan #1591), drawn from what the page has read.
@@ -43,7 +44,7 @@ export function TodayPage({
   timezone: string;
 }) {
   return (
-    <>
+    <PageColumn>
       <PageHeader title="Today" />
       <div className="space-y-8">
         <ReviewStrip review={review} />
@@ -52,6 +53,6 @@ export function TodayPage({
         <LiveSection summary={summary} live={live} />
         <SinceList since={since} timezone={timezone} />
       </div>
-    </>
+    </PageColumn>
   );
 }

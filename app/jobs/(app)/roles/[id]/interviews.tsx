@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { createInterviewRound, groupInterviews } from './interview-actions';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
@@ -64,33 +65,25 @@ export function Interviews({
   return (
     <div className="space-y-3">
       {interviews.length === 0 && interviewGroups.length === 0 ? (
-        <div
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-10 text-center text-ui text-ink-muted',
-          )}
-        >
-          {interviewMail.length > 0 ? (
-            <>
-              <p className="text-ink">
-                {interviewMail.length === 1
-                  ? 'An email about scheduling is linked to this pursuit, but no interview is recorded.'
-                  : `${interviewMail.length} emails about scheduling are linked to this pursuit, but no interview is recorded.`}
-              </p>
-              <p className="mt-1">
-                The mail only ever carries a booking when it arrives with a calendar invite. Add the
-                round below, or from the message itself under Linked mail.
-              </p>
-            </>
-          ) : closed ? (
-            <p>No interviews were recorded before this closed.</p>
-          ) : (
-            <p>
-              No interviews yet. They appear here when a scheduling email arrives, or you can add
-              one below.
-            </p>
-          )}
-        </div>
+        interviewMail.length > 0 ? (
+          <EmptyState
+            size="box"
+            title={
+              interviewMail.length === 1
+                ? 'An email about scheduling is linked to this pursuit, but no interview is recorded.'
+                : `${interviewMail.length} emails about scheduling are linked to this pursuit, but no interview is recorded.`
+            }
+            description="The mail only ever carries a booking when it arrives with a calendar invite. Add the round below, or from the message itself under Linked mail."
+          />
+        ) : closed ? (
+          <EmptyState size="box" title="No interviews were recorded before this closed." />
+        ) : (
+          <EmptyState
+            size="box"
+            title="No interviews yet."
+            description="They appear here when a scheduling email arrives, or you can add one below."
+          />
+        )
       ) : (
         <>
           {/* Rounds that sit on one day and are not yet an occasion. Offered
@@ -180,7 +173,7 @@ function AddRound({ applicationId, nextRound }: { applicationId: string; nextRou
         // radii and two edges.
         className={cn(
           cardVariants(),
-          'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
+          'press w-full border border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
         )}
       >
         {pending ? 'Adding…' : 'Add a round'}
@@ -214,7 +207,7 @@ function GroupTheseRounds({
 
   return (
     <div
-      className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border-dashed px-4 py-2.5')}
+      className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border border-dashed px-4 py-2.5')}
     >
       <p className="text-ui text-ink-muted">
         {interviewIds.length} interviews on {label}, in separate rounds.

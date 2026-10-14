@@ -7,6 +7,8 @@ import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { MAX_NOTE, type CardNote, type NoteWrite } from '@/lib/learn/notes/notes';
 import { LinkedText } from '@/components/ui/linked-text';
+import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Your notes on a Learn card or on an idea's page, and the box to add one
@@ -91,17 +93,16 @@ export function CardNotes({
                     </p>
                     {from && <p className="mt-0.5 text-small text-ink-muted">{from}</p>}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void drop(note.id)}
-                    pending={removing === note.id}
-                    aria-label="Delete this note"
-                    className="shrink-0"
-                  >
-                    <X className="size-3.5" strokeWidth={2} aria-hidden />
-                  </Button>
+                  <Tooltip label="Delete this note" align="end" className="shrink-0">
+                    <IconButton
+                      label="Delete this note"
+                      onClick={() => void drop(note.id)}
+                      disabled={removing === note.id}
+                      aria-busy={removing === note.id || undefined}
+                    >
+                      <X strokeWidth={1.75} aria-hidden />
+                    </IconButton>
+                  </Tooltip>
                 </li>
               );
             })}
@@ -155,7 +156,7 @@ export function CardNotes({
           onClick={() => setOpen(true)}
           className={cn(notes.length > 0 && 'mt-2')}
         >
-          <NotebookPen className="size-3.5" strokeWidth={2} aria-hidden />
+          <NotebookPen className="size-3.5" strokeWidth={1.75} aria-hidden />
           Add a note
         </Button>
       )}

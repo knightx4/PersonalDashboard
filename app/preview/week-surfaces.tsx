@@ -1,6 +1,7 @@
 import { WeekReviewView } from '@/app/home/week/view';
 import type { TimelineEvent } from '@/lib/timeline/timeline';
 import type { ShownWeekReview } from '@/lib/week-review/view';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The week in review (plan #1233) in the surface gallery (plan #1600): a
@@ -73,16 +74,16 @@ const WEEKS = ['2026-09-27', '2026-09-20', '2026-09-13', '2026-09-06'];
 
 export function WeekReviewSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <WeekReviewView state="shown" review={REVIEW} weeks={WEEKS} timezone="America/New_York" />
-    </div>
+    </PageColumn>
   );
 }
 
 export function WeekReviewNoneSurface() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <WeekReviewView state="none" next={{ day: '2026-10-11', due: false }} />
-    </div>
+    </PageColumn>
   );
 }

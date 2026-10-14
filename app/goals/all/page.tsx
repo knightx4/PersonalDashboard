@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { FileText } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
@@ -6,6 +7,7 @@ import { allGoalsViewOf } from '@/lib/goals/all-goals';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { GoalsView } from '../goals-view';
 import { loadAllGoals } from './data';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'All goals' };
 export const dynamic = 'force-dynamic';
@@ -37,15 +39,15 @@ export default async function AllGoalsPage({
   const data = await loadAllGoals(user, view);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader
         title="All goals"
-        crumbs={allGoalsCrumbs()}
+        subject={{ ref: null, path: allGoalsCrumbs() }}
         actions={
           // Files has no tab; the longer pieces Dash wrote are reached from here and from each goal.
           <Link
             href="/goals/files"
-            className="inline-flex items-center gap-1.5 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className={cn('inline-flex items-center gap-1.5 text-small', linkVariants({ tone: 'quiet' }))}
           >
             <FileText className="size-3.5" strokeWidth={1.75} aria-hidden />
             Files
@@ -53,6 +55,6 @@ export default async function AllGoalsPage({
         }
       />
       <GoalsView {...data} view={view} />
-    </div>
+    </PageColumn>
   );
 }

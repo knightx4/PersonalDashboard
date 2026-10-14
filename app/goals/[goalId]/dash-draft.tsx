@@ -121,7 +121,7 @@ export function DashDraft({
               rel="noopener noreferrer"
               className={buttonVariants({ variant: 'ghost', size: 'sm' })}
             >
-              <ExternalLink className="size-3.5" aria-hidden />
+              <ExternalLink strokeWidth={1.75} className="size-3.5" aria-hidden />
               Open {placeOf(link)}
             </a>
           )}

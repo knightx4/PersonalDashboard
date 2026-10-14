@@ -60,7 +60,6 @@ const map: GoalMap = {
     areaId: 'money',
     title: 'Pay off the student loans',
     acceptance: null,
-    fog: null,
     status: 'open',
     position: 10,
     unit: null,

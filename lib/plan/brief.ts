@@ -1,6 +1,6 @@
 import { commentLine } from '@/lib/comments/context';
 import { APP_VISION, type VisionBodies } from '@/lib/specs/vision';
-import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
+import { isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
 import { outlineIndex, readableRefs, stepRef, type OutlineIndex } from './ref';
 import {
@@ -55,39 +55,33 @@ export const PLAIN_ENGLISH_RULE =
   'what a step is. So the FIRST SENTENCE of every detail says what will be ' +
   'different for them and names nothing from the codebase -- no file paths, no ' +
   'table names, no type or function names -- and the rest is as technical as it ' +
-  'needs to be. Same for a title, a question, its options, and any fog. Read ' +
+  'needs to be. Same for a title, a question and its options. Read ' +
   'your first sentence back and ask whether somebody who has never opened this ' +
   'repository would know what they are getting; if not, it is not written yet. ' +
   'No stock phrases, no metaphor for machinery, no claims about why the step ' +
   'matters.';
 
 /**
- * What a session may write as fog, said in the instruction itself.
+ * Where a thought that is not part of the feature goes, said in the
+ * instruction itself.
  *
- * Fog is the part of the feature in hand that cannot be specified until more
- * of it exists. It was being used for anything a session thought of and did
- * not want to lose: whether ten interview questions should be asked again
- * months later, whether the five-minute reading unit should exist for reading
- * too, what a selection is for on a list belonging to a different feature.
- * None of those stop their feature being finished, and fog is the one place
- * nothing reads again -- the feature ships, the patch stays, and the thought
- * is lost more thoroughly than if it had been dropped.
+ * Sessions shaping a feature kept thinking of things it could also do:
+ * whether ten interview questions should be asked again months later, whether
+ * the five-minute reading unit should exist for reading too. None of those
+ * stop the feature being finished, and written into the feature they are lost
+ * the moment it ships. The ideas page is where a follow-on is read again.
  *
- * So the test is about finishing rather than about certainty, and a follow-on
- * has somewhere else to go. Carried by shaping and re-shaping both, for the
- * same reason as the writing rule above: these are the two jobs that write
- * fog, and a rule only one of them had would show up as half the plan
- * collecting it again.
+ * Carried by shaping and re-shaping both, for the same reason as the writing
+ * rule above: a rule only one of them had would show up as half the plan
+ * collecting follow-ons again.
  */
-export const FOG_RULE =
-  'Fog is only what cannot be decided until part of THIS feature exists. ' +
-  'Before writing any, ask: if this is never resolved, is the feature still ' +
-  'finished? If yes, it is a follow-on, not fog -- file it on the ideas page ' +
+export const FOLLOW_ON_RULE =
+  'Before adding anything to the feature, ask: if this is never done, is the ' +
+  'feature still finished? If yes, it is a follow-on -- file it on the ideas page ' +
   '(plan.ts idea "the follow-on" --module <id>) and name it in your report. If ' +
-  'no, and it can be phrased sharply now, it is a decision step; if it cannot ' +
-  'be phrased yet, it is fog. One patch per feature: fog is a single column, ' +
-  'so a second one replaces the first rather than joining it, and a feature ' +
-  'that seems to need two has one of them wrong.';
+  'no, and it can be phrased sharply now, it is a decision step. If it cannot be ' +
+  'decided until part of the feature exists, it is a step that waits on that part, ' +
+  'saying what it will decide.';
 
 /**
  * Which questions are worth the person's time, said in the instruction itself.
@@ -124,8 +118,7 @@ export const QUESTION_RULE =
 /**
  * What "not right now" means to a session, said in the instruction itself.
  *
- * Dismissing is the way out of a question you do not want to settle and a fog
- * patch you do not want raised again. It only works if the next run reads it:
+ * Dismissing is the way out of a question you do not want to settle. It only works if the next run reads it:
  * a re-shape that cannot see what was put aside re-derives the same question
  * from the same code and writes it back, which is the loop this is meant to
  * end. So the dismissed rows are listed in the turn, and this says what to do
@@ -134,7 +127,7 @@ export const QUESTION_RULE =
 export const DISMISSAL_RULE =
   'Anything listed as dismissed has been put aside by the person as not right ' +
   'now. Respect it: do not propose it again, do not ask the same question in ' +
-  'different words, do not write it back as fog, and do not file it as an idea. ' +
+  'different words, and do not file it as an idea. ' +
   'Dismissing and bringing one back are both the person\'s moves, on /dev/plan ' +
   'and /dev/ideas -- a session never does either.';
 
@@ -451,15 +444,11 @@ export function dismissedUnder(
   suggestions: readonly { body: string }[] = [],
 ): string {
   const rows = flatten([feature]);
-  const outlines = outlineIndex([feature]);
   const lines: string[] = [];
 
   for (const item of rows) {
     if (isDismissed(item)) {
       lines.push(`- ${stepRef(item)} ${item.title} (${item.kind === 'decision' ? 'question' : 'step'})`);
-    }
-    if (item.fog && item.fogDismissedAt !== null) {
-      lines.push(`- The fog on ${stepRef(item)}: ${readableRefs(firstLine(item.fog), outlines)} (fog)`);
     }
   }
   for (const idea of suggestions) {
@@ -556,14 +545,6 @@ export function planBrief(
   out.push(...surfaceLines(surfaces));
   out.push(...patternLines(node, surfaces.length > 0));
   out.push(...referenceLines(node, surfaces, options.references ?? REFERENCES));
-
-  // What nobody can see yet. Said plainly, because the alternative a proposal
-  // reaches for is plausible steps invented to fill the gap. A patch that has
-  // been put aside is not said at all -- that is the whole of what dismissing
-  // it does.
-  if (node.fog && hasLiveFog(node)) {
-    out.push('', '## Not yet specified', '', readable(node.fog));
-  }
 
   if (node.dependsOn.length > 0) {
     out.push('', '## Waits on', '');

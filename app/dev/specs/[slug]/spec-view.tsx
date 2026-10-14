@@ -57,7 +57,7 @@ export function SpecOrphan({
   orphan: { id: string; heading: string; thread: DevComment[] };
 }) {
   return (
-    <div className={cn(cardVariants({ padding: 'dense' }), 'border-dashed')}>
+    <div className={cn(cardVariants({ padding: 'dense' }), 'border border-dashed')}>
       <h3 className="mb-2 text-ui font-semibold text-ink-muted">{orphan.heading}</h3>
       <Thread
         subject={threadRef('spec', orphan.id)}

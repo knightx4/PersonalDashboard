@@ -2,10 +2,11 @@
 
 import { useActionState, useId, useRef, useState } from 'react';
 import { Check, CalendarRange } from 'lucide-react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Popover } from '@/components/ui/popover';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { usePopover } from '@/lib/use-popover';
 import { toggleCalendar, type CalendarPickerState } from '@/app/todo/calendar/actions';
 
@@ -63,7 +64,7 @@ export function CalendarPicker({ calendars }: { calendars: CalendarChoice[] }) {
         onClick={() => setOpen(!open)}
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
-        <CalendarRange className="size-3.5" strokeWidth={2} aria-hidden />
+        <CalendarRange className="size-3.5" strokeWidth={1.75} aria-hidden />
         Calendars
         {/* A calendar switched off leaves nothing behind on the grid to say
             so -- an emptier month looks exactly like a quieter one. */}
@@ -80,9 +81,9 @@ export function CalendarPicker({ calendars }: { calendars: CalendarChoice[] }) {
           aria-label="Calendars"
           className="w-64 space-y-1"
         >
-          <h2 className="px-2 pb-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+          <SectionLabel as="h2" className="px-2 pb-1">
             Subscribed
-          </h2>
+          </SectionLabel>
 
           <div className="space-y-0.5">
             {calendars.map((calendar) => (
@@ -92,7 +93,7 @@ export function CalendarPicker({ calendars }: { calendars: CalendarChoice[] }) {
 
           <p className="border-t border-border px-2 pt-2 text-small text-ink-muted">
             Your own events and tasks always show.{' '}
-            <Link href="/todo/settings" className="font-medium text-accent hover:underline">
+            <Link href="/todo/settings" className={linkVariants()}>
               Subscriptions
             </Link>
           </p>
@@ -132,7 +133,7 @@ function CalendarRow({ calendar }: { calendar: CalendarChoice }) {
         <span className="flex min-w-0 items-center gap-2">
           <Check
             className={cn('size-4 shrink-0', calendar.shown ? 'text-accent' : 'opacity-0')}
-            strokeWidth={2.5}
+            strokeWidth={1.75}
             aria-hidden
           />
           <span className="truncate">{calendar.name}</span>

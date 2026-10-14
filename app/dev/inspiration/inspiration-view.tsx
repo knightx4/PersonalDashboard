@@ -1,9 +1,9 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Telescope } from 'lucide-react';
 import { cardVariants } from '@/components/ui/card';
 import { Group, SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { durationLabel } from '@/lib/learn/youtube/format';
 import {
@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { CheckNow } from './check-now';
 import { PlaylistSetting } from './playlist-setting';
 import { TakeawayRow } from './takeaway-row';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The body of the Inspiration tab (plan #1412): the two arrangements of what
@@ -40,11 +41,7 @@ function ViewSwitch({ view }: { view: InspirationViewName }) {
             href={option === 'videos' ? '/dev/inspiration' : `/dev/inspiration?view=${option}`}
             scroll={false}
             aria-current={on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on ? 'bg-accent-tint text-accent' : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(on)}
           >
             {INSPIRATION_VIEW_LABEL[option]}
           </Link>
@@ -88,12 +85,12 @@ function VideoHeader({ video }: { video: InspirationVideo }) {
           loading="lazy"
           width={96}
           height={54}
-          className="h-[54px] w-24 rounded-sm bg-sunken object-cover"
+          className="h-[54px] w-24 rounded-card bg-sunken object-cover"
         />
       </a>
       <div className="min-w-0 flex-1">
         <h2 className="text-ui font-semibold text-ink">
-          <a href={watch} target="_blank" rel="noreferrer" className="line-clamp-2 hover:underline">
+          <a href={watch} target="_blank" rel="noreferrer" className="press-area line-clamp-2 hover:underline">
             {video.title}
           </a>
         </h2>
@@ -202,7 +199,7 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
  */
 export function InspirationScreen({ page, view }: { page: InspirationPage; view: InspirationViewName }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageColumn className="space-y-6">
       <div>
         <PageHeader
           title="Inspiration"
@@ -224,6 +221,6 @@ export function InspirationScreen({ page, view }: { page: InspirationPage; view:
         </div>
       </div>
       <InspirationView page={page} view={view} />
-    </div>
+    </PageColumn>
   );
 }

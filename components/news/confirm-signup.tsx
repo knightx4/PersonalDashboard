@@ -41,7 +41,7 @@ export function ConfirmSignup({
   if (shown) {
     return (
       <p className={cn('flex items-center gap-1.5 text-ui text-ink-muted', className)}>
-        <Check className="size-3.5"strokeWidth={2} aria-hidden />
+        <Check className="size-3.5"strokeWidth={1.75} aria-hidden />
         {confirmedLabel ? `Confirmed ${confirmedLabel}` : 'Confirmed just now'}
       </p>
     );

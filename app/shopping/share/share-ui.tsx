@@ -41,7 +41,7 @@ export function NewShareButton() {
         onClick={() => setOpen((o) => !o)}
         className={buttonVariants({ variant: 'primary', size: 'sm' })}
       >
-        <Plus className="size-4" strokeWidth={2} aria-hidden />
+        <Plus className="size-4" strokeWidth={1.75} aria-hidden />
         New form
       </button>
       {open && (

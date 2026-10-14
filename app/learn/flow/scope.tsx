@@ -1,6 +1,5 @@
-import Link from 'next/link';
-import { segmentedFrame } from '@/components/ui/segmented';
-import { cn } from '@/lib/cn';
+import Link, { linkVariants } from '@/components/ui/link';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { practiceHref } from '@/lib/learn/flow/href';
 import type { FlowOnly } from './session';
 
@@ -15,7 +14,7 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
       <span>
         Only asking about <span className="font-medium text-ink">{name}</span>
       </span>
-      <Link href={practiceHref()} className="text-accent hover:underline">
+      <Link href={practiceHref()} className={linkVariants()}>
         {back}
       </Link>
     </p>
@@ -49,13 +48,7 @@ export function ScopeFilter({ filter }: { filter: FlowOnly }) {
             href={option.href}
             scroll={false}
             aria-current={option.on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-              option.on
-                ? 'bg-accent-tint text-accent'
-                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(option.on)}
           >
             {option.label}
           </Link>

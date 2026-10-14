@@ -23,6 +23,7 @@ import {
   type ResearchSource,
 } from '@/lib/learn/essays/research';
 import { researchEssay } from './actions';
+import { linkVariants } from '@/components/ui/link';
 
 /** Where each level's run has got to: running, or the error the last press ended with. */
 type Pending = Partial<Record<ResearchLevel, 'running' | { error: string }>>;
@@ -113,7 +114,7 @@ function Quote({
           href={textFragmentUrl(source.url, citation.quote)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-11 min-w-0 flex-1 items-center px-2 text-small text-accent hover:underline lg:min-h-8"
+          className={cn('inline-flex min-h-11 min-w-0 flex-1 items-center px-2 text-small lg:min-h-8', linkVariants())}
           title={source.title}
         >
           <span className="truncate">{source.domain || source.title}</span>

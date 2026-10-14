@@ -3,6 +3,8 @@
 import { Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { IconButton } from '@/components/ui/icon-button';
+import Link, { linkVariants } from '@/components/ui/link';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
@@ -11,6 +13,7 @@ import { moduleById, moduleForPath } from '@/lib/modules';
 import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
 type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
@@ -89,23 +92,25 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           ladder at all: an interview or a return deadline is an appointment,
           not something you finish. */}
       {item.completable ? (
-        <button
-          type="button"
-          aria-label="Mark done"
-          onClick={(event) =>
-            run({
-              state: 'done',
-              write: () => completeItem(item.source, item.key),
-              from: event.currentTarget.getBoundingClientRect(),
-            })
-          }
-          className={cn(
-            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
-            shown === 'done' ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
-          )}
-        >
-          <StatusGlyph glyph={shown === 'done' ? 'check' : 'empty'} size={16} />
-        </button>
+        <Tooltip label="Mark done" className="shrink-0">
+          <button
+            type="button"
+            aria-label="Mark done"
+            onClick={(event) =>
+              run({
+                state: 'done',
+                write: () => completeItem(item.source, item.key),
+                from: event.currentTarget.getBoundingClientRect(),
+              })
+            }
+            className={cn(
+              'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
+              shown === 'done' ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
+            )}
+          >
+            <StatusGlyph glyph={shown === 'done' ? 'check' : 'empty'} size={16} />
+          </button>
+        </Tooltip>
       ) : (
         <span
           className="mt-0.5 flex size-[18px] shrink-0 items-center justify-center text-ink-muted"
@@ -117,7 +122,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          {/* What came from Goals carries the Goals mark, the lime flag, so a
+          {/* What came from Goals carries the Goals mark, the emerald flag, so a
               step towards a goal is told apart from a task at a glance (note
               134ec065). The mark rather than a green row: green on this app
               means money came back (law 4), and the mark is the colour the
@@ -129,7 +134,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             </span>
           )}
           {item.link ? (
-            <a
+            <Link
               href={item.link.href}
               className={cn(
                 'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
@@ -137,7 +142,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               )}
             >
               {item.title}
-            </a>
+            </Link>
           ) : (
             <span
               className={cn('text-ui font-medium text-ink', shown === 'done' && 'line-through')}
@@ -160,12 +165,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               no hover to reveal it. This matches a linked task's anchor, so
               "click through to the job" reads the same on both kinds of row. */}
           {item.link && (
-            <a
-              href={item.link.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
-            >
+            <Link href={item.link.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }))}>
               {item.link.label}
-            </a>
+            </Link>
           )}
 
           {item.action && (
@@ -173,9 +175,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
+              className={cn('inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
             >
-              <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+              <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               {item.action.label}
             </a>
           )}
@@ -196,36 +198,34 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        <button
-          type="button"
-          title="Later"
-          onClick={(event) =>
-            run({
-              state: 'deferred',
-              write: () => deferItem(item.source, item.key),
-              from: event.currentTarget.getBoundingClientRect(),
-            })
-          }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Later</span>
-        </button>
-        <button
-          type="button"
-          title="Not this one"
-          onClick={(event) =>
-            run({
-              state: 'dismissed',
-              write: () => dismissItem(item.source, item.key),
-              from: event.currentTarget.getBoundingClientRect(),
-            })
-          }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-        >
-          <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Not this one</span>
-        </button>
+        <Tooltip label="Later" align="end">
+          <IconButton
+            label="Later"
+            onClick={(event) =>
+              run({
+                state: 'deferred',
+                write: () => deferItem(item.source, item.key),
+                from: event.currentTarget.getBoundingClientRect(),
+              })
+            }
+          >
+            <Clock strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
+        <Tooltip label="Not this one" align="end">
+          <IconButton
+            label="Not this one"
+            onClick={(event) =>
+              run({
+                state: 'dismissed',
+                write: () => dismissItem(item.source, item.key),
+                from: event.currentTarget.getBoundingClientRect(),
+              })
+            }
+          >
+            <X strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
       </div>
     </div>
   );

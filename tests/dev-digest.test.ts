@@ -59,7 +59,6 @@ function closedStep(over: Row = {}): Row {
     acceptance: null,
     status: 'done',
     kind: 'build',
-    fog: null,
     resolution: null,
     comment: null,
     priority: 2,

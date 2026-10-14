@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { CalendarDays, MapPin } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';

@@ -1,8 +1,10 @@
-import Link from 'next/link';
+import { RowLink } from '@/components/shell/back-link';
+import Link from '@/components/ui/link';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CardSection, cardVariants } from '@/components/ui/card';
 import { MoveLabel } from '@/components/ui/move-label';
+import { Tooltip } from '@/components/ui/tooltip';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { applicationMove } from '@/lib/jobs/move';
@@ -199,7 +201,7 @@ function FocusLine({
 
   return (
     <li>
-      <Link
+      <RowLink
         href={`/jobs/roles/${row.roleId}`}
         // ui-ok: fixed-control-height -- a row, not a control: 44px on a
         // phone for a thumb, 40 above it so a screen holds what is open.
@@ -224,12 +226,14 @@ function FocusLine({
           </span>
         </span>
 
+        {/* Inside the row's link, so the tip is for the mouse and the
+          * label reaches a screen reader through the link's name. */}
         {row.needsReview && (
-          <AlertTriangle
-            className="size-3.5 shrink-0 text-caution"
-            strokeWidth={2}
-            aria-label="Needs review"
-          />
+          <Tooltip label="Something on this role needs you to look at it" align="end" className="shrink-0">
+            <span role="img" aria-label="Needs review" className="inline-flex">
+              <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-hidden />
+            </span>
+          </Tooltip>
         )}
 
         {detail && (
@@ -253,13 +257,12 @@ function FocusLine({
 
         {move && <MoveLabel move={move.move} title={move.title} className="min-w-0" />}
 
-        <span
-          className={cn('tabular w-10 shrink-0 text-right text-micro', stale ? 'text-caution' : 'text-ink-muted')}
-          title="Time since the last thing that happened"
-        >
-          {shortAge(row.lastActivityAt)}
-        </span>
-      </Link>
+        <Tooltip label="Time since the last thing that happened" align="end" className="w-10 shrink-0 justify-end">
+          <span className={cn('tabular text-right text-micro', stale ? 'text-caution' : 'text-ink-muted')}>
+            {shortAge(row.lastActivityAt)}
+          </span>
+        </Tooltip>
+      </RowLink>
     </li>
   );
 }

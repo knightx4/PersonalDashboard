@@ -17,10 +17,8 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -119,11 +117,22 @@ describe('besideRunning', () => {
     expect(ids(besideRunning(sections, ['run'])).sort()).toEqual(['clear', 'todo']);
   });
 
-  it('never shares among features with no module', () => {
+  it('shares among features with no module when their paths do not meet', () => {
     const sections = tree([
       item({ id: 'a', module: null, detail: 'app/a/page.tsx' }),
       item({ id: 'b', module: null, detail: 'app/b/page.tsx' }),
+      item({ id: 'c', module: null, detail: 'app/a/list.tsx' }),
+      item({ id: 'd', module: null }),
     ]);
-    expect(ids(besideRunning(sections, ['a']))).toEqual([]);
+    expect(ids(besideRunning(sections, ['a']))).toEqual(['b']);
+  });
+
+  it('holds features with no module to two at once', () => {
+    const sections = tree([
+      item({ id: 'a', module: null, detail: 'app/a/page.tsx' }),
+      item({ id: 'b', module: null, detail: 'app/b/page.tsx' }),
+      item({ id: 'c', module: null, detail: 'app/c/page.tsx' }),
+    ]);
+    expect(ids(besideRunning(sections, ['a', 'b']))).toEqual([]);
   });
 });

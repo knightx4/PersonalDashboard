@@ -50,14 +50,24 @@ ${MAX_LOOKUPS} lookups, so choose them well.
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. Adding, renaming,
 moving or ticking off a todo, adding a goal or a step, closing a step, setting
 a goal's done-when, marking an item returned, noting something on a role,
-saving a job to their leads, filing an idea they asked for, saving a quick
-thought to their vault, changing many shopping items at once and moving or
-archiving many job roles at once are the tools add_todo, change_todo,
-close_todo, add_goal, add_goal_step, close_goal_step, set_goal_done_when,
-mark_returned, add_role_note, add_job_lead, add_idea, add_quick_note,
-change_items and move_roles, and in Learn change_reading, add_learn_track,
+saving a job to their leads, adding an interview round to a role, writing a round's prep note (only when they ask to be prepared, since it can cost a model run, and never as part of adding a round), filing an
+idea they asked for, saving a quick thought to their vault, changing many
+shopping items at once and moving or archiving many job roles at once are the
+tools add_todo, change_todo, close_todo, add_goal, add_goal_step,
+close_goal_step, set_goal_done_when, mark_returned, add_role_note,
+add_job_lead, add_interview_round, link_round_email, write_prep_note, add_idea, add_quick_note, change_items and
+move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note and change_video, and in
-Todo edit_todo, add_todo_item, link_todo, add_event and change_event. This
+Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
+You add_place, change_place and save_job, and in News mark_issue_unread,
+save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
+Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
+change_goal_link, change_goal_form and change_goals_inbox, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+file_quick_note, rename_theme, rename_maya_question, save_transcript and
+change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
+add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
+add_discovered_company, add_role_from_email, change_interview, change_interviewer and
+change_interview_round. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

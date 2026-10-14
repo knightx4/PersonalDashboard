@@ -1,7 +1,11 @@
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadIdeaMap } from '@/lib/learn/map/load';
+import { MAX_NEXT_TOPICS } from '@/lib/learn/map/next-topics';
+import { loadNextTopics } from '@/lib/learn/map/next-topics-load';
 import { parseMapParams } from '@/lib/learn/map/view';
+import { loadRecording } from '@/lib/learn/map/recording-store';
+import { saveRecordingAction } from './actions';
 import { IdeaSpaceView } from './idea-space-view';
 
 export const dynamic = 'force-dynamic';
@@ -20,11 +24,32 @@ export default async function IdeaSpacePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const [learn, search] = await Promise.all([createLearnClient(), searchParams]);
+  const recording = await loadRecording(learn, user.id).catch((error: unknown) => {
+    console.error('[learn idea space] recording', error instanceof Error ? error.message : error);
+    return undefined;
+  });
   const view = await loadIdeaMap(learn).catch((error: unknown) => {
     console.error('[learn idea space]', error instanceof Error ? error.message : error);
     return null;
   });
-  return <IdeaSpaceView view={view} params={parseMapParams(search)} />;
+  // The topics next to what you know (plan #2016.6), beside the lit ones the
+  // frame already worked out. A failed read is said on the card.
+  const lit = view?.topics?.topics.filter((topic) => topic.state === 'lit').map((topic) => topic.id) ?? [];
+  const nextTopics = view?.topics
+    ? await loadNextTopics(learn, user.id, lit, { limit: MAX_NEXT_TOPICS }).catch((error: unknown) => {
+        console.error('[learn idea space] next topics', error instanceof Error ? error.message : error);
+        return null;
+      })
+    : undefined;
+  return (
+    <IdeaSpaceView
+      view={view}
+      nextTopics={nextTopics}
+      params={parseMapParams(search)}
+      recording={recording}
+      save={saveRecordingAction}
+    />
+  );
 }

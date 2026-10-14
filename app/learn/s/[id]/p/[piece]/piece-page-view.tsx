@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
@@ -7,6 +6,9 @@ import type { PracticeView } from '@/lib/learn/lessons/practice';
 import type { DueReview } from '@/lib/learn/lessons/review';
 import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
+import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -14,25 +16,19 @@ export type PiecePageProps = {
   standing: { practicePassed: boolean; checkPassed: boolean };
   /** Ideas from this plan's passed pieces due for review, this piece's own left out. */
   reviews: DueReview[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 };
 
 /** One piece of a learning goal's plan, from what its page read (plan #1602). */
-export function PiecePageView({ page, practice, standing, reviews }: PiecePageProps) {
+export function PiecePageView({ page, practice, standing, reviews, path }: PiecePageProps) {
   const { piece, subject, unit, siblings } = page;
 
   return (
-    <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
+    <PageColumn>
 
       <PageHeader
+        subject={path}
         title={piece.title}
         description={`Unit ${unit.ordinal}, ${unit.title} · piece ${piece.ordinal} of ${siblings.length}${
           piece.passedAt ? ' · passed' : ''
@@ -50,7 +46,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
 
       <ReviewList
         reviews={reviews}
-        title="First, from earlier pieces"
+        title="First, from earlier in this track"
         description="Due for review today. A right answer brings the next question later; a miss brings it back tomorrow."
         showPlan={false}
       />
@@ -93,7 +89,7 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
                   ) : (
                     <Link
                       href={`/learn/s/${subject.id}/p/${sibling.id}`}
-                      className="press-area text-accent hover:underline"
+                      className={cn('press-area', linkVariants())}
                     >
                       {sibling.title}
                     </Link>
@@ -105,6 +101,6 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
           </Card>
         </nav>
       )}
-    </>
+    </PageColumn>
   );
 }

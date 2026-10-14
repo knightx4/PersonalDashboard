@@ -23,6 +23,17 @@ import {
   summarize,
 } from '@/lib/plan/tree';
 
+// The Tooltip draws its text only while it shows, so these renders read it
+// from a title on a stand-in instead (plan #1985.5).
+vi.mock('@/components/ui/tooltip', async () => {
+  const { createElement } = await import('react');
+  return {
+    Tooltip: ({ label, children }: { label: string; children: React.ReactNode }) =>
+      createElement('span', { title: label }, children),
+  };
+});
+
+
 // The server actions pull in the session client, which has no business in a
 // render test; the page only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/plan/actions', () => {
@@ -34,7 +45,6 @@ vi.mock('@/app/dev/plan/actions', () => {
     approvePlanItem: noop,
     deletePlanItem: noop,
     dismissPlanDecision: noop,
-    dismissPlanFog: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
     reshapePlanFeature: noop,
@@ -66,10 +76,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -253,8 +261,8 @@ describe('PlanView', () => {
     );
     // Both presses are on the page: the runner's step offers Mine, and the one
     // already held offers the press that gives it back.
-    expect(html).toContain('title="Mine"');
-    expect(html).toContain('title="Not mine"');
+    expect(html).toContain('aria-label="Mine"');
+    expect(html).toContain('aria-label="Not mine"');
     // Pressed buttons, not forms: the row changes at once (plan #1850), so the
     // press carries no hidden fields for the action to read.
     expect(html).not.toContain('name="assignee"');
@@ -294,7 +302,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</a><span title="Yours. The runner will not take this one."',
+      '>Account deletion<span hidden=""></span></a><span title="Yours, so the runner will not take it.'
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -324,7 +332,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</a><span title="Overhaul.');
+    expect(html).toContain('>Move threads onto the core<span hidden=""></span></a><span title="An overhaul:');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });
@@ -695,115 +703,6 @@ describe('PlanView', () => {
     // behind a fold.
     expect(html).toContain('unanswered questions');
     expect(html).toMatch(/2<span class="sr-only">\s*unanswered questions/);
-  });
-
-  it('shows what a feature admits it cannot see yet, and nothing when it can', () => {
-    const foggy = buildPlanTree({
-      items: [
-        item({
-          id: 'export',
-          title: 'Export',
-          fog: 'How the second half is shaped is not yet known.',
-        }),
-        item({ id: 'writer', title: 'The writer', parentId: 'export' }),
-      ],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(foggy, 'all')}
-        finished={[]}
-        summary={summarize(foggy)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-        unfolded
-      />,
-    );
-
-    // In the tree, not behind a fold: a plan's own admission that part of it
-    // is missing is no use if you have to open a step to find it.
-    expect(html).toContain('Not yet specified');
-    expect(html).toContain('How the second half is shaped is not yet known.');
-    // Exactly once -- the step beneath it has no fog and shows no block.
-    expect((html.match(/Not yet specified/g) ?? []).length).toBe(1);
-    // And a plan with none of it anywhere says nothing at all.
-    expect(render('all')).not.toContain('Not yet specified');
-  });
-
-  it('gives a feature that is only fog an arrow to fold it away', () => {
-    // #386's shape: real enough to name, not yet real enough to break into
-    // steps. The fold used to be drawn off the sub-steps alone, so a row like
-    // this one had its fog pinned open with no control anywhere on it.
-    const stepless = buildPlanTree({
-      items: [
-        item({
-          id: 'defence',
-          title: 'Test each concept at three rungs',
-          fog: 'The defence rung still cannot be written as steps.',
-        }),
-        item({ id: 'plain', title: 'A feature with neither steps nor fog' }),
-      ],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(stepless, 'all')}
-        finished={[]}
-        summary={summarize(stepless)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-      />,
-    );
-
-    // Unfolded to start, so scanning the plan still reads the fog without a
-    // press -- the arrow is what is new, not the hiding.
-    expect(html).toContain('The defence rung still cannot be written as steps.');
-    // Exactly one arrow: the row with nothing under it gets none, and the
-    // fog row gets one, which folds the row (title and aria-label).
-    expect((html.match(/aria-label="Fold #/g) ?? []).length).toBe(1);
-    expect((html.match(/aria-label="Unfold #/g) ?? []).length).toBe(0);
-  });
-
-  it('says nothing about a patch of fog that has been put aside', () => {
-    const aside = buildPlanTree({
-      items: [
-        item({
-          id: 'export',
-          title: 'Export',
-          fog: 'How the second half is shaped is not yet known.',
-          fogDismissedAt: '2026-09-13T00:00:00Z',
-        }),
-      ],
-      dependencies: [],
-    });
-    const at = (view: 'all' | 'dismissed') =>
-      renderToStaticMarkup(
-        <PlanView
-          sections={applyView(aside, view)}
-          finished={[]}
-          summary={summarize(aside)}
-          view={view}
-          catalog={[]}
-          empty={false}
-          canSend={false}
-          lastRuns={{}}
-          commitChecks={{}}
-          unfolded
-        />,
-      );
-
-    expect(at('all')).not.toContain('How the second half is shaped is not yet known.');
-    // Under Dismissed it is shown again, with the one move back.
-    expect(at('dismissed')).toContain('How the second half is shaped is not yet known.');
-    expect(at('dismissed')).toContain('Bring back');
   });
 
   it('finds a question put aside, with the way back, under Dismissed', () => {
@@ -1332,7 +1231,7 @@ describe('a step a session added under an approved feature', () => {
     const html = drawAdded();
     expect(html).toContain('Added by Dash on 2026-09-26');
     // The session is there for whoever wants it, under the pointer.
-    expect(html).toContain('title="Session cse_01abc"');
+    expect(html).toContain('Session cse_01abc.');
     // Said once: the stamp is not also shown as the row's note.
     expect(html).not.toContain('Note: Added by');
     expect(html).not.toContain('Claude');

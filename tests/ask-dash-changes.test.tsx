@@ -183,9 +183,10 @@ describe('the changes Dash made, on the Ask page', () => {
     expect(html).toContain('href="/shopping/inventory/i1"');
     expect(html).toContain('href="/todo/all?status=all&amp;focus=todo-row"');
     expect(html).toContain('href="/ask/c3"');
-    expect(html).toContain('>I sent the kettle back</a>');
+    // Each link carries its pending marker (components/ui/link.tsx) before </a>.
+    expect(html).toMatch(/>I sent the kettle back(?:<span hidden=""><\/span>)?<\/a>/);
     expect(html).toContain('href="/ask/c2"');
-    expect(html).toContain('>a question</a>');
+    expect(html).toMatch(/>a question(?:<span hidden=""><\/span>)?<\/a>/);
   });
 
   it('offers Undo on a standing change only, and says an undone one was taken back', () => {

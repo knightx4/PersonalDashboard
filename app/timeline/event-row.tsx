@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { formatMoney } from '@/lib/money';
 import { KIND_NOUNS, timelineHref, type TimelineEvent } from '@/lib/timeline/timeline';

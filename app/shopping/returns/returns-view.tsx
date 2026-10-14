@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
+import { buttonVariants } from '@/components/ui/button';
 import { ListPage } from '@/components/patterns/list-detail';
 import { FilterSheet } from '@/components/shell/filter-sheet';
 import { RailGroup, RailItem } from '@/components/shell/left-rail';
@@ -18,6 +19,7 @@ import type { OnTimeSavings } from '@/lib/returns/savings';
 import { OnTimeSavingsFigure } from './on-time-savings';
 import { ReturnItemRow } from './return-item-row';
 import { ReturnsOrderList } from './returns-order-list';
+import { PageColumn } from '@/components/shell/page-width';
 
 function returnsHref(
   view: ReturnsView,
@@ -102,7 +104,7 @@ export function ReturnsPageView({
       actions={
         <Link
           href="/shopping/settings#return-policies"
-          className="press-area text-ui font-medium text-accent hover:underline"
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
           Edit return policies
         </Link>
@@ -150,7 +152,7 @@ export function ReturnsPageView({
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header}
         <div className="mb-4">{tools}</div>
         <EmptyState
@@ -171,7 +173,7 @@ export function ReturnsPageView({
           }
         />
         <OnTimeSavingsFigure savings={savings} className="mt-6" />
-      </div>
+      </PageColumn>
     );
   }
 

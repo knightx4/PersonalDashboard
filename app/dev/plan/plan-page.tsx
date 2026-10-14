@@ -2,7 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { featureTable } from '@/lib/plan/feature-table';
 import { updateOverdueDays } from '@/lib/plan/updates';
 import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -41,6 +41,8 @@ import {
 import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { catalogOf } from './plan-catalog';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -254,12 +256,6 @@ export async function renderPlanPage({
   // Light on purpose -- the tree is already on the page once.
   const catalog = catalogOf(everything);
 
-  // Wider than the other dev pages, which are prose and lists at max-w-3xl.
-  // This one is a table with six columns and a tree indenting the first of
-  // them, and the Status column took the last of the room the titles had: at
-  // 3xl a third-level step's title truncated after about two words. The page
-  // earns the extra width by being the only one here that is a grid rather
-  // than a column of text.
   // A project sends to its own routine, and only once that routine is set:
   // with no id the send would fall back to this repository's.
   const canSend = project
@@ -271,8 +267,13 @@ export async function renderPlanPage({
   const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeader
+        subject={
+          project
+            ? sectionSubject('/dev/plan', 'Plan', { label: project.label, href: basePath })
+            : sectionSubject('/dev/plan', 'Plan')
+        }
         title={project ? project.label : 'Plan'}
         actions={
           <Link
@@ -280,7 +281,7 @@ export async function renderPlanPage({
             scroll={false}
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
-            <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
             New feature
           </Link>
         }
@@ -342,6 +343,6 @@ export async function renderPlanPage({
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />
-    </div>
+    </PageColumn>
   );
 }

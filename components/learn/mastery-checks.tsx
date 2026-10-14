@@ -37,12 +37,12 @@ const STANDING_LABEL: Record<CheckStanding, string> = {
 function StandingMark({ standing }: { standing: CheckStanding }) {
   const shared = 'size-3.5 shrink-0 translate-y-0.5';
   if (standing === 'right') {
-    return <Check className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+    return <Check className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
   }
   if (standing === 'missed') {
-    return <X className={cn(shared, 'text-danger')} strokeWidth={2} aria-hidden />;
+    return <X className={cn(shared, 'text-danger')} strokeWidth={1.75} aria-hidden />;
   }
-  return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+  return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={1.75} aria-hidden />;
 }
 
 /**

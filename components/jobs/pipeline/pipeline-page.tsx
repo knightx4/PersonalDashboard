@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';
@@ -9,6 +9,7 @@ import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageHeader } from '@/components/shell/page-header';
+import { sectionSubject } from '@/lib/core/section-path';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
@@ -74,7 +75,7 @@ export function PipelinePage({
   if (rows.length === 0) {
     return (
       <>
-        <PageHeader title="Pipeline" />
+        <PageHeader subject={sectionSubject('/jobs/pipeline', 'Pipeline')} title="Pipeline" />
         <EmptyState
           icon={KanbanSquare}
           title="Nothing in the pipeline yet"
@@ -114,6 +115,7 @@ export function PipelinePage({
   const askFilter = askListFilter('pipeline', params);
   const header = (
     <PageHeader
+      subject={sectionSubject('/jobs/pipeline', 'Pipeline')}
       title="Pipeline"
       actions={
         <>

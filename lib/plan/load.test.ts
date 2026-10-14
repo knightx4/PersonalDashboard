@@ -21,7 +21,6 @@ describe('planItemFromRow', () => {
     acceptance: 'Done when it works.',
     status: 'blocked',
     kind: 'build',
-    fog: null,
     resolution: null,
     comment: null,
     priority: 1,
@@ -45,16 +44,14 @@ describe('planItemFromRow', () => {
     expect(item.kind).toBe('build');
   });
 
-  it('round-trips a decision with its fog and its answer', () => {
+  it('round-trips a decision with its answer', () => {
     const item = planItemFromRow({
       ...row,
       status: 'done',
       kind: 'decision',
-      fog: 'How the export is shaped is not yet known.',
       resolution: 'One file per month.',
     });
     expect(item.kind).toBe('decision');
-    expect(item.fog).toBe('How the export is shaped is not yet known.');
     expect(item.resolution).toBe('One file per month.');
   });
 

@@ -13,7 +13,7 @@
  * the check again; its baseline entry goes with it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { actionGaps } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
@@ -164,6 +164,99 @@ function rawMotionInCode(file: string, text: string): string[] {
   return out;
 }
 
+// -- docs/ONE-INTERFACE-SPEC.md ---------------------------------------------
+
+/**
+ * Rule R14: a radius class is one of the tokens the themes move
+ * (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`) or
+ * `rounded-full`. One item per other radius class in a string under app/ or
+ * components/, as `file:line: the class`: the fixed sizes (`rounded`,
+ * `rounded-lg`, `rounded-[7px]`), with or without a side (`rounded-t-md`) or
+ * a variant (`sm:rounded-xl`). Aurora's rounder and Poster's square corners
+ * reach only the tokens, so a fixed size is a corner the theme skips.
+ *
+ * `rounded-none` is allowed: zero is zero in every theme, and it is how a
+ * component's own corner is taken off where an edge meets the page.
+ *
+ * Read from string literals with the comments blanked, and only those that
+ * read as a class list: prose about a class ("rounded-lg is a fixed 8px.")
+ * has a comma, a colon or a full stop followed by a space, or ends a
+ * sentence. app/preview/overhaul/now.tsx and entries.tsx are not read: they
+ * draw and describe the markup from before the component overhaul, on
+ * purpose, beside what replaced it.
+ */
+const RADIUS_CLASS =
+  /(?<![\w-])((?:[\w-]+:)*rounded(?:-(?:t|b|l|r|s|e|tl|tr|bl|br|ss|se|es|ee))?(?:-([\w.]+|\[[^\]\s]+\]))?)(?![\w-])/g;
+const ON_TOKEN = new Set(['pane', 'card', 'control', 'pill', 'full', 'none']);
+const STRING_LITERAL = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g;
+const PROSE = /[,.;:?!]\s|[.?!]['"`]?$/;
+const RADIUS_RECORDS = new Set(['app/preview/overhaul/now.tsx', 'app/preview/overhaul/entries.tsx']);
+
+function offTokenRadius(root: string): string[] {
+  const out: string[] = [];
+  for (const file of listFiles(root, ['app', 'components'], ['.ts', '.tsx'])) {
+    if (/\.test\.tsx?$/.test(file) || RADIUS_RECORDS.has(file)) continue;
+    const code = withoutComments(readFileSync(join(root, file), 'utf8'));
+    for (const literal of code.matchAll(STRING_LITERAL)) {
+      const body = literal[0].slice(1, -1);
+      if (PROSE.test(body)) continue;
+      for (const m of body.matchAll(RADIUS_CLASS)) {
+        if (m[2] !== undefined && ON_TOKEN.has(m[2])) continue;
+        out.push(`${file}:${lineAt(code, literal.index + 1 + m.index)}: ${m[1]}`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Rule R15: Lucide icons are drawn at one stroke weight, ICON_STROKE (1.75,
+ * app/dev/ui/measurements.ts). One item per Lucide element under app/ or
+ * components/ drawn at any other weight, as `file:line: <Name strokeWidth>`.
+ * An element with no strokeWidth counts too: Lucide's own default is 2.
+ *
+ * A Lucide element is a tag named by an import from `lucide-react` (an alias
+ * included), or, in a file that imports from it, a tag named `Icon` or
+ * `…Icon` that the file does not define itself: the `Icon` a row is handed as
+ * a `LucideIcon`. The one weight allowed besides 1.75 is the phone dock's
+ * current tab, drawn at 2 on purpose so the tab you are on reads heavier.
+ * The overhaul records are not read, as for R14.
+ */
+const LUCIDE_IMPORT = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g;
+const JSX_OPEN = /<([A-Z][\w.]*)(\s[^<>]*?)?\/?>/g;
+const STROKE_PROP = /\bstrokeWidth=(?:\{([^}]*)\}|"([^"]*)")/;
+const ON_STROKE = /^(?:1\.75|(?:\w+\.)?ICON_STROKE)$/;
+const DOCK_CURRENT = { file: 'components/shell/app-shell.tsx', value: 'on ? 2 : 1.75' };
+
+function iconStrokeOff(root: string): string[] {
+  const out: string[] = [];
+  for (const file of listFiles(root, ['app', 'components'], ['.tsx'])) {
+    if (/\.test\.tsx$/.test(file) || RADIUS_RECORDS.has(file)) continue;
+    const code = withoutComments(readFileSync(join(root, file), 'utf8'));
+    if (!code.includes('lucide-react')) continue;
+    const names = new Set<string>();
+    for (const m of code.matchAll(LUCIDE_IMPORT)) {
+      for (const part of m[1].split(',')) {
+        const name = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim() ?? '';
+        if (/^[A-Z]/.test(name) && !/^Lucide(?:Icon|Props)$/.test(name)) names.add(name);
+      }
+    }
+    for (const m of code.matchAll(JSX_OPEN)) {
+      const name = m[1];
+      const handed =
+        /(?:^|\.)\w*Icon$/.test(name) &&
+        !new RegExp(`\\b(?:function|const)\\s+${name.replace('.', '\\.')}\\b`).test(code);
+      if (!names.has(name) && !handed) continue;
+      const prop = (m[2] ?? '').match(STROKE_PROP);
+      const value = prop ? (prop[1] ?? prop[2]).trim() : null;
+      if (value !== null && ON_STROKE.test(value)) continue;
+      if (file === DOCK_CURRENT.file && value === DOCK_CURRENT.value) continue;
+      out.push(`${file}:${lineAt(code, m.index)}: <${name} strokeWidth=${value ?? '(Lucide default 2)'}>`);
+    }
+  }
+  return out;
+}
+
 // -- docs/UI-QUALITY-SPEC.md ------------------------------------------------
 
 /** A page that returns nothing and calls `redirect`: a moved address, not a screen. */
@@ -189,6 +282,87 @@ function routesWithoutSurface(root: string): string[] {
     if (route !== null && surfacesForRoute(route).length === 0) routes.add(route);
   }
   return [...routes].sort();
+}
+
+// -- docs/ONE-INTERFACE-SPEC.md -------------------------------------------------
+
+/**
+ * Part 2: every page for one row says where it sits, drawn from the
+ * catalogue by refPath (lib/core/refs.ts, plan #1931). A page for one row is
+ * a `page.tsx` whose route has a dynamic segment (`[id]`, `[...path]`). It
+ * draws a path when it, or a file it imports from app/ or components/ (two
+ * imports deep, which reaches a page's view and that view's header), passes
+ * `crumbs` or a PageHeader or TabbedDetail `subject`, or draws a Breadcrumb itself. Pages
+ * that only send the visitor on are not counted, nor is /open/[ref], which is
+ * one of those that reads a row first, nor the two pages for someone with no
+ * account (a case page sent to an employer, a shared shelf), which sit in no
+ * workspace and have nowhere to lead back to.
+ */
+const DRAWS_PATH =
+  /\bcrumbs=\{|<Breadcrumb\b|<(?:PageHeader|TabbedDetail)\b[\s\S]{0,2000}?\bsubject=\{/;
+const LOCAL_IMPORT = /\bfrom\s+'((?:\.{1,2}\/|@\/(?:app|components)\/)[^']+)'/g;
+const NOT_ROW_PAGES = new Set(['app/open/[ref]/page.tsx', 'app/jobs/p/[slug]/page.tsx', 'app/s/[token]/page.tsx']);
+/**
+ * The shared shell and patterns pass a path through (PageHeader draws the
+ * Breadcrumb it is given), so importing them is not drawing one.
+ */
+const PASSES_PATH_THROUGH = /^components\/(?:shell|patterns)\//;
+
+function importedFiles(root: string, file: string, text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(LOCAL_IMPORT)) {
+    const spec = m[1];
+    const base = spec.startsWith('@/') ? spec.slice(2) : join(dirname(file), spec);
+    const found = ['.tsx', '.ts', '/index.tsx', '/index.ts']
+      .map((ext) => `${base}${ext}`)
+      .find((candidate) => existsSync(join(root, candidate)));
+    if (found && !PASSES_PATH_THROUGH.test(found)) out.push(found);
+  }
+  return out;
+}
+
+function drawsPath(root: string, file: string, depth: number, seen: Set<string>): boolean {
+  if (seen.has(file)) return false;
+  seen.add(file);
+  const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+  if (DRAWS_PATH.test(text)) return true;
+  if (depth === 0) return false;
+  return importedFiles(root, file, text).some((next) => drawsPath(root, next, depth - 1, seen));
+}
+
+function rowPagesWithoutPath(root: string): string[] {
+  return listFiles(root, ['app'], ['.tsx'])
+    .filter((file) => /\/page\.tsx$/.test(file) && /\/\[/.test(file) && !NOT_ROW_PAGES.has(file))
+    .filter((file) => routeOfFile(file) !== null)
+    .filter((file) => !isRedirectOnly(readFileSync(join(root, file), 'utf8')))
+    .filter((file) => !drawsPath(root, file, 2, new Set()))
+    .sort();
+}
+
+/**
+ * Part 2 (plan #1931.3): a row page has one back link, drawn by PageHeader
+ * through components/shell/back-link.tsx, which keeps the list's filters and
+ * its scroll. A hand-rolled one is a link whose first child is a left arrow or
+ * chevron followed by its label, or a button that calls the router's or the
+ * history's back(). A chevron alone in a link, such as the day before on a
+ * calendar or a review, is a step through siblings and is not counted; nor is
+ * the gallery, which draws pages that are not the app's.
+ */
+const HAND_BACK_LINK =
+  /<(?:Link|a)\b[^>]*\bhref=[^>]*>\s*<(?:ArrowLeft|ChevronLeft)\b[^>]*\/>\s*(?![<\s])/g;
+const HISTORY_BACK = /\b(?:router|history)\.back\(\)/g;
+const BACK_LINK_HOME = new Set(['components/shell/back-link.tsx']);
+
+function handRolledBackLinks(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !BACK_LINK_HOME.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(HAND_BACK_LINK), ...text.matchAll(HISTORY_BACK)].map(
+        (m) => `${file}:${lineAt(text, m.index ?? 0)}`,
+      );
+    })
+    .sort();
 }
 
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
@@ -256,10 +430,49 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     ],
   },
   {
+    name: 'off-token-radius',
+    counts: 'radius classes under app/ and components/ that the themes do not move',
+    target: 0,
+    measure: offTokenRadius,
+  },
+  {
+    name: 'icon-stroke-off',
+    counts: 'Lucide icons under app/ and components/ drawn at a stroke other than 1.75',
+    target: 0,
+    measure: iconStrokeOff,
+  },
+  {
     name: 'routes-without-surface',
     counts: 'pages under app/ with no surface in the gallery',
     target: 0,
     measure: routesWithoutSurface,
+  },
+  {
+    // docs/ONE-INTERFACE-SPEC.md, R9 (plan #1927.1): every layout and page
+    // gets its shell from shellFor in lib/shell/shell-for.tsx, the one file
+    // left. The gallery draws the shell from fixtures and is not counted.
+    name: 'shell-mounts',
+    counts: 'files outside the gallery that render <AppShell',
+    target: 1,
+    measure: (root) =>
+      filesMatching(root, {
+        dirs: ['app', 'components', 'lib'],
+        exts: ['.tsx'],
+        pattern: /<AppShell\b/,
+        exclude: /^app\/preview\/|\.test\.tsx$/,
+      }),
+  },
+  {
+    name: 'row-pages-without-path',
+    counts: 'pages for one row that draw no path to it',
+    target: 0,
+    measure: rowPagesWithoutPath,
+  },
+  {
+    name: 'hand-rolled-back-links',
+    counts: 'back links a page draws itself rather than through PageHeader',
+    target: 0,
+    measure: handRolledBackLinks,
   },
   {
     // Plan #1895: the actions a page lets the person do that an agent should

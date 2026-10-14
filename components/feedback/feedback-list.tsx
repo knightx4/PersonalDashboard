@@ -1,7 +1,9 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { DashMark } from '@/components/ui/dash-mark';
+import { Note } from '@/components/ui/note';
 import {
   deleteFeedback,
   editFeedback,
@@ -29,6 +31,7 @@ import {
 } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 import { KIND_TONE } from '@/components/feedback/kind-tone';
+import { Chip } from '@/components/ui/chip';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -149,14 +152,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
     // The id is where the app-wide search lands a note: /dev/bugs#note-<id>.
     <li id={`note-${row.id}`} className="row-pad flex scroll-mt-bar flex-col gap-2 px-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
-            KIND_TONE[row.kind],
-          )}
-        >
+        <Chip tone={KIND_TONE[row.kind]} size="sm">
           {FEEDBACK_KIND_LABEL[row.kind]}
-        </span>
+        </Chip>
         {/* The status is a word you press, which opens the picker: the select
             and its Set button used to sit in a row of their own under every
             note. */}
@@ -165,7 +163,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           items={statusItems}
           align="start"
           triggerClassName={cn(
-            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+            'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
             TONE_TEXT[HEALTH_TONE[health]],
           )}
           trigger={
@@ -200,9 +198,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             {surfaceOf(row.pagePath) ? (
               <>
                 {' · '}
-                <a href="/dev/surfaces" className="text-accent hover:underline">
+                <Link href="/dev/surfaces" className={linkVariants()}>
                   surface: {surfaceOf(row.pagePath)}
-                </a>
+                </Link>
                 {' · judged against /dev/ui'}
               </>
             ) : (
@@ -258,11 +256,11 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
       <AttachmentList files={row.attachments ?? []} />
 
       {row.resolutionNote && (
-        <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
+        <Note className="text-ink-muted">
           {row.status === 'blocked' ? 'Waiting on: ' : ''}
           {row.resolutionNote}
           {row.commitSha ? ` · ${row.commitSha}` : ''}
-        </p>
+        </Note>
       )}
 
       {/* Under the note and its resolution note, above the row of buttons: what

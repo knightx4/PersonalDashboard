@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import { ListChecks, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LEVEL3_AIM_NAME } from '@/lib/learn/aims';
 import { addLevel3Goal, type Level3State } from './level3-actions';
+import { cn } from '@/lib/cn';
 
 const initial: Level3State = {};
 
@@ -18,7 +19,7 @@ export function LearnGoalsLine({ href, offerLevel3 }: { href: string; offerLevel
   const [state, add, adding] = useActionState(addLevel3Goal, initial);
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-ui">
-      <Link href={href} className="flex items-center gap-1.5 text-accent hover:underline">
+      <Link href={href} className={cn('flex items-center gap-1.5', linkVariants())}>
         <Target className="size-3.5" strokeWidth={1.75} aria-hidden />
         Your learning goals, in Goals
       </Link>

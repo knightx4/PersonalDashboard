@@ -19,7 +19,7 @@ function WriteButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Reading the material…' : `Write ${count} questions`}
     </Button>
   );

@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { clockTime, durationLabel } from '@/lib/learn/youtube/format';
@@ -16,6 +15,9 @@ import { cardVariants } from '@/components/ui/card';
 import { moveVideoAction } from '../actions';
 import { addedLabel } from '../video-rows';
 import { WatchedToggle } from '../watched-toggle';
+import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One video on your list (plan #1069): the player, and beside it the summary,
@@ -36,7 +38,14 @@ export type ListVideoViewProps = {
   relatedError: string | null;
 };
 
-export function ListVideoView({ video, start, cards, related, relatedError }: ListVideoViewProps) {
+export function ListVideoView({
+  video,
+  start,
+  cards,
+  related,
+  relatedError,
+  path,
+}: ListVideoViewProps & { path?: PageSubject }) {
   const meta = [
     video.channel,
     durationLabel(video.durationSeconds),
@@ -46,20 +55,14 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
   ].filter(Boolean);
 
   return (
-    <div className="max-w-3xl">
-      <p className="mb-3">
-        <Link href="/learn/videos" className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Videos
-        </Link>
-      </p>
-
+    <PageColumn>
       <PageHeader
+        subject={path}
         title={video.title}
         description={
           <>
             {meta.join(' · ')} ·{' '}
-            <a href={video.url} className="hover:underline" target="_blank" rel="noreferrer">
+            <a href={video.url} className={linkVariants({ tone: 'quiet' })} target="_blank" rel="noreferrer">
               Open on YouTube
             </a>
           </>
@@ -104,13 +107,13 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
               <ul className="space-y-1">
                 {related.map((idea) => (
                   <li key={idea.conceptId} className="text-ui">
-                    <Link href={`/learn/c/${idea.conceptId}`} className="text-ink hover:underline">
+                    <Link href={`/learn/c/${idea.conceptId}`} className={linkVariants()}>
                       {idea.name}
                     </Link>
                     {idea.subjectName && idea.subjectId && (
                       <>
                         <span className="text-ink-muted"> in </span>
-                        <Link href={`/learn/s/${idea.subjectId}`} className="text-ink-muted hover:underline">
+                        <Link href={`/learn/s/${idea.subjectId}`} className={linkVariants({ tone: 'quiet' })}>
                           {idea.subjectName}
                         </Link>
                       </>
@@ -122,7 +125,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
           ) : null}
         </div>
       </div>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -183,7 +186,7 @@ function Pile({ video, cards }: { video: ListVideoPage; cards: VideoCard[] }) {
             <Link
               href={`/learn/videos/${video.videoId}?t=${video.bestStartSeconds}`}
               scroll={false}
-              className="tabular-nums text-accent hover:underline"
+              className={cn('tabular-nums', linkVariants())}
             >
               Best stretch {clockTime(video.bestStartSeconds)}
               {video.bestEndSeconds !== null && ` to ${clockTime(video.bestEndSeconds)}`}

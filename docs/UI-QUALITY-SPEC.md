@@ -414,10 +414,13 @@ that has one.
    page. The address updates after it (law 5).
 9. **Marks are big enough to see:** at least 4 pixels across at any width,
    and the ones that matter most a step larger.
-10. **Past three categories, colour gets help.** The limit of three hues on
-    one chart, kept for readers with red-green colour blindness, stands. The
-    other categories are told apart by direct labels, shapes, or tapping a
-    legend entry to highlight its marks, rather than sharing one gray.
+10. **Up to ten categories get their own colour, and colour gets help.** A
+    chart may give each of up to ten categories its own hue, such as one per
+    domain, and keeps each category's colour fixed so it means the same on
+    every visit. Ten hues cannot all stay apart for every reader, so colour is
+    never the only cue: categories are also named on the chart, or picked out
+    by pressing their legend entry. Changed from a three-hue limit on 13
+    October 2026 at the person's request.
 
 The Idea Space sketch the person preferred, at
 https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6, shows rules 1 to 5 and 8.
@@ -518,6 +521,29 @@ Checked by: audit.
 Checked by: audit.
 
 **R19.** Every design check verdict answers the three questions of Part 2.
+Checked by: audit.
+
+**R20.** A button or link whose only child is an icon has an `aria-label`
+(or `title`) and sits inside a `<Tooltip>`, so a mouse and a screen reader
+both get its name. The `check:ui` rule `icon-button-without-label` fails the
+gate on a new one, with baseline 0 when the rule was added; the valve is
+`ui-ok:` on the line, as for the other rules.
+Checked by: audit.
+
+**R21.** Any spec that describes a screen lists the parts of it that cannot
+be seen at first, under a heading named "Hidden parts" or in a line that
+starts "Hidden:". The kinds to look for are:
+
+- controls that appear on hover or focus
+- popovers, menus and tooltips
+- drawers, sheets and dialogs
+- the empty, loading and error states
+- comment indicators and unread marks
+- anything collapsed or scrolled out of view at 390 pixels
+
+A screen with none of a kind says so in a few words, so a missing entry is
+a gap and not an omission. A script cannot judge whether the list is
+complete.
 Checked by: audit.
 
 ## Decisions

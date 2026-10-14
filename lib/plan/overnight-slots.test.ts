@@ -53,6 +53,18 @@ describe('runnerSlots', () => {
     expect(states(slots)).toEqual(['idle', 'idle', 'idle', 'idle']);
   });
 
+  it('carries the plan run id a working slot follows, and none for a stand-in', () => {
+    const run = '5937de32-5848-419f-9068-cf39068248a7';
+    const slots = runnerSlots({
+      run: night(),
+      sessions: [session(run, 1), session('feature@2026-10-08T22:02:00Z', 2)],
+      goalRun: null,
+      now: T0,
+    });
+    expect(slots[0]).toMatchObject({ state: 'working', work: { runId: run } });
+    expect(slots[1]).toMatchObject({ state: 'working', work: { runId: null } });
+  });
+
   it('names four slots in order', () => {
     const slots = runnerSlots({ run: null, sessions: [], goalRun: null, now: T0 });
     expect(slots.map((s) => s.slot)).toEqual(['feature-1', 'feature-2', 'feature-3', 'goals']);
@@ -156,7 +168,12 @@ describe('runnerSlots', () => {
 
   it('puts a fourth feature in the goals seat while goals has nothing on', () => {
     const four = [session('a', 0), session('b', 1), session('c', 2), session('d', 3)];
-    const slots = runnerSlots({ run: night(), sessions: four, goalRun: null, now: T0 + 60 * 60_000 });
+    const slots = runnerSlots({
+      run: night(),
+      sessions: four,
+      goalRun: null,
+      now: T0 + 60 * 60_000,
+    });
     expect(slots.map((s) => s.slot)).toEqual(['feature-1', 'feature-2', 'feature-3', 'feature-4']);
     expect(states(slots)).toEqual(['working', 'working', 'working', 'working']);
   });
@@ -178,7 +195,7 @@ describe('runnerSlots', () => {
     ]);
   });
 
-  it('carries a session\'s feature progress onto its work', () => {
+  it("carries a session's feature progress onto its work", () => {
     const one: SlotSession = { ...session('a', 1), progress: { done: 2, total: 5 } };
     const slots = runnerSlots({ run: night(), sessions: [one], goalRun: null, now: T0 + 60_000 });
     expect(slots[0]).toMatchObject({ state: 'working', work: { progress: { done: 2, total: 5 } } });

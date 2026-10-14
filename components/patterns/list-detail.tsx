@@ -1,6 +1,7 @@
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The list-and-detail pattern (docs/UI-QUALITY-SPEC.md, Part 4): a list you
@@ -39,14 +40,14 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-3xl', className)}>
+    <PageColumn className={className}>
       {header}
       {tools && <div className="mb-4">{tools}</div>}
       <Card padding="none">
         <ul className="divide-y divide-border">{children}</ul>
       </Card>
       {foot && <div className="mt-3 text-small text-ink-muted">{foot}</div>}
-    </div>
+    </PageColumn>
   );
 }
 
@@ -70,7 +71,7 @@ export function ListRow({
 }) {
   return (
     <li>
-      <Link
+      <RowLink
         href={href}
         className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
       >
@@ -79,7 +80,7 @@ export function ListRow({
           {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
         </span>
         {end && <span className="tabular shrink-0 text-small text-ink-muted">{end}</span>}
-      </Link>
+      </RowLink>
     </li>
   );
 }
@@ -110,14 +111,14 @@ export function DetailPage({
   className?: string;
 }) {
   return (
-    <div className={cn('mx-auto max-w-3xl space-y-6', className)}>
+    <PageColumn className={cn('space-y-6', className)}>
       <div>
         {header}
         <section aria-label="Details">{details}</section>
       </div>
       {text}
       {children}
-    </div>
+    </PageColumn>
   );
 }
 

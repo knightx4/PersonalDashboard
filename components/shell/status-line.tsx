@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
   type MainDot,
 } from '@/lib/plan/main-check';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The status line.
@@ -229,18 +230,19 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
 
   return (
     <span className="pointer-events-auto relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={said}
-        className="-m-1.5 flex items-center rounded-full p-1.5 transition-colors hover:bg-shell-hover"
-      >
-        <span className={cn('size-2 rounded-full', DOT[state])} aria-hidden />
-        <span className="sr-only">{`CI on main. ${said}`}</span>
-      </button>
+      <Tooltip label={said} above>
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className="-m-1.5 flex items-center rounded-full p-1.5 transition-colors hover:bg-shell-hover"
+        >
+          <span className={cn('size-2 rounded-full', DOT[state])} aria-hidden />
+          <span className="sr-only">{`CI on main. ${said}`}</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <Popover
@@ -266,7 +268,7 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
               href={check.runUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-block text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+              className={cn(linkVariants({ tone: 'quiet' }), 'mt-2 inline-block text-caption')}
             >
               Open the run on GitHub
             </a>
@@ -357,7 +359,7 @@ function Readings({ check }: { check: MainCheck }) {
                   href={check.deployUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline underline-offset-2 hover:text-ink"
+                  className={cn(linkVariants({ tone: 'quiet' }), 'text-current')}
                 >
                   Open the deploy
                 </a>

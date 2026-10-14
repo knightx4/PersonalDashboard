@@ -13,13 +13,15 @@
  * interviewers heading; what it did not have is said once, quietly, at the
  * bottom.
  */
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRef, useState, useTransition } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
@@ -48,9 +50,7 @@ function Prose({ children }: { children: string }) {
 function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <div>
-      <h5 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-        {heading}
-      </h5>
+      <SectionLabel as="h5">{heading}</SectionLabel>
       <div className="mt-1">{children}</div>
     </div>
   );
@@ -122,11 +122,7 @@ export function RoundPrep({
       setStale(false);
     });
 
-  const heading = (
-    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-      {headingText}
-    </h4>
-  );
+  const heading = <SectionLabel as="h4">{headingText}</SectionLabel>;
 
   const staleLine = stale && (
     <p className="mt-1 text-small text-caution">
@@ -176,7 +172,7 @@ export function RoundPrep({
         >
           <ChevronRight
             aria-hidden
-            strokeWidth={2}
+            strokeWidth={1.75}
             className="size-3.5 shrink-0 text-ink-muted transition-transform duration-quick group-open/prep:rotate-90"
           />
           {heading}
@@ -196,108 +192,105 @@ export function RoundPrep({
 
         {/* A well rather than a frame, the same as the answer draft: this is
             the one block on the card that the app wrote rather than you. */}
-        <div className="mt-2 space-y-3 rounded-card bg-canvas p-3">
-          <Prose>{note.roundSummary}</Prose>
+        <Note className="mt-2 p-3">
+          <div className="space-y-3">
+            <Prose>{note.roundSummary}</Prose>
 
-          {note.interviewers.length > 0 && (
-            <Section heading="Who you are meeting">
-              <ul className="space-y-1.5">
-                {note.interviewers.map((person) => (
-                  <li key={person.contactId} className="text-ui text-ink">
-                    <span className="font-medium">{person.name}</span>
-                    <div className="mt-0.5 text-small text-ink-muted">
-                      <Prose>{person.note}</Prose>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
+            {note.interviewers.length > 0 && (
+              <Section heading="Who you are meeting">
+                <ul className="space-y-1.5">
+                  {note.interviewers.map((person) => (
+                    <li key={person.contactId} className="text-ui text-ink">
+                      <span className="font-medium">{person.name}</span>
+                      <div className="mt-0.5 text-small text-ink-muted">
+                        <Prose>{person.note}</Prose>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
 
-          <Points heading="Where you are strong" points={note.strengths} />
-          <Points heading="Where you are thin" points={note.gaps} />
+            <Points heading="Where you are strong" points={note.strengths} />
+            <Points heading="Where you are thin" points={note.gaps} />
 
-          {note.stories.length > 0 && (
-            <Section heading="Stories to have ready">
-              <ul className="space-y-1.5">
-                {note.stories.map((story) => (
-                  <li key={story.evidenceItemId} className="text-ui text-ink">
-                    {/* The bank is edited in Material, so the story links back
-                        to the item it came from rather than restating it. */}
-                    <Link
-                      href={`/jobs/material?part=evidence#evidence-${story.evidenceItemId}`}
-                      className="font-medium underline underline-offset-2 hover:text-accent"
-                    >
-                      {story.title}
-                    </Link>
-                    <div className="mt-0.5 text-small text-ink-muted">
-                      <Prose>{story.note}</Prose>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
+            {note.stories.length > 0 && (
+              <Section heading="Stories to have ready">
+                <ul className="space-y-1.5">
+                  {note.stories.map((story) => (
+                    <li key={story.evidenceItemId} className="text-ui text-ink">
+                      {/* The bank is edited in Material, so the story links back
+                          to the item it came from rather than restating it. */}
+                      <Link
+                        href={`/jobs/material?part=evidence#evidence-${story.evidenceItemId}`}
+                        className={cn(linkVariants({ tone: 'quiet' }), 'font-medium text-ink')}
+                      >
+                        {story.title}
+                      </Link>
+                      <div className="mt-0.5 text-small text-ink-muted">
+                        <Prose>{story.note}</Prose>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
 
-          {(note.priorRoundsNote || note.priorQuestions.length > 0) && (
-            <Section heading="Earlier rounds here">
-              {note.priorRoundsNote && (
-                <div className="text-small text-ink-muted">
-                  <Prose>{note.priorRoundsNote}</Prose>
-                </div>
-              )}
-              {note.priorQuestions.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-ui text-ink-muted">
-                  {note.priorQuestions.map((question, index) => (
+            {(note.priorRoundsNote || note.priorQuestions.length > 0) && (
+              <Section heading="Earlier rounds here">
+                {note.priorRoundsNote && (
+                  <div className="text-small text-ink-muted">
+                    <Prose>{note.priorRoundsNote}</Prose>
+                  </div>
+                )}
+                {note.priorQuestions.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 text-ui text-ink-muted">
+                    {note.priorQuestions.map((question, index) => (
+                      <li key={index}>· {question}</li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            )}
+
+            {note.questionsToAsk.length > 0 && (
+              <Section heading="Worth asking them">
+                <ul className="space-y-0.5 text-ui text-ink">
+                  {note.questionsToAsk.map((question, index) => (
                     <li key={index}>· {question}</li>
                   ))}
                 </ul>
-              )}
-            </Section>
-          )}
+              </Section>
+            )}
 
-          {note.questionsToAsk.length > 0 && (
-            <Section heading="Worth asking them">
-              <ul className="space-y-0.5 text-ui text-ink">
-                {note.questionsToAsk.map((question, index) => (
-                  <li key={index}>· {question}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
+            {/* Quiet, not a warning: an absent job description is an ordinary
+                state, and the point is that the note says so rather than
+                writing around it. */}
+            {note.missing.length > 0 && (
+              <p className="text-small text-ink-muted">Written without: {note.missing.join(' ')}</p>
+            )}
 
-          {/* Quiet, not a warning: an absent job description is an ordinary
-              state, and the point is that the note says so rather than
-              writing around it. */}
-          {note.missing.length > 0 && (
-            <p className="text-small text-ink-muted">Written without: {note.missing.join(' ')}</p>
-          )}
+            {note.bannedFound.length > 0 && (
+              <p className="text-small text-caution">
+                Uses {note.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
+                list.
+              </p>
+            )}
 
-          {note.bannedFound.length > 0 && (
-            <p className="text-small text-caution">
-              Uses {note.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
-              list.
-            </p>
-          )}
-
-          {generatedAt && (
-            <p className="tabular text-small text-ink-muted">
-              Written {formatDateTime(generatedAt, timezone)}.
-            </p>
-          )}
-        </div>
+            {generatedAt && (
+              <p className="tabular text-small text-ink-muted">
+                Written {formatDateTime(generatedAt, timezone)}.
+              </p>
+            )}
+          </div>
+        </Note>
       </details>
 
       <div className="absolute right-0 top-0 flex items-center gap-2">
         <PaidHint {...PREP_HINT} align="end" />
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => prepare(true)}
-          className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-        >
+        <Button type="button" variant="link" disabled={pending} onClick={() => prepare(true)}>
           {pending ? 'Preparing…' : 'Regenerate'}
-        </button>
+        </Button>
       </div>
     </div>
   );

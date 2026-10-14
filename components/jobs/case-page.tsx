@@ -1,3 +1,4 @@
+import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
 import { LinkedText } from '@/components/ui/linked-text';
 
 export interface CaseMatch {
@@ -48,16 +49,14 @@ export function CasePageView({ page }: { page: CasePage }) {
 
       {page.matches.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-body font-semibold text-ink">The role, line by line</h2>
+          <SectionHeading title="The role, line by line" />
 
           {groups.map((group) => {
             const lines = page.matches.filter((match) => match.kind === group.kind);
             if (lines.length === 0) return null;
             return (
               <div key={group.kind} className="mt-5">
-                <h3 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-                  {group.label}
-                </h3>
+                <SectionLabel as="h3">{group.label}</SectionLabel>
                 <ul className="mt-2 space-y-4">
                   {lines.map((match, index) => {
                     const item = match.evidenceItemId ? byId.get(match.evidenceItemId) : null;

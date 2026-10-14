@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';

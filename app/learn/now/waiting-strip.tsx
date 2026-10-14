@@ -1,6 +1,7 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import type { WaitingLine } from '@/lib/learn/feed/waiting';
+import { cn } from '@/lib/cn';
 
 /**
  * What is waiting for you, as one short strip at the top of Now (plan #1486):
@@ -28,7 +29,7 @@ export function WaitingStrip({
         <ul className="contents">
           {lines.map((line) => (
             <li key={line.key}>
-              <Link href={line.href} className="text-ui text-accent hover:underline">
+              <Link href={line.href} className={cn('text-ui', linkVariants())}>
                 {line.text}
               </Link>
             </li>

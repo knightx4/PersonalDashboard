@@ -1,12 +1,14 @@
 'use client';
 
-import Link from 'next/link';
+import { RowLink } from '@/components/shell/back-link';
 import { useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
+import { IconButton } from '@/components/ui/icon-button';
+import { Note } from '@/components/ui/note';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { ScoreLine } from '@/components/jobs/ui/score-figures';
@@ -26,6 +28,7 @@ import {
 } from '@/lib/jobs/board-moment';
 import { completionMoment } from '@/components/motion/complete';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   CARD_ATTR,
   LANE_ATTR,
@@ -544,16 +547,23 @@ function PipelineCard({
             {/* Padded out to a finger's height and pulled back by the same
               * margin, so the title is a 44px target on a phone without the
               * card growing. */}
-            <Link
+            <RowLink
               href={`/jobs/roles/${row.roleId}`}
               className="-my-3.5 block min-w-0 truncate py-3.5 text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {row.roleTitle}
-            </Link>
+            </RowLink>
             {row.excitement !== null && (
-              <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
-                {'★'.repeat(row.excitement)}
-              </span>
+              <Tooltip label={`How excited you are about this role, ${row.excitement} of 5`} align="end" className="shrink-0">
+                <span
+                  tabIndex={0}
+                  role="img"
+                  aria-label={`Excitement ${row.excitement} of 5`}
+                  className="tabular text-small text-ink-muted"
+                >
+                  {'★'.repeat(row.excitement)}
+                </span>
+              </Tooltip>
             )}
           </div>
           {/*
@@ -575,29 +585,33 @@ function PipelineCard({
             </p>
             <div className="flex shrink-0 items-center gap-1.5">
               {coverage && (
-                <span
-                  className={cn(
-                    'tabular text-micro',
-                    row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
-                  )}
-                  title={`${coverage} covered by your evidence`}
-                >
-                  {row.coverage.covered}/{row.coverage.total}
-                </span>
+                <Tooltip label={`${coverage} covered by your evidence`} align="end">
+                  <span
+                    tabIndex={0}
+                    className={cn(
+                      'tabular text-micro',
+                      row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
+                    )}
+                  >
+                    {row.coverage.covered}/{row.coverage.total}
+                  </span>
+                </Tooltip>
               )}
               {row.needsReview && (
-                <AlertTriangle
-                  className="size-3.5 text-caution"
-                  strokeWidth={1.75}
-                  aria-label="Needs review"
-                />
+                <Tooltip label="Something on this role needs you to look at it" align="end">
+                  <span tabIndex={0} role="img" aria-label="Needs review" className="inline-flex">
+                    <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-hidden />
+                  </span>
+                </Tooltip>
               )}
-              <span
-                className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
-                title="Time since the last thing that happened"
-              >
-                {age}
-              </span>
+              <Tooltip label="Time since the last thing that happened" align="end">
+                <span
+                  tabIndex={0}
+                  className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
+                >
+                  {age}
+                </span>
+              </Tooltip>
             </div>
           </div>
           <ScoreLine note={row.scoreNote} />
@@ -618,7 +632,7 @@ function PipelineCard({
           // Laid over the card's top right corner rather than beside it, so
           // the invisible pair holds no width at a laptop: the stars and the
           // age end on the card's own edge there too (law 18).
-          <span className="absolute top-1 right-1 hidden items-center gap-0.5 rounded-lg focus-within:bg-surface group-hover:bg-surface sm:flex">
+          <span className="absolute top-1 right-1 hidden items-center gap-0.5 rounded-control focus-within:bg-surface group-hover:bg-surface sm:flex">
             {onReject && <QuickReject row={row} onReject={onReject} />}
             <Dismiss row={row} />
           </span>
@@ -626,10 +640,12 @@ function PipelineCard({
       </div>
 
       {row.nextAction && (
-        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-small text-ink-muted">
-          {row.nextAction}
-          {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
-        </p>
+        <Note className="mt-1.5 px-1.5 py-1 text-small text-ink-muted">
+          <p className="truncate">
+            {row.nextAction}
+            {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
+          </p>
+        </Note>
       )}
 
       {/* Only a closed card still needs a row of its own, and only for the
@@ -684,15 +700,15 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
   }
 
   return (
-    <button
-      type="button"
-      title="Send straight to rejected"
-      onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
-    >
-      <Ban className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Send straight to rejected</span>
-    </button>
+    <Tooltip label="Send straight to rejected" align="end">
+      <IconButton
+        label="Send straight to rejected"
+        onClick={() => setConfirming(true)}
+        className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Ban strokeWidth={1.75} aria-hidden />
+      </IconButton>
+    </Tooltip>
   );
 }
 
@@ -735,14 +751,14 @@ function Dismiss({ row }: { row: PipelineRow }) {
   }
 
   return (
-    <button
-      type="button"
-      title="Not a real pursuit — remove it"
-      onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
-    >
-      <X className="size-4" strokeWidth={1.75} aria-hidden />
-      <span className="sr-only">Not a real pursuit — remove it</span>
-    </button>
+    <Tooltip label="Not a real pursuit, so take it off the board" align="end">
+      <IconButton
+        label="Not a real pursuit — remove it"
+        onClick={() => setConfirming(true)}
+        className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <X strokeWidth={1.75} aria-hidden />
+      </IconButton>
+    </Tooltip>
   );
 }

@@ -3,6 +3,7 @@ import { Figure } from '@/components/ui/figure';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import { formatMoney } from '@/lib/money';
@@ -141,10 +142,11 @@ function Section({
 }) {
   return (
     <section className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
-        <h2 className="text-body font-semibold text-ink">{title}</h2>
-        {note && <p className="text-ui text-ink-muted">{note}</p>}
-      </div>
+      <SectionHeading
+        title={title}
+        action={note && <p className="text-ui text-ink-muted">{note}</p>}
+        className="px-1"
+      />
       <ul
         className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}
       >

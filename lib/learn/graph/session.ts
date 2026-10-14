@@ -15,6 +15,15 @@ import {
 } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
+import { EVIDENCE_CEILING } from '@/lib/learn/strength';
+
+/**
+ * Evidence worth half the ceiling or more puts an untested idea first in line
+ * for a question (plan #2006.6): one note of your own at 0.6, or a clipping
+ * at 0.6 or above with a quarter weight.
+ */
+export const STRONG_EVIDENCE = EVIDENCE_CEILING / 2;
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 
 /**
  * A probe session: what to ask about next, and what an answer settles.
@@ -231,19 +240,33 @@ export async function probesFor(
  * you were asked about longest ago takes the turn, so old ground comes round
  * without waiting for the frontier to run out. Nothing old enough, or no
  * cadence passed, and the bands decide as before.
+ *
+ * `evidence` is what each concept's notes, courses and work are worth
+ * (`evidenceStrength`, plan #2006.6). A concept never tested whose evidence
+ * reaches STRONG_EVIDENCE comes straight after the misconceptions, strongest
+ * first: your notes say you know it, and one question settles whether you do.
  */
 export function nextConcept(
   concepts: Concept[],
   askedCounts: Map<string, number>,
   recheck?: { answered: number; now: Date },
+  evidence?: ReadonlyMap<string, number>,
 ): Concept | null {
   if (recheck && isRecheckTurn(recheck.answered)) {
     const old = conceptToRecheck(concepts, recheck.now);
     if (old) return old;
   }
 
+  const backing = (concept: Concept): number => evidence?.get(concept.id) ?? 0;
+  const toConfirm = (concept: Concept): boolean =>
+    concept.state !== 'misconception' &&
+    concept.testedAt === null &&
+    concept.established !== 'tested' &&
+    backing(concept) >= STRONG_EVIDENCE;
+
   const rank = (concept: Concept): number => {
     if (concept.state === 'misconception') return 0;
+    if (toConfirm(concept)) return 0.5;
     if (concept.state === 'shaky') return 1;
     if (concept.state === 'unknown') return 2;
     // Recognised sits between the two: something has been shown about it, and
@@ -262,6 +285,11 @@ export function nextConcept(
   const sorted = [...concepts].sort((a, b) => {
     const byRank = rank(a) - rank(b);
     if (byRank !== 0) return byRank;
+    // Among ideas waiting to be confirmed, the best backed first.
+    if (toConfirm(a)) {
+      const byBacking = backing(b) - backing(a);
+      if (byBacking !== 0) return byBacking;
+    }
     const byDoor = doorRank(a) - doorRank(b);
     if (byDoor !== 0) return byDoor;
     // Then whichever has been asked about least, so a session spreads out
@@ -794,6 +822,7 @@ async function settleConcept(
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Recording what that answer showed', error);
+  await scheduleIdeas(supabase, userId, [input.conceptId]);
 
   // Growth trigger 3: answering correctly about a node says the things it
   // rests on are probably in place. Weakly, and never over an answer somebody

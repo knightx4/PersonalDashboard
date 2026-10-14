@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
@@ -32,6 +32,7 @@ import { AskDash } from './ask-dash';
 import { DoneSinceList } from './done-since-list';
 import { FoldLine } from './fold-line';
 import { GoalLanes } from './goal-lanes';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Goals home (plan #1077, under #1072), for a once-a-day visit. One
@@ -126,7 +127,7 @@ export function HomeView({
   const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageColumn className="space-y-6">
       <section aria-labelledby="briefing-heading">
         <Card padding="standard" className="space-y-3">
           <div className="flex items-center gap-2">
@@ -185,7 +186,7 @@ export function HomeView({
           </>
         }
       />
-    </div>
+    </PageColumn>
   );
 }
 
@@ -270,7 +271,7 @@ function SinceLine({
         {/* Runs left the tab bar: an audit log, read from here when wanted. */}
         <Link
           href="/goals/runs"
-          className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
+          className={cn(PRESS_AREA, linkVariants())}
         >
           Every run
         </Link>
@@ -305,7 +306,7 @@ function FilesLine({ files, timeZone }: { files: FileListing[] | null; timeZone:
       <p className="px-1 text-small">
         <Link
           href="/goals/files"
-          className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
+          className={cn(PRESS_AREA, linkVariants())}
         >
           {files.length > shown.length ? `All ${files.length} on Files` : 'All files'}
         </Link>

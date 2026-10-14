@@ -1,10 +1,10 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
 import { RunChanges } from '@/app/goals/runs/[runId]/run-changes';
-import { BackButton, EmailFrame } from '@/app/mail/[id]/reader';
+import { EmailFrame } from '@/app/mail/[id]/reader';
 import { MessageHead } from '@/app/mail/[id]/message-head';
 import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
@@ -12,6 +12,7 @@ import type { ChangeLine } from '@/lib/goals/run-changes';
 import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { RunLinesView } from '@/components/runs/run-lines';
 import type { RunActivity } from '@/lib/core/run-activities';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -80,13 +81,13 @@ const ACTIVITY: RunActivity[] = [
 export function GoalRunSurface() {
   const { meta } = runMeta(RUN, NOW, 'America/New_York');
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <PageColumn className="space-y-4">
       <PageHeader
         title={JOB_LABELS[RUN.job]}
         description={
           <>
             {'On '}
-            <Link href={`/goals/${RUN.item!.id}`} className="underline-offset-2 hover:underline">
+            <Link href={`/goals/${RUN.item!.id}`} className={linkVariants({ tone: 'quiet' })}>
               {RUN.item!.title}
             </Link>
             {' · '}
@@ -94,7 +95,7 @@ export function GoalRunSurface() {
           </>
         }
         actions={
-          <Link href="/goals/runs" className="press-area text-small text-ink-muted underline-offset-2 hover:underline">
+          <Link href="/goals/runs" className={`${linkVariants({ tone: 'quiet' })} press-area text-small`}>
             All runs
           </Link>
         }
@@ -106,7 +107,7 @@ export function GoalRunSurface() {
       <Card>
         <RunChanges runId={RUN.id} lines={LINES} />
       </Card>
-    </div>
+    </PageColumn>
   );
 }
 
@@ -155,9 +156,19 @@ export function MailMessageSurface() {
   const subject = MESSAGES.find((m) => m.subject)?.subject ?? '(no subject)';
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <BackButton />
-      <PageHeader title={subject} description={`${MESSAGES.length} messages`} />
+    <PageColumn>
+      <PageHeader
+        subject={{
+          ref: null,
+          path: [
+            { label: 'Home', href: '/home' },
+            { label: subject, href: '/mail/t1' },
+          ],
+        }}
+        back={{ label: 'Home', href: '/home' }}
+        title={subject}
+        description={`${MESSAGES.length} messages`}
+      />
       <div className="mb-4 flex flex-wrap gap-2">
         {reply && (
           <a href={reply} className={buttonVariants({ variant: 'primary', size: 'md' })}>
@@ -192,6 +203,6 @@ export function MailMessageSurface() {
           ))}
         </ol>
       </Card>
-    </div>
+    </PageColumn>
   );
 }

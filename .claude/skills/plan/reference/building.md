@@ -36,14 +36,13 @@ npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
                                                # one line on your run, shown live on its page
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
-npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
                                                # under an approved feature the step is
                                                # ready to build; --proposed only for a
                                                # step that acts outside the repository
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
-npx tsx scripts/plan.ts fog <n> --note "…"     # what cannot be seen yet; --clear once it can
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # one close to an idea already filed is
                                                # refused; two an hour is the most you may file
@@ -151,14 +150,19 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    failure found at the merge costs a second gate run. Run them before the
    critic, so the critic's shots are of the screen that will merge.
 
+   A control drawn as an icon alone takes an `aria-label` and a `<Tooltip>`
+   (`components/ui/tooltip`). `check:ui` fails a new one
+   (`icon-button-without-label`, spec R20). When you touch a file that holds
+   unlabelled ones, label them and run `npm run check:ui -- --update`.
+
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
    each of its surfaces. After a third failed round you settle it yourself (see
    **Building a screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
-   sent you runs both when it merges your step to main, which is as soon as you
-   report the commit; CI runs them again on main. Running them here first would only run
+   sent you runs both before the feature goes to main, and CI runs them again
+   on main. Running them here first would only run
    them twice. The exception is a step whose done-when is about the build or
    about a test that the narrow run cannot reach: run what the done-when needs
    and say so in your report.
@@ -166,33 +170,36 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    the step's outline: `Add the anonymous share page (plan #1073.4)`. A step that changed a
    screen has each critic round recorded in `public.ui_checks` before it
    commits (see **Building a screen**). **Do not push and do
-   not merge.** The session that sent you puts your commit on main and closes
-   your step from there, so stop at the commit and say in your report that you
+   not merge.** The session that sent you merges your commit into the
+   feature's branch and puts the feature on main, so stop at the commit and say in your report that you
    made it. If nobody sent you and this step is the whole job, the merge is
    yours: the procedure is step 4 of the Building section in `SKILL.md`, and
    the merge comes before the close.
-8. **Before closing, look up once.** If the feature above your step carries
-   fog, and what you just learned makes it specifiable, write those steps now
-   — `add "…" --parent <the feature> --done-when "…" --size s|m|l` — and
-   clear the patch with `fog <the feature> --clear`. Under a feature the
-   person has approved they go in ready to build, marked as added by your
-   session; under one still proposed they are proposals whatever you pass. A
-   step among them that acts outside the repository takes `--proposed` (see
-   **Steps that act outside the repository**). Say in your report what you
-   graduated and what you cleared.
+8. **Before closing, look up once.** If a step under the feature waits on
+   yours to decide something, and what you just built makes that answerable,
+   write the steps it called for now with
+   `add "…" --parent <the feature> --done-when "…" --size s|m|l`, and drop
+   the waiting step with a note naming them. If what it waits to decide is a
+   choice for the person, write it as a decision instead. Under a feature the
+   person has approved the steps go in ready to build, marked as added by
+   your session; under one still proposed they are proposals whatever you
+   pass. A step among them that acts outside the repository takes
+   `--proposed` (see **Steps that act outside the repository**). Say in your
+   report what you wrote and what you dropped.
 
    Most of the time the answer is no, and no is the right answer: you are
    heads-down on one done-when and will miss most of what a re-shape would
-   catch. But it costs a glance, and it means fog can dissolve without anybody
-   pressing anything.
+   catch. But it costs a glance, and it means a waiting step can be settled
+   without anybody pressing anything.
 
    With the decision below, this is the **only** rewriting you do beyond your
-   own step: your own decisions, and fog you can now specify. Nothing else — no
+   own step: your own decisions, and a waiting step your work has settled.
+   Nothing else: no
    reordering, no dropping somebody else's step, no rewriting a done-when you
    disagree with, and never an approve.
 9. **Hand the close over.** `done` refuses a commit that is not on main, and
    yours is on a branch nobody has merged yet, so the session that sent you
-   closes the step once it has merged. Write the note it should close with —
+   marks the step built and closes it when the feature lands on main. Write the note it should close with —
    what changed, in one sentence — and put it in your report. If nobody sent
    you, merge first and then close it yourself: `done <n> --note "…"`, which
    records the commit from HEAD and names any steps that became ready. Then
@@ -234,7 +241,7 @@ session building the next step:
   many rounds it took, and the last verdict. After a third failed round, the
   last verdict's fixes in full and where the shots are.
 - **Anything you wrote outside your own step**: a decision and its dependency
-  edge, fog graduated or cleared, an idea filed, a raise. By outline and title.
+  edge, steps written for a waiting step you settled, an idea filed, a raise. By outline and title.
 - **Any step that became ready** when you closed yours.
 
 Keep it to what the next session needs. A page is too long; three lines is too
@@ -255,6 +262,23 @@ in `lib/preview/routes.ts` give the surfaces a step's words and changed files
 name. A step that changes a page with no surface adds one, and adds its routes
 to `SURFACE_ROUTES` in the same file; `tests/preview-routes.test.ts` fails on
 a surface with no routes. A step that changes no surface skips this section.
+
+**Hidden parts.** A screen has parts a person sees only after doing
+something: hover controls, popovers, drawers, empty and loading states, and
+comment indicators. The hidden-parts rule in `docs/UI-QUALITY-SPEC.md` makes
+them part of the screen. When the brief or the step's detail lists any, build
+every one with the screen, not the default layout alone, and give each its
+own gallery surface (an entry in `app/preview/surfaces.tsx` that draws the
+part open or showing, with a route in `SURFACE_ROUTES`), named
+`<id>-<part>`. A hover control is drawn with the hover held, a drawer or
+popover open, an empty state with an empty fixture, a loading state mid-load,
+and a comment indicator on a row that has a comment. Photograph each with the
+rest of the loop below, so every listed part has its four shots and its own
+recorded round. A part you cannot draw is not skipped silently: say which
+and why in the close note. Send the critic the list of hidden parts the step
+names, or "none" when it names none, in the prompt (4 below). A screen that
+shows only its default state, with a listed part missing, comes back as a
+fix and is not wired until every part is drawn and passed.
 
 **References.** A reference is a design the person prefers for a screen
 (`docs/UI-QUALITY-SPEC.md`, Part 2 and R18), kept by surface id in
@@ -337,7 +361,8 @@ registered; working offline, read the line and `REFERENCES` yourself.
    moment from `app/dev/ui/moments.ts` the surface plays (its name and
    `sees` line) or "none", the reference registered for the surface in
    `lib/preview/references.ts` (its picture paths, link and `why`, as
-   `referenceForCritic` prints it) or "none", the step's done-when, the page pattern, and on
+   `referenceForCritic` prints it) or "none", the hidden parts the step lists
+(each with the surface that draws it) or "none", the step's done-when, the page pattern, and on
    rounds 2 and 3 the fixes from the round before. The
    pattern is the name and rule under the brief's `## Pattern` section.
    Working offline, take the name from the `Pattern:` line of the step's
@@ -401,7 +426,9 @@ this one.
 
 A shared component that has a surface drawing it in every state belongs on
 `COMPONENT_SURFACES` in `lib/preview/routes.ts`, so the guard stops at that
-surface rather than every page under it.
+surface rather than every page under it. Every file in `components/ui` is
+already there: a change to Button or Card is checked once, on `ui-kit`
+(`app/preview/ui-kit-surface.tsx`), and a new primitive is drawn there too.
 
 `block` refuses an ask that puts a design check to the person
 (`lib/plan/block-ask.ts`). Older steps blocked on one before the change: when
@@ -694,13 +721,13 @@ changed nothing on an answered step.
 ## The other two files you may need
 
 - **`writing.md`** — how to write a title and a detail. Read it before you
-  write any row: a sub-step, a decision, fog, an idea, or the note you close
+  write any row: a sub-step, a decision, an idea, or the note you close
   with.
 - **`raising.md`** — the four places something a session has to say can go, and
   which one takes what. Read it when you have something to say that does not
   belong to the step in front of you.
 
-## Statuses, kind and fog
+## Statuses and kind
 
 - `proposed` — waiting on the person. Never yours to move.
 - `not_started` — agreed, nothing has claimed it.
@@ -721,7 +748,3 @@ person, and it is never yours to answer, however it is assigned and whoever
 named it. A setup step is a job of theirs outside the repo, written with
 `needs`; it closes when they say they have done it and carries no commit.
 Neither is ever closed by a session.
-
-**Fog** is one sentence on a feature: what cannot be seen yet about finishing
-it. `done` refuses a feature that still carries fog, so fog is cleared by
-graduating it into steps (step 8 above), not by ignoring it.

@@ -1,7 +1,7 @@
 'use client';
 
 import { SearchMark } from '@/components/ui/search-mark';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import { cn } from '@/lib/cn';
 import type { SearchScope } from '@/lib/search/scope';

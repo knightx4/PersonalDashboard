@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { Undo2 } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { toggleChipClass } from '@/components/ui/chip';
 import { FieldError, Input } from '@/components/ui/field';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
@@ -262,14 +263,14 @@ function LoggedLines({
             {estimateAsked(entry) && (
               <div role="group" aria-label={ESTIMATE_QUESTION} className="pb-1">
                 <p className="text-ink-muted">{ESTIMATE_QUESTION}</p>
-                <div className="-ml-2.5 flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1">
                   {PROGRESS_ESTIMATES.map((estimate) => (
                     <button
                       key={estimate}
                       type="button"
                       disabled={answering !== null}
                       onClick={() => answer(index, estimate)}
-                      className="press rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent disabled:opacity-50"
+                      className={cn(toggleChipClass(false), 'disabled:opacity-50')}
                     >
                       {ESTIMATE_CHIPS[estimate]}
                     </button>

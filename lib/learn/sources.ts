@@ -1,4 +1,14 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
+const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
+const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
+const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
+const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+/** Briefs are listed on Now (app/learn/now/briefs-list.tsx). */
+const NOW: Section = { href: '/learn/now', label: 'Now' };
+/** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
+const GOALS_HOME: Section = { href: '/goals', label: 'Home' };
 
 /**
  * Learn's tables, as Goals reads them (lib/sources/types.ts). What someone
@@ -15,6 +25,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'about'],
       title: 'name',
       href: () => '/goals',
+      section: GOALS_HOME,
+      parent: parentBy('goal_id', 'goals.items'),
       note: 'Each aim is a goal in the Learn area on /goals (aims.goal_id, goals 0066), and the goal owns its name, line and whether it is active. Read the goal rather than counting both.',
     },
     {
@@ -25,6 +37,7 @@ export const learnSources: ModuleSources = {
       search: ['name', 'note'],
       title: 'name',
       href: (id) => `/learn/s/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.goals',
@@ -42,6 +55,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'question'],
       title: 'title',
       href: (id) => `/learn/t/${id}`,
+      section: READING_LISTS,
     },
     {
       table: 'learn.readings',
@@ -51,6 +65,8 @@ export const learnSources: ModuleSources = {
       search: ['title', 'why', 'note'],
       title: 'title',
       href: (id) => `/learn/r/${id}`,
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.learning_log',
@@ -77,6 +93,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'claim'],
       title: 'name',
       href: (id) => `/learn/c/${id}`,
+      section: SUBJECTS,
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.curriculum_units',
@@ -137,6 +155,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'preparing_for'],
       title: 'title',
       href: (id) => `/learn/quiz/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.imports',
@@ -189,19 +208,10 @@ export const learnSources: ModuleSources = {
       page: {
         title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
         href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        section: VIDEOS,
         reads: ['video_id'],
       },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
-    },
-    {
-      table: 'learn.personality_results',
-      module: 'Learn',
-      holds: 'Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.',
-      weight: 'record',
-      search: ['test_name', 'typed_value', 'note', 'read_points'],
-      title: 'test_name',
-      href: () => '/learn/know#personality',
-      note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
     {
       table: 'learn.essays',
@@ -211,13 +221,41 @@ export const learnSources: ModuleSources = {
       search: ['path', 'draft_body'],
       title: 'path',
       href: (id) => `/learn/e/${id}`,
+      section: ESSAYS,
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
+    },
+    {
+      table: 'learn.evidence_links',
+      module: 'Learn',
+      holds: 'What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.',
+      weight: 'record',
+      search: ['basis'],
+      title: 'basis',
+      newest: 'found_at',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+    },
+    {
+      table: 'learn.briefs',
+      module: 'Learn',
+      holds: 'Topics they asked Dash to research: the question, why they want it and the short answer.',
+      weight: 'intent',
+      search: ['question', 'angle', 'short_answer'],
+      title: 'question',
+      href: (id) => `/learn/b/${id}`,
+      // A brief's sources are a reading list (track_id), so it sits there.
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
+      note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
   ],
   notSources: [
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
-    { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
+    {
+      table: 'learn.area_check_articles',
+      reason:
+        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
+    },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
@@ -228,10 +266,19 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_providers', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
+    { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
+    { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
+    { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
+    { table: 'learn.work_passages', reason: 'Passages of the résumé and Career notes, copied and embedded daily to link ideas to work history; the résumé and the notes are the sources.' },
+    { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },
     { table: 'learn.concept_mentions', reason: 'Graph structure; read through concepts.' },
     {
       table: 'learn.course_reads',
       reason: 'Which transcript courses have been read into Learn; the ideas are in concepts.',
+    },
+    {
+      table: 'learn.course_embeddings',
+      reason: 'Each transcript course as the text and vector it is matched to ideas by; the course is in you.courses and the links in evidence_links.',
     },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
@@ -241,7 +288,12 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.opening_sweeps',
       reason: 'Placement bookkeeping.',
-      page: { title: 'asked', href: (row) => `/learn/opening/${row.id}` },
+      page: {
+        title: 'asked',
+        href: (row) => `/learn/opening/${row.id}`,
+        section: SUBJECTS,
+        parent: parentBy('subject_id', 'learn.subjects'),
+      },
     },
     { table: 'learn.piece_practice', reason: 'Practice tasks Dash wrote; read through what was handed in for them.' },
     { table: 'learn.plan_projects', reason: 'Final projects Dash wrote; read through what was handed in for them.' },

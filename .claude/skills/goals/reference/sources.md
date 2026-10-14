@@ -129,6 +129,15 @@ YouTube videos they chose to watch, saved to their playlist, or kept from a chan
 - Opens at `/learn/videos/<video_id>`
 - item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.
 
+### `learn.briefs` (Learn)
+
+Topics they asked Dash to research: the question, why they want it and the short answer.
+
+- Search: `question`, `angle`, `short_answer`
+- Name a row by `question`; link it by `id`
+- Opens at `/learn/b/<id>`
+- Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.
+
 ### `news.preferences` (News)
 
 The neighbourhood they want local news for.
@@ -282,24 +291,6 @@ Follow-ups the job search is reminding them of.
 - Name a row by `body`; link it by `id`
 - Opens at `/jobs`
 
-### `obsidian.courses` (Vault)
-
-Every course on their academic transcripts: the school, code, title, term, credits and grade, as written.
-
-- Search: `title`, `code`, `school`, `term`
-- Name a row by `title`; link it by `id`
-- Opens at `/vault/education#course-<id>`
-- transcript_id points at obsidian.transcripts. year is the year of the term where the transcript gives one. grade is null for a course with no grade, such as transfer credit.
-
-### `obsidian.transcripts` (Vault)
-
-The academic transcripts they have uploaded, one per school record, with the original file kept.
-
-- Search: `school`, `file_name`
-- Name a row by `school`; link it by `id`
-- Opens at `/vault/education#transcript-<id>`
-- The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.
-
 ### `learn.tracks` (Learn)
 
 Reading tracks, each answering one question.
@@ -399,15 +390,6 @@ Lists they pasted in to learn from, as pasted.
 - Search: `raw_text`, `source_hint`
 - Name a row by `source_hint`; link it by `id`
 
-### `learn.personality_results` (Learn)
-
-Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
-
-- Search: `test_name`, `typed_value`, `note`, `read_points`
-- Name a row by `test_name`; link it by `id`
-- Opens at `/learn/know#personality`
-- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
-
 ### `learn.essays` (Learn)
 
 Essays they are writing or have published: the draft, the brief (question, claim, reader) and the words.
@@ -416,6 +398,14 @@ Essays they are writing or have published: the draft, the brief (question, claim
 - Name a row by `path`; link it by `id`
 - Opens at `/learn/e/<id>`
 - Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.
+
+### `learn.evidence_links` (Learn)
+
+What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.
+
+- Search: `basis`
+- Name a row by `basis`; link it by `id`
+- target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
 
 ### `todo.tasks` (Todo)
 
@@ -484,6 +474,51 @@ Each charge, bill, renewal notice or price change read from their mail, one per 
 - Name a row by `event`; link it by `id`
 - A rise is amount_cents above previous_amount_cents. Read with recurring_payments through payment_id for the payee.
 
+### `you.courses` (You)
+
+Every course on their academic transcripts: the school, code, title, term, credits and grade, as written.
+
+- Search: `title`, `code`, `school`, `term`
+- Name a row by `title`; link it by `id`
+- Opens at `/you/work#course-<id>`
+- transcript_id points at you.transcripts. year is the year of the term where the transcript gives one. grade is null for a course with no grade, such as transfer credit.
+
+### `you.transcripts` (You)
+
+The academic transcripts they have uploaded, one per school record, with the original file kept.
+
+- Search: `school`, `file_name`
+- Name a row by `school`; link it by `id`
+- Opens at `/you/work#transcript-<id>`
+- The courses on each are in you.courses. The file is in the private vault-transcripts bucket at storage_path.
+
+### `you.personality_results` (You)
+
+Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
+
+- Search: `test_name`, `typed_value`, `note`, `read_points`
+- Name a row by `test_name`; link it by `id`
+- Opens at `/you/personality`
+- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
+
+### `you.places` (You)
+
+The places they have lived, with when they moved in and out.
+
+- Search: `name`, `city`, `region`, `country`, `note`
+- Name a row by `name`; link it by `id`
+- Opens at `/you/places/<id>`
+- moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.
+
+### `you.work_history` (You)
+
+The jobs they have held: employer, title, place and dates, read from their résumé or added by hand.
+
+- Search: `employer`, `title`, `place`, `note`
+- Name a row by `employer`; link it by `id`
+- Opens at `/you/work#job-<id>`
+- started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
@@ -501,6 +536,14 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
+### `core.dash_handoffs` (Home)
+
+What they asked Dash that it handed to the backup routine, and how far that has got.
+
+- Search: `request`
+- Name a row by `request`; link it by `id`
+- status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.
+
 ### `core.attachments` (Home)
 
 Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.
@@ -517,7 +560,7 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Search: `angle`, `body`
 - Name a row by `angle`; link it by `id`
 - Opens at `/dev/posts`
-- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread. image_paths are the pictures attached to it.
 
 ### `public.x_posts` (Dev)
 

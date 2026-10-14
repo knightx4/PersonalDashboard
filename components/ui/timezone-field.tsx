@@ -283,10 +283,11 @@ export function TimezoneField({
           if (open) close();
           else setOpen(true);
         }}
-        className="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-ink-muted hover:text-ink"
+        className="absolute right-0 top-0 flex h-(--control-h) w-9 items-center justify-center text-ink-muted hover:text-ink"
       >
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
+          strokeWidth={1.75}
           aria-hidden
         />
       </button>
@@ -297,7 +298,7 @@ export function TimezoneField({
           id={listId}
           role="listbox"
           aria-label="Timezones"
-          className="popover-panel absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-raised py-1 shadow-lg"
+          className="popover-panel absolute z-overlay mt-1 max-h-64 w-full overflow-y-auto rounded-card border border-border bg-raised py-1 shadow-lg"
         >
           {matches.map((match, index) => (
             <li

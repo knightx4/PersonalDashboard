@@ -10,7 +10,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * kind of class and the later one silently deleted the earlier -- which is how
  * the primary button lost its label colour and rendered white-on-lavender.
  *
- * Any new named scale added to globals.css belongs in this list too.
+ * Any new named scale added to globals.css belongs in these lists too.
  */
 const TEXT_SIZES = [
   'micro',
@@ -70,8 +70,16 @@ const COLOURS = [
   ).flatMap((stage) => [`status-${stage}`, `status-${stage}-tint`]),
 ] as const;
 
+/**
+ * The corner radii the themes move (app/globals.css). Without them a
+ * `rounded-card` passed to a component whose own corner is `rounded-control`
+ * kept both, and which one drew was left to the stylesheet's order.
+ */
+const RADII = ['pane', 'card', 'control', 'pill'] as const;
+
 const merge = extendTailwindMerge({
   extend: {
+    theme: { radius: [...RADII] },
     classGroups: {
       'font-size': [{ text: [...TEXT_SIZES] }],
       'text-color': [{ text: [...COLOURS] }],

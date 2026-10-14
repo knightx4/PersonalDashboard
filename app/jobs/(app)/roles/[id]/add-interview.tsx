@@ -77,7 +77,7 @@ export function AddInterview({
         onClick={() => setOpen(true)}
         className={cn(
           cardVariants(),
-          'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
+          'press w-full border border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
         )}
       >
         {triggerLabel}
@@ -192,9 +192,9 @@ export function AddInterview({
         >
           {groupId ? 'Add it to this round' : 'Add it in a round of its own'}
         </Button>
-        <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
+        <Button type="button" variant="ghost" size="sm" onClick={close}>
           Cancel
-        </button>
+        </Button>
         {error && <span className="text-small text-danger">{error}</span>}
       </div>
     </section>

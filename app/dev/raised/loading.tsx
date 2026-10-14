@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skeleton';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * Dash's shape while it loads: the header, the Status card with its two rows,
@@ -7,7 +8,7 @@ import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skel
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageColumn className="space-y-6">
       <PageHeaderSkeleton action={false} />
 
       <Card padding="dense" className="space-y-3">
@@ -22,6 +23,6 @@ export default function Loading() {
       </Card>
 
       <RowsSkeleton rows={4} />
-    </div>
+    </PageColumn>
   );
 }

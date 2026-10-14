@@ -1,6 +1,7 @@
-import Link from 'next/link';
+import { sectionSubject } from '@/lib/core/section-path';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Flag, ListTree } from 'lucide-react';
+import { Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -20,6 +21,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { MarkFileRead } from './mark-read';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'File' };
 export const dynamic = 'force-dynamic';
@@ -64,14 +66,9 @@ export default async function FilePage({
   const earlier = versions.filter((version) => version.version !== file.version);
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <Link
-        href="/goals/files"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Files
-      </Link>
+    <PageColumn>
       <PageHeader
+        subject={sectionSubject('/goals/files', 'Files', { label: shown.title, href: fileHref(file.id) })}
         title={shown.title}
         description={
           <>
@@ -85,7 +82,7 @@ export default async function FilePage({
           <Banner tone="info">
             <p className="text-small text-ink">
               This is version {asked}.{' '}
-              <Link href={fileHref(file.id)} className="underline underline-offset-2">
+              <Link href={fileHref(file.id)} className={linkVariants()}>
                 Read the newest, version {file.version}
               </Link>
               .
@@ -189,6 +186,6 @@ export default async function FilePage({
           </p>
         )}
       </div>
-    </div>
+    </PageColumn>
   );
 }

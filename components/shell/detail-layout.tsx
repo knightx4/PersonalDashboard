@@ -1,5 +1,7 @@
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PageWide } from '@/components/shell/page-width';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * A detail page: the thing itself on the left, its properties in a column on
@@ -32,7 +34,8 @@ export function DetailLayout({
   className?: string;
 }) {
   return (
-    <div
+    // Two columns, so a wide page (components/shell/page-width.tsx).
+    <PageWide
       className={cn(
         'grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_15rem]',
         className,
@@ -54,7 +57,7 @@ export function DetailLayout({
         {properties}
       </aside>
       <div className="lg:col-start-1 lg:row-start-2">{children}</div>
-    </div>
+    </PageWide>
   );
 }
 
@@ -93,7 +96,7 @@ export function Property({
 }) {
   return (
     <div className={cn('min-w-0', wide && 'col-span-2 lg:col-span-1')}>
-      <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
+      <SectionLabel as="dt">{label}</SectionLabel>
       <dd className="tabular mt-0.5 truncate text-ui text-ink" title={hint}>
         {value}
       </dd>

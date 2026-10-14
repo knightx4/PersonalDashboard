@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -17,15 +17,18 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { CommentCount } from '@/components/dev/comment-count';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
-import { FogNote } from '@/components/dev/fog-note';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { Tooltip } from '@/components/ui/tooltip';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
 import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
 import { readableRefs } from '@/lib/plan/ref';
 import type { PlanProgress } from '@/lib/plan/tree';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { Breakdown } from './counts';
 import { Dependencies } from './dependencies';
@@ -51,7 +54,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * passed in by the page rather than written here. What is left is what any
  * page of steps shares: the tree guides and the fold, the number and title,
  * the health word you press to change, whose move it is, the count of what
- * is beneath, the fog, and the opened panel with the detail, Done when,
+ * is beneath, and the opened panel with the detail, Done when,
  * Needs, the note, the questions, what it waits on and the thread.
  *
  * A page fills it in three steps: `useTreeRow` for the row's own state, which
@@ -69,8 +72,6 @@ export type TreeRowNode = TreeQuestion &
     blockAsk: string | null;
     /** The step's history note. */
     comment: string | null;
-    fog: string | null;
-    fogDismissedAt: string | null;
     /** Under a filter: whether this row matched or is only here for what is beneath it. */
     matches: boolean;
     rollup: PlanProgress;
@@ -133,17 +134,7 @@ export function useTreeRow(
   // A search is the exception, and the same one as before: the row is only on
   // the page because something inside it matched, and folding that away would
   // be answering the search with a closed drawer.
-  //
-  // Fog folds too, and that is the whole of what the arrow is for on a row
-  // with no steps under it. #386 is fog and nothing else -- a feature real
-  // enough to name and not yet real enough to break up -- so gating the arrow
-  // on sub-steps alone left its one block of text pinned open with no control
-  // anywhere on the row. A leaf still starts unfolded, so scanning the plan
-  // shows the fog exactly as it did; what is new is being able to put it away.
-  const foldableFog = Boolean(node.fog) && (node.fogDismissedAt === null || showDismissed);
-  const [showChildren, setShowChildren] = useState(
-    () => searching || unfolded || (!hasChildren && foldableFog),
-  );
+  const [showChildren, setShowChildren] = useState(() => searching || unfolded);
 
   return {
     open,
@@ -158,7 +149,6 @@ export function useTreeRow(
     setShowChildren,
     substeps,
     hasChildren,
-    foldableFog,
     /** Show the sub-steps and open the add form beneath them. */
     addChild: () => {
       setShowChildren(true);
@@ -331,11 +321,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   /** Draws one sub-step, one level further in. */
   renderChild: (child: TreeRowNode, trail: readonly boolean[]) => ReactNode;
 }) {
-  const [fogState, fogAction, fogPending] = useActionState(
-    actions.dismissFog,
-    {} as TreeActionState,
-  );
-  const { open, setOpen, showChildren, setShowChildren, substeps, hasChildren, foldableFog } = row;
+  const { open, setOpen, showChildren, setShowChildren, substeps, hasChildren } = row;
 
   // A question beneath a step is that step's question, and it is read and
   // answered in the step's own questions section. It is deliberately not also a
@@ -356,6 +342,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // page knows, and a page without it draws the text as written.
   const outlines = useMemo(() => outlinesOf(titles), [titles]);
   const readable = (text: string) => readableRefs(text, outlines);
+  // Only the dev plan passes titles; there a bare `#1931` is a feature, and
+  // on a goal it is more likely a list number, so a goal links outlines only.
+  const stepRefs = titles ? 'all' : 'outlines';
   // A setup job still open. Closed, it is an ordinary finished row -- the
   // errand is run, and a box inviting you to run it again would be a lie.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -383,13 +372,20 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // and a step read in full meant pressing both. Either now unfolds both, or
   // folds everything when anything is showing; the arrow at the top of the
   // panel condenses the panel and leaves the sub-steps.
-  const foldable = hasChildren || foldableFog;
+  const foldable = hasChildren;
   const expanded = open || (foldable && showChildren);
   // A leaf has nothing to fold, so its chevron (drawn when the title links
   // away) opens and closes the panel, and says so.
   const foldLabel = foldable
     ? `${expanded ? 'Fold' : 'Unfold'} #${handle}`
     : `${expanded ? 'Close' : 'Open'} #${handle}`;
+  const foldTip = foldable
+    ? expanded
+      ? `Fold #${handle}, hiding its detail and the steps beneath it.`
+      : `Unfold #${handle} to read its detail and the steps beneath it.`
+    : expanded
+      ? `Close #${handle}'s detail.`
+      : `Open #${handle} to read its detail here.`;
   const titleClass = cn(
     'min-w-0',
     open ? 'break-words' : 'break-words sm:truncate',
@@ -417,7 +413,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // link brackets: what a folded panel shows beside Show details.
   const foldedPreview = readable(node.detail ?? node.acceptance ?? '')
     .split('\n')
-    .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
+    .map((line) =>
+      line
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/[*_#>`]/g, '')
+        .trim(),
+    )
     .find((line) => line.length > 0);
 
   // A link to this row by its own id (a goal step from the Goals home, or
@@ -442,16 +443,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // step to change: "where is this" is the question the page exists for, and
   // answering it differently should not be a form. The grid draws it after
   // the title; the list draws it before, where a checkbox would be.
-  const healthMenu = (
+  // What the state means rides on the menu's trigger as a Tooltip, rather
+  // than on the label inside it, so the button keeps the one tab stop.
+  const healthTrigger = (
     <ActionMenu
       label={`Status of #${node.outline} ${node.title}`}
       items={statusMenu}
       align="start"
-      className={list ? 'shrink-0' : 'justify-self-start'}
       triggerClassName={cn(
         list
           ? 'size-7 px-0 text-small font-medium'
-          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+          : 'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
         TONE_TEXT[health.tone],
       )}
       trigger={
@@ -461,7 +463,6 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // button.
           className="text-inherit"
           tone={health.tone}
-          title={health.title}
           word={health.word}
           // No glyph on a dropped row. The slash was a third way of
           // saying what the ghost tone and the struck-through title
@@ -485,6 +486,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
         </StateLabel>
       }
     />
+  );
+  const healthMenu = health.title ? (
+    <Tooltip label={health.title} className={list ? 'shrink-0' : 'justify-self-start'}>
+      <span className="inline-flex">{healthTrigger}</span>
+    </Tooltip>
+  ) : (
+    <span className={cn('inline-flex', list ? 'shrink-0' : 'justify-self-start')}>
+      {healthTrigger}
+    </span>
   );
 
   // What the title cell says: the title and the lines under it. A button
@@ -539,16 +549,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
          * knows is there is the thing this whole section exists to
          * stop. */}
         {unanswered > 0 && !open && (
-          <span
-            title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+          <Tooltip
+            label={`${unanswered === 1 ? 'A question' : `${unanswered} questions`} under this step ${unanswered === 1 ? 'waits' : 'wait'} on your answer. Open the step to answer.`}
+            className="shrink-0"
           >
-            <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-            {unanswered}
-            <span className="sr-only">
-              unanswered {unanswered === 1 ? 'question' : 'questions'}
-            </span>
-          </span>
+            <Chip
+              tone="caution"
+              // A tab stop only where the row is not itself a button.
+              tabIndex={titleHref ? 0 : undefined}
+            >
+              <HelpCircle strokeWidth={1.75} aria-hidden />
+              {unanswered}
+              <span className="sr-only">
+                unanswered {unanswered === 1 ? 'question' : 'questions'}
+              </span>
+            </Chip>
+          </Tooltip>
         )}
         {/* And whether anything has been said about it. */}
         <CommentCount count={node.thread.length} />
@@ -568,13 +584,18 @@ export function TreeRow<E extends TreeCatalogEntry>({
             stops at the feature, so this row never asked you; saying so
             is what the Drop at the top of its menu is for. */}
       {addedBy && (
-        <span
-          title={addedBy.session ? `Session ${addedBy.session}` : undefined}
-          className="block truncate text-small text-ink-ghost"
+        <Tooltip
+          label={`Dash wrote this under a feature you approved, so it did not ask you first. Drop it from the menu if you do not want it.${addedBy.session ? ` Session ${addedBy.session}.` : ''}`}
+          className="flex max-w-full"
         >
-          <DashCredit />
-          Added by Dash on {addedBy.date}
-        </span>
+          <span
+            tabIndex={titleHref ? 0 : undefined}
+            className="block truncate text-small text-ink-ghost"
+          >
+            <DashCredit />
+            Added by Dash on {addedBy.date}
+          </span>
+        </Tooltip>
       )}
       {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
       {need && !open && (
@@ -628,57 +649,73 @@ export function TreeRow<E extends TreeCatalogEntry>({
           {/* The fold, where there is something beneath to fold. A spacer
               where there is not, so the titles at one depth line up. */}
           {heading ? null : foldable || (titleHref && !isDecision && !setupOpen) ? (
-            <button
-              type="button"
-              onClick={toggle}
-              aria-expanded={expanded}
-              title={foldLabel}
-              aria-label={foldLabel}
+            <Tooltip
+              label={foldTip}
               className={cn(
-                LEVEL,
-                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                'shrink-0',
                 // In the list the row can run to several lines (the title,
                 // Needs, a date), so the fold sits on the title's line.
-                list ? 'mt-1 h-5 self-start' : 'h-5 self-center sm:mt-1 sm:self-start',
+                list ? 'mt-1 self-start' : 'self-center sm:mt-1 sm:self-start',
               )}
             >
-              <ChevronDown
+              <button
+                type="button"
+                onClick={toggle}
+                aria-expanded={expanded}
+                aria-label={foldLabel}
                 className={cn(
-                  'size-3.5 transition-transform duration-quick',
-                  !expanded && '-rotate-90',
+                  LEVEL,
+                  'press flex h-5 shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-accent-tint hover:text-accent',
                 )}
-                strokeWidth={1.75}
-                aria-hidden
-              />
-            </button>
+              >
+                <ChevronDown
+                  className={cn(
+                    'size-3.5 transition-transform duration-quick',
+                    !expanded && '-rotate-90',
+                  )}
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              </button>
+            </Tooltip>
           ) : isDecision ? (
             // Where a build step's checkbox would be. A question and a piece
             // of work are different things, and the row should say which it is
             // before the health column is read.
-            <span
-              title="A decision: a question, closed by an answer rather than a commit."
-              className={cn(
-                LEVEL,
-                'flex h-5 shrink-0 select-none items-center justify-center self-center text-small font-semibold text-caution',
-              )}
+            <Tooltip
+              label="A decision: a question for you, closed by your answer rather than a commit."
+              className="shrink-0 self-center"
             >
-              ?<span className="sr-only">Decision</span>
-            </span>
+              <span
+                tabIndex={0}
+                className={cn(
+                  LEVEL,
+                  'flex h-5 select-none items-center justify-center rounded-control text-small font-semibold text-caution',
+                )}
+              >
+                ?<span className="sr-only">Decision</span>
+              </span>
+            </Tooltip>
           ) : setupOpen ? (
             // The same slot, for the other row that is not a piece of work.
             // A setup job is an errand, closed by going and doing it, and the
             // row should say so before the health column is read -- the same
             // argument as the question mark above.
-            <span
-              title="A setup job: something only you can set up, closed when you have."
-              className={cn(
-                LEVEL,
-                'flex h-5 shrink-0 select-none items-center justify-center self-center text-caution',
-              )}
+            <Tooltip
+              label="A setup job: something only you can set up. Open it for what to do, and say so when you have."
+              className="shrink-0 self-center"
             >
-              <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Setup</span>
-            </span>
+              <span
+                tabIndex={0}
+                className={cn(
+                  LEVEL,
+                  'flex h-5 select-none items-center justify-center rounded-control text-caution',
+                )}
+              >
+                <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Setup</span>
+              </span>
+            </Tooltip>
           ) : (
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
@@ -785,13 +822,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
           <>
             {/* Wraps rather than clips: "Waiting on 26 Oct" is wider than the
                 column, and a cut word lost the day it waits for (note 5025f689). */}
-            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">{move}</span>
+            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">
+              {move}
+            </span>
 
             <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>
 
             {/* No "Who" column. It was a column of dashes with the occasional
                 name in it -- one fact, on a plan whose every approved step the
                 runner takes unless you keep it, and keeping it is a button. */}
+            {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
             <span className="hidden sm:flex sm:h-7 sm:items-center">
               <Breakdown rollup={node.rollup} />
             </span>
@@ -802,7 +842,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div className={cn('flex items-center justify-self-end', list ? 'shrink-0' : 'self-center sm:self-start')}>
+        <div
+          className={cn(
+            'flex items-center justify-self-end',
+            list ? 'shrink-0' : 'self-center sm:self-start',
+          )}
+        >
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
@@ -813,34 +858,6 @@ export function TreeRow<E extends TreeCatalogEntry>({
       </li>
 
       {notices}
-
-      {/* In the tree rather than behind the fold, because fog on a feature is
-          the thing you most want to see while scanning a plan: it is the part
-          that is admittedly not a plan yet, and one that only showed on a step
-          you thought to open would be a gap nobody found. Quiet and dashed, so
-          it does not read as detail. Nothing at all when there is none, which
-          is most steps most of the time.
-
-          It does fold with the group, though. Fog belongs to what is beneath
-          the row -- it is the part of it that is not a plan yet -- so a
-          collapsed feature leaving its fog behind was one block outliving the
-          thing it described. The arrow appears for fog as well as for
-          sub-steps, so the fold is a control everywhere it is a state. */}
-      {foldableFog && showChildren && (
-        <li style={inset} className="pb-1.5 pr-3">
-          {/* Putting the patch aside stops it being raised: off the page,
-              out of the Not specified view, out of every turn, and no
-              longer holding the step open when you close it. */}
-          <FogNote
-            id={node.id}
-            fog={readable(node.fog ?? '')}
-            aside={node.fogDismissedAt !== null}
-            action={fogAction}
-            pending={fogPending}
-            error={fogState.error}
-          />
-        </li>
-      )}
 
       {row.editing && !titleEditor ? (
         <li style={inset} className="pr-3">
@@ -866,7 +883,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded-control px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -895,17 +912,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!isDecision && !setupOpen && detailView}
                   {node.detail && !isDecision && !setupOpen && !detailView && (
                     <p className="whitespace-pre-wrap text-ui text-ink-muted">
-                      <LinkedText text={readable(node.detail)} />
+                      <LinkedText text={readable(node.detail)} refs={stepRefs} />
                     </p>
                   )}
                   {(node.acceptance || acceptanceView) && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Done when
-                      </p>
+                      <SectionLabel>Done when</SectionLabel>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
-                          <LinkedText text={readable(node.acceptance ?? '')} />
+                          <LinkedText text={readable(node.acceptance ?? '')} refs={stepRefs} />
                         </p>
                       )}
                     </div>
@@ -915,18 +930,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   sentence that still stands. */}
                   {node.blockAsk && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Needs
-                      </p>
+                      <SectionLabel>Needs</SectionLabel>
                       <p className="whitespace-pre-wrap text-ui text-ink">
-                        <LinkedText text={readable(node.blockAsk)} />
+                        <LinkedText text={readable(node.blockAsk)} refs={stepRefs} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
-                    <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
-                      <LinkedText text={readable(node.comment)} />
-                    </p>
+                    <Note className="whitespace-pre-wrap">
+                      <LinkedText text={readable(node.comment)} refs={stepRefs} />
+                    </Note>
                   )}
 
                   {body}

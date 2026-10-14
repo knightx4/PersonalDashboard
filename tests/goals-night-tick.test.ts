@@ -42,7 +42,6 @@ function goal(id: string, over: Partial<NightGoal> = {}): NightGoal {
     status: 'open',
     approvedAt: null,
     createdAt: new Date(START).toISOString(),
-    fogChangedAt: null,
     ...over,
   };
 }
@@ -278,16 +277,6 @@ describe('goalsNightNote', () => {
         refused: [],
       }),
     ).toBe('Started the goal step "Draft the cover letter" on "Change jobs".');
-    expect(
-      goalsNightNote({
-        act: 'mapped',
-        goalId: 'g',
-        goalTitle: 'Change jobs',
-        reason: 'fog',
-        runId: 'r',
-        featuresLeft: 1,
-      }),
-    ).toBe('Started mapping the goal "Change jobs" again, since its fog changed.');
     expect(goalsNightNote({ act: 'waiting' })).toBeNull();
   });
 });

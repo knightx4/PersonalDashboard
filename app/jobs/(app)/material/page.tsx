@@ -2,6 +2,8 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { MATERIAL_PARTS, QUESTION_KINDS, type MaterialPart } from '@/lib/jobs/material';
 import { MaterialView } from './material-view';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Material' };
 
@@ -57,8 +59,9 @@ export default async function MaterialPage({
   }>;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
+        subject={sectionSubject('/jobs/material', 'Material')}
         title="Material"
         description="What every application draws on: your answers, your stories, your resumes and how you write."
       />
@@ -100,6 +103,6 @@ export default async function MaterialPage({
           bannedConstructions: ((profile?.banned_constructions as string[]) ?? []).join('\n'),
         }}
       />
-    </>
+    </PageColumn>
   );
 }

@@ -1,3 +1,4 @@
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
@@ -28,6 +29,7 @@ import {
   type FunnelApplication,
   type RejectionStage,
 } from '@/lib/jobs/pipeline';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Jobs pages that had no picture in the gallery (plan #1601): Activity,
@@ -46,7 +48,7 @@ import {
 /** The instant every fixture is measured from, so the shots do not move. */
 const NOW = new Date('2026-10-06T14:00:00Z');
 
-const page = (children: React.ReactNode) => <div className="mx-auto max-w-3xl">{children}</div>;
+const page = (children: React.ReactNode) => <PageColumn>{children}</PageColumn>;
 
 // ---- Activity ---------------------------------------------------------------
 
@@ -480,7 +482,7 @@ export function JobsOnboardingSurface() {
         </div>
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">Welcome</p>
+            <SectionLabel>Welcome</SectionLabel>
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>

@@ -11,10 +11,12 @@ import {
 } from '@/app/shopping/saved/actions';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Property } from '@/components/shell/detail-layout';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { linkVariants } from '@/components/ui/link';
+import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { FieldError, InlineInput, InlineTextarea } from '@/components/ui/field';
@@ -58,15 +60,11 @@ type Fields = {
 /** An inline field's own padding pulled back, so its text starts where its label does. */
 const flush = '-mx-1 max-sm:-my-2 max-sm:py-2.5';
 
-/** A word you press, quiet until you point at it. */
-const quietPress =
-  'press -mx-1 shrink-0 rounded-control px-1 text-ui text-ink-muted hover:bg-sunken hover:text-ink max-sm:-my-2 max-sm:py-2.5';
-
 /** A fact that runs the whole row at every width: an address does not fit a quarter of one. */
 function WideFact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="col-span-2 min-w-0 sm:col-span-4">
-      <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
+      <SectionLabel as="dt">{label}</SectionLabel>
       <dd className="mt-0.5 text-ui text-ink">{value}</dd>
     </div>
   );
@@ -82,10 +80,13 @@ export function SavedItemBody({
   item,
   subtitle,
   banner,
+  path,
 }: {
   item: EditableSavedItem;
   subtitle: string;
   banner?: React.ReactNode;
+  /** The path to the saved item, which the page read from the catalogue. */
+  path?: Subject;
 }) {
   // The last values the server accepted, to tell a change from a visit.
   const [lastSaved, setLastSaved] = useState<Fields>({
@@ -175,6 +176,7 @@ export function SavedItemBody({
       header={
         <>
           <PageHeader
+            subject={path}
             leading={
               lastSaved.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
@@ -253,13 +255,19 @@ export function SavedItemBody({
                     href={lastSaved.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="min-w-0 flex-1 truncate text-accent hover:underline"
+                    className={cn('min-w-0 flex-1 truncate', linkVariants())}
                   >
                     {lastSaved.url}
                   </a>
-                  <button type="button" onClick={() => setEditingUrl(true)} className={quietPress}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setEditingUrl(true)}
+                    className="-mx-1 shrink-0"
+                  >
                     Edit
-                  </button>
+                  </Button>
                 </span>
               )
             }
@@ -283,9 +291,15 @@ export function SavedItemBody({
                   className={flush}
                 />
               ) : (
-                <button type="button" onClick={() => setEditingImage(true)} className={quietPress}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setEditingImage(true)}
+                  className="-mx-1"
+                >
                   {lastSaved.imageUrl ? 'Change image' : 'Add image'}
-                </button>
+                </Button>
               )
             }
           />
@@ -293,7 +307,7 @@ export function SavedItemBody({
       }
       text={
         <section aria-label="Notes" className="space-y-2">
-          <h2 className="text-ui font-semibold text-ink">Notes</h2>
+          <SectionHeading title="Notes" />
           <Card padding="dense">
             <EditableProse
               label="Notes"

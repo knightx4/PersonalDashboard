@@ -1,11 +1,14 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
+import { chipVariants } from '@/components/ui/chip';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { cn } from '@/lib/cn';
 import { formatDate, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import type { ClosestApplication, ClosestRound } from '@/lib/jobs/today/closest';
 import { HomeSection } from './home-section';
 
-const LINK =
-  'press-area text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-accent';
+const LINK = cn(linkVariants({ tone: 'quiet' }), 'press-area text-small');
+const CAUTION_LINK = cn(chipVariants({ tone: 'caution' }), 'press-area transition-colors duration-quick hover:text-accent');
 
 /** The role's Interviews tab, open on one round's first conversation, where its prep and notes are. */
 function roundHref(roleId: string, round: ClosestRound): string {
@@ -46,7 +49,7 @@ export function ClosestSection({
                 </Link>
                 <span className="text-small text-ink-muted">{app.stage}</span>
               </div>
-              <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-small">
+              <ValueList className="space-y-1">
                 <Line term="Next round">
                   {app.next ? (
                     <span className="text-ink">
@@ -68,7 +71,7 @@ export function ClosestSection({
                         <Link
                           key={round.key}
                           href={roundHref(app.roleId, round)}
-                          className="press-area rounded-full bg-caution-tint px-1.5 py-0.5 text-ink transition-colors duration-quick hover:text-accent"
+                          className={CAUTION_LINK}
                         >
                           Write up {round.label ?? 'the round'},{' '}
                           {formatDate(round.scheduledAt, timezone)}
@@ -77,7 +80,7 @@ export function ClosestSection({
                     </span>
                   </Line>
                 )}
-              </dl>
+              </ValueList>
             </li>
           ))}
         </ul>
@@ -88,10 +91,7 @@ export function ClosestSection({
 
 function Line({ term, children }: { term: string; children: React.ReactNode }) {
   return (
-    <>
-      <dt className="text-ink-muted">{term}</dt>
-      <dd className="min-w-0">{children}</dd>
-    </>
+    <ValueRow label={term} value={children} />
   );
 }
 
@@ -111,7 +111,7 @@ function Prep({ app, timezone }: { app: ClosestApplication; timezone: string }) 
         ) : (
           <Link
             href={roundHref(app.roleId, app.next)}
-            className="press-area rounded-full bg-caution-tint px-1.5 py-0.5 text-ink transition-colors duration-quick hover:text-accent"
+            className={CAUTION_LINK}
           >
             None yet: write it
           </Link>

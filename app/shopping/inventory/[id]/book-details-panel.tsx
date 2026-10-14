@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useRef } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   confirmBookEdition,
   switchBookEdition,
@@ -12,6 +12,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { ChipSelect, FieldError } from '@/components/ui/field';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import type { BookEditionCandidate } from '@/lib/books/types';
 
 export type BookDetailsView = {
@@ -51,12 +52,16 @@ function Fact({
   mono?: boolean;
 }) {
   return (
-    <div>
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className={value ? (mono ? 'font-mono text-ink' : 'text-ink') : 'text-ink-muted'}>
-        {value || 'Not listed'}
-      </dd>
-    </div>
+    <ValueRow
+      label={label}
+      value={
+        value ? (
+          <span className={mono ? 'font-mono' : undefined}>{value}</span>
+        ) : (
+          <span className="text-ink-muted">Not listed</span>
+        )
+      }
+    />
   );
 }
 
@@ -90,10 +95,10 @@ function CandidateRow({
         <img
           src={candidate.coverUrl}
           alt=""
-          className="h-16 w-11 shrink-0 rounded object-cover bg-canvas"
+          className="h-16 w-11 shrink-0 rounded-control object-cover bg-canvas"
         />
       ) : (
-        <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
+        <div className="h-16 w-11 shrink-0 rounded-control bg-canvas" />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-body font-medium text-ink">{candidate.title}</p>
@@ -142,27 +147,24 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
         <p className="text-small text-ink-muted">Imported from an order email</p>
       )}
 
-      <dl className="grid gap-2 text-body sm:grid-cols-2">
+      <ValueList>
         {book.isbn13 && <Fact label="ISBN-13" value={book.isbn13} mono />}
         {book.isbn10 && <Fact label="ISBN-10" value={book.isbn10} mono />}
-        <div className="sm:col-span-2">
-          <Fact
-            label="Authors"
-            value={book.authors.length > 0 ? book.authors.join(', ') : null}
-          />
-        </div>
+        <Fact
+          label="Authors"
+          value={book.authors.length > 0 ? book.authors.join(', ') : null}
+        />
         <Fact label="Publisher" value={book.publisher} />
         <Fact label="Year" value={book.publishedYear} />
         <Fact label="Edition" value={book.edition} />
-        <div>
-          <dt className="text-ink-muted">Resolved via</dt>
-          <dd className="text-ink">
-            {SOURCE_LABEL[book.resolutionSource] ?? book.resolutionSource.replace('_', ' ')}
-            {book.matchConfidence != null
+        <ValueRow
+          label="Resolved via"
+          value={`${SOURCE_LABEL[book.resolutionSource] ?? book.resolutionSource.replace('_', ' ')}${
+            book.matchConfidence != null
               ? ` · ${Math.round(Number(book.matchConfidence) * 100)}% match`
-              : ''}
-          </dd>
-        </div>
+              : ''
+          }`}
+        />
         {/*
           * Condition is a fact about the copy, so it is a row in the same list
           * as the rest of them — and it is the row that can be changed.
@@ -175,9 +177,10 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
           * — one short enum, reversible from the same chip, and no
           * half-finished state to save by accident. Laws 9 and 12.
           */}
-        <div>
-          <dt className="text-ink-muted">Condition</dt>
-          <dd>
+        <ValueRow
+          label="Condition"
+          value={
+            <>
             <form ref={conditionForm} action={conditionAction}>
               <input type="hidden" name="inventory_item_id" value={book.inventoryItemId} />
               <ChipSelect
@@ -203,9 +206,10 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
               </ChipSelect>
             </form>
             <FieldError>{conditionState.error}</FieldError>
-          </dd>
-        </div>
-      </dl>
+            </>
+          }
+        />
+      </ValueList>
 
       {/* The same gate the game panel draws, and for the same reason: one
           warn Banner where there was a caution box holding a bordered card
@@ -228,10 +232,10 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
                 <img
                   src={book.imageUrl}
                   alt=""
-                  className="h-16 w-11 shrink-0 rounded object-cover bg-canvas"
+                  className="h-16 w-11 shrink-0 rounded-control object-cover bg-canvas"
                 />
               ) : (
-                <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
+                <div className="h-16 w-11 shrink-0 rounded-control bg-canvas" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-body font-medium text-ink">{book.title}</p>
@@ -284,7 +288,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
 
           <p className="mt-3 text-small text-ink-muted">
             Neither one? Scan the barcode on the back cover from{' '}
-            <Link href="/shopping/inventory/add/books" className="text-accent hover:underline">
+            <Link href="/shopping/inventory/add/books" className={linkVariants()}>
               Add books
             </Link>{' '}
             — the ISBN settles it in one shot.

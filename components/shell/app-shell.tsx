@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
-import { ThemePicker } from '@/components/shell/theme-picker';
+import { ThemeRepair } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
@@ -22,7 +22,9 @@ import { SearchMark } from '@/components/ui/search-mark';
 import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
-import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
+import { KeyHintsProvider } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
+import { IconButton } from '@/components/ui/icon-button';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
@@ -34,10 +36,12 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
+import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
 import type { Brief } from '@/lib/shell/brief';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const NAV_COLLAPSED_KEY = 'pt_nav_collapsed';
 
@@ -61,7 +65,9 @@ export type NavSection = {
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
    * wrong -- and Raised has, because an unread question is a session that
-   * guessed and built on the guess. Nothing else in this app has.
+   * guessed and built on the guess. Goals' Inbox and Learn's Now carry one
+   * too, for the same reason: an unanswered question or a due item left
+   * unseen goes stale quietly.
    */
   badge?: number;
 };
@@ -209,15 +215,71 @@ export function AppShell({
   }, []);
 
   /**
-   * A new page starts at the top of the page.
+   * A new page starts at the top of the pane, and Back returns to where you
+   * were (plan #1919.2).
    *
    * The router scrolls `window` on navigation, and from lg up the window is
    * not the thing that scrolls -- the pane is. Without this, opening a role
    * from halfway down the pipeline lands you halfway down the role. Below lg
    * the pane is not a scroll container and this is a no-op.
+   *
+   * Next gives no event for the kind of navigation, but a Back or Forward
+   * press fires `popstate` before the new path renders, so that sets a flag
+   * the path change reads. The offset is saved as the pane scrolls and again
+   * at the moment of leaving, before the old content is replaced.
+   *
+   * The back link on a row page (components/shell/back-link.tsx) is a link
+   * to the list you came from, and marks the visit as a return so the list
+   * opens where you left it too (plan #1931.3). Below lg the window is what
+   * scrolls, so there the offset is the window's.
    */
+  const poppedRef = useRef(false);
+  const pathRef = useRef(pathname);
   useEffect(() => {
-    paneRef.current?.scrollTo({ top: 0 });
+    const pane = paneRef.current;
+    if (!pane) return;
+    const save = () =>
+      savePaneScroll(pathRef.current, windowScrolls(pane) ? window.scrollY : pane.scrollTop);
+    const onPop = () => {
+      save();
+      poppedRef.current = true;
+    };
+    pane.addEventListener('scroll', save, { passive: true });
+    window.addEventListener('scroll', save, { passive: true });
+    document.addEventListener('click', save, true);
+    window.addEventListener('popstate', onPop, true);
+    return () => {
+      pane.removeEventListener('scroll', save);
+      window.removeEventListener('scroll', save);
+      document.removeEventListener('click', save, true);
+      window.removeEventListener('popstate', onPop, true);
+    };
+  }, []);
+  useEffect(() => {
+    const pane = paneRef.current;
+    pathRef.current = pathname;
+    const { top, returned } = arrival(pathname, poppedRef.current);
+    poppedRef.current = false;
+    if (!pane) return;
+    pane.scrollTo({ top });
+    // Below lg the browser restores the window itself on a Back press; a
+    // return by the back link is a push, so that one is restored here.
+    const viaWindow = returned && windowScrolls(pane);
+    if (viaWindow) window.scrollTo({ top });
+    if (!top) return;
+    // The page may still be filling in; keep asking for a moment until the
+    // pane is long enough to hold the offset.
+    let tries = 0;
+    let frame = 0;
+    const settle = () => {
+      const at = viaWindow ? window.scrollY : pane.scrollTop;
+      if (Math.abs(at - top) < 2 || ++tries > 30) return;
+      if (viaWindow) window.scrollTo({ top });
+      else pane.scrollTo({ top });
+      frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
   }, [pathname]);
 
   function toggleCollapsed() {
@@ -277,14 +339,11 @@ export function AppShell({
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const active = sections.find(isActive);
-  // The top bar names the workspace, and the page's own heading names the
-  // page. It used to name the section, which on a section's first page is the
-  // heading's exact words a few inches lower: "Quick read" twice. Below that
-  // first page the section follows as a link back up to it, so a company or an
-  // order still says where it sits.
+  // The top bar names the workspace and nothing else (plan #1931.2). Where a
+  // page sits inside it is the page's own path, drawn once above its heading
+  // by PageHeader's `subject`; the bar used to add the section after a ›,
+  // which repeated the first part of that path a few inches lower.
   const title = moduleById(module)?.label ?? 'Home';
-  const crumb = active && pathname !== active.href ? active : undefined;
 
   useEffect(() => {
     if (!drawer) return;
@@ -325,69 +384,78 @@ export function AppShell({
     narrow?: boolean;
     /** The shortcut that opens it, shown while a modifier is held. */
     hint?: string;
-  }) => (
-    <Link
-      key={href}
-      href={href}
-      // Opening a section is exactly when the drawer should close.
-      onClick={() => setDrawer(false)}
-      aria-current={on ? 'page' : undefined}
-      // Where capture flies an item filed into this workspace (landed.ts).
-      data-capture-nav={href}
-      title={narrow ? label : undefined}
-      className={cn(
-        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
-        narrow ? 'justify-center px-2' : 'pl-3 pr-2',
-        on
-          ? 'bg-shell-hover text-shell-ink'
-          : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
-      )}
-    >
-      {/* The workspace's own colour, as a bar rather than a tint. A tint
-          would have to be legible on five different shells; a 2px bar in
-          the mark key's fixed hue is vivid on all of them. */}
-      <span
+  }) => {
+    const row = (
+      <Link
+        key={href}
+        href={href}
+        // Opening a section is exactly when the drawer should close.
+        onClick={() => setDrawer(false)}
+        aria-current={on ? 'page' : undefined}
+        // Where capture flies an item filed into this workspace (landed.ts).
+        data-capture-nav={href}
         className={cn(
-          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
-          on ? 'opacity-100' : 'opacity-0',
+          'group relative flex items-center gap-2 rounded-control py-1.5 text-ui font-medium transition-colors duration-quick',
+          narrow ? 'justify-center px-2' : 'pl-3 pr-2',
+          on
+            ? 'bg-shell-hover text-shell-ink'
+            : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
         )}
-        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
-        aria-hidden
-      />
-      {/* Muted until the row is current, so the column reads as a list
-          of names with marks beside them rather than a wall of icons
-          competing with the one that says where you are. */}
-      {Icon && (
-        <Icon
-          className={cn(
-            'size-4 shrink-0 transition-colors duration-quick',
-            on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
-          )}
-          strokeWidth={1.75}
-          aria-hidden
-        />
-      )}
-      {/* The name is a tooltip in the narrow column, but it stays in the
-          accessibility tree either way: a rail of unlabelled icons is not a
-          navigation a screen reader can use. */}
-      <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
-      {hint && !narrow && <Kbd>{hint}</Kbd>}
-      {badge !== undefined && badge > 0 && (
+      >
+        {/* The workspace's own colour, as a bar rather than a tint. A tint
+            would have to be legible on five different shells; a 2px bar in
+            the mark key's fixed hue is vivid on all of them. */}
         <span
           className={cn(
-            'tabular bg-caution-fill font-bold text-caution-fill-ink',
-            narrow
-              ? // No room for a number beside a centred icon, so it becomes a
-                // dot in the corner -- still "something is waiting here".
-                'absolute right-1.5 top-1 size-1.5 rounded-full'
-              : 'rounded-full px-1.5 py-0.5 text-micro',
+            'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
+            on ? 'opacity-100' : 'opacity-0',
           )}
-        >
-          <span className={cn(narrow && 'sr-only')}>{badge}</span>
-        </span>
-      )}
-    </Link>
-  );
+          style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+          aria-hidden
+        />
+        {/* Muted until the row is current, so the column reads as a list
+            of names with marks beside them rather than a wall of icons
+            competing with the one that says where you are. */}
+        {Icon && (
+          <Icon
+            className={cn(
+              'size-4 shrink-0 transition-colors duration-quick',
+              on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
+            )}
+            strokeWidth={1.75}
+            aria-hidden
+          />
+        )}
+        {/* The name is a tooltip in the narrow column, but it stays in the
+            accessibility tree either way: a rail of unlabelled icons is not a
+            navigation a screen reader can use. */}
+        <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
+        {hint && !narrow && <Kbd>{hint}</Kbd>}
+        {badge !== undefined && badge > 0 && (
+          <span
+            className={cn(
+              'tabular bg-caution-fill font-bold text-caution-fill-ink',
+              narrow
+                ? // No room for a number beside a centred icon, so it becomes a
+                  // dot in the corner -- still "something is waiting here".
+                  'absolute right-1.5 top-1 size-1.5 rounded-full'
+                : 'rounded-full px-1.5 py-0.5 text-micro',
+            )}
+          >
+            <span className={cn(narrow && 'sr-only')}>{badge}</span>
+          </span>
+        )}
+      </Link>
+    );
+    // The icon alone in the narrow column, so its name comes up beside it.
+    return narrow ? (
+      <Tooltip key={href} label={label} className="flex">
+        {row}
+      </Tooltip>
+    ) : (
+      row
+    );
+  };
 
   const nav = (narrow: boolean) => (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
@@ -604,25 +672,27 @@ export function AppShell({
             settings rule, because it is a thing you do to the column rather
             than a place you can go. */}
             <div className="border-t border-shell-border px-2 py-2">
-              <button
-                type="button"
-                onClick={toggleCollapsed}
-                title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
-                aria-pressed={collapsed}
-                className={cn(
-                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
-                  collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
-                )}
-              >
-                {collapsed ? (
-                  <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-                ) : (
-                  <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-                )}
-                <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
-                  {collapsed ? 'Expand' : 'Collapse'}
-                </span>
-              </button>
+              <Tooltip label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'} className="flex">
+                <button
+                  type="button"
+                  onClick={toggleCollapsed}
+                  aria-label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
+                  aria-pressed={collapsed}
+                  className={cn(
+                    'press flex w-full items-center gap-2 rounded-control py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
+                    collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
+                  )}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  ) : (
+                    <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  )}
+                  <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
+                    {collapsed ? 'Expand' : 'Collapse'}
+                  </span>
+                </button>
+              </Tooltip>
             </div>
           </aside>
 
@@ -637,14 +707,15 @@ export function AppShell({
               />
               <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
                 <div className="flex justify-end px-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setDrawer(false)}
-                    className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
-                  >
-                    <X className="size-4" strokeWidth={2} aria-hidden />
-                    <span className="sr-only">Close navigation</span>
-                  </button>
+                  <Tooltip label="Close navigation" align="end">
+                    <IconButton
+                      label="Close navigation"
+                      onClick={() => setDrawer(false)}
+                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                    >
+                      <X strokeWidth={1.75} aria-hidden />
+                    </IconButton>
+                  </Tooltip>
                 </div>
                 {/* Never narrow: a drawer you opened on purpose has no width to
                 save, and it closes the moment you pick something. */}
@@ -671,14 +742,15 @@ export function AppShell({
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
               <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
-                <button
-                  type="button"
-                  onClick={() => setDrawer(true)}
-                  className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                  aria-label="Open navigation"
-                >
-                  <Menu className="size-4" strokeWidth={1.75} aria-hidden />
-                </button>
+                <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
+                  <IconButton
+                    label="Open navigation"
+                    onClick={() => setDrawer(true)}
+                    className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                  >
+                    <Menu strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                </Tooltip>
 
                 {/* The mark in the bar is the switcher, not a picture of one.
                 From lg up the column carries it -- and still does when the
@@ -702,19 +774,6 @@ export function AppShell({
                 title reads better than an account icon pushed off the edge. */}
                 <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
-                  {crumb && (
-                    <>
-                      <span className="px-1.5 font-normal text-shell-muted" aria-hidden>
-                        ›
-                      </span>
-                      <Link
-                        href={crumb.href}
-                        className="font-normal text-shell-muted transition-colors hover:text-shell-ink"
-                      >
-                        {crumb.label}
-                      </Link>
-                    </>
-                  )}
                 </h2>
 
                 {/* The one thing this workspace would say if it could say only
@@ -791,32 +850,33 @@ export function AppShell({
                   with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
                   the left and a second way in beside it would be two controls
                   for one thing. */}
-                  <button
-                    type="button"
-                    onClick={() => openSearch()}
-                    title="Search"
-                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                  >
-                    <SearchMark />
-                    <span className="sr-only">Search</span>
-                  </button>
+                  <Tooltip label="Search" className="shrink-0 lg:hidden">
+                    <IconButton
+                      label="Search"
+                      onClick={() => openSearch()}
+                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                    >
+                      <SearchMark />
+                      <span className="sr-only">Search</span>
+                    </IconButton>
+                  </Tooltip>
 
                   {/* Dash, from any page (plan #1090): a question about
                   anything in the app, answered with links to what it used. */}
                   <AskDashButton />
                   <CaptureButton />
-                  <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
                   <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
 
-                  <Link
-                    href="/account"
-                    className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
-                    title={displayName ?? email}
-                  >
-                    {initial}
-                    <span className="sr-only">Account</span>
-                  </Link>
+                  <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
+                    <Link
+                      href="/account"
+                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                    >
+                      {initial}
+                      <span className="sr-only">Account</span>
+                    </Link>
+                  </Tooltip>
                 </div>
               </div>
             </header>
@@ -885,6 +945,8 @@ export function AppShell({
             onClose={() => setSwitcher(false)}
           />
 
+          <ThemeRepair value={theme} />
+
           <CommandPalette
             account={account}
             module={module}
@@ -900,4 +962,13 @@ export function AppShell({
       </CaptureProvider>
     </ToastProvider>
   );
+}
+
+/**
+ * Whether the window rather than the pane scrolls: below lg the pane is not a
+ * scroll container, so its own offset stays at zero.
+ */
+function windowScrolls(pane: HTMLElement): boolean {
+  const overflow = window.getComputedStyle(pane).overflowY;
+  return overflow !== 'auto' && overflow !== 'scroll';
 }

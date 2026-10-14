@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { scheduleIdeas } from './review-store';
 import type { UnitForCheck } from './write-unit-check';
 
 /**
@@ -54,8 +55,9 @@ export async function loadUnitForCheck(
  * Mark the unit's concepts tested after a right answer. Only concepts still
  * known or sharp: one that became shaky since the check was written keeps
  * what the later answer said. The state stays; what changes is that it now
- * rests on an answer rather than on your word, so the declared date goes.
- * Returns how many were marked.
+ * rests on an answer rather than on your word, so the declared date goes,
+ * and each goes on the review schedule if it was not already. Returns how
+ * many were marked.
  */
 export async function markUnitConceptsTested(
   learn: LearnSupabaseClient,
@@ -71,5 +73,7 @@ export async function markUnitConceptsTested(
     .in('state', ['known', 'sharp'])
     .select('concept_id');
   if (error) throw new Error(`Marking the unit's ideas tested failed: ${error.message}`);
-  return (data ?? []).length;
+  const marked = ((data ?? []) as { concept_id: string }[]).map((row) => row.concept_id);
+  await scheduleIdeas(learn, userId, marked);
+  return marked.length;
 }

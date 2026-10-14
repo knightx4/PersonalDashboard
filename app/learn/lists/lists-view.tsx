@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { BookOpen, CornerDownRight, Plus } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
@@ -6,8 +6,11 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SaveLinkForm } from '../save/save-link-form';
 import type { TrackProgress } from '@/lib/learn/tracks/load';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The reading lists, which the database and the code still call tracks. They
@@ -64,24 +67,30 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
 export function ListsView({ rows, search }: { rows: NestedTrack[]; search: string }) {
   const header = (
     <PageHeader
+      subject={sectionSubject('/learn/lists', 'Reading lists')}
       title="Reading lists"
       actions={
         <Link href="/learn/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden />
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           New reading list
         </Link>
       }
     />
   );
+  // Saving a link comes first: it is the quick way onto the queue, and the
+  // search is for finding something already there.
   const tools = (
-    <div className="max-w-md">
-      <SearchField placeholder="Search your reading lists" />
+    <div className="space-y-3">
+      <SaveLinkForm />
+      <div className="max-w-md">
+        <SearchField placeholder="Search your reading lists" />
+      </div>
     </div>
   );
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <PageColumn>
         {header}
         <div className="mb-4">{tools}</div>
         {search ? (
@@ -96,7 +105,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
             action={{ label: 'Paste a reading list', href: '/learn/new' }}
           />
         )}
-      </div>
+      </PageColumn>
     );
   }
 
@@ -124,7 +133,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
                   {depth > 0 && (
                     <CornerDownRight
                       className="mr-1.5 inline size-3.5 shrink-0 align-[-0.15em] text-ink-muted"
-                      strokeWidth={2}
+                      strokeWidth={1.75}
                       aria-hidden
                     />
                   )}
@@ -151,7 +160,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
                       href={`/learn/r/${reading.id}`}
                       className="flex items-center gap-1.5 py-1 pl-5 pr-4 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
                     >
-                      <CornerDownRight className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                      <CornerDownRight className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
                       <span className="truncate">{reading.subject}</span>
                     </Link>
                   </li>

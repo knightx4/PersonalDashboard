@@ -1,4 +1,5 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { AGENDA_HREF } from '@/lib/day-brief/picks';
 import { BRIEF_ANCHOR, type ShownBrief } from '@/lib/day-brief/shown';
 import { PickLink } from './pick-link';
@@ -29,7 +30,7 @@ export function DayBrief({ brief, day }: { brief: ShownBrief; day: string }) {
                 day={day}
                 pickKey={pick.key}
                 href={pick.href}
-                className="text-body font-semibold text-ink underline decoration-border-strong underline-offset-4 hover:text-accent hover:decoration-current"
+                className={cn('text-body font-semibold', linkVariants({ tone: 'quiet' }), 'text-ink hover:text-accent')}
               >
                 {pick.title}
               </PickLink>
@@ -44,7 +45,7 @@ export function DayBrief({ brief, day }: { brief: ShownBrief; day: string }) {
       {brief.kind !== 'body' && (
         <p className="mt-3 text-small text-ink-muted">
           {brief.kind === 'picks' ? 'Everything else is on the ' : 'Your to-dos are on the '}
-          <Link href={AGENDA_HREF} className="font-medium text-accent underline underline-offset-2">
+          <Link href={AGENDA_HREF} className={linkVariants()}>
             Agenda
           </Link>
           .

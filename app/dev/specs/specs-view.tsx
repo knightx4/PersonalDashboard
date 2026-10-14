@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MessageSquareText } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -18,6 +18,8 @@ import type { InterviewCardView } from '@/lib/specs/interview-view';
 import { AgentActionsPanel } from './agent-actions-panel';
 import type { AgentActionSummary } from '@/lib/agent-actions/summary';
 import { cn } from '@/lib/cn';
+import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The specs page apart from its reads, so the surface gallery can draw it:
@@ -35,7 +37,7 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
           <h3 className="text-body font-semibold text-ink">{spec.title}</h3>
           {comments > 0 && (
             <span className="flex shrink-0 items-center gap-1 text-caption text-ink-muted">
-              <MessageSquareText className="size-3.5" strokeWidth={2} aria-hidden />
+              <MessageSquareText className="size-3.5" strokeWidth={1.75} aria-hidden />
               {comments}
             </span>
           )}
@@ -72,8 +74,8 @@ export function SpecsView({
   const groups = groupSpecs(SPECS, counts);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Specs" />
+    <PageColumn className="space-y-6">
+      <PageHeader subject={sectionSubject('/dev/specs', 'Specs')} title="Specs" />
 
       {/* Changes Dash proposes to the specs, above the documents they change
           (plan #1506). First because they are the one thing on the page
@@ -124,7 +126,7 @@ export function SpecsView({
                 </span>
                 {group.comments > 0 && (
                   <span className="flex items-center gap-1">
-                    <MessageSquareText className="size-3.5" strokeWidth={2} aria-hidden />
+                    <MessageSquareText className="size-3.5" strokeWidth={1.75} aria-hidden />
                     {group.comments}
                   </span>
                 )}
@@ -197,6 +199,6 @@ export function SpecsView({
           </Disclosure>
         ))}
       </div>
-    </div>
+    </PageColumn>
   );
 }

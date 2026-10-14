@@ -5,6 +5,8 @@ import { cn } from '@/lib/cn';
 import { nextQuestion, outstandingCount, type OpeningSweep } from '@/lib/learn/graph/opening';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { QuestionForm } from './question-form';
+import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * The questions asked before anything is laid out for you.
@@ -27,15 +29,16 @@ const OUTCOME_LABEL = {
 } as const;
 
 /** One sweep, as the question to answer next or, once answered, the results (plan #1602). */
-export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
+export function OpeningView({ sweep, path }: { sweep: OpeningSweep; path?: PageSubject }) {
   const left = outstandingCount(sweep);
   const current = nextQuestion(sweep);
   const total = sweep.questions.length;
 
   if (current) {
     return (
-      <>
+      <PageColumn>
         <PageHeader
+          subject={path}
           title={`Before we start on ${sweep.subjectName}`}
           description="Ten questions across the subject, answered from memory. Most people get most of them wrong, which is what makes this worth doing."
         />
@@ -48,7 +51,7 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
           total={total}
           left={left}
         />
-      </>
+      </PageColumn>
     );
   }
 
@@ -56,8 +59,9 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
   const answered = sweep.questions.filter((q) => q.outcome !== 'skipped').length;
 
   return (
-    <>
+    <PageColumn>
       <PageHeader
+        subject={path}
         title={`What you already had on ${sweep.subjectName}`}
         description={
           answered === 0
@@ -107,6 +111,6 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
       <div className="[&_input[name=goal]]:-my-2.5 [&_input[name=goal]]:py-2.5">
         <GoalForm goal={sweep.asked} sweepId={sweep.id} />
       </div>
-    </>
+    </PageColumn>
   );
 }

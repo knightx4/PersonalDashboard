@@ -11,7 +11,7 @@ export default function Error({
 }) {
   return (
     <RouteError
-      what="this page"
+      what="your shopping"
       error={error}
       reset={reset}
       backHref="/shopping/dashboard"

@@ -16,10 +16,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -127,12 +125,11 @@ describe('planBrief', () => {
     );
   });
 
-  it('gives a step with no feature above it, no decisions and no fog exactly the brief it had', () => {
+  it('gives a step with no feature above it, no decisions exactly the brief it had', () => {
     // The one that must not grow: an ordinary step in an ordinary plan.
     const plain = planBrief(sections, findNode(sections, 'auth')!);
     expect(plain).not.toContain('## Destination');
     expect(plain).not.toContain('## Decided so far');
-    expect(plain).not.toContain('## Not yet specified');
     expect(plain).not.toContain('## Question');
     expect(plain).toBe(
       '# Plan step #8 — Anonymous auth\n\n' +
@@ -142,14 +139,13 @@ describe('planBrief', () => {
   });
 });
 
-describe('planBrief with decisions and fog', () => {
+describe('planBrief with decisions', () => {
   const sections = buildPlanTree({
     items: [
       item({
         id: 'feature',
         title: 'Export',
         acceptance: 'I can take my data out.',
-        fog: 'What the second half looks like is not yet known.',
       }),
       item({
         id: 'settled',
@@ -201,14 +197,6 @@ describe('planBrief with decisions and fog', () => {
     expect(brief).toContain('## Answered\n\nOne file per month.');
   });
 
-  it('says what is not yet specified when a step admits it', () => {
-    const brief = planBrief(sections, findNode(sections, 'feature')!);
-    expect(brief).toContain(
-      '## Not yet specified\n\nWhat the second half looks like is not yet known.',
-    );
-    // The feature's own done-when is already printed; it is not its own destination.
-    expect(brief).not.toContain('## Destination');
-  });
 });
 
 describe('planBrief on a step a re-shape wrote', () => {
@@ -242,8 +230,6 @@ describe('what has been put aside', () => {
         id: 'feature',
         title: 'Talking back',
         acceptance: 'I can answer a session without leaving the app.',
-        fog: 'how a reply reaches a decision is not settled',
-        fogDismissedAt: '2026-09-13T00:00:00Z',
       }),
       item({
         id: 'asked',
@@ -261,14 +247,12 @@ describe('what has been put aside', () => {
   it('is left out of the brief a session builds from', () => {
     const brief = planBrief(sections, feature);
     expect(brief).not.toContain('Which shape for the reply?');
-    expect(brief).not.toContain('## Not yet specified');
     expect(brief).toContain('The thread itself');
   });
 
   it('is named for the re-shape, so it is not written back', () => {
     const written = dismissedUnder(feature, [{ body: 'A search box over the whole plan' }]);
     expect(written).toContain('Which shape for the reply?');
-    expect(written).toContain('how a reply reaches a decision is not settled');
     expect(written).toContain('A search box over the whole plan');
   });
 

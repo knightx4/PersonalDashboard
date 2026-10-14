@@ -62,7 +62,6 @@ returning id, number;
 update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
 
 -- a decision, when shaping: the question, its options, your recommendation.
--- Fog goes in the `fog` column of the feature the same insert creates.
 insert into plan_items (user_id, module, parent_id, title, detail, kind, status, position)
 values ('…', 'shopping', '<the feature id>', '…?', '…', 'decision', 'proposed', 20);
 
@@ -183,19 +182,13 @@ set status = 'done', resolution = '<their words>', commit_sha = null,
     comment = coalesce(comment || E'\n\n', '') || 'Answered <date>: …'
 where id = '…';
 
--- fog: write it, or clear it once the steps that dispel it exist. Not a
--- status change, so no dated line goes in the comment. Writing a new patch
--- clears any dismissal on the old one, which is the person's, not yours.
-update plan_items set fog = '…', fog_dismissed_at = null where id = '…';
-
 -- dismissed: put aside as not right now. Here to be read, never written.
--- `dismissed_at` is the row itself -- a question they are not answering --
--- and `fog_dismissed_at` is the patch of fog on it; `ideas.dismissed_at` is
--- a suggestion they are not taking. Leave every one of them out of what you
+-- `plan_items.dismissed_at` is a question they are not answering, and
+-- `ideas.dismissed_at` is a suggestion they are not taking. Leave every one of them out of what you
 -- read the plan for, and never write one back in another form.
-select o.outline, p.title, p.dismissed_at, p.fog_dismissed_at
+select o.outline, p.title, p.dismissed_at
 from plan_items p join plan_item_outlines o on o.id = p.id
-where p.user_id = '…' and (p.dismissed_at is not null or p.fog_dismissed_at is not null);
+where p.user_id = '…' and p.dismissed_at is not null;
 
 -- a row a re-shape wrote, stamped with the answer that produced it. The same
 -- line `add --from` writes, and what the page and the brief read back; keep
@@ -320,7 +313,7 @@ Dash, says what happened to which row, and stays under 300 characters.
 select core.record_dash_action('…', 'public.plan_items:<id>', 'insert', 'add_step',
   $s$Dash added step #1463, "Show the count on Home", under #1456.$s$);
 
--- an update (done, block, drop, fog, linking an idea): keep the row as it
+-- an update (done, block, drop, linking an idea): keep the row as it
 -- is, write, then record, in one call. dash_before is what makes it undoable.
 select core.dash_before('public.plan_items:<id>');
 update plan_items set status = 'done', commit_sha = '…' where id = '<id>';
@@ -329,7 +322,7 @@ select core.record_dash_action('…', 'public.plan_items:<id>', 'update', 'close
 ```
 
 Kinds: `add_step`, `add_decision`, `close_step`, `block_step`, `drop_step`,
-`write_fog`, `file_idea`, `link_idea`. The note that goes in its own
+`file_idea`, `link_idea`. The note that goes in its own
 statement after the status goes in the same call, between the status update
 and the record call, so the record holds both. A note written after the
 record reads as a later change, and the Undo then refuses. If the call fails,

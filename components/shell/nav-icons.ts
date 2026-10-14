@@ -10,6 +10,7 @@ import {
   Bug,
   Building2,
   FileText,
+  Fingerprint,
   Flag,
   GalleryHorizontalEnd,
   Gauge,
@@ -34,14 +35,17 @@ import {
   Mail,
   Megaphone,
   Map,
+  MapPin,
   Network,
   Orbit,
+  PenLine,
   MessageSquareText,
   MonitorPlay,
   Receipt,
   Repeat,
   Share2,
   Shapes,
+  Sparkles,
   StickyNote,
   Tag,
   Target,
@@ -147,6 +151,8 @@ export const NAV_ICONS = {
   know: Network,
   // Idea Space: your ideas as points around what they are about (plan #1857).
   ideaSpace: Orbit,
+  // Essays: what you write about what you learned (plan #1863).
+  essays: PenLine,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
   // Videos: your list, its clips and the YouTube library on one page (plan
@@ -176,6 +182,11 @@ export const NAV_ICONS = {
   goalsFiles: FileText,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
+
+  personality: Fingerprint,
+  places: MapPin,
+  workSchool: GraduationCap,
+  insights: Sparkles,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

@@ -1,10 +1,12 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronRight, History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
+import { toggleChipClass } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Timeline, type TimelineEntry } from '@/components/ui/timeline';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
   CHANGELOG_DEFAULT_GROUPING,
@@ -27,6 +29,7 @@ import { moduleById } from '@/lib/modules';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { stepRef } from '@/lib/plan/ref';
 import { PostAbout } from './post-about';
+import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The changelog apart from its read, so the surface gallery can draw it: the
@@ -80,7 +83,7 @@ export function ChangelogView({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       {/* No paragraph under the heading: the rows say what they are, and a
           chevron on each says it opens (plan #1745). */}
       <PageHeader title="Changelog" />
@@ -93,12 +96,7 @@ export function ChangelogView({
                 key={candidate}
                 href={href({ group: candidate })}
                 aria-current={candidate === grouping ? 'page' : undefined}
-                className={cn(
-                  'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                  candidate === grouping
-                    ? 'bg-accent text-surface'
-                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-                )}
+                className={toggleChipClass(candidate === grouping)}
               >
                 {CHANGELOG_GROUPING_LABEL[candidate]}
               </Link>
@@ -147,42 +145,99 @@ export function ChangelogView({
          * border and eight pixels of margin around every day of work. One
          * surface under the rows is the list pattern's (plan #1745). */
         <div className="space-y-3">
-          <Card padding="dense" className="divide-y divide-border">
-            {groups.map((group) => (
-              <div key={group.key} className="py-1 first:pt-0 last:pb-0">
-                {/* By issue, a feature is one line until it is asked to be
+          {/* By date the changelog is a timeline: the day is the time on each
+              entry, and the line says how long a quiet stretch was. The other
+              groupings keep their lists, which need the headings. */}
+          {grouping === 'day' ? (
+            <Card padding="standard">
+              <Timeline entries={timelineEntries(groups, screens)} />
+            </Card>
+          ) : (
+            <Card padding="dense" className="divide-y divide-border">
+              {groups.map((group) => (
+                <div key={group.key} className="py-1 first:pt-0 last:pb-0">
+                  {/* By issue, a feature is one line until it is asked to be
                     more. Its steps are the detail underneath. A group that is
                     its own heading -- a note, a feature that shipped by
                     itself -- has nothing to open and stays a plain line. */}
-                {group.kind === 'issue' && !isItsOwnHeading(group) ? (
-                  <IssueSummary group={group} screens={screens} />
-                ) : (
-                  <section>
-                    {/* A group of one whose heading is its own entry gets no
+                  {group.kind === 'issue' && !isItsOwnHeading(group) ? (
+                    <IssueSummary group={group} screens={screens} />
+                  ) : (
+                    <section>
+                      {/* A group of one whose heading is its own entry gets no
                         heading: it would be the same sentence twice, which is
                         law 15. */}
-                    {!isItsOwnHeading(group) && <GroupHeading group={group} />}
-                    <ul className="divide-y divide-border">
-                      {group.entries.map((entry) => (
-                        <Entry
-                          key={entry.key}
-                          entry={entry}
-                          inGroup={group.kind}
-                          screens={screensOf(screens, entry)}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                )}
-              </div>
-            ))}
-          </Card>
+                      {!isItsOwnHeading(group) && <GroupHeading group={group} />}
+                      <ul className="divide-y divide-border">
+                        {group.entries.map((entry) => (
+                          <Entry
+                            key={entry.key}
+                            entry={entry}
+                            inGroup={group.kind}
+                            screens={screensOf(screens, entry)}
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                </div>
+              ))}
+            </Card>
+          )}
           {/* The count closes the list, under the card, as on every list page. */}
           <p className="text-micro text-ink-ghost">
             {matched.length} {matched.length === 1 ? 'change' : 'changes'}
           </p>
         </div>
       )}
+    </PageColumn>
+  );
+}
+
+/** The matched entries as timeline entries; each closed at `at`, so each is done. */
+function timelineEntries(
+  groups: ChangelogGroup[],
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>,
+): TimelineEntry[] {
+  return groups.flatMap((group) =>
+    group.entries.map((entry) => ({
+      id: entry.key,
+      time: entry.at,
+      kind: 'done' as const,
+      title:
+        entry.number === null
+          ? entry.title
+          : `${stepRef({ number: entry.number, outline: entry.outline })} ${entry.title}`,
+      body: entry.detail || undefined,
+      children: <TimelineExtras entry={entry} screens={screensOf(screens, entry)} />,
+      link: {
+        href: entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs',
+        label: `${moduleById(entry.module)?.label ?? 'The app as a whole'} · ${entry.source === 'plan' ? 'plan' : 'note'}`,
+      },
+    })),
+  );
+}
+
+/**
+ * What a list row carries beyond its title that the timeline has no slot for:
+ * the workspace's mark with the whole commit sha, the changed screens, and the
+ * button to post about the step.
+ */
+function TimelineExtras({
+  entry,
+  screens,
+}: {
+  entry: ChangelogEntry;
+  screens: readonly ScreenChangeView[];
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="flex items-center gap-2 text-micro text-ink-ghost">
+        <ModuleMark module={entry.module} size="sm" />
+        {entry.commitSha && <span className="font-mono break-all">{entry.commitSha}</span>}
+      </p>
+      {screens.length > 0 && <ScreenAfters changes={screens} />}
+      {postable(entry) && entry.number !== null && <PostAbout number={entry.number} />}
     </div>
   );
 }
@@ -209,9 +264,7 @@ function workspaceLabel(candidate: WorkspaceView): string {
  * sets one, which is where the reader has seen it before.
  */
 function isItsOwnHeading(group: ChangelogGroup): boolean {
-  return (
-    group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null
-  );
+  return group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null;
 }
 
 /**
@@ -223,7 +276,10 @@ function isItsOwnHeading(group: ChangelogGroup): boolean {
  * underneath. Listing the feature's row again beneath its own title was the
  * page showing the top level and the underneath separately.
  */
-function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps: ChangelogEntry[] } {
+function splitIssue(group: ChangelogGroup): {
+  self: ChangelogEntry | null;
+  steps: ChangelogEntry[];
+} {
   return {
     self: group.entries.find((entry) => entry.issue === null) ?? null,
     steps: group.entries.filter((entry) => entry.issue !== null),
@@ -284,9 +340,7 @@ function IssueSummary({
             part of it the summary had no room for. */}
         {self?.detail && <p className="row-pad text-small text-ink-muted">{self.detail}</p>}
         {self?.commitSha && (
-          <p className="row-pad font-mono break-all text-micro text-ink-ghost">
-            {self.commitSha}
-          </p>
+          <p className="row-pad font-mono break-all text-micro text-ink-ghost">{self.commitSha}</p>
         )}
         <ul className="divide-y divide-border">
           {steps.map((entry) => (
@@ -309,7 +363,7 @@ function IssueSummary({
  * moving it.
  */
 const ROW =
-  'row-pad -mx-2 flex cursor-pointer list-none items-start gap-2 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden';
+  'row-pad -mx-2 flex cursor-pointer list-none items-start gap-2 rounded-control px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden';
 
 /**
  * The slots in front of a row's title, the same three in the same order on
@@ -393,7 +447,11 @@ function Entry({
           <RowLead
             open="group-open/entry:rotate-90"
             module={entry.module}
-            name={entry.number === null ? null : stepRef({ number: entry.number, outline: entry.outline })}
+            name={
+              entry.number === null
+                ? null
+                : stepRef({ number: entry.number, outline: entry.outline })
+            }
           />
           {/* Two lines at most on a phone and one from the small breakpoint
               up. A note's title is the whole thing somebody typed on a phone,

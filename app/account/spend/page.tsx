@@ -1,18 +1,13 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { requireUser } from '@/lib/auth/server';
+import { sectionSubject } from '@/lib/core/section-path';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
-import { AppShell } from '@/components/shell/app-shell';
+import { shellFor, type ShellFrame } from '@/lib/shell/shell-for';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
+import { SpendOverview } from './spend-overview';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars, todayInTimezone } from '@/lib/money';
+import { readSpendPerDay, spendTotal, usageWindow } from '@/lib/usage/per-day';
 import { loadSpend } from '@/lib/core/spend/load';
 import { compareEstimates, EVERY_OPERATION } from '@/lib/core/spend/comparison';
 import { ESTIMATE_WINDOW_DAYS, loadCostRanges, MEASURED_MIN_RUNS } from '@/lib/core/spend/estimate';
@@ -28,7 +23,6 @@ import {
   totalOf,
   type SpendGroup,
   type SpendRow,
-  type SpendTotal,
 } from '@/lib/core/spend/summary';
 
 export const dynamic = 'force-dynamic';
@@ -57,26 +51,6 @@ function formatTokens(tokens: number): string {
   if (tokens < 1000) return String(tokens);
   if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(tokens < 10_000 ? 1 : 0)}k`;
   return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
-
-function Total({ label, total }: { label: string; total: SpendTotal }) {
-  return (
-    <div className={cardVariants({ padding: 'dense' })}>
-      <p className="text-ui text-ink-muted">{label}</p>
-      <p className="mt-1 text-heading text-ink tabular-nums">
-        {total.calls === 0 ? '—' : formatMicroDollars(total.micros)}
-      </p>
-      <p className="mt-0.5 text-small text-ink-muted">
-        {total.calls === 0
-          ? 'nothing yet'
-          : `${total.calls} ${total.calls === 1 ? 'call' : 'calls'}${
-              total.unpriced > 0
-                ? ` · ${total.unpriced} not priced, so the total is short by them`
-                : ''
-            }`}
-      </p>
-    </div>
-  );
 }
 
 function GroupRow({ group }: { group: SpendGroup }) {
@@ -120,15 +94,10 @@ function CallRow({ row, timezone }: { row: SpendRow; timezone: string }) {
 }
 
 export default async function SpendPage() {
-  const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadRaisedNotifications(user.id),
-    loadMainCheck(),
-    isOwner({ user }),
-  ]);
+  return shellFor({ module: null, children: spendContent });
+}
 
+async function spendContent({ user, settings, owner }: ShellFrame) {
   const supabase = await createCoreClient();
   const [rows, ranges] = await Promise.all([
     loadSpend(supabase),
@@ -154,90 +123,70 @@ export default async function SpendPage() {
 
   const timezone = settings.timezone;
   const localDateOf = (instant: string) => todayInTimezone(timezone, new Date(instant));
+  // The chart and the thirty-day card read the same whole local days, so the
+  // bars add up to the amount beside them (plan #2036.3).
+  const days = usageWindow(timezone);
+  const perDay = rows.length > 0 ? await readSpendPerDay(supabase, timezone, days) : null;
   const thisMonth = sinceLocalDate(rows, monthStart(todayInTimezone(timezone)), localDateOf);
 
   const groups = rollUp(rows);
   const recent = rows.slice(0, 50);
 
   return (
-    <div className="min-h-full">
-      <AppShell
-        account={user.id}
-        module={null}
-        sections={[]}
-        displayName={settings.displayName}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        mainCheck={mainCheck}
-      >
-        <div className="mx-auto max-w-3xl">
-          <p className="mb-3">
-            <Link
-              href="/account"
-              className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-            >
-              <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-              Account
-            </Link>
-          </p>
+    <>
 
-          <PageHeader
-            title="Spend"
-            description="What the models have cost, per call, since this was switched on."
+      <PageHeader
+        subject={sectionSubject('/account', 'Account', { label: 'Spend', href: '/account/spend' })}
+        title="Spend"
+        description="What the models have cost, per call, since this was switched on."
+      />
+
+      {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
+        <div className="mb-6">
+          <TranscriptCredits usage={transcripts} />
+        </div>
+      )}
+
+      {rows.length === 0 && (
+        <>
+          <EmptyState
+            size="box"
+            title="Nothing has been spent yet."
+            description="Every model call this app makes lands here — what it was doing, which model ran, and what it cost."
+          />
+          {estimates}
+        </>
+      )}
+      {rows.length > 0 && (
+        <>
+          <SpendOverview
+            values={perDay?.values ?? []}
+            today={days.today}
+            span={days.span}
+            last30={perDay ? spendTotal(perDay) : { calls: 0, micros: 0, unpriced: 0 }}
+            thisMonth={totalOf(thisMonth)}
+            allTime={totalOf(rows)}
           />
 
-          {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
-            <div className="mb-6">
-              <TranscriptCredits usage={transcripts} />
-            </div>
-          )}
+          <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {groups.map((group) => (
+              <GroupRow key={`${group.module}-${group.operation}`} group={group} />
+            ))}
+          </ul>
 
-          {rows.length === 0 && (
-            <>
-              <p
-                className={cn(
-                  cardVariants(),
-                  'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-                )}
-              >
-                Nothing has been spent yet. Every model call this app makes lands here — what it was
-                doing, which model ran, and what it cost.
-              </p>
-              {estimates}
-            </>
-          )}
-          {rows.length > 0 && (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Total label="This month" total={totalOf(thisMonth)} />
-                <Total label="All time" total={totalOf(rows)} />
-              </div>
+          {estimates}
 
-              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
-              <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                {groups.map((group) => (
-                  <GroupRow key={`${group.module}-${group.operation}`} group={group} />
-                ))}
-              </ul>
-
-              {estimates}
-
-              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
-                The last {recent.length === 1 ? 'call' : `${recent.length} calls`}
-              </h2>
-              <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                {recent.map((row) => (
-                  <CallRow key={row.id} row={row} timezone={timezone} />
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      </AppShell>
-    </div>
+          <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
+            The last {recent.length === 1 ? 'call' : `${recent.length} calls`}
+          </h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {recent.map((row) => (
+              <CallRow key={row.id} row={row} timezone={timezone} />
+            ))}
+          </ul>
+        </>
+      )}
+    </>
   );
 }

@@ -172,7 +172,7 @@ vision. Three things can come out of that.
 **How many notes make a finding is not settled.** Nobody has written the
 rule down, and inventing a number here would only hide that. The first two
 or three reviews, read against which edits the person accepts and which they
-dismiss, should show where the line is (the fog on plan #1104). Until then:
+dismiss, should show where the line is (plan #1104). Until then:
 
 - Lean towards holds.
 - In every note, give the window's page opens (see "Page opens").

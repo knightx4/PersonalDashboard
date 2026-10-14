@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { signOut } from '@/app/(auth)/actions';
 import { Button, PRESS_AREA, buttonVariants } from '@/components/ui/button';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -125,7 +125,7 @@ export function DashChangeRow({
         {change.status === 'done' ? (
           <Link
             href={changeHref(change)}
-            className="font-medium text-accent underline-offset-2 hover:underline"
+            className={`${linkVariants({ tone: 'inline' })} font-medium`}
           >
             {words.what}
           </Link>
@@ -140,7 +140,7 @@ export function DashChangeRow({
       {change.kind === 'start_watch' && !change.input.pushOn && !settled && (
         <p className="text-small text-caution">
           {NO_PUSH}{' '}
-          <Link href={PUSH_SETTINGS_HREF} className="text-accent underline-offset-2 hover:underline">
+          <Link href={PUSH_SETTINGS_HREF} className={linkVariants({ tone: 'inline' })}>
             Switch push on
           </Link>{' '}
           in Account, on your phone.
@@ -176,7 +176,7 @@ export function DashChangeRow({
           <ChangeStatus change={change} />
           <Link
             href={changeHref(change)}
-            className="text-small text-accent underline-offset-2 hover:underline"
+            className={`${linkVariants({ tone: 'inline' })} text-small`}
           >
             {changeWhere(change)}
           </Link>
@@ -189,7 +189,7 @@ export function DashChangeRow({
             disabled={pressing !== null}
             onClick={() => press('undo')}
           >
-            <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
+            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
             {pressing === 'undo' ? 'Undoing…' : 'Undo'}
           </Button>
         </div>
@@ -221,7 +221,7 @@ export function ChangeStatus({ change }: { change: DashChange }) {
     <span className="inline-flex items-center gap-1 text-small text-ink-muted">
       <Glyph
         className={change.status === 'done' ? 'size-3.5 text-positive' : 'size-3.5'}
-        strokeWidth={2}
+        strokeWidth={1.75}
         aria-hidden
       />
       <span className={change.status === 'done' ? 'font-medium text-ink' : 'font-medium'}>

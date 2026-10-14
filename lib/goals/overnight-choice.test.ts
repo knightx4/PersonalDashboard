@@ -117,7 +117,6 @@ describe('chooseNightMaps (plan #1009)', () => {
       status: 'open',
       approvedAt: null,
       createdAt: at(4),
-      fogChangedAt: null,
       ...over,
     };
   }
@@ -145,21 +144,9 @@ describe('chooseNightMaps (plan #1009)', () => {
     ]);
   });
 
-  it('leaves a mapped goal alone until its fog changes after the map', () => {
-    const mapped = [mapRun('g', 'done', 30)];
-    expect(chosen([goal('g', { createdAt: at(40) })], mapped)).toEqual([]);
-    expect(chosen([goal('g', { createdAt: at(40), fogChangedAt: at(35) })], mapped)).toEqual([]);
-    expect(chosen([goal('g', { createdAt: at(40), fogChangedAt: at(10) })], mapped)).toEqual([
-      ['g', 'fog'],
-    ]);
-  });
-
-  it('maps an approved goal only when its fog changed since you approved it', () => {
+  it('leaves a goal alone once it has been mapped or approved', () => {
+    expect(chosen([goal('g', { createdAt: at(40) })], [mapRun('g', 'done', 30)])).toEqual([]);
     expect(chosen([goal('g', { approvedAt: at(20) })])).toEqual([]);
-    expect(chosen([goal('g', { approvedAt: at(20), fogChangedAt: at(25) })])).toEqual([]);
-    expect(chosen([goal('g', { approvedAt: at(20), fogChangedAt: at(10) })])).toEqual([
-      ['g', 'fog'],
-    ]);
   });
 
   it('tries a goal again the next night when its mapping run failed, but not the same night', () => {

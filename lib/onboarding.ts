@@ -5,6 +5,8 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { saveAccountIdentity } from '@/lib/core/account/settings';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import { ONBOARDED_COOKIE, ONBOARDED_COOKIE_OPTIONS } from '@/lib/onboarded-cookie';
 
 /**
  * Onboarding uses profiles.onboarding_completed_at.
@@ -53,6 +55,13 @@ export async function markOnboardingComplete(
     .update({ onboarding_completed_at: new Date().toISOString() })
     .eq('id', userId);
   if (error) return { error: error.message };
+
+  // Lets the proxy send the next launch straight to Home (plan #1920). Only a
+  // server action or route handler may set a cookie; while a page renders this
+  // throws, and /api/onboarding/launch sets it instead.
+  try {
+    (await cookies()).set(ONBOARDED_COOKIE, '1', ONBOARDED_COOKIE_OPTIONS);
+  } catch {}
 
   return saveAccountIdentity(userId, {
     timezone: extras?.timezone,

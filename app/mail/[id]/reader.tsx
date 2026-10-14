@@ -1,8 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 
 /**
  * One email's HTML, drawn in a sandboxed frame.
@@ -71,19 +69,5 @@ export function EmailFrame({ html, title }: { html: string; title: string }) {
       style={{ height }}
       className="block w-full rounded-control bg-white"
     />
-  );
-}
-
-/** Back to wherever the link was tapped, or home when the reader was opened directly. */
-export function BackButton() {
-  const router = useRouter();
-  return (
-    <button
-      type="button"
-      onClick={() => (window.history.length > 1 ? router.back() : router.push('/home'))}
-      className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-    >
-      <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Back
-    </button>
   );
 }

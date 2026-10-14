@@ -98,7 +98,8 @@ not held.
 
    **Do not pad to a step count.** Three real steps and an honest gap beat
    six, three of which were invented to look complete. What goes in the gap
-   is a decision, fog, or an idea, and two tests in order say which.
+   is a decision, a step that waits, or an idea, and two tests in order say
+   which.
 
    > **First: if this question is never resolved, is the feature still
    > finished?**
@@ -107,9 +108,9 @@ not held.
    > page — `idea "<the follow-on>" --module <id>` — and name it in the
    > report. Whether the thing you are building should later work somewhere
    > else, whether it will still be right in six months, what a neighbouring
-   > feature should do with it: all of these are follow-ons. **They are not
-   > fog.** Written as fog they sit on a feature that ships without them and
-   > nothing reads them again.
+   > feature should do with it: all of these are follow-ons. Written into the
+   > feature they sit on something that ships without them, and nothing reads
+   > them again.
    >
    > No, and it can only be settled once part of this feature exists → it is a
    > real gap, and the second test says which kind.
@@ -124,9 +125,12 @@ not held.
    > other way it reaches the person as a paragraph rather than as a choice —
    > see **How a decision must be written** in `building.md`.
    >
-   > No → it is **fog**. Put it on the feature: `--fog "<what is not yet
-   > known, and what would have to be found out>"`. It graduates into steps
-   > once somebody can see far enough to write them, and is cleared then.
+   > No, because it cannot be decided until part of this feature exists → it
+   > is a **step that waits on that part**. Add it under the feature, say in
+   > its `--detail` what it will decide and what it needs to see first, and
+   > `depends` it on the step that builds that part. When that step is done,
+   > the waiting step is ready and whoever picks it up settles it, as steps or
+   > as a decision.
 
    Before either test, check the question is worth asking at all. The person
    takes the recommended option almost every time, so most choices are not
@@ -142,11 +146,6 @@ not held.
    question. A question nobody can answer yet is still a decision if it is
    sharp.
 
-   **One patch of fog per feature.** `fog` is one column, so a second one
-   replaces the first rather than joining it. A feature that seems to need two
-   has at most one: the other is a decision, or it is a follow-on and belongs
-   on the ideas page.
-
    **A step that adds or changes a screen names its pattern.** The patterns
    are listed on `/dev/ui` under "Page patterns" (Part 4 of
    `docs/UI-QUALITY-SPEC.md`), by the names in `lib/plan/patterns.ts`:
@@ -160,6 +159,15 @@ not held.
    The step's brief prints that pattern's rule, and the building session
    gives the rule to the design critic, which judges the screen against it.
    A step that changes no screen has no pattern line.
+
+   **A step that adds a screen lists its hidden parts.** The hidden-parts rule
+   in `docs/UI-QUALITY-SPEC.md` asks for every screen to list what only
+   shows on some visits: hover controls, popovers, drawers, the empty,
+   loading and error states, and comment indicators. When you shape a
+   feature that adds a screen, put that list in the step's `--detail`, after
+   the pattern line, one part per line with what triggers it. A screen with
+   none of a kind says so ("no drawer") instead of leaving the kind out.
+   The same holds when you draft a spec change that describes a screen.
 
    **A screen that fits none of them is a decision for the person.** Every
    later screen of that kind would follow it, so do not invent the layout in

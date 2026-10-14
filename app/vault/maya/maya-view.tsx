@@ -1,10 +1,11 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { OwlIcon } from '@/components/shell/owl-icon';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ListPage } from '@/components/patterns/list-detail';
 import type { MayaThreadRow } from '@/lib/vault/maya/store';
 import { mayaThreadHref } from '@/lib/vault/paths';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * Every thread with Maya, drawn from what the page read (page.tsx), so the
@@ -15,7 +16,7 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
   if (threads.length === 0) {
     return (
       <>
-        <PageHeader title="Maya" />
+        <PageHeader subject={sectionSubject('/vault/maya', 'Maya')} title="Maya" />
         <EmptyState
           icon={OwlIcon}
           title="No threads with Maya yet"
@@ -31,7 +32,7 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
 
   return (
     <ListPage
-      header={<PageHeader title="Maya" />}
+      header={<PageHeader subject={sectionSubject('/vault/maya', 'Maya')} title="Maya" />}
       foot={
         <>
           {threads.length} {threads.length === 1 ? 'thread' : 'threads'}, most recent first

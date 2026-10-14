@@ -7,6 +7,7 @@ import { Card, CardSection } from '@/components/ui/card';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Textarea } from '@/components/ui/field';
+import { Note } from '@/components/ui/note';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import {
@@ -25,7 +26,6 @@ import type { PanelProps } from './types';
 export function Answers({
   answers,
   applicationId,
-  bankSize,
   roleId,
   coverLetter,
   status,
@@ -125,7 +125,7 @@ export function Answers({
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} closed={closed} />
+            <AnswerCard key={answer.id} answer={answer} closed={closed} />
           ))}
         </div>
       )}
@@ -218,15 +218,17 @@ function CoverLetter({
   );
 }
 
-function AnswerCard({
+/** One question and its answer; exported for the preview gallery. */
+export function AnswerCard({
   answer,
-  bankSize,
   closed,
+  initialDraft = null,
 }: {
   answer: PanelProps['answers'][number];
-  bankSize: number;
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** For the preview gallery: the card opens with this draft beside it. */
+  initialDraft?: AnswerDraft | null;
 }) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
@@ -238,7 +240,7 @@ function AnswerCard({
   // answer only through Insert, and the record only through Save -- the
   // compose.ts rule: the model may prepare text, but nothing goes out over
   // your name that you did not put there.
-  const [draft, setDraft] = useState<AnswerDraft | null>(null);
+  const [draft, setDraft] = useState<AnswerDraft | null>(initialDraft);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -266,9 +268,9 @@ function AnswerCard({
       </div>
 
       {usingCanonical && (
-        <p className="mt-2 rounded bg-accent-tint px-2 py-1 text-small text-accent">
+        <Note tone="accent" className="mt-2 text-small">
           Filled from your default answer for this question. Edit it if this one needs tailoring.
-        </p>
+        </Note>
       )}
 
       {/*
@@ -277,16 +279,13 @@ function AnswerCard({
         live only in the session that generated it.
       */}
       {!draft && answer.unsupportedClaims.length > 0 && (
-        <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
-          <p className="text-small font-medium text-ink">
-            This answer states things your bank does not carry:
-          </p>
-          <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
+        <Note tone="caution" className="mt-2" title="This answer states things your bank does not carry:">
+          <ul className="list-disc pl-4 text-small text-ink">
             {answer.unsupportedClaims.map((claim) => (
               <li key={claim}>{claim}</li>
             ))}
           </ul>
-        </div>
+        </Note>
       )}
 
       {/* The answer, read. It was a five-row textarea holding its own value,
@@ -395,12 +394,6 @@ function AnswerCard({
               size="sm"
               variant="ghost"
               pending={drafting}
-              disabled={bankSize === 0}
-              title={
-                bankSize === 0
-                  ? 'Your evidence bank is empty, so there is nothing to draft from.'
-                  : undefined
-              }
               onClick={() => {
                 setDrafting(true);
                 setDraftError(null);
@@ -415,14 +408,12 @@ function AnswerCard({
                 });
               }}
             >
-              {drafting ? 'Drafting…' : 'Draft from my evidence'}
+              {drafting ? 'Drafting…' : 'Draft'}
             </Button>
-            {bankSize > 0 && (
-              <PaidHint
-                action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-                what="Cost of drafting"
-              />
-            )}
+            <PaidHint
+              action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+              what="Cost of drafting"
+            />
           </>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
@@ -434,9 +425,9 @@ function AnswerCard({
         // yours yet -- a machine's suggestion waiting to be inserted or thrown
         // away -- and a recessed ground says that without adding a second
         // border inside the answer card. Law 11: a shared ground groups.
-        <div className="mt-3 rounded-card bg-canvas p-3">
+        <Note className="mt-3 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
+            <h4 className="text-small font-medium text-ink">A draft</h4>
             <span className="text-small text-ink-muted">
               Nothing is saved until you insert it and save.
             </span>
@@ -447,17 +438,14 @@ function AnswerCard({
           </p>
 
           <p className="mt-2 text-small text-ink-muted">
-            Draws on{' '}
-            {draft.evidenceItemIds.length === 1
-              ? 'one item'
-              : `${draft.evidenceItemIds.length} items`}{' '}
-            from your bank.
+            {draft.evidenceItemIds.length === 0
+              ? 'Draws on nothing from your bank.'
+              : `Draws on ${draft.evidenceItemIds.length === 1 ? 'one item' : `${draft.evidenceItemIds.length} items`} from your bank.`}
           </p>
 
           {draft.unsupportedClaims.length > 0 && (
-            <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
-              <p className="text-small font-medium text-ink">Not grounded in anything you wrote:</p>
-              <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
+            <Note tone="caution" className="mt-2" title="Not grounded in anything you wrote:">
+              <ul className="list-disc pl-4 text-small text-ink">
                 {draft.unsupportedClaims.map((claim) => (
                   <li key={claim}>{claim}</li>
                 ))}
@@ -465,7 +453,7 @@ function AnswerCard({
               <p className="mt-1 text-small text-ink-muted">
                 Check each of these before it goes out, or cut it.
               </p>
-            </div>
+            </Note>
           )}
 
           {draft.bannedFound.length > 0 && (
@@ -504,7 +492,7 @@ function AnswerCard({
               Discard
             </Button>
           </div>
-        </div>
+        </Note>
       )}
     </Card>
   );

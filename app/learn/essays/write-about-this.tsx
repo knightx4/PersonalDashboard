@@ -10,7 +10,7 @@ function Submit({ title, size }: { title: string; size: 'sm' | 'md' }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" size={size} pending={pending} aria-label={`Write an essay about ${title}`}>
-      <PenLine className="size-4" strokeWidth={2} aria-hidden />
+      <PenLine className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Starting…' : 'Write about this'}
     </Button>
   );

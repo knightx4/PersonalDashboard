@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { exactTime, shortWhen } from '@/lib/comments/when';
@@ -28,7 +28,7 @@ export function RunQuestionCard({
     <li className="card-pad-x row-pad min-w-0 space-y-1">
       <Link
         href={question.href}
-        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink transition-colors duration-quick hover:text-accent"
       >
         {question.about}
       </Link>

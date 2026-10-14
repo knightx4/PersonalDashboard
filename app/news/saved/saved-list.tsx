@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Bookmark, BookmarkMinus, ExternalLink } from 'lucide-react';
 import { StoryText } from '@/components/news/story-text';
 import { Button } from '@/components/ui/button';
@@ -127,10 +127,10 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                     href={story.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+                    className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
                   >
                     Read the article
-                    <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+                    <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
                   </a>
                 ) : (
                   <span aria-hidden />

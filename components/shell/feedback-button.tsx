@@ -11,18 +11,19 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { shapeIdea } from '@/app/dev/ideas/actions';
-import { AddFile } from '@/components/attachments/add-file';
+import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
-import { cn } from '@/lib/cn';
+import { IconButton } from '@/components/ui/icon-button';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import type { FeedbackKind } from '@/lib/feedback/load';
 import type { FiledAs } from '@/lib/feedback/move';
 import type { TriageView } from '@/lib/feedback/triage';
 import { usePopover } from '@/lib/use-popover';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Always-available capture for bugs, requests and ideas.
@@ -98,6 +99,7 @@ export function FeedbackButton({
   // has. Kept while the panel is shut, so closing it by mistake does not
   // lose a screenshot already sent up. Send waits while one is uploading.
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
+  const adder = useRef<AddFileHandle>(null);
   const [uploading, setUploading] = useState(false);
   const [settledNote, setSettledNote] = useState<FeedbackActionState | null>(null);
   if (state.filed && state !== settledNote) {
@@ -176,23 +178,19 @@ export function FeedbackButton({
 
   return (
     <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title="Report a bug, request a feature, or note an idea"
-        className={cn(
-          'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open
-            ? 'bg-accent-tint text-accent'
-            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-        )}
-      >
-        <MessageSquarePlus className="size-4" aria-hidden />
-        <span className="sr-only">Report a bug, request a feature, or note an idea</span>
-      </button>
+      <Tooltip label="Report a bug, request a feature, or note an idea" align="end">
+        <IconButton
+          ref={triggerRef}
+          label="Report a bug, request a feature, or note an idea"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          active={open}
+          className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
+        >
+          <MessageSquarePlus strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </Tooltip>
 
       {open && (
         <Popover
@@ -225,6 +223,11 @@ export function FeedbackButton({
                     ? 'A bug, a change, or an idea. Dash files it as a note or an idea for you.'
                     : 'What went wrong, or what it should do.'
                 }
+                // A screenshot copied from anywhere goes in as a file, without
+                // saving it and choosing it again (note e8b051a0).
+                onPaste={(event) => {
+                  if (adder.current?.paste(event.clipboardData)) event.preventDefault();
+                }}
               />
               <p className="mt-1 text-small text-ink-muted">
                 Saved with the page you are on ({pathname}).
@@ -232,6 +235,7 @@ export function FeedbackButton({
             </div>
 
             <AddFile
+              ref={adder}
               name="attachments"
               value={files}
               onChange={setFiles}

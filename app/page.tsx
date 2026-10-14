@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { modulesFor, type AppModule, type ModuleId } from '@/lib/modules';
 import { cn } from '@/lib/cn';
@@ -31,6 +31,9 @@ const PITCH: Partial<Record<ModuleId, string>> = {
 function hue(module: AppModule): CSSProperties {
   return { '--hue-from': module.key.from, '--hue-to': module.key.to } as CSSProperties;
 }
+
+// The browser tab reads "Dash" alone, without the " · Dash" every other page adds.
+export const metadata = { title: { absolute: 'Dash' } };
 
 export default function HomePage() {
   const workspaces = modulesFor(false);
@@ -238,7 +241,7 @@ export default function HomePage() {
 
             <div className={cn(s.glass, s.window, 'p-5 sm:p-6')} aria-hidden>
               <div className="flex justify-end">
-                <p className={cn(s.ink, 'max-w-sm rounded-2xl rounded-br-md bg-white/10 px-4 py-2.5 text-ui')}>
+                <p className={cn(s.ink, 'max-w-sm rounded-card rounded-br-control bg-white/10 px-4 py-2.5 text-ui')}>
                   Which applications have gone quiet for more than two weeks?
                 </p>
               </div>

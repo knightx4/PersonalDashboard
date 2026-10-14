@@ -4,6 +4,7 @@ import { useFormStatus } from 'react-dom';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { Concept } from '@/lib/learn/graph/model';
 import { readAboutConcept } from './actions';
+import { Button } from '@/components/ui/button';
 
 /**
  * Taking a gap to the reading queue.
@@ -55,13 +56,8 @@ function Submit() {
   const { pending } = useFormStatus();
 
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      aria-busy={pending}
-      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:hover:text-ink-muted disabled:hover:no-underline"
-    >
+    <Button variant="link" type="submit" pending={pending}>
       {pending ? 'Looking for something…' : 'Find something to read for this'}
-    </button>
+    </Button>
   );
 }

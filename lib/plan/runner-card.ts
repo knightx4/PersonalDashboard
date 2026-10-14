@@ -23,7 +23,7 @@ import {
 import { oneLine } from '@/lib/digest/build';
 import type { PlanItem } from './load';
 import { lastStoredPush, type StoredPush } from './liveness';
-import { runEnd, type StoredRunReading } from './run-end';
+import { IN_FLIGHT_LOOKBACK_MS, runEnd, type StoredRunReading } from './run-end';
 import { overnightStanding, type OvernightRun } from './overnight';
 import { readyFeatureCount, runnerOrder } from './overnight-choice';
 import { topFeatureOf, type PlanSection } from './tree';
@@ -71,7 +71,7 @@ export function runnerCard(input: {
   /** The whole tree, not a filtered view of it: what is ready is about the plan. */
   sections: readonly PlanSection[];
   /** The runs still going, as `loadStartedRuns` reads them. */
-  started: readonly { planItemId: string; at: string }[];
+  started: readonly { planItemId: string; at: string; status?: string }[];
   lastRuns: Iterable<{ reading: StoredRunReading | null }>;
   now?: number;
 }): RunnerCard {
@@ -91,17 +91,21 @@ export function runnerCard(input: {
 
   // The runs still marked going, less the ones `endQuietRuns` would write off:
   // the plan page sweeps before it reads, but Dash does not wait on that write,
-  // so the same rule is read here instead of the sweep being waited for.
+  // so the same rule is read here instead of the sweep being waited for. A
+  // quiet run, or one waiting on an answer, is going for as long as the tick
+  // counts it, which is while it is inside the tick's lookback.
   const now = input.now ?? Date.now();
   const itemById = new Map(items.map((item) => [item.id, item]));
-  const going = input.started.filter(
-    (started) =>
-      runEnd(
-        { status: 'started', createdAt: started.at },
-        itemById.get(started.planItemId) ?? null,
-        now,
-      ) === null,
-  );
+  const going = input.started.filter((started) => {
+    const status = started.status ?? 'started';
+    if (status !== 'started') {
+      return now - new Date(started.at).getTime() < IN_FLIGHT_LOOKBACK_MS;
+    }
+    return (
+      runEnd({ status, createdAt: started.at }, itemById.get(started.planItemId) ?? null, now) ===
+      null
+    );
+  });
 
   const on = live
     ? onNow(going, items).map((line) => ({

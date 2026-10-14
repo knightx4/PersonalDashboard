@@ -19,10 +19,18 @@ import { detectPosting, isBoardVendor } from '@/lib/jobs/ats/detect';
 import { companyFromBoardToken } from '@/lib/jobs/ats/company';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
+import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
+import { YOU_WRITE_TOOLS } from './you-writes';
+import { NEWS_WRITE_TOOLS } from './news-writes';
+import { GOALS_WRITE_TOOLS } from './goals-writes';
+import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
+import { VAULT_WRITE_TOOLS } from './vault-writes';
+import { JOBS_WRITE_TOOLS } from './jobs-writes';
+import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -45,8 +53,9 @@ import { TODO_WRITE_TOOLS } from './todo-writes';
  *   add_job_lead     a role saved as a lead in Jobs, from a posting link or
  *                    a title and company.
  *   change_items     many owned items marked for sale or to return, taken
- *                    off either, or grouped as one item, with one Undo
- *                    (lib/dash/bulk-items.ts, plan #1656).
+ *                    off either, grouped, ungrouped, separated or disposed
+ *                    of, with one Undo (lib/dash/bulk-items.ts, plans #1656
+ *                    and #1894.5.1).
  *   move_roles       many job roles moved to one stage or archived, each
  *                    through the board's own move, with one Undo
  *                    (lib/dash/bulk-roles.ts, plan #1657).
@@ -57,6 +66,40 @@ import { TODO_WRITE_TOOLS } from './todo-writes';
  *   Todo's five      a todo's notes, pin, snooze or state, an item on its
  *                    list, what it is about, and a calendar event added or
  *                    changed (lib/dash/todo-writes.ts, plan #1894.9.1).
+ *   News's four and stop_watch  an issue marked unread, a story saved or
+ *                    unsaved, sent to Learn or made a todo, and a price
+ *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
+ *   Goals' seven     an area added, renamed, noted, moved or archived, a
+ *                    goal edited, moved, archived, closed, parked or
+ *                    reopened (lib/dash/goals-writes.ts, plan #1894.7.1),
+ *                    and a step edited, dropped, reopened, blocked, moved,
+ *                    archived, linked or made to wait (plan #1894.7.2),
+ *                    and a goal's measure, links or step form changed
+ *                    (plan #1894.7.3), and a Goals Inbox row snoozed or
+ *                    an event's going recorded (plan #1894.7.4).
+ *   You's two        a place they have lived added or changed
+ *                    (lib/dash/you-writes.ts, plan #1991.5).
+ *   Shopping's       change_item (one item's name, variant, notes, group
+ *                    name or sell price) and item_lists (items on or off a
+ *                    list, a list made or renamed), in
+ *                    lib/dash/shopping-writes.ts (plan #1894.5.1).
+ *   The Vault's six and change_course  a note written, edited, renamed or
+ *                    filed from the Inbox, a theme or a Maya question
+ *                    renamed, and a course corrected (lib/dash/vault-writes.ts,
+ *                    plan #1894.9.3).
+ *   Jobs' eight      a role's fields or company, and an application's
+ *                    excitement or channel (lib/dash/jobs-writes.ts, plan
+ *                    #1894.6.1); a company's name or details, and duplicate
+ *                    roles merged (plan #1894.6.2); a reminder finished,
+ *                    put off, edited or linked to an email, and a waiting
+ *                    row finished or put off (plan #1894.6.3); an
+ *                    application confirmed or reopened, and flagged events
+ *                    acknowledged or flagged again, from Jobs review (plan
+ *                    #1894.6.4.1); emails in Jobs review dismissed or
+ *                    brought back (plan #1894.6.4.2); a new role made from
+ *                    an email in Jobs review (plan #1894.6.4.3).
+ *   add_interview_round  a round on a role, with its first interview
+ *                    (lib/dash/interview-writes.ts, plan #2044.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1011,11 +1054,17 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'change_items',
-    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more). Only items they still own are changed. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
+    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more), dispose (they sold, gave away, donated, threw out, recycled or used them up: give disposal_method, and proceeds for one item sold), ungroup (every copy in the groups those items are in stacks by its own details again), separate (hold each copy out of its stack as an item of its own). Only items they still own are changed, except that ungroup takes any. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
     {
       type: 'object',
       properties: {
         change: { type: 'string', enum: [...ITEM_CHANGES], description: 'Which change to make to every item.' },
+        disposal_method: {
+          type: 'string',
+          enum: [...DISPOSAL_METHODS],
+          description: 'For dispose: how they got rid of them. gifted is given away; trashed is thrown out; consumed is used up.',
+        },
+        proceeds: { type: 'number', description: 'For dispose of one item: what they got for it, in dollars.' },
         item_refs: {
           type: 'array',
           items: { type: 'string' },
@@ -1076,6 +1125,20 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...LEARN_WRITE_TOOLS,
   // Todo's, which the connector offers too (plan #1894.9.1).
   ...TODO_WRITE_TOOLS,
+  // You's places, which the connector offers too (plan #1991.5).
+  ...YOU_WRITE_TOOLS,
+  // News's, and stopping a watch, which the connector offers too (plan #1894.9.4).
+  ...NEWS_WRITE_TOOLS,
+  // Goals' areas and goals, which the connector offers too (plan #1894.7.1).
+  ...GOALS_WRITE_TOOLS,
+  // Shopping's one-item and list changes, which the connector offers too (plan #1894.5.1).
+  ...SHOPPING_WRITE_TOOLS,
+  // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).
+  ...VAULT_WRITE_TOOLS,
+  // Jobs' role and application edits, which the connector offers too (plan #1894.6.1).
+  ...JOBS_WRITE_TOOLS,
+  // A round on a role (plan #2044.1).
+  ...INTERVIEW_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

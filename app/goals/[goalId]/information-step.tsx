@@ -4,6 +4,7 @@ import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { Note } from '@/components/ui/note';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { Field, FieldError, InlineTextarea } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -44,6 +45,7 @@ import { FieldInput } from './field-input';
 import { DocumentKinds } from './document-kinds';
 import { FillFromDocument } from './fill-from-document';
 import { RecordValue } from './record-value';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * The record or table on an information step (plan #954; docs/GOALS-SPEC.md,
@@ -649,7 +651,7 @@ function RecordTable({
           onClose={() => setFilling(false)}
         />
       ) : adding ? (
-        <div className="rounded-control bg-sunken p-3">
+        <Note className="p-3">
           <AddRecordForm
             stepId={node.id}
             collection={collection}
@@ -657,7 +659,7 @@ function RecordTable({
             onDone={() => setAdding(false)}
             onCancel={() => setAdding(false)}
           />
-        </div>
+        </Note>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <AddTrigger label="Add a row" onClick={() => setAdding(true)} />
@@ -770,32 +772,35 @@ function ConfirmButton({
     },
     initial,
   );
+  const source = SOURCE_LABELS[record.source].toLowerCase();
+  const button = (
+    <Button
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={confirming}
+      aria-label={
+        updates
+          ? `Update the saved row with this draft ${source}`
+          : compact
+            ? `Confirm draft ${source}`
+            : undefined
+      }
+    >
+      {updates ? 'Update row' : 'Confirm'}
+    </Button>
+  );
+  // Where the draft came from, which the compact row and the update leave unsaid.
+  const tip = updates
+    ? `Draft, ${source}. Confirming puts these figures on the saved row with the same ID.`
+    : compact
+      ? `Draft, ${source}`
+      : null;
   return (
     <form action={confirm}>
       <input type="hidden" name="stepId" value={stepId} />
       <input type="hidden" name="recordId" value={record.id} />
-      <Button
-        type="submit"
-        size="sm"
-        variant="secondary"
-        pending={confirming}
-        aria-label={
-          updates
-            ? `Update the saved row with this draft ${SOURCE_LABELS[record.source].toLowerCase()}`
-            : compact
-              ? `Confirm draft ${SOURCE_LABELS[record.source].toLowerCase()}`
-              : undefined
-        }
-        title={
-          updates
-            ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}. Confirming puts these figures on the saved row with the same ID.`
-            : compact
-              ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}`
-              : undefined
-        }
-      >
-        {updates ? 'Update row' : 'Confirm'}
-      </Button>
+      {tip ? <Tooltip label={tip}>{button}</Tooltip> : button}
     </form>
   );
 }

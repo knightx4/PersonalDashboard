@@ -1,11 +1,12 @@
-import Link from 'next/link';
+import { RowLink } from '@/components/shell/back-link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatCompBand, formatDate, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
 import type { DisplayChoice } from '@/lib/list-display';
-import { ScoreReasons, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
+import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
@@ -103,7 +104,7 @@ export function RolesTable({
                     domains: row.companyDomains,
                     website: row.companyWebsite,
                   }}
-                  className="size-5 rounded"
+                  className="size-5 rounded-control"
                   imageClassName="size-4"
                 />
                 <span className="max-w-32 truncate">{row.companyName}</span>
@@ -131,13 +132,17 @@ export function RolesTable({
             </TD>
             )}
             {showing('fit') && (
-             <TD label={FIT_SCORE_LABEL} muted className={cn(cell, 'tabular')} title={row.scoreNote?.fit?.unsure ? 'Dash is not sure of this one' : undefined}>
-              {row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}
+            <TD label={FIT_SCORE_LABEL} muted className={cn(cell, 'tabular')}>
+              <Unsure unsure={row.scoreNote?.fit?.unsure}>
+                <span>{row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}</span>
+              </Unsure>
             </TD>
             )}
             {showing('chance') && (
-            <TD label={CHANCE_LABEL} muted className={cell} title={row.scoreNote?.chance?.unsure ? 'Dash is not sure of this one' : undefined}>
-              {row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}
+            <TD label={CHANCE_LABEL} muted className={cell}>
+              <Unsure unsure={row.scoreNote?.chance?.unsure}>
+                <span>{row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}</span>
+              </Unsure>
             </TD>
             )}
             {showing('comp') && (
@@ -176,12 +181,12 @@ function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: strin
   return (
     <li className="relative row-pad px-4 hover:bg-sunken">
       <p className="min-w-0 truncate text-ui">
-        <Link
+        <RowLink
           href={`/jobs/roles/${row.roleId}`}
           className="font-medium text-ink after:absolute after:inset-0 after:content-[''] hover:text-accent"
         >
           {row.roleTitle}
-        </Link>
+        </RowLink>
         {showing('company') && <span className="ml-1.5 text-ink-muted">{row.companyName}</span>}
       </p>
       <p className="mt-1 flex min-w-0 items-center gap-x-2 text-small text-ink-muted">
