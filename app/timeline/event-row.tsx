@@ -2,6 +2,7 @@ import Link from '@/components/ui/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { formatMoney } from '@/lib/money';
 import { KIND_NOUNS, timelineHref, type TimelineEvent } from '@/lib/timeline/timeline';
+import { whenDate, whenWeekday, zoneParts } from '@/lib/core/when';
 
 /**
  * One event on the timeline, linked to where it lives: the day, the
@@ -43,8 +44,6 @@ export function EventRow({
 
 /** "Sat 26", or "26 Sep" with the month, on the person's calendar. */
 function dayLabel(iso: string, timezone: string, withMonth: boolean): string {
-  const parts: Intl.DateTimeFormatOptions = withMonth
-    ? { day: 'numeric', month: 'short', timeZone: timezone }
-    : { weekday: 'short', day: 'numeric', timeZone: timezone };
-  return new Intl.DateTimeFormat('en-GB', parts).format(new Date(iso));
+  if (withMonth) return whenDate(iso, { timeZone: timezone, year: 'never' });
+  return `${whenWeekday(iso, { timeZone: timezone, style: 'short' })} ${zoneParts(iso, timezone).day}`;
 }

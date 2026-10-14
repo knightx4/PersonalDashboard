@@ -50,7 +50,7 @@ import { putAway } from '@/components/motion/place';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
-import { formatClock } from '@/lib/core/when';
+import { whenAt } from '@/lib/core/when';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
@@ -1157,13 +1157,7 @@ function DueLabel({
     );
   }
 
-  const text = task.dueAt
-    ? formatClock(task.dueAt, { timeZone: timezone, day: 'numeric', month: 'short' })
-    : new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'UTC',
-        day: 'numeric',
-        month: 'short',
-      }).format(new Date(`${task.dueOn}T00:00:00Z`));
+  const text = whenAt(task.dueAt ?? `${task.dueOn}`, { timeZone: timezone });
 
   return (
     <button

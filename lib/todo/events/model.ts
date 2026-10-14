@@ -1,5 +1,5 @@
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/core/when';
+import { formatClock, whenDate, zoneClock } from '@/lib/core/when';
 
 /**
  * What an event is, and which days of the calendar it covers.
@@ -100,23 +100,12 @@ export function compareEvents(a: Event, b: Event, timezone: string): number {
 
 /** The wall clock of an instant, where the reader is standing. */
 function clockIn(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(iso));
+  return zoneClock(iso, timezone);
 }
 
 /** A day, written the way a person says it. */
 export function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long' });
 }
 
 /**

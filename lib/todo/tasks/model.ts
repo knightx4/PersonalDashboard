@@ -8,6 +8,8 @@
  * lib/vault/sync/plan.ts, for the same reason.
  */
 
+import { zoneDay } from '@/lib/core/when';
+
 export type TaskStatus = 'open' | 'done' | 'dropped';
 
 /**
@@ -115,12 +117,7 @@ export const SNOOZE_DAYS = 7;
  * shopping module to know what day it is.
  */
 export function todayIn(timezone: string, now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  return zoneDay(now, timezone);
 }
 
 /** A calendar day `days` after `day`. Pure string arithmetic on a UTC date. */

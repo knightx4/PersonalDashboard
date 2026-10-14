@@ -20,6 +20,7 @@ import type { PushPayload } from '@/lib/push/send';
 import type { PriceDetail } from '@/lib/watch/parse-price';
 import { money, WATCH_URL } from '@/lib/watch/format';
 import type { WatchRow } from '@/lib/watch/run';
+import { zoneParts } from '@/lib/core/when';
 
 /** How long after a report time the run still sends it. */
 export const REPORT_WINDOW_MINUTES = 90;
@@ -31,14 +32,8 @@ export type WatchReport = { title: string; body: string };
 export type ValuePoint = { value: number; taken_at: string };
 
 function minuteOfDay(timezone: string, now: Date): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
-  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0');
-  return get('hour') * 60 + get('minute');
+  const { hour, minute } = zoneParts(now, timezone);
+  return hour * 60 + minute;
 }
 
 /** "09:00" or "09:00:00" as minutes after midnight; null when unreadable. */

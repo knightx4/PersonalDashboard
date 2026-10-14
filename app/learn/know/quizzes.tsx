@@ -4,6 +4,7 @@ import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { QuizListItem } from '@/lib/learn/quiz/load';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * The quizzes you have taken, and the ones you have not finished, as a
@@ -19,11 +20,7 @@ import type { QuizListItem } from '@/lib/learn/quiz/load';
 export const QUIZZES_HREF = '/learn/know?open=quizzes#quizzes';
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDay(iso, { timeZone: 'UTC' });
 }
 
 /** What a row says about how it went, in one phrase. */

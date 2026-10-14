@@ -9,6 +9,7 @@ import { StateLabel } from '@/components/dev/state-label';
 import { snoozeInboxRow, unsnoozeInboxRow } from '@/lib/core/inbox-snooze-actions';
 import { localDayStart, pickedDayStart, snoozeChoices } from '@/lib/core/inbox-snoozes';
 import { cn } from '@/lib/cn';
+import { deviceTimeZone, whenDate } from '@/lib/core/when';
 
 /**
  * Snooze one inbox row, in Dev and in Goals (plan #1843). Closed to a single
@@ -124,11 +125,7 @@ export type SnoozedItem = {
 
 /** "Fri 16 Oct", in the reader's own time zone. */
 function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  return whenDate(iso, { timeZone: deviceTimeZone() ?? 'UTC', weekday: 'short', year: 'never' });
 }
 
 function SnoozedRow({ item }: { item: SnoozedItem }) {

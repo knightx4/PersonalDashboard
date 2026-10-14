@@ -8,6 +8,7 @@
  */
 
 import { readDraftMarks, type AuthorMark } from './authorship';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The brief, in the person's own words (spec, "Starting an essay"): the five
@@ -229,9 +230,9 @@ export function countWords(body: string): number {
  * "412 of 800 words" with a target.
  */
 export function wordCountLabel(words: number, target: number | null): string {
-  const n = words.toLocaleString('en-GB');
+  const n = formatNumber(words);
   if (target === null) return `${n} ${words === 1 ? 'word' : 'words'}`;
-  return `${n} of ${target.toLocaleString('en-GB')} words`;
+  return `${n} of ${formatNumber(target)} words`;
 }
 
 /** A target typed into the field, or an error saying what is allowed. */
@@ -241,7 +242,7 @@ export function parseWordTarget(input: string): { target: number | null } | { er
   if (!/^\d+$/.test(trimmed)) return { error: 'Write the target as a number of words.' };
   const target = Number(trimmed);
   if (target < WORD_TARGET_MIN || target > WORD_TARGET_MAX) {
-    return { error: `A target is between ${WORD_TARGET_MIN} and ${WORD_TARGET_MAX.toLocaleString('en-GB')} words.` };
+    return { error: `A target is between ${WORD_TARGET_MIN} and ${formatNumber(WORD_TARGET_MAX)} words.` };
   }
   return { target };
 }

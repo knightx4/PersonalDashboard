@@ -57,7 +57,7 @@ describe('sourcesLine', () => {
         FIELDS,
         RECORDS,
       ),
-    ).toBe('From Grad PLUS 2024–25 and Grad PLUS 2025–26, figures as of Sep 2, 2026');
+    ).toBe('From Grad PLUS 2024–25 and Grad PLUS 2025–26, figures as of 2 Sep 2026');
   });
 
   it('dates each row when they differ, and counts a row since archived', () => {
@@ -72,7 +72,7 @@ describe('sourcesLine', () => {
         RECORDS,
       ),
     ).toBe(
-      'From Grad PLUS 2024–25 (Sep 2, 2026), Grad PLUS 2025–26 (Oct 2, 2026) and a row since archived (Aug 1, 2026)',
+      'From Grad PLUS 2024–25 (2 Sep 2026), Grad PLUS 2025–26 (2 Oct 2026) and a row since archived (1 Aug 2026)',
     );
   });
 });

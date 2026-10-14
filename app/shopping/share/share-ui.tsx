@@ -14,6 +14,7 @@ import {
   revokeShareToken,
   type ShareActionState,
 } from './actions';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * The page's one action: a New button in the header that opens the name box
@@ -115,7 +116,7 @@ export function ShareLinkRow({
           {revoked
             ? ' · revoked'
             : lastSeenAt
-              ? ` · last answered ${new Date(lastSeenAt).toLocaleDateString()}`
+              ? ` · last answered ${whenDate(lastSeenAt, { timeZone: 'UTC', year: 'auto' })}`
               : ' · not opened yet'}
         </p>
       </div>

@@ -1,6 +1,7 @@
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { chooseReviewStories, reviewItem, type ReviewInput, type ReviewItem, type ReviewPick } from './choose';
 import type { ReviewReply } from './reply';
+import { zoneDay, zoneParts } from '@/lib/core/when';
 
 /**
  * One person's daily review (plan #1615, under #1612).
@@ -56,24 +57,11 @@ export type ReviewResult =
  * before 8pm.
  */
 export function reviewClock(timezone: string, now: Date): { day: string; until: Date } | null {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  const hour = Number(get('hour'));
+  const { hour, minute, second } = zoneParts(now, timezone);
   if (!(hour >= REVIEW_HOUR)) return null;
-  const since8pm =
-    ((hour - REVIEW_HOUR) * 3600 + Number(get('minute')) * 60 + Number(get('second'))) * 1000 +
-    now.getUTCMilliseconds();
+  const since8pm = ((hour - REVIEW_HOUR) * 3600 + minute * 60 + second) * 1000 + now.getUTCMilliseconds();
   return {
-    day: `${get('year')}-${get('month')}-${get('day')}`,
+    day: zoneDay(now, timezone),
     until: new Date(now.getTime() - since8pm),
   };
 }

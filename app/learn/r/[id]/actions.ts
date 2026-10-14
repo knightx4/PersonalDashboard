@@ -43,6 +43,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { RESUME_MAX_BYTES } from '@/lib/jobs/resume-file';
 import { recordOutcome } from '@/lib/learn/next/record';
+import { formatNumber } from '@/lib/money';
 
 /**
  * What you can do to a reading.
@@ -867,7 +868,7 @@ export async function saveReadingPdf(
     revalidatePath(`/learn/r/${readingId}`);
     return extracted.cut
       ? {
-          notice: `That PDF has more text than a reading keeps. Dash kept the first ${MAX_READING_TEXT.toLocaleString('en-GB')} characters and will read only those.`,
+          notice: `That PDF has more text than a reading keeps. Dash kept the first ${formatNumber(MAX_READING_TEXT)} characters and will read only those.`,
         }
       : {};
   } finally {

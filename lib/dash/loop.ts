@@ -9,6 +9,7 @@ import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type T
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
+import { whenDate, whenWeekday } from '@/lib/core/when';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -183,13 +184,7 @@ export type DashContext = {
 
 /** "Sunday, 4 October 2026", from a YYYY-MM-DD day read as a calendar day. */
 function spelledDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T00:00:00Z`));
+  return `${whenWeekday(day, { timeZone: 'UTC' })}, ${whenDate(day, { timeZone: 'UTC', month: 'long' })}`;
 }
 
 /**

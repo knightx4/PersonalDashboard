@@ -39,6 +39,7 @@ import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
+import { whenDate } from '@/lib/core/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -243,9 +244,5 @@ export default async function NotePage({
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

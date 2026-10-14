@@ -1,6 +1,7 @@
 import Link from '@/components/ui/link';
 import { Banner } from '@/components/ui/banner';
 import type { VaultConnectionSummary } from '@/lib/vault/notes/load';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * When the mirror is not what it looks like.
@@ -48,9 +49,5 @@ export function VaultStatusBanner({ connection }: { connection: VaultConnectionS
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

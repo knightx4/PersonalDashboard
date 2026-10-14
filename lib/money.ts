@@ -15,6 +15,8 @@
  *      Label them differently in the UI.
  */
 
+import { zoneDay } from '@/lib/core/when';
+
 /** ISO 4217. Kept as a nominal-ish alias so mixed-currency math is visible. */
 export type CurrencyCode = string;
 
@@ -54,6 +56,17 @@ export function formatMoney(
     minimumFractionDigits: showCents ? 2 : 0,
     maximumFractionDigits: showCents ? 2 : 0,
   }).format(cents / 100);
+}
+
+/**
+ * A plain number with its thousands grouped: "12,400", "182.5". For counts
+ * and readings, which are not money; here because the lint rule keeps
+ * `Intl.NumberFormat` out of components, and so that no caller reaches for
+ * the platform's locale string, which the date counter reads as a date.
+ */
+export function formatNumber(value: number, options: { maximumFractionDigits?: number } = {}): string {
+  const { maximumFractionDigits = 3 } = options;
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(value);
 }
 
 /**
@@ -613,12 +626,7 @@ export function monthlySpendByMerchant(
  * sees the wrong orders for most of a day, twice a month.
  */
 export function todayInTimezone(timezone: string, now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  return zoneDay(now, timezone);
 }
 
 export type PresetRange =
