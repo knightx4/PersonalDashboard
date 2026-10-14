@@ -111,3 +111,15 @@ export async function readSpendPerDay(client: Client, timezone: string, window: 
     unpriced: rows.reduce((sum, row) => sum + row.unpriced, 0),
   };
 }
+
+/**
+ * The amount, calls and unpriced calls a spend period adds up to: the figure
+ * the Account Spend page lists beside its chart, so the two cannot differ.
+ */
+export function spendTotal(spend: SpendDays): { calls: number; micros: number; unpriced: number } {
+  return {
+    calls: spend.calls,
+    micros: spend.values.reduce((sum, day) => sum + day.value, 0),
+    unpriced: spend.unpriced,
+  };
+}

@@ -1,6 +1,8 @@
 import { DayBarChart } from '@/components/ui/day-bar-chart';
 import type { DayMeasure, DayValue } from '@/lib/usage/day-bars';
 import { periodDays } from '@/lib/usage/day-bars';
+import { SpendOverview } from '@/app/account/spend/spend-overview';
+import { spendTotal } from '@/lib/usage/per-day';
 
 /**
  * The per-day bar chart drawn from fixtures for the gallery (plan #2036.1):
@@ -70,4 +72,23 @@ export function DayBarsReadoutSurface() {
 /** A period with nothing in it. */
 export function DayBarsEmptySurface() {
   return <DayBarChart title="Page views" values={[]} end={END} measure={VIEWS} />;
+}
+
+/**
+ * The top of the Account Spend page (plan #2036.3): the month's chart above
+ * the thirty-day, month and all-time totals. The thirty-day figure is summed
+ * from the bars' own days, as the page does.
+ */
+export function SpendOverviewSurface() {
+  const last30 = spendTotal({ values: MONTH_SPEND, calls: 148, unpriced: 3 });
+  return (
+    <SpendOverview
+      values={MONTH_SPEND}
+      today={END}
+      span={30}
+      last30={last30}
+      thisMonth={{ calls: 61, micros: 2_650_000, unpriced: 0 }}
+      allTime={{ calls: 2_311, micros: 41_920_000, unpriced: 12 }}
+    />
+  );
 }

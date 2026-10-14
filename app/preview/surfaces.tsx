@@ -41,7 +41,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -6012,6 +6012,13 @@ export const SURFACES: readonly Surface[] = [
       shows: 'Tapping the chart lights the bar under the finger, dims the rest, and names its day and value under the chart.',
     },
     render: () => <DayBarsReadoutSurface />,
+  },
+  {
+    id: 'account-spend-overview',
+    label: 'Account · Spend, chart above the totals',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendOverviewSurface />,
   },
   {
     id: 'usage-day-bars-empty',
