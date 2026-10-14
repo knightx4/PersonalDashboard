@@ -43,6 +43,7 @@ describe('runConnectorWrite', () => {
       'link_todo',
       'add_event',
       'change_event',
+      'change_agenda_row',
       'add_place',
       'change_place',
       'save_job',

@@ -12,7 +12,7 @@ import { isYouChangeKind, type YouChangeKind } from './you-changes';
  */
 
 /** The Todo write tools, by name, which is the kind each change is kept under. */
-export const TODO_CHANGE_KINDS = ['edit_todo', 'add_todo_item', 'link_todo', 'add_event', 'change_event'] as const;
+export const TODO_CHANGE_KINDS = ['edit_todo', 'add_todo_item', 'link_todo', 'add_event', 'change_event', 'change_agenda_row'] as const;
 
 export type TodoChangeKind = (typeof TODO_CHANGE_KINDS)[number];
 

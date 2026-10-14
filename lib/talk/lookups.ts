@@ -126,6 +126,8 @@ export function lookupLabel(name: string, input: unknown): string {
       return 'Checking job applications';
     case 'todos':
       return 'Checking todos';
+    case 'agenda':
+      return 'Checking the Todo agenda';
     case 'goal_status':
       return 'Checking goals';
     case 'vault_notes': {

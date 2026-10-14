@@ -119,8 +119,9 @@ reword_concept, add_concept_note or change_video. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
-change_event. When they tell you about a place they have lived, or ask to
-change one, call add_place or change_place; when they tell you about a job
+change_event. To finish, put off or dismiss a row another workspace put on
+their agenda, find it with agenda and call change_agenda_row. When they tell
+you about a place they have lived, or ask to change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it

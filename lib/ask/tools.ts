@@ -17,6 +17,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { agendaLookup } from './agenda';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
@@ -48,6 +49,7 @@ export const ASK_TOOL_NAMES = [
   'spend_by_merchant',
   'job_applications',
   'todos',
+  'agenda',
   'goal_status',
   'vault_notes',
   'note_positions',
@@ -210,6 +212,18 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       properties: {
         from: { ...DATE_FIELD, description: 'First day, YYYY-MM-DD, inclusive.' },
         to: { ...DATE_FIELD, description: 'Last day, YYYY-MM-DD, inclusive. Defaults to today.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'agenda',
+    description:
+      "The rows other workspaces have put on the person's Todo agenda: job reminders, goal steps they sent to Todo, drafts waiting to be sent, return deadlines, bills and the like, as the Todo page shows them now. Each says in can which of finish, put_off and dismiss it takes. Use it to find the agenda_source and agenda_key that change_agenda_row needs; their own todos are in todos and search.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        words: { type: 'string', description: 'Only rows whose title or detail holds all of these words.' },
       },
       additionalProperties: false,
     },
@@ -413,6 +427,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
+  agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },

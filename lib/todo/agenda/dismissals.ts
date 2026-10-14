@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { AgendaClients } from '@/lib/todo/agenda/clients';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 
 /**
@@ -14,6 +15,10 @@ import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
  * date, on its own row, so both /jobs and /todo agree without an overlay
  * at all -- see lib/todo/agenda/sources/. This is for the sources that have
  * nowhere else to put it.
+ *
+ * Writes take the `clients` the source was handed, so an agent acting for the
+ * person (lib/dash/agenda-writes.ts) writes on its own client; a page leaves
+ * it out and writes on the session.
  */
 
 export type Dismissals = Map<string, { until: string | null }>;
@@ -51,8 +56,9 @@ export async function dismiss(
   source: DismissalSource,
   sourceKey: string,
   until: Date | null,
+  clients?: AgendaClients,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = await (clients ? clients.todo() : createTodoClient());
 
   const { error } = await supabase.from('dismissals').upsert(
     {
@@ -72,8 +78,9 @@ export async function undismiss(
   userId: string,
   source: DismissalSource,
   sourceKey: string,
+  clients?: AgendaClients,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = await (clients ? clients.todo() : createTodoClient());
 
   const { error } = await supabase
     .from('dismissals')
