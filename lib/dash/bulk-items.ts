@@ -3,7 +3,9 @@ import { readSubject, sameValue } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import { displayName, groupUnits } from '@/lib/inventory/group-units';
 import { isUuid } from '@/lib/ask/db';
-import { namedItems } from '@/lib/ask/change-view';
+import { DISPOSAL_WORDS, namedItems } from '@/lib/ask/change-view';
+import { DISPOSAL_METHODS, inventoryStatusForDisposal, type DisposalMethod } from '@/lib/inventory/status-actions';
+import { parseDollarsToCents } from '@/lib/money';
 import type { DashChangeInput } from '@/lib/talk/changes';
 import type { DashWriteContext, DashWriteResult } from './registry';
 
@@ -24,31 +26,57 @@ import type { DashWriteContext, DashWriteResult } from './registry';
  *
  * Deleting is not one of the changes: a delete cannot be undone from a
  * reply, so it stays on the bulk bar (R10).
+ *
+ * Plan #1894.5.1 added three: dispose (sold, gave away, threw out and the
+ * rest, as the item page's dispose form does), ungroup (the copies stack by
+ * their own details again) and separate (a copy held out of its stack in a
+ * group of its own, as the item page's Separate does). Ungrouping by hand
+ * deletes the group; Dash empties it and clears the key it claimed instead,
+ * so nothing draws the copies back in and Undo can put them back.
  */
 
 /** The most items one change may touch. */
 export const BULK_MAX = 100;
 
 /** The changes the bulk bar offers, by the name Dash sends. */
-export const ITEM_CHANGES = ['for_sale', 'not_for_sale', 'to_return', 'not_returning', 'group'] as const;
+export const ITEM_CHANGES = [
+  'for_sale',
+  'not_for_sale',
+  'to_return',
+  'not_returning',
+  'group',
+  'dispose',
+  'ungroup',
+  'separate',
+] as const;
 export type ItemChange = (typeof ITEM_CHANGES)[number];
 
 /** The column each flag change writes, and the value it writes there. */
-const FLAG: Record<Exclude<ItemChange, 'group'>, { column: 'for_sale' | 'return_planned'; value: boolean }> = {
+const FLAG: Record<Exclude<ItemChange, 'group' | 'dispose' | 'ungroup' | 'separate'>, { column: 'for_sale' | 'return_planned'; value: boolean }> = {
   for_sale: { column: 'for_sale', value: true },
   not_for_sale: { column: 'for_sale', value: false },
   to_return: { column: 'return_planned', value: true },
   not_returning: { column: 'return_planned', value: false },
 };
 
-/** One item the change moved: its id and the column before and after. */
-export type ChangedRow = { id: string; before: Record<string, unknown>; after: Record<string, unknown> };
+/**
+ * One row the change moved: its id and the columns before and after. An
+ * item, unless `table` says it is a group whose key ungroup cleared.
+ */
+export type ChangedRow = {
+  id: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  table?: 'item_groups';
+};
 
 /** What the record keeps in `undo` for change_items. */
 export type ItemChangeUndo = {
   rows: ChangedRow[];
   /** The item group Dash made to group them, removed by Undo once nothing is in it. */
   group_made: string | null;
+  /** The groups separate made, one per copy, each removed by Undo once empty. */
+  groups_made?: string[];
 };
 
 const ITEMS = 'public.inventory_items';
@@ -65,9 +93,15 @@ type ItemRow = {
   return_planned: boolean | null;
   group_id: string | null;
   order_item_id: string | null;
+  disposed_at: string | null;
+  disposal_method: string | null;
+  disposal_proceeds_cents: number | null;
 };
 
-const ITEM_SELECT = 'id, name, short_name, status, for_sale, return_planned, group_id, order_item_id';
+const ITEM_SELECT =
+  'id, name, short_name, status, for_sale, return_planned, group_id, order_item_id, disposed_at, disposal_method, disposal_proceeds_cents';
+
+const DISPOSAL_COLUMNS = ['status', 'disposed_at', 'disposal_method', 'disposal_proceeds_cents'] as const;
 
 const refuse = (error: string): DashWriteResult => ({ ok: false, error });
 
@@ -81,7 +115,7 @@ function refList(args: Record<string, unknown>, key: string): string[] | null {
 const noun = (count: number) => (count === 1 ? 'item' : 'items');
 
 /** What the change did, after "Dash", in the past tense. */
-function didWords(change: ItemChange, count: number): string {
+function didWords(change: ItemChange, count: number, method: DisposalMethod | null): string {
   switch (change) {
     case 'for_sale':
       return `marked ${count} ${noun(count)} for sale`;
@@ -93,7 +127,67 @@ function didWords(change: ItemChange, count: number): string {
       return `took ${count} ${noun(count)} off the to-return list`;
     case 'group':
       return `grouped ${count} copies as one item`;
+    case 'dispose':
+      return `marked ${count} ${noun(count)} as ${DISPOSAL_WORDS[method ?? 'trashed']}`;
+    case 'ungroup':
+      return `ungrouped ${count} ${count === 1 ? 'copy' : 'copies'}, so they stack by their own details again`;
+    case 'separate':
+      return `separated ${count} ${count === 1 ? 'copy' : 'copies'} from ${count === 1 ? 'its stack' : 'their stacks'}`;
   }
+}
+
+/**
+ * Every copy in the groups the named items are in, taken out of them, and
+ * the key each group claimed cleared so the copies are not drawn back in.
+ * The groups are kept, empty, for Undo to put the copies back into.
+ */
+async function ungroup(
+  shop: SchemaClient,
+  userId: string,
+  named: ItemRow[],
+): Promise<{ ok: true; rows: ChangedRow[]; members: ItemRow[] } | { ok: false; error: string }> {
+  const groupIds = [...new Set(named.flatMap((row) => (row.group_id ? [row.group_id] : [])))];
+  if (groupIds.length === 0) return { ok: false, error: 'None of those items is in a group, so nothing was changed.' };
+  const { data: groups, error: groupsError } = await shop
+    .from('item_groups')
+    .select('id, group_key')
+    .eq('user_id', userId)
+    .in('id', groupIds);
+  if (groupsError) throw new Error(`item_groups: ${groupsError.message}`);
+  const { data: memberData, error: membersError } = await shop
+    .from('inventory_items')
+    .select(ITEM_SELECT)
+    .eq('user_id', userId)
+    .in('group_id', groupIds);
+  if (membersError) throw new Error(`inventory_items: ${membersError.message}`);
+  const members = (memberData ?? []) as ItemRow[];
+  if (members.length > BULK_MAX) {
+    return { ok: false, error: `Those groups hold ${members.length} copies, and at most ${BULK_MAX} can be changed at once.` };
+  }
+
+  const { data: updated, error: writeError } = await shop
+    .from('inventory_items')
+    .update({ group_id: null })
+    .eq('user_id', userId)
+    .in('group_id', groupIds)
+    .select('id');
+  if (writeError) throw new Error(`inventory_items: ${writeError.message}`);
+  const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+  // The ones they named first, so the summary names theirs.
+  const order = new Map(named.map((row, i) => [row.id, i]));
+  const rows: ChangedRow[] = members
+    .filter((row) => written.has(row.id))
+    .sort((a, b) => (order.get(a.id) ?? BULK_MAX) - (order.get(b.id) ?? BULK_MAX))
+    .map((row) => ({ id: row.id, before: { group_id: row.group_id }, after: { group_id: null } }));
+  if (rows.length === 0) return { ok: false, error: 'Those groups have no copies in them, so nothing was changed.' };
+
+  for (const group of (groups ?? []) as { id: string; group_key: string | null }[]) {
+    if (!group.group_key) continue;
+    const { error } = await shop.from('item_groups').update({ group_key: null }).eq('id', group.id).eq('user_id', userId);
+    if (error) throw new Error(`item_groups: ${error.message}`);
+    rows.push({ id: group.id, table: 'item_groups', before: { group_key: group.group_key }, after: { group_key: null } });
+  }
+  return { ok: true, rows, members };
 }
 
 async function readIn<T>(client: SchemaClient, table: string, select: string, column: string, values: string[]): Promise<T[]> {
@@ -114,6 +208,21 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
   const change = typeof args.change === 'string' ? (args.change.trim() as ItemChange) : null;
   if (!change || !ITEM_CHANGES.includes(change)) {
     return refuse(`change must be one of ${ITEM_CHANGES.join(', ')}. Deleting items is done on the inventory list, not by Dash.`);
+  }
+  let method: DisposalMethod | null = null;
+  let proceedsCents: number | null = null;
+  if (change === 'dispose') {
+    const given = typeof args.disposal_method === 'string' ? args.disposal_method.trim() : '';
+    if (!(DISPOSAL_METHODS as readonly string[]).includes(given)) {
+      return refuse(`disposal_method must be one of ${DISPOSAL_METHODS.join(', ')}: how they got rid of the items.`);
+    }
+    method = given as DisposalMethod;
+    if (args.proceeds !== undefined && args.proceeds !== null) {
+      if (typeof args.proceeds !== 'number' || !Number.isFinite(args.proceeds) || args.proceeds < 0) {
+        return refuse('proceeds is what they got for it, in dollars, such as 12.5.');
+      }
+      proceedsCents = parseDollarsToCents(args.proceeds.toFixed(2));
+    }
   }
   const itemRefs = refList(args, 'item_refs');
   const orderRefs = refList(args, 'order_refs');
@@ -164,6 +273,9 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
   if (ids.length > BULK_MAX) {
     return refuse(`That is ${ids.length} items, and at most ${BULK_MAX} can be changed at once. Ask them to narrow it down.`);
   }
+  if (proceedsCents !== null && ids.length > 1) {
+    return refuse('proceeds is for one item at a time: say what each one went for in a change of its own.');
+  }
 
   const { data, error } = await shop.from('inventory_items').select(ITEM_SELECT).eq('user_id', ctx.userId).in('id', ids);
   if (error) throw new Error(`inventory_items: ${error.message}`);
@@ -183,7 +295,57 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
 
   let rows: ChangedRow[];
   let groupMade: string | null = null;
-  if (change === 'group') {
+  const groupsMade: string[] = [];
+  if (change === 'ungroup') {
+    const ungrouped = await ungroup(shop, ctx.userId, found);
+    if (!ungrouped.ok) return refuse(ungrouped.error);
+    rows = ungrouped.rows;
+    for (const member of ungrouped.members) if (!found.some((row) => row.id === member.id)) found.push(member);
+  } else if (change === 'separate') {
+    if (owned.length === 0) return refuse('None of those are items they still own, so nothing was changed.');
+    rows = [];
+    for (const row of owned) {
+      const { data: group, error: groupError } = await shop
+        .from('item_groups')
+        .insert({ user_id: ctx.userId, name: displayName(row), group_key: null })
+        .select('id')
+        .single();
+      if (groupError || !group) throw new Error(`item_groups: ${groupError?.message ?? 'no row'}`);
+      const groupId = (group as { id: string }).id;
+      groupsMade.push(groupId);
+      const { error: moveError } = await shop
+        .from('inventory_items')
+        .update({ group_id: groupId })
+        .eq('user_id', ctx.userId)
+        .eq('id', row.id);
+      if (moveError) throw new Error(`inventory_items: ${moveError.message}`);
+      rows.push({ id: row.id, before: { group_id: row.group_id }, after: { group_id: groupId } });
+    }
+  } else if (change === 'dispose') {
+    if (owned.length === 0) return refuse('None of those are items they still own, so nothing was changed.');
+    const values = {
+      status: inventoryStatusForDisposal(method!),
+      disposed_at: ctx.today,
+      disposal_method: method,
+      disposal_proceeds_cents: proceedsCents && proceedsCents > 0 ? proceedsCents : null,
+    };
+    const { data: updated, error: writeError } = await shop
+      .from('inventory_items')
+      .update(values)
+      .eq('user_id', ctx.userId)
+      .eq('status', 'owned')
+      .in('id', owned.map((row) => row.id))
+      .select('id');
+    if (writeError) throw new Error(`inventory_items: ${writeError.message}`);
+    const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+    rows = owned
+      .filter((row) => written.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        before: Object.fromEntries(DISPOSAL_COLUMNS.map((column) => [column, row[column]])),
+        after: { ...values },
+      }));
+  } else if (change === 'group') {
     if (owned.length < 2) return refuse('Grouping needs at least two items they still own.');
     const grouped = await groupUnits(shop, ctx.userId, owned.map((row) => row.id));
     if (!grouped.ok) return refuse(grouped.error);
@@ -216,13 +378,16 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
   if (rows.length === 0) return refuse('Those items are already set that way, so nothing was changed.');
 
   const byId = new Map(found.map((row) => [row.id, row]));
-  const titles = rows.slice(0, NAMED).map((row) => displayName(byId.get(row.id)!));
-  const left = found.length - rows.length;
+  const itemRows = rows.filter((row) => !row.table);
+  const count = itemRows.length;
+  const titles = itemRows.slice(0, NAMED).map((row) => displayName(byId.get(row.id)!));
+  // Ungroup takes every copy in the groups, named or not, so it leaves none.
+  const left = change === 'ungroup' ? 0 : found.length - count;
   const firstRef = toRef(ITEMS, rows[0].id);
   const subjectAfter = await readSubject(ctx.db, firstRef);
   const subjectBefore = { ...(subjectAfter ?? {}), ...rows[0].before };
-  const input: DashChangeInput['change_items'] = { change, count: rows.length, titles, left };
-  const undo: ItemChangeUndo = { rows, group_made: groupMade };
+  const input: DashChangeInput['change_items'] = { change, count, titles, left, ...(method ? { method } : {}) };
+  const undo: ItemChangeUndo = { rows, group_made: groupMade, ...(groupsMade.length > 0 ? { groups_made: groupsMade } : {}) };
   const where = change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
 
   return {
@@ -235,9 +400,9 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
     after: subjectAfter,
     undo: undo as unknown as Record<string, unknown>,
     summary:
-      `Dash ${didWords(change, rows.length)}: ${namedItems(titles, rows.length)}.` +
+      `Dash ${didWords(change, count, method)}: ${namedItems(titles, count)}.` +
       (left > 0 ? ` ${left} ${left === 1 ? 'was' : 'were'} left as ${left === 1 ? 'it was' : 'they were'}, already set that way or no longer owned.` : ''),
-    row: { table: ITEMS, ref: rows[0].id, title: `${rows.length} ${change === 'group' ? 'copies' : noun(rows.length)}`, href: where },
+    row: { table: ITEMS, ref: rows[0].id, title: `${count} ${change === 'group' ? 'copies' : noun(count)}`, href: where },
   };
 }
 
@@ -249,7 +414,12 @@ function itemUndo(value: Record<string, unknown> | null): ItemChangeUndo | null 
     (r) => r && typeof r === 'object' && typeof r.id === 'string' && r.before && r.after && typeof r.before === 'object',
   );
   if (!ok) return null;
-  return { rows: rows as ChangedRow[], group_made: typeof value?.group_made === 'string' ? value.group_made : null };
+  const made = Array.isArray(value?.groups_made) ? value.groups_made.filter((id): id is string => typeof id === 'string') : [];
+  return {
+    rows: rows as ChangedRow[],
+    group_made: typeof value?.group_made === 'string' ? value.group_made : null,
+    groups_made: made,
+  };
 }
 
 /**
@@ -268,11 +438,18 @@ export async function undoItemChange(
   const shop = await deps.db('public');
 
   // One write per column and pair of values, narrowed to the rows still as Dash left them.
-  const batches = new Map<string, { column: string; before: unknown; after: unknown; ids: string[] }>();
+  const batches = new Map<string, { table: string; column: string; before: unknown; after: unknown; ids: string[] }>();
   for (const row of undo.rows) {
+    const table = row.table === 'item_groups' ? 'item_groups' : 'inventory_items';
     for (const column of Object.keys(row.after)) {
-      const key = JSON.stringify([column, row.before[column] ?? null, row.after[column] ?? null]);
-      const batch = batches.get(key) ?? { column, before: row.before[column] ?? null, after: row.after[column] ?? null, ids: [] };
+      const key = JSON.stringify([table, column, row.before[column] ?? null, row.after[column] ?? null]);
+      const batch = batches.get(key) ?? {
+        table,
+        column,
+        before: row.before[column] ?? null,
+        after: row.after[column] ?? null,
+        ids: [],
+      };
       batch.ids.push(row.id);
       batches.set(key, batch);
     }
@@ -280,28 +457,35 @@ export async function undoItemChange(
   const restored = new Set<string>();
   for (const batch of batches.values()) {
     let query = shop
-      .from('inventory_items')
+      .from(batch.table)
       .update({ [batch.column]: batch.before })
       .eq('user_id', deps.userId)
       .in('id', batch.ids);
     query = batch.after === null ? query.is(batch.column, null) : query.eq(batch.column, batch.after);
     const { data, error } = await query.select('id');
-    if (error) throw new Error(`inventory_items: ${error.message}`);
-    for (const row of (data ?? []) as { id: string }[]) restored.add(row.id);
+    if (error) {
+      // A key another group has claimed since stays with that group; the copies still go back.
+      if (batch.table === 'item_groups') {
+        console.error(`undo change_items: the key on group ${batch.ids.join(', ')} was not put back`, error.message);
+        continue;
+      }
+      throw new Error(`${batch.table}: ${error.message}`);
+    }
+    if (batch.table === 'inventory_items') for (const row of (data ?? []) as { id: string }[]) restored.add(row.id);
   }
 
-  // The group Dash made goes once nothing is left in it.
-  if (undo.group_made) {
+  // The groups Dash made go once nothing is left in them.
+  for (const made of [...(undo.group_made ? [undo.group_made] : []), ...(undo.groups_made ?? [])]) {
     const { data: members, error } = await shop
       .from('inventory_items')
       .select('id')
       .eq('user_id', deps.userId)
-      .eq('group_id', undo.group_made)
+      .eq('group_id', made)
       .limit(1);
     if (error) throw new Error(`inventory_items: ${error.message}`);
     if ((members ?? []).length === 0) {
-      const { error: groupError } = await shop.from('item_groups').delete().eq('id', undo.group_made).eq('user_id', deps.userId);
-      if (groupError) console.error(`undo change_items: the empty group ${undo.group_made} was kept`, groupError.message);
+      const { error: groupError } = await shop.from('item_groups').delete().eq('id', made).eq('user_id', deps.userId);
+      if (groupError) console.error(`undo change_items: the empty group ${made} was kept`, groupError.message);
     }
   }
 

@@ -11,6 +11,7 @@ import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
@@ -54,6 +55,7 @@ describe('DASH_TOOLS', () => {
       ...YOU_CHANGE_KINDS,
       ...NEWS_CHANGE_KINDS,
       ...GOALS_CHANGE_KINDS,
+      ...SHOPPING_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,

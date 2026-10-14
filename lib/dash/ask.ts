@@ -126,7 +126,10 @@ mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
 when they ask to stop a price watch, call stop_watch. In Goals, when they ask
 to add, rename, reorder or archive an area or write what they want from it,
 call change_goal_area; to reword a goal, date it, move it to another area,
-reorder, archive, close, park or reopen it, call change_goal. When they tell you about a place they have lived, or ask to
+reorder, archive, close, park or reopen it, call change_goal. In Shopping, to
+change one item's name, variant, notes, group name or sell price, call
+change_item; to put items on a list, take them off or rename a list, call
+item_lists. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to

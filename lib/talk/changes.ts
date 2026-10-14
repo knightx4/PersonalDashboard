@@ -4,11 +4,14 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
 import type { RoleStage } from '@/lib/dash/bulk-roles';
+import type { ItemChange } from '@/lib/dash/bulk-items';
+import type { DisposalMethod } from '@/lib/inventory/status-actions';
 import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS, type TodoChangeInput, type TodoChangeKind } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS, type YouChangeInput, type YouChangeKind } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS, type NewsChangeInput, type NewsChangeKind } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS, type GoalsChangeInput, type GoalsChangeKind } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS, type ShoppingChangeInput, type ShoppingChangeKind } from '@/lib/ask/shopping-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -57,6 +60,8 @@ export const DASH_CHANGE_KINDS = [
   ...NEWS_CHANGE_KINDS,
   // Goals' areas and goals, in the same shape (lib/ask/goals-changes.ts, plan #1894.7.1).
   ...GOALS_CHANGE_KINDS,
+  // Shopping's one-item and list changes, in the same shape (lib/ask/shopping-changes.ts, plan #1894.5.1).
+  ...SHOPPING_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -150,10 +155,12 @@ export type DashChangeInput = {
   add_idea: { body: string; module: string | null };
   add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
   change_items: {
-    change: 'for_sale' | 'not_for_sale' | 'to_return' | 'not_returning' | 'group';
+    change: ItemChange;
     count: number;
     titles: string[];
     left: number;
+    /** How they got rid of them, for dispose (plan #1894.5.1). */
+    method?: DisposalMethod;
   };
   move_roles: {
     stage: RoleStage;
@@ -168,7 +175,8 @@ export type DashChangeInput = {
   Record<TodoChangeKind, TodoChangeInput> &
   Record<YouChangeKind, YouChangeInput> &
   Record<NewsChangeKind, NewsChangeInput> &
-  Record<GoalsChangeKind, GoalsChangeInput>;
+  Record<GoalsChangeKind, GoalsChangeInput> &
+  Record<ShoppingChangeKind, ShoppingChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];
