@@ -200,6 +200,26 @@ export const THREAD_TOOLS: readonly DashTool[] = [
       additionalProperties: false,
     },
   ),
+  write(
+    'move_goal_step',
+    [GOAL_THREAD_TABLE],
+    'Move the step the comment is on, with its sub-steps, to the end of another of their open goals, when the comment says it belongs there. When the comment names no listed goal, or its words fit more than one, ask which instead of calling this.',
+    {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'The ref of the goal it goes under, from their other open goals listed, such as g2.' },
+        named: { type: 'string', description: 'The words the comment used for that goal, copied as written.' },
+      },
+      required: ['goal', 'named'],
+      additionalProperties: false,
+    },
+  ),
+  write(
+    'archive_goal_step',
+    [GOAL_THREAD_TABLE],
+    'Archive the step the comment is on, when the comment says it is no longer needed or wanted. Its sub-steps go out of view with it, and Undo on Home brings it back. Never a delete.',
+    { type: 'object', properties: {}, additionalProperties: false },
+  ),
   handoff(
     'take_step',
     [GOAL_THREAD_TABLE],

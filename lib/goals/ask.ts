@@ -6,7 +6,9 @@
  * #1465) with Ask Dash's lookups and writes and the goal's own tools, and
  * write the reply into the same thread as `claude`. The goal's own tools file
  * facts into its collections as drafts (file_goal_record), date a step or put
- * it on Todo (schedule_goal_step), take the step (take_step), or pass the
+ * it on Todo (schedule_goal_step), move a step under another goal or archive
+ * it (move_goal_step, archive_goal_step, in lib/goals/thread-acts.ts), take
+ * the step (take_step), or pass the
  * comment to the goals routine when it needs more, research, email or
  * changing the steps (pass_to_routine), whose reply lands in the thread later.
  *
@@ -21,7 +23,7 @@
  * ones where nothing could be done, because a question that went nowhere
  * silently looks the same as one being worked on.
  *
- * Each draft filed and each change to a step's date or Todo is recorded in
+ * Each draft filed and each change to a step's date, Todo, goal or archive is recorded in
  * core.dash_actions alongside the write (plan #1459), so it can be undone
  * while nobody has changed the row since.
  */
@@ -44,11 +46,13 @@ import { addRecord, loadCollectionsForGoal, loadInformation } from '@/lib/goals/
 import {
   commentRunText,
   FILINGS_MAX,
+  findStep,
   goalReplyMessage,
   parseGoalReply,
   replyBody,
   scheduleSaid,
   type ReplyCollection,
+  type ReplyGoal,
 } from '@/lib/goals/comments';
 import { loadThreads, writeComment } from '@/lib/goals/comments-store';
 import { acknowledgeThreadTurn } from '@/lib/thread/store';
@@ -58,6 +62,7 @@ import { sendGoalStep } from '@/lib/goals/handover-store';
 import { goalRunText, runInFlight } from '@/lib/goals/shaping';
 import { loadShaping, recordAndFire } from '@/lib/goals/shaping-store';
 import { loadGoalMap, setStepOnTodo, updateStep } from '@/lib/goals/steps-store';
+import { stepActs, type GoalAct } from '@/lib/goals/thread-acts';
 
 export type GoalAskInput = {
   /** Your own client: reads, and the run row. */
@@ -109,6 +114,19 @@ The goal's own tools:
   year), on_todo true or false. Putting a step on Todo works only for an open
   step of theirs. Do not tell them to set a date or a Todo flag themselves. On
   the goal itself there is no step to date, so say so.
+- move_goal_step. A comment on a step saying it belongs under another goal
+  ("this belongs under the house goal", "move this to Fitness") is done by you
+  now: goal is the ref of that goal in their other open goals listed (g1, g2),
+  and named is the words the comment used for it. Its sub-steps go with it.
+  When the comment names no goal on the list, or its words fit more than one,
+  do not call it: ask which goal they mean, naming the ones it could be.
+- archive_goal_step. A comment on a step saying it is no longer needed or
+  wanted ("we don't need this any more", "take this off") archives that step,
+  and its sub-steps go out of view with it. Archiving is undone from Home and
+  is never a delete.
+
+Use those two only when the comment asks for the change. A question about
+whether a step belongs elsewhere, or is still needed, is answered in words.
 - take_step. When a comment on a step tells you to do that step or get it
   ready ("do this", "draft this for me", "write the email for this", "review
   my resume", "you do it"), take it. A step of Claude's is worked and closed; a
@@ -123,7 +141,8 @@ The goal's own tools:
 
 What stays theirs, however the comment is phrased: answering a question
 Claude asked them, approving a goal or a proposal, marking a step of theirs
-done or dropping it, and deleting anything. Asked for one of those, say in one
+done or dropping it, and deleting anything. Archiving a step they no longer
+want is yours to do, with archive_goal_step. Asked for one of those, say in one
 sentence that it is theirs, and where on the goal's page it is done. Doing the
 work a step asks for is never on that list.`;
 
@@ -179,8 +198,12 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
 
   const threads = await loadThreads(input.client, [input.itemId]);
   const history = (threads[input.itemId] ?? []).filter((c) => c.id !== input.commentId);
+  // Their other open goals, the ones a step can be moved under.
+  const otherGoals: ReplyGoal[] = (map.otherGoals ?? [])
+    .filter((g) => g.status === 'open')
+    .map((g) => ({ id: g.id, title: g.title, areaName: g.areaName ?? '', errand: g.errand ?? false }));
   const { message, refs } = goalReplyMessage(
-    { goal: map.goal, steps: map.steps, collections, itemId: input.itemId, today: input.today },
+    { goal: map.goal, steps: map.steps, collections, itemId: input.itemId, today: input.today, otherGoals },
     history,
     input.question,
   );
@@ -244,6 +267,20 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
     return { ok: true, recorded: true, kind: 'schedule_goal_step', said: done.said };
   };
 
+  // The thread's own writes, by tool name (lib/dash/thread-tools.ts).
+  const acts: Record<string, GoalAct> = {
+    file_goal_record: fileRecord,
+    schedule_goal_step: schedule,
+    ...stepActs({
+      client: input.client,
+      userId: input.userId,
+      dash: input.dash,
+      goalTitle: map.goal.title,
+      step: input.itemId === input.goalId ? null : findStep(map.steps, input.itemId),
+      refs,
+    }),
+  };
+
   const handOff = async (name: string, args: unknown): Promise<ThreadHandOff> => {
     if (name === 'pass_to_routine') {
       const raw = args && typeof args === 'object' ? (args as { why?: unknown }) : {};
@@ -262,11 +299,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
     message: `${subjectLine(subjectRef)} The goal is goals.items ref ${input.goalId}.\n\n${message}`,
     dash: input.dashThread,
     acts: async (name, args) =>
-      name === 'file_goal_record'
-        ? fileRecord(args)
-        : name === 'schedule_goal_step'
-          ? schedule(args)
-          : { ok: false, error: 'That cannot be done on a goal.' },
+      Object.hasOwn(acts, name) ? acts[name](args) : { ok: false, error: 'That cannot be done on a goal.' },
     handOff,
     acknowledge: () =>
       acknowledgeThreadTurn(input.claude, { userId: input.userId, ref: subjectRef, turnId: input.commentId }),
