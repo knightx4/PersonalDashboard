@@ -73,6 +73,8 @@ import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
+import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -339,7 +341,7 @@ import {
   DevIdeasEmptySurface,
   DevRaisedSurface,
   DevInboxSurface,
-  DevRaisedStatusSurface,
+  DevSettingsSurface,
   DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
@@ -6395,13 +6397,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevInboxSurface />,
   },
   {
-    /* The Status panel at the top of Home in Dev, with Dash's mark under
-     * Plan (note 076e7744). */
-    id: 'dev-raised-status',
-    label: 'Dev · Home, the Status panel',
+    /* Dev settings (plan #1937.10): the routines that were the Status panel
+     * on Home, with Dash's mark under Plan (note 076e7744). */
+    id: 'dev-settings',
+    label: 'Dev · Settings',
     module: 'dev',
     width: 'page',
-    render: () => <DevRaisedStatusSurface />,
+    render: () => <DevSettingsSurface />,
+  },
+  {
+    /* Goals settings (plan #1937.10): the morning run on, the weekly run off. */
+    id: 'goals-settings',
+    label: 'Goals · Settings',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
+  },
+  {
+    /* Learn settings (plan #1937.10): subject offers on, an explain-back card
+     * in every ten. */
+    id: 'learn-settings',
+    label: 'Learn · Settings',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSettingsView settings={{ offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a
