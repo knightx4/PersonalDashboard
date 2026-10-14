@@ -63,6 +63,7 @@ describe('runConnectorWrite', () => {
       'change_goal_step',
       'change_item',
       'item_lists',
+      'add_items',
       ...VAULT_CHANGE_KINDS,
     ]);
   });
