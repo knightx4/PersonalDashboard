@@ -16,6 +16,7 @@ import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
 import type { ModuleId } from '@/lib/modules';
 import { withoutCoveredThreads } from '@/lib/todo/agenda/sources/threads';
+import { withoutCovered } from '@/lib/todo/agenda/covered';
 
 /**
  * Everything the agenda needs, fetched in parallel and merged by a pure
@@ -75,7 +76,7 @@ export async function loadAgenda(
 
   // A switched-off module's sources never run, whatever this module's own
   // settings say. Turning off a workspace has to mean it stops appearing.
-  const active = activeSources(account, agendaSettings.enabledSources).filter(
+  const active = activeSources(account, agendaSettings.enabledSources, workspace).filter(
     (source) => !workspace || source.module === workspace || source.crossesWorkspaces,
   );
 
@@ -152,6 +153,7 @@ async function runSources(
     }
   });
 
-  // A row listed by its own source and by a thread under it shows once, as itself.
-  return [withoutCoveredThreads(items), context, failed];
+  // A row listed by its own source and by a thread under it shows once, as
+  // itself; an ask listed in a more particular form shows once, as that.
+  return [withoutCovered(withoutCoveredThreads(items)), context, failed];
 }

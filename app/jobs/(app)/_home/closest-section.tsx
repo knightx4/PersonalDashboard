@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
-import { chipVariants } from '@/components/ui/chip';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { cn } from '@/lib/cn';
 import { formatDate, formatInterviewWhen } from '@/lib/jobs/applications/load';
@@ -8,7 +7,6 @@ import type { ClosestApplication, ClosestRound } from '@/lib/jobs/today/closest'
 import { HomeSection } from './home-section';
 
 const LINK = cn(linkVariants({ tone: 'quiet' }), 'press-area text-small');
-const CAUTION_LINK = cn(chipVariants({ tone: 'caution' }), 'press-area transition-colors duration-quick hover:text-accent');
 
 /** The role's Interviews tab, open on one round's first conversation, where its prep and notes are. */
 function roundHref(roleId: string, round: ClosestRound): string {
@@ -16,15 +14,14 @@ function roundHref(roleId: string, round: ClosestRound): string {
 }
 
 /**
- * The applications at final round or in process, first on Today under the
- * review strip, one row each with what the next round needs
- * (lib/jobs/today/closest.ts).
+ * The applications at final round or in process, first on Now, one row each
+ * with where the next round stands (lib/jobs/today/closest.ts).
  *
- * Four lines under the name, each left out when it has nothing to say: the
- * next round, its prep, what the earlier rounds left on record, and a round
- * still owed a debrief. The debrief is asked here instead of in This week, so
- * a round is nudged once. Nothing at all when no application is this close
- * (law 1).
+ * Three lines under the name, each left out when it has nothing to say: the
+ * next round, its prep, and what the earlier rounds left on record. Now asks
+ * for nothing (plan #1937.9), so a round still owed a debrief is no longer
+ * called out here; the Earlier line's count says how many are written up.
+ * Nothing at all when no application is this close (law 1).
  */
 export function ClosestSection({
   closest,
@@ -64,22 +61,6 @@ export function ClosestSection({
                 </Line>
                 <Prep app={app} timezone={timezone} />
                 <Earlier app={app} />
-                {app.debriefs.length > 0 && (
-                  <Line term="Debrief">
-                    <span className="flex flex-wrap gap-x-3 gap-y-1">
-                      {app.debriefs.map((round) => (
-                        <Link
-                          key={round.key}
-                          href={roundHref(app.roleId, round)}
-                          className={CAUTION_LINK}
-                        >
-                          Write up {round.label ?? 'the round'},{' '}
-                          {formatDate(round.scheduledAt, timezone)}
-                        </Link>
-                      ))}
-                    </span>
-                  </Line>
-                )}
               </ValueList>
             </li>
           ))}
@@ -109,11 +90,8 @@ function Prep({ app, timezone }: { app: ClosestApplication; timezone: string }) 
             Open the prep
           </Link>
         ) : (
-          <Link
-            href={roundHref(app.roleId, app.next)}
-            className={CAUTION_LINK}
-          >
-            None yet: write it
+          <Link href={roundHref(app.roleId, app.next)} className={LINK}>
+            None yet
           </Link>
         )}
       </Line>

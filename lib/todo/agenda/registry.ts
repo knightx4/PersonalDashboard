@@ -11,6 +11,7 @@ import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
+import { jobWaitingSource } from '@/lib/todo/agenda/sources/job-waiting';
 import { planStepsSource } from '@/lib/todo/agenda/sources/plan-steps';
 import { raisedSource } from '@/lib/todo/agenda/sources/raised';
 import { returnDeadlinesSource } from '@/lib/todo/agenda/sources/return-deadlines';
@@ -26,6 +27,7 @@ import { threadsSource } from '@/lib/todo/agenda/sources/threads';
 const SOURCES: AgendaSource[] = [
   jobRemindersSource,
   jobInterviewsSource,
+  jobWaitingSource,
   returnDeadlinesSource,
   goalStepsSource,
   deliveriesSource,
@@ -55,10 +57,20 @@ export function sourceModule(id: SourceId): ModuleId {
  * The sources that run for this account: switched on here, or always on, and
  * never one whose workspace is off. Turning off a workspace has to mean it
  * stops appearing, whatever this module's own settings say.
+ *
+ * For a workspace's Inbox, that workspace's `inboxAlwaysOn` sources run too,
+ * switched on in Todo or not.
  */
-export function activeSources(account: AccountSettings, enabled: SourceId[]): AgendaSource[] {
+export function activeSources(
+  account: AccountSettings,
+  enabled: SourceId[],
+  inbox?: ModuleId,
+): AgendaSource[] {
   return SOURCES.filter(
     (source) =>
-      (source.alwaysOn || enabled.includes(source.id)) && moduleEnabled(account, source.module),
+      (source.alwaysOn ||
+        enabled.includes(source.id) ||
+        (source.inboxAlwaysOn === true && source.module === inbox)) &&
+      moduleEnabled(account, source.module),
   );
 }

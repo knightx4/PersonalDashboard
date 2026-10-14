@@ -1,22 +1,20 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { CalendarClock, Clock, MailQuestion, NotebookPen, PenLine, Video } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { CalendarClock, Video } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
 import { cn } from '@/lib/cn';
-import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
+import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
 import { roundDetail, roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
-import { ReminderActions } from './reminder-actions';
-import { WaitingActions } from './waiting-actions';
 
 /**
  * The week itself, lifted out of the section so it can be photographed.
  *
  * ThisWeekSection takes the board and decides whether the week is clear; this
- * is the four lists: interviews coming up, rounds owing a debrief (the
- * Interviews tab's banner until plan #1591), mail waiting on you and nudges. Each list's heading is an h3, under the section's h2.
+ * is the interviews coming up, one line a round. The debriefs, the mail
+ * waiting on you and the nudges that were listed under them left Now in plan
+ * #1937.9: the mail and the reminders are rows in the Jobs Inbox. The list's
+ * heading is an h3, under the section's h2.
  * The preview gallery cannot import a page whose first line asks for a
  * signed-in user.
  */
@@ -59,11 +57,6 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
               // The first conversation is when the round starts, which is
               // what a week is read against. What else is in it is said in the
               // detail line rather than as four more rows.
-              //
-              // A round with no prep anywhere in it is the one worth
-              // flagging: notes on one of four conversations still means
-              // somebody has looked at the day.
-              const hasPrep = interviews.some((interview) => interview.hasPrep);
               const joinable = interviews.find((interview) => interview.meetingUrl);
               const round = roundLabel(group);
               const detail = roundDetail(
@@ -104,117 +97,13 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                       Join
                     </a>
                   )}
-                  {!hasPrep && (
-                    <Chip tone="caution" size="sm">
-                      no prep notes
-                    </Chip>
-                  )}
                 </li>
               );
             })}
           </ul>
         </Section>
       )}
-
-      {board.debriefs.length > 0 && (
-        // Straight to the round that needs writing up, which is the only
-        // reason this list exists.
-        <Section icon={NotebookPen} title="Write these up tonight">
-          <ul className="divide-y divide-border">
-            {board.debriefs.map((round) => (
-              <li key={round.key} className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="tabular w-full text-small text-ink-muted sm:w-44">
-                  {formatInterviewWhen(round.scheduledAt, round.timeKnown, timezone)}
-                </span>
-                <Link
-                  href={`/jobs/roles/${round.roleId}?tab=interviews&interview=${round.leadId}`}
-                  className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-                >
-                  <span className="absolute inset-0" aria-hidden />
-                  {round.companyName} · {round.roleTitle}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {board.waiting.length > 0 && (
-        // No hint: "Waiting on you" already says it, and the line restating it
-        // took a row of its own on a phone (law 15).
-        <Section icon={MailQuestion} title="Waiting on you">
-          <ul className="divide-y divide-border">
-            {board.waiting.map((row) => (
-              <li key={row.eventId} className="row-pad flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="tabular w-full text-small text-ink-muted sm:w-44">
-                  {formatDateTime(row.occurredAt, timezone)}
-                </span>
-                <Link
-                  href={`/jobs/roles/${row.roleId}`}
-                  className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-                >
-                  {row.companyName} · {row.roleTitle}
-                </Link>
-                {row.summary && (
-                  <span className="w-full text-small text-ink-muted sm:w-auto sm:flex-1">
-                    {row.summary}
-                  </span>
-                )}
-                <WaitingActions row={row} />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {board.reminders.length > 0 && (
-        <Section icon={Clock} title="Nudges">
-          <ul className="divide-y divide-border">
-            {board.reminders.map((reminder) => (
-              <li key={reminder.id} className="row-pad flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                {reminder.roleId ? (
-                  <Link
-                    href={`/jobs/roles/${reminder.roleId}`}
-                    className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-                  >
-                    {reminder.companyName} · {reminder.roleTitle}
-                  </Link>
-                ) : (
-                  <span className="text-ui font-medium text-ink">Reminder</span>
-                )}
-                <span className="w-full text-small text-ink-muted sm:w-auto sm:flex-1">
-                  {reminder.body}
-                </span>
-                {reminder.followUpHref && <DraftLink href={reminder.followUpHref} />}
-                <ReminderActions id={reminder.id} />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
     </div>
-  );
-}
-
-/**
- * Opens Gmail's own composer with the follow-up already written.
- *
- * Not a draft written through the API: that needs `gmail.compose` on top of
- * the read-only grant this app asks for, and a reconnect to get it. A wider
- * key to the mailbox is a poor trade for saving one click.
- */
-function DraftLink({ href }: { href: string }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-    >
-      <PenLine className="size-3.5" strokeWidth={1.75} aria-hidden />
-      Draft follow-up
-    </a>
   );
 }
 

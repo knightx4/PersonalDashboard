@@ -17,37 +17,29 @@ import { HomeSection } from './home-section';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
- * Every live application, grouped by whose move it is, under the numbers
- * that say where the search stands (plan #1151, #1591).
+ * The numbers that say where the search stands, in Now's rail (plan #1151,
+ * #1591, #1937.9).
  *
- * The numbers each open the applications they counted: Live opens Pipeline,
- * which opens on the live ones; a stage opens the table narrowed to it; sent
- * opens the table narrowed to what was sent in the window, closed or not; and
- * the interviews go to This week, higher on this page, which lists them.
- *
- * The groups are lib/jobs/today/live.ts's: yours, theirs, and the ones not
- * sent yet. A group with nothing in it is left out (law 1).
+ * Each opens the applications it counted: Live opens Pipeline, which opens
+ * on the live ones; a stage opens the table narrowed to it; sent opens the
+ * table narrowed to what was sent in the window, closed or not; and the
+ * interviews go to This week, which lists them.
  */
-export function LiveSection({ summary, live }: { summary: SearchSummary; live: LiveByMove }) {
-  // Each label has a short form for a phone, where seven numbers have to
-  // fit two rows of four without a label wrapping.
-  const stats: Array<{ label: string; short: string; value: string; href: string }> = [
-    { label: 'Live', short: 'Live', value: String(summary.live), href: PIPELINE_PATH },
+export function SearchNumbers({ summary }: { summary: SearchSummary }) {
+  const stats: Array<{ label: string; value: string; href: string }> = [
+    { label: 'Live', value: String(summary.live), href: PIPELINE_PATH },
     ...summary.byStage.map((stage) => ({
-      label: stage.label,
-      short: stage.key === 'unsent' ? 'Not sent' : stage.label,
+      label: stage.key === 'unsent' ? 'Not sent' : stage.label,
       value: String(stage.count),
       href: stageHref(stage.key),
     })),
     {
       label: `Sent in ${SENT_WINDOW_DAYS} days`,
-      short: `Sent ${SENT_WINDOW_DAYS}d`,
       value: String(summary.sentRecently),
       href: sentHref(),
     },
     {
       label: `Interviews in ${INTERVIEW_HORIZON_DAYS} days`,
-      short: 'Interviews',
       // Law 2: a failed read says so rather than passing for none.
       value: summary.interviewsSoon === null ? 'Could not load' : String(summary.interviewsSoon),
       href: '#this-week',
@@ -55,37 +47,38 @@ export function LiveSection({ summary, live }: { summary: SearchSummary; live: L
   ];
 
   return (
+    <HomeSection id="numbers" title="Where the search stands">
+      <Card padding="standard">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          {stats.map((stat) => (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="press-area min-w-0 transition-colors duration-quick hover:[&_p:first-child]:text-accent"
+            >
+              <Stat size="sm" value={stat.value} label={stat.label} />
+            </Link>
+          ))}
+        </div>
+      </Card>
+    </HomeSection>
+  );
+}
+
+/**
+ * Every live application, grouped by whose move it is (plan #1151, #1591).
+ * The numbers that sat above them are in the rail since plan #1937.9.
+ *
+ * The groups are lib/jobs/today/live.ts's: yours, theirs, and the ones not
+ * sent yet. A group with nothing in it is left out (law 1).
+ */
+export function LiveSection({ live }: { live: LiveByMove }) {
+  return (
     <HomeSection
       id="live"
       title="Live applications"
       more={{ href: PIPELINE_PATH, label: 'Open Pipeline' }}
     >
-      <Card padding="standard">
-        <div className="grid grid-cols-4 gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-x-8">
-          {stats.map((stat) => (
-            <Link
-              key={stat.label}
-              href={stat.href}
-              className="press-area min-w-0 whitespace-nowrap transition-colors duration-quick hover:[&_p:first-child]:text-accent"
-            >
-              <Stat
-                size="sm"
-                value={stat.value}
-                label={
-                  <>
-                    <span className="sm:hidden" aria-hidden={stat.short !== stat.label || undefined}>
-                      {stat.short}
-                    </span>
-                    {stat.short !== stat.label && <span className="max-sm:sr-only">{stat.label}</span>}
-                    {stat.short === stat.label && <span className="max-sm:hidden">{stat.label}</span>}
-                  </>
-                }
-              />
-            </Link>
-          ))}
-        </div>
-      </Card>
-
       {live.total === 0 ? (
         <EmptyState
           size="inline"

@@ -56,6 +56,8 @@ export const jobRemindersSource: AgendaSource = {
   id: 'job_reminders',
   label: 'To-dos and follow-ups',
   module: 'jobs',
+  // Jobs' Inbox lists them whatever Todo's switch says (plan #1937.9).
+  inboxAlwaysOn: true,
   description:
     'Follow-ups, prep and thank-yous the job search is holding, with the follow-up already written.',
 

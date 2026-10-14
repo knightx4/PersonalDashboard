@@ -3,22 +3,20 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPipeline } from '@/lib/jobs/applications/load';
 import { summariseSearch, type SummaryInterview } from '@/lib/jobs/home/summary';
 import { loadSinceView } from '@/lib/jobs/home/since-load';
-import { loadReviewQueue } from '@/lib/jobs/review/load';
 import {
   CLOSEST_STATUSES,
   closestToOffer,
   loadClosestInterviews,
-  withoutClosestDebriefs,
 } from '@/lib/jobs/today/closest';
 import { liveByMove } from '@/lib/jobs/today/live';
 import { loadToday } from '@/lib/jobs/today/load';
-import { reviewPeek } from '@/lib/jobs/today/review-peek';
 import { TodayPage } from './_home/today-page';
 
-export const metadata = { title: 'Today' };
+export const metadata = { title: 'Now' };
 
 /**
- * Today, and where `/jobs` lands (plan #1150, #1591).
+ * Now, and where `/jobs` lands (plan #1150, #1591, #1937.9). What needs you
+ * is in the Jobs Inbox (/jobs/inbox), which has its own page.
  *
  * Reads everything once and hands it to TodayPage, which draws it. The
  * pipeline is read once for the live list, the numbers and This week's
@@ -27,8 +25,7 @@ export const metadata = { title: 'Today' };
  * puts the live list's move on you.
  *
  * The applications at final round or in process are read once more, for
- * their interviews' prep and notes, which open the page; the debriefs they
- * ask for are taken out of This week so a round is nudged once.
+ * their interviews' prep and notes, which open the page.
  *
  * /jobs/today, the page Home replaced, redirects here.
  */
@@ -58,9 +55,8 @@ export default async function JobsToday() {
   ]);
 
   const now = new Date();
-  const [board, queue, closestInterviews] = await Promise.all([
+  const [board, closestInterviews] = await Promise.all([
     loadToday(supabase, user.id, { senderName, pipeline, now }),
-    loadReviewQueue(supabase, core, user.id),
     loadClosestInterviews(
       supabase,
       user.id,
@@ -85,9 +81,8 @@ export default async function JobsToday() {
 
   return (
     <TodayPage
-      review={reviewPeek(queue.rows)}
       closest={closest}
-      board={withoutClosestDebriefs(board, closest)}
+      board={board}
       summary={summariseSearch(pipeline, interviews, now)}
       live={liveByMove(pipeline, new Set(board.waiting.map((item) => item.applicationId)))}
       since={since}

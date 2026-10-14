@@ -1,32 +1,30 @@
+import { MainRail } from '@/components/patterns/main-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import type { SearchSummary } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { ClosestApplication } from '@/lib/jobs/today/closest';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { LiveByMove } from '@/lib/jobs/today/live';
-import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import { ClosestSection } from './closest-section';
-import { LiveSection } from './live-section';
-import { ReviewStrip } from './review-strip';
+import { LiveSection, SearchNumbers } from './live-section';
 import { SinceList } from './since-list';
 import { ThisWeekSection } from './this-week-section';
-import { PageColumn } from '@/components/shell/page-width';
 
 /**
- * Today, where Jobs opens (plan #1591), drawn from what the page has read.
+ * Now, where Jobs opens (plan #1591, #1937.9), drawn from what the page has
+ * read.
  *
- * One column, in the order things need you: imports waiting to be checked
- * (when there are any), then the applications closest to an offer (when there
- * are any), then This week, then every live application grouped
- * by whose move it is, under the numbers that say where the search stands,
- * then what came in since your last visit. It took in three tabs: Review is
- * the strip, Interviews' debrief nudge is in This week (or on the
- * application in Closest to an offer, when it is one), and Activity is behind "Since you last looked". Their pages keep their addresses.
+ * What is going on, and nothing that asks for an action: what needs you is in
+ * the Jobs Inbox (/jobs/inbox), which took the imports to check, the mail
+ * waiting on a reply and the reminders when Today split in two (decision
+ * #1937.3). Main plus rail: the applications closest to an offer, This week's
+ * interviews and every live application by whose move it is in the column
+ * you read; the numbers and what came in since your last visit in the rail
+ * beside it.
  *
  * Here rather than in the page so the gallery can draw it from fixtures.
  */
 export function TodayPage({
-  review,
   closest,
   board,
   summary,
@@ -34,9 +32,7 @@ export function TodayPage({
   since,
   timezone,
 }: {
-  review: ReviewPeek;
   closest: readonly ClosestApplication[];
-  /** With the debriefs Closest to an offer asks for already taken out. */
   board: TodayBoard;
   summary: SearchSummary;
   live: LiveByMove;
@@ -44,15 +40,23 @@ export function TodayPage({
   timezone: string;
 }) {
   return (
-    <PageColumn>
-      <PageHeader title="Today" />
-      <div className="space-y-8">
-        <ReviewStrip review={review} />
-        <ClosestSection closest={closest} timezone={timezone} />
-        <ThisWeekSection board={board} timezone={timezone} />
-        <LiveSection summary={summary} live={live} />
-        <SinceList since={since} timezone={timezone} />
-      </div>
-    </PageColumn>
+    <MainRail
+      main={
+        <>
+          <PageHeader title="Now" />
+          <div className="space-y-8">
+            <ClosestSection closest={closest} timezone={timezone} />
+            <ThisWeekSection board={board} timezone={timezone} />
+            <LiveSection live={live} />
+          </div>
+        </>
+      }
+      rail={
+        <>
+          <SearchNumbers summary={summary} />
+          <SinceList since={since} timezone={timezone} />
+        </>
+      }
+    />
   );
 }

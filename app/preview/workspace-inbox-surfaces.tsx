@@ -69,14 +69,26 @@ const JOBS: InboxRow[] = [
     verbs: [done, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }],
   },
   {
-    ref: 'job_search.applications:a2',
+    // Mail waiting on a reply (plan #1937.9): the request as the title, the
+    // role under it.
+    ref: 'job_search.application_events:e1',
     section: 'actions',
-    title: 'Reply to Wise about a second interview',
-    line: 'They wrote on Tue 7 Oct',
+    title: 'Asked for two or three times next week for a call with the hiring manager',
+    line: 'Wise · Senior Product Designer, Card Payments',
     href: '/jobs/roles/r2',
     move: onYou,
     putOff,
-    verbs: [{ label: 'Open the role', tone: 'primary', href: '/jobs/roles/r2' }],
+    verbs: [done],
+    decline,
+  },
+  {
+    ref: 'job_search.applications:a4',
+    section: 'actions',
+    title: 'Do the Starling assessment',
+    href: '/jobs/roles/r4',
+    move: onYou,
+    putOff,
+    verbs: [{ label: 'Product Designer', tone: 'primary', href: '/jobs/roles/r4' }],
     decline,
   },
   {

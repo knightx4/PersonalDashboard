@@ -95,12 +95,10 @@ import { summariseSearch } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import {
   closestToOffer,
-  withoutClosestDebriefs,
   type ClosestApplication,
   type ClosestInterview,
 } from '@/lib/jobs/today/closest';
 import { liveByMove } from '@/lib/jobs/today/live';
-import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
@@ -1445,18 +1443,6 @@ const todayPageBoard: TodayBoard = {
       scheduledAt: '2026-09-08T15:00:00.000Z',
       timeKnown: true,
     },
-  ],
-};
-const todayPageReview: ReviewPeek = {
-  count: 5,
-  items: [
-    {
-      id: 'rv1',
-      title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
-      kind: 'Confirmation email',
-    },
-    { id: 'rv2', title: 'Brightwell · Software Engineer, Treasury', kind: 'New application from mail' },
-    { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
   ],
 };
 const todayPageSince: SinceView = {
@@ -3397,16 +3383,15 @@ const findView = {
   people: recommendedPeople,
 };
 
-/** Jobs Today drawn from the sample rows, with the review queue given. */
-function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+/** Jobs' Now drawn from the sample rows, with the week given. */
+function JobsTodaySurface({ board }: { board: TodayBoard }) {
   return (
     <TodayPage
-      review={review}
       closest={todayPageClosest}
-      board={withoutClosestDebriefs(todayPageBoard, todayPageClosest)}
+      board={board}
       summary={summariseSearch(
         todayPageRows,
-        todayPageBoard.interviews.map((interview) => ({
+        board.interviews.map((interview) => ({
           id: interview.id,
           scheduledAt: interview.scheduledAt,
           timeKnown: interview.timeKnown,
@@ -4504,22 +4489,23 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Today, where Jobs opens (plan #1591): the review strip, the
-     * applications closest to an offer, This week, the live applications by whose move it is, and what came in since. */
+    /* Now, where Jobs opens (plan #1591, #1937.9): the applications closest
+     * to an offer, This week's interviews and the live applications by whose
+     * move it is, with the numbers and what came in since in the rail. */
     id: 'jobs-today',
-    label: 'Today',
+    label: 'Now',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={todayPageReview} />,
+    render: () => <JobsTodaySurface board={todayPageBoard} />,
   },
   {
-    /* The same page with nothing waiting to be checked, so the review strip
-     * does not draw: the picture for a post about Today. */
+    /* The same page in a week with no interviews booked, so This week is
+     * its one quiet line. */
     id: 'jobs-today-clear',
-    label: 'Today · nothing to check',
+    label: 'Now · a clear week',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={{ count: 0, items: [] }} />,
+    render: () => <JobsTodaySurface board={{ ...todayPageBoard, interviews: [] }} />,
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */

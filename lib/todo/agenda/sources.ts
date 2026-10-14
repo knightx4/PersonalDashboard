@@ -25,6 +25,7 @@ import type { AgendaClients } from '@/lib/todo/agenda/clients';
 export const SOURCE_IDS = [
   'job_reminders',
   'job_interviews',
+  'job_waiting',
   'return_deadlines',
   'goal_steps',
   'deliveries',
@@ -119,6 +120,13 @@ export interface AgendaItem {
    * (lib/todo/agenda/workspace.ts).
    */
   workspace?: ModuleId;
+  /**
+   * Rows this item stands for, as refs (plan #1937.9). An item another
+   * source found about one of them is left out while this one is listed, so
+   * the same ask shows once, as its most particular form: the email asking
+   * for your availability, not "Reply to Monzo" beside it.
+   */
+  covers?: string[];
 }
 
 /**
@@ -196,6 +204,13 @@ export interface AgendaSource {
    * whichever workspace it is for.
    */
   crossesWorkspaces?: boolean;
+  /**
+   * Runs in its own workspace's Inbox whether or not Todo has it switched on
+   * (plan #1937.9). The switch chooses what Todo's agenda carries; the
+   * workspace's Inbox is where everything in it that is on you is listed,
+   * and these are its rows.
+   */
+  inboxAlwaysOn?: boolean;
   /** One line, shown beside the switch. Say what appears, not how it works. */
   description: string;
   /** Everything this source has for the window. */
