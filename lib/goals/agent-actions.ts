@@ -11,7 +11,7 @@ export const goalsActions: ModuleActions = {
     moveAreaAction: GAP,
     archiveAreaAction: GAP,
     addGoal: tool('add_goal'),
-    editGoal: gap("Set a goal's done-when and wording (plan #1897)."),
+    editGoal: gap("set_goal_done_when sets the done-when; the wording, due date and area have no tool yet (plan #1894.7)."),
     moveGoalAction: GAP,
     archiveGoalAction: GAP,
     settleGoalAction: GAP,

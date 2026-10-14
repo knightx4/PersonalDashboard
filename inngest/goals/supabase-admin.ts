@@ -5,18 +5,23 @@ import { z } from 'zod';
 import { publicEnv } from '@/lib/env';
 import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 
+/** What a service-role write says about itself in goals.history (historyHeaders). */
+export type GoalsServiceHistory = Parameters<typeof historyHeaders>[0];
+
 /**
  * Service-role client for the goals schema, for the morning run (plan #933).
  *
  * Bypasses RLS -- every query must filter by user_id explicitly. Only import
  * from `inngest/`, `scripts/`, or a route handler that genuinely has no
  * session. Its writes are recorded in goals.history as Claude's, which is who
- * the scheduled run acts for.
+ * the scheduled run acts for, unless `history` says otherwise: the connector's
+ * goal writes (plan #1894.3) pass the person's own request through as Ask
+ * Dash does on their session.
  *
  * Intentionally does NOT use serverEnv(): that requires DATABASE_URL, which is
  * optional on Vercel where we talk to Supabase over HTTPS only.
  */
-export function createGoalsServiceSupabase(): GoalsSupabaseClient {
+export function createGoalsServiceSupabase(history: GoalsServiceHistory = { actor: 'claude' }): GoalsSupabaseClient {
   if (typeof window !== 'undefined') {
     throw new Error('createGoalsServiceSupabase is server-only');
   }
@@ -26,6 +31,6 @@ export function createGoalsServiceSupabase(): GoalsSupabaseClient {
   return createClient(publicEnv().NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     db: { schema: GOALS_SCHEMA },
-    global: { headers: historyHeaders({ actor: 'claude' }) },
+    global: { headers: historyHeaders(history) },
   }) as GoalsSupabaseClient;
 }

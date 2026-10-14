@@ -40,6 +40,9 @@ import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
  * The service role passes no RLS, so every query in lib/learn/chat names that
  * person.
  *
+ * Four more (plan #1894.3) add a goal, add a step under one, close a step and
+ * set a goal's done-when, by the same route.
+ *
  * Each change is recorded in core.dash_actions as Dash's, so it is listed on
  * Home with an Undo, and logged in core.connector_calls like a lookup.
  */
@@ -63,6 +66,12 @@ export type ConnectorWriteContext = {
    * (add_quick_note, add_idea, add_job_lead). Absent: those are refused.
    */
   db?: AskDb;
+  /**
+   * A service-role goals client recording its writes in goals.history as the
+   * history options say, for the goal writes (plan #1894.3). Absent: those
+   * are refused.
+   */
+  goals?: DashWriteContext['goals'];
   /** Writes a quick note into the person's vault Inbox. Absent: add_quick_note is refused. */
   fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
   /**
@@ -476,7 +485,25 @@ const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
 }));
 
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
-type SharedWrite = 'add_quick_note' | 'add_idea' | 'add_job_lead';
+type SharedWrite =
+  | 'add_quick_note'
+  | 'add_idea'
+  | 'add_job_lead'
+  | 'add_goal'
+  | 'add_goal_step'
+  | 'close_goal_step'
+  | 'set_goal_done_when';
+
+/**
+ * The shared writes that name a goal or a step by its ref. Ask holds a ref to
+ * one a lookup in the conversation returned; the connector keeps no
+ * conversation, so it takes any ref, and every read in these tools names the
+ * verified person, so a ref that is not theirs is refused as not found.
+ */
+const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'close_goal_step', 'set_goal_done_when']);
+
+/** The shared writes that change Goals, and so need the goals client. */
+const WRITES_GOALS: ReadonlySet<SharedWrite> = new Set(['add_goal', ...NAMES_GOAL_ROWS]);
 
 function refuse(): never {
   throw new AskInputError('That change cannot be made through this connection.');
@@ -496,7 +523,9 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
     definition: { ...dash.definition, description },
     async run(ctx, input) {
       if (!ctx.db || !ctx.account) refuse();
+      if (WRITES_GOALS.has(name) && !ctx.goals) refuse();
       const db = ctx.db;
+      const goals = ctx.goals;
       const write = {
         userId: ctx.userId,
         today: ctx.account.today,
@@ -504,9 +533,9 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         enabledModules: ctx.account.enabledModules,
         db,
         searchSources: [],
-        // None of these three names a row it looked up, or writes a goal or a todo.
-        seen: () => false,
-        goals: async () => refuse(),
+        seen: () => NAMES_GOAL_ROWS.has(name),
+        // Only the goal writes reach this; none of the others writes a goal or a todo.
+        goals: goals && WRITES_GOALS.has(name) ? goals : async () => refuse(),
         createTask: async () => refuse(),
         fileQuickNote: ctx.fileQuickNote,
       } satisfies DashWriteContext;
@@ -550,6 +579,26 @@ const addJobLead = sharedWrite(
   'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. It is listed on Home with an Undo.',
 );
 
+const addGoal = sharedWrite(
+  'add_goal',
+  'Add a goal to the person\'s Goals workspace in Dash, under one of their areas, when they ask for a new goal ("add a goal to run a half marathon"). Name the area by its name as they have it; when none of theirs fits, pass new_area true with a short name for one. Write the goal as an outcome. A step under a goal they already have is add_goal_step. It is listed on Home with an Undo.',
+);
+
+const addGoalStep = sharedWrite(
+  'add_goal_step',
+  'Add a step to the end of one of the person\'s goals in Dash, when they ask you to. Name the goal by the goals.items ref goal_status or search (kinds ["goal"]) returned for it; look it up first. The step is theirs, and the goal must already be approved. It is listed on Home with an Undo.',
+);
+
+const closeGoalStep = sharedWrite(
+  'close_goal_step',
+  'Mark a step under one of the person\'s goals in Dash done, when they say it is done or ask you to. Name the step by the goals.items ref search (kinds ["step"]) or goal_status returned for it; look it up first. A goal itself is not closed this way. It is listed on Home with an Undo.',
+);
+
+const setGoalDoneWhen = sharedWrite(
+  'set_goal_done_when',
+  'Write, change or clear the done-when of one of the person\'s goals in Dash, when they ask: the line that says when the goal is finished ("the song is live on Spotify"). Name the goal by the goals.items ref search (kinds ["goal"]) or goal_status returned for it; look it up first. Write it in their words; an empty done_when clears it. It is listed on Home with an Undo.',
+);
+
 /** Every write the connector offers, in the order clients are sent them. */
 export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addToReadingList,
@@ -558,6 +607,10 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addQuickNote,
   addIdea,
   addJobLead,
+  addGoal,
+  addGoalStep,
+  closeGoalStep,
+  setGoalDoneWhen,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,
