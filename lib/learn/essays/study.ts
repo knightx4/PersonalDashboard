@@ -50,7 +50,8 @@ export type StudyKind =
   | 'card'
   | 'log'
   | 'goal'
-  | 'theme';
+  | 'theme'
+  | 'brief';
 
 export type StudyItem = {
   /** Stable for the item across searches; what hiding it stores. */
@@ -79,6 +80,7 @@ export const STUDY_KIND_LABELS: Record<StudyKind, string> = {
   log: 'Learning log',
   goal: 'Goal',
   theme: 'Theme',
+  brief: 'Research brief',
 };
 
 /** Words too common to say two texts are about the same thing. */
@@ -266,6 +268,7 @@ const PIN_STUDY_KIND: Record<PinKind, StudyKind> = {
   reading: 'reading',
   theme: 'theme',
   log: 'log',
+  brief: 'brief',
 };
 
 /** The key a pin's item has, the same as the item found by search for that row. */
@@ -296,7 +299,9 @@ export function pinItems(
           ? `/vault/map/${pin.id}`
           : pin.kind === 'reading'
             ? `/learn/r/${pin.id}`
-            : null,
+            : pin.kind === 'brief'
+              ? `/learn/b/${pin.id}`
+              : null,
       link: null,
       pinned: true,
     };

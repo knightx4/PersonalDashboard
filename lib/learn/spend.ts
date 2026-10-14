@@ -352,6 +352,13 @@ export const LEARN_OPERATIONS = [
   // daily run for the places that are new or whose ideas changed by more
   // than a third, up to forty places a call, and none on a day nothing moved.
   'name-places',
+  // Researching a brief's question (plan #2023.2): one Sonnet call framing
+  // three to five sub-questions, one Haiku call with up to ten web searches
+  // and five pages read, and one Sonnet call writing the cited positions and
+  // the short answer from those pages. Recorded together, after the reply,
+  // by whatever started the run; the weekly check for new sources on a brief
+  // (plan #2023.6) records here too.
+  'research-topic',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

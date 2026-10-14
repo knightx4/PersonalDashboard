@@ -30,22 +30,42 @@ export async function saveErrandAndStart(input: {
   dueOn: string;
   detail?: string | null;
 }): Promise<ErrandResult> {
-  const { client, user, areaId, title, dueOn } = input;
-  const detail = input.detail?.trim() ? input.detail.trim() : null;
-
-  let goalId: string | null;
-  try {
-    goalId = await insertGoal(client, user.id, areaId, { title, errand: true, dueOn, detail });
-  } catch {
-    return { ok: false, error: 'The errand could not be saved. Try again.' };
-  }
-  if (!goalId) return { ok: false, error: 'That area is no longer on the page.' };
+  const { client, user, title, dueOn } = input;
+  const saved = await saveErrand({ ...input, userId: user.id });
+  if (!saved.ok) return saved;
+  const { goalId } = saved;
   return startOnSaved({
     client,
     user,
     goal: { id: goalId, title, errandDueOn: dueOn },
     noun: 'errand',
   });
+}
+
+/**
+ * Save an errand without starting a run: the write behind saveErrandAndStart,
+ * and what Dash's goal thread calls when it turns a step into an errand (plan
+ * #2035.2). An errand always has a date, since the database refuses one
+ * without (goals 0061). Blank notes are saved as none.
+ */
+export async function saveErrand(input: {
+  client: GoalsSupabaseClient;
+  userId: string;
+  areaId: string;
+  title: string;
+  dueOn: string;
+  detail?: string | null;
+}): Promise<{ ok: true; goalId: string } | { ok: false; error: string }> {
+  const { client, userId, areaId, title, dueOn } = input;
+  const detail = input.detail?.trim() ? input.detail.trim() : null;
+  let goalId: string | null;
+  try {
+    goalId = await insertGoal(client, userId, areaId, { title, errand: true, dueOn, detail });
+  } catch {
+    return { ok: false, error: 'The errand could not be saved. Try again.' };
+  }
+  if (!goalId) return { ok: false, error: 'That area is no longer on the page.' };
+  return { ok: true, goalId };
 }
 
 /**

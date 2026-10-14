@@ -10,6 +10,7 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -793,6 +794,11 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).
   if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
     return undoMany(deps, change, surface, undoContactRows);
+  }
+  if (change.kind === 'add_interview_round') {
+    // The round's row is the record's; its interview is checked here.
+    const moved = await roundConversationMoved(deps.db, change.undo);
+    if (moved) return { ok: false, error: moved, change };
   }
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },

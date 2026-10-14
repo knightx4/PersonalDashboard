@@ -1580,7 +1580,9 @@ export async function sweepQuietRuns(input: {
   const { data, error } = await supabase
     .from('plan_runs')
     .select('user_id, created_at')
-    .eq('status', 'started')
+    // Stale runs too: an account whose only open runs are stale still has
+    // runs to end (`STALE_RUN_ENDS_AFTER_MINUTES`).
+    .in('status', ['started', 'stale'])
     .limit(SWEEP_LIMIT);
   if (error) throw new Error(error.message);
 

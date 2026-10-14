@@ -60,7 +60,8 @@ export async function turnFiles(core: CoreSupabaseClient, turnId: string): Promi
 
 /**
  * The files a turn was sent with, downloaded through the person's own client
- * and read for Dash (plan #1716): pictures and PDFs as they are, Word, text
+ * and read for Dash (plan #1716): pictures and PDFs as they are, a picture
+ * too large to send as a smaller copy (plan #2032.1), Word, text
  * and CSV as text, and anything that cannot be read named with the reason.
  */
 export async function readTurnFiles(core: CoreSupabaseClient, turnId: string): Promise<DashFile[]> {

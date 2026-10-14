@@ -10,8 +10,10 @@ import {
   Check,
   ExternalLink,
   Feather,
+  FileSearch,
   GraduationCap,
   Play,
+  Sparkle,
   Sprout,
   Weight,
   X,
@@ -19,7 +21,7 @@ import {
 import { CardNotes } from '@/components/learn/card-notes';
 import { TalkThread } from '@/components/talk/talk-thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
@@ -688,6 +690,12 @@ function DeckCard({
         <article ref={body} className="card-pad min-w-0">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small text-ink-muted">
             <span>{card.why}</span>
+            {card.fresh && (
+              <Chip>
+                <Sparkle strokeWidth={1.75} aria-hidden />
+                New source
+              </Chip>
+            )}
             {card.depth && (
               <Chip>{DEPTH_LABEL[card.depth]}</Chip>
             )}
@@ -853,18 +861,28 @@ function DeckCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => void openCardSource(card.id)}
-                className={cn('inline-flex items-center gap-1', linkVariants({ tone: 'quiet' }))}
+                className={cn('inline-flex min-h-11 items-center gap-1', linkVariants({ tone: 'quiet' }))}
               >
                 {card.article}
                 <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               </a>
-              {` · ${card.site}`}
+              {' '}
+              <span className="whitespace-nowrap">{`· ${card.site}`}</span>
               {card.licence ? ` · ${card.licence}` : ''}
             </p>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {card.link && (
+            {/* A brief's source is on the brief's reading list already, and
+                has no section to start a subject from (plan #2023.6): its
+                card links back to the brief instead of Save and Test me. */}
+            {card.kind === 'research' && card.briefId && (
+              <Link href={`/learn/b/${card.briefId}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                <FileSearch className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Open the brief
+              </Link>
+            )}
+            {card.link && card.kind !== 'research' && (
               <Button
                 type="button"
                 variant="ghost"
@@ -881,14 +899,16 @@ function DeckCard({
                 {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </Button>
             )}
-            <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
-              <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
-              {testing
-                ? card.kind === 'lesson'
-                  ? 'Opening the questions…'
-                  : 'Starting a subject…'
-                : 'Test me on this'}
-            </Button>
+            {card.kind !== 'research' && (
+              <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
+                <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
+                {testing
+                  ? card.kind === 'lesson'
+                    ? 'Opening the questions…'
+                    : 'Starting a subject…'
+                  : 'Test me on this'}
+              </Button>
+            )}
             {/* A lesson's track already exists, so testing on it costs nothing. */}
             {card.kind === 'section' && (
               <PaidHint
@@ -1003,8 +1023,10 @@ function DeckCard({
         </article>
 
         {/* The three swipes as buttons, held at the foot of the screen while
-            a long card is read, so leaving a card never needs a scroll back. */}
-        <div className="sticky bottom-0 rounded-b-card border-t border-border bg-surface card-pad-x py-2">
+            a long card is read, so leaving a card never needs a scroll back.
+            On a phone they stop above the tab bar, as the deck pattern's
+            forward row does (components/patterns/deck.tsx). */}
+        <div className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:bottom-0 rounded-b-card border-t border-border bg-surface card-pad-x py-2">
           {/* A phrase selected on the card, and its explanation (plan
               #1057), above the swipes so it is on screen wherever the
               phrase was. */}

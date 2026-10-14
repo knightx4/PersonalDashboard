@@ -14,6 +14,11 @@ import { GOALS_CHANGE_KINDS, type GoalsChangeInput, type GoalsChangeKind } from 
 import { SHOPPING_CHANGE_KINDS, type ShoppingChangeInput, type ShoppingChangeKind } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS, type VaultChangeInput, type VaultChangeKind } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS, type JobsChangeInput, type JobsChangeKind } from '@/lib/ask/jobs-changes';
+import {
+  INTERVIEW_CHANGE_KINDS,
+  type InterviewChangeInput,
+  type InterviewChangeKind,
+} from '@/lib/ask/interview-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -68,6 +73,8 @@ export const DASH_CHANGE_KINDS = [
   ...VAULT_CHANGE_KINDS,
   // Jobs' role and application edits, in the same shape (lib/ask/jobs-changes.ts, plan #1894.6.1).
   ...JOBS_CHANGE_KINDS,
+  // A round on a role, in the same shape (lib/ask/interview-changes.ts, plan #2044.1).
+  ...INTERVIEW_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -128,6 +135,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  added or changed (plan #1894.9.1), in the same shape.
  * You's two        a place they have lived added or changed (plan #1991.5),
  *                  in the same shape.
+ * add_interview_round  a round added to a role with its first conversation
+ *                  (plan #2044.1), in the same shape. The record keeps that
+ *                  conversation as it was made in `undo.interview`, so Undo
+ *                  can tell whether anything was written on it since.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -184,7 +195,8 @@ export type DashChangeInput = {
   Record<GoalsChangeKind, GoalsChangeInput> &
   Record<ShoppingChangeKind, ShoppingChangeInput> &
   Record<VaultChangeKind, VaultChangeInput> &
-  Record<JobsChangeKind, JobsChangeInput>;
+  Record<JobsChangeKind, JobsChangeInput> &
+  Record<InterviewChangeKind, InterviewChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];

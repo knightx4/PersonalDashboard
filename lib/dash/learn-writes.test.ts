@@ -3,6 +3,7 @@ import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { LEARN_WRITES, runLearnWrite, type LearnWriteEnv } from './learn-writes';
 
 vi.mock('@/lib/learn/youtube/video-card-run', () => ({ settleVideoCards: vi.fn(async () => ({ withdrawn: 0, revived: 0 })) }));
+vi.mock('@/lib/learn/briefs/start', () => ({ briefStarter: vi.fn() }));
 vi.mock('@/lib/learn/embed/idea-embedding', () => ({
   embedIdeaClaim: vi.fn(async () => ({ embedding: null, embedding_model: null })),
 }));
@@ -24,11 +25,11 @@ function fakeLearn(tables: Record<string, Row[]>) {
   let ids = 0;
   const from = (table: string) => {
     const rows = (tables[table] ??= []);
-    let op: 'select' | 'update' | 'insert' = 'select';
+    let op: 'select' | 'update' | 'insert' | 'delete' = 'select';
     let patch: Row = {};
     let order: string | null = null;
     const filters: [string, unknown][] = [];
-    const matching = () => rows.filter((row) => filters.every(([column, value]) => row[column] === value));
+    const matching = () => rows.filter((row) => filters.every(([column, value]) => (row[column] ?? null) === value));
     const run = (): Row[] => {
       if (op === 'insert') {
         const row = { id: `new-${++ids}`, ...patch };
@@ -36,6 +37,10 @@ function fakeLearn(tables: Record<string, Row[]>) {
         return [row];
       }
       const found = matching();
+      if (op === 'delete') {
+        for (const row of found) rows.splice(rows.indexOf(row), 1);
+        return found;
+      }
       if (op === 'update') for (const row of found) Object.assign(row, patch);
       if (order) found.sort((a, b) => Number(b[order!]) - Number(a[order!]));
       return found.map((row) => ({ ...row }));
@@ -44,7 +49,10 @@ function fakeLearn(tables: Record<string, Row[]>) {
       select: () => builder,
       update: (values: Row) => ((op = 'update'), (patch = values), builder),
       insert: (values: Row) => ((op = 'insert'), (patch = values), builder),
+      delete: () => ((op = 'delete'), builder),
       eq: (column: string, value: unknown) => (filters.push([column, value]), builder),
+      is: (column: string, value: unknown) => (filters.push([column, value]), builder),
+      then: (resolve: (result: { data: Row[]; error: null }) => unknown) => resolve({ data: run(), error: null }),
       order: (column: string) => ((order = column), builder),
       limit: () => builder,
       maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
@@ -157,5 +165,86 @@ describe('the Learn writes', () => {
     expect(made.subjectRef).toBe('learn.watch_list:w1');
     expect(made.after).toMatchObject({ verdict: 'watch', verdict_by: 'you' });
     expect(made.summary).toBe('Dash changed the video "video dQw4w9WgXcQ": moved to Watch.');
+  });
+
+  describe('research_topic', () => {
+    const SUBS = [
+      { id: 'q1', text: 'What does SOX require of controls over AI outputs?' },
+      { id: 'q2', text: 'How do auditors test model changes?' },
+      { id: 'q3', text: 'Which regulators have said anything?' },
+    ];
+    const starter = (subQuestions: typeof SUBS | null = SUBS) => ({
+      frame: vi.fn(async () => subQuestions),
+      start: vi.fn(),
+    });
+
+    it('makes the list and the brief, starts the run, and returns the sub-questions', async () => {
+      const tables: Record<string, Row[]> = {};
+      const research = starter();
+      const made = await runLearnWrite(write('research_topic'), { userId: ME, learn: fakeLearn(tables), research }, {
+        topic: 'How SOX controls apply to AI',
+        reason: 'They are interviewing for an IT audit role.',
+      });
+      if ('ok' in made) throw new Error(made.error);
+      expect(research.frame).toHaveBeenCalledWith('How SOX controls apply to AI', 'They are interviewing for an IT audit role.');
+      expect(tables.tracks).toEqual([expect.objectContaining({ user_id: ME, title: 'How SOX controls apply to AI' })]);
+      const trackId = tables.tracks[0].id;
+      expect(made.after).toMatchObject({
+        user_id: ME,
+        track_id: trackId,
+        depth: 'standard',
+        status: 'researching',
+        stage: 'searching',
+        sub_questions: SUBS,
+      });
+      const id = made.after.id as string;
+      expect(research.start).toHaveBeenCalledWith(id);
+      expect(made).toMatchObject({
+        kind: 'research_topic',
+        op: 'insert',
+        subjectRef: `learn.briefs:${id}`,
+        undo: { archive_brief: true },
+        summary: 'Dash started researching "How SOX controls apply to AI".',
+      });
+      expect(made.row).toMatchObject({ href: `/learn/b/${id}`, detail: { sub_questions: SUBS.map((q, i) => `${i + 1}. ${q.text}`).join('\n') } });
+    });
+
+    it('lets the run frame the question when the first call fails', async () => {
+      const tables: Record<string, Row[]> = {};
+      const made = await runLearnWrite(write('research_topic'), { userId: ME, learn: fakeLearn(tables), research: starter(null) }, {
+        topic: 'Model risk management',
+      });
+      if ('ok' in made) throw new Error(made.error);
+      expect(made.after).toMatchObject({ stage: 'framing', sub_questions: [], angle: '' });
+    });
+
+    it('links an open brief on the same topic and starts nothing', async () => {
+      const tables: Record<string, Row[]> = {
+        briefs: [
+          { id: 'b-archived', user_id: ME, question: 'SOX controls and AI', status: 'ready', archived_at: '2026-10-01', created_at: '2026-10-01' },
+          { id: 'b-open', user_id: ME, question: 'How do SOX controls apply to AI?', status: 'ready', archived_at: null, created_at: '2026-10-02' },
+        ],
+      };
+      const research = starter();
+      const result = await runLearnWrite(write('research_topic'), { userId: ME, learn: fakeLearn(tables), research }, {
+        topic: 'I want to learn how SOX controls apply to AI',
+      });
+      expect(result).toMatchObject({ ok: false });
+      expect('error' in result && result.error).toContain('/learn/b/b-open');
+      expect(research.frame).not.toHaveBeenCalled();
+      expect(tables.tracks ?? []).toEqual([]);
+    });
+
+    it('refuses where no run can be started, and a depth it does not know', async () => {
+      const env = { userId: ME, learn: fakeLearn({}) };
+      expect(await runLearnWrite(write('research_topic'), env, { topic: 'Evals' })).toEqual({
+        ok: false,
+        error: 'Research cannot be started from here. Tell them nothing was started.',
+      });
+      expect(await runLearnWrite(write('research_topic'), { ...env, research: starter() }, { topic: 'Evals', depth: 'huge' })).toEqual({
+        ok: false,
+        error: 'depth must be one of quick, standard, deep.',
+      });
+    });
   });
 });

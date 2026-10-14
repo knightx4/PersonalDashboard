@@ -105,6 +105,7 @@ describe('RLS coverage', () => {
       'area_check_articles',
       'area_domains',
       'area_fields',
+      'briefs',
       'card_notes',
       'catalogue_course_items',
       'catalogue_items',

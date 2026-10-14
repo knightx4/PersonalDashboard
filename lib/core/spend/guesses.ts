@@ -242,6 +242,11 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The five pages' kept text (about 5,000 tokens each) and the draft in; a
   // heading and a sentence or two per claim out, for up to six claims.
   'judge-essay-claims': run(SONNET, 30_000, 3_000),
+  // A research brief (plan #2023.2): the search call dominates, with about
+  // eight searches and five pages of about 6,000 tokens read again on each
+  // round, as the essay's gathering is. The two Sonnet calls (framing, and
+  // writing from the five pages) add about $0.15, folded into the tokens.
+  'research-topic': searching(run(HAIKU, 400_000, 10_000), 8),
   // The rules and an essay of up to 2,000 words (about 3,000 tokens) in; at
   // most eight claims of a sentence or two out (plan #1873).
   'name-essay-claims': run(SONNET, 3_500, 700),

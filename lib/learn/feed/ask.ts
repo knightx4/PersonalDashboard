@@ -16,6 +16,7 @@ export type CardMaterial = { title: string; text: string };
 
 export function cardMaterial(row: FeedCardRow): CardMaterial | null {
   if (row.reason === 'queued' || row.reason === 'unit_check' || row.reason === 'teach_back') return null;
+  if (row.reason === 'researched') return researchMaterial(row);
 
   const lesson = row.reason === 'lesson';
   const item = lesson ? (row.source_item ?? null) : row.item;
@@ -41,6 +42,31 @@ export function cardMaterial(row: FeedCardRow): CardMaterial | null {
   }
   if (parts.length === 0) return null;
   return { title, text: parts.join('\n\n') };
+}
+
+/**
+ * A card from a brief's source (plan #2023.6): the card, then the summary of
+ * the page the research run wrote, which is what the card was written from
+ * when the page's own text was not given.
+ */
+function researchMaterial(row: FeedCardRow): CardMaterial | null {
+  const title = row.idea_name?.trim();
+  if (!title) return null;
+  const parts: string[] = [];
+  const add = (label: string, value: string | null | undefined) => {
+    const text = value?.trim();
+    if (text) parts.push(`${label}: ${text}`);
+  };
+  add('Takeaway', row.takeaway);
+  add('Context', row.context);
+  add('Summary', row.summary);
+  add('Example', row.example);
+  const reading = row.reading;
+  if (reading?.summary?.trim()) {
+    const where = reading.title?.trim() || reading.open_url?.trim() || 'the source';
+    parts.push(`The source the card was written from (${where}), as summarised:\n\n${reading.summary.trim()}`);
+  }
+  return parts.length > 0 ? { title, text: parts.join('\n\n') } : null;
 }
 
 /** Added to Dash's instructions for a card: the material is the card and its passage. */

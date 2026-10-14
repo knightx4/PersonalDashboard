@@ -30,6 +30,7 @@ import { GOALS_WRITE_TOOLS } from './goals-writes';
 import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 import { VAULT_WRITE_TOOLS } from './vault-writes';
 import { JOBS_WRITE_TOOLS } from './jobs-writes';
+import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -95,6 +96,8 @@ import { JOBS_WRITE_TOOLS } from './jobs-writes';
  *                    application confirmed or reopened, and flagged events
  *                    acknowledged or flagged again, from Jobs review (plan
  *                    #1894.6.4.1).
+ *   add_interview_round  a round on a role, with its first interview
+ *                    (lib/dash/interview-writes.ts, plan #2044.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1132,6 +1135,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...VAULT_WRITE_TOOLS,
   // Jobs' role and application edits, which the connector offers too (plan #1894.6.1).
   ...JOBS_WRITE_TOOLS,
+  // A round on a role (plan #2044.1).
+  ...INTERVIEW_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

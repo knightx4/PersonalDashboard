@@ -109,15 +109,15 @@ export const jobsActions: ModuleActions = {
   },
   'app/jobs/(app)/roles/[id]/interview-actions.ts': {
     saveInterview: GAP,
-    addInterview: GAP,
+    addInterview: tool('add_interview_round'),
     addInterviewer: GAP,
     addInterviewerByName: GAP,
     removeInterviewer: GAP,
     groupInterviews: GAP,
-    createInterviewRound: GAP,
+    createInterviewRound: tool('add_interview_round'),
     deleteInterviewRound: none('deletes'),
     saveInterviewGroup: GAP,
-    linkRoundMessage: GAP,
+    linkRoundMessage: tool('link_round_email'),
     unlinkRoundMessage: GAP,
     ungroupInterview: GAP,
     deleteInterview: none('deletes'),
@@ -133,7 +133,7 @@ export const jobsActions: ModuleActions = {
     matchRoleRequirements: none('spends'),
   },
   'app/jobs/(app)/roles/[id]/prep-actions.ts': {
-    writeRoundPrepNote: none('spends'),
+    writeRoundPrepNote: tool('write_prep_note'),
   },
   'app/jobs/(app)/roles/[id]/timeline-actions.ts': {
     updateReminder: tool('change_reminder'),

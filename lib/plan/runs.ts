@@ -68,6 +68,8 @@ import {
 } from './run-work';
 import { readAll } from '@/lib/learn/db/read-all';
 import { lineSilent, readLastLines } from '@/lib/core/run-liveness';
+import { ABANDONED_STALE_ERROR } from '@/lib/core/run-activities';
+import { subtreeTrail } from './subtree';
 import {
   abandonedClaim,
   FEATURE_IDLE_AFTER_MINUTES,
@@ -243,6 +245,11 @@ export async function endQuietRuns(input: {
    * `readLastLines` on the core schema unless a test hands one in.
    */
   readLines?: (runIds: readonly string[]) => Promise<Map<string, string>>;
+  /**
+   * When anything under each of these rows last changed, by row id; missing or
+   * null when it could not be read. `subtreeTrail` unless a test hands one in.
+   */
+  readTouched?: (rootIds: readonly string[]) => Promise<Map<string, string | null>>;
 }): Promise<{ finished: number; failed: number; stale: number; error: string | null }> {
   const now = input.now ?? Date.now();
   const nothing = { finished: 0, failed: 0, stale: 0 };
@@ -318,6 +325,7 @@ export async function endQuietRuns(input: {
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
   const silent: string[] = [];
+  const abandonedCandidates: QuietRun[] = [];
   for (const row of started) {
     const step = (row.plan_item_id ? stamps.get(row.plan_item_id) : null) ?? {
       completedAt: null,
@@ -328,7 +336,8 @@ export async function endQuietRuns(input: {
     if (lastLine) {
       // Lines replace the clock. The step closing or stopping on a question,
       // or the job's trail saying it is over, still finishes the run; silence
-      // only ever marks it stale, which the person acknowledges to end it.
+      // marks it stale, which you can acknowledge, and two hours more with
+      // nothing under its feature ends it (`STALE_RUN_ENDS_AFTER_MINUTES`).
       const done = readsWork(row.job) ? (work.get(row.id) ?? null) : null;
       if (
         endsRun(step.completedAt, row.created_at) ||
@@ -338,6 +347,8 @@ export async function endQuietRuns(input: {
         finished.push(row.id);
       } else if (row.status !== 'stale' && lineSilent(lastLine, now)) {
         silent.push(row.id);
+      } else if (row.status === 'stale' && olderThan(lastLine, now, STALE_RUN_ENDS_AFTER_MINUTES)) {
+        abandonedCandidates.push(row);
       }
       continue;
     }
@@ -393,6 +404,20 @@ export async function endQuietRuns(input: {
       .update({ status: 'failed', error: row.note })
       .eq('id', row.id);
   }
+  // A stale run nothing has come back to for two hours is ended, so the
+  // runner can start the feature again rather than hold its seat and claims
+  // until somebody presses Acknowledge. Whatever was going on under the
+  // feature keeps it: a row changed in that time means a session is still on
+  // it, whatever its lines say. A read that fails keeps every run stale.
+  const abandoned = await abandonedRuns(abandonedCandidates, now, input);
+  if (abandoned.length > 0) {
+    await input.supabase
+      .from('plan_runs')
+      .update({ status: 'failed', error: ABANDONED_STALE_ERROR })
+      .in('id', abandoned)
+      .eq('status', 'stale');
+  }
+
   // Only a run still started: a line written since the read moved nothing,
   // but one that asked a question since is awaiting_input and stays so.
   if (silent.length > 0) {
@@ -403,7 +428,74 @@ export async function endQuietRuns(input: {
       .eq('status', 'started');
   }
 
-  return { finished: finished.length, failed: ended.length, stale: silent.length, error: null };
+  return {
+    finished: finished.length,
+    failed: ended.length + abandoned.length,
+    stale: silent.length,
+    error: null,
+  };
+}
+
+/**
+ * How long a stale run may go with no line from it and no change under its
+ * feature before it is ended. The same two hours a run without lines is given
+ * (`RUN_QUIET_AFTER_MINUTES`) and a claim is held for (`STALLED_AFTER_MINUTES`).
+ *
+ * Until 14 October 2026 a stale run was ended only by your Acknowledge
+ * (plan #1825). A session that stopped at the account's usage limit then held
+ * a runner seat and its claimed steps for hours with nobody looking: #1931's
+ * held one from midnight until it was ended by hand at 03:30.
+ */
+export const STALE_RUN_ENDS_AFTER_MINUTES = 120;
+
+function olderThan(at: string | null, now: number, minutes: number): boolean {
+  if (!at || now === 0) return false;
+  const time = Date.parse(at);
+  return Number.isFinite(time) && (now - time) / 60_000 >= minutes;
+}
+
+/** The candidates whose feature has also gone untouched for the same two hours. */
+async function abandonedRuns(
+  candidates: readonly QuietRun[],
+  now: number,
+  input: {
+    supabase: Db;
+    userId: string;
+    readTouched?: (rootIds: readonly string[]) => Promise<Map<string, string | null>>;
+  },
+): Promise<string[]> {
+  if (candidates.length === 0) return [];
+  const roots = [...new Set(candidates.map((row) => row.plan_item_id).filter(Boolean))] as string[];
+  let touched = new Map<string, string | null>();
+  if (roots.length > 0) {
+    try {
+      touched = await (
+        input.readTouched ??
+        (async (ids) => {
+          const out = new Map<string, string | null>();
+          for (const id of ids) {
+            const trail = await subtreeTrail(input.supabase, input.userId, id);
+            if (trail) out.set(id, trail.touchedAt);
+          }
+          return out;
+        })
+      )(roots);
+    } catch (err) {
+      console.error(
+        `the features behind the stale runs could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+      );
+      return [];
+    }
+  }
+  return candidates
+    .filter((row) => {
+      if (!row.plan_item_id) return true;
+      // Not read means not known to be idle.
+      if (!touched.has(row.plan_item_id)) return false;
+      const at = touched.get(row.plan_item_id) ?? null;
+      return at === null || olderThan(at, now, STALE_RUN_ENDS_AFTER_MINUTES);
+    })
+    .map((row) => row.id);
 }
 
 /** A run still marked started, as the sweep reads it. */
