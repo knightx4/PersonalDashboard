@@ -9,14 +9,30 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { usePathname, useRouter } from 'next/navigation';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import type { AskChat } from '@/lib/talk/ask-chats';
-import { AskChats, openChatRef } from './chats';
+import { AskChats, openChatRef, type ChatEdits } from './chats';
 import { ChatUsed, type ChatUsedData } from './used';
-import { confirmDashChange, declineDashChange, undoDashChange } from './actions';
+import {
+  archiveDashChat,
+  confirmDashChange,
+  declineDashChange,
+  pinDashChat,
+  renameDashChat,
+  searchDashChats,
+  undoDashChange,
+} from './actions';
+import { useTransition } from 'react';
 
 const PRESSES: ChangePresses = {
   confirm: confirmDashChange,
   decline: declineDashChange,
   undo: undoDashChange,
+};
+
+const EDITS: ChatEdits = {
+  pin: pinDashChat,
+  rename: renameDashChat,
+  archive: archiveDashChat,
+  search: searchDashChats,
 };
 
 /**
@@ -50,7 +66,7 @@ export function DashChatsFrame({
           {chatsFailed && (
             <p className="mb-2 text-small text-danger">Your chats could not be read. Reload to try again.</p>
           )}
-          <AskChats chats={chats} today={today} made={made} madeFailed={madeFailed} presses={PRESSES} />
+          <AskChats chats={chats} today={today} made={made} madeFailed={madeFailed} presses={PRESSES} edits={EDITS} />
         </>
       }
     >
@@ -76,9 +92,12 @@ export function AskConversation({
   changes,
   openHandoffs,
   used,
+  archived = false,
 }: {
   title: string;
   conversationRef: string;
+  /** Archived out of the list (plan #1899.6): said above the thread, with the way back. */
+  archived?: boolean;
   turns: TalkTurn[];
   changes: DashChange[];
   openHandoffs?: number;
@@ -95,6 +114,7 @@ export function AskConversation({
         content: <ChatUsed used={used} presses={PRESSES} />,
       }}
     >
+    {archived && <ArchivedNote conversationRef={conversationRef} />}
     <AskThread
       id={`ask-${conversationRef}`}
       conversationRef={conversationRef}
@@ -108,6 +128,36 @@ export function AskConversation({
       hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
     />
     </ConversationChat>
+  );
+}
+
+/** Above an archived chat: it is out of the list, and one press puts it back. */
+export function ArchivedNote({
+  conversationRef,
+  restore = archiveDashChat,
+}: {
+  conversationRef: string;
+  restore?: ChatEdits['archive'];
+}) {
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  return (
+    <p className="mb-4 text-small text-ink-muted">
+      This chat is archived, so it is out of your list.{' '}
+      <button
+        type="button"
+        className="press font-medium text-accent hover:underline disabled:opacity-50"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const outcome = await restore(conversationRef, false);
+            if (outcome.ok) router.refresh();
+          })
+        }
+      >
+        Put it back in the list
+      </button>
+    </p>
   );
 }
 

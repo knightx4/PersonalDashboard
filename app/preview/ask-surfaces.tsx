@@ -16,8 +16,8 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
-import { AskChats } from '@/app/ask/chats';
-import { CHATS_BACK, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/ask/view';
+import { AskChats, type ChatEdits } from '@/app/ask/chats';
+import { ArchivedNote, CHATS_BACK, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/ask/view';
 import { ChatUsed } from '@/app/ask/used';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import type { AskChat } from '@/lib/talk/ask-chats';
@@ -514,6 +514,7 @@ export const DASH_CHATS: AskChat[] = [
     lastAt: chatAt('2026-10-13', 18),
     day: '2026-10-13',
     workspaces: ['learn'],
+    pinnedAt: chatAt(CHAT_TODAY, 7),
   },
   {
     id: 'd4',
@@ -538,6 +539,38 @@ export const DASH_CHATS: AskChat[] = [
     lastAt: chatAt('2026-09-28', 12),
     day: '2026-09-28',
     workspaces: [],
+  },
+  {
+    id: 'd7',
+    ref: '00000000-0000-4000-8000-000000000027',
+    title: 'Which flights to Lisbon did I look at in August?',
+    lastAt: chatAt('2026-09-14', 20),
+    day: '2026-09-14',
+    workspaces: ['goals'],
+    archivedAt: chatAt('2026-10-01', 9),
+  },
+];
+
+/** What the list's presses do in the gallery: each lands, after a moment. */
+const DASH_EDITS: ChatEdits = {
+  pin: async () => ({ ok: true }),
+  rename: async () => ({ ok: true }),
+  archive: async () => ({ ok: true }),
+  search: async (text) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return { hits: SEARCH_HITS.filter((hit) => hit.snippet.toLowerCase().includes(text.toLowerCase())) };
+  },
+};
+
+/** What a search for "Catan" finds said inside two chats, one of them only in an answer. */
+const SEARCH_HITS = [
+  {
+    ref: '00000000-0000-4000-8000-000000000021',
+    snippet: '…Two of them are still unsold in your inventory, and your todo to list the Catan lot is five days overdue.',
+  },
+  {
+    ref: '00000000-0000-4000-8000-000000000024',
+    snippet: '…a long run on Sunday, then the board game night with the Catan crowd on Tuesday, so keep Monday easy…',
   },
 ];
 
@@ -614,16 +647,31 @@ export function DashPageSurface({
   listOpen = true,
   usedOpen,
   sheetOpen = false,
+  list,
 }: {
-  chat?: 'open' | 'new';
+  chat?: 'open' | 'new' | 'archived';
+  /** The list's hidden parts (plan #1899.6): a search, a menu, a rename or Archived open. */
+  list?: 'search' | 'menu' | 'rename' | 'archived';
   listOpen?: boolean;
   /** The column of what Dash used, shown or folded. */
   usedOpen?: boolean;
   /** The column opened as a sheet, as it opens where there is no room for it. */
   sheetOpen?: boolean;
 }) {
-  const open = DASH_CHATS[0];
-  const turns = dashPageTurns(open.title ?? '');
+  const open = chat === 'archived' ? DASH_CHATS[DASH_CHATS.length - 1] : DASH_CHATS[0];
+  const turns: TalkTurn[] =
+    chat === 'archived'
+      ? [
+          { id: 'lq', role: 'user', body: open.title ?? '', createdAt: open.lastAt },
+          {
+            id: 'la',
+            role: 'assistant',
+            body: 'Three: TAP from Heathrow on 3 October for $212, easyJet from Gatwick on 4 October for $164, and British Airways on 5 October for $298. You saved the easyJet one to your Lisbon trip goal.',
+            createdAt: open.lastAt,
+          },
+        ]
+      : dashPageTurns(open.title ?? '');
+  const opened = chat !== 'new';
   return (
     <AskDashProvider source={FIXTURES}>
       <AppShell
@@ -636,11 +684,11 @@ export function DashPageSurface({
         counts={{ jobs: '3', todo: '8', shopping: '1' }}
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
-        pathname={chat === 'open' ? `/ask/${open.ref}` : '/ask'}
+        pathname={opened ? `/ask/${open.ref}` : '/ask'}
       >
         <Conversation
           label="Chats"
-          open={chat === 'open'}
+          open={opened}
           initialListOpen={listOpen}
           newChat={{ href: '/ask', label: 'New chat' }}
           list={
@@ -649,11 +697,17 @@ export function DashPageSurface({
               today={CHAT_TODAY}
               made={DASH_MADE}
               presses={DASH_PRESSES}
-              active={chat === 'open' ? open.ref : null}
+              edits={DASH_EDITS}
+              active={opened ? open.ref : null}
+              initialQuery={list === 'search' ? 'Catan' : undefined}
+              initialHits={list === 'search' ? SEARCH_HITS : undefined}
+              initialMenu={list === 'menu' ? DASH_CHATS[1].ref : null}
+              initialRenaming={list === 'rename' ? DASH_CHATS[1].ref : null}
+              initialArchivedOpen={list === 'archived' || chat === 'archived'}
             />
           }
         >
-          {chat === 'open' ? (
+          {opened ? (
             <ConversationChat
               title={open.title ?? 'A question'}
               back={CHATS_BACK}
@@ -677,6 +731,7 @@ export function DashPageSurface({
                 ),
               }}
             >
+              {chat === 'archived' && <ArchivedNote conversationRef={open.ref} restore={DASH_EDITS.archive} />}
               <AskThread
                 id="dash-page-preview"
                 conversationRef={open.ref}

@@ -24,6 +24,7 @@ function fakeClient(rows: {
         select: (...args: unknown[]) => (calls.push({ table, op: 'select', args }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
         in: (...args: unknown[]) => (calls.push({ table, op: 'in', args }), chain),
+        is: (...args: unknown[]) => (calls.push({ table, op: 'is', args }), chain),
         order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
         limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
         upsert: async (...args: unknown[]) => {

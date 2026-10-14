@@ -5186,6 +5186,41 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashPageSurface listOpen={false} />,
   },
   {
+    /* The list searched for "Catan" (plan #1899.6): two chats found by what
+     * was said in them, one only in Dash's answer, each with the words
+     * around it. On a phone the list is the page. */
+    id: 'ask-page-search',
+    label: 'Dash · Searching the chats',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="search" />,
+  },
+  {
+    /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
+    id: 'ask-page-menu',
+    label: "Dash · A chat's menu",
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="menu" />,
+  },
+  {
+    /* A chat being renamed in place in the list (plan #1899.6). */
+    id: 'ask-page-rename',
+    label: 'Dash · Renaming a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="rename" />,
+  },
+  {
+    /* An archived chat opened from Archived at the foot of the list (plan
+     * #1899.6), with the line above it that puts it back. */
+    id: 'ask-page-archived',
+    label: 'Dash · An archived chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="archived" usedOpen={false} />,
+  },
+  {
     /* The presses under each answer (plan #1899.7): the first answer made a
      * todo and saved to the vault, each card with Undo, and Edit pressed on
      * the second, so its question is back in the box. */
