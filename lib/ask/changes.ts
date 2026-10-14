@@ -10,7 +10,7 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
-import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
@@ -792,6 +792,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   // So does an email linked, turned down or unlinked (plan #1894.6.5).
   if (change.kind === 'change_role_email') return undoMany(deps, change, surface, undoRoleEmail);
+  // A role made from a review email takes the role out again while nothing has come to hang on it (plan #1894.6.4.3).
+  if (change.kind === 'add_role_from_email') return undoMany(deps, change, surface, undoRoleFromEmail);
   // A review queue change puts back each row it touched (plan #1894.6.4).
   if ((JOBS_ROWS_KINDS as readonly string[]).includes(change.kind)) return undoMany(deps, change, surface, undoJobsRows);
   // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).

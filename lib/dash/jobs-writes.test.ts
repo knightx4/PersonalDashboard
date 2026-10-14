@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
-import { JOBS_WRITES, runJobsWrite, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
+import { JOBS_WRITES, runJobsWrite, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
 
 /**
  * The Jobs writes an agent makes (plan #1894.6.1): each names one row, read
@@ -663,5 +663,76 @@ describe('review_emails (plan #1894.6.4.2)', () => {
     expect(await refused('review_emails', withMail(), { email_refs: [MAIL_1], verb: 'restore' })).toMatch(/None of those has been dismissed/);
     expect(await refused('review_emails', withMail(), { email_refs: [MAIL_1], verb: 'dismiss', classification: 'offer' })).toMatch(/goes with restore/);
     expect(await refused('review_emails', withMail(), { email_refs: [], verb: 'dismiss' })).toMatch(/Name the emails/);
+  });
+});
+
+describe('add_role_from_email (plan #1894.6.4.3)', () => {
+  const MAIL = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+  const LINKED = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+  const THEIRS = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3';
+  const MAILBOX = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function withMail(): FakeTables {
+    const t = tables();
+    const verdicts = [
+      { id: MAIL, classification: 'rejection', parse_status: 'needs_review', resulting_application_id: null, link_method: null, link_confidence: null, error: 'no role found' },
+      { id: LINKED, classification: 'recruiter_outreach', parse_status: 'parsed', resulting_application_id: APP_1, link_method: 'thread', link_confidence: 1, error: null },
+      { id: THEIRS, classification: 'offer', parse_status: 'needs_review', resulting_application_id: null, link_method: null, link_confidence: null, error: null },
+    ];
+    t['job_search.ingested_messages'] = verdicts.map((row) => ({ ...row }));
+    t['job_search.inbox_messages'] = verdicts.map((row, i) => ({
+      ...row,
+      user_id: row.id === THEIRS ? SOMEONE : ME,
+      email_account_id: MAILBOX,
+      provider_message_id: `m${i + 1}`,
+      subject: ['Update on your application', 'A role for you', 'Not mine'][i],
+      received_at: '2026-10-01T10:00:00.000Z',
+    }));
+    t['job_search.application_events'] = [];
+    t['job_search.notes'] = [];
+    return t;
+  }
+  const undoOn = (t: FakeTables) => ({ userId: ME, db: async (schema: Parameters<ReturnType<typeof fakeSchemaDb>>[0]) => fakeSchemaDb(t)(schema) });
+
+  it('makes the company, role and application and links the email, and its Undo takes all four back', async () => {
+    const t = withMail();
+    const change = await made('add_role_from_email', t, { email_ref: `${MAILBOX}:m1`, company: 'Globex', title: 'Data Engineer' });
+    const globex = t['job_search.companies'].find((c) => c.name === 'Globex')!;
+    const role = t['job_search.roles'].find((r) => r.title === 'Data Engineer')!;
+    const application = t['job_search.applications'].find((a) => a.role_id === role.id)!;
+    expect(role).toMatchObject({ user_id: ME, company_id: globex.id, source: 'portal' });
+    expect(application).toMatchObject({ user_id: ME, source: 'portal', created_by: 'manual' });
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: application.id, parse_status: 'parsed', link_method: 'manual' });
+    expect(t['job_search.application_events']).toEqual([expect.objectContaining({ application_id: application.id, kind: 'rejection', ingested_message_id: MAIL })]);
+    expect(change).toMatchObject({ kind: 'add_role_from_email', op: 'insert', subjectRef: `job_search.roles:${role.id}` });
+    expect(change.summary).toBe(
+      'Dash made the role Data Engineer at Globex from "Update on your application" in Jobs review, adding the company, and linked the email to it.',
+    );
+
+    expect(await undoRoleFromEmail(undoOn(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: null, parse_status: 'needs_review', error: 'no role found' });
+    expect(t['job_search.application_events']).toHaveLength(0);
+    expect(t['job_search.roles'].find((r) => r.id === role.id)).toBeUndefined();
+    expect(t['job_search.applications'].find((a) => a.id === application.id)).toBeUndefined();
+    expect(t['job_search.companies'].find((c) => c.id === globex.id)).toBeUndefined();
+  });
+
+  it('files the role under a company on file, and keeps a role that has gathered a note on Undo', async () => {
+    const t = withMail();
+    const change = await made('add_role_from_email', t, { email_ref: MAIL, company: 'acme', title: 'Analyst' });
+    const role = t['job_search.roles'].find((r) => r.title === 'Analyst')!;
+    expect(role.company_id).toBe(COMPANY);
+    t['job_search.notes'].push({ id: LINK, user_id: ME, role_id: role.id, body: 'Ask about the team' });
+    expect(await undoRoleFromEmail(undoOn(t), change.undo)).toMatchObject({ ok: false, error: expect.stringMatching(/gathered more/) });
+    expect(t['job_search.roles'].find((r) => r.id === role.id)).toBeDefined();
+    expect(t['job_search.application_events']).toHaveLength(1);
+    expect(t['job_search.companies'].find((c) => c.id === COMPANY)).toBeDefined();
+  });
+
+  it('refuses a role already on file, a linked email, mail that is not theirs and a missing title', async () => {
+    expect(await refused('add_role_from_email', withMail(), { email_ref: MAIL, company: 'Acme', title: 'role from email' })).toMatch(/on file already.*change_role_email/);
+    expect(await refused('add_role_from_email', withMail(), { email_ref: LINKED, company: 'Globex', title: 'Data Engineer' })).toMatch(/linked to a role already/);
+    expect(await refused('add_role_from_email', withMail(), { email_ref: THEIRS, company: 'Globex', title: 'Data Engineer' })).toMatch(/not one the job search has read/);
+    expect(await refused('add_role_from_email', withMail(), { email_ref: MAIL, company: 'Globex' })).toMatch(/Give title/);
   });
 });

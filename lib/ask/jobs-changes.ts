@@ -15,13 +15,13 @@ import type { LearnChangeInput } from './learn-changes';
 /** Material's, Settings' and Find's (plan #1894.6.7, lib/dash/career-writes.ts), last in JOBS_WRITES. */
 const CAREER_CHANGE_KINDS = ['add_evidence', 'add_resume_version', 'attach_resume_pdf', 'change_career_thought', 'add_discovered_company'] as const;
 
-export const JOBS_CHANGE_KINDS = ['change_role', 'change_application', 'add_application_questions', 'save_answer', 'set_default_answer', 'change_company', 'merge_roles', 'change_reminder', 'change_waiting', 'change_role_email', 'review_application', 'review_events', 'review_emails', 'change_contact', 'change_touch', 'mark_suggestion_sent', ...CAREER_CHANGE_KINDS] as const;
+export const JOBS_CHANGE_KINDS = ['change_role', 'change_application', 'add_application_questions', 'save_answer', 'set_default_answer', 'change_company', 'merge_roles', 'change_reminder', 'change_waiting', 'change_role_email', 'review_application', 'review_events', 'review_emails', 'change_contact', 'change_touch', 'mark_suggestion_sent', 'add_role_from_email', ...CAREER_CHANGE_KINDS] as const;
 
 /** The Jobs changes that touch many rows, whose Undo is Ask's (MANY_ROW_KINDS in lib/core/dash-actions.ts). */
-export const JOBS_MANY_ROW_KINDS: readonly JobsChangeKind[] = ['merge_roles', 'change_role_email', 'review_application', 'review_events', 'review_emails', 'change_contact', 'change_touch', 'mark_suggestion_sent', 'add_application_questions', 'add_discovered_company'];
+export const JOBS_MANY_ROW_KINDS: readonly JobsChangeKind[] = ['merge_roles', 'change_role_email', 'review_application', 'review_events', 'review_emails', 'change_contact', 'change_touch', 'mark_suggestion_sent', 'add_application_questions', 'add_discovered_company', 'add_role_from_email'];
 
 /** The review queue's changes (plan #1894.6.4), whose record keeps its rows as RowsUndo in lib/dash/jobs-writes.ts. */
-export const JOBS_ROWS_KINDS: readonly JobsChangeKind[] = ['review_application', 'review_events'];
+export const JOBS_ROWS_KINDS: readonly JobsChangeKind[] = ['review_application', 'review_events', 'review_emails'];
 
 export type JobsChangeKind = (typeof JOBS_CHANGE_KINDS)[number];
 

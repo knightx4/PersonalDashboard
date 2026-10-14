@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
+import { channelForMessage } from '@/lib/jobs/applications/channel';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { CLASSIFICATIONS, eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
@@ -13,7 +14,7 @@ import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
-import { CAREER_WRITES } from './career-writes';
+import { CAREER_WRITES, companyHeld } from './career-writes';
 import { JobsRefused } from './jobs-refused';
 
 /**
@@ -64,6 +65,13 @@ import { JobsRefused } from './jobs-refused';
  *
  *   change_role_email   an email linked to a role, a suggested one turned down,
  *                       or one taken off a role it was wrongly linked to.
+ *
+ * and, from Jobs review again (plan #1894.6.4.3):
+ *
+ *   add_role_from_email  a new role and application made from an email,
+ *                       with the email linked to it (RoleFromEmailUndo).
+ *                       Linking a review email to a role on file is
+ *                       change_role_email's link.
  *
  *
  * and, from the contacts pages and Find (plan #1894.6.6):
@@ -2042,6 +2050,239 @@ async function reviewEmails(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// add_role_from_email
+// ---------------------------------------------------------------------------
+
+/**
+ * A new role made from an email in Jobs review (plan #1894.6.4.3), as the
+ * page's "new role" option does: the company is found by name or added, the
+ * role and its application are made with the channel the email implies, and
+ * the email is linked to the application by change_role_email's link, which
+ * files the event its classification implies. Linking an email to a role on
+ * file is change_role_email itself.
+ *
+ * The record keeps the link's own undo (RoleEmailUndo) and the rows made.
+ * The Undo puts the email back in the queue, then takes the application, the
+ * role and an added company out, each only while nothing has come to hang on
+ * it since, so a note or an interview added in between is never lost.
+ */
+export type RoleFromEmailUndo = {
+  email: RoleEmailUndo | null;
+  application_id: string;
+  role_id: string;
+  /** The company, when this change added it. */
+  company_added: string | null;
+};
+
+async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const title = text(args, 'title');
+  if (!title) throw new JobsRefused('Give title: what the role is called.');
+  if (title.length > TITLE_MAX) throw new JobsRefused(`Keep title under ${TITLE_MAX} characters.`);
+  const companyGiven = text(args, 'company');
+  if (!companyGiven) throw new JobsRefused('Give company: which company the role is at.');
+  if (companyGiven.length > COMPANY_MAX) throw new JobsRefused(`Keep company under ${COMPANY_MAX} characters.`);
+  let emailRef = text(args, 'email_ref');
+  if (emailRef.startsWith('job_search.inbox_messages:')) emailRef = emailRef.slice('job_search.inbox_messages:'.length);
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  const email = await namedEmail(env, emailRef);
+  const messageId = email.id as string;
+  const { data: stored, error: storedError } = await env.jobs.from('ingested_messages').select('resulting_application_id').eq('id', messageId).maybeSingle();
+  if (storedError) throw new Error(`Reading the email failed: ${storedError.message}`);
+  if (!stored) throw new JobsRefused('That email is no longer in the mailbox.');
+  if ((stored as Row).resulting_application_id) {
+    throw new JobsRefused('That email is linked to a role already. Unlink it there first with change_role_email.');
+  }
+
+  const { data: onFile, error: companyError } = await env.jobs
+    .from('companies')
+    .select('id, name')
+    .eq('user_id', env.userId)
+    .eq('slug', slugify(companyGiven))
+    .maybeSingle();
+  if (companyError) throw new Error(`Reading the company failed: ${companyError.message}`);
+  if (onFile) {
+    const { data: same, error: sameError } = await env.jobs.from('roles').select('id, title').eq('user_id', env.userId).eq('company_id', (onFile as Row).id as string);
+    if (sameError) throw new Error(`Reading the roles failed: ${sameError.message}`);
+    const twin = ((same ?? []) as Row[]).find((role) => typeof role.title === 'string' && role.title.trim().toLowerCase() === title.toLowerCase());
+    if (twin) {
+      throw new JobsRefused(`${roleName(twin, (onFile as Row).name as string)} is on file already (role ${twin.id as string}). Link the email to it with change_role_email instead.`);
+    }
+  }
+
+  const undo: RoleFromEmailUndo = { email: null, application_id: '', role_id: '', company_added: null };
+  const backOut = async (error: unknown): Promise<never> => {
+    try {
+      await putBackRoleFromEmail({ userId: env.userId, db: async () => env.jobs }, undo);
+    } catch (putBack) {
+      console.error('add_role_from_email: putting a failed change back failed', putBack);
+    }
+    throw error;
+  };
+
+  let companyId = onFile ? ((onFile as Row).id as string) : '';
+  if (!companyId) {
+    const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, companyGiven);
+    if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
+    companyId = company.id;
+    undo.company_added = company.id;
+  }
+
+  // Recruiter inbound only when the recruiter wrote first, as the page decides.
+  const channel = channelForMessage(email.classification as string | null);
+  let role: Row;
+  try {
+    const { data: madeRole, error: roleError } = await env.jobs
+      .from('roles')
+      .insert({ user_id: env.userId, company_id: companyId, title, source: channel })
+      .select('*')
+      .single();
+    if (roleError || !madeRole) throw new Error(`Adding the role failed: ${roleError?.message ?? 'no row'}`);
+    role = madeRole as Row;
+    undo.role_id = role.id as string;
+    const { data: application, error: applicationError } = await env.jobs
+      .from('applications')
+      // A person read the email and said this is a real pursuit, so it is not an inferred one.
+      .insert({ user_id: env.userId, role_id: role.id as string, source: channel, created_by: 'manual' })
+      .select('id')
+      .single();
+    if (applicationError || !application) throw new Error(`Adding the application failed: ${applicationError?.message ?? 'no row'}`);
+    undo.application_id = (application as Row).id as string;
+  } catch (error) {
+    return backOut(error);
+  }
+
+  const linked = await runJobsWrite(changeRoleEmailWrite(), env, { action: 'link', application_ref: undo.application_id, email_ref: messageId });
+  if ('ok' in linked) return backOut(new Error(`Linking the email failed: ${linked.error}`));
+  undo.email = roleEmailUndo(linked.undo);
+
+  const roleId = undo.role_id;
+  const name = roleName(role, (onFile as Row | null)?.name ? ((onFile as Row).name as string) : companyGiven);
+  const subject = quotedBody(email.subject, 'an email with no subject');
+  const href = roleHref(roleId);
+  return {
+    kind: 'add_role_from_email',
+    input: {
+      verb: 'Made',
+      what: name,
+      rest: ` from ${subject}, and linked the email to it`,
+      href,
+      where: 'Open the role',
+      paths: [...rolePaths(roleId), REVIEW_HREF],
+    },
+    subjectRef: toRef(ROLES, roleId),
+    op: 'insert',
+    before: null,
+    after: role,
+    summary: `Dash made the role ${name} from ${subject} in Jobs review${undo.company_added ? ', adding the company,' : ''} and linked the email to it.`,
+    row: { table: ROLES, ref: roleId, title: name, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/** change_role_email's entry, which the link runs through. */
+const changeRoleEmailWrite = (): JobsWrite => JOBS_WRITES.find((write) => write.name === 'change_role_email')!;
+
+function roleFromEmailUndo(value: Record<string, unknown> | null): RoleFromEmailUndo | null {
+  if (!value || typeof value.role_id !== 'string' || !isUuid(value.role_id)) return null;
+  const email = value.email && typeof value.email === 'object' ? roleEmailUndo(value.email as Record<string, unknown>) : null;
+  return {
+    email,
+    application_id: typeof value.application_id === 'string' && isUuid(value.application_id) ? value.application_id : '',
+    role_id: value.role_id,
+    company_added: typeof value.company_added === 'string' && isUuid(value.company_added) ? value.company_added : null,
+  };
+}
+
+/** What hangs on an application or a role and would go with it: the Undo leaves a row that holds any. */
+const APPLICATION_HOLDERS: readonly { schema: AskSchema; table: string; column: string; owned: boolean }[] = [
+  { schema: 'job_search', table: 'application_events', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'interviews', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'interview_groups', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'contact_touches', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'notes', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'attachments', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'application_answers', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'cover_letters', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'reminders', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'ingested_messages', column: 'resulting_application_id', owned: false },
+  { schema: 'job_search', table: 'message_link_dismissals', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'quiet_dismissals', column: 'application_id', owned: true },
+  { schema: 'todo', table: 'task_links', column: 'application_id', owned: false },
+];
+const ROLE_HOLDERS: readonly { schema: AskSchema; table: string; column: string; owned: boolean }[] = [
+  { schema: 'job_search', table: 'applications', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'notes', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'attachments', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'suggestions', column: 'role_id', owned: true },
+  { schema: 'todo', table: 'task_links', column: 'role_id', owned: false },
+];
+
+/** Whether any row other than `except` hangs on the row `id`. */
+async function held(deps: { userId: string; db: AskDb }, holders: typeof ROLE_HOLDERS, id: string, except: Set<string>): Promise<boolean> {
+  for (const holder of holders) {
+    let query = (await deps.db(holder.schema)).from(holder.table).select('id').eq(holder.column, id);
+    if (holder.owned) query = query.eq('user_id', deps.userId);
+    const { data, error } = await query.limit(except.size + 1);
+    if (error) throw new Error(`${holder.table}: ${error.message}`);
+    if (((data ?? []) as Row[]).some((row) => !except.has(row.id as string))) return true;
+  }
+  return false;
+}
+
+/** Put the email back, then take out the application, the role and an added company nothing else holds; how many rows went back or out. */
+async function putBackRoleFromEmail(deps: { userId: string; db: AskDb }, undo: RoleFromEmailUndo): Promise<number> {
+  const jobs = await deps.db('job_search');
+  let restored = undo.email ? await putBackRoleEmail(deps, undo.email) : 0;
+  const takeOut = async (table: string, id: string) => {
+    const { data, error } = await jobs.from(table).delete().eq('id', id).eq('user_id', deps.userId).select('id');
+    if (error) throw new Error(`${table}: ${error.message}`);
+    return (data ?? []).length;
+  };
+  if (undo.application_id) restored += await takeOut('applications', undo.application_id);
+  if (undo.role_id) restored += await takeOut('roles', undo.role_id);
+  if (undo.company_added && !(await companyHeld(deps, undo.company_added))) {
+    restored += await takeOut('companies', undo.company_added);
+  }
+  return restored;
+}
+
+/**
+ * Undo a role made from an email (RoleFromEmailUndo). Before anything is
+ * changed, the application and the role are checked for rows that came to
+ * hang on them after the link (a note, a reminder, an interview with a time
+ * set, another email), and the Undo is refused while there is one, since
+ * taking the role out would take those with it. Ask's undo calls it for
+ * every surface (lib/ask/changes.ts, undoMany).
+ */
+export async function undoRoleFromEmail(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = roleFromEmailUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this made, so it cannot be undone.' };
+  const jobs = await deps.db('job_search');
+  const { data: role, error } = await jobs.from('roles').select('id').eq('id', undo.role_id).eq('user_id', deps.userId).maybeSingle();
+  if (error) throw new Error(`roles: ${error.message}`);
+  if (!role) return { ok: false, error: 'That role has been taken out since, so there is nothing to undo.' };
+
+  // The rows the link itself wrote do not count; a round it booked counts once a time is set on it.
+  const own = new Set<string>([...(undo.email?.events_added ?? []), undo.email?.message_id ?? '', undo.application_id]);
+  const round = undo.email?.interview_added;
+  if (round) {
+    const { data: interview } = await jobs.from('interviews').select('id, scheduled_at').eq('id', round.interview_id).eq('user_id', deps.userId).maybeSingle();
+    if (interview && (interview as Row).scheduled_at == null) {
+      own.add(round.interview_id);
+      if (round.group_id) own.add(round.group_id);
+    }
+  }
+  if ((undo.application_id && (await held(deps, APPLICATION_HOLDERS, undo.application_id, own))) || (await held(deps, ROLE_HOLDERS, undo.role_id, own))) {
+    return { ok: false, error: 'The role has gathered more since, such as a note or another email, so undoing would lose it.' };
+  }
+  const restored = await putBackRoleFromEmail(deps, undo);
+  return { ok: true, restored };
+}
+
 function rowsUndo(value: Record<string, unknown> | null): RowsUndo | null {
   if (!value) return null;
   const updated = Array.isArray(value.updated) ? (value.updated as RowsUndo['updated']) : [];
@@ -2849,6 +3090,22 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: markSuggestionSent,
+  },
+  {
+    name: 'add_role_from_email',
+    description:
+      "Make a new role from an email in Jobs review when they say it is about a pursuit with nothing on file, as the review page's new role option does: the company (found by name, or added), the role and its application are made, and the email is linked to it, filing the event its classification implies, such as a rejection or an interview invite. Refused when the company already has a role of that title; link the email to a role on file with change_role_email.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_ref: { type: 'string', description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.' },
+        company: { type: 'string', description: 'The company the role is at, by name.' },
+        title: { type: 'string', description: 'What the role is called.' },
+      },
+      required: ['email_ref', 'company', 'title'],
+      additionalProperties: false,
+    },
+    run: addRoleFromEmail,
   },
   // From Material, Settings and Find (plan #1894.6.7), in lib/dash/career-writes.ts.
   ...CAREER_WRITES,

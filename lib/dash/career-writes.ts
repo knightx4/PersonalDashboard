@@ -426,7 +426,7 @@ const COMPANY_HOLDERS: readonly { schema: 'job_search' | 'todo'; table: string; 
   { schema: 'todo', table: 'task_links', owned: false },
 ];
 
-async function companyHeld(deps: { userId: string; db: AskDb }, companyId: string): Promise<boolean> {
+export async function companyHeld(deps: { userId: string; db: AskDb }, companyId: string): Promise<boolean> {
   for (const holder of COMPANY_HOLDERS) {
     let query = (await deps.db(holder.schema)).from(holder.table).select('id').eq('company_id', companyId);
     if (holder.owned) query = query.eq('user_id', deps.userId);

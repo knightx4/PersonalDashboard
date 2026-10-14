@@ -93,6 +93,7 @@ describe('runConnectorWrite', () => {
       'change_contact',
       'change_touch',
       'mark_suggestion_sent',
+      'add_role_from_email',
       'add_evidence',
       'add_resume_version',
       'attach_resume_pdf',

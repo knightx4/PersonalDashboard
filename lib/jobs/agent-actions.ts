@@ -26,8 +26,8 @@ export const jobsActions: ModuleActions = {
     prepareWithDash: none('spends'),
   },
   'app/jobs/(app)/review/actions.ts': {
-    linkMessage: GAP,
-    createRoleFromMessage: GAP,
+    linkMessage: tool('change_role_email'),
+    createRoleFromMessage: tool('add_role_from_email'),
     dismissMessage: tool('review_emails'),
     confirmApplication: tool('review_application'),
     deleteInferredApplication: none('deletes'),
