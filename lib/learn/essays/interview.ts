@@ -42,6 +42,7 @@ export const PIN_LABELS: Record<PinKind, string> = {
   reading: 'Reading',
   theme: 'Theme',
   log: 'Learning log',
+  brief: 'Research brief',
 };
 
 /** The longest answer kept, about a paragraph. */
@@ -60,6 +61,8 @@ function opener(pin: EssayPin): string {
       return `Your notes keep coming back to “${pin.title}”.`;
     case 'log':
       return `You talked through “${pin.title}”.`;
+    case 'brief':
+      return `Dash researched “${pin.title}” for you.`;
   }
 }
 
@@ -75,8 +78,25 @@ export function openingAsk(pins: readonly EssayPin[]): string {
   return `${opener(pin)} What is the question about it you want to answer?`;
 }
 
-/** The brief a new essay starts with: empty answers, its pins, and the first question. */
-export function newEssayBrief(pins: readonly EssayPin[]): Record<string, unknown> {
+/**
+ * The brief a new essay starts with: empty answers, its pins, and the first
+ * question. Given a question already (an essay started from a research
+ * brief, plan #2023.5), that answer is filled in and the interview opens on
+ * the next one, so the person is not asked what they have already asked.
+ */
+export function newEssayBrief(pins: readonly EssayPin[], question = ''): Record<string, unknown> {
+  const asked = cleanAnswer(question);
+  if (asked) {
+    return {
+      question: asked,
+      claim: '',
+      reader: '',
+      origin: '',
+      change: '',
+      pinned: pins.map((pin) => ({ kind: pin.kind, id: pin.id, title: pin.title })),
+      interview: { status: 'asking', field: 'claim', ask: PLAIN_ASKS.claim },
+    };
+  }
   return {
     question: '',
     claim: '',

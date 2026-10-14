@@ -46,17 +46,22 @@ const CONTINUATIONS = 3;
 const SEARCH_MAX_TOKENS = 8_000;
 const JUDGE_MAX_TOKENS = 6_000;
 /** The most of one fetched page that goes into the gathering call's context. */
-const PAGE_TOKENS = 6_000;
+export const PAGE_TOKENS = 6_000;
 
 type Failure = { ok: false; detail: string };
 
-/** One tool turn, continued while the server pauses it; every block that came back, in order. */
-async function searchTurn(
+/**
+ * One tool turn, continued while the server pauses it; every block that came
+ * back, in order. Research briefs (lib/learn/briefs/research-model.ts) search
+ * with it too.
+ */
+export async function searchTurn(
   client: Anthropic,
   system: string,
   tools: unknown[],
   prompt: string,
   onSpend?: SpendSink,
+  model: string = RESEARCH_MODEL,
 ): Promise<{ ok: true; content: unknown[] } | Failure> {
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
   const content: unknown[] = [];
@@ -64,7 +69,7 @@ async function searchTurn(
     let response;
     try {
       response = await client.messages.create({
-        model: RESEARCH_MODEL,
+        model,
         max_tokens: SEARCH_MAX_TOKENS,
         system,
         // The installed SDK predates the server tools' types.
@@ -74,7 +79,7 @@ async function searchTurn(
     } catch (error) {
       return { ok: false, detail: error instanceof Error ? error.message : 'The search failed.' };
     }
-    onSpend?.({ model: RESEARCH_MODEL, usage: usageFrom(response.usage) });
+    onSpend?.({ model, usage: usageFrom(response.usage) });
     content.push(...response.content);
     // Widened: the installed SDK's type predates these reasons.
     const stop: string | null = response.stop_reason;

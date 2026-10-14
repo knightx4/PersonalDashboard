@@ -173,11 +173,21 @@ import {
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
+import {
+  LearnBriefFailedSurface,
+  LearnBriefQuoteSourceSurface,
+  LearnBriefResearchingSurface,
+  LearnBriefShortAnswerEditorSurface,
+  LearnBriefSurface,
+  LearnBriefNewSourcesSurface,
+  LearnNowBriefsSurface,
+} from './brief-surfaces';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
@@ -4811,6 +4821,63 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A research brief's quick read (plan #2023.6): the cards written from
+     * its sources, one at a time, with Not interested at the start of the
+     * forward row. Dismissing one here dismisses it in Learn now too. */
+    id: 'learn-brief-quick',
+    label: 'Brief · Quick read',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] h2',
+      direction: 'left',
+      shows: 'The card follows the finger left, then the next source’s card comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <BriefQuickPreview state="deck" />
+      </div>
+    ),
+  },
+  {
+    /* The quick read while the brief is still researching: no cards yet,
+     * and the way back to the brief. */
+    id: 'learn-brief-quick-empty',
+    label: 'Brief · Quick read, still researching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="researching" />,
+  },
+  {
+    /* The quick read after its last card: done, and back to the brief. */
+    id: 'learn-brief-quick-end',
+    label: 'Brief · Quick read, every card read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="end" />,
+  },
+  {
+    /* Learn now with a card from a research brief's source on top (plan
+     * #2023.6): the why line names the research, the source is named under
+     * the title, and Open the brief stands in for Save and Test me. */
+    id: 'learn-now-research-card',
+    label: 'Now · A card from your research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchPreview />,
+  },
+  {
+    /* The same card when a brief's weekly check found its source (plan
+     * #2023.8): marked as a new source until it is opened. */
+    id: 'learn-now-research-card-new',
+    label: 'Now · A new source from a watched topic',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchNewPreview />,
+  },
+  {
     /* The courses fold on Learn's Tracks page with no transcript saved: it
      * points to You's Work & school tab (plan #1391). */
     id: 'learn-courses-empty',
@@ -6546,6 +6613,57 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnYoutubeVideoSurface />,
   },
 
+  /* A researched topic on its own page, and Now's list of them (plan
+   * #2023.4). Fixtures in brief-surfaces.tsx. */
+  {
+    id: 'learn-brief',
+    label: 'Research brief · Ready, with cited answers',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefSurface />,
+  },
+  {
+    id: 'learn-brief-new-sources',
+    label: 'Research brief · New sources since you asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefNewSourcesSurface />,
+  },
+  {
+    id: 'learn-brief-researching',
+    label: 'Research brief · Still researching',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefResearchingSurface />,
+  },
+  {
+    id: 'learn-brief-failed',
+    label: 'Research brief · The run failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefFailedSurface />,
+  },
+  {
+    id: 'learn-brief-quote-source',
+    label: 'Research brief · A quote’s source showing',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefQuoteSourceSurface />,
+  },
+  {
+    id: 'learn-brief-short-answer-editor',
+    label: 'Research brief · Editing the short answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefShortAnswerEditorSurface />,
+  },
+  {
+    id: 'learn-now-briefs',
+    label: 'Now · Topics you asked Dash to research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowBriefsSurface />,
+  },
   /* Essays (plan #1865). Fixtures in essay-surfaces.tsx. */
   {
     id: 'learn-essays',

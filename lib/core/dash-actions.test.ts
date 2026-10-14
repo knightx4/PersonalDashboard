@@ -121,6 +121,61 @@ describe('undoDashAction', () => {
     });
     expect(tables['todo.tasks'][0].due_on).toBe('2026-10-09');
   });
+
+  describe('a research brief Dash started (plan #2023.3)', () => {
+    const BRIEF = id(70);
+    const TRACK = id(71);
+    const inserted: Row = { id: BRIEF, user_id: ME, track_id: TRACK, question: 'SOX and AI', status: 'researching', sections: [], archived_at: null };
+
+    function briefSetup(brief: Row | null, track: Row = { id: TRACK, user_id: ME, status: 'active' }) {
+      const tables: Tables = {
+        'core.dash_actions': [
+          action({
+            kind: 'research_topic',
+            subject_ref: `learn.briefs:${BRIEF}`,
+            op: 'insert',
+            before_values: null,
+            after_values: inserted,
+            undo: { archive_brief: true },
+          }),
+        ],
+        'learn.briefs': brief ? [brief] : [],
+        'learn.tracks': [track],
+        // A source the run found, which an archive leaves in place.
+        'learn.readings': [{ id: id(72), user_id: ME, track_id: TRACK, brief_id: BRIEF }],
+      };
+      const client = fakeSchemaDb(tables);
+      const deps: DashActionDeps = {
+        userId: ME,
+        core: client('core'),
+        db: async (schema: AskSchema) => client(schema),
+        now: () => '2026-10-03T12:00:00Z',
+      };
+      return { tables, deps };
+    }
+
+    it('archives the brief and shelves its list, though the run has filled it in since', async () => {
+      const { tables, deps } = briefSetup({ ...inserted, status: 'ready', sections: [{ sub_question_id: 'q1' }] });
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({ ok: true, action: { status: 'undone' } });
+      expect(tables['learn.briefs'][0]).toMatchObject({ archived_at: '2026-10-03T12:00:00Z', status: 'ready' });
+      expect(tables['learn.tracks'][0].status).toBe('shelved');
+      expect(tables['learn.readings']).toHaveLength(1);
+    });
+
+    it('leaves a list the person finished as it is', async () => {
+      const { tables, deps } = briefSetup(inserted, { id: TRACK, user_id: ME, status: 'done' });
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({ ok: true });
+      expect(tables['learn.tracks'][0].status).toBe('done');
+    });
+
+    it('refuses a brief archived already', async () => {
+      const { deps } = briefSetup({ ...inserted, archived_at: '2026-10-02T00:00:00Z' });
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({
+        ok: false,
+        error: 'It has been archived already, so there is nothing to undo.',
+      });
+    });
+  });
 });
 
 describe('planUndo', () => {

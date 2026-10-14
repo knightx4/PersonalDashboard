@@ -25,7 +25,7 @@ export type EssayBrief = {
 };
 
 /** The kinds of thing an essay can be started from, and pinned to its brief. */
-export const PIN_KINDS = ['goal', 'reading', 'theme', 'log'] as const;
+export const PIN_KINDS = ['goal', 'reading', 'theme', 'log', 'brief'] as const;
 export type PinKind = (typeof PIN_KINDS)[number];
 
 /** Something pinned to the brief: what "Write about this" started the essay from. */
