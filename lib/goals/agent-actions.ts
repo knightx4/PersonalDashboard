@@ -1,4 +1,4 @@
-import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the Goals pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const goalsActions: ModuleActions = {
@@ -34,12 +34,12 @@ export const goalsActions: ModuleActions = {
   },
   'app/goals/suggestion-actions.ts': {
     reactToSuggestionAction: none('theirs'),
-    recordAttendedAction: GAP,
+    recordAttendedAction: tool('change_goals_inbox'),
     addSuggestedStepAction: none('theirs'),
   },
   'app/goals/inbox/actions.ts': {
-    snoozeInboxRowAction: GAP,
-    unsnoozeInboxRowAction: GAP,
+    snoozeInboxRowAction: tool('change_goals_inbox'),
+    unsnoozeInboxRowAction: tool('change_goals_inbox'),
   },
   'app/goals/[goalId]/learn-actions.ts': {
     setLearnDepth: none('setting'),
@@ -108,9 +108,9 @@ export const goalsActions: ModuleActions = {
     markFileReadAction: none('own', 'Opening the file marks it read, which means the person read it.'),
   },
   'app/goals/home-actions.ts': {
-    setAsideAction: GAP,
-    restoreAsideAction: GAP,
-    bringBackAction: GAP,
+    setAsideAction: tool('change_goal_step'),
+    restoreAsideAction: tool('change_goal_step'),
+    bringBackAction: tool('change_goal_step'),
     askDashAction: none('spends'),
   },
   'app/goals/capture-actions.ts': {

@@ -505,7 +505,18 @@ const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => (
     if (!ctx.account.enabledModules.includes('goals')) {
       throw new AskInputError('The Goals workspace is switched off, so nothing can be changed there.');
     }
-    const made = await runGoalsWrite(write, { userId: ctx.userId, goals: await ctx.db('goals'), write: ctx.goals }, input);
+    const made = await runGoalsWrite(
+      write,
+      {
+        userId: ctx.userId,
+        goals: await ctx.db('goals'),
+        write: ctx.goals,
+        core: await ctx.db('core'),
+        today: ctx.account.today,
+        timezone: ctx.account.timezone,
+      },
+      input,
+    );
     if ('ok' in made) throw new AskInputError(made.error);
     const recorded = await recordDashAction(
       { userId: ctx.userId, core: ctx.core, db: ctx.db },
