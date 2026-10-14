@@ -61,6 +61,14 @@ export type Source = {
   owner?: string;
   /** Where one row opens in the app, from its ref. Absent when it has no page. */
   href?: (ref: string) => string;
+  /**
+   * The section of the nav a row's page sits under, for a source whose page
+   * is worked out from `href` (see Page.section). Required whenever `href` is
+   * set and `page` is not; the catalogue refuses one without it.
+   */
+  section?: Section | null;
+  /** How to find the row above this one in the path (see Page.parent). */
+  parent?: Parent;
   /** Anything else Claude should know to read it well. */
   note?: string;
   /**
@@ -102,7 +110,55 @@ export type Page = {
    * alone gives the page, so refHref needs no query.
    */
   reads?: readonly string[];
+  /**
+   * The section of the workspace's nav a row's page sits under, which is the
+   * second part of its path (refPath in lib/core/refs.ts): Pipeline for a
+   * role, Plan for a plan step. Null for a row that sits under another row
+   * rather than a section of its own, such as a file under the step it was
+   * written for: its path takes the section of the row above it.
+   */
+  section: Section | null;
+  /** How to find the row this one sits under, when it sits under one. */
+  parent?: Parent;
+  /**
+   * The path walks past rows of this table without naming them. An
+   * application stands between an interview and its role, and the role is
+   * what a person knows it by.
+   */
+  passThrough?: true;
 };
+
+/**
+ * One section of a workspace's nav: the tab's address and its name, as the
+ * workspace's layout writes them (app/<workspace>/layout.tsx), or the
+ * workspace's settings page. lib/sources/catalogue.test.ts holds each one to
+ * its layout.
+ */
+export type Section = { href: string; label: string };
+
+/**
+ * How a row names the row it sits under: a goal step its goal, a role its
+ * company, a plan step its feature. `ref` reads the columns in `reads` and
+ * gives the parent's ref (`schema.table:id`), or null when this row has none.
+ */
+export type Parent = {
+  reads: readonly string[];
+  ref: (row: PageRow) => string | null;
+};
+
+/**
+ * The usual parent: a foreign key column naming a row of `table` by its id,
+ * as `parentBy('company_id', 'job_search.companies')` for a role.
+ */
+export function parentBy(column: string, table: string): Parent {
+  return {
+    reads: [column],
+    ref: (row) => {
+      const id = row[column];
+      return typeof id === 'string' && id ? `${table}:${id}` : null;
+    },
+  };
+}
 
 export type ModuleSources = {
   sources: readonly Source[];

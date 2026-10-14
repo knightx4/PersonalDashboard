@@ -460,7 +460,7 @@ Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 43, target 0, pending #1932.
+Checked by: count `row-pages-without-path`, baseline 33, target 0.
 
 **R4.** There is one back-link component.
 Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending #1934.

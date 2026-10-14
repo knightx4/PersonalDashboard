@@ -1,4 +1,8 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of News' nav its rows sit under (app/news/layout.tsx). */
+const NEWSLETTERS: Section = { href: '/news/all', label: 'Newsletters' };
+const SAVED: Section = { href: '/news/saved', label: 'Saved' };
 
 /**
  * News's tables, as Goals reads them (lib/sources/types.ts). A story they
@@ -16,6 +20,8 @@ export const newsSources: ModuleSources = {
       title: 'headline',
       newest: 'saved_at',
       href: () => '/news/saved',
+      section: SAVED,
+      parent: parentBy('issue_id', 'news.issues'),
     },
     {
       table: 'news.preferences',
@@ -38,6 +44,7 @@ export const newsSources: ModuleSources = {
       search: ['subject', 'summary', 'text_body'],
       title: 'subject',
       href: (id) => `/news/i/${id}`,
+      section: NEWSLETTERS,
       note: 'Leads only: an issue mentioning a subject says nothing about what they want.',
     },
   ],
