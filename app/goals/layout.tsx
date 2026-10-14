@@ -34,6 +34,9 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
         { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
       ];
     },
+    // Whether the morning and weekly runs start (plan #1937.10).
+    settingsHref: '/goals/settings',
+    settingsLabel: 'Goals settings',
     children,
   });
 }

@@ -56,7 +56,7 @@ import {
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = process.env.PREVIEW_PORT ?? '3400';
 const OUT = join(process.cwd(), '.preview-shots');
-const PROBE = 9500;
+const PROBE = process.env.SHOOT_PROBE_PORT ? Number(process.env.SHOOT_PROBE_PORT) : 9500;
 
 /**
  * What a full-page capture can survive, measured rather than looked up.

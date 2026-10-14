@@ -166,7 +166,7 @@ export function WaitingCard({
           <p className="text-micro text-ink-ghost">
             {row.module ? planScopeLabel(row.module) : 'Everything'}
           </p>
-          {snooze && <SnoozeMenu snoozeRef={planRowRef(row.id)} />}
+          {snooze && <SnoozeMenu snoozeRef={planRowRef(row.id)} label={`#${row.number} ${row.title}`} />}
         </div>
         {(setup || blockedJob) && (
           <div className="flex flex-wrap items-center gap-2">

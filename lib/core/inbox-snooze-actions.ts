@@ -57,7 +57,16 @@ export async function unsnoozeInboxRow(ref: string): Promise<SnoozeActionState> 
     .delete()
     .eq('user_id', user.id)
     .eq('ref', ref);
-  if (error) return { error: 'Dash could not unsnooze that. Try again.' };
+  if (error) return { error: 'Dash could not bring that back. Try again.' };
   refresh();
   return {};
+}
+
+/**
+ * Bring back, from an Inbox's Later fold (plan #1937.4): unsnoozeInboxRow
+ * taking the ref from the form, so the shared Inbox page can post it.
+ */
+export async function bringBackInboxRow(form: FormData): Promise<SnoozeActionState & { message?: string }> {
+  const result = await unsnoozeInboxRow(String(form.get('ref') ?? ''));
+  return result.error ? result : { message: 'Back on you.' };
 }

@@ -11,6 +11,7 @@ import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
+import { loadOfferSubjects } from '@/lib/learn/offer-setting';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
@@ -139,7 +140,12 @@ export async function PracticeFlow({
   // theme from your notes is offered as the way on (plan #778). Not when
   // focused, where the empty state points back at the other tracks instead.
   const offer =
-    picked.kind === 'nothing' && !asking && !track && !aboutGoals
+    picked.kind === 'nothing' &&
+    !asking &&
+    !track &&
+    !aboutGoals &&
+    // Switched off on Learn settings (plan #1937.10); a failed read leaves it on.
+    (await loadOfferSubjects(supabase, user.id).catch(() => true))
       ? await loadTrackOffer(supabase, vault)
       : null;
 
