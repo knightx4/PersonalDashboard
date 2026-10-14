@@ -18,8 +18,10 @@ import {
 
 /**
  * A count or an amount for each day of a period (plan #2036.1), for the
- * usage pages. One bar per day on one scale from zero, so a day with nothing
- * is an empty slot rather than a missing one, and the total for the period
+ * usage pages. One bar per day on one scale from zero, and a day with nothing
+ * is a hollow stub on the baseline rather than a gap (plan #2036.2), so every
+ * day has a mark. The scale column is a fixed minimum width, so two charts
+ * stacked on one page start their bars at the same place. The total for the period
  * sits beside the title. Follows the burn-up chart: the baseline is SVG
  * stretched to the card, the bars are HTML on top, where stretching cannot
  * squash their rounded ends, and pointing at a slot, tapping it or moving
@@ -91,7 +93,7 @@ export function DayBarChart({
       </div>
       {chart.busiest ? (
         <figure className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
-          <div className="tabular flex min-w-6 flex-col justify-between text-right text-small text-ink-muted">
+          <div className="tabular flex min-w-12 flex-col justify-between text-right text-small text-ink-muted">
             <span className="-translate-y-1/2">{formatScale(chart.high, measure)}</span>
             <span className="translate-y-1/2">0</span>
           </div>
@@ -144,7 +146,11 @@ export function DayBarChart({
                     index === active && 'bg-accent-tint',
                   )}
                 >
-                  {bar.value > 0 && (
+                  {bar.value === 0 ? (
+                    // An empty day keeps its slot as a hollow stub on the
+                    // baseline, so a zero reads as zero rather than as no data.
+                    <div data-zero-day className="h-1 w-full max-w-12 rounded-t-control border border-b-0 border-border-strong" />
+                  ) : (
                     <div
                       className={cn(
                         'w-full max-w-12 rounded-t-control bg-accent transition-opacity duration-quick',
