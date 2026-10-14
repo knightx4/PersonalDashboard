@@ -427,6 +427,14 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     ...under({ schema: JOB, table: 'roles', column: 'company_id' }, ROLE_DEPENDENTS),
   ],
   'job_search.roles': ROLE_DEPENDENTS,
+  // What capture's Add buttons make in Learn (plan #1950.4). The readings a
+  // topic was started with go with it; one added since, a topic branched off
+  // it and a quiz's questions are later work.
+  'learn.tracks': [
+    { schema: 'learn', table: 'readings', column: 'track_id', since: true },
+    { schema: 'learn', table: 'tracks', column: 'branched_from' },
+  ],
+  'learn.quizzes': [{ schema: 'learn', table: 'quiz_questions', column: 'quiz_id' }],
   'job_search.interview_groups': INTERVIEW_GROUP_DEPENDENTS,
   'job_search.contacts': [
     { schema: JOB, table: 'interview_participants', column: 'contact_id', since: true },

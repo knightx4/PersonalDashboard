@@ -1,7 +1,5 @@
-import NewTrackPage from '@/app/learn/new/page';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
-import NewQuizPage from '@/app/learn/quiz/new/page';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
 import { ListsView } from '@/app/learn/lists/lists-view';
 import { OpeningView } from '@/app/learn/opening/[id]/opening-view';
@@ -367,16 +365,6 @@ const listRows: NestedTrack[] = [
 
 export function LearnListsSurface() {
   return <ListsView rows={listRows} search="" />;
-}
-
-// ---- New reading list, new quiz -----------------------------------------------
-
-export function LearnNewSurface() {
-  return <NewTrackPage />;
-}
-
-export function LearnQuizNewSurface() {
-  return <NewQuizPage />;
 }
 
 // ---- Before you start: the opening questions, answered ------------------------
