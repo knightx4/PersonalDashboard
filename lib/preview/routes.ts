@@ -303,6 +303,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-onboarding': ['/jobs/onboarding'],
   'jobs-case-page': ['/jobs/p/[slug]'],
   'mail-message': ['/mail/[id]'],
+  // A researched topic (plan #2023.4): ready, and its hidden parts.
+  'learn-brief': ['/learn/b/[id]'],
+  'learn-brief-researching': ['/learn/b/[id]'],
+  'learn-brief-failed': ['/learn/b/[id]'],
+  'learn-brief-quote-source': ['/learn/b/[id]'],
+  'learn-brief-short-answer-editor': ['/learn/b/[id]'],
+  'learn-now-briefs': ['/learn/now'],
   'learn-concept': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
