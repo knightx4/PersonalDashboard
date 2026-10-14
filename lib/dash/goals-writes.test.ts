@@ -297,6 +297,26 @@ describe('the Goals writes', () => {
       expect(restored.after).toMatchObject({ archived_at: null });
     });
 
+    it('makes a step its own errand in the goal\'s area and archives the step (note 16a21d3a)', async () => {
+      const data = tables();
+      expect(await refused('change_goal_step', data, { change: 'make_errand', step_ref: STEP })).toMatch(/needs a date/);
+      const change = await made('change_goal_step', data, { change: 'make_errand', step_ref: STEP, due_on: '2026-10-20' });
+      const errand = data['goals.items']!.find((r) => r.errand === true)!;
+      expect(errand).toMatchObject({ user_id: ME, level: 'goal', area_id: HEALTH, title: 'Buy shoes', due_on: '2026-10-20' });
+      expect(row(data, 'goals.items', STEP).archived_at).not.toBeNull();
+      expect(change.summary).toBe('Dash made the step "Buy shoes" its own errand in Health, due 2026-10-20, and archived the step from "Run a half marathon".');
+      expect(change.input.href).toBe(`/goals/${errand.id}`);
+      expect(change.undo).toEqual({ none: expect.stringContaining('Two rows changed') });
+      expect(await refused('change_goal_step', data, { change: 'make_errand', step_ref: STEP })).toBe('That step is archived. Restore it first.');
+    });
+
+    it('makes an errand in a named area, on the step\'s own date', async () => {
+      const data = tables();
+      row(data, 'goals.items', STEP_2).due_on = '2026-11-02';
+      await made('change_goal_step', data, { change: 'make_errand', step_ref: STEP_2, area: 'Music' });
+      expect(data['goals.items']!.find((r) => r.errand === true)).toMatchObject({ area_id: MUSIC, due_on: '2026-11-02' });
+    });
+
     it('counts a step towards another goal and stops it, each a link row', async () => {
       const data = tables();
       const linked = await made('change_goal_step', data, { change: 'count_towards', step_ref: STEP, goal_ref: GOAL_2 });
