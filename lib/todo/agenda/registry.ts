@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { moduleEnabled, type AccountSettings } from '@/lib/core/account/settings';
+import type { ModuleId } from '@/lib/modules';
 import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
 import { applicationsSource } from '@/lib/todo/agenda/sources/applications';
 import { appointmentsSource } from '@/lib/todo/agenda/sources/appointments';
@@ -43,6 +44,11 @@ export function allSources(): AgendaSource[] {
 
 export function sourceById(id: SourceId): AgendaSource | undefined {
   return SOURCES.find((source) => source.id === id);
+}
+
+/** The workspace a source reads, for placing its items in an Inbox. */
+export function sourceModule(id: SourceId): ModuleId {
+  return sourceById(id)?.module ?? 'todo';
 }
 
 /**

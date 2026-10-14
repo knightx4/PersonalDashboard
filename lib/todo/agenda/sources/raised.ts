@@ -49,6 +49,8 @@ export function raisedItems(rows: readonly RaisedRowIn[]): AgendaItem[] {
       action: null,
       detail: row.ask?.trim() || null,
       completable: false,
+      // A goal's flag is Goals'; the rest are Dev's, by their table.
+      ...(row.goal_id ? { workspace: 'goals' as const } : {}),
     }));
 }
 
@@ -56,6 +58,7 @@ export const raisedSource: AgendaSource = {
   id: 'raised',
   label: 'Questions Dash raised',
   module: 'todo',
+  crossesWorkspaces: true,
   alwaysOn: true,
   description: 'Questions Dash has raised for you and you have not answered yet.',
 

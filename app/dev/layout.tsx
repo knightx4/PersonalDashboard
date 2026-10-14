@@ -23,8 +23,8 @@ import { countProposedSpecChanges } from '@/lib/specs/changes';
  * workspace that had nothing to do with it. It is its own place now, with the
  * ideas list beside it.
  *
- * No onboarding gate and no settings of its own: nothing here needs a mailbox
- * connected, and there is nothing about this workspace to configure.
+ * No onboarding gate: nothing here needs a mailbox connected. Its settings
+ * page holds the routines that work the repository (plan #1937.10).
  */
 export default async function DevLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -76,6 +76,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     sections: async ({ raised }) => devSections(raised, ...(await inboxReads)),
     brief: async ({ raised }) => loadDevBrief(devWaiting(raised, ...(await inboxReads))),
     feedbackHref: '/dev/bugs',
+    // The routines that work the repository, moved off Home (plan #1937.10).
+    settingsHref: '/dev/settings',
+    settingsLabel: 'Dev settings',
     children,
   });
 }

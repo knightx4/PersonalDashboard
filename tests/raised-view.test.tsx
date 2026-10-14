@@ -61,7 +61,7 @@ function raise(over: Record<string, unknown> = {}): RaisedRow {
 const TITLE: Record<WaitingGroupKey, string> = {
   actions: 'Your actions',
   questions: 'Questions for you',
-  approve: 'To approve',
+  approve: 'To review',
 };
 
 const OF_HEALTH: Record<WaitingRow['health'], WaitingGroupKey> = {
@@ -437,7 +437,7 @@ describe('approving the whole group', () => {
   it('draws no Approve all over a group that holds only requests', () => {
     const html = render([request()], []);
 
-    expect(html).toContain('To approve');
+    expect(html).toContain('To review');
     expect(html).not.toContain('Approve all');
   });
 
@@ -470,13 +470,13 @@ describe('the three groups', () => {
 
     expect(html).toContain('Your actions');
     expect(html).toContain('Questions for you');
-    expect(html).toContain('To approve');
-    // Two actions, one question, one to approve, on each heading and again in
-    // the overview at the top, each count a link to its section.
+    expect(html).toContain('To review');
+    // Two actions, one question, one to review, each on its heading, and the
+    // total once after the last section.
     expect(html).toMatch(/Your actions<span[^>]*>2</);
     expect(html).toMatch(/Questions for you<span[^>]*>1</);
-    expect(html).toMatch(/To approve<span[^>]*>1</);
-    expect(html).toMatch(/href="#inbox-actions"[^>]*><span[^>]*>2</);
+    expect(html).toMatch(/To review<span[^>]*>1</);
+    expect(html).toContain('4 things waiting on you');
     expect(html).toContain('id="inbox-actions"');
   });
 
@@ -491,7 +491,7 @@ describe('the three groups', () => {
 
     expect(html).toContain('Your actions');
     expect(html).not.toContain('Questions for you');
-    expect(html).not.toContain('To approve');
+    expect(html).not.toContain('To review');
   });
 
   it('still says nothing is waiting when all three are empty', () => {

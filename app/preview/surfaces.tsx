@@ -75,6 +75,8 @@ import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
+import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -307,6 +309,15 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import { InboxPageSurface } from './inbox-page-surface';
+import {
+  JobsInboxSurface,
+  LearnInboxSurface,
+  NewsInboxSurface,
+  ShoppingInboxSurface,
+  TodoInboxSurface,
+  VaultInboxSurface,
+} from './workspace-inbox-surfaces';
 import {
   AuthCodeErrorSurface,
   ConsentSurface,
@@ -342,7 +353,7 @@ import {
   DevIdeasEmptySurface,
   DevRaisedSurface,
   DevInboxSurface,
-  DevRaisedStatusSurface,
+  DevSettingsSurface,
   DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
@@ -4018,6 +4029,61 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsInboxSurface />,
   },
   {
+    /* The one Inbox component (plan #1937.4) from its row shape alone, as
+     * every workspace's Inbox draws it: the three sections, the verbs, Later
+     * and Decline, and the Later fold open. */
+    id: 'inbox-page',
+    label: 'Inbox · the one component',
+    module: 'dev',
+    width: 'page',
+    render: () => <InboxPageSurface />,
+  },
+  /* Each workspace's Inbox (plan #1937.5): the agenda's on-you rows cut to
+   * the workspace, with a queue row where it keeps one. News is drawn empty.
+   * Fixtures in workspace-inbox-surfaces.tsx. */
+  {
+    id: 'shopping-inbox',
+    label: 'Shopping · Inbox',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingInboxSurface />,
+  },
+  {
+    id: 'jobs-inbox',
+    label: 'Job search · Inbox',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface />,
+  },
+  {
+    id: 'todo-inbox',
+    label: 'Todo · Inbox',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoInboxSurface />,
+  },
+  {
+    id: 'vault-inbox',
+    label: 'Vault · Inbox',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultInboxSurface />,
+  },
+  {
+    id: 'learn-inbox',
+    label: 'Learn · Inbox',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnInboxSurface />,
+  },
+  {
+    id: 'news-inbox',
+    label: 'News · Inbox, empty',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsInboxSurface />,
+  },
+  {
     /* Three areas and their goals, edited where they stand. */
     id: 'goals-all',
     label: 'Goals · all goals',
@@ -6447,13 +6513,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevInboxSurface />,
   },
   {
-    /* The Status panel at the top of Home in Dev, with Dash's mark under
-     * Plan (note 076e7744). */
-    id: 'dev-raised-status',
-    label: 'Dev · Home, the Status panel',
+    /* Dev settings (plan #1937.10): the routines that were the Status panel
+     * on Home, with Dash's mark under Plan (note 076e7744). */
+    id: 'dev-settings',
+    label: 'Dev · Settings',
     module: 'dev',
     width: 'page',
-    render: () => <DevRaisedStatusSurface />,
+    render: () => <DevSettingsSurface />,
+  },
+  {
+    /* Goals settings (plan #1937.10): the morning run on, the weekly run off. */
+    id: 'goals-settings',
+    label: 'Goals · Settings',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
+  },
+  {
+    /* Learn settings (plan #1937.10): subject offers on, an explain-back card
+     * in every ten. */
+    id: 'learn-settings',
+    label: 'Learn · Settings',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSettingsView settings={{ offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a

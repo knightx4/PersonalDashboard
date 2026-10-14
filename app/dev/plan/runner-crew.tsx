@@ -71,16 +71,17 @@ function PillName({ slot }: { slot: RunnerSlot }) {
   const name = slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App');
   const title = work.title ?? 'A run with no step recorded';
   return (
-    <>
+    <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="sr-only">Working on </span>
-      {name}{' '}
-      {/* The title is long and the pill is a quarter of the card, so it
-          waits in a tip on the number, and in the panel the pill opens. */}
-      <Tooltip label={title}>
-        <span className="tabular font-medium">{work.ref ?? title}</span>
+      <span className="shrink-0">{name}</span>
+      {/* The title is long and the row is narrow, so it fills what is left and
+          is cut where it meets the time; the whole of it waits in a tip, and
+          in the panel the row opens. */}
+      <Tooltip label={title} className="min-w-0">
+        <span className="tabular min-w-0 truncate font-medium">{work.ref ?? title}</span>
       </Tooltip>
       <span className="sr-only">, {title}</span>
-    </>
+    </span>
   );
 }
 
@@ -110,8 +111,8 @@ function Pill({
       aria-expanded={open}
       aria-controls={panel}
       onClick={onPress}
-      className={`flex w-full min-w-0 items-center gap-3 rounded-control border px-3 py-2.5 text-left transition-colors ${
-        open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
+      className={`flex min-h-11 w-full min-w-0 items-center gap-3 px-1 py-2 text-left transition-colors ${
+        open ? 'bg-accent-tint' : 'hover:bg-sunken'
       }`}
     >
       <DashMark
@@ -124,26 +125,26 @@ function Pill({
         // Only a slot at work glows; asleep or off, its Dash sits unlit.
         still={!working}
       />
-      {/* Every pill has the same three rows, a meter track included, so the
-          four stand the same height whatever their slots are doing. */}
+      {/* One line: the name, then what the slot is doing. A progress track
+          shows only while a slot works on a feature that has steps. */}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`block truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
-          <span className="sr-only">{slot.label}: </span>
-          <PillName slot={slot} />
+        <span className="flex min-w-0 items-baseline justify-between gap-3">
+          <span className={`block min-w-0 truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
+            <span className="sr-only">{slot.label}: </span>
+            <PillName slot={slot} />
+          </span>
+          <span className="block shrink-0 truncate text-small text-ink-muted tabular">
+            {pillStatus(slot, held, progress)}
+          </span>
         </span>
-        <span className="block truncate text-small text-ink-muted tabular">
-          {pillStatus(slot, held, progress)}
-        </span>
-        {progress ? (
+        {working && progress && (
           <Meter
             value={progress.done}
             max={progress.total}
-            label={`${working ? (slot.work.ref ?? 'The feature') : slot.label}: ${progress.done} of ${progress.total} steps done`}
+            label={`${slot.work.ref ?? 'The feature'}: ${progress.done} of ${progress.total} steps done`}
             minFraction={0.04}
             moves
           />
-        ) : (
-          <span aria-hidden className="block h-1.5 rounded-full bg-canvas" />
         )}
       </span>
     </button>
@@ -243,7 +244,7 @@ export function RunnerCrew({
     <div className="flex flex-col gap-3">
       <ul
         aria-label="What each of the runner's four sessions is doing"
-        className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
+        className="flex flex-col divide-y divide-border border-t border-border"
       >
         {slots.map((slot) => (
           <li key={slot.slot} className="min-w-0">

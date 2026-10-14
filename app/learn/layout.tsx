@@ -20,6 +20,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     sections: async ({ owner }) =>
       learnSections(owner, await countReadNow(await createLearnClient())),
     brief: () => loadLearnBrief(),
+    // What Learn offers without being asked (plan #1937.10).
+    settingsHref: '/learn/settings',
+    settingsLabel: 'Learn settings',
     children,
   });
 }
