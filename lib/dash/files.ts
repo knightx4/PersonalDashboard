@@ -24,7 +24,7 @@ export type DashFile =
   | { name: string; kind: 'text'; text: string }
   | { name: string; kind: 'unread'; why: string };
 
-/** The model refuses a picture over 5 MB of base64, which is about 3.75 MB of file. */
+/** A picture over this is shrunk to a smaller copy when Dash reads it; the stored original is untouched. */
 export const IMAGE_MAX_BYTES = 3_750_000;
 
 /** The model reads a PDF of up to 100 pages. */
@@ -88,7 +88,7 @@ async function shrinkImage(bytes: Uint8Array): Promise<{ data: Buffer } | { why:
   } catch {
     return { why: 'the picture could not be opened' };
   }
-  return { why: 'the picture is still over the 3.75 MB Dash can look at after shrinking it' };
+  return { why: 'the picture could not be shrunk enough to read' };
 }
 
 /** One stored file, as Dash will read it. */
