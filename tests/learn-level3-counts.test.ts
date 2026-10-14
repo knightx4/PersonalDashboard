@@ -89,6 +89,17 @@ describe('learn.level3_evidence_counts', () => {
     expect(await countsFor(userA)).toEqual({ claimed: 2, tested: 1, total: Number(list.n) });
   });
 
+  it('leaves Level 4 topics out of the list and the evidence (plan #2016.1)', async () => {
+    const before = await countsFor(userA);
+    const [provider] = await admin<{ id: string }[]>`select id from catalogue_providers where slug = 'wikipedia'`;
+    await admin`
+      insert into area_check_articles (title, section, level)
+      values ('Level four only', 'Science > Biology > Cells', 4)`;
+    await seedGotIt(userA, provider.id, 'Level four only');
+    expect(await countsFor(userA)).toEqual(before);
+    await admin`delete from area_check_articles where title = 'Level four only'`;
+  });
+
   it('gives another user none of it', async () => {
     const counts = await countsFor(userB);
     expect([counts.claimed, counts.tested]).toEqual([0, 0]);

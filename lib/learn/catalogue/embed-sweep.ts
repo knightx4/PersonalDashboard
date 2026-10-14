@@ -129,9 +129,9 @@ export type EmbedSweepResult = {
 };
 
 /** Postgres wants `[1,2,3]`, and a vector of the wrong width fails the cast. */
-export function vectorLiteral(vector: number[]): string {
-  if (vector.length !== EMBEDDING_DIMENSIONS) {
-    throw new Error(`Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${vector.length}.`);
+export function vectorLiteral(vector: number[], dimensions: number = EMBEDDING_DIMENSIONS): string {
+  if (vector.length !== dimensions) {
+    throw new Error(`Expected ${dimensions} dimensions, got ${vector.length}.`);
   }
   return `[${vector.join(',')}]`;
 }
