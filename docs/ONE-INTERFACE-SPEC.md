@@ -267,7 +267,8 @@ five positions in every room, so the thumb learns one layout.
 
 Section addresses stay what they are (`/shopping/dashboard`, `/jobs`,
 `/goals`); only the names in the column and the dock change. `/jobs/review`
-and `/shopping/review` gain the Inbox name and keep their paths.
+and `/shopping/review` keep their paths, lose their own entries and light
+the Inbox, which lists each queue as a row.
 
 ## Part 2: Every thing has a page, a path and a way back
 

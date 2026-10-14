@@ -2712,8 +2712,10 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -5850,7 +5852,8 @@ export const SURFACES: readonly Surface[] = [
           account="preview"
           module="news"
           sections={[
-            { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
+            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
             { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
