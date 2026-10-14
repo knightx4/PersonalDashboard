@@ -86,10 +86,12 @@ import { JOBS_WRITE_TOOLS } from './jobs-writes';
  *                    filed from the Inbox, a theme or a Maya question
  *                    renamed, and a course corrected (lib/dash/vault-writes.ts,
  *                    plan #1894.9.3).
- *   Jobs' four       a role's fields or company, and an application's
+ *   Jobs' six        a role's fields or company, and an application's
  *                    excitement or channel (lib/dash/jobs-writes.ts, plan
  *                    #1894.6.1); a company's name or details, and duplicate
- *                    roles merged (plan #1894.6.2).
+ *                    roles merged (plan #1894.6.2); a reminder finished,
+ *                    put off, edited or linked to an email, and a waiting
+ *                    row finished or put off (plan #1894.6.3).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)

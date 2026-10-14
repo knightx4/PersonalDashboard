@@ -638,7 +638,7 @@ const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
     const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
     if ('ok' in made) throw new AskInputError(made.error);
     if (!made.undo) {
-      await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before);
+      await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
       return { ok: true, rows: [made.row], note: made.summary };
     }
     const recorded = await recordDashAction(

@@ -7,6 +7,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -26,6 +27,12 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                       industry, headquarters and links.
  *   merge_roles         fold duplicate roles at one company into the one
  *                       they keep.
+ *
+ * and, from Jobs Today and a role's timeline (plan #1894.6.3):
+ *
+ *   change_reminder     a reminder finished, put off a week, reworded, moved
+ *                       to another day, or linked to the email behind it.
+ *   change_waiting      a "Waiting on you" row done or put off a week.
  *
  * Moving a role to another stage is move_roles (lib/dash/bulk-roles.ts), and
  * removing a pursuit deletes rows, which Dash never does.
@@ -63,8 +70,10 @@ export type JobsMade = {
   kind: JobsChangeKind;
   input: JobsChangeInput;
   subjectRef: string;
-  op: 'update';
-  before: Record<string, unknown>;
+  /** An insert only for a waiting row put aside the first time (change_waiting). */
+  op: 'insert' | 'update';
+  /** The row before, for an update; null for an insert. */
+  before: Record<string, unknown> | null;
   after: Record<string, unknown>;
   summary: string;
   row: AskRow;
@@ -851,6 +860,220 @@ export async function undoRoleMerge(
 }
 
 // ---------------------------------------------------------------------------
+// change_reminder
+// ---------------------------------------------------------------------------
+
+const REMINDERS = 'job_search.reminders';
+const WAITING = 'job_search.waiting_dismissals';
+const BODY_MAX = 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A week on, as Jobs Today's "Later" puts a reminder or a waiting row off. */
+const putOffUntil = () => new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString();
+
+/** The role an application is on, for the words a change is told in. */
+async function applicationRole(env: JobsWriteEnv, applicationId: unknown): Promise<{ id: string; name: string } | null> {
+  if (typeof applicationId !== 'string') return null;
+  const { data: application } = await env.jobs
+    .from('applications')
+    .select('role_id')
+    .eq('id', applicationId)
+    .eq('user_id', env.userId)
+    .maybeSingle();
+  const roleId = (application as Row | null)?.role_id;
+  if (typeof roleId !== 'string') return null;
+  const { data: role } = await env.jobs.from('roles').select('*').eq('id', roleId).eq('user_id', env.userId).maybeSingle();
+  if (!role) return null;
+  return { id: roleId, name: roleName(role as Row, await companyName(env, (role as Row).company_id)) };
+}
+
+/** "Send the take-home", as the reminder reads, cut for a sentence. */
+function quotedBody(body: unknown, fallback: string): string {
+  const said = typeof body === 'string' && body.trim() ? body.trim() : fallback;
+  return `"${said.length > 100 ? `${said.slice(0, 99).trimEnd()}…` : said}"`;
+}
+
+/** A day, as the timeline's date field sends one and reads it back (midnight UTC), or a moment. */
+function dueOf(args: Args): string {
+  const value = text(args, 'due');
+  const at = new Date(value);
+  if (!value || Number.isNaN(at.getTime())) throw new JobsRefused('due must be a day, YYYY-MM-DD, or a date and time.');
+  return at.toISOString();
+}
+
+/**
+ * The email a call names: the job_search.inbox_messages ref, or the ref
+ * search_mail returned (`<mailbox>:<message id>`), read by the person's user
+ * id either way, as the timeline's picker checks it.
+ */
+async function namedEmail(env: JobsWriteEnv, ref: string): Promise<Row> {
+  let query = env.jobs.from('inbox_messages').select('id, subject').eq('user_id', env.userId);
+  if (isUuid(ref)) query = query.eq('id', ref);
+  else {
+    const at = ref.indexOf(':');
+    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('email_ref must be the ref search_mail or a lookup returned for the email.');
+    query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
+  }
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(`Reading the email failed: ${error.message}`);
+  if (!data) throw new JobsRefused('That email is not one the job search has read. Only mail it has taken in can be linked.');
+  return data as Row;
+}
+
+async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const before = await ownRow(env.jobs, 'reminders', idOf(text(args, 'reminder_ref'), 'reminder'), env.userId, 'reminder');
+  const id = before.id as string;
+  const update: Row = {};
+  const changed: string[] = [];
+
+  if (args.finish === true && args.put_off === true) throw new JobsRefused('Finish it or put it off, not both.');
+  if (args.finish === true) {
+    if (before.completed_at) throw new JobsRefused('That reminder is finished already.');
+    update.completed_at = new Date().toISOString();
+    changed.push('finished');
+  }
+  if (args.put_off === true) {
+    if (given(args, 'due')) throw new JobsRefused('Put it off a week, or give it a new due date, not both.');
+    update.due_at = putOffUntil();
+    changed.push(`put off for ${SNOOZE_DAYS} days`);
+  }
+  if (given(args, 'body')) {
+    const body = text(args, 'body');
+    if (!body) throw new JobsRefused('A reminder needs words: say what it is, or leave body out.');
+    if (body.length > BODY_MAX) throw new JobsRefused(`Keep it under ${BODY_MAX} characters.`);
+    if (body !== before.body) {
+      update.body = body;
+      changed.push(`reworded to ${quotedBody(body, '')}`);
+    }
+  }
+  if (given(args, 'due')) {
+    update.due_at = dueOf(args);
+    changed.push('moved to a new due date');
+  }
+  if (given(args, 'email_ref')) {
+    const ref = typeof args.email_ref === 'string' ? args.email_ref.trim() : '';
+    if (!ref) {
+      if (before.ingested_message_id === null) throw new JobsRefused('That reminder has no email linked to it.');
+      update.ingested_message_id = null;
+      changed.push('unlinked from its email');
+    } else {
+      const email = await namedEmail(env, ref);
+      update.ingested_message_id = email.id;
+      changed.push(`linked to the email ${quotedBody(email.subject, 'with no subject')}`);
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new JobsRefused('Nothing to change: give finish, put_off, body, due or email_ref.');
+  }
+
+  const { data, error } = await env.jobs
+    .from('reminders')
+    .update(update)
+    .eq('id', id)
+    .eq('user_id', env.userId)
+    .select('*')
+    .single();
+  if (error || !data) throw new Error(`Changing the reminder failed: ${error?.message ?? 'no row'}`);
+
+  const after = data as Row;
+  const role = await applicationRole(env, before.application_id);
+  const was = quotedBody(before.body, 'reminder');
+  const said = listed(changed);
+  const href = role ? roleHref(role.id) : '/jobs';
+  return {
+    kind: 'change_reminder',
+    input: {
+      verb: 'Changed',
+      what: was,
+      rest: role ? ` on ${role.name}: ${said}` : `: ${said}`,
+      href,
+      where: role ? 'Open the role' : 'Open Jobs',
+      paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/todo'],
+    },
+    subjectRef: toRef(REMINDERS, id),
+    op: 'update',
+    before,
+    after,
+    summary: `Dash ${said} the reminder ${was}${role ? ` on ${role.name}` : ''}.`,
+    row: { table: REMINDERS, ref: id, title: quotedBody(after.body, 'reminder'), href },
+    undo: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// change_waiting
+// ---------------------------------------------------------------------------
+
+/**
+ * Jobs Today's "Waiting on you" rows are mail that asked something of them,
+ * recomputed from the event log on every load, so finishing one or putting
+ * it off writes a row of its own in job_search.waiting_dismissals, as the
+ * page does: no date for done, a week on for later. The first time that row
+ * is new, and its Undo takes it out; after that it is changed in place.
+ */
+async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const verb = text(args, 'verb');
+  if (verb !== 'finish' && verb !== 'put_off') throw new JobsRefused('verb must be finish or put_off.');
+  const event = await ownRow(env.jobs, 'application_events', idOf(text(args, 'event_ref'), 'event'), env.userId, 'event');
+  const payload = (event.payload ?? {}) as Row;
+  if (payload.action_required !== true && payload.action_required !== 'true') {
+    throw new JobsRefused('That event is not one waiting on them: only mail that asked them something is on "Waiting on you".');
+  }
+  const eventId = event.id as string;
+
+  const { data: existing, error: readError } = await env.jobs
+    .from('waiting_dismissals')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('application_event_id', eventId)
+    .maybeSingle();
+  if (readError) throw new Error(`Reading the waiting row failed: ${readError.message}`);
+  const before = (existing as Row | null) ?? null;
+  if (verb === 'finish' && before && before.dismissed_until === null) throw new JobsRefused('That one is marked done already.');
+
+  const until = verb === 'finish' ? null : putOffUntil();
+  const { data, error } = before
+    ? await env.jobs
+        .from('waiting_dismissals')
+        .update({ dismissed_until: until })
+        .eq('id', before.id as string)
+        .eq('user_id', env.userId)
+        .select('*')
+        .single()
+    : await env.jobs
+        .from('waiting_dismissals')
+        .insert({ user_id: env.userId, application_event_id: eventId, dismissed_until: until })
+        .select('*')
+        .single();
+  if (error || !data) throw new Error(`Changing the waiting row failed: ${error?.message ?? 'no row'}`);
+
+  const after = data as Row;
+  const role = await applicationRole(env, event.application_id);
+  const what = quotedBody(event.summary, 'the email that asked them something');
+  const said = verb === 'finish' ? 'marked done' : `put off for ${SNOOZE_DAYS} days`;
+  const href = role ? roleHref(role.id) : '/jobs';
+  return {
+    kind: 'change_waiting',
+    input: {
+      verb: verb === 'finish' ? 'Done' : 'Put off',
+      what,
+      rest: role ? ` on ${role.name}, waiting on you` : ', waiting on you',
+      href: '/jobs',
+      where: 'Open Jobs',
+      paths: ['/jobs', ...(role ? [roleHref(role.id)] : [])],
+    },
+    subjectRef: toRef(WAITING, after.id as string),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    summary: `Dash ${said} ${what}${role ? ` on ${role.name}` : ''}, from "Waiting on you" on Jobs Today.`,
+    row: { table: 'job_search.application_events', ref: eventId, title: what, href },
+    undo: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -947,6 +1170,41 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: mergeRoles,
+  },
+  {
+    name: 'change_reminder',
+    description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off ${SNOOZE_DAYS} days as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        reminder_ref: { type: 'string', description: 'The job_search.reminders ref list_rows or a lookup returned.' },
+        finish: { type: 'boolean', description: 'True to tick it off.' },
+        put_off: { type: 'boolean', description: `True to put it off ${SNOOZE_DAYS} days from now.` },
+        body: { type: 'string', description: 'The new wording.' },
+        due: { type: 'string', description: 'The new due day, YYYY-MM-DD.' },
+        email_ref: {
+          type: 'string',
+          description: 'The email to link it to: the ref search_mail returned, or a job_search.inbox_messages ref. An empty string unlinks it.',
+        },
+      },
+      required: ['reminder_ref'],
+      additionalProperties: false,
+    },
+    run: changeReminder,
+  },
+  {
+    name: 'change_waiting',
+    description: `Finish or put off (${SNOOZE_DAYS} days) a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_ref: { type: 'string', description: 'The job_search.application_events ref of the request.' },
+        verb: { type: 'string', enum: ['finish', 'put_off'], description: 'finish when it is dealt with; put_off for later.' },
+      },
+      required: ['event_ref', 'verb'],
+      additionalProperties: false,
+    },
+    run: changeWaiting,
   },
 ];
 

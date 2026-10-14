@@ -241,3 +241,81 @@ describe('merge_roles (plan #1894.6.2)', () => {
     expect(await refused('merge_roles', dupes(), { keep_role_ref: ROLE, merge_role_refs: [ROLE] })).toMatch(/Pick a different role/);
   });
 });
+
+describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
+  const REMINDER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const MAILBOX = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const MESSAGE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const DISMISSAL = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function withReminders(): FakeTables {
+    return {
+      ...tables(),
+      'job_search.reminders': [
+        { id: REMINDER, user_id: ME, application_id: APP_1, kind: 'custom', body: 'Send the take-home', due_at: '2026-10-10T00:00:00.000Z', completed_at: null, ingested_message_id: null },
+        { id: LINK, user_id: SOMEONE, application_id: null, kind: 'custom', body: 'Not mine', due_at: '2026-10-10T00:00:00.000Z', completed_at: null, ingested_message_id: null },
+      ],
+      'job_search.inbox_messages': [
+        { id: MESSAGE, user_id: ME, email_account_id: MAILBOX, provider_message_id: '18f2a', subject: 'Your take-home' },
+      ],
+      'job_search.application_events': [
+        { id: EVENT, user_id: ME, application_id: APP_1, kind: 'email', summary: 'Asked for references', payload: { action_required: true } },
+        { id: ANSWER_1, user_id: ME, application_id: APP_1, kind: 'email', summary: 'Thanks for applying', payload: {} },
+      ],
+      'job_search.waiting_dismissals': [],
+    };
+  }
+
+  it('finishes a reminder, keeping the row as it was', async () => {
+    const change = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true });
+    expect(change.op).toBe('update');
+    expect(change.subjectRef).toBe(`job_search.reminders:${REMINDER}`);
+    expect(change.before).toMatchObject({ completed_at: null });
+    expect(change.after.completed_at).toEqual(expect.any(String));
+    expect(change.summary).toBe('Dash finished the reminder "Send the take-home" on Role from email at Acme.');
+    expect(change.undo).toBeNull();
+  });
+
+  it('puts one off a week, rewords and moves one, and links it to an email by its search_mail ref', async () => {
+    const off = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: true });
+    const days = (new Date(off.after.due_at as string).getTime() - Date.now()) / 86_400_000;
+    expect(Math.round(days)).toBe(7);
+
+    const edited = await made('change_reminder', withReminders(), {
+      reminder_ref: REMINDER,
+      body: 'Submit the take-home',
+      due: '2026-10-20',
+      email_ref: `${MAILBOX}:18f2a`,
+    });
+    expect(edited.after).toMatchObject({ body: 'Submit the take-home', due_at: '2026-10-20T00:00:00.000Z', ingested_message_id: MESSAGE });
+    expect(edited.summary).toContain('linked to the email "Your take-home"');
+  });
+
+  it('refuses a reminder that is not theirs, an email it has not taken in, and a call with nothing in it', async () => {
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: LINK, finish: true })).toMatch(/no reminder of theirs/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, email_ref: `${MAILBOX}:nope` })).toMatch(
+      /not one the job search has read/,
+    );
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER })).toMatch(/Nothing to change/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true, put_off: true })).toMatch(/not both/);
+  });
+
+  it('marks a waiting row done with a new row, whose Undo takes it out', async () => {
+    const change = await made('change_waiting', withReminders(), { event_ref: EVENT, verb: 'finish' });
+    expect(change.op).toBe('insert');
+    expect(change.before).toBeNull();
+    expect(change.after).toMatchObject({ user_id: ME, application_event_id: EVENT, dismissed_until: null });
+    expect(change.subjectRef).toMatch(/^job_search\.waiting_dismissals:/);
+    expect(change.summary).toBe('Dash marked done "Asked for references" on Role from email at Acme, from "Waiting on you" on Jobs Today.');
+  });
+
+  it('puts off a row already set aside in place, and refuses an event that asked nothing', async () => {
+    const data = withReminders();
+    data['job_search.waiting_dismissals'] = [{ id: DISMISSAL, user_id: ME, application_event_id: EVENT, dismissed_until: null }];
+    const change = await made('change_waiting', data, { event_ref: EVENT, verb: 'put_off' });
+    expect(change.op).toBe('update');
+    expect(change.subjectRef).toBe(`job_search.waiting_dismissals:${DISMISSAL}`);
+    expect(change.after.dismissed_until).toEqual(expect.any(String));
+    expect(await refused('change_waiting', withReminders(), { event_ref: ANSWER_1, verb: 'finish' })).toMatch(/not one waiting on them/);
+  });
+});
