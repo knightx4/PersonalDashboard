@@ -13,6 +13,8 @@ import { fakeDashDeps, fakeId, type FakeTables } from '../../tests/stubs/fake-sc
 const tables: FakeTables = {};
 const ME = '00000000-0000-4000-8000-0000000000cc';
 const STEP = '00000000-0000-4000-8000-000000000301';
+/** The step's own due date, which a test can set before asking. */
+const STEP_DUE = vi.hoisted(() => ({ value: null as string | null }));
 const COLLECTION = vi.hoisted(() => ({ id: 'col-1', name: 'Loans', shape: 'many', fields: [], records: [] as unknown[] }));
 
 vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: vi.fn() }));
@@ -43,13 +45,38 @@ vi.mock('@/lib/goals/collections-store', () => ({
     return { ok: true, value: id };
   }),
 }));
+vi.mock('@/lib/goals/store', () => ({
+  loadAreas: vi.fn(async () => [
+    { id: 'area-money', name: 'Money' },
+    { id: 'area-home', name: 'Home' },
+    { id: 'area-home-repairs', name: 'Home repairs' },
+  ]),
+  insertGoal: vi.fn(async (_c: unknown, userId: string, areaId: string, f: Record<string, unknown>) => {
+    const id = fakeId();
+    tables['goals.items'].push({
+      id,
+      user_id: userId,
+      level: 'goal',
+      area_id: areaId,
+      title: f.title,
+      errand: f.errand,
+      due_on: f.dueOn,
+      detail: f.detail,
+      archived_at: null,
+    });
+    return id;
+  }),
+}));
 vi.mock('@/lib/goals/steps-store', () => ({
   loadGoalMap: vi.fn(async () => ({
-    goal: { id: 'g', title: 'Clear the loans', status: 'open' },
+    goal: { id: 'g', title: 'Clear the loans', status: 'open', areaId: 'area-money' },
     steps: [
       {
         id: '00000000-0000-4000-8000-000000000301',
         title: 'Email the servicer',
+        status: 'open',
+        dueOn: STEP_DUE.value,
+        detail: 'Account 4471.',
         children: [{ id: 'sub-1', title: 'Find the address', children: [] }],
       },
     ],
@@ -125,7 +152,84 @@ beforeEach(() => {
       updated_at: '2026-10-01T09:00:00Z',
     },
   ];
+  STEP_DUE.value = null;
   vi.clearAllMocks();
+});
+
+describe('making a step its own errand from its thread (plan #2035.2)', () => {
+  const errands = () => tables['goals.items'].filter((row) => row.level === 'goal');
+
+  it('makes the errand with the date and notes, archives the step, links it, and each change undoes', async () => {
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([
+      toolCall('e', 'promote_step_to_errand', { due_on: '2026-10-20', notes: 'Ask about the payoff letter.' }),
+      answerCall('Made it an errand.'),
+    ]);
+    const outcome = await askWith(dash, model);
+    expect(outcome).toEqual({ ok: true, message: 'Done, and said in the thread.' });
+
+    const [errand] = errands();
+    expect(errand).toMatchObject({
+      area_id: 'area-money',
+      title: 'Email the servicer',
+      errand: true,
+      due_on: '2026-10-20',
+      detail: 'Account 4471.\n\nAsk about the payoff letter.',
+    });
+    expect(tables['goals.items'][0].archived_at).not.toBeNull();
+
+    const [added, archived] = tables['core.dash_actions'];
+    expect(added).toMatchObject({
+      surface: 'thread',
+      kind: 'promote_step_to_errand',
+      op: 'insert',
+      subject_ref: `goals.items:${errand.id}`,
+      summary: 'Made "Email the servicer" its own errand in Money, due 20 Oct 2026.',
+    });
+    expect(archived).toMatchObject({
+      kind: 'promote_step_to_errand',
+      op: 'update',
+      subject_ref: `goals.items:${STEP}`,
+      before_values: { archived_at: null },
+      summary: 'Archived "Email the servicer" from "Clear the loans", with its sub-step, now that it is an errand.',
+    });
+    const body = vi.mocked(writeComment).mock.calls.at(-1)?.[1].body;
+    expect(body).toContain(`[Email the servicer](/goals/${errand.id})`);
+
+    expect((await undoDashAction(dash, archived.id as string)).ok).toBe(true);
+    expect(tables['goals.items'][0].archived_at).toBeNull();
+    expect((await undoDashAction(dash, added.id as string)).ok).toBe(true);
+    expect(errands()).toHaveLength(0);
+  });
+
+  it("uses the step's own date when the comment gives none, in the area the comment names", async () => {
+    STEP_DUE.value = '2026-11-02';
+    const dash = fakeDashDeps(tables, ME);
+    await ask(dash, toolCall('e', 'promote_step_to_errand', { area: 'the Home area' }), answerCall('Done.'));
+    expect(errands()[0]).toMatchObject({ area_id: 'area-home', due_on: '2026-11-02', detail: 'Account 4471.' });
+  });
+
+  it('changes nothing with no date in the comment or on the step, and tells the model to ask for one', async () => {
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([toolCall('e', 'promote_step_to_errand', {}), answerCall('Which day is it due?')]);
+    await askWith(dash, model);
+
+    expect(errands()).toHaveLength(0);
+    expect(vi.mocked(setStepArchived)).not.toHaveBeenCalled();
+    expect(tables['core.dash_actions'] ?? []).toHaveLength(0);
+    expect(toolResults(model.sent).join(' ')).toContain('ask them which day it is due');
+  });
+
+  it('changes nothing when the area named is not one of theirs', async () => {
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([
+      toolCall('e', 'promote_step_to_errand', { due_on: '2026-10-20', area: 'Garden' }),
+      answerCall('Which area?'),
+    ]);
+    await askWith(dash, model);
+    expect(errands()).toHaveLength(0);
+    expect(toolResults(model.sent).join(' ')).toContain('"Garden" is not one of their areas');
+  });
 });
 
 describe('moving and archiving a step from its thread (plan #2035.1)', () => {

@@ -6,8 +6,9 @@
  * #1465) with Ask Dash's lookups and writes and the goal's own tools, and
  * write the reply into the same thread as `claude`. The goal's own tools file
  * facts into its collections as drafts (file_goal_record), date a step or put
- * it on Todo (schedule_goal_step), move a step under another goal or archive
- * it (move_goal_step, archive_goal_step, in lib/goals/thread-acts.ts), take
+ * it on Todo (schedule_goal_step), move a step under another goal, archive it
+ * or make it its own errand (move_goal_step, archive_goal_step,
+ * promote_step_to_errand, in lib/goals/thread-acts.ts), take
  * the step (take_step), or pass the
  * comment to the goals routine when it needs more, research, email or
  * changing the steps (pass_to_routine), whose reply lands in the thread later.
@@ -124,9 +125,19 @@ The goal's own tools:
   wanted ("we don't need this any more", "take this off") archives that step,
   and its sub-steps go out of view with it. Archiving is undone from Home and
   is never a delete.
+- promote_step_to_errand. A comment on a step saying it should be its own
+  errand ("make this its own errand", "turn this into an errand") makes one
+  now, titled as the step and carrying its notes, and archives the step. An
+  errand needs a due date: give due_on as YYYY-MM-DD when the comment names a
+  day, worked out as for schedule_goal_step, and leave it out to use the
+  step's own. When the comment gives no date and the step shows none, do not
+  call it: ask them which day the errand is due. area is the words the comment
+  used for an area, left out to keep the goal's own; notes is anything the
+  comment adds for the errand, in their words.
 
-Use those two only when the comment asks for the change. A question about
-whether a step belongs elsewhere, or is still needed, is answered in words.
+Use those three only when the comment asks for the change. A question about
+whether a step belongs elsewhere, is still needed, or would be better as an
+errand, is answered in words.
 - take_step. When a comment on a step tells you to do that step or get it
   ready ("do this", "draft this for me", "write the email for this", "review
   my resume", "you do it"), take it. A step of Claude's is worked and closed; a
@@ -276,6 +287,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
       userId: input.userId,
       dash: input.dash,
       goalTitle: map.goal.title,
+      goalAreaId: map.goal.areaId,
       step: input.itemId === input.goalId ? null : findStep(map.steps, input.itemId),
       refs,
     }),

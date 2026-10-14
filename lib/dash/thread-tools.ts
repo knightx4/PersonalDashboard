@@ -220,6 +220,24 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'Archive the step the comment is on, when the comment says it is no longer needed or wanted. Its sub-steps go out of view with it, and Undo on Home brings it back. Never a delete.',
     { type: 'object', properties: {}, additionalProperties: false },
   ),
+  write(
+    'promote_step_to_errand',
+    [GOAL_THREAD_TABLE],
+    'Make the step the comment is on its own errand, titled as the step and carrying its notes, then archive the step, when the comment asks for that. An errand needs a due date: when the comment gives none and the step has none, ask for one instead of calling this.',
+    {
+      type: 'object',
+      properties: {
+        due_on: {
+          type: 'string',
+          pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+          description: "YYYY-MM-DD, worked out from today, when the comment gives a day. Leave out to use the step's own due date.",
+        },
+        area: { type: 'string', description: "The words the comment used for the area it goes in. Leave out to keep the goal's own area." },
+        notes: { type: 'string', description: 'Anything the comment adds for the errand, in their words. Added after the step\'s own notes.' },
+      },
+      additionalProperties: false,
+    },
+  ),
   handoff(
     'take_step',
     [GOAL_THREAD_TABLE],
