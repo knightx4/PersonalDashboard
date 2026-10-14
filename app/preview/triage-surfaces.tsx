@@ -77,6 +77,22 @@ const triageActions: TriageActions = {
     triagePlaces.filter((place) => place.title.toLowerCase().includes(query.toLowerCase())),
 };
 
-export function TriagePreview({ empty = false, writable }: { empty?: boolean; writable: boolean }) {
-  return <QuickNoteTriage notes={empty ? [] : triageNotes} writable={writable} actions={triageActions} />;
+export function TriagePreview({
+  empty = false,
+  writable,
+  second = false,
+}: {
+  empty?: boolean;
+  writable: boolean;
+  /** The first note already left for later, so Previous shows. */
+  second?: boolean;
+}) {
+  return (
+    <QuickNoteTriage
+      notes={empty ? [] : triageNotes}
+      writable={writable}
+      actions={triageActions}
+      alreadyPassed={second ? ['triage-1'] : undefined}
+    />
+  );
 }

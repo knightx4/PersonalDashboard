@@ -109,6 +109,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-quick-note-read-only': ['/vault'],
   'vault-triage': ['/vault/triage'],
   'vault-triage-empty': ['/vault/triage'],
+  'vault-triage-previous': ['/vault/triage'],
   'vault-triage-read-only': ['/vault/triage'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
