@@ -59,6 +59,24 @@ describe('the request', () => {
     expect(sent.truncation).toBe(true);
   });
 
+  it('asks for a narrower width when the column is narrower, and holds the answer to it', async () => {
+    const sent = embeddingRequestBody({ texts: ['a'], model: 'voyage-4-lite', inputType: 'document', dimensions: 512 });
+    expect(sent.output_dimension).toBe(512);
+
+    const narrow = { data: [{ embedding: vector(0.1, 512), index: 0 }], model: 'voyage-4-lite' };
+    expect(parseEmbeddingResponse(narrow, 1, 512).ok).toBe(true);
+    expect(parseEmbeddingResponse(narrow, 1).ok).toBe(false);
+
+    const fetchImpl = responding({ json: narrow });
+    const result = await voyageClient('vk-test', fetchImpl)({
+      texts: ['a'],
+      model: 'voyage-4-lite',
+      inputType: 'document',
+      dimensions: 512,
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('sends the key as a bearer token', async () => {
     const fetchImpl = responding({ json: body(1) });
     await voyageClient('vk-test', fetchImpl)({

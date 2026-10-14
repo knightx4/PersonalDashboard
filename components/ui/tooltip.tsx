@@ -2,6 +2,7 @@
 
 import {
   cloneElement,
+  isValidElement,
   useEffect,
   useId,
   useLayoutEffect,
@@ -108,8 +109,14 @@ export function Tooltip({
       }}
     >
       {/* `title: undefined` clears a native title the child sets itself, as
-          IconButton does from its label, so the tip is the only one shown. */}
-      {cloneElement(children, { title: undefined, ...(open ? { 'aria-describedby': tipId } : {}) })}
+          IconButton does from its label, so the tip is the only one shown.
+          A child a server component passed can arrive as a lazy reference
+          rather than an element once the page's payload is large, and
+          cloning one gives an element with no type, which took down the
+          Pipeline at 27 rows. That child is drawn as it came. */}
+      {isValidElement(children)
+        ? cloneElement(children, { title: undefined, ...(open ? { 'aria-describedby': tipId } : {}) })
+        : children}
       {open && (
         <Popover
           ref={panelRef}

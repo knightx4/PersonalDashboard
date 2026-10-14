@@ -5,6 +5,7 @@ import {
   DEFAULT_EMBEDDING_MODEL,
   voyageClient,
   type EmbeddingClient,
+  type EmbeddingDimensions,
   type EmbeddingInputType,
   type EmbeddingModel,
 } from '@/lib/learn/embed/voyage';
@@ -62,6 +63,8 @@ export type EmbedInput = {
   /** Documents unless the caller is embedding something to search with. */
   inputType?: EmbeddingInputType;
   model?: EmbeddingModel;
+  /** The width asked for; EMBEDDING_DIMENSIONS when absent. */
+  dimensions?: EmbeddingDimensions;
   /** Falls back to EMBEDDING_API_KEY, which is what the deployment sets. */
   apiKey?: string | null;
   /** Injected by the tests, so nothing here reaches a network under vitest. */
@@ -75,7 +78,7 @@ export type EmbedInput = {
 export type EmbedOutcome =
   | {
       ok: true;
-      /** One per text, in order, each EMBEDDING_DIMENSIONS long. */
+      /** One per text, in order, each `dimensions` long. */
       vectors: number[][];
       /** What produced them, for `catalogue_segments.embedding_model`. */
       model: string;
@@ -171,7 +174,7 @@ export async function embedTexts(input: EmbedInput): Promise<EmbedOutcome> {
 
   for (const batch of batchTexts(input.texts)) {
     for (let attempt = 1; ; attempt += 1) {
-      const result = await client({ texts: batch, model, inputType });
+      const result = await client({ texts: batch, model, inputType, dimensions: input.dimensions });
 
       // Anything that got a response body is reported, including one that did
       // not parse. A 429 and a dropped connection are charged for nothing.
