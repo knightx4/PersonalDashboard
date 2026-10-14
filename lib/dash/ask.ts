@@ -133,7 +133,7 @@ links or an information step's form, call change_goal_number, change_goal_link
 or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
-item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. In Jobs, to change a role's title, location, pay, posting or company, call
+item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
 change_role; to set how excited they are about one or how they applied, call
 change_application; to rename a company or correct its details, call change_company; to fold duplicate roles into one, call merge_roles. In the Vault, to write
 a note, change or rename one, file a quick note, or rename a theme or a

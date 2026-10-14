@@ -417,3 +417,146 @@ describe('change_saved_item', () => {
     expect(await refused('change_saved_item', { change: 'add', url: 'not a link', title: 'X' })).toMatch(/full product link/);
   });
 });
+
+const ORDER = '00000000-0000-4000-8000-0000000e0001';
+const ORDER_TWO = '00000000-0000-4000-8000-0000000e0002';
+const ORDER_THEIRS = '00000000-0000-4000-8000-0000000e0003';
+const LINE = '00000000-0000-4000-8000-0000000e0101';
+const LINE_THEIRS = '00000000-0000-4000-8000-0000000e0102';
+const WAITING = '00000000-0000-4000-8000-0000000e0201';
+const SHIPPED = '00000000-0000-4000-8000-0000000e0202';
+const GIFT_TAG = '00000000-0000-4000-8000-0000000e0301';
+
+describe('the order writes (plan #1894.5.4)', () => {
+  const order = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    user_id: ME,
+    merchant_id: 'm-amazon',
+    order_date: '2026-10-01',
+    needs_review: true,
+    deleted_at: null,
+    cancelled_at: null,
+    external_order_number: null,
+    ...extra,
+  });
+  const message = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    classification: 'order_confirmation',
+    parse_status: 'needs_review',
+    resulting_order_id: null,
+    error: null,
+    parse_confidence: null,
+    ...extra,
+  });
+
+  beforeEach(() => {
+    tables['public.merchants'][0].is_global = true;
+    tables['public.orders'] = [order(ORDER), order(ORDER_TWO, { order_date: '2026-10-02' }), order(ORDER_THEIRS, { user_id: SOMEONE })];
+    tables['public.order_items'] = [
+      { id: LINE, order_id: ORDER, name: 'Desk lamp' },
+      { id: LINE_THEIRS, order_id: ORDER_THEIRS, name: 'Not mine' },
+    ];
+    tables['public.order_item_tags'] = [];
+    tables['public.item_tags'] = [{ id: GIFT_TAG, user_id: ME, name: 'gift', slug: 'gift' }];
+    tables['public.shipments'] = [];
+    const waiting = message(WAITING, { subject: 'Your Amazon order' });
+    const shipped = message(SHIPPED, { classification: 'shipping', subject: 'Your parcel has shipped' });
+    tables['public.ingested_messages'] = [waiting, shipped];
+    // The view carries the owner the verdict rows do not; the fake keeps it as rows of its own.
+    tables['public.inbox_messages'] = [
+      { ...waiting, user_id: ME },
+      { ...shipped, user_id: ME, email_account_id: 'acct', provider_message_id: 'g1', received_at: '2026-10-03T10:00:00Z' },
+    ];
+  });
+
+  it('adds an order with a unit per thing bought, and Undo takes it away', async () => {
+    const kept = await viaAsk('add_order', {
+      merchant: 'amazon',
+      order_date: '2026-10-10',
+      tax: 1,
+      lines: [{ name: 'Mug', quantity: 2, unit_price: 8 }],
+    });
+    const added = tables['public.orders'].find((r) => r.order_date === '2026-10-10')!;
+    expect(added).toMatchObject({ user_id: ME, merchant_id: 'm-amazon', source: 'manual', total_cents: 1700 });
+    expect(tables['public.inventory_items'].filter((r) => r.name === 'Mug')).toHaveLength(2);
+    expect(lastSummary()).toBe('Dash added an order from Amazon of 2026-10-10 for $17.00, with 2 items in the inventory.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(tables['public.orders'].some((r) => r.id === added.id)).toBe(false);
+  });
+
+  it('keeps an added order once something hangs off it, and saves a receipt or a waiting email as its source', async () => {
+    const kept = await viaAsk('add_order', { merchant: 'Corner Shop', from_receipt: true, lines: [{ name: 'Bread', unit_price: 3 }] });
+    const added = tables['public.orders'].find((r) => r.source === 'receipt_photo')!;
+    expect(tables['public.merchants'].some((m) => m.name === 'Corner Shop' && m.created_by_user_id === ME)).toBe(true);
+    tables['public.shipments'].push({ id: 'ship-1', order_id: added.id });
+    expect(await undoChange(deps(), kept.id)).toMatchObject({ ok: false });
+    expect(tables['public.orders'].some((r) => r.id === added.id)).toBe(true);
+
+    const fromEmail = await viaAsk('add_order', { merchant: 'Amazon', message_ref: WAITING, lines: [{ name: 'Lamp', unit_price: 40 }] });
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'parsed' });
+    expect((await undoChange(deps(), fromEmail.id)).ok).toBe(true);
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'needs_review', resulting_order_id: null });
+  });
+
+  it('tags an order line, making the tag, and Undo takes both away; untagging is undone too', async () => {
+    const kept = await viaAsk('order_item_tags', { change: 'add', order_item_ref: LINE, tag: 'Office' });
+    const office = tables['public.item_tags'].find((t) => t.slug === 'office')!;
+    expect(tables['public.order_item_tags']).toEqual([expect.objectContaining({ order_item_id: LINE, tag_id: office.id })]);
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(tables['public.order_item_tags']).toEqual([]);
+    expect(tables['public.item_tags'].some((t) => t.slug === 'office')).toBe(false);
+
+    await viaAsk('order_item_tags', { change: 'add', order_item_ref: LINE, tag: 'gift' });
+    const off = await viaAsk('order_item_tags', { change: 'remove', order_item_ref: LINE, tag: 'gift' });
+    expect(tables['public.order_item_tags']).toEqual([]);
+    expect((await undoChange(deps(), off.id)).ok).toBe(true);
+    expect(tables['public.order_item_tags']).toEqual([expect.objectContaining({ tag_id: GIFT_TAG })]);
+  });
+
+  it('confirms, discards and restores orders in the queue, each undone', async () => {
+    const confirmed = await viaAsk('review_orders', { move: 'confirm', order_refs: [ORDER, ORDER_TWO] });
+    expect([row('orders', ORDER).needs_review, row('orders', ORDER_TWO).needs_review]).toEqual([false, false]);
+    expect(lastSummary()).toBe('Dash confirmed 2 orders: the Amazon order of 2026-10-01 and the Amazon order of 2026-10-02.');
+    expect((await undoChange(deps(), confirmed.id)).ok).toBe(true);
+    expect(row('orders', ORDER).needs_review).toBe(true);
+
+    row('ingested_messages', WAITING).resulting_order_id = ORDER;
+    tables['public.inbox_messages'].find((m) => m.id === WAITING)!.resulting_order_id = ORDER;
+    const discarded = await viaAsk('review_orders', { move: 'discard', order_refs: [ORDER] });
+    expect(row('orders', ORDER).deleted_at).not.toBeNull();
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'skipped', resulting_order_id: null });
+    expect((await undoChange(deps(), discarded.id)).ok).toBe(true);
+    expect(row('orders', ORDER)).toMatchObject({ deleted_at: null, needs_review: true });
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'needs_review', resulting_order_id: ORDER });
+
+    row('orders', ORDER_TWO).deleted_at = '2026-10-05T00:00:00Z';
+    await viaAsk('review_orders', { move: 'restore', order_refs: [ORDER_TWO] });
+    expect(row('orders', ORDER_TWO).deleted_at).toBeNull();
+  });
+
+  it('dismisses a waiting email and puts it back', async () => {
+    const dismissed = await viaAsk('review_orders', { move: 'dismiss', message_refs: [WAITING] });
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'skipped', error: 'Dismissed from review queue' });
+    expect(lastSummary()).toBe('Dash dismissed 1 email from the review queue: Your Amazon order.');
+    expect((await undoChange(deps(), dismissed.id)).ok).toBe(true);
+    expect(row('ingested_messages', WAITING)).toMatchObject({ parse_status: 'needs_review', error: null });
+  });
+
+  it('attaches a shipping email to its order, writing the shipment, and Undo takes it back to the queue', async () => {
+    const kept = await viaAsk('review_orders', { move: 'attach', message_ref: SHIPPED, order_ref: ORDER });
+    expect(row('ingested_messages', SHIPPED)).toMatchObject({ parse_status: 'parsed', resulting_order_id: ORDER });
+    expect(tables['public.shipments']).toHaveLength(1);
+    expect(lastSummary()).toBe('Dash attached the shipping email "Your parcel has shipped" to the Amazon order of 2026-10-01.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(row('ingested_messages', SHIPPED)).toMatchObject({ parse_status: 'needs_review', resulting_order_id: null });
+    expect(tables['public.shipments']).toHaveLength(0);
+  });
+
+  it("refuses another person's order or line, and a move with nothing to move", async () => {
+    expect(await refused('review_orders', { move: 'confirm', order_refs: [ORDER_THEIRS] })).toMatch(/not orders of theirs/);
+    expect(await refused('review_orders', { move: 'restore', order_refs: [ORDER] })).toMatch(/None of those is deleted/);
+    expect(await refused('review_orders', { move: 'undismiss', message_refs: [WAITING] })).toMatch(/None of those was dismissed/);
+    expect(await refused('add_order', { lines: [] })).toMatch(/at least one/);
+    expect(await refused('order_item_tags', { change: 'add', order_item_ref: LINE_THEIRS, tag: 'gift' })).toMatch(/no order line of theirs/);
+  });
+});
