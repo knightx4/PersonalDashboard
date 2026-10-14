@@ -1,5 +1,6 @@
 /**
- * Not now on the Goals home: put something on you aside until a later day.
+ * Later on the Goals home and Inbox: put something on you aside until a later
+ * day, chosen from the menu every Later uses (components/inbox/snooze-menu.tsx).
  *
  * A step that is set aside gets a start date, the same `starts_on` the goal
  * page's Starts field writes (migrations-goals/0043). Everything that picks
@@ -19,22 +20,11 @@
  * setAsideAction in app/goals/home-actions.ts.
  */
 import type { TodayKind } from '@/lib/goals/today';
+import { SNOOZE_CHOICES, snoozeDay, type SnoozeChoice } from '@/lib/core/snooze-days';
 
-export type SetAsideChoice = 'tomorrow' | 'weekend' | 'next_week' | 'next_month';
-
-export const SET_ASIDE_CHOICES: readonly SetAsideChoice[] = [
-  'tomorrow',
-  'weekend',
-  'next_week',
-  'next_month',
-];
-
-export const SET_ASIDE_LABELS: Record<SetAsideChoice, string> = {
-  tomorrow: 'Tomorrow',
-  weekend: 'This weekend',
-  next_week: 'Next week',
-  next_month: 'Next month',
-};
+/** Later's named days (lib/core/snooze-days.ts), the same everywhere. */
+export type SetAsideChoice = SnoozeChoice;
+export const SET_ASIDE_CHOICES: readonly SetAsideChoice[] = SNOOZE_CHOICES;
 
 /** The Today kinds whose id is a step, which is what a start date goes on. */
 const STEP_KINDS: ReadonlySet<TodayKind> = new Set(['step', 'question', 'ask', 'rhythm']);
@@ -43,41 +33,13 @@ export function canSetAside(kind: TodayKind): boolean {
   return STEP_KINDS.has(kind);
 }
 
-function addDays(day: string, days: number): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** 0 for Sunday through 6 for Saturday. */
-function weekday(day: string): number {
-  return new Date(`${day}T00:00:00Z`).getUTCDay();
-}
-
 /**
- * The day a choice means, from `today` (YYYY-MM-DD in the account's zone):
- *
- * - tomorrow: the next day
- * - this weekend: the coming Saturday, a week on if today is Saturday
- * - next week: the coming Monday, a week on if today is Monday
- * - next month: the first of next month
+ * The day a named choice means, from `today` (YYYY-MM-DD in the account's
+ * zone), as snoozeDay reads it: tomorrow, the coming Saturday, the coming
+ * Monday, or the first of next month.
  */
 export function setAsideOn(choice: SetAsideChoice, today: string): string {
-  switch (choice) {
-    case 'tomorrow':
-      return addDays(today, 1);
-    case 'weekend': {
-      const until = (6 - weekday(today) + 7) % 7;
-      return addDays(today, until === 0 ? 7 : until);
-    }
-    case 'next_week': {
-      const until = (1 - weekday(today) + 7) % 7;
-      return addDays(today, until === 0 ? 7 : until);
-    }
-    case 'next_month': {
-      const [year, month] = today.split('-').map(Number);
-      const next = new Date(Date.UTC(year, month, 1));
-      return next.toISOString().slice(0, 10);
-    }
-  }
+  return snoozeDay(choice, today) as string;
 }
 
 /**

@@ -6,7 +6,6 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
-  Clock,
   GripVertical,
   MessageSquare,
   Pencil,
@@ -47,6 +46,8 @@ import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
 import { putAway } from '@/components/motion/place';
+import { LaterDayField, LaterMenu, LATER_CHOICES } from '@/components/inbox/snooze-menu';
+import { PICK_A_DAY } from '@/lib/core/snooze-days';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
@@ -109,7 +110,8 @@ type RowWrite = {
 /** What "later" does to the row until the server says when. Only the button
  * reads it: a snoozed task shows "Bring back" where an open one shows "Later".
  */
-function snoozedFrom(now: number): string {
+function snoozedFrom(): string {
+  const now = Date.now();
   return new Date(now + SNOOZE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
@@ -201,6 +203,10 @@ export function TaskRow({
   const [adding, setAdding] = useState(false);
   /** The anchor finder on a narrow row, which has no button of its own. */
   const [aboutOpen, setAboutOpen] = useState(false);
+  /** The phone menu showing Later's days in place of its own items. */
+  const [laterStep, setLaterStep] = useState(false);
+  /** Later's Pick a day, opened from the phone menu, under the row. */
+  const [pickingLater, setPickingLater] = useState(false);
   /** Hand to Dash (plan #1263), which opens in place of the row like the editor. */
   const [handing, setHanding] = useState(false);
   const [pending, start] = useTransition();
@@ -322,12 +328,14 @@ export function TaskRow({
     });
   }
 
-  function later() {
+  /** Later, to one of the Later menu's days or a day picked. */
+  function later(choice: string) {
+    setPickingLater(false);
     const away = sendAway('Open');
     run({
-      patch: { snoozedUntil: snoozedFrom(Date.now()) },
+      patch: { snoozedUntil: snoozedFrom() },
       write: async () => {
-        const result = await laterTask(task.id);
+        const result = await laterTask(task.id, choice);
         if (!result.error) away();
         return result;
       },
@@ -366,7 +374,8 @@ export function TaskRow({
           label: 'Bring back',
           onSelect: () => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) }),
         }
-      : { id: 'later', label: 'Later', onSelect: later },
+      : // Later turns the menu into Later's days, the same five as the row's own menu.
+        { id: 'later', label: 'Later', closeOnSelect: false, onSelect: () => setLaterStep(true) },
     // On All the phone row is the menu alone, so Drop and Edit come in too.
     ...(archive ? [{ id: 'drop', label: 'Drop', onSelect: drop }] : []),
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
@@ -387,6 +396,12 @@ export function TaskRow({
         ]
       : []),
     { id: 'dash', label: 'Hand to Dash', onSelect: () => setHanding(true) },
+  ];
+
+  /** What the phone menu holds once Later is pressed in it: Later's own five. */
+  const laterMenuItems: ActionMenuItem[] = [
+    ...LATER_CHOICES.map(({ id, label, choice }) => ({ id, label, onSelect: () => later(choice) })),
+    { id: 'later-pick', label: PICK_A_DAY, onSelect: () => setPickingLater(true) },
   ];
 
   /** A row can be reordered when it is in a pile and still on the list. */
@@ -656,9 +671,7 @@ export function TaskRow({
                   <Undo2 strokeWidth={1.75} aria-hidden />
                 </RowAction>
               ) : (
-                <RowAction label="Later" onClick={later}>
-                  <Clock strokeWidth={1.75} aria-hidden />
-                </RowAction>
+                <LaterMenu compact label={task.title} onChoose={later} />
               )}
               <RowAction label="Drop" onClick={drop}>
                 <X strokeWidth={1.75} aria-hidden />
@@ -712,7 +725,13 @@ export function TaskRow({
                   </RowAction>
                 </>
               )}
-              <ActionMenu label="More actions" items={moreActions} />
+              <ActionMenu
+                label="More actions"
+                items={laterStep ? laterMenuItems : moreActions}
+                onOpenChange={(open) => {
+                  if (!open) setLaterStep(false);
+                }}
+              />
               {/* Drawn with no trigger of its own -- the menu above opens it. */}
               <TaskAbout
                 taskId={task.id}
@@ -748,6 +767,13 @@ export function TaskRow({
           )}
         </div>
       </div>
+
+      {/* Later's Pick a day, when the phone menu asked for it. */}
+      {pickingLater && (
+        <div className="pb-2 pl-9 pr-3">
+          <LaterDayField label={task.title} onChoose={later} onCancel={() => setPickingLater(false)} />
+        </div>
+      )}
 
       {/* The files, under the row, when the paperclip has opened them. */}
       {showFiles && files.length > 0 && <TaskFiles files={files} className="pb-2 pl-9 pr-3" />}

@@ -23,7 +23,7 @@ const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
  * The rows are the Home's own (TodayRow, DashRow, LaterRow), so a button
  * here does what it does under Do next. Moves show at once, as they do on
  * the Home: a row set aside or handed to Dash leaves the list, one brought
- * back leaves Set aside, and the server's redraw then puts each where it is.
+ * back leaves Later, and the server's redraw then puts each where it is.
  */
 export function GoalsInboxView({
   groups,
@@ -112,7 +112,7 @@ export function GoalsInboxView({
 
       {/* Shut: these are off you until the day they come back. */}
       {later.length > 0 && (
-        <SectionFold title="Set aside" count={later.length} defaultOpen={false}>
+        <SectionFold title="Later" count={later.length} defaultOpen={false}>
           <Card>
             <ul className="divide-y divide-border">
               {later.map((item) => (

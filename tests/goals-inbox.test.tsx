@@ -105,7 +105,7 @@ describe('the Inbox page', () => {
       ],
     });
     expect(html).toContain('Nothing waiting on you');
-    expect(html).toContain('Set aside');
+    expect(html).toContain('>Later<');
     expect(html).toContain('Turn on autopay');
     expect(html).not.toContain('Your actions');
   });

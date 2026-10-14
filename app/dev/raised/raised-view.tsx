@@ -335,7 +335,7 @@ function RaiseCard({
                 Dismiss
               </Button>
             </form>
-            {snooze && <SnoozeMenu snoozeRef={raiseRef(row.id)} />}
+            {snooze && <SnoozeMenu snoozeRef={raiseRef(row.id)} label={row.title} />}
           </>
         ) : (
           <>

@@ -2,9 +2,8 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
-import { BellRing, ChevronDown, Copy, ExternalLink } from 'lucide-react';
+import { BellRing, Copy, ExternalLink } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
-import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Input } from '@/components/ui/field';
@@ -15,9 +14,9 @@ import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import { areaHref, stepHref } from '@/lib/goals/all-goals';
 import { preparedExcerpt } from '@/lib/goals/home';
-import { SET_ASIDE_CHOICES, SET_ASIDE_LABELS, canSetAside } from '@/lib/goals/set-aside';
+import { canSetAside } from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
-import { SnoozeMenu } from '@/components/inbox/snooze-menu';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
 import { snoozeInboxRowAction, unsnoozeInboxRowAction } from './inbox/actions';
 import { askDashStepAction } from './[goalId]/shaping-actions';
@@ -38,8 +37,8 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
  * (withPrepared in lib/goals/today.ts): the first lines, Open for the rest in
  * place, and Copy. The row's one button stays what it was.
  *
- * Anything that is a step can be put aside with Not now (Tomorrow, This
- * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
+ * Anything that is a step can be put off with Later (Tomorrow, This
+ * weekend, Next week, Next month, Pick a day; components/inbox/snooze-menu.tsx). The row leaves at
  * once, the toast offers Undo, and the step comes back on the day chosen. A
  * step of yours that Dash could prepare also offers Ask Dash, which
  * writes a draft, a script or a checklist onto the step and leaves it yours.
@@ -180,7 +179,7 @@ export function TodayRow({
         {item.backFromSnooze && (
           <p className="inline-flex items-center gap-1 text-small font-semibold text-accent">
             <BellRing className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Back from snooze
+            Back from Later
           </p>
         )}
         {item.url ? (
@@ -264,10 +263,14 @@ export function TodayRow({
             )}
             <span className="ml-auto flex items-center gap-1">
               {preparable && <PrepareButton item={item} onHanded={onHanded} />}
-              {onSnoozed && snoozeRefOf(item.kind, item.id) && (
-                <SnoozeRow item={item} onSnoozed={onSnoozed} />
+              {/* One Later per row: a step takes a start date, which every
+                list honours; anything else the Inbox shows is snoozed there. */}
+              {canSetAside(item.kind) ? (
+                <SetAside item={item} onAside={onAside} />
+              ) : (
+                onSnoozed &&
+                snoozeRefOf(item.kind, item.id) && <SnoozeRow item={item} onSnoozed={onSnoozed} />
               )}
-              {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
             </span>
             {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
           </form>
@@ -340,11 +343,11 @@ function PreparedDraft({ text, title }: { text: string; title: string }) {
 }
 
 /**
- * Not now: a menu of days. Choosing one hides the row at once and sets the
- * step's start date; the toast's Undo puts the dates back and the row with
- * them. A refusal brings the row back and says why.
+ * Later on a step: the one menu of days. Choosing one hides the row at once
+ * and sets the step's start date; the toast's Undo puts the dates back and the
+ * row with them. A refusal brings the row back and says why.
  */
-function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean) => void }) {
+function SetAside({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean) => void }) {
   const toast = useToast();
   const choose = async (choice: string) => {
     onAside(true);
@@ -359,7 +362,7 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
     }
     const before = result.before;
     toast({
-      text: result.message ?? 'Set aside.',
+      text: result.message ?? 'Later.',
       undone: 'Put back.',
       undo: async () => {
         const back = new FormData();
@@ -372,28 +375,11 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
       },
     });
   };
-  return (
-    <ActionMenu
-      label={`Not now: ${item.title}`}
-      align="end"
-      triggerClassName={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-auto')}
-      trigger={
-        <span className="inline-flex items-center gap-1">
-          Not now
-          <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
-        </span>
-      }
-      items={SET_ASIDE_CHOICES.map((choice) => ({
-        id: choice,
-        label: SET_ASIDE_LABELS[choice],
-        onSelect: () => void choose(choice),
-      }))}
-    />
-  );
+  return <LaterMenu label={item.title} onChoose={(choice) => void choose(choice)} />;
 }
 
 /**
- * Snooze: the row leaves the Inbox and its count until the day chosen, or
+ * Later on a goal or a flag in the Inbox: the row leaves the Inbox and its count until the day chosen, or
  * sooner if the step, goal or flag changes (lib/core/inbox-snoozes.ts). The
  * toast's Undo brings it back. A refusal brings the row back and says why.
  */
@@ -415,7 +401,7 @@ function SnoozeRow({ item, onSnoozed }: { item: TodayItem; onSnoozed: (hidden: b
       return;
     }
     toast({
-      text: result.message ?? 'Snoozed.',
+      text: result.message ?? 'Later.',
       undone: 'Brought back.',
       undo: async () => {
         const back = await unsnoozeInboxRowAction(fields());
@@ -424,7 +410,7 @@ function SnoozeRow({ item, onSnoozed }: { item: TodayItem; onSnoozed: (hidden: b
       },
     });
   };
-  return <SnoozeMenu label={item.title} onChoose={(choice) => void choose(choice)} />;
+  return <LaterMenu label={item.title} onChoose={(choice) => void choose(choice)} />;
 }
 
 /**
