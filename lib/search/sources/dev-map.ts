@@ -2,14 +2,16 @@ import { MODULES } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
 import { APP_VISION, visionAnchor } from '@/lib/specs/vision';
 import { stepRef } from '@/lib/plan/ref';
+import { planRefHref } from '@/lib/comments/refs';
 
 /**
  * Dev rows into hits, apart from the reads so the hrefs can be tested without
  * a database -- the same split as map.ts.
  *
- * Only a spec has a page of its own. A plan step lands on the plan with its
- * number already in the plan's own search box, which unfolds the feature it
- * sits under; an idea and a note land on their list at the row's anchor.
+ * A plan step lands on its own page, its feature's Steps tab at its row
+ * (plan #1931.4: a hit opens the row, not its list), and a spec on its page;
+ * an idea and a note land on their list at the row's anchor, which is the
+ * only page either has.
  *
  * An open question and a raise land on the Dash tab at their card instead,
  * because that is where they are answered: the plan shows a question, but
@@ -109,8 +111,9 @@ export function firstLine(body: string, max = 90): string {
 /** What a note's subtitle calls it. Keyed by the `feedback_kind` enum. */
 const NOTE_KIND_LABEL: Record<string, string> = { bug: 'Bug', feature: 'Request', like: 'Like' };
 
+/** A step's own page: the same address its ref opens (planRefHref). */
 export function planHref(number: number): string {
-  return `/dev/plan?view=all&q=${encodeURIComponent(`#${number}`)}`;
+  return planRefHref(number);
 }
 
 export function devHits(rows: DevRows): SearchHit[] {

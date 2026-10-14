@@ -40,6 +40,7 @@ import {
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
+import { RefPreviewSurface } from './ref-preview-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -5976,6 +5977,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'wide',
     render: () => <UiKit />,
+  },
+
+  /* A ref link's preview held open (plan #1931.4): the hidden part of every
+   * comment, Dash reply and plan detail that names a row. */
+  {
+    id: 'ref-preview',
+    label: 'Design · A ref link previewing its row',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <RefPreviewSurface />,
   },
 
   /* The day closing on the agenda (plan #1556): played by ticking the last

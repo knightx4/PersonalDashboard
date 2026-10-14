@@ -74,7 +74,7 @@ describe('Markdown', () => {
 
     const marked = renderToStaticMarkup(<Markdown markdown="@dash see #494" mentions planRefs />);
     expect(marked).toContain('comment-mention');
-    expect(marked).toContain('#plan-494');
+    expect(marked).toContain('href="/dev/plan/494"');
   });
 
   it('reads stored and written refs by their outline when the titles place them', () => {
@@ -83,7 +83,7 @@ describe('Markdown', () => {
       <Markdown markdown="Stored #1084, written #1073.4, unplaced #1073.9" planRefs={{ titles }} />,
     );
     // Both land on the step's number and read as its outline.
-    expect(html.match(/#plan-1084/g)).toHaveLength(2);
+    expect(html.match(/href="\/dev\/plan\/1084"/g)).toHaveLength(2);
     expect(html).not.toContain('>#1084<');
     expect(html.match(/>#1073\.4</g)).toHaveLength(2);
     // An outline the titles do not place stays as words.

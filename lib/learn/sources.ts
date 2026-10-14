@@ -240,6 +240,9 @@ export const learnSources: ModuleSources = {
       search: ['question', 'angle', 'short_answer'],
       title: 'question',
       href: (id) => `/learn/b/${id}`,
+      // A brief's sources are a reading list (track_id), so it sits there.
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
   ],

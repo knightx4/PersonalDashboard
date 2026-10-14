@@ -127,7 +127,7 @@ describe('dev search: outlines', () => {
       'Question #1073.5 · waiting on you',
     ]);
     // Still linked by the stored number, which the plan's search box finds.
-    expect(hits[0].href).toBe('/dev/plan?view=all&q=%231084');
+    expect(hits[0].href).toBe('/dev/plan/1084');
   });
 
   it('falls back to the number when the outline view cannot be read', async () => {

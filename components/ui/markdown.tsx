@@ -9,9 +9,13 @@ import {
   planRefHref,
   planRefLabel,
   planRefText,
+  refTarget,
   splitOnRefs,
   type PlanRefTitles,
+  type RefReading,
 } from '@/lib/comments/refs';
+import { previewKeyFromHref } from '@/lib/core/ref-preview';
+import { RefLink } from '@/components/ui/ref-link';
 import { linkBareDomains } from '@/lib/goals/result-links';
 
 /**
@@ -49,8 +53,12 @@ export type MarkdownProps = {
   fold?: boolean;
   /** Mark `@dash` as addressing somebody. */
   mentions?: boolean;
-  /** Link `#494` to the plan step; pass titles to label it the way the plan does. */
-  planRefs?: boolean | { titles?: PlanRefTitles };
+  /**
+   * Link `#494` to the plan step; pass titles to label it the way the plan
+   * does. `reading: 'outlines'` links only `#1490.11`, for text where a bare
+   * `#3` is a list number (lib/comments/refs.ts RefReading).
+   */
+  planRefs?: boolean | { titles?: PlanRefTitles; reading?: RefReading };
   /** What may be drawn; anything else is unwrapped to its text. */
   allowedElements?: readonly string[];
   /** Rewrite a link's target, or return null to show its text unlinked. */
@@ -132,40 +140,43 @@ function walkMentions(node: Node): void {
  */
 const OPAQUE = new Set(['link', 'linkReference', 'definition', 'mention']);
 
-function markPlanRefs(titles?: PlanRefTitles) {
-  return () => (tree: Node) => walkRefs(tree, titles);
+function markPlanRefs(titles?: PlanRefTitles, reading: RefReading = 'all') {
+  return () => (tree: Node) => walkRefs(tree, titles, reading);
 }
 
-function walkRefs(node: Node, titles?: PlanRefTitles): void {
+function walkRefs(node: Node, titles: PlanRefTitles | undefined, reading: RefReading): void {
   if (!node.children || OPAQUE.has(node.type)) return;
 
   const out: Node[] = [];
   for (const child of node.children) {
     if (child.type !== 'text' || typeof child.value !== 'string') {
-      walkRefs(child, titles);
+      walkRefs(child, titles, reading);
       out.push(child);
       continue;
     }
 
-    const parts = splitOnRefs(child.value, titles);
-    if (!parts.some((part) => part.ref !== null)) {
+    const parts = splitOnRefs(child.value, titles, reading);
+    if (!parts.some((part) => refTarget(part) !== null)) {
       out.push(child);
       continue;
     }
 
     for (const part of parts) {
       if (part.text === '') continue;
+      const target = refTarget(part);
       out.push(
-        part.ref !== null
+        target !== null
           ? {
               type: 'planRef',
-              children: [{ type: 'text', value: planRefText(part.ref, titles) }],
+              children: [
+                { type: 'text', value: part.ref !== null ? planRefText(part.ref, titles) : part.text },
+              ],
               data: {
                 hName: 'a',
                 hProperties: {
-                  href: planRefHref(part.ref),
+                  href: planRefHref(target),
                   className: ['comment-ref'],
-                  title: planRefLabel(part.ref, titles),
+                  ...(part.ref !== null ? { title: planRefLabel(part.ref, titles) } : {}),
                 },
               },
             }
@@ -236,13 +247,14 @@ type Pipeline = {
 function pipeline(props: MarkdownProps): Pipeline {
   const { mentions, planRefs, resolveHref, image, allowedElements } = props;
   const titles = typeof planRefs === 'object' ? planRefs.titles : undefined;
+  const reading = typeof planRefs === 'object' ? planRefs.reading : undefined;
 
   return {
     remarkPlugins: [
       remarkGfm,
       ...(props.remarkPlugins ?? []),
       ...(mentions ? [markMentions] : []),
-      ...(planRefs ? [markPlanRefs(titles)] : []),
+      ...(planRefs ? [markPlanRefs(titles, reading)] : []),
     ],
     rehypePlugins: props.rehypePlugins ?? [],
     allowedElements,
@@ -252,6 +264,20 @@ function pipeline(props: MarkdownProps): Pipeline {
         const resolved = resolveHref ? resolveHref(href) : href;
         // A link with nowhere to go keeps its words and loses the click.
         if (resolved === null) return <span className="text-ink-muted">{children}</span>;
+        // A link to a row previews it on hover or hold (plan #1931.4).
+        const key = previewKeyFromHref(resolved);
+        if (key && resolved) {
+          return (
+            <RefLink
+              href={resolved}
+              previewKey={key}
+              className={typeof rest.className === 'string' ? rest.className : undefined}
+              title={typeof rest.title === 'string' ? rest.title : undefined}
+            >
+              {children}
+            </RefLink>
+          );
+        }
         const external = /^https?:\/\//i.test(resolved ?? '');
         return (
           <a

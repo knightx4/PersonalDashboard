@@ -131,6 +131,6 @@ describe('buildPostsPage', () => {
       run: null,
       now: Date.parse('2026-10-02T12:00:00Z'),
     });
-    expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan?view=all&q=%231084' });
+    expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan/1084' });
   });
 });

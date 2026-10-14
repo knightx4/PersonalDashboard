@@ -92,7 +92,7 @@ describe('refTitles', () => {
     expect(out.get(refs[0])).toMatchObject({
       missing: false,
       title: 'Give rows a ref',
-      href: '/dev/plan?view=all&q=%231449#plan-1449',
+      href: '/dev/plan/1449',
     });
     expect(out.get(refs[1])).toMatchObject({ title: 'Run a marathon', href: `/goals/${ID}` });
     expect(out.get(refs[2])).toMatchObject({ title: 'Buy shoes', href: `/goals/${ID}/s/${OTHER}` });
@@ -203,8 +203,8 @@ describe('refPath', () => {
     expect(await refPath(`public.plan_items:${PLAN_STEP}`, reader())).toEqual([
       { label: 'Dev', href: '/dev/raised' },
       { label: 'Plan', href: '/dev/plan' },
-      { label: 'Every row has a page', href: '/dev/plan?view=all&q=%231931#plan-1931' },
-      { label: 'The catalogue knows each row', href: '/dev/plan?view=all&q=%231932#plan-1932' },
+      { label: 'Every row has a page', href: '/dev/plan/1931' },
+      { label: 'The catalogue knows each row', href: '/dev/plan/1932' },
     ]);
   });
 

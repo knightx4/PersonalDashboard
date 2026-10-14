@@ -72,7 +72,7 @@ function Turn({ turn, now }: { turn: DevComment; now: number }) {
           </time>
         </div>
         <div className="text-body text-ink">
-          <CommentBody body={turn.body} refs={false} />
+          <CommentBody body={turn.body} refs="outlines" />
         </div>
       </div>
     </li>
