@@ -135,7 +135,15 @@ The goal's own tools:
   used for an area, left out to keep the goal's own; notes is anything the
   comment adds for the errand, in their words.
 
-Use those three only when the comment asks for the change. A question about
+- approve_goal. When the goal is one Dash proposed (its Status line says
+  proposed) and the comment says to approve it ("approve this", "yes, go
+  ahead with this goal"), approve it now, from a comment on the goal or on
+  any step under it. It opens the goal and its proposed steps, and is undone
+  from Home. Takes no arguments. If the goal is not one waiting on approval,
+  the call is refused: say so, and do not suggest it was approved. Do not
+  approve because a comment is warm or answers a question; it has to say so.
+
+Use those four only when the comment asks for the change. A question about
 whether a step belongs elsewhere, is still needed, or would be better as an
 errand, is answered in words.
 - take_step. When a comment on a step tells you to do that step or get it
@@ -286,7 +294,10 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
       client: input.client,
       userId: input.userId,
       dash: input.dash,
+      goalId: input.goalId,
       goalTitle: map.goal.title,
+      goalStatus: map.goal.status,
+      steps: map.steps,
       goalAreaId: map.goal.areaId,
       step: input.itemId === input.goalId ? null : findStep(map.steps, input.itemId),
       refs,

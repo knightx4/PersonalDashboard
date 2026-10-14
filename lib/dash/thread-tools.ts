@@ -238,6 +238,12 @@ export const THREAD_TOOLS: readonly DashTool[] = [
       additionalProperties: false,
     },
   ),
+  write(
+    'approve_goal',
+    [GOAL_THREAD_TABLE],
+    'Approve the goal this thread is on, when Dash proposed it and the comment says to approve it. It opens the goal and its proposed steps, and Undo on Home puts them back. Refused for a goal that was not proposed or is already approved.',
+    { type: 'object', properties: {}, additionalProperties: false },
+  ),
   handoff(
     'take_step',
     [GOAL_THREAD_TABLE],

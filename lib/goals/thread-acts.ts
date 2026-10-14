@@ -9,6 +9,8 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { formatDue } from '@/lib/goals/due-precision';
 import { saveErrand } from '@/lib/goals/errand-store';
 import type { StepNode } from '@/lib/goals/steps';
+import type { GoalStatus } from '@/lib/goals/tree';
+import { approveGoal } from '@/lib/goals/shaping-store';
 import { moveStepToGoal, setStepArchived } from '@/lib/goals/steps-store';
 import { loadAreas } from '@/lib/goals/store';
 
@@ -37,7 +39,12 @@ export type GoalActContext = {
   userId: string;
   /** The person's clients, for core.dash_actions. */
   dash: DashActionDeps;
+  goalId: string;
   goalTitle: string;
+  /** The goal's status; only a proposed goal can be approved (plan #2035.3). */
+  goalStatus: GoalStatus;
+  /** Every step on the goal, so the proposed ones can be recorded before approving. */
+  steps: StepNode[];
   /** The area the goal is in, where an errand made from one of its steps goes by default. */
   goalAreaId: string;
   /** The step the comment is on, or null when it is on the goal itself. */
@@ -216,11 +223,70 @@ async function promoteStepToErrand(ctx: GoalActContext, args: unknown): ReturnTy
   };
 }
 
+function proposedIds(nodes: StepNode[]): string[] {
+  return nodes.flatMap((node) => [...(node.status === 'proposed' ? [node.id] : []), ...proposedIds(node.children)]);
+}
+
+/**
+ * Approve the goal, when Dash proposed it (plan #2035.3): the store function
+ * the page's Approve button calls, which opens the goal and every proposed
+ * step under it. The page offers Approve for a goal whose status is
+ * 'proposed', so that is the test here; a goal the person added, or one
+ * already open, is refused with the reason. It works from a comment on the
+ * goal or on any step under it.
+ *
+ * Each row it opens is recorded with its values before, so Home lists an
+ * Undo for the goal and for each step.
+ */
+async function approveProposedGoal(ctx: GoalActContext): ReturnType<DashThreadActs> {
+  if (ctx.goalStatus !== 'proposed') {
+    return {
+      ok: false,
+      error: `"${ctx.goalTitle}" is not a goal Dash proposed that is waiting on approval, so nothing was changed. Tell them that approving is theirs to do, or already done.`,
+    };
+  }
+  const goalRef = toRef('goals.items', ctx.goalId);
+  const stepRefs = proposedIds(ctx.steps).map((id) => toRef('goals.items', id));
+  const goalBefore = await readSubjectOrNull(ctx.dash, goalRef);
+  const stepsBefore = await Promise.all(stepRefs.map((ref) => readSubjectOrNull(ctx.dash, ref)));
+
+  let opened: number | null;
+  try {
+    opened = await approveGoal(ctx.client, ctx.goalId);
+  } catch (error) {
+    return { ok: false, error: `It was not approved: ${reason(error)}.` };
+  }
+  if (opened === null) return { ok: false, error: 'It was not approved: the goal is no longer on the page.' };
+
+  const live = opened === 0 ? '' : ` ${opened} ${opened === 1 ? 'step is' : 'steps are'} now live.`;
+  const sentence = `Approved "${ctx.goalTitle}".${live}`;
+  await recordDashAction(ctx.dash, {
+    surface: 'thread',
+    kind: 'approve_goal',
+    subjectRef: goalRef,
+    op: 'update',
+    beforeValues: goalBefore,
+    summary: sentence,
+  });
+  for (const [index, ref] of stepRefs.entries()) {
+    await recordDashAction(ctx.dash, {
+      surface: 'thread',
+      kind: 'approve_goal',
+      subjectRef: ref,
+      op: 'update',
+      beforeValues: stepsBefore[index],
+      summary: `Opened a step of "${ctx.goalTitle}" by approving the goal.`,
+    });
+  }
+  return { ok: true, recorded: true, kind: 'approve_goal', said: `${sentence} Undo on Home takes it back.` };
+}
+
 /** The step acts, by tool name. */
 export function stepActs(ctx: GoalActContext): Record<string, GoalAct> {
   return {
     move_goal_step: (args) => moveGoalStep(ctx, args),
     archive_goal_step: () => archiveGoalStep(ctx),
     promote_step_to_errand: (args) => promoteStepToErrand(ctx, args),
+    approve_goal: () => approveProposedGoal(ctx),
   };
 }

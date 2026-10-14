@@ -15,6 +15,8 @@ const ME = '00000000-0000-4000-8000-0000000000cc';
 const STEP = '00000000-0000-4000-8000-000000000301';
 /** The step's own due date, which a test can set before asking. */
 const STEP_DUE = vi.hoisted(() => ({ value: null as string | null }));
+/** The goal's status, which a test can set to proposed before asking. */
+const GOAL_STATUS = vi.hoisted(() => ({ value: 'open' as string }));
 const COLLECTION = vi.hoisted(() => ({ id: 'col-1', name: 'Loans', shape: 'many', fields: [], records: [] as unknown[] }));
 
 vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: vi.fn() }));
@@ -67,9 +69,19 @@ vi.mock('@/lib/goals/store', () => ({
     return id;
   }),
 }));
+vi.mock('@/lib/goals/shaping-store', () => ({
+  loadShaping: vi.fn(async () => ({ lastRun: null })),
+  recordAndFire: vi.fn(),
+  approveGoal: vi.fn(async (_c: unknown, id: string) => {
+    const goal = tables['goals.items'].find((r) => r.id === id);
+    if (!goal) return null;
+    goal.status = 'open';
+    return 1;
+  }),
+}));
 vi.mock('@/lib/goals/steps-store', () => ({
   loadGoalMap: vi.fn(async () => ({
-    goal: { id: 'g', title: 'Clear the loans', status: 'open', areaId: 'area-money' },
+    goal: { id: 'g', title: 'Clear the loans', status: GOAL_STATUS.value, areaId: 'area-money' },
     steps: [
       {
         id: '00000000-0000-4000-8000-000000000301',
@@ -107,6 +119,7 @@ vi.mock('@/lib/goals/steps-store', () => ({
 import { answerCall, scriptedModel, stubThreadDash, toolCall, toolResults } from '../../tests/stubs/dash-model';
 import { askDashOnGoal } from './ask';
 import { writeComment } from './comments-store';
+import { approveGoal } from './shaping-store';
 import { moveStepToGoal, setStepArchived } from './steps-store';
 import type { GoalsSupabaseClient } from './db/schema-name';
 
@@ -306,6 +319,41 @@ describe('moving and archiving a step from its thread (plan #2035.1)', () => {
     await askWith(dash, model, 'g');
     expect(vi.mocked(setStepArchived)).not.toHaveBeenCalled();
     expect(toolResults(model.sent).join(' ')).toContain('on the goal itself');
+  });
+});
+
+describe('approving a proposed goal', () => {
+  beforeEach(() => {
+    GOAL_STATUS.value = 'open';
+  });
+
+  it('approves a proposed goal, records it, and undoing it puts it back', async () => {
+    GOAL_STATUS.value = 'proposed';
+    tables['goals.items'].push({ id: 'g', user_id: ME, level: 'goal', title: 'Clear the loans', status: 'proposed', archived_at: null });
+    const dash = fakeDashDeps(tables, ME);
+    await ask(dash, toolCall('p', 'approve_goal', {}), answerCall('Approved.'));
+
+    expect(vi.mocked(approveGoal)).toHaveBeenCalledTimes(1);
+    const [action] = tables['core.dash_actions'];
+    expect(action).toMatchObject({
+      kind: 'approve_goal',
+      op: 'update',
+      subject_ref: 'goals.items:g',
+      before_values: { status: 'proposed' },
+      summary: 'Approved "Clear the loans". 1 step is now live.',
+    });
+    expect(tables['goals.items'].find((r) => r.id === 'g')!.status).toBe('open');
+    expect((await undoDashAction(dash, action.id as string)).ok).toBe(true);
+    expect(tables['goals.items'].find((r) => r.id === 'g')!.status).toBe('proposed');
+  });
+
+  it('refuses a goal that is not waiting on approval', async () => {
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([toolCall('p', 'approve_goal', {}), answerCall('It is already open.')]);
+    await askWith(dash, model);
+    expect(vi.mocked(approveGoal)).not.toHaveBeenCalled();
+    expect(tables['core.dash_actions'] ?? []).toHaveLength(0);
+    expect(toolResults(model.sent).join(' ')).toContain('not a goal Dash proposed');
   });
 });
 
