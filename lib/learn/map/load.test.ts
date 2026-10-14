@@ -43,7 +43,7 @@ const USER = '00000000-0000-4000-8000-000000000001';
 
 const ROWS = {
   concepts: [
-    { id: 'i1', name: 'Churn', claim: 'Churn compounds.', subject_id: 's1', embedding: stored(0) },
+    { id: 'i1', name: 'Churn', claim: 'Churn compounds.', subject_id: 's1', embedding: stored(0), created_at: '2026-09-24T10:00:00Z' },
     { id: 'i2', name: 'Net retention', claim: 'Expansion offsets churn.', subject_id: 's1', embedding: stored(0, 0.2) },
     { id: 'i3', name: 'Named ranges', claim: 'Names make formulas readable.', subject_id: 's2', embedding: stored(10) },
     { id: 'i4', name: 'Not yet embedded', claim: 'Waiting for the fill.', subject_id: 's2', embedding: null },
@@ -84,7 +84,9 @@ describe('loadIdeaMap', () => {
       track: { id: 's1', name: 'SaaS metrics' },
       field: { id: 'f1', name: 'Finance' },
       domain: { id: 'd1', name: 'Business' },
+      createdAt: '2026-09-24T10:00:00Z',
     });
+    expect(retention!.createdAt).toBeNull();
     expect(retention!.state).toBe('unknown');
     expect(ranges).toMatchObject({ track: { id: 's2', name: 'Excel modelling' }, field: null, domain: { id: 'd2', name: 'Tools' } });
 
@@ -99,7 +101,9 @@ describe('loadIdeaMap', () => {
     const narrowed = new Set(
       calls.filter((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === USER).map((c) => c.table),
     );
-    expect(narrowed).toEqual(new Set(['concepts', 'concept_state', 'subjects']));
+    expect(narrowed).toEqual(
+      new Set(['concepts', 'concept_state', 'subjects', 'idea_places', 'idea_place_members', 'vault_dust']),
+    );
   });
 
   it('draws an empty map when nothing is embedded', async () => {

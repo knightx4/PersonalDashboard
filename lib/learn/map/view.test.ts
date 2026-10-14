@@ -21,33 +21,45 @@ describe('the address', () => {
   });
 
   it('reads each switch, and ignores values it does not know', () => {
-    expect(
-      parseMapParams({ layout: 'axes', colour: 'domain', labels: 'on', idea: 'abc', domain: 'd1' }),
-    ).toEqual({
+    expect(parseMapParams({ layout: 'axes', idea: 'abc', domain: 'd1' })).toEqual({
+      ...DEFAULT_PARAMS,
       layout: 'axes',
-      colour: 'domain',
-      labels: true,
       idea: 'abc',
       domain: 'd1',
     });
-    expect(parseMapParams({ layout: 'spiral', colour: ['domain', 'state'], idea: '  ' })).toEqual({
+    expect(parseMapParams({ layout: 'spiral', idea: '  ' })).toEqual(DEFAULT_PARAMS);
+  });
+
+  it('opens an old link that still says what the colour meant and whether names were on', () => {
+    expect(parseMapParams({ colour: 'domain', labels: 'on', idea: 'abc' })).toEqual({
       ...DEFAULT_PARAMS,
-      colour: 'domain',
+      idea: 'abc',
     });
   });
 
   it('leaves defaults out of the address and round-trips the rest', () => {
     expect(mapHref(DEFAULT_PARAMS)).toBe('/learn/space');
-    const href = mapHref(DEFAULT_PARAMS, { layout: 'axes', labels: true, idea: 'x1' });
-    expect(href).toBe('/learn/space?layout=axes&labels=on&idea=x1');
+    const href = mapHref(DEFAULT_PARAMS, { layout: 'axes', idea: 'x1' });
+    expect(href).toBe('/learn/space?layout=axes&idea=x1');
     const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
-    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, layout: 'axes', labels: true, idea: 'x1' });
+    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, layout: 'axes', idea: 'x1' });
   });
 
   it('carries the domain picked in the legend, and drops it when set to null', () => {
-    const href = mapHref({ ...DEFAULT_PARAMS, colour: 'domain' }, { domain: 'd1' });
-    expect(href).toBe('/learn/space?colour=domain&domain=d1');
+    const href = mapHref(DEFAULT_PARAMS, { domain: 'd1' });
+    expect(href).toBe('/learn/space?domain=d1');
     expect(mapHref({ ...DEFAULT_PARAMS, domain: 'd1' }, { domain: null })).toBe('/learn/space');
+  });
+
+  it('gives a place opened as a graph its own address, and a neighbourhood when there is no place', () => {
+    const href = mapHref(DEFAULT_PARAMS, { place: 'p1' });
+    expect(href).toBe('/learn/space?place=p1');
+    expect(parseMapParams({ place: 'p1' })).toEqual({ ...DEFAULT_PARAMS, place: 'p1' });
+    expect(mapHref(DEFAULT_PARAMS, { around: 'i1' })).toBe('/learn/space?around=i1');
+    expect(parseMapParams({ around: 'i1' })).toEqual({ ...DEFAULT_PARAMS, around: 'i1' });
+    // A place wins over a neighbourhood, so only one graph is ever open.
+    expect(parseMapParams({ place: 'p1', around: 'i1' })).toEqual({ ...DEFAULT_PARAMS, place: 'p1' });
+    expect(mapHref({ ...DEFAULT_PARAMS, place: 'p1' }, { place: null })).toBe('/learn/space');
   });
 
   it('closes an idea by setting it to null', () => {

@@ -82,6 +82,8 @@ export const MODELS = {
   learnAreaPlace: SONNET,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
+  /** lib/learn/places/name.ts; a few words for each place on Idea Space, daily */
+  learnPlaceNames: HAIKU,
   /** lib/learn/feed/name-material.ts; a reply of about 230 tokens */
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */

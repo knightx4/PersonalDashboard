@@ -140,6 +140,9 @@ vi.mock('@/inngest/dev/claims', () => ({
 vi.mock('@/inngest/dev/digest', () => ({
   runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
 }));
+vi.mock('@/inngest/learn/embeddings-daily', () => ({
+  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, places: [], dust: [] })),
+}));
 vi.mock('@/inngest/dev/idea-scores', () => ({
   runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),
 }));
