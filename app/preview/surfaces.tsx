@@ -288,6 +288,7 @@ import {
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
+  PostsSendSurface,
   PostsSurface,
   PostsWriteSurface,
   PostsXSurface,
@@ -5492,6 +5493,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsMatchedSurface />,
+  },
+  {
+    /* Post pressed once (plan #2072): the confirm on a draft with a link,
+     * warning about X's URL rate, and on a thread whose first post is
+     * already up, sending the rest. */
+    id: 'dev-posts-send',
+    label: 'Dev · Posts, posting to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsSendSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the

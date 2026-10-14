@@ -1,3 +1,4 @@
+import { xSendCheck, type XSendCheck } from '@/lib/x/post';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { dayLabel } from '@/lib/dev/inspiration/view';
 import { planHref } from '@/lib/search/sources/dev-map';
@@ -62,6 +63,11 @@ export type PostCard = {
   images: { path: string; src: string }[];
   /** The day it was drafted, posted or dropped, whichever its status says. */
   day: string;
+  /**
+   * For a waiting draft, whether it may be sent to X from the tab and what
+   * that costs (plan #2072). Null for a posted or dropped one.
+   */
+  send: XSendCheck | null;
 };
 
 export type PostsPage = {
@@ -135,7 +141,8 @@ export function buildPostsPage(input: {
     const when = post.status === 'posted' ? post.postedAt : post.status === 'dropped' ? post.droppedAt : null;
     const candidate =
       post.status !== 'posted' && post.xCandidateId ? (candidates.get(post.xCandidateId) ?? null) : null;
-    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today) };
+    const send = post.status === 'suggested' ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
+    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send };
   };
 
   return {

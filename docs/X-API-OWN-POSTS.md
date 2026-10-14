@@ -101,6 +101,11 @@ posts and users but cannot post, like or follow, which matches the rule that
 Dash never posts. If the permission is changed later, the token has to be
 regenerated to carry it.
 
+(Since plan #2072 the tab can post a draft when the person presses Post and
+confirms it. That needs the app's permission set to "Read and write" and the
+`tweet.write` scope, so a sign-in made before then is replaced by
+disconnecting and connecting once more.)
+
 OAuth 2.0 with PKCE would work as well, but its access tokens expire after two
 hours. Keeping one alive means storing a refresh token and rotating it on each
 use, which is more to build for a single account.
