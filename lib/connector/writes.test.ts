@@ -82,6 +82,8 @@ describe('runConnectorWrite', () => {
       'merge_roles',
       'change_reminder',
       'change_waiting',
+      'review_application',
+      'review_events',
     ]);
   });
 
