@@ -15,6 +15,7 @@ import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 import { holdActingSteps, type HoldSurface } from '@/lib/goals/hold-acts-store';
 import { jevEnabledFor } from '@/lib/jev/enabled';
+import { goalRunOn } from '@/lib/goals/settings-store';
 import { judgedOnPace, reviewGoals } from '@/lib/goals/reviews';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { PACE_WINDOW_DAYS, paceForGoal, type GoalPace } from '@/lib/goals/pace';
@@ -194,6 +195,11 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   const parsed = ownerSchema.safeParse(owner.data);
   if (owner.error || !parsed.success) throw new Error('Could not resolve the owner to run goals for.');
   const userId = parsed.data.userId;
+
+  // Switched off on /goals/settings (plan #1937.10).
+  if (!(await goalRunOn(client, userId, 'morningRun'))) {
+    return { skipped: 'the morning run is switched off in Goals settings' };
+  }
 
   const last = await client
     .from('runs')

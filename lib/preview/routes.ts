@@ -66,6 +66,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-step-arrival': ['/goals/[goalId]/s/[stepId]'],
   'goals-home': ['/goals'],
   'goals-inbox': ['/goals/inbox'],
+  'inbox-page': ['/goals/inbox', '/dev/inbox'],
   'goals-all': ['/goals/all'],
   'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
@@ -299,8 +300,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-project-plan': ['/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
   'dev-inbox': ['/dev/inbox'],
-  'dev-raised-status': ['/dev/raised'],
-  'dev-runner-crew': ['/dev/plan', '/dev/raised'],
+  'dev-settings': ['/dev/settings'],
+  'goals-settings': ['/goals/settings'],
+  'learn-settings': ['/learn/settings'],
+  'dev-runner-crew': ['/dev/plan', '/dev/settings'],
   'dev-specs': ['/dev/specs'],
   'dev-specs-interview-empty': ['/dev/specs'],
   'dev-specs-interview-half': ['/dev/specs'],
@@ -430,6 +433,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The one Inbox component (plan #1937.4), drawn from its row shape.
+  'inbox-page': ['components/inbox/inbox-page.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],

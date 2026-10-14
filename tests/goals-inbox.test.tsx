@@ -28,6 +28,7 @@ vi.mock('@/app/goals/home-actions', () => ({
   askDashAction: vi.fn(),
   setAsideAction: vi.fn(),
   restoreAsideAction: vi.fn(),
+  bringBackAction: vi.fn(),
 }));
 
 const { GoalsInboxView } = await import('@/app/goals/inbox/inbox-view');
@@ -89,15 +90,16 @@ describe('the Inbox page', () => {
       />,
     );
 
-  it('opens on the counts, each a link to its section', () => {
+  it('counts each section on its heading, and the total after them', () => {
     const html = render();
-    expect(html).toMatch(/href="#inbox-questions"[^>]*><span[^>]*>3</);
+    expect(html).toMatch(/Questions for you<span[^>]*>3</);
+    expect(html).toContain('5 things waiting on you');
     expect(html).toContain('id="inbox-actions"');
     expect(html).toContain('Pay the card');
     expect(html).toContain('Needs you: Which card has the lower rate?');
   });
 
-  it('says so when nothing is on you, and folds what was set aside', () => {
+  it('says so when nothing is on you, and folds what was put off under Later', () => {
     const html = render({
       groups: goalInboxGroups([], []),
       laterOn: [
@@ -105,7 +107,7 @@ describe('the Inbox page', () => {
       ],
     });
     expect(html).toContain('Nothing waiting on you');
-    expect(html).toContain('Set aside');
+    expect(html).toContain('Later');
     expect(html).toContain('Turn on autopay');
     expect(html).not.toContain('Your actions');
   });
