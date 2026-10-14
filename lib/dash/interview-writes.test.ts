@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AskContext } from '@/lib/ask/db';
 import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
@@ -6,8 +6,18 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { insertMadeChange, type MadeDashChange } from '@/lib/talk/changes';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
+import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
+import type { PrepareRoundResult } from '@/lib/jobs/interview/prepare-round';
 import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 import type { DashWriteContext, DashWriteResult } from './registry';
+
+// The note itself is written by prepareRound, which reads through embedded
+// joins the in-memory database does not serve and calls the model; these
+// tests cover the tool around it.
+const prepareRound = vi.fn<(...args: unknown[]) => Promise<PrepareRoundResult>>();
+const recordSessionSpend = vi.fn(async () => undefined);
+vi.mock('@/lib/jobs/interview/prepare-round', () => ({ prepareRound: (...args: unknown[]) => prepareRound(...args) }));
+vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: (...args: unknown[]) => recordSessionSpend(...(args as [])) }));
 
 /**
  * A round Dash adds to a role when asked (plan #2044.1): made the way the
@@ -27,6 +37,7 @@ const ACCOUNT = '00000000-0000-4000-8000-000000000c0a';
 const GMAIL_ID = 'abc123';
 const MAIL_REF = `${ACCOUNT}:${GMAIL_ID}`;
 const FIRST_ROUND = '00000000-0000-4000-8000-000000000c05';
+const LEAD = '00000000-0000-4000-8000-000000000c0b';
 
 let tables: FakeTables;
 let seen: Set<string>;
@@ -81,6 +92,9 @@ const interviews = () => tables['job_search.interviews'];
 
 beforeEach(() => {
   seen = new Set();
+  prepareRound.mockReset();
+  recordSessionSpend.mockClear();
+  process.env.ANTHROPIC_API_KEY = 'test-key';
   tables = {
     'core.dash_actions': [],
     'core.conversation_turns': [],
@@ -262,5 +276,91 @@ describe('link_round_email', () => {
     const theirRole = await attach({ role_ref: THEIR_ROLE, round_number: 1, message_ref: MAIL_REF });
     expect(!theirRole.ok && theirRole.error).toContain('not one of theirs');
     expect(links()).toEqual([]);
+  });
+});
+
+describe('write_prep_note', () => {
+  const prep = INTERVIEW_WRITE_TOOLS.find((t) => t.name === 'write_prep_note')!;
+  const ask = (input: unknown, ctx = context()) => prep.apply(ctx, input);
+  const note = { roundSummary: 'A first screen with the recruiter.' } as PrepNote;
+  const written = (over: Partial<PrepareRoundResult> = {}): PrepareRoundResult => ({
+    note,
+    error: null,
+    roleId: ROLE,
+    spent: true,
+    spend: [{ model: 'm', inputTokens: 1, outputTokens: 1 } as never],
+    ...over,
+  });
+  const seeRole = () => seen.add(`job_search.roles:${ROLE}`);
+  beforeEach(() => {
+    tables['job_search.interviews'] = [
+      { id: LEAD, user_id: ME, group_id: FIRST_ROUND, application_id: APPLICATION, kind: 'recruiter_screen', scheduled_at: null },
+    ];
+  });
+
+  it('writes the note through the button’s code, says it spent a run and records the spend', async () => {
+    seeRole();
+    prepareRound.mockResolvedValue(written());
+    const result = ok(await ask({ role_ref: ROLE, round_number: 1 }));
+    expect(prepareRound).toHaveBeenCalledWith(expect.anything(), { userId: ME, interviewId: LEAD, apiKey: 'test-key' });
+    expect(result).toMatchObject({
+      kind: 'write_prep_note',
+      op: 'update',
+      subjectRef: `job_search.interviews:${LEAD}`,
+      summary: 'Dash wrote the prep note for round 1 of Product designer, using one model run.',
+      undo: { none: expect.any(String) },
+      row: { detail: { spent_a_run: true, summary: 'A first screen with the recruiter.' } },
+    });
+    expect(recordSessionSpend).toHaveBeenCalledWith(ME, { module: 'jobs', operation: 'write-interview-prep' }, expect.any(Array));
+  });
+
+  it('returns an unchanged round’s stored note and says no run was spent', async () => {
+    seeRole();
+    prepareRound.mockResolvedValue(written({ spent: false, spend: [] }));
+    const result = ok(await ask({ role_ref: ROLE, round_number: 1 }));
+    expect(result.summary).toContain('already up to date, so no model run was used');
+    expect(result.row?.detail).toMatchObject({ spent_a_run: false });
+    expect(prepareRound).toHaveBeenCalledTimes(1);
+    expect(prepareRound.mock.calls[0][1]).not.toHaveProperty('regenerate');
+  });
+
+  it('passes the refusal on in plain words, and still records any spend', async () => {
+    seeRole();
+    prepareRound.mockResolvedValue(
+      written({ note: null, spent: false, spend: [], error: 'There is nothing to ground a prep note on.' }),
+    );
+    const refused = await ask({ role_ref: ROLE, round_number: 1 });
+    expect(!refused.ok && refused.error).toContain('No prep note was written for round 1 of Product designer: There is nothing to ground');
+    expect(interviews()[0]).not.toHaveProperty('prep_note');
+  });
+
+  it('refuses a role or round that is not theirs, an empty round, and a missing key, before any run', async () => {
+    seeRole();
+    const noRound = await ask({ role_ref: ROLE, round_number: 4 });
+    expect(!noRound.ok && noRound.error).toContain('has no round 4');
+    seen.add(`job_search.roles:${THEIR_ROLE}`);
+    const theirs = await ask({ role_ref: THEIR_ROLE, round_number: 1 });
+    expect(!theirs.ok && theirs.error).toContain('not one of theirs');
+    const unseen = await ask({ role_ref: '00000000-0000-4000-8000-000000000fff', round_number: 1 });
+    expect(!unseen.ok && unseen.error).toContain('Look it up first');
+    const bad = await ask({ role_ref: ROLE, round_number: 0 });
+    expect(!bad.ok && bad.error).toContain('round_number');
+    tables['job_search.interviews'] = [];
+    const empty = await ask({ role_ref: ROLE, round_number: 1 });
+    expect(!empty.ok && empty.error).toContain('nothing to prepare for');
+    tables['job_search.interviews'] = [{ id: LEAD, user_id: ME, group_id: FIRST_ROUND }];
+    delete process.env.ANTHROPIC_API_KEY;
+    const keyless = await ask({ role_ref: ROLE, round_number: 1 });
+    expect(!keyless.ok && keyless.error).toContain('not configured');
+    expect(prepareRound).not.toHaveBeenCalled();
+  });
+
+  it('refuses while Jobs is switched off, and is described as asked-for only, with no Undo', async () => {
+    const off = await ask({ role_ref: ROLE, round_number: 1 }, context([]));
+    expect(!off.ok && off.error).toContain('switched off');
+    expect(prep.definition.description).toContain('only when they ask for the prep');
+    expect(prep.definition.description).toContain('never call it as a side effect of adding a round');
+    expect(prep.definition.description).toContain('with no Undo');
+    expect(prep.definition.description).not.toContain('with an Undo');
   });
 });

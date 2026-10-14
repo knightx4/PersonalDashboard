@@ -133,7 +133,7 @@ export const jobsActions: ModuleActions = {
     matchRoleRequirements: none('spends'),
   },
   'app/jobs/(app)/roles/[id]/prep-actions.ts': {
-    writeRoundPrepNote: none('spends'),
+    writeRoundPrepNote: tool('write_prep_note'),
   },
   'app/jobs/(app)/roles/[id]/timeline-actions.ts': {
     updateReminder: GAP,

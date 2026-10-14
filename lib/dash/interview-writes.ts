@@ -6,7 +6,9 @@ import { movedColumns, readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KIND_LABEL, INTERVIEW_KINDS, type InterviewKind } from '@/lib/jobs/interview-kinds';
+import { prepareRound } from '@/lib/jobs/interview/prepare-round';
 import { insertInterview, insertInterviewRound, nextRoundNumber } from '@/lib/jobs/interview/rounds';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -18,6 +20,11 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *
  *   link_round_email     an email put on a round, as the page's "add email"
  *                        does (#2044.2). Undo deletes the link row only.
+ *
+ *   write_prep_note      the round's prep note, by the code behind the page's
+ *                        "Prepare me" (#2044.3). It can spend a model run, so
+ *                        it is offered only when the person asks for the prep.
+ *                        There is no Undo: the run is already paid for.
  *
  * The round and its conversation are made by the code the role page's "Add
  * interview" uses (lib/jobs/interview/rounds.ts), so the numbering and the
@@ -33,6 +40,9 @@ const DONE_NOTE =
 const ROLE = 'job_search.roles';
 const APPLICATION = 'job_search.applications';
 const ROUND = 'job_search.interview_groups';
+
+const NO_UNDO_NOTE =
+  'It is done: it shows under your answer, with no Undo. Say in your answer what you did and whether it used a model run, and cite the row this returned.';
 
 /** The longest round name the page takes. */
 const LABEL_MAX = 120;
@@ -214,33 +224,29 @@ export async function roundConversationMoved(
     : null;
 }
 
-/**
- * Dash names a round by the role it is on and its number ("round 2"), the
- * numbering add_interview_round reports and the role page shows, since no
- * lookup returns rounds. The role is taken the way add_interview_round takes
- * it, by its latest application.
- */
-async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
-  if (!ctx.enabledModules.includes('jobs')) {
-    throw new Refused('The Jobs workspace is switched off, so nothing can be changed there.');
-  }
+/** The role and round number a tool names its round by, checked. */
+function roundNamed(args: Args): { ref: string; number: number } {
   const ref = text(args, 'role_ref');
   if (!ref) throw new Refused('role_ref is missing.');
   const number = args.round_number;
   if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) {
     throw new Refused("round_number must be the round's number on the role, 1 or higher.");
   }
-  const mailRef = text(args, 'message_ref');
-  if (!mailRef) throw new Refused('message_ref is missing.');
-  if (!ctx.seen('gmail', mailRef)) {
-    throw new Refused('No search_mail in this conversation returned that email. Find it with search_mail and use the ref it gives.');
-  }
-  const named = parseMailRef(mailRef);
-  if (!named) throw new Refused('message_ref must be the ref search_mail returned for the email.');
+  return { ref, number };
+}
 
-  const jobs = await ctx.db('job_search');
+/**
+ * The round a tool names by its role and number, refused when the role is not
+ * the person's or has no such round. Shared by link_round_email and
+ * write_prep_note, so both read "round 2" the same way.
+ */
+async function resolveRound(
+  ctx: DashWriteContext,
+  jobs: Awaited<ReturnType<DashWriteContext['db']>>,
+  ref: string,
+  number: number,
+): Promise<{ roundId: string; label: string | null; roleId: string; roleTitle: string; roundName: string }> {
   const { applicationId, roleId, roleTitle } = await applicationFor(ctx, jobs, ref);
-
   const round = await one<{ id: string; label: string | null }>(
     jobs
       .from('interview_groups')
@@ -251,6 +257,32 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
       .limit(1),
   );
   if (!round) throw new Refused(`${roleTitle} has no round ${number}.`);
+  const roundName = round.label ? `round ${number}, ${round.label}` : `round ${number}`;
+  return { roundId: round.id, label: round.label, roleId, roleTitle, roundName };
+}
+
+/**
+ * Dash names a round by the role it is on and its number ("round 2"), the
+ * numbering add_interview_round reports and the role page shows, since no
+ * lookup returns rounds. The role is taken the way add_interview_round takes
+ * it, by its latest application.
+ */
+async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  if (!ctx.enabledModules.includes('jobs')) {
+    throw new Refused('The Jobs workspace is switched off, so nothing can be changed there.');
+  }
+  const { ref, number } = roundNamed(args);
+  const mailRef = text(args, 'message_ref');
+  if (!mailRef) throw new Refused('message_ref is missing.');
+  if (!ctx.seen('gmail', mailRef)) {
+    throw new Refused('No search_mail in this conversation returned that email. Find it with search_mail and use the ref it gives.');
+  }
+  const named = parseMailRef(mailRef);
+  if (!named) throw new Refused('message_ref must be the ref search_mail returned for the email.');
+
+  const jobs = await ctx.db('job_search');
+  const round = await resolveRound(ctx, jobs, ref, number);
+  const { roleId, roleTitle, roundName } = round;
 
   const message = await one<{ id: string }>(
     jobs
@@ -265,9 +297,8 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
     throw new Refused('That email is not in their mailbox here, or has not been brought in yet, so it cannot be attached.');
   }
 
-  const roundName = round.label ? `round ${number}, ${round.label}` : `round ${number}`;
   const existing = await one<{ id: string }>(
-    jobs.from('interview_group_messages').select('id').eq('group_id', round.id).eq('message_id', message.id).limit(1),
+    jobs.from('interview_group_messages').select('id').eq('group_id', round.roundId).eq('message_id', message.id).limit(1),
   );
   if (existing) {
     return { ok: false, error: `That email is already attached to ${roundName} of ${roleTitle}. Nothing was changed; tell them so.` };
@@ -275,7 +306,7 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
 
   const { data, error } = await jobs
     .from('interview_group_messages')
-    .insert({ user_id: ctx.userId, group_id: round.id, message_id: message.id })
+    .insert({ user_id: ctx.userId, group_id: round.roundId, message_id: message.id })
     .select('id')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'The email was not attached.');
@@ -310,6 +341,83 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
   };
 }
 
+/**
+ * The round's prep note, written when it is missing or out of date and
+ * returned as stored when it is not. The same code as the "Prepare me" button
+ * (prepareRound), so the same refusals hold: nothing to ground the note on
+ * gives no note, and an unchanged round costs no model call. The spend is
+ * recorded under the button's operation. The note is kept on the round's lead
+ * conversation, which is the row this reports.
+ */
+async function writePrepNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  if (!ctx.enabledModules.includes('jobs')) {
+    throw new Refused('The Jobs workspace is switched off, so nothing can be changed there.');
+  }
+  const { ref, number } = roundNamed(args);
+  const jobs = await ctx.db('job_search');
+  const round = await resolveRound(ctx, jobs, ref, number);
+  const { roleId, roleTitle, roundName } = round;
+
+  const lead = await one<{ id: string }>(
+    jobs
+      .from('interviews')
+      .select('id')
+      .eq('group_id', round.roundId)
+      .eq('user_id', ctx.userId)
+      .order('scheduled_at', { ascending: true })
+      .limit(1),
+  );
+  if (!lead) throw new Refused(`${roundName} of ${roleTitle} has no interview in it, so there is nothing to prepare for.`);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Refused('Prep is not configured, so no note was written. Tell them.');
+
+  const subjectRef = toRef('job_search.interviews', lead.id);
+  const before = await readSubject(ctx.db, subjectRef);
+  const result = await prepareRound(jobs as unknown as AppSupabaseClient, {
+    userId: ctx.userId,
+    interviewId: lead.id,
+    apiKey,
+  });
+  // Recorded whether or not a note came back: the run was paid for.
+  await recordSessionSpend(ctx.userId, { module: 'jobs', operation: 'write-interview-prep' }, result.spend);
+  if (result.error || !result.note) {
+    throw new Refused(
+      `No prep note was written for ${roundName} of ${roleTitle}: ${result.error ?? 'none came back.'} Tell them this in plain words.`,
+    );
+  }
+
+  const href = `/jobs/roles/${roleId}`;
+  const input: InterviewChangeInput = {
+    verb: result.spent ? 'Wrote the prep note for' : 'Showed the prep note for',
+    what: roundName,
+    rest: ` of ${roleTitle}`,
+    href,
+    where: 'Open the role',
+    paths: [href, '/jobs/interviews', '/jobs'],
+  };
+  return {
+    ok: true,
+    kind: 'write_prep_note' satisfies InterviewChangeKind,
+    input: input as unknown as Record<string, unknown>,
+    subjectRef,
+    op: 'update',
+    before,
+    after: await readSubject(ctx.db, subjectRef),
+    undo: { none: 'The prep note cost a model run to write. The role page can write it again.' },
+    summary: result.spent
+      ? `Dash wrote the prep note for ${roundName} of ${roleTitle}, using one model run.`
+      : `Dash showed the prep note for ${roundName} of ${roleTitle}. It was already up to date, so no model run was used.`,
+    row: {
+      table: 'job_search.interviews',
+      ref: lead.id,
+      title: `Prep note for ${roundName}`,
+      href,
+      detail: { role: roleTitle, round: number, spent_a_run: result.spent, summary: result.note.roundSummary },
+    },
+  };
+}
+
 /** Runs a write, turning a refusal or a failure into the sentence the model reads. Never throws. */
 function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
   return async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
@@ -329,11 +437,12 @@ function tool(
   description: string,
   input_schema: Anthropic.Tool['input_schema'],
   run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>,
+  doneNote = DONE_NOTE,
 ): DashWriteTool<DashWriteResult> {
   return {
     name,
     kind: 'write',
-    definition: { name, description: `${description} ${DONE_NOTE}`, input_schema },
+    definition: { name, description: `${description} ${doneNote}`, input_schema },
     apply: guarded(name, run),
   };
 }
@@ -371,5 +480,20 @@ export const INTERVIEW_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = 
       additionalProperties: false,
     },
     linkRoundEmail,
+  ),
+  tool(
+    'write_prep_note',
+    "Write the prep note for an interview round on one of their roles in Jobs, as the role page's \"Prepare me\" does, when they ask to be prepared (\"prepare me for round 2 at Stripe\"). Call it only when they ask for the prep: writing a note costs a model run, so never call it as a side effect of adding a round or attaching an email. Name the round by its role (the job_search.roles or job_search.applications ref a lookup returned) and its number on that role. The note is written only when it is missing or out of date; when it is current this returns the stored one and spends nothing. With no job description and nothing in their evidence bank there is nothing to ground a note on, and this refuses: pass that on in plain words. The reply says whether a run was spent; tell them. This cannot be undone from here; the role page can write the note again.",
+    {
+      type: 'object',
+      properties: {
+        role_ref: { type: 'string', description: 'The job_search.roles or job_search.applications ref a lookup returned.' },
+        round_number: { type: 'integer', minimum: 1, description: "The round's number on that role." },
+      },
+      required: ['role_ref', 'round_number'],
+      additionalProperties: false,
+    },
+    writePrepNote,
+    NO_UNDO_NOTE,
   ),
 ];
