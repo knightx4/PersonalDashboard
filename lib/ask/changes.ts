@@ -8,7 +8,7 @@ import { undoItemChange } from '@/lib/dash/bulk-items';
 import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
-import { undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoContactRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -787,6 +787,10 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   // So does an email linked, turned down or unlinked (plan #1894.6.5).
   if (change.kind === 'change_role_email') return undoMany(deps, change, surface, undoRoleEmail);
+  // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).
+  if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
+    return undoMany(deps, change, surface, undoContactRows);
+  }
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,

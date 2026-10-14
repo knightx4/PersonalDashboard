@@ -43,6 +43,17 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   change_role_email   an email linked to a role, a suggested one turned down,
  *                       or one taken off a role it was wrongly linked to.
  *
+ * and, from the contacts pages and Find (plan #1894.6.6):
+ *
+ *   change_contact        a contact added or corrected.
+ *   change_touch          a touch logged in the outreach log, corrected, or
+ *                         marked answered.
+ *   mark_suggestion_sent  a suggested person marked as messaged.
+ *
+ * These three keep what they changed in `undo` (ContactRowsUndo), since a
+ * touch moves its contact along and taking out a contact takes everything on
+ * it with it; undoContactRows puts them back.
+ *
  * Moving a role to another stage is move_roles (lib/dash/bulk-roles.ts), and
  * removing a pursuit deletes rows, which Dash never does.
  *
@@ -1372,6 +1383,450 @@ export async function undoRoleEmail(
 }
 
 // ---------------------------------------------------------------------------
+// change_contact, change_touch, mark_suggestion_sent
+// ---------------------------------------------------------------------------
+
+const CONTACTS = 'job_search.contacts';
+const TOUCHES = 'job_search.contact_touches';
+const SUGGESTIONS = 'job_search.suggestions';
+
+const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
+const TOUCH_CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+const DIRECTIONS = ['outbound', 'inbound'] as const;
+const NAME_MAX = 200;
+const NOTES_MAX = 20_000;
+const MESSAGE_MAX = 10_000;
+
+const contactHref = (id: string) => `/jobs/contacts/${id}`;
+const contactPaths = (id: string) => ['/jobs/contacts', contactHref(id), '/jobs/companies'];
+
+function contactName(contact: Row): string {
+  const name = typeof contact.full_name === 'string' && contact.full_name.trim() ? contact.full_name.trim() : 'the contact';
+  return name.length > 100 ? `${name.slice(0, 99).trimEnd()}…` : name;
+}
+
+/** A link or an address, checked the way the contact form checks it. */
+function contactLink(args: Args, key: string, kind: 'url' | 'email'): string | null {
+  const value = clearable(args, key, LINK_MAX);
+  if (value === null) return null;
+  if (kind === 'url' && !/^https?:\/\/\S+$/i.test(value)) throw new JobsRefused(`${key} must be a link starting http:// or https://.`);
+  if (kind === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw new JobsRefused(`${key} must be an email address.`);
+  return value;
+}
+
+/**
+ * A contact added or corrected, as the contacts page and a contact's page do:
+ * name, title, company, LinkedIn page, work email, how they know them and
+ * notes. There is nowhere for a personal phone number or a home address, as
+ * on the page. A company named that is not on file is added, as change_role
+ * does, and the Undo leaves it.
+ */
+async function changeContact(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const ref = text(args, 'contact_ref');
+  const before = ref ? await ownRow(env.jobs, 'contacts', idOf(ref, 'contact'), env.userId, 'contact') : null;
+  const values: Row = {};
+
+  if (given(args, 'full_name') || !before) {
+    const name = text(args, 'full_name');
+    if (!name) throw new JobsRefused(before ? 'A contact needs a name: give full_name, or leave it out.' : 'Give full_name: a contact needs a name.');
+    if (name.length > NAME_MAX) throw new JobsRefused(`Keep full_name under ${NAME_MAX} characters.`);
+    values.full_name = name;
+  }
+  if (given(args, 'title')) values.title = clearable(args, 'title', FIELD_MAX);
+  if (given(args, 'linkedin_url')) values.linkedin_url = contactLink(args, 'linkedin_url', 'url');
+  if (given(args, 'email')) values.email = contactLink(args, 'email', 'email');
+  if (given(args, 'relationship')) values.relationship = oneOf(args, 'relationship', RELATIONSHIPS, false);
+  if (given(args, 'how_we_connect')) values.how_we_connect = clearable(args, 'how_we_connect', NOTES_MAX);
+  if (given(args, 'notes')) values.notes = clearable(args, 'notes', NOTES_MAX);
+  if (given(args, 'company')) {
+    const name = clearable(args, 'company', COMPANY_MAX);
+    if (name === null) values.company_id = null;
+    else {
+      const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, name);
+      if (company.error) throw new Error(`Finding the company failed: ${company.error}`);
+      values.company_id = company.id;
+    }
+  }
+
+  const undo: ContactRowsUndo = { added: [], changed: [] };
+  let after: Row;
+  if (before) {
+    const update = Object.fromEntries(Object.entries(values).filter(([key, value]) => before[key] !== value));
+    if (Object.keys(update).length === 0) {
+      throw new JobsRefused('Nothing to change: give full_name, title, company, linkedin_url, email, relationship, how_we_connect or notes, with a new value.');
+    }
+    const written = await changeKept(env, undo, 'contacts', before, update);
+    if (!written) throw new Error('Changing the contact failed: no row');
+    after = written;
+  } else {
+    after = await addKept(env, undo, 'contacts', { relationship: 'cold', ...values });
+  }
+
+  const id = after.id as string;
+  const name = contactName(after);
+  const company = await companyName(env, after.company_id);
+  const at = company ? ` at ${company}` : '';
+  return {
+    kind: 'change_contact',
+    input: {
+      verb: before ? 'Updated' : 'Added',
+      what: name,
+      rest: before ? `${at} in your contacts` : `${at} to your contacts`,
+      href: contactHref(id),
+      where: 'Open the contact',
+      paths: contactPaths(id),
+    },
+    subjectRef: toRef(CONTACTS, id),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    summary: before ? `Dash updated the contact ${name}${at}.` : `Dash added ${name}${at} to the contacts.`,
+    row: { table: CONTACTS, ref: id, title: name, href: contactHref(id) },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * What a touch logged, edited or answered, or a suggestion marked sent,
+ * keeps in `undo`: the rows it added, in order, and for each row it changed
+ * the columns it wrote, before and after. The Undo (undoContactRows) puts a
+ * changed row back while it still holds what Dash left, and takes an added
+ * row out, newest first, so a touch goes before the contact it hangs on.
+ */
+export type ContactRowsUndo = {
+  added: { table: string; id: string }[];
+  changed: { table: string; id: string; before: Row; after: Row }[];
+};
+
+/** The tables these writes touch, the only ones their Undo will write to. */
+const CONTACT_TABLES = new Set(['contacts', 'contact_touches', 'suggestions']);
+
+/** Change one row of theirs, keeping the columns written before and after. */
+async function changeKept(env: JobsWriteEnv, undo: ContactRowsUndo, table: string, row: Row, update: Row, only?: { column: string; values: string[] }): Promise<Row | null> {
+  let query = env.jobs.from(table).update(update).eq('id', row.id as string).eq('user_id', env.userId);
+  if (only) query = query.in(only.column, only.values);
+  const { data, error } = await query.select('*');
+  if (error) throw new Error(`Changing ${table} failed: ${error.message}`);
+  const written = ((data ?? []) as Row[])[0];
+  if (!written) return null;
+  undo.changed.push({
+    table,
+    id: row.id as string,
+    before: Object.fromEntries(Object.keys(update).map((column) => [column, row[column] ?? null])),
+    after: Object.fromEntries(Object.keys(update).map((column) => [column, written[column] ?? null])),
+  });
+  return written;
+}
+
+async function addKept(env: JobsWriteEnv, undo: ContactRowsUndo, table: string, values: Row): Promise<Row> {
+  const { data, error } = await env.jobs.from(table).insert({ user_id: env.userId, ...values }).select('*').single();
+  if (error || !data) throw new Error(`Adding to ${table} failed: ${error?.message ?? 'no row'}`);
+  undo.added.push({ table, id: (data as Row).id as string });
+  return data as Row;
+}
+
+/** A failed write of several rows puts back what it had done, then fails. */
+async function backOutContact(env: JobsWriteEnv, undo: ContactRowsUndo, error: unknown, kind: string): Promise<never> {
+  try {
+    await putBackContactRows({ userId: env.userId, db: async () => env.jobs }, undo);
+  } catch (putBack) {
+    console.error(`${kind}: putting a failed change back failed`, putBack);
+  }
+  throw error;
+}
+
+/** "a LinkedIn message", for the words a touch is told in. */
+const CHANNEL_WORDS: Record<string, string> = {
+  linkedin_dm: 'a LinkedIn message',
+  linkedin_connect: 'a LinkedIn connection request',
+  email: 'an email',
+  intro: 'an introduction',
+  event: 'a meeting at an event',
+  other: 'a message',
+};
+
+/**
+ * The outreach log on a contact's page: a touch logged (a send moves a
+ * contact still to be contacted to contacted, as the page does), a touch's
+ * channel or words corrected, or a touch marked answered (the contact moves
+ * to responded). Nothing is sent: the log records what they did.
+ */
+async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const action = text(args, 'action');
+  if (action !== 'log' && action !== 'edit' && action !== 'answered') throw new JobsRefused('action must be log, edit or answered.');
+  const undo: ContactRowsUndo = { added: [], changed: [] };
+
+  let touch: Row;
+  let contact: Row;
+  let touchBefore: Row | null = null;
+  if (action === 'log') {
+    contact = await ownRow(env.jobs, 'contacts', idOf(text(args, 'contact_ref'), 'contact'), env.userId, 'contact');
+    const channel = given(args, 'channel') ? oneOf(args, 'channel', TOUCH_CHANNELS, false) : 'other';
+    const direction = given(args, 'direction') ? oneOf(args, 'direction', DIRECTIONS, false) : 'outbound';
+    const message = given(args, 'message') ? clearable(args, 'message', MESSAGE_MAX) : null;
+    let applicationId: string | null = null;
+    if (text(args, 'application_ref')) {
+      const application = await ownRow(env.jobs, 'applications', idOf(text(args, 'application_ref'), 'application'), env.userId, 'application');
+      applicationId = application.id as string;
+    }
+    touch = await addKept(env, undo, 'contact_touches', {
+      contact_id: contact.id,
+      application_id: applicationId,
+      channel,
+      direction,
+      message,
+      sent_at: new Date().toISOString(),
+    });
+    if (direction === 'outbound') {
+      try {
+        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact'] });
+      } catch (error) {
+        return backOutContact(env, undo, error, 'change_touch');
+      }
+    }
+  } else {
+    const before = await ownRow(env.jobs, 'contact_touches', idOf(text(args, 'touch_ref'), 'touch'), env.userId, 'touch');
+    touchBefore = before;
+    contact = await ownRow(env.jobs, 'contacts', before.contact_id as string, env.userId, 'contact');
+    if (action === 'edit') {
+      const update: Row = {};
+      if (given(args, 'channel')) update.channel = oneOf(args, 'channel', TOUCH_CHANNELS, false);
+      if (given(args, 'message')) update.message = clearable(args, 'message', MESSAGE_MAX);
+      const changed = Object.fromEntries(Object.entries(update).filter(([key, value]) => before[key] !== value));
+      if (Object.keys(changed).length === 0) throw new JobsRefused('Nothing to change: give a new channel or message.');
+      const written = await changeKept(env, undo, 'contact_touches', before, changed);
+      if (!written) throw new Error('Changing the touch failed: no row');
+      touch = written;
+    } else {
+      if (before.responded_at) throw new JobsRefused('That touch is marked answered already.');
+      const summary = given(args, 'response') ? clearable(args, 'response', MESSAGE_MAX) : null;
+      const written = await changeKept(env, undo, 'contact_touches', before, { responded_at: new Date().toISOString(), response_summary: summary });
+      if (!written) throw new Error('Marking the touch answered failed: no row');
+      touch = written;
+      try {
+        if (contact.status !== 'responded') await changeKept(env, undo, 'contacts', contact, { status: 'responded' });
+      } catch (error) {
+        return backOutContact(env, undo, error, 'change_touch');
+      }
+    }
+  }
+
+  const contactId = contact.id as string;
+  const name = contactName(contact);
+  const how = CHANNEL_WORDS[touch.channel as string] ?? 'a message';
+  const said =
+    action === 'log'
+      ? touch.direction === 'inbound'
+        ? `logged ${how} from ${name}`
+        : `logged ${how} to ${name}`
+      : action === 'edit'
+        ? `corrected a logged touch with ${name}`
+        : `marked ${name}'s reply to ${how} answered`;
+  return {
+    kind: 'change_touch',
+    input: {
+      verb: action === 'log' ? 'Logged' : action === 'edit' ? 'Corrected' : 'Answered',
+      what: how,
+      rest: action === 'log' ? ` ${touch.direction === 'inbound' ? 'from' : 'to'} ${name}` : ` with ${name}`,
+      href: contactHref(contactId),
+      where: 'Open the contact',
+      paths: contactPaths(contactId),
+    },
+    subjectRef: toRef(TOUCHES, touch.id as string),
+    op: action === 'log' ? 'insert' : 'update',
+    before: touchBefore,
+    after: touch,
+    summary: `Dash ${said}, in the outreach log.`,
+    row: { table: TOUCHES, ref: touch.id as string, title: `${how} with ${name}`, href: contactHref(contactId) },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/** The suggestion a call names: by its ref, or by the person or line it suggested, among the open ones. */
+async function namedSuggestion(env: JobsWriteEnv, args: Args): Promise<Row> {
+  const ref = text(args, 'suggestion_ref');
+  if (ref) return ownRow(env.jobs, 'suggestions', idOf(ref, 'suggestion'), env.userId, 'suggestion');
+  const person = text(args, 'person').toLowerCase();
+  if (!person) throw new JobsRefused('Name the suggestion: suggestion_ref, or person for who it suggested they message.');
+  const { data, error } = await env.jobs
+    .from('suggestions')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('kind', 'reach_out')
+    .eq('status', 'open');
+  if (error) throw new Error(`Reading the suggestions failed: ${error.message}`);
+  const open = (data ?? []) as Row[];
+  const said = (row: Row) => [row.person_name, row.headline].filter((part): part is string => typeof part === 'string').join(' ').toLowerCase();
+  const found = open.filter((row) => said(row).includes(person));
+  if (found.length === 1) return found[0];
+  const listedNames = open.map((row) => `"${(row.person_name as string | null) ?? (row.headline as string)}" (${row.id as string})`).join('; ');
+  if (found.length === 0) throw new JobsRefused(open.length ? `No open suggestion names "${person}". The open ones: ${listedNames}.` : 'There are no open suggestions of people to message.');
+  throw new JobsRefused(`More than one open suggestion names "${person}": ${listedNames}. Give suggestion_ref.`);
+}
+
+/**
+ * Mark a suggested person on Find as messaged, as its Sent press does: the
+ * person is added as a contact if they are not one yet, the suggested
+ * message is logged as sent to them, and the suggestion is closed. Nothing is
+ * sent from here; they sent it themselves.
+ */
+async function markSuggestionSent(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const suggestion = await namedSuggestion(env, args);
+  if (suggestion.kind !== 'reach_out') throw new JobsRefused('That suggestion is a role to apply for, not a person to message.');
+  if (suggestion.status !== 'open') throw new JobsRefused(`That suggestion is ${suggestion.status === 'done' ? 'marked sent' : 'closed'} already.`);
+  const undo: ContactRowsUndo = { added: [], changed: [] };
+
+  let contact: Row | null = null;
+  try {
+    if (typeof suggestion.contact_id === 'string') {
+      contact = await ownRow(env.jobs, 'contacts', suggestion.contact_id, env.userId, 'contact');
+    } else if (typeof suggestion.person_name === 'string' && suggestion.person_name.trim()) {
+      const companyId = typeof suggestion.company_name === 'string' && suggestion.company_name.trim()
+        ? await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, suggestion.company_name).then((company) => {
+            if (company.error) throw new Error(`Finding the company failed: ${company.error}`);
+            return company.id;
+          })
+        : null;
+      const source = typeof suggestion.source_url === 'string' ? suggestion.source_url : null;
+      contact = await addKept(env, undo, 'contacts', {
+        company_id: companyId,
+        full_name: suggestion.person_name.trim(),
+        title: suggestion.person_title ?? null,
+        linkedin_url: source && /linkedin\.com\/in\//.test(source) ? source : null,
+        relationship: 'cold',
+        status: 'contacted',
+        notes: source ? `Found by Dash: ${source}` : 'Found by Dash.',
+      });
+    }
+    if (contact) {
+      await addKept(env, undo, 'contact_touches', {
+        contact_id: contact.id,
+        channel: suggestion.channel ?? 'other',
+        direction: 'outbound',
+        message: suggestion.message ?? null,
+        sent_at: new Date().toISOString(),
+      });
+      if (contact.status === 'to_contact' || contact.status === 'dormant') {
+        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'dormant'] });
+      }
+    }
+    const closed: Row = { status: 'done', acted_at: new Date().toISOString() };
+    if (contact) closed.contact_id = contact.id;
+    const written = await changeKept(env, undo, 'suggestions', suggestion, closed, { column: 'status', values: ['open'] });
+    if (!written) throw new JobsRefused('That suggestion was closed while this ran.');
+  } catch (error) {
+    return backOutContact(env, undo, error, 'mark_suggestion_sent');
+  }
+
+  const who = contact ? contactName(contact) : quotedBody(suggestion.headline, 'the suggestion');
+  const href = contact ? contactHref(contact.id as string) : '/jobs/find';
+  return {
+    kind: 'mark_suggestion_sent',
+    input: {
+      verb: 'Marked sent',
+      what: who,
+      rest: contact ? ', logged in the outreach log' : ', from Find',
+      href,
+      where: contact ? 'Open the contact' : 'Open Find',
+      paths: ['/jobs/find', ...(contact ? contactPaths(contact.id as string) : [])],
+    },
+    subjectRef: toRef(SUGGESTIONS, suggestion.id as string),
+    op: 'update',
+    before: suggestion,
+    after: { ...suggestion, status: 'done' },
+    summary: contact
+      ? `Dash marked the suggestion to message ${who} as sent, logging it in the outreach log${undo.added.some((row) => row.table === 'contacts') ? ' and adding them as a contact' : ''}.`
+      : `Dash marked the suggestion ${who} as sent.`,
+    row: { table: SUGGESTIONS, ref: suggestion.id as string, title: who, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+function contactRowsUndo(value: Record<string, unknown> | null): ContactRowsUndo | null {
+  if (!value) return null;
+  const isRow = (row: unknown): row is Row => !!row && typeof row === 'object' && !Array.isArray(row);
+  const known = (row: Row) => typeof row.table === 'string' && CONTACT_TABLES.has(row.table) && typeof row.id === 'string' && isUuid(row.id);
+  const added = (Array.isArray(value.added) ? value.added : []).filter(isRow).filter(known);
+  const changed = (Array.isArray(value.changed) ? value.changed : [])
+    .filter(isRow)
+    .filter((row) => known(row) && isRow(row.before) && isRow(row.after));
+  if (added.length + changed.length === 0) return null;
+  return {
+    added: added.map((row) => ({ table: row.table as string, id: row.id as string })),
+    changed: changed.map((row) => ({ table: row.table as string, id: row.id as string, before: row.before as Row, after: row.after as Row })),
+  };
+}
+
+/** The rows that hang on a contact and go with it when it is deleted. */
+// Two have no user_id of their own; the contact id, which is theirs, is enough.
+const CONTACT_HOLDERS: readonly { schema: AskSchema; table: string; owned: boolean }[] = [
+  { schema: 'job_search', table: 'contact_touches', owned: true },
+  { schema: 'job_search', table: 'notes', owned: true },
+  { schema: 'job_search', table: 'reminders', owned: true },
+  { schema: 'job_search', table: 'attachments', owned: true },
+  { schema: 'job_search', table: 'interview_participants', owned: false },
+  { schema: 'job_search', table: 'suggestions', owned: true },
+  { schema: 'todo', table: 'task_links', owned: false },
+];
+
+/** Whether anything Dash did not add in this change hangs on the contact. */
+async function contactHolds(deps: { userId: string; db: AskDb }, contactId: string, addedIds: Set<string>): Promise<boolean> {
+  for (const holder of CONTACT_HOLDERS) {
+    const client = await deps.db(holder.schema);
+    let query = client.from(holder.table).select('id').eq('contact_id', contactId);
+    if (holder.owned) query = query.eq('user_id', deps.userId);
+    const { data, error } = await query;
+    if (error) throw new Error(`${holder.table}: ${error.message}`);
+    if (((data ?? []) as Row[]).some((row) => !addedIds.has(row.id as string))) return true;
+  }
+  return false;
+}
+
+/** Put back what a contact write kept; how many rows went back. */
+async function putBackContactRows(deps: { userId: string; db: AskDb }, undo: ContactRowsUndo): Promise<number> {
+  const jobs = await deps.db('job_search');
+  let restored = 0;
+  for (const row of [...undo.changed].reverse()) {
+    let query = jobs.from(row.table).update(row.before).eq('id', row.id).eq('user_id', deps.userId);
+    for (const [column, value] of Object.entries(row.after)) {
+      if (!scalar(value)) continue;
+      query = value === null ? query.is(column, null) : query.eq(column, value as string | number | boolean);
+    }
+    const { data, error } = await query.select('id');
+    if (error) throw new Error(`${row.table}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  const addedIds = new Set(undo.added.map((row) => row.id));
+  for (const row of [...undo.added].reverse()) {
+    // Taking a contact out takes everything on it with it (the foreign keys
+    // cascade), so one that has gathered anything since stays.
+    if (row.table === 'contacts' && (await contactHolds(deps, row.id, addedIds))) continue;
+    const { data, error } = await jobs.from(row.table).delete().eq('id', row.id).eq('user_id', deps.userId).select('id');
+    if (error) throw new Error(`${row.table}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  return restored;
+}
+
+/**
+ * Undo a touch logged, edited or answered, or a suggestion marked sent, from
+ * what it kept (ContactRowsUndo). Ask's undo calls it for every surface
+ * (lib/ask/changes.ts, undoMany).
+ */
+export async function undoContactRows(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = contactRowsUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
+  const restored = await putBackContactRows(deps, undo);
+  if (restored === 0) {
+    return { ok: false, error: 'Everything this changed has changed again since, so undoing would lose the later changes.' };
+  }
+  return { ok: true, restored };
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -1523,6 +1978,62 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: changeRoleEmail,
+  },
+  {
+    name: 'change_contact',
+    description:
+      "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words) and notes. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_ref: { type: 'string', description: 'The job_search.contacts ref a lookup returned, to correct that contact. Leave it out to add one.' },
+        full_name: { type: 'string', description: 'Their name. Needed to add one.' },
+        title: { type: 'string', description: `Their job title. ${CLEARABLE}` },
+        company: { type: 'string', description: `The company they work at, by name. ${CLEARABLE}` },
+        linkedin_url: { type: 'string', description: `Their LinkedIn page. ${CLEARABLE}` },
+        email: { type: 'string', description: `Their work email. ${CLEARABLE}` },
+        relationship: { type: 'string', enum: [...RELATIONSHIPS], description: 'How they know them; cold when they do not.' },
+        how_we_connect: { type: 'string', description: `How they know them, in their words. ${CLEARABLE}` },
+        notes: { type: 'string', description: `Notes on them, in full, replacing what is there. ${CLEARABLE}` },
+      },
+      additionalProperties: false,
+    },
+    run: changeContact,
+  },
+  {
+    name: 'change_touch',
+    description:
+      "Keep the outreach log on a contact when they ask: log that they reached out to someone or heard from them (log; a message they sent moves the contact from to-contact to contacted), correct a logged touch's channel or words (edit), or mark one answered with what came back (answered; the contact moves to responded). This records what they did; nothing is sent. Touches are listed by list_rows on job_search.contact_touches.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['log', 'edit', 'answered'], description: 'log a new touch, edit one, or mark one answered.' },
+        contact_ref: { type: 'string', description: 'With log: the job_search.contacts ref of who it was with.' },
+        touch_ref: { type: 'string', description: 'With edit or answered: the job_search.contact_touches ref.' },
+        channel: { type: 'string', enum: [...TOUCH_CHANNELS], description: 'How it went: a LinkedIn message or connection request, email, an introduction, an event, or other.' },
+        direction: { type: 'string', enum: [...DIRECTIONS], description: 'With log: outbound when they reached out (the default), inbound when the contact did.' },
+        message: { type: 'string', description: `What was said. With edit, ${CLEARABLE.toLowerCase()}` },
+        application_ref: { type: 'string', description: 'With log, optionally: the job_search.applications ref it was about.' },
+        response: { type: 'string', description: 'With answered: what came back, in a line.' },
+      },
+      required: ['action'],
+      additionalProperties: false,
+    },
+    run: changeTouch,
+  },
+  {
+    name: 'mark_suggestion_sent',
+    description:
+      "Mark a person Dash suggested on Find as messaged, when they say they sent it, as Find's Sent press does: they are added as a contact if they are not one, the suggested message is logged as sent in the outreach log, and the suggestion is closed. Nothing is sent from here. Name it by suggestion_ref, or by person for who it suggested (a name or words from its line); an unclear name is refused with the open ones listed.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        suggestion_ref: { type: 'string', description: 'The job_search.suggestions ref of the suggestion.' },
+        person: { type: 'string', description: 'Instead of suggestion_ref: the name of the person it suggested, or words from its line.' },
+      },
+      additionalProperties: false,
+    },
+    run: markSuggestionSent,
   },
 ];
 

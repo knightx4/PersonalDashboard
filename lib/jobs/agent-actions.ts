@@ -46,11 +46,11 @@ export const jobsActions: ModuleActions = {
     dismissPursuit: none('deletes', 'Removes the application, and the role and company with it when nothing else holds them.'),
   },
   'app/jobs/(app)/contacts/actions.ts': {
-    createContact: GAP,
-    updateContact: GAP,
-    logTouch: GAP,
-    updateTouch: GAP,
-    markTouchAnswered: GAP,
+    createContact: tool('change_contact'),
+    updateContact: tool('change_contact'),
+    logTouch: tool('change_touch'),
+    updateTouch: tool('change_touch'),
+    markTouchAnswered: tool('change_touch'),
   },
   'app/jobs/(app)/settings/actions.ts': {
     updateProfile: none('setting'),
@@ -87,7 +87,7 @@ export const jobsActions: ModuleActions = {
     suggestOpenings: none('spends'),
     dismissSuggestion: none('theirs'),
     dismissOpening: none('theirs'),
-    markSuggestionSent: GAP,
+    markSuggestionSent: tool('mark_suggestion_sent'),
     saveOpening: none('theirs'),
   },
   'app/jobs/(app)/roles/actions.ts': {

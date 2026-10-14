@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
-import { JOBS_WRITES, runJobsWrite, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
+import { JOBS_WRITES, runJobsWrite, undoContactRows, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
 
 /**
  * The Jobs writes an agent makes (plan #1894.6.1): each names one row, read
@@ -385,5 +385,135 @@ describe('change_role_email (plan #1894.6.5)', () => {
     expect(await refused('change_role_email', withMail(APP_2), { action: 'link', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/another role/);
     expect(await refused('change_role_email', withMail(), { action: 'unlink', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/not linked to this role/);
     expect(await refused('change_role_email', withMail(), { action: 'nope', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/action must be/);
+  });
+});
+
+describe('contacts, touches and suggestions (plan #1894.6.6)', () => {
+  const TOUCH = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const SUGGESTION = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
+  const SUGGESTION_2 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
+
+  function people(): FakeTables {
+    return {
+      ...tables(),
+      'job_search.contacts': [
+        { id: CONTACT, user_id: ME, full_name: 'Sam Lee', title: null, email: null, company_id: COMPANY, status: 'to_contact', relationship: 'cold' },
+      ],
+      'job_search.contact_touches': [],
+      'job_search.notes': [],
+      'job_search.reminders': [],
+      'job_search.attachments': [],
+      'job_search.interview_participants': [],
+      'job_search.suggestions': [
+        {
+          id: SUGGESTION,
+          user_id: ME,
+          kind: 'reach_out',
+          status: 'open',
+          contact_id: null,
+          person_name: 'Priya Rao',
+          person_title: 'Data Lead',
+          company_name: 'Acme',
+          channel: 'linkedin_dm',
+          message: 'Hi Priya',
+          headline: 'Ask Priya about the team',
+          source_url: 'https://www.linkedin.com/in/priya',
+        },
+        { id: SUGGESTION_2, user_id: ME, kind: 'reach_out', status: 'open', contact_id: null, person_name: 'Priya Shah', headline: 'Meet Priya Shah', channel: null, message: null },
+      ],
+      'todo.task_links': [],
+    };
+  }
+  const deps = (t: FakeTables) => ({ userId: ME, db: async (schema: Parameters<ReturnType<typeof fakeSchemaDb>>[0]) => fakeSchemaDb(t)(schema) });
+
+  it('adds a contact at a company on file, and its Undo takes it out', async () => {
+    const t = people();
+    const change = await made('change_contact', t, { full_name: 'Jo Park', company: 'Acme', relationship: 'alum' });
+    expect(change.op).toBe('insert');
+    expect(t['job_search.contacts']).toHaveLength(2);
+    expect(t['job_search.contacts'][1]).toMatchObject({ user_id: ME, full_name: 'Jo Park', company_id: COMPANY, relationship: 'alum' });
+    expect(change.summary).toBe('Dash added Jo Park at Acme to the contacts.');
+    expect(await undoContactRows(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contacts']).toHaveLength(1);
+  });
+
+  it("corrects a contact, and refuses a bad link, no change and someone else's contact", async () => {
+    const t = people();
+    const change = await made('change_contact', t, { contact_ref: CONTACT, title: 'Staff Engineer', email: 'sam@acme.com' });
+    expect(t['job_search.contacts'][0]).toMatchObject({ title: 'Staff Engineer', email: 'sam@acme.com' });
+    expect(change.summary).toBe('Dash updated the contact Sam Lee at Acme.');
+    expect(await undoContactRows(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contacts'][0]).toMatchObject({ title: null, email: null });
+    expect(await refused('change_contact', people(), { contact_ref: CONTACT, linkedin_url: 'linkedin' })).toMatch(/must be a link/);
+    expect(await refused('change_contact', people(), { contact_ref: CONTACT, full_name: 'Sam Lee' })).toMatch(/Nothing to change/);
+    expect(await refused('change_contact', people(), {})).toMatch(/needs a name/);
+    const theirs = people();
+    theirs['job_search.contacts'][0].user_id = SOMEONE;
+    expect(await refused('change_contact', theirs, { contact_ref: CONTACT, title: 'x' })).toMatch(/no contact of theirs/);
+  });
+
+  it('logs a touch, moving the contact to contacted, and the Undo puts both back', async () => {
+    const t = people();
+    const change = await made('change_touch', t, { action: 'log', contact_ref: CONTACT, channel: 'email', message: 'Coffee?' });
+    expect(t['job_search.contact_touches']).toHaveLength(1);
+    expect(t['job_search.contact_touches'][0]).toMatchObject({ user_id: ME, contact_id: CONTACT, channel: 'email', direction: 'outbound', message: 'Coffee?' });
+    expect(t['job_search.contacts'][0].status).toBe('contacted');
+    expect(change.summary).toBe('Dash logged an email to Sam Lee, in the outreach log.');
+    expect(await undoContactRows(deps(t), change.undo)).toMatchObject({ ok: true, restored: 2 });
+    expect(t['job_search.contact_touches']).toHaveLength(0);
+    expect(t['job_search.contacts'][0].status).toBe('to_contact');
+  });
+
+  it('marks a touch answered, then corrects it, each undone', async () => {
+    const t = people();
+    t['job_search.contact_touches'] = [
+      { id: TOUCH, user_id: ME, contact_id: CONTACT, channel: 'linkedin_dm', direction: 'outbound', message: 'Hi', responded_at: null, response_summary: null },
+    ];
+    const answered = await made('change_touch', t, { action: 'answered', touch_ref: TOUCH, response: 'Happy to chat' });
+    expect(t['job_search.contact_touches'][0]).toMatchObject({ response_summary: 'Happy to chat', responded_at: expect.any(String) });
+    expect(t['job_search.contacts'][0].status).toBe('responded');
+    expect(await refused('change_touch', t, { action: 'answered', touch_ref: TOUCH })).toMatch(/answered already/);
+    expect(await undoContactRows(deps(t), answered.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contact_touches'][0]).toMatchObject({ responded_at: null, response_summary: null });
+    expect(t['job_search.contacts'][0].status).toBe('to_contact');
+    const edited = await made('change_touch', t, { action: 'edit', touch_ref: TOUCH, channel: 'email' });
+    expect(t['job_search.contact_touches'][0].channel).toBe('email');
+    expect(await undoContactRows(deps(t), edited.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contact_touches'][0].channel).toBe('linkedin_dm');
+    expect(await refused('change_touch', t, { action: 'edit', touch_ref: TOUCH, channel: 'linkedin_dm' })).toMatch(/Nothing to change/);
+  });
+
+  it('marks a suggestion sent by name, adding the contact and the touch, and the Undo takes them out', async () => {
+    const t = people();
+    const change = await made('mark_suggestion_sent', t, { person: 'Priya Rao' });
+    expect(t['job_search.contacts']).toHaveLength(2);
+    expect(t['job_search.contacts'][1]).toMatchObject({
+      full_name: 'Priya Rao',
+      company_id: COMPANY,
+      status: 'contacted',
+      linkedin_url: 'https://www.linkedin.com/in/priya',
+    });
+    expect(t['job_search.contact_touches'][0]).toMatchObject({ channel: 'linkedin_dm', direction: 'outbound', message: 'Hi Priya' });
+    expect(t['job_search.suggestions'][0]).toMatchObject({ status: 'done', contact_id: t['job_search.contacts'][1].id });
+    expect(change.summary).toBe(
+      'Dash marked the suggestion to message Priya Rao as sent, logging it in the outreach log and adding them as a contact.',
+    );
+    expect(await refused('mark_suggestion_sent', t, { suggestion_ref: SUGGESTION })).toMatch(/marked sent already/);
+    expect(await undoContactRows(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contacts']).toHaveLength(1);
+    expect(t['job_search.contact_touches']).toHaveLength(0);
+    expect(t['job_search.suggestions'][0]).toMatchObject({ status: 'open', contact_id: null });
+  });
+
+  it('leaves an added contact that has gathered a note since, and refuses an unclear name', async () => {
+    const t = people();
+    const change = await made('mark_suggestion_sent', t, { suggestion_ref: SUGGESTION });
+    const added = t['job_search.contacts'][1].id;
+    t['job_search.notes'].push({ id: 'note-1', user_id: ME, contact_id: added, body: 'Met at the meetup' });
+    expect(await undoContactRows(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.contacts']).toHaveLength(2);
+    expect(t['job_search.suggestions'][0].status).toBe('open');
+    expect(await refused('mark_suggestion_sent', people(), { person: 'Priya' })).toMatch(/More than one/);
+    expect(await refused('mark_suggestion_sent', people(), { person: 'Nobody' })).toMatch(/No open suggestion/);
   });
 });

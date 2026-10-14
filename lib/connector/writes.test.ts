@@ -83,6 +83,9 @@ describe('runConnectorWrite', () => {
       'change_reminder',
       'change_waiting',
       'change_role_email',
+      'change_contact',
+      'change_touch',
+      'mark_suggestion_sent',
     ]);
   });
 
