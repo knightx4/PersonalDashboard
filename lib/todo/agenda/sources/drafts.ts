@@ -39,6 +39,7 @@ export const draftsSource: AgendaSource = {
   id: 'drafts',
   label: 'Follow-ups and return requests',
   module: 'todo',
+  crossesWorkspaces: true,
   description:
     'A follow-up on an application that has gone quiet, or a return request before the window closes, written by Dash and ready to send from Gmail.',
 
@@ -108,6 +109,7 @@ export const draftsSource: AgendaSource = {
         },
         detail: row.reason,
         completable: true,
+        workspace: row.kind === 'return_request' ? 'shopping' : 'jobs',
       };
     });
   },

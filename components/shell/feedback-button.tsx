@@ -11,7 +11,7 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { shapeIdea } from '@/app/dev/ideas/actions';
-import { AddFile } from '@/components/attachments/add-file';
+import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
@@ -99,6 +99,7 @@ export function FeedbackButton({
   // has. Kept while the panel is shut, so closing it by mistake does not
   // lose a screenshot already sent up. Send waits while one is uploading.
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
+  const adder = useRef<AddFileHandle>(null);
   const [uploading, setUploading] = useState(false);
   const [settledNote, setSettledNote] = useState<FeedbackActionState | null>(null);
   if (state.filed && state !== settledNote) {
@@ -222,6 +223,11 @@ export function FeedbackButton({
                     ? 'A bug, a change, or an idea. Dash files it as a note or an idea for you.'
                     : 'What went wrong, or what it should do.'
                 }
+                // A screenshot copied from anywhere goes in as a file, without
+                // saving it and choosing it again (note e8b051a0).
+                onPaste={(event) => {
+                  if (adder.current?.paste(event.clipboardData)) event.preventDefault();
+                }}
               />
               <p className="mt-1 text-small text-ink-muted">
                 Saved with the page you are on ({pathname}).
@@ -229,6 +235,7 @@ export function FeedbackButton({
             </div>
 
             <AddFile
+              ref={adder}
               name="attachments"
               value={files}
               onChange={setFiles}

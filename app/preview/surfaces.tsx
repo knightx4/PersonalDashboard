@@ -15,6 +15,7 @@ import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
 import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
 import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
@@ -308,6 +309,14 @@ import {
 } from './goal-page-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import {
+  JobsInboxSurface,
+  LearnInboxSurface,
+  NewsInboxSurface,
+  ShoppingInboxSurface,
+  TodoInboxSurface,
+  VaultInboxSurface,
+} from './workspace-inbox-surfaces';
+import {
   AuthCodeErrorSurface,
   ConsentSurface,
   FrontDoorSurface,
@@ -511,6 +520,15 @@ const rolePanels: PanelProps = {
       summary: 'From the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+    {
+      id: 'e4',
+      kind: 'screen_scheduled',
+      occurredAt: '2026-09-04T16:10:00.000Z',
+      source: 'email',
+      summary: 'Phone screen with Dana Okafor, 15 September',
+      needsReview: false,
+      gmailHref: null,
     },
     {
       id: 'e2',
@@ -3460,6 +3478,26 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answer-draft',
+    label: 'Role · An answer with its draft',
+    module: 'jobs',
+    width: 'wide',
+    // The draft beside a question after Draft is pressed (note ad554975): one
+    // drawn from the posting alone, citing nothing from the bank.
+    render: () => (
+      <AnswerCard
+        answer={rolePanels.answers[0]}
+        closed={false}
+        initialDraft={{
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          evidenceItemIds: [],
+          unsupportedClaims: ['for two years'],
+          bannedFound: [],
+        }}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-interviews',
     label: 'Role · Interviews',
     module: 'jobs',
@@ -3997,6 +4035,51 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <InboxPageSurface />,
+  },
+  /* Each workspace's Inbox (plan #1937.5): the agenda's on-you rows cut to
+   * the workspace, with a queue row where it keeps one. News is drawn empty.
+   * Fixtures in workspace-inbox-surfaces.tsx. */
+  {
+    id: 'shopping-inbox',
+    label: 'Shopping · Inbox',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingInboxSurface />,
+  },
+  {
+    id: 'jobs-inbox',
+    label: 'Job search · Inbox',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface />,
+  },
+  {
+    id: 'todo-inbox',
+    label: 'Todo · Inbox',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoInboxSurface />,
+  },
+  {
+    id: 'vault-inbox',
+    label: 'Vault · Inbox',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultInboxSurface />,
+  },
+  {
+    id: 'learn-inbox',
+    label: 'Learn · Inbox',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnInboxSurface />,
+  },
+  {
+    id: 'news-inbox',
+    label: 'News · Inbox, empty',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */

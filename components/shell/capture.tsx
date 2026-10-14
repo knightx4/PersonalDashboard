@@ -19,7 +19,7 @@ import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/ui/kbd';
-import { AddFile } from '@/components/attachments/add-file';
+import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   CaptureFoot,
@@ -640,6 +640,7 @@ function AnythingPanel({
   const [pending, start] = useTransition();
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement | null>(null);
+  const adder = useRef<AddFileHandle>(null);
   usePanelChrome(onClose, panelRef);
 
   const guess: PlaceGuess = asked !== undefined ? { state: 'answered', sort: asked } : guessed;
@@ -751,6 +752,10 @@ function AnythingPanel({
           }}
           value={text}
           onChange={(event) => retype(event.target.value)}
+          // A picture copied from anywhere goes in as a file (note e8b051a0).
+          onPaste={(event) => {
+            if (adder.current?.paste(event.clipboardData)) event.preventDefault();
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -770,6 +775,7 @@ function AnythingPanel({
           costs={costs}
           files={
             <AddFile
+              ref={adder}
               value={uploads}
               onChange={setUploads}
               disabled={pending}
