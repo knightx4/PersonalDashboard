@@ -90,9 +90,10 @@ describe('the Inbox page', () => {
       />,
     );
 
-  it('opens on the counts, each a link to its section', () => {
+  it('counts each section on its heading, and the total after them', () => {
     const html = render();
-    expect(html).toMatch(/href="#inbox-questions"[^>]*><span[^>]*>3</);
+    expect(html).toMatch(/Questions for you<span[^>]*>3</);
+    expect(html).toContain('5 things waiting on you');
     expect(html).toContain('id="inbox-actions"');
     expect(html).toContain('Pay the card');
     expect(html).toContain('Needs you: Which card has the lower rate?');

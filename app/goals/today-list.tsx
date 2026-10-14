@@ -163,6 +163,7 @@ export function TodayRow({
   );
   const answered = !state.error && (state.message !== undefined || state.done !== undefined);
   const field = ANSWER_FIELD[item.kind];
+  const [answering, setAnswering] = useState(false);
   const primary = PRIMARY_VALUE[item.kind];
   const second = SECOND[item.kind];
   const href = hrefFor(item);
@@ -231,18 +232,26 @@ export function TodayRow({
           <form action={action} className="flex flex-wrap items-center gap-2 pt-1">
             <input type="hidden" name="id" value={item.id} />
             {item.startsOn && <input type="hidden" name="startsOn" value={item.startsOn} />}
-            {field && (
+            {/* An answer in words stays one press until it is started (law 14). */}
+            {field && answering && (
               <Input
                 name={field}
                 required
+                autoFocus
                 aria-label={`Your answer: ${item.title}`}
                 placeholder="Your answer"
                 className="w-full max-sm:min-h-11 sm:w-64"
               />
             )}
-            <Button type="submit" name={primary?.[0]} value={primary?.[1]} pending={pending}>
-              {item.action}
-            </Button>
+            {field && !answering ? (
+              <Button type="button" onClick={() => setAnswering(true)}>
+                {item.action}
+              </Button>
+            ) : (
+              <Button type="submit" name={primary?.[0]} value={primary?.[1]} pending={pending}>
+                {field ? 'Send' : item.action}
+              </Button>
+            )}
             {second && (
               <Button
                 type="submit"

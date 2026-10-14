@@ -29,7 +29,7 @@ import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { inboxAnchor, type InboxCell } from '@/components/inbox/overview';
+import { inboxAnchor } from '@/components/inbox/overview';
 import { INBOX_WORDS, InboxPage, type InboxRow, type InboxSectionKey } from '@/components/inbox/inbox-page';
 import { isRunnerSource } from '@/lib/plan/stall';
 import {
@@ -459,18 +459,6 @@ export function RaisedView({
   );
   const approve = groups.find((group) => group.key === 'approve');
 
-  const extraCells: InboxCell[] =
-    queue.unfinished.length > 0
-      ? [
-          {
-            key: 'unfinished',
-            title: 'Answered, nothing done',
-            count: queue.unfinished.length,
-            hint: 'Run it or close it',
-          },
-        ]
-      : [];
-
   return (
     <div className="space-y-6">
       <InboxPage
@@ -489,7 +477,7 @@ export function RaisedView({
             ? { review: <ApproveAll entries={approve.entries} /> }
             : undefined
         }
-        extraCells={extraCells}
+        alsoWaiting={queue.unfinished.length}
       >
         {queue.unfinished.length > 0 && (
           <div id={inboxAnchor('unfinished')} className="scroll-mt-bar">

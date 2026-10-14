@@ -71,6 +71,7 @@ const rows: InboxRow[] = [
     move: { state: 'on_you' },
     verbs: [{ label: 'Add it', tone: 'primary', write: write('Added.') }],
     decline: write('Declined.'),
+    later,
   },
   {
     ref: 'learn.suggestions:s1',

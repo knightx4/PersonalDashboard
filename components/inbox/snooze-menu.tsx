@@ -62,7 +62,7 @@ export function SnoozeMenu({
       trigger={
         <span className="inline-flex items-center gap-1">
           <BellOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="max-sm:sr-only">Later</span>
+          <span>Later</span>
           <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
         </span>
       }

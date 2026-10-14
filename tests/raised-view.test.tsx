@@ -471,12 +471,12 @@ describe('the three groups', () => {
     expect(html).toContain('Your actions');
     expect(html).toContain('Questions for you');
     expect(html).toContain('To review');
-    // Two actions, one question, one to approve, on each heading and again in
-    // the overview at the top, each count a link to its section.
+    // Two actions, one question, one to review, each on its heading, and the
+    // total once after the last section.
     expect(html).toMatch(/Your actions<span[^>]*>2</);
     expect(html).toMatch(/Questions for you<span[^>]*>1</);
     expect(html).toMatch(/To review<span[^>]*>1</);
-    expect(html).toMatch(/href="#inbox-actions"[^>]*><span[^>]*>2</);
+    expect(html).toContain('4 things waiting on you');
     expect(html).toContain('id="inbox-actions"');
   });
 

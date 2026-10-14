@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition, type ReactNode } from 'react';
 import { BellRing, Inbox as InboxIcon } from 'lucide-react';
-import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
+import { inboxAnchor } from '@/components/inbox/overview';
 import { SnoozeMenu } from '@/components/inbox/snooze-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -157,6 +157,7 @@ function Answer({ row, run, pending }: { row: InboxRow; run: ReturnType<typeof u
   const question = row.question!;
   const field = question.field ?? 'answer';
   const [words, setWords] = useState('');
+  const [open, setOpen] = useState(false);
   if (question.options && question.options.length > 0) {
     return (
       <div className="flex flex-wrap gap-2" role="group" aria-label={`Answers: ${row.title}`}>
@@ -175,9 +176,17 @@ function Answer({ row, run, pending }: { row: InboxRow; run: ReturnType<typeof u
       </div>
     );
   }
+  // Closed to one press until an answer is started (law 14).
+  if (!open) {
+    return (
+      <Button type="button" size="sm" onClick={() => setOpen(true)}>
+        Answer
+      </Button>
+    );
+  }
   return (
     <form
-      className="flex flex-wrap items-center gap-2 max-sm:w-full"
+      className="flex w-full flex-wrap items-center gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (words.trim()) run(question, { [field]: words.trim() });
@@ -187,12 +196,16 @@ function Answer({ row, run, pending }: { row: InboxRow; run: ReturnType<typeof u
         value={words}
         onChange={(event) => setWords(event.target.value)}
         required
+        autoFocus
         aria-label={`Your answer: ${row.title}`}
         placeholder="Your answer"
         className="w-full max-sm:min-h-11 sm:w-72"
       />
       <Button type="submit" size="sm" pending={pending}>
-        Answer
+        Send
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        Cancel
       </Button>
     </form>
   );
@@ -275,22 +288,30 @@ function ShapeRow({ row }: { row: InboxRow }) {
 function LaterShapeRow({ row }: { row: InboxLaterRow }) {
   const { pending, said, run } = useWrites();
   return (
-    <li className="card-pad-x row-pad flex flex-wrap items-center justify-between gap-2">
-      <div className="min-w-0 flex-1">
-        <RowTitle title={row.title} href={row.href} />
-        {row.line && <p className="text-small break-words text-ink-muted">{row.line}</p>}
+    <li className="card-pad-x row-pad space-y-0.5">
+      {/* The title takes the whole width; Bring back sits on the line under it. */}
+      <RowTitle title={row.title} href={row.href} />
+      <div className="flex flex-wrap items-center justify-between gap-x-2">
+        {row.line && <p className="min-w-0 text-small break-words text-ink-muted">{row.line}</p>}
+        {said.message && !said.error ? (
+          <span className="ml-auto text-small text-positive" role="status">
+            {said.message}
+          </span>
+        ) : (
+          row.bringBack && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              pending={pending}
+              onClick={() => run(row.bringBack!)}
+            >
+              {INBOX_WORDS.bringBack}
+            </Button>
+          )
+        )}
       </div>
-      {said.message && !said.error ? (
-        <span className="text-small text-positive" role="status">
-          {said.message}
-        </span>
-      ) : (
-        row.bringBack && (
-          <Button type="button" size="sm" variant="ghost" pending={pending} onClick={() => run(row.bringBack!)}>
-            {INBOX_WORDS.bringBack}
-          </Button>
-        )
-      )}
       <FieldError>{said.error}</FieldError>
     </li>
   );
@@ -301,7 +322,7 @@ export function InboxPage({
   later = [],
   empty,
   sectionActions,
-  extraCells = [],
+  alsoWaiting = 0,
   laterOpen = false,
   children,
 }: {
@@ -313,8 +334,8 @@ export function InboxPage({
   empty: { title: string; description: string };
   /** A press that acts on a whole section, opposite its heading (Dev's Approve all). */
   sectionActions?: Partial<Record<InboxSectionKey, ReactNode>>;
-  /** Counts for anything the workspace adds below the sections. */
-  extraCells?: readonly InboxCell[];
+  /** Rows the workspace lists under the sections itself, which keep the empty state away. */
+  alsoWaiting?: number;
   /** Whether Later starts open; shut on the app's pages. */
   laterOpen?: boolean;
   /** Anything the workspace keeps under the sections, before Later. */
@@ -326,23 +347,13 @@ export function InboxPage({
     rows: rows.filter((row) => row.section === key),
   })).filter((section) => section.rows.length > 0);
 
-  const cells: InboxCell[] = [
-    ...sections.map((section) => ({
-      key: section.key,
-      title: section.title,
-      count: section.rows.length,
-      hint: section.hint,
-    })),
-    ...extraCells,
-  ];
+  const total = sections.reduce((sum, section) => sum + section.rows.length, 0);
 
+  // No count card above the rows: each heading carries its own count, and the
+  // total is one line after the last section (the list pattern's count).
   return (
     <div className="space-y-6">
-      {cells.length === 0 ? (
-        <EmptyState icon={InboxIcon} title={empty.title} description={empty.description} />
-      ) : (
-        <InboxOverview cells={cells} />
-      )}
+      {total + alsoWaiting === 0 && <EmptyState icon={InboxIcon} title={empty.title} description={empty.description} />}
 
       {sections.map((section) => (
         <div key={section.key} id={inboxAnchor(section.key)} className="scroll-mt-bar">
@@ -364,6 +375,12 @@ export function InboxPage({
           </Group>
         </div>
       ))}
+
+      {total > 0 && (
+        <p className="tabular text-small text-ink-muted">
+          {total === 1 ? '1 thing waiting on you' : `${total} things waiting on you`}
+        </p>
+      )}
 
       {children}
 
