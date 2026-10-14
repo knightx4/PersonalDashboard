@@ -123,9 +123,9 @@ export const jobsActions: ModuleActions = {
     deleteInterview: none('deletes'),
   },
   'app/jobs/(app)/roles/[id]/mail-actions.ts': {
-    unlinkMessage: GAP,
-    linkCandidateMessage: GAP,
-    declineCandidateMessage: GAP,
+    unlinkMessage: tool('change_role_email'),
+    linkCandidateMessage: tool('change_role_email'),
+    declineCandidateMessage: tool('change_role_email'),
     searchUnlinkedMessages: none('page'),
   },
   'app/jobs/(app)/roles/[id]/posting-actions.ts': {

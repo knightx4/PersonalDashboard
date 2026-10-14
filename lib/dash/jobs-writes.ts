@@ -3,6 +3,9 @@ import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } fr
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
+import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -33,6 +36,12 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   change_reminder     a reminder finished, put off a week, reworded, moved
  *                       to another day, or linked to the email behind it.
  *   change_waiting      a "Waiting on you" row done or put off a week.
+ *
+ *
+ * and, from a role's mail (plan #1894.6.5):
+ *
+ *   change_role_email   an email linked to a role, a suggested one turned down,
+ *                       or one taken off a role it was wrongly linked to.
  *
  * Moving a role to another stage is move_roles (lib/dash/bulk-roles.ts), and
  * removing a pursuit deletes rows, which Dash never does.
@@ -907,7 +916,7 @@ function dueOf(args: Args): string {
  * id either way, as the timeline's picker checks it.
  */
 async function namedEmail(env: JobsWriteEnv, ref: string): Promise<Row> {
-  let query = env.jobs.from('inbox_messages').select('id, subject').eq('user_id', env.userId);
+  let query = env.jobs.from('inbox_messages').select('id, subject, classification, received_at').eq('user_id', env.userId);
   if (isUuid(ref)) query = query.eq('id', ref);
   else {
     const at = ref.indexOf(':');
@@ -1074,6 +1083,295 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 }
 
 // ---------------------------------------------------------------------------
+// change_role_email
+// ---------------------------------------------------------------------------
+
+const MESSAGES = 'job_search.ingested_messages';
+
+/** The columns of an ingested message that linking and unlinking write. */
+const LINK_COLUMNS = ['resulting_application_id', 'parse_status', 'link_method', 'link_confidence', 'error'] as const;
+
+/**
+ * What a link, a turned-down suggestion or an unlink keeps in `undo`: the
+ * message's link columns before and after, the events it took out whole or
+ * put in, the "not this one" mark it added, and the round it booked. The
+ * Undo (undoRoleEmail) puts each back where the row still holds what Dash
+ * left. The message has no user_id of its own, so the person's ownership is
+ * read through job_search.inbox_messages, which carries it.
+ */
+export type RoleEmailUndo = {
+  message_id: string;
+  message_before: Row | null;
+  message_after: Row | null;
+  events_removed: Row[];
+  events_added: string[];
+  dismissal_added: string | null;
+  interview_added: { interview_id: string; group_id: string | null } | null;
+};
+
+const pickLink = (row: Row): Row => Object.fromEntries(LINK_COLUMNS.map((column) => [column, row[column] ?? null]));
+
+async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const action = text(args, 'action');
+  if (action !== 'link' && action !== 'decline' && action !== 'unlink') throw new JobsRefused('action must be link, decline or unlink.');
+  const application = await namedApplication(env, args);
+  const applicationId = application.id as string;
+  const emailRef = text(args, 'email_ref');
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  // Through the inbox view, which carries the person's user id.
+  const email = await namedEmail(env, emailRef);
+  const messageId = email.id as string;
+  const { data: stored, error: storedError } = await env.jobs.from('ingested_messages').select('*').eq('id', messageId).maybeSingle();
+  if (storedError) throw new Error(`Reading the email failed: ${storedError.message}`);
+  if (!stored) throw new JobsRefused('That email is no longer in the mailbox.');
+  const message = stored as Row;
+
+  const undo: RoleEmailUndo = {
+    message_id: messageId,
+    message_before: null,
+    message_after: null,
+    events_removed: [],
+    events_added: [],
+    dismissal_added: null,
+    interview_added: null,
+  };
+  const subject = quotedBody(email.subject, 'an email with no subject');
+  const role = await applicationRole(env, applicationId);
+  const onRole = role ? ` on ${role.name}` : '';
+  const backOut = (error: unknown, failed: string) =>
+    putBackRoleEmail({ userId: env.userId, db: async () => env.jobs }, undo).then(
+      () => {
+        throw error;
+      },
+      (putBack: unknown) => {
+        console.error(`change_role_email: putting a failed ${failed} back failed`, putBack);
+        throw error;
+      },
+    );
+
+  const markDeclined = async () => {
+    const { data, error } = await env.jobs
+      .from('message_link_dismissals')
+      .upsert({ user_id: env.userId, application_id: applicationId, message_id: messageId }, { onConflict: 'application_id,message_id' })
+      .select('id')
+      .single();
+    if (error || !data) throw new Error(`Remembering the decline failed: ${error?.message ?? 'no row'}`);
+    return (data as Row).id as string;
+  };
+
+  let summary: string;
+  let verb: string;
+  let rest: string;
+  if (action === 'decline') {
+    if (message.resulting_application_id === applicationId) throw new JobsRefused('That email is linked to this role already. Unlink it instead.');
+    const { data: marked } = await env.jobs
+      .from('message_link_dismissals')
+      .select('id')
+      .eq('user_id', env.userId)
+      .eq('application_id', applicationId)
+      .eq('message_id', messageId)
+      .maybeSingle();
+    if (marked) throw new JobsRefused('That email has been turned down for this role already.');
+    undo.dismissal_added = await markDeclined();
+    summary = `Dash turned down ${subject} as a match${onRole}.`;
+    verb = 'Turned down';
+    rest = `${onRole}, so it is not suggested again`;
+  } else if (action === 'link') {
+    if (message.resulting_application_id === applicationId) throw new JobsRefused('That email is linked to this role already.');
+    if (message.resulting_application_id) {
+      throw new JobsRefused('That email is linked to another role. Unlink it from there first, then link it here.');
+    }
+    undo.message_before = pickLink(message);
+    const linked = {
+      resulting_application_id: applicationId,
+      parse_status: 'parsed',
+      link_method: 'manual',
+      link_confidence: 1,
+      error: null,
+    };
+    const { error } = await env.jobs.from('ingested_messages').update(linked).eq('id', messageId);
+    if (error) throw new Error(`Linking the email failed: ${error.message}`);
+    undo.message_after = linked;
+    try {
+      const kind = eventKindFor(email.classification as MessageClassification);
+      if (kind) {
+        const conflict = handLinkedEventNeedsReview(application.status as ApplicationStatus, kind);
+        const { data: event, error: eventError } = await env.jobs
+          .from('application_events')
+          .insert({
+            user_id: env.userId,
+            application_id: applicationId,
+            kind,
+            occurred_at: typeof email.received_at === 'string' ? email.received_at : new Date().toISOString(),
+            source: 'email',
+            ingested_message_id: messageId,
+            summary: typeof email.subject === 'string' && email.subject ? email.subject : 'Linked by hand',
+            needs_review: conflict,
+          })
+          .select('id')
+          .single();
+        if (eventError || !event) throw new Error(`Filing the email on the timeline failed: ${eventError?.message ?? 'no row'}`);
+        undo.events_added.push((event as Row).id as string);
+        if (kind === 'interview_scheduled') {
+          const round = await ensureInterviewRound(env.jobs as unknown as AppSupabaseClient, { userId: env.userId, applicationId, kind: null });
+          if (round) undo.interview_added = { interview_id: round.interviewId, group_id: round.groupCreated ? round.groupId : null };
+        }
+      }
+    } catch (error) {
+      return backOut(error, 'link');
+    }
+    summary = `Dash linked ${subject} to the role${onRole}.`;
+    verb = 'Linked';
+    rest = onRole;
+  } else {
+    if (message.resulting_application_id !== applicationId) throw new JobsRefused('That email is not linked to this role, so there is nothing to unlink.');
+    undo.message_before = pickLink(message);
+    const { data: events, error: eventsError } = await env.jobs
+      .from('application_events')
+      .select('*')
+      .eq('ingested_message_id', messageId)
+      .eq('application_id', applicationId)
+      .eq('user_id', env.userId);
+    if (eventsError) throw new Error(`Reading the timeline failed: ${eventsError.message}`);
+    // Events first, as the page does: a failure leaves the link whole.
+    const { error: deleteError } = await env.jobs
+      .from('application_events')
+      .delete()
+      .eq('ingested_message_id', messageId)
+      .eq('application_id', applicationId)
+      .eq('user_id', env.userId);
+    if (deleteError) throw new Error(`Taking the email off the timeline failed: ${deleteError.message}`);
+    undo.events_removed = (events ?? []) as Row[];
+    const unlinked = {
+      resulting_application_id: null,
+      parse_status: 'needs_review',
+      link_method: null,
+      link_confidence: null,
+      error: 'Unlinked by hand from the role page.',
+    };
+    try {
+      const { error } = await env.jobs.from('ingested_messages').update(unlinked).eq('id', messageId);
+      if (error) throw new Error(`Unlinking the email failed: ${error.message}`);
+      undo.message_after = unlinked;
+      undo.dismissal_added = await markDeclined();
+    } catch (error) {
+      return backOut(error, 'unlink');
+    }
+    summary = `Dash took ${subject} off the role${onRole}; it is back in the review queue.`;
+    verb = 'Unlinked';
+    rest = `${onRole}, back in the review queue`;
+  }
+
+  const href = role ? roleHref(role.id) : '/jobs';
+  return {
+    kind: 'change_role_email',
+    input: { verb, what: subject, rest, href, where: role ? 'Open the role' : 'Open Jobs', paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/jobs/review'] },
+    subjectRef: toRef(APPLICATIONS, applicationId),
+    op: 'update',
+    before: application,
+    after: application,
+    summary,
+    row: { table: MESSAGES, ref: messageId, title: subject, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+function roleEmailUndo(value: Record<string, unknown> | null): RoleEmailUndo | null {
+  if (!value || typeof value.message_id !== 'string') return null;
+  const object = (key: string) => (value[key] && typeof value[key] === 'object' ? (value[key] as Row) : null);
+  const ids = (key: string) => (Array.isArray(value[key]) ? (value[key] as unknown[]).filter((id): id is string => typeof id === 'string') : []);
+  const removed = Array.isArray(value.events_removed) ? (value.events_removed as Row[]) : [];
+  const added = object('interview_added');
+  const undo: RoleEmailUndo = {
+    message_id: value.message_id,
+    message_before: object('message_before'),
+    message_after: object('message_after'),
+    events_removed: removed.filter((row) => row && typeof row.id === 'string'),
+    events_added: ids('events_added'),
+    dismissal_added: typeof value.dismissal_added === 'string' ? value.dismissal_added : null,
+    interview_added:
+      added && typeof added.interview_id === 'string'
+        ? { interview_id: added.interview_id, group_id: typeof added.group_id === 'string' ? added.group_id : null }
+        : null,
+  };
+  const count =
+    (undo.message_before ? 1 : 0) + undo.events_removed.length + undo.events_added.length + (undo.dismissal_added ? 1 : 0) + (undo.interview_added ? 1 : 0);
+  return count > 0 ? undo : null;
+}
+
+/** Put back what a role email change kept; how many rows went back. */
+async function putBackRoleEmail(deps: { userId: string; db: AskDb }, undo: RoleEmailUndo): Promise<number> {
+  const jobs = await deps.db('job_search');
+  let restored = 0;
+
+  // The message goes back only while it still holds what Dash left, and only
+  // if it shows in the person's inbox view, which is where its owner is read.
+  if (undo.message_before && undo.message_after) {
+    const { data: own } = await jobs.from('inbox_messages').select('id').eq('id', undo.message_id).eq('user_id', deps.userId).maybeSingle();
+    if (own) {
+      let query = jobs.from('ingested_messages').update(undo.message_before).eq('id', undo.message_id);
+      for (const [column, value] of Object.entries(undo.message_after)) {
+        query = value === null ? query.is(column, null) : query.eq(column, value as string | number);
+      }
+      const { data, error } = await query.select('id');
+      if (error) throw new Error(`ingested_messages: ${error.message}`);
+      restored += (data ?? []).length;
+    }
+  }
+  for (const row of undo.events_removed) {
+    if (row.user_id !== deps.userId) continue;
+    const { data, error } = await jobs.from('application_events').upsert(row, { onConflict: 'id', ignoreDuplicates: true }).select('id');
+    if (error) throw new Error(`application_events: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  if (undo.events_added.length > 0) {
+    const { data, error } = await jobs.from('application_events').delete().eq('user_id', deps.userId).in('id', undo.events_added).select('id');
+    if (error) throw new Error(`application_events: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  if (undo.dismissal_added) {
+    const { data, error } = await jobs.from('message_link_dismissals').delete().eq('user_id', deps.userId).eq('id', undo.dismissal_added).select('id');
+    if (error) throw new Error(`message_link_dismissals: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  if (undo.interview_added) {
+    // The round the link booked, only while nothing has been set on it.
+    const { data, error } = await jobs
+      .from('interviews')
+      .delete()
+      .eq('user_id', deps.userId)
+      .eq('id', undo.interview_added.interview_id)
+      .is('scheduled_at', null)
+      .select('id');
+    if (error) throw new Error(`interviews: ${error.message}`);
+    restored += (data ?? []).length;
+    if (undo.interview_added.group_id && (data ?? []).length > 0) {
+      const { error: groupError } = await jobs.from('interview_groups').delete().eq('user_id', deps.userId).eq('id', undo.interview_added.group_id);
+      if (groupError) throw new Error(`interview_groups: ${groupError.message}`);
+    }
+  }
+  return restored;
+}
+
+/**
+ * Undo a link, a turned-down suggestion or an unlink from what it kept
+ * (RoleEmailUndo). Ask's undo calls it for every surface (lib/ask/changes.ts,
+ * undoMany).
+ */
+export async function undoRoleEmail(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = roleEmailUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
+  const restored = await putBackRoleEmail(deps, undo);
+  if (restored === 0) {
+    return { ok: false, error: 'Everything this changed has changed again since, so undoing would lose the later changes.' };
+  }
+  return { ok: true, restored };
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -1205,6 +1503,26 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: changeWaiting,
+  },
+  {
+    name: 'change_role_email',
+    description:
+      "Link an email to a role, turn a suggested email down, or take an email off a role it was wrongly linked to, when they ask. link files the email on the role's timeline as the review queue does (an email linked to another role must be unlinked first); decline remembers that the email is not this role's, so it is not suggested again, and leaves the email alone; unlink takes the email and the events it wrote off the role and returns it to the review queue. Name the role by application_ref or role_ref and the email by email_ref.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['link', 'decline', 'unlink'], description: 'link, decline (not this one) or unlink.' },
+        application_ref: APPLICATION_REF,
+        role_ref: { type: 'string', description: "Instead of application_ref: the job_search.roles ref, for the role's latest application." },
+        email_ref: {
+          type: 'string',
+          description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.',
+        },
+      },
+      required: ['action', 'email_ref'],
+      additionalProperties: false,
+    },
+    run: changeRoleEmail,
   },
 ];
 

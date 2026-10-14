@@ -82,6 +82,7 @@ describe('runConnectorWrite', () => {
       'merge_roles',
       'change_reminder',
       'change_waiting',
+      'change_role_email',
     ]);
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
-import { JOBS_WRITES, runJobsWrite, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
+import { JOBS_WRITES, runJobsWrite, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
 
 /**
  * The Jobs writes an agent makes (plan #1894.6.1): each names one row, read
@@ -317,5 +317,73 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
     expect(change.subjectRef).toBe(`job_search.waiting_dismissals:${DISMISSAL}`);
     expect(change.after.dismissed_until).toEqual(expect.any(String));
     expect(await refused('change_waiting', withReminders(), { event_ref: ANSWER_1, verb: 'finish' })).toMatch(/not one waiting on them/);
+  });
+});
+
+describe('change_role_email (plan #1894.6.5)', () => {
+  const MAILBOX = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const MESSAGE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const OTHER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+
+  function withMail(linkedTo: string | null = null): FakeTables {
+    return {
+      ...tables(),
+      'job_search.inbox_messages': [
+        { id: MESSAGE, user_id: ME, email_account_id: MAILBOX, provider_message_id: '18f2a', subject: 'Your application', classification: 'application_confirmation', received_at: '2026-10-01T10:00:00.000Z' },
+        { id: OTHER, user_id: SOMEONE, email_account_id: MAILBOX, provider_message_id: 'zz', subject: 'Not mine', classification: 'rejection', received_at: '2026-10-01T10:00:00.000Z' },
+      ],
+      'job_search.ingested_messages': [
+        { id: MESSAGE, resulting_application_id: linkedTo, parse_status: linkedTo ? 'parsed' : 'needs_review', link_method: linkedTo ? 'manual' : null, link_confidence: linkedTo ? 1 : null, error: null },
+        { id: OTHER, resulting_application_id: null, parse_status: 'needs_review', link_method: null, link_confidence: null, error: null },
+      ],
+      'job_search.application_events': [],
+      'job_search.message_link_dismissals': [],
+    };
+  }
+  const deps = (t: FakeTables) => ({ userId: ME, db: async (schema: Parameters<ReturnType<typeof fakeSchemaDb>>[0]) => fakeSchemaDb(t)(schema) });
+
+  it('links an email, filing its event, and its Undo takes both back', async () => {
+    const t = withMail();
+    const change = await made('change_role_email', t, { action: 'link', application_ref: APP_1, email_ref: MESSAGE });
+    expect(change.subjectRef).toBe(`job_search.applications:${APP_1}`);
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: APP_1, parse_status: 'parsed', link_method: 'manual' });
+    expect(t['job_search.application_events']).toHaveLength(1);
+    expect(t['job_search.application_events'][0]).toMatchObject({ user_id: ME, application_id: APP_1, kind: 'confirmation' });
+    expect(change.summary).toBe('Dash linked "Your application" to the role on Role from email at Acme.');
+    expect(await undoRoleEmail(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: null, parse_status: 'needs_review' });
+    expect(t['job_search.application_events']).toHaveLength(0);
+  });
+
+  it('turns an email down, remembered for the pair, and the Undo forgets it', async () => {
+    const t = withMail();
+    const change = await made('change_role_email', t, { action: 'decline', role_ref: ROLE, email_ref: MESSAGE });
+    expect(t['job_search.message_link_dismissals']).toHaveLength(1);
+    expect(t['job_search.ingested_messages'][0].resulting_application_id).toBeNull();
+    expect(await undoRoleEmail(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.message_link_dismissals']).toHaveLength(0);
+  });
+
+  it('unlinks an email back to the queue, and the Undo puts its events and link back', async () => {
+    const t = withMail(APP_1);
+    t['job_search.application_events'] = [
+      { id: EVENT, user_id: ME, application_id: APP_1, ingested_message_id: MESSAGE, kind: 'confirmation', summary: 'Your application' },
+    ];
+    const change = await made('change_role_email', t, { action: 'unlink', application_ref: APP_1, email_ref: MESSAGE });
+    expect(t['job_search.application_events']).toHaveLength(0);
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: null, parse_status: 'needs_review' });
+    expect(t['job_search.message_link_dismissals']).toHaveLength(1);
+    expect(await undoRoleEmail(deps(t), change.undo)).toMatchObject({ ok: true });
+    expect(t['job_search.application_events']).toHaveLength(1);
+    expect(t['job_search.ingested_messages'][0]).toMatchObject({ resulting_application_id: APP_1, parse_status: 'parsed' });
+    expect(t['job_search.message_link_dismissals']).toHaveLength(0);
+  });
+
+  it('refuses mail that is not theirs, a link already made, one elsewhere, and an unlink of a stranger', async () => {
+    expect(await refused('change_role_email', withMail(), { action: 'link', application_ref: APP_1, email_ref: OTHER })).toMatch(/not one the job search has read/);
+    expect(await refused('change_role_email', withMail(APP_1), { action: 'link', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/linked to this role already/);
+    expect(await refused('change_role_email', withMail(APP_2), { action: 'link', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/another role/);
+    expect(await refused('change_role_email', withMail(), { action: 'unlink', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/not linked to this role/);
+    expect(await refused('change_role_email', withMail(), { action: 'nope', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/action must be/);
   });
 });
