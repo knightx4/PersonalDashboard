@@ -13,6 +13,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { SONNET } from '@/lib/core/models';
 import { PageColumn } from '@/components/shell/page-width';
+import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
 import { Conversation } from '@/components/patterns/conversation';
 import { AskChats } from '@/app/ask/chats';
@@ -121,6 +122,35 @@ function proposalTo(question: string): { turns: TalkTurn[]; changes: DashChange[
     ],
     changes: proposals('pa'),
   };
+}
+
+/** A todo or a note made from an answer with the presses under it (plan #1899.7), as the server keeps it. */
+function savedChange(turnId: string, to: 'todo' | 'vault', at: string): DashChange {
+  const base = { ...CHANGE_BASE, turnId, status: 'done' as const, createdAt: at, doneAt: at };
+  return to === 'todo'
+    ? {
+        ...base,
+        id: `${turnId}-saved-todo`,
+        kind: 'add_todo',
+        input: { title: 'You spent $412.60 on eBay flips this quarter across three orders.', body: null, dueOn: null, dueTime: null, pinned: false },
+        subjectRef: 'todo.tasks:saved-todo',
+        writtenTable: 'todo.tasks',
+        writtenRef: 'saved-todo',
+      }
+    : {
+        ...base,
+        id: `${turnId}-saved-note`,
+        kind: 'add_quick_note',
+        input: {
+          noteId: 'saved-note',
+          title: 'What did I spend on eBay flips this quarter',
+          path: 'Inbox/What did I spend on eBay flips this quarter.md',
+          body: 'You spent $412.60 on eBay flips this quarter across three orders.',
+        },
+        subjectRef: 'obsidian.notes:saved-note',
+        writtenTable: 'obsidian.notes',
+        writtenRef: 'saved-note',
+      };
 }
 
 /** What a press does in the gallery: the change moved on, as the server would move it. */
@@ -233,6 +263,10 @@ const FIXTURES: AskSource = {
   },
   open: async () => ({ turns: answerTo(RECENT[0].title ?? ''), changes: [] }),
   poll: async () => ({ turns: [], open: 0 }),
+  save: async (_ref, turnId, to) => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return { ok: true, change: savedChange(turnId, to, new Date().toISOString()) };
+  },
   confirm: pressed('done'),
   decline: pressed('declined'),
   undo: pressed('undone'),
@@ -583,6 +617,49 @@ export function DashPageSurface({
           )}
         </Conversation>
       </AppShell>
+    </AskDashProvider>
+  );
+}
+
+/**
+ * An answer kept elsewhere with the presses under it (plan #1899.7): the
+ * first answer made a todo and saved to the vault, each card with Undo, and
+ * Edit pressed on the second, so its question is back in the box to change.
+ */
+export function AskAnswerActionsSurface() {
+  const at = (hour: number) => `2026-10-14T${String(hour).padStart(2, '0')}:00:00Z`;
+  const first = answerTo('What did I spend on eBay flips this quarter?').map((turn) => ({
+    ...turn,
+    id: `s1-${turn.id}`,
+    createdAt: at(9),
+  }));
+  const turns: TalkTurn[] = [
+    ...first,
+    { id: 's2-q', role: 'user', body: 'Which of them are still unsold?', createdAt: at(10) },
+    {
+      id: 's2-a',
+      role: 'assistant',
+      body: 'Two are still unsold: the Catan lot, listed at $210.00, and the Penguin Classics bundle, which is not listed yet.',
+      createdAt: at(10),
+    },
+  ];
+  return (
+    <AskDashProvider source={FIXTURES}>
+      {/* On the chat's card at reading width, as Dash's page draws it. */}
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id="ask-actions-preview"
+            conversationRef="00000000-0000-4000-8000-000000000021"
+            turns={turns}
+            changes={[savedChange('s1-a', 'todo', at(9)), savedChange('s1-a', 'vault', at(9))]}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
+            startWriting
+            initialDraft="Which of them are still unsold, and for how long?"
+          />
+        </Card>
+      </PageColumn>
     </AskDashProvider>
   );
 }

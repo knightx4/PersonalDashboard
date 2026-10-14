@@ -20,6 +20,7 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { AnswerActions } from '@/components/talk/answer-actions';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
@@ -44,6 +45,7 @@ import {
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
+  saveDashAnswer,
   undoDashChange,
 } from '@/app/ask/actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -93,6 +95,8 @@ export type AskSource = ChangePresses & {
   poll: typeof pollAskQuestion;
   costs: typeof askDashCosts;
   label: typeof askDashPageLabel;
+  /** Make an answer a todo or a vault note, kept as a change under it (plan #1899.7). */
+  save: typeof saveDashAnswer;
 };
 
 /**
@@ -142,6 +146,7 @@ const ACTIONS: AskSource = {
   poll: pollAskQuestion,
   costs: askDashCosts,
   label: askDashPageLabel,
+  save: saveDashAnswer,
   confirm: confirmDashChange,
   decline: declineDashChange,
   undo: undoDashChange,
@@ -346,6 +351,8 @@ export function AskThread({
   above?: React.ReactNode;
   startWriting?: boolean;
   ask?: string;
+  /** For the preview gallery: the box opens with these words in it. */
+  initialDraft?: string;
 }) {
   const source = useAskDash()?.source ?? ACTIONS;
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
@@ -410,13 +417,26 @@ export function AskThread({
       written={written}
       activity="searching"
       incoming={incoming}
-      below={(turn) => {
+      below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
             <LookupFold calls={turn.toolCalls} />
+            {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
+                A todo or a note comes back as a change, drawn above with Undo. */}
+            <AnswerActions
+              body={turn.body}
+              question={thread.question}
+              busy={thread.busy}
+              onRetry={thread.resend}
+              onEdit={thread.edit}
+              save={ref ? (to) => source.save(ref, turn.id, to) : undefined}
+              onSaved={(change) =>
+                setChanges((current) => [...current.filter((c) => c.id !== change.id), change])
+              }
+            />
           </>
         );
       }}

@@ -261,6 +261,7 @@ import {
   AskDashSurface,
   AskMadeChangesSurface,
   DashPageSurface,
+  AskAnswerActionsSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -5169,6 +5170,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* The presses under each answer (plan #1899.7): the first answer made a
+     * todo and saved to the vault, each card with Undo, and Edit pressed on
+     * the second, so its question is back in the box. */
+    id: 'ask-answer-actions',
+    label: 'Dash · An answer kept as a todo and a note',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface />,
   },
 
   {
