@@ -156,6 +156,40 @@ export function briefFromRow(row: BriefRow): Brief {
   };
 }
 
+/** Words that say nothing about which topic a request is for. */
+const FILLER = new Set(
+  (
+    'a an the and or of to in on for about with how what why when which who does do is are be it its ' +
+    'i me my want would like learn learning know understand more research look into apply applies'
+  ).split(' '),
+);
+
+function topicWords(question: string): Set<string> {
+  const words = question
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .map((word) => (word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word))
+    .filter((word) => word && !FILLER.has(word));
+  return new Set(words);
+}
+
+/**
+ * Whether two requests are for the same topic, so Ask Dash links the brief
+ * already open rather than starting a second (plan #2023.3). The words that
+ * name the topic, made singular, must overlap by four in five: "how SOX
+ * controls apply to AI" and "SOX control and AI" are the same; "SOX controls"
+ * and "SOX controls for AI agents" are not.
+ */
+export function sameTopic(a: string, b: string): boolean {
+  const left = topicWords(a);
+  const right = topicWords(b);
+  if (left.size === 0 || right.size === 0) return a.trim().toLowerCase() === b.trim().toLowerCase();
+  let shared = 0;
+  for (const word of left) if (right.has(word)) shared += 1;
+  return shared / (left.size + right.size - shared) >= 0.8;
+}
+
 /** A found_kind written loosely ("Professional body", "standard-setter") read into the column's values. */
 export function readFoundKind(raw: string): FoundKind | null {
   const word = raw.toLowerCase().replace(/[^a-z]+/g, ' ').trim();

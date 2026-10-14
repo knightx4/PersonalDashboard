@@ -20,6 +20,9 @@ import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
  *   update  the columns Dash changed get their before values back.
  *   delete  the row Dash removed is inserted again as it was.
  *
+ * One insert is archived instead (archivesBrief): a research brief Dash
+ * started, which its run goes on filling in after the change is kept.
+ *
  * The undo itself is not a new action: the action is marked `undone`, which
  * the table's guard allows only from `done`, so a second press finds nothing
  * to move.
@@ -214,6 +217,19 @@ export function undoneByVault(action: Pick<DashAction, 'surface' | 'kind' | 'und
 export function noUndoReason(action: Pick<DashAction, 'undo'>): string | null {
   const none = action.undo?.none;
   return typeof none === 'string' && none.trim() !== '' ? none.trim() : null;
+}
+
+/**
+ * Whether undoing this archives a research brief rather than deleting it
+ * (plan #2023.3). Ask Dash's research_topic adds the brief and its reading
+ * list and starts a run that writes the sub-questions, the answers and the
+ * sources into them over the next few minutes, so the row never holds what
+ * was recorded for long and its readings hang off it. Undo archives the
+ * brief and shelves its list instead, whenever the brief is not archived
+ * already. The record says so with `undo.archive_brief`.
+ */
+export function archivesBrief(action: Pick<DashAction, 'op' | 'subjectRef' | 'undo'>): boolean {
+  return action.op === 'insert' && action.undo?.archive_brief === true && !!action.subjectRef?.startsWith('learn.briefs:');
 }
 
 /**
@@ -446,7 +462,9 @@ export function movedColumns(current: Values, after: Values): string[] {
 export type UndoPlan =
   | { op: 'delete' }
   | { op: 'update'; values: Values }
-  | { op: 'insert'; values: Values };
+  | { op: 'insert'; values: Values }
+  /** Archive a research brief and shelve its list (archivesBrief). */
+  | { op: 'archive_brief'; trackId: string | null };
 
 /** Why an action in this status cannot be undone. */
 function notDone(status: DashActionStatus): string {
@@ -525,6 +543,10 @@ export function planUndo(
   }
 
   if (!current) return { ok: false, reason: 'It has since been deleted, so there is nothing to undo.' };
+  if (archivesBrief(action)) {
+    if (current.archived_at) return { ok: false, reason: 'It has been archived already, so there is nothing to undo.' };
+    return { ok: true, plan: { op: 'archive_brief', trackId: typeof current.track_id === 'string' ? current.track_id : null } };
+  }
   if (movedColumns(current, after!).length > 0) {
     return {
       ok: false,
@@ -631,6 +653,28 @@ async function apply(deps: DashActionDeps, ref: string, plan: UndoPlan, current:
   if (plan.op === 'insert') {
     const { error } = await client.from(table).insert(plan.values).select('id');
     if (error) throw new Refused(`Dash could not put it back: ${error.message}`);
+    return;
+  }
+
+  if (plan.op === 'archive_brief') {
+    const stamp = deps.now ? deps.now() : new Date().toISOString();
+    const { data, error } = await client
+      .from(table)
+      .update({ archived_at: stamp })
+      .eq('id', id)
+      .is('archived_at', null)
+      .select('id');
+    if (error) throw new Refused(`Dash could not archive it: ${error.message}`);
+    if ((data ?? []).length === 0) throw new Refused(CHANGED);
+    if (plan.trackId) {
+      // The list it made goes with it; one the person has finished or shelved stays as they left it.
+      const { error: trackError } = await client
+        .from('tracks')
+        .update({ status: 'shelved' })
+        .eq('id', plan.trackId)
+        .eq('status', 'active');
+      if (trackError) console.error(`undo: shelving the reading list of ${ref} failed`, trackError.message);
+    }
     return;
   }
 

@@ -3,6 +3,8 @@ import { isUuid, type AskRow } from '@/lib/ask/db';
 import type { LearnChangeInput, LearnChangeKind } from '@/lib/ask/learn-changes';
 import { toRef } from '@/lib/core/refs';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { BRIEF_DEPTHS, sameTopic, type BriefDepth } from '@/lib/learn/briefs/model';
+import { briefStarter, type BriefStarter } from '@/lib/learn/briefs/start';
 import { rewrittenClaimUpdate } from '@/lib/learn/graph/rewrite-save';
 import { isSameClaim, MAX_CLAIM } from '@/lib/learn/graph/rewrite';
 import { noteBody } from '@/lib/learn/notes/notes';
@@ -25,10 +27,15 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   add_concept_note   a note on an idea, or on a Learn now card's idea.
  *   change_video       a video on the watch list marked watched or not, or
  *                      moved to another pile.
+ *   research_topic     a reading list and a research brief on a topic, with
+ *                      the run that fills them in started (plan #2023.3).
  *
  * Each is one row, inserted or updated, so the one undo rule in
  * lib/core/dash-actions.ts puts it back from the values kept (#1894.4: an
- * agent's writes go straight in, each listed on Home with an Undo).
+ * agent's writes go straight in, each listed on Home with an Undo). The
+ * exception is research_topic, whose brief the run goes on filling in after
+ * the change is kept: its Undo archives the brief and shelves its list
+ * (`undo.archive_brief`), as archivesBrief there says.
  *
  * Both Ask and the connector run them. Ask runs them as a write tool on the
  * person's own clients and keeps the change with its card; the connector runs
@@ -37,8 +44,12 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * every read and write here names the person's user id itself.
  */
 
-/** Who the change is for, and their learn client: all a Learn write needs. */
-export type LearnWriteEnv = { userId: string; learn: LearnSupabaseClient };
+/**
+ * Who the change is for, and their learn client: all a Learn write needs.
+ * `research` starts a brief's run, for research_topic; without it that tool
+ * is refused.
+ */
+export type LearnWriteEnv = { userId: string; learn: LearnSupabaseClient; research?: BriefStarter };
 
 /** A Learn change as made, before a surface keeps it. */
 export type LearnMade = {
@@ -50,6 +61,8 @@ export type LearnMade = {
   after: Record<string, unknown>;
   summary: string;
   row: AskRow;
+  /** What undoing needs beyond the row, kept in the record's `undo` column. */
+  undo?: Record<string, unknown> | null;
 };
 
 export type LearnWrite = {
@@ -460,6 +473,97 @@ async function changeVideo(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
 }
 
 // ---------------------------------------------------------------------------
+// research_topic
+// ---------------------------------------------------------------------------
+
+const QUESTION_MAX = 500;
+const REASON_MAX = 1000;
+/** How many open briefs are read to find one on the same topic. */
+const OPEN_BRIEFS_READ = 100;
+
+async function researchTopic(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
+  const question = text(args, 'topic');
+  if (!question) throw new LearnRefused('topic is missing: say what they want to learn, in their words.');
+  if (question.length > QUESTION_MAX) throw new LearnRefused(`Keep the topic under ${QUESTION_MAX} characters; put the rest in reason.`);
+  const angle = text(args, 'reason');
+  if (angle.length > REASON_MAX) throw new LearnRefused(`Keep the reason under ${REASON_MAX} characters.`);
+  const depth = (text(args, 'depth') || 'standard') as BriefDepth;
+  if (!BRIEF_DEPTHS.includes(depth)) throw new LearnRefused(`depth must be one of ${BRIEF_DEPTHS.join(', ')}.`);
+  if (!env.research) throw new LearnRefused('Research cannot be started from here. Tell them nothing was started.');
+
+  // One brief a topic: a request for one already open links to it.
+  const { data: open, error } = await env.learn
+    .from('briefs')
+    .select('id, question, status')
+    .eq('user_id', env.userId)
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+    .limit(OPEN_BRIEFS_READ);
+  if (error) throw new Error(`Reading their briefs failed: ${error.message}`);
+  const same = ((open ?? []) as { id: string; question: string; status: string }[]).find((b) => sameTopic(b.question, question));
+  if (same) {
+    const state = same.status === 'researching' ? 'still being researched' : same.status === 'failed' ? 'stopped with an error, and its page has Try again' : 'ready';
+    throw new LearnRefused(
+      `They already have a brief on this, "${named(same.question, 'their question')}", ${state}. Nothing new was started. ` +
+        `Link them to that one, /learn/b/${same.id}; list_rows on learn.briefs returns it to cite.`,
+    );
+  }
+
+  const subQuestions = await env.research.frame(question, angle);
+  const title = named(question, question);
+  const track = await inserted(env, 'tracks', { user_id: env.userId, title: question.slice(0, 300), question }, 'reading list');
+  const trackId = track.id as string;
+  let after: Row;
+  try {
+    after = await inserted(
+      env,
+      'briefs',
+      {
+        user_id: env.userId,
+        track_id: trackId,
+        question,
+        angle,
+        depth,
+        sub_questions: subQuestions ?? [],
+        status: 'researching',
+        stage: subQuestions ? 'searching' : 'framing',
+      },
+      'brief',
+    );
+  } catch (failure) {
+    // An empty list with no brief is nothing they asked for.
+    await env.learn.from('tracks').delete().eq('id', trackId).eq('user_id', env.userId);
+    throw failure;
+  }
+  const id = after.id as string;
+  env.research.start(id);
+
+  const href = `/learn/b/${id}`;
+  return {
+    kind: 'research_topic',
+    input: { verb: 'Started researching', what: title, rest: '', href, where: 'Open the brief', paths: [href, '/learn/lists', `/learn/t/${trackId}`] },
+    subjectRef: toRef('learn.briefs', id),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash started researching "${title}".`,
+    row: {
+      table: 'learn.briefs',
+      ref: id,
+      title,
+      href,
+      detail: {
+        status: 'researching',
+        // One line each; none while the run is still choosing them.
+        sub_questions: (subQuestions ?? []).map((q, i) => `${i + 1}. ${q.text}`).join('\n') || null,
+        reading_list: `/learn/t/${trackId}`,
+      },
+    },
+    undo: { archive_brief: true },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The definitions
 // ---------------------------------------------------------------------------
 
@@ -566,6 +670,30 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
     },
     run: changeVideo,
   },
+  {
+    name: 'research_topic',
+    description:
+      'Research a topic they say they want to learn about ("I want to learn how SOX controls apply to AI", "look into X for me"): ' +
+      'Dash makes a reading list and a brief, splits the question into three to five sub-questions, and spends the next few minutes ' +
+      'searching the web and reading sources to answer each one with quotes. ' +
+      'First look for why they want it with recall (their job search, notes and goals). If the reason is still unclear, ask them one ' +
+      'question about why, and never a second. Then call this without asking them to confirm: the request is the go-ahead. ' +
+      'Pass the topic as they put it, the reason in a sentence (empty only when they would not say), and depth only when they asked ' +
+      'for a quick look or a deep one. In your answer, list the sub-questions this returns (an empty list means they are still being ' +
+      'chosen) and link the brief, which fills in over a few minutes. If they already have an open brief on the topic, this starts ' +
+      'nothing and says which one: link that.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'What they want to learn, in their words, as a question or a topic.' },
+        reason: { type: 'string', description: 'Why they want it, from what they said or what recall found, in a sentence.' },
+        depth: { type: 'string', enum: [...BRIEF_DEPTHS], description: 'How much to search. standard unless they asked.' },
+      },
+      required: ['topic'],
+      additionalProperties: false,
+    },
+    run: researchTopic,
+  },
 ];
 
 /** Runs one Learn write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -596,9 +724,10 @@ export const LEARN_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = LEAR
     if (!ctx.enabledModules.includes('learn')) {
       return { ok: false, error: 'The Learn workspace is switched off, so nothing can be changed there.' };
     }
-    const env = { userId: ctx.userId, learn: (await ctx.db('learn')) as LearnSupabaseClient };
+    const learn = (await ctx.db('learn')) as LearnSupabaseClient;
+    const env: LearnWriteEnv = { userId: ctx.userId, learn, research: briefStarter({ learn, userId: ctx.userId }) };
     const made = await runLearnWrite(write, env, input);
     if ('ok' in made) return made;
-    return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: null };
+    return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: made.undo ?? null };
   },
 }));

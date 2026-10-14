@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { briefFromRow, readFoundKind, readSections, readSubQuestions } from './model';
+import { briefFromRow, readFoundKind, readSections, readSubQuestions, sameTopic } from './model';
 import {
   chooseReadings,
   finalText,
@@ -262,5 +262,14 @@ describe('reading a brief row', () => {
       updated_at: 't',
     });
     expect(brief).toMatchObject({ depth: 'standard', stage: 'searching', subQuestions: [], angle: '', shortAnswer: '' });
+  });
+});
+
+describe('sameTopic', () => {
+  it('reads two wordings of one topic as the same, and a narrower one as another', () => {
+    expect(sameTopic('I want to learn how SOX controls apply to AI', 'How do SOX controls apply to AI?')).toBe(true);
+    expect(sameTopic('SOX control and AI', 'how SOX controls apply to AI')).toBe(true);
+    expect(sameTopic('SOX controls', 'SOX controls for AI agents')).toBe(false);
+    expect(sameTopic('Model risk management', 'SOX controls and AI')).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createTrack } from '@/lib/learn/tracks/save';
 import type { BriefSection, BriefStage, SubQuestion } from './model';
 import { BRIEF_COLUMNS, briefFromRow, type Brief, type BriefRow } from './model';
-import { chooseReadings, type ChosenReading } from './research';
+import { chooseReadings, SUB_QUESTIONS_MIN, type ChosenReading } from './research';
 import { frameQuestion, gatherSources, writeBrief } from './research-model';
 
 /**
@@ -18,7 +18,8 @@ import { frameQuestion, gatherSources, writeBrief } from './research-model';
  * The brief row exists before this runs, made by whatever starts it (Ask
  * Dash's research_topic tool, plan #2023.3, or Try again on the brief's page).
  * The run moves `stage` through framing, searching and writing so the page
- * can say where it is, saves the sub-questions as soon as they are framed,
+ * can say where it is, saves the sub-questions as soon as they are framed
+ * (or keeps the ones the brief was made with),
  * and ends with the brief ready, or failed with a reason the person can read.
  *
  * Each source becomes a reading on the brief's list (made here if the brief
@@ -35,7 +36,7 @@ export type ResearchOutcome = { ok: true; readings: number; sections: number } |
 /** How the run records what it spent. The default writes through the session's own client. */
 export type RecordSpend = (userId: string, reports: SpendReport[]) => Promise<void>;
 
-const recordWithSession: RecordSpend = (userId, reports) => recordLearnSpend(userId, 'research-topic', reports);
+export const recordWithSession: RecordSpend = (userId, reports) => recordLearnSpend(userId, 'research-topic', reports);
 
 /** What the person reads when a run fails, by the step it failed at. */
 const FAILED = {
@@ -147,10 +148,15 @@ export async function researchBrief(
     if (!options.client && !apiKey) return await fail('key', 'ANTHROPIC_API_KEY is not set');
     const client = options.client ?? new Anthropic({ apiKey });
 
-    await updateBrief(supabase, briefId, atStage('framing'));
-    const framed = await frameQuestion({ question: brief.question, angle: brief.angle, client, onSpend: spend.sink });
-    if (!framed.ok) return await fail('framing', framed.detail);
-    const subQuestions: SubQuestion[] = framed.subQuestions;
+    // Ask Dash frames the question before it replies, so it can name the
+    // sub-questions (plan #2023.3); a brief that has them keeps them.
+    let subQuestions: SubQuestion[] = brief.subQuestions;
+    if (subQuestions.length < SUB_QUESTIONS_MIN) {
+      await updateBrief(supabase, briefId, atStage('framing'));
+      const framed = await frameQuestion({ question: brief.question, angle: brief.angle, client, onSpend: spend.sink });
+      if (!framed.ok) return await fail('framing', framed.detail);
+      subQuestions = framed.subQuestions;
+    }
 
     failedAt = 'searching';
     await updateBrief(supabase, briefId, atStage('searching', { sub_questions: subQuestions }));
