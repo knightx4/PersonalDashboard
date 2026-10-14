@@ -141,7 +141,7 @@ vi.mock('@/inngest/dev/digest', () => ({
   runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
 }));
 vi.mock('@/inngest/learn/embeddings-daily', () => ({
-  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, places: [], dust: [], noteEvidence: [], courses: [], work: [] })),
+  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, aims: [], parents: { topics: 0, ideas: 0, calls: 1, stoppedEarly: false }, places: [], dust: [], noteEvidence: [], courses: [], work: [], topics: [] })),
 }));
 vi.mock('@/inngest/learn/brief-watch', () => ({
   runBriefWatch: vi.fn(async () => ({ due: 1, checked: [], cards: 0 })),

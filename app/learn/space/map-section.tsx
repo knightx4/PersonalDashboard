@@ -16,8 +16,8 @@ import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/le
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
-import { StarSky, type SkyName, type Star } from './star-sky';
-import { StarSwatch } from './swatch';
+import { StarSky, type SkyName, type SkyTopic, type Star } from './star-sky';
+import { StarSwatch, TopicSwatch } from './swatch';
 import { MapTimeline } from './timeline';
 import { backedByText } from '@/lib/learn/evidence/model';
 
@@ -46,11 +46,14 @@ export function MapSection({
   view,
   pointingAt,
   daysAgo,
+  zoomOn,
 }: {
   view: IdeaMapView;
   pointingAt?: string | null;
   /** The gallery opens the timeline this many days before today. */
   daysAgo?: number;
+  /** The gallery opens the sky flown into this topic. */
+  zoomOn?: string | null;
 }) {
   const { params, set } = usePick();
   const domains = useMemo(() => ideaDomains(view.ideas), [view.ideas]);
@@ -76,6 +79,14 @@ export function MapSection({
   );
 
   const names = useMemo(() => skyNames(view, layout), [view, layout]);
+  const topics: SkyTopic[] = useMemo(
+    () =>
+      (view.topics?.topics ?? []).map((topic) => ({
+        ...topic,
+        at: layout === 'axes' ? topic.pca : topic.neighbourMap,
+      })),
+    [view.topics, layout],
+  );
   const graph = useOpenGraph(view);
 
   // The timeline: the day shown, and the map relit as it stood then.
@@ -155,6 +166,8 @@ export function MapSection({
           <StarSky
             stars={stars}
             names={names}
+            topics={topics}
+            zoomOn={zoomOn}
             dust={dust}
             asOf={replay ? momentOf(span, shownDay, today).toISOString() : view.asOf}
             replay={replay ?? lighting.replay}
@@ -169,6 +182,7 @@ export function MapSection({
             <MapTimeline start={span.start} days={span.days} day={shownDay} counts={countsOf(lights)} onDay={onDay} touring={tour.running} />
           )}
           <Legend params={params} set={set} lights={lights} domains={domainsThen} slots={slots} dust={dust.length} />
+          {!graph && view.topics && <TopicLegend counts={view.topics.counts} />}
           <MapNotes view={view} params={params} graph={graph} past={past} litNames={lighting.names} />
         </div>
       </Card>
@@ -277,15 +291,38 @@ function MapNotes({
       {view.places.length === 0 ? (
         <p>Your places are named by the daily run; until then the map names domains.</p>
       ) : (
-        <p>Tap a place&rsquo;s name on the map, or pick one under Places, to open it as a graph.</p>
+        <p>Tap a place&rsquo;s name to open it as a graph, or a topic&rsquo;s name to fly into it.</p>
       )}
-      {view.missing > 0 && (
-        <p>
-          {plural(view.missing, 'idea is', 'ideas are')} not on the map yet. The daily run gives{' '}
-          {view.missing === 1 ? 'it' : 'them'} a place.
-        </p>
-      )}
+      {!view.topics && <p>The topics could not be read just now, so the map shows your ideas without them.</p>}
     </div>
+  );
+}
+
+/**
+ * The topics' three states, with how many of each (plan #2016.5): lit by
+ * what you know, unlocked by something that touches it, and the Level 4
+ * topics still hidden, which are not drawn. Level 3 landmarks nothing touches
+ * yet have a mark of their own.
+ */
+function TopicLegend({ counts }: { counts: NonNullable<IdeaMapView['topics']>['counts'] }) {
+  const marks: { key: string; swatch: React.ReactNode; label: string; count: number }[] = [
+    { key: 'lit', swatch: <TopicSwatch kind="lit" />, label: 'Topic lit', count: counts.lit },
+    { key: 'unlocked', swatch: <TopicSwatch kind="unlocked" />, label: 'Topic unlocked', count: counts.unlocked },
+    { key: 'landmark', swatch: <TopicSwatch kind="landmark" />, label: 'Level 3 topic, not touched yet', count: counts.untouched },
+    { key: 'hidden', swatch: null, label: 'Level 4 topics hidden until something touches them', count: counts.hidden },
+  ];
+  return (
+    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-ink-muted" aria-label="What the diamonds mean">
+      {marks
+        .filter((mark) => mark.count > 0)
+        .map((mark) => (
+          <li key={mark.key} className="inline-flex items-center gap-1.5">
+            {mark.swatch}
+            {mark.label}
+            <span className="tabular">{countText(mark.count)}</span>
+          </li>
+        ))}
+    </ul>
   );
 }
 

@@ -38,6 +38,7 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTopicsSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
@@ -5393,6 +5394,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceEvidenceSurface />,
+  },
+  {
+    /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
+     * its Level 4 topics drawn and seven of them named, strongest first,
+     * with the rest counted under the Level 3 name. */
+    id: 'learn-idea-space-topics',
+    label: 'Learn · Idea Space, inside a topic',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTopicsSurface />,
   },
   {
     /* Clips before any are cut. */

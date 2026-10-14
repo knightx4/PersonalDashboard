@@ -1,4 +1,5 @@
 import { shadeFor } from '@/lib/learn/areas/grid';
+import type { NextTopic } from '@/lib/learn/map/next-topics';
 import type { Depth } from './depth';
 import { NO_PREFERENCES, fieldWeight, goalWeight, themeWeight, type FeedPreferences } from './preference';
 
@@ -66,8 +67,14 @@ export type FieldTests = { tracks: number; answered: number };
 export type FeedGoal = {
   id: string;
   name: string;
-  /** 'level3' for the Level 3 goal, whose cards come from its list. Left out for an open subject. */
-  list?: 'level3';
+  /**
+   * 'level3' for the Level 3 goal, whose cards come from its list. 'next' for
+   * an open goal drawn for the topics next to what you know that rank closest
+   * to it (plan #2016.6, `next-topics.ts`). Left out for an open subject.
+   */
+  list?: 'level3' | 'next';
+  /** For a 'next' goal: its topics, best first. */
+  next?: NextTopic[];
   /** What the person means by it, when they said. */
   about: string | null;
   /** The card depth the goal starts at, from its depth (`cardDepthForAim`). */

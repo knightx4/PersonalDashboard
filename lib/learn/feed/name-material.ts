@@ -40,6 +40,8 @@ export type NamedSection = {
   model?: string;
   /** Set on a Level 3 article coming back: the titles of the cards already had on it. */
   returning?: { earlier: string[] };
+  /** Set on a topic next to one the person knows: the known topic it sits beside (plan #2016.6). */
+  beside?: string;
 };
 
 /** `skipped` says why any pick the call meant to make was left out. */
