@@ -130,6 +130,23 @@ The limit assumes the account does not have X Premium. If it does, raising the
 limit is a change to this section and to the counter on the Posts tab, and
 nothing else.
 
+## What posting costs
+
+Posting through the API is pay-per-use. Prices read from the X console on
+14 October 2026:
+
+- Post: Create is $0.015 per request.
+- Post: Create (with URL) is $0.200 per request, about 13 times more.
+- Summoned is $0.010 and covers replies to mentions. Thread replies from
+  the owner account are normal creates.
+- Reading own posts is $0.001 per post.
+
+Each post in a thread is its own request, so a 5-post thread costs $0.075.
+Drafts contain no links, so the URL price applies only if the person adds a
+link when posting. The Post button shows its price beside it and warns before
+sending a post that contains a link. The prices live in one constant in code,
+so the button and the warning read the same numbers.
+
 ## Examples
 
 Each example is written from a shipped step, cited by number, with its
