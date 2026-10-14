@@ -1,15 +1,24 @@
+import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isUuid, type AskDb, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import { namedItems } from '@/lib/ask/change-view';
 import type { ShoppingChangeInput, ShoppingChangeKind } from '@/lib/ask/shopping-changes';
+import { classifyScannedCode } from '@/lib/barcodes/scan-code';
+import { buildOwnedBookRows, type OwnedBookBundle } from '@/lib/books/create-owned-book';
+import { normalizeIsbn } from '@/lib/books/isbn';
+import { resolveBook } from '@/lib/books/resolve';
+import type { CanonicalBook } from '@/lib/books/types';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
 import { toRef } from '@/lib/core/refs';
+import { fingerprintLoose } from '@/lib/fingerprint';
+import { buildOwnedGameRows, type OwnedGameBundle } from '@/lib/games/create-owned-game';
+import type { CanonicalGame } from '@/lib/games/types';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import { displayName } from '@/lib/inventory/group-units';
 import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
 import { pickListGradient } from '@/lib/lists/gradients';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, todayInTimezone } from '@/lib/money';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
@@ -24,8 +33,13 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 its stack, as the item page's Details form does), a note
  *                 added to it (the sell page's "planning to list"), the name
  *                 of the group it is in, or its sell price.
+ *                 Also a book's or a game's condition, and its edition
+ *                 confirmed (plan #1894.5.2).
  *   item_lists    items put on one of their lists or taken off it, the list
  *                 made when it is new, or a list renamed.
+ *   add_items     books, board games and anything else they own added to the
+ *                 inventory, as the add pages save them (plan #1894.5.2).
+ *                 Undo takes each one away while nothing hangs off it.
  *
  * Both Ask and the connector run them, as News's (lib/dash/news-writes.ts):
  * Ask on the person's own clients, the connector on service-role ones for the
@@ -149,6 +163,22 @@ const itemHref = (id: string) => `/shopping/inventory/${id}`;
 const pick = (row: Row, keys: readonly string[]) => Object.fromEntries(keys.map((key) => [key, row[key] ?? null]));
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/** The conditions a book's or a game's details take (the book_condition and game_condition enums). */
+const CONDITIONS = {
+  book_details: ['new', 'like_new', 'very_good', 'good', 'acceptable'],
+  game_details: ['new_sealed', 'like_new', 'complete_used', 'incomplete', 'damaged'],
+} as const;
+
+/** The book or game details of an item already checked to be theirs, or null for anything else. */
+async function detailsOf(env: ShoppingWriteEnv, itemId: string): Promise<{ table: 'book_details' | 'game_details'; row: Row } | null> {
+  for (const table of ['book_details', 'game_details'] as const) {
+    const { data, error } = await env.shop.from(table).select('*').eq('inventory_item_id', itemId).maybeSingle();
+    if (error) throw new Error(`Reading the item's details failed: ${error.message}`);
+    if (data) return { table, row: data as Row };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // change_item
 // ---------------------------------------------------------------------------
@@ -174,14 +204,18 @@ async function changeItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMa
   }
   if (clearPrice && priceCents !== undefined) throw new ShoppingRefused('Give sell_price or clear_sell_price, not both.');
   if (clearPrice) priceCents = null;
+  const condition = textArg(args, 'condition', 40);
+  const confirmEdition = args.confirm_edition === true;
   if (name === '') throw new ShoppingRefused('name cannot be empty.');
   if (addNote === '') throw new ShoppingRefused('add_note cannot be empty.');
   if (groupName === '') throw new ShoppingRefused('group_name cannot be empty.');
   if (notes !== undefined && addNote !== undefined) {
     throw new ShoppingRefused('Give notes to replace them or add_note to add a line, not both.');
   }
-  if ([name, variant, notes, addNote, groupName, priceCents].every((value) => value === undefined)) {
-    throw new ShoppingRefused('Say what to change: name, variant, notes, add_note, group_name, sell_price or clear_sell_price.');
+  if ([name, variant, notes, addNote, groupName, priceCents, condition].every((value) => value === undefined) && !confirmEdition) {
+    throw new ShoppingRefused(
+      'Say what to change: name, variant, notes, add_note, group_name, sell_price, clear_sell_price, condition or confirm_edition.',
+    );
   }
 
   const rows: NonNullable<ShoppingUndo['rows']> = [];
@@ -288,6 +322,33 @@ async function changeItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMa
         after: { manual_expected_price_cents: priceCents },
       });
       said.push(priceCents === null ? 'cleared its sell price' : `set its sell price to ${formatMoney(priceCents)}`);
+    }
+  }
+
+  if (condition !== undefined || confirmEdition) {
+    // A book's or a game's details, as the item page's condition picker and "this is the right edition" press write them.
+    const details = await detailsOf(env, id);
+    if (!details) {
+      throw new ShoppingRefused(`"${title}" is not a book or a board game, so it has no condition or edition to set.`);
+    }
+    const values: Row = {};
+    if (condition !== undefined) {
+      const allowed = CONDITIONS[details.table];
+      const next = condition === '' ? null : condition;
+      if (next !== null && !(allowed as readonly string[]).includes(next)) {
+        throw new ShoppingRefused(`condition for a ${details.table === 'book_details' ? 'book' : 'game'} is one of ${allowed.join(', ')}, or empty to clear it.`);
+      }
+      if (!same(details.row.condition, next)) values.condition = next;
+    }
+    if (confirmEdition && details.row.needs_confirmation === true) {
+      Object.assign(values, { needs_confirmation: false, candidates: [], confirmation_reason: null });
+    }
+    if (Object.keys(values).length > 0) {
+      const { error } = await env.shop.from(details.table).update(values).eq('id', details.row.id);
+      if (error) throw new Error(`Changing the item's details failed: ${error.message}`);
+      rows.push({ table: details.table, id: details.row.id as string, before: pick(details.row, Object.keys(values)), after: { ...values } });
+      if ('condition' in values) said.push(values.condition ? `set its condition to ${String(values.condition).replace(/_/g, ' ')}` : 'cleared its condition');
+      if ('needs_confirmation' in values) said.push('confirmed its edition');
     }
   }
 
@@ -489,8 +550,379 @@ async function itemLists(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMad
 }
 
 // ---------------------------------------------------------------------------
+// add_items
+// ---------------------------------------------------------------------------
+
+const ADD_KINDS = ['book', 'game', 'other'] as const;
+type AddKind = (typeof ADD_KINDS)[number];
+
+/** The most items one call adds, a shelf's worth. */
+export const ADD_MAX = 50;
+
+/** One item as asked for, checked, before any catalog lookup. */
+type AddAsked = {
+  kind: AddKind;
+  title: string | null;
+  isbn: { isbn13: string; isbn10: string | null } | null;
+  authors: string[];
+  publisher: string | null;
+  year: number | null;
+  edition: string | null;
+  barcode: string | null;
+  variant: string | null;
+  notes: string | null;
+  category: string | null;
+  costCents: number;
+  acquiredOn: string | null;
+};
+
+function addAsked(raw: unknown, i: number): AddAsked {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ShoppingRefused(`items[${i}] must be an object.`);
+  const args = raw as Args;
+  const at = (key: string) => `items[${i}].${key}`;
+  const text = (key: string, max: number) => {
+    try {
+      return textArg(args, key, max);
+    } catch (error) {
+      if (error instanceof ShoppingRefused) throw new ShoppingRefused(`items[${i}].${error.message}`);
+      throw error;
+    }
+  };
+  const kind = (typeof args.kind === 'string' ? args.kind.trim() : '') as AddKind;
+  if (!ADD_KINDS.includes(kind)) throw new ShoppingRefused(`${at('kind')} must be one of ${ADD_KINDS.join(', ')}.`);
+  const title = text('title', 300) || null;
+  const isbnRaw = text('isbn', 40);
+  const isbn = isbnRaw ? normalizeIsbn(isbnRaw) : null;
+  if (isbnRaw && !isbn) throw new ShoppingRefused(`${at('isbn')} failed its check digit; ask them to read it again.`);
+  if (isbn && kind !== 'book') throw new ShoppingRefused(`${at('isbn')} is for a book: give kind book.`);
+  if (!title && !isbn) throw new ShoppingRefused(`${at('title')} is missing: give the title${kind === 'book' ? ', or the ISBN' : ''}.`);
+
+  const authorsRaw = args.authors;
+  if (authorsRaw !== undefined && authorsRaw !== null && (!Array.isArray(authorsRaw) || authorsRaw.some((a) => typeof a !== 'string'))) {
+    throw new ShoppingRefused(`${at('authors')} must list names.`);
+  }
+  const authors = ((authorsRaw as string[] | undefined) ?? []).map((a) => a.trim()).filter(Boolean).slice(0, 20);
+
+  let year: number | null = null;
+  if (given(args, 'year')) {
+    const value = args.year;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1000 || value > 2100) {
+      throw new ShoppingRefused(`${at('year')} must be a four-digit year.`);
+    }
+    year = value;
+  }
+
+  let costCents = 0;
+  if (given(args, 'cost')) {
+    const value = args.cost;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new ShoppingRefused(`${at('cost')} is a dollar amount such as 24.99.`);
+    costCents = Math.round(value * 100);
+  }
+
+  const acquiredOn = text('acquired_on', 10) || null;
+  if (acquiredOn && !/^\d{4}-\d{2}-\d{2}$/.test(acquiredOn)) throw new ShoppingRefused(`${at('acquired_on')} must be a date, YYYY-MM-DD.`);
+
+  const barcodeRaw = text('barcode', 40);
+  const code = barcodeRaw ? classifyScannedCode(barcodeRaw) : null;
+  if (barcodeRaw && code?.kind === 'isbn' && kind !== 'book') {
+    throw new ShoppingRefused(`${at('barcode')} is an ISBN, so it is a book: give kind book and the ISBN.`);
+  }
+
+  const onlyFor = (key: string, kinds: readonly AddKind[]) => {
+    if (given(args, key) && !kinds.includes(kind)) throw new ShoppingRefused(`${at(key)} is not taken for kind ${kind}.`);
+  };
+  onlyFor('authors', ['book']);
+  onlyFor('edition', ['book']);
+  onlyFor('publisher', ['book', 'game']);
+  onlyFor('year', ['book', 'game']);
+  onlyFor('variant', ['other']);
+  onlyFor('category', ['other']);
+
+  return {
+    kind,
+    title,
+    isbn,
+    authors,
+    publisher: text('publisher', 200) || null,
+    year,
+    edition: text('edition', 200) || null,
+    barcode: code?.kind === 'product' ? code.ean13 : null,
+    variant: text('variant', 300) || null,
+    notes: text('notes', 5000) || null,
+    category: text('category', 60) || null,
+    costCents,
+    acquiredOn,
+  };
+}
+
+/** The book an item names: the catalog's record for its ISBN, else what they gave, as the by-hand form saves it. */
+async function bookFor(asked: AddAsked): Promise<{ book: CanonicalBook; lookedUp: boolean } | null> {
+  if (asked.isbn) {
+    let found: CanonicalBook | null = null;
+    try {
+      found = await resolveBook({ isbn: asked.isbn.isbn13 }, { googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? null });
+    } catch (error) {
+      console.error('add_items: the book lookup failed', error);
+    }
+    if (found) return { book: found, lookedUp: true };
+  }
+  if (!asked.title) return null;
+  return {
+    lookedUp: false,
+    book: {
+      isbn13: asked.isbn?.isbn13 ?? null,
+      isbn10: asked.isbn?.isbn10 ?? null,
+      title: asked.title,
+      authors: asked.authors,
+      publisher: asked.publisher,
+      publishedYear: asked.year,
+      edition: asked.edition,
+      coverUrl: null,
+      weightGrams: null,
+      matchConfidence: 1,
+      needsConfirmation: false,
+      resolutionSource: 'manual',
+      alternates: [],
+      confirmationReason: null,
+    },
+  };
+}
+
+async function sharedCategoryId(env: ShoppingWriteEnv, slug: string, what: string): Promise<string> {
+  const { data, error } = await env.shop.from('categories').select('id').eq('slug', slug).is('user_id', null).maybeSingle();
+  if (error) throw new Error(`Reading the ${what} category failed: ${error.message}`);
+  if (!data) throw new Error(`The ${what} category is missing from the database.`);
+  return (data as Row).id as string;
+}
+
+/** A category named for a plain item: theirs or a shared one, by its name. */
+async function namedCategory(env: ShoppingWriteEnv, name: string): Promise<{ id: string; slug: string; name: string }> {
+  const slug = slugifyCategoryName(name);
+  if (!slug) throw new ShoppingRefused('category needs letters or numbers in it.');
+  const { data, error } = await env.shop
+    .from('categories')
+    .select('id, slug, name, user_id')
+    .eq('slug', slug)
+    .or(`user_id.is.null,user_id.eq.${env.userId}`);
+  if (error) throw new Error(`Reading their categories failed: ${error.message}`);
+  const found = ((data ?? []) as Row[]).sort((a, b) => Number(a.user_id === null) - Number(b.user_id === null))[0];
+  if (!found) throw new ShoppingRefused(`They have no category called "${name}". Leave category out, or use one they have.`);
+  return { id: found.id as string, slug: found.slug as string, name: found.name as string };
+}
+
+const inventoryRow = (bundle: OwnedBookBundle | OwnedGameBundle, notes: string | null, costCents: number, acquiredOn: string | null): Row => ({
+  id: bundle.inventory.id,
+  user_id: bundle.inventory.userId,
+  order_item_id: null,
+  category_id: bundle.inventory.categoryId,
+  name: bundle.inventory.name,
+  short_name: bundle.inventory.shortName,
+  variant: bundle.inventory.variant,
+  image_url: bundle.inventory.imageUrl,
+  fingerprint_loose: bundle.inventory.fingerprintLoose,
+  acquired_at: acquiredOn ?? bundle.inventory.acquiredAt,
+  cost_cents: costCents,
+  search_tags: bundle.inventory.searchTags,
+  notes,
+  source: bundle.inventory.source,
+  status: bundle.inventory.status,
+});
+
+/**
+ * Add what they own, as the add pages save it: a book (looked up by its ISBN
+ * when they give one, as the scan page does, or saved by hand), a board game
+ * by hand, or anything else typed in. Every lookup is made before anything is
+ * written, so one that fails leaves nothing half added.
+ */
+async function addItems(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const raw = args.items;
+  if (!Array.isArray(raw) || raw.length === 0) throw new ShoppingRefused('items must list at least one item.');
+  if (raw.length > ADD_MAX) throw new ShoppingRefused(`At most ${ADD_MAX} items at once.`);
+  const asked = raw.map(addAsked);
+
+  const { data: profile } = await env.shop.from('profiles').select('timezone').eq('id', env.userId).maybeSingle();
+  const today = todayInTimezone(((profile as Row | null)?.timezone as string | undefined) ?? 'UTC');
+  const booksId = asked.some((a) => a.kind === 'book') ? await sharedCategoryId(env, 'books', 'Books') : null;
+  const gamesId = asked.some((a) => a.kind === 'game') ? await sharedCategoryId(env, 'board-games', 'Board games') : null;
+
+  const items: Row[] = [];
+  const books: Row[] = [];
+  const games: Row[] = [];
+  const titles: string[] = [];
+  let unconfirmed = 0;
+
+  for (const [i, item] of asked.entries()) {
+    if (item.kind === 'book') {
+      const found = await bookFor(item);
+      if (!found) throw new ShoppingRefused(`No catalog has the ISBN in items[${i}]: ask them for the title and add it by hand.`);
+      const bundle = buildOwnedBookRows({ userId: env.userId, booksCategoryId: booksId!, book: found.book, acquiredAt: today, source: 'manual' });
+      items.push(inventoryRow(bundle, item.notes, item.costCents, item.acquiredOn));
+      const d = bundle.bookDetails;
+      if (d.needsConfirmation) unconfirmed += 1;
+      books.push({
+        id: d.id,
+        inventory_item_id: d.inventoryItemId,
+        isbn_13: d.isbn13,
+        isbn_10: d.isbn10,
+        authors: d.authors,
+        edition: d.edition,
+        publisher: d.publisher,
+        published_year: d.publishedYear,
+        weight_grams: d.weightGrams,
+        condition: null,
+        resolution_source: d.resolutionSource,
+        match_confidence: d.matchConfidence,
+        needs_confirmation: d.needsConfirmation,
+        candidates: d.candidates,
+        confirmation_reason: d.confirmationReason,
+        auto_imported: false,
+      });
+      titles.push(found.book.title);
+    } else if (item.kind === 'game') {
+      const game: CanonicalGame = {
+        bggId: null,
+        barcode: item.barcode,
+        title: item.title!,
+        yearPublished: item.year,
+        publisher: item.publisher,
+        minPlayers: null,
+        maxPlayers: null,
+        playingTimeMinutes: null,
+        imageUrl: null,
+        matchConfidence: 1,
+        needsConfirmation: false,
+        resolutionSource: 'manual',
+        alternates: [],
+        confirmationReason: null,
+      };
+      const bundle = buildOwnedGameRows({ userId: env.userId, gamesCategoryId: gamesId!, game, acquiredAt: today, source: 'manual', forceConfirmed: true });
+      items.push(inventoryRow(bundle, item.notes, item.costCents, item.acquiredOn));
+      const d = bundle.gameDetails;
+      games.push({
+        id: d.id,
+        inventory_item_id: d.inventoryItemId,
+        bgg_id: d.bggId,
+        wikidata_id: d.wikidataId,
+        barcode: d.barcode,
+        year_published: d.yearPublished,
+        publisher: d.publisher,
+        min_players: d.minPlayers,
+        max_players: d.maxPlayers,
+        playing_time_minutes: d.playingTimeMinutes,
+        condition: null,
+        resolution_source: d.resolutionSource,
+        match_confidence: d.matchConfidence,
+        needs_confirmation: d.needsConfirmation,
+        candidates: d.candidates,
+        confirmation_reason: d.confirmationReason,
+        auto_imported: d.autoImported,
+      });
+      titles.push(game.title);
+    } else {
+      const name = item.title!;
+      const category = item.category ? await namedCategory(env, item.category) : null;
+      const enriched = enrichItemDisplay({ name, variant: item.variant, categorySlug: category?.slug ?? null, categoryName: category?.name ?? null });
+      items.push({
+        id: randomUUID(),
+        user_id: env.userId,
+        order_item_id: null,
+        category_id: category?.id ?? null,
+        name,
+        short_name: enriched.shortName,
+        variant: item.variant,
+        image_url: null,
+        fingerprint_loose: fingerprintLoose(name),
+        acquired_at: item.acquiredOn ?? today,
+        cost_cents: item.costCents,
+        search_tags: item.barcode ? [...enriched.searchTags, item.barcode] : enriched.searchTags,
+        notes: item.notes,
+        source: 'manual',
+        status: 'owned',
+      });
+      titles.push(name);
+    }
+  }
+
+  const { error } = await env.shop.from('inventory_items').insert(items);
+  if (error) throw new Error(`Adding the items failed: ${error.message}`);
+  const ids = items.map((row) => row.id as string);
+  for (const [table, rows] of [['book_details', books], ['game_details', games]] as const) {
+    if (rows.length === 0) continue;
+    const { error: detailError } = await env.shop.from(table).insert(rows);
+    if (detailError) {
+      await env.shop.from('inventory_items').delete().eq('user_id', env.userId).in('id', ids);
+      throw new Error(`Adding the ${table} failed: ${detailError.message}`);
+    }
+  }
+
+  const first = items[0];
+  const count = items.length;
+  const shown = titles.map((t) => named(t, 'an item'));
+  const short = titles.map((t) => {
+    const line = named(t, 'an item');
+    return line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line;
+  });
+  const href = count === 1 ? itemHref(ids[0]) : '/shopping/inventory';
+  const confirm = unconfirmed > 0 ? ` ${unconfirmed === 1 ? 'One needs' : `${unconfirmed} need`} its edition confirmed before selling.` : '';
+  return {
+    kind: 'add_items',
+    input: {
+      verb: 'Added',
+      what: namedItems(shown, count),
+      rest: ' to your inventory',
+      href,
+      where: count === 1 ? 'Open the item' : 'Open the inventory',
+      paths: ['/shopping/inventory', '/shopping/sell', ...ids.map(itemHref)],
+    },
+    subjectRef: toRef(ITEMS, ids[0]),
+    op: 'insert',
+    before: null,
+    after: first,
+    // The details go with each item when Undo takes it away (they cascade), so only the items are kept here.
+    undo: { added: ids.map((id) => ({ table: 'inventory_items' as const, id })) },
+    summary: `Dash added ${count} ${noun(count)} to Shopping: ${namedItems(short, count)}.${confirm}`,
+    row: { table: ITEMS, ref: ids[0], title: shown[0], href },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Undo
 // ---------------------------------------------------------------------------
+
+/**
+ * What the person can hang off an item after Dash added it: a list, a tag, a
+ * use, a family, a return or a todo. An added item with any of these, or one
+ * since grouped, marked for sale or no longer owned, is theirs now, and Undo
+ * keeps it. A price quote is the app's own reading and goes with the item.
+ */
+const ITEM_DEPENDENTS = [
+  { schema: 'public', table: 'inventory_item_lists' },
+  { schema: 'public', table: 'inventory_item_tags' },
+  { schema: 'public', table: 'item_uses' },
+  { schema: 'public', table: 'inventory_item_families' },
+  { schema: 'public', table: 'returns' },
+  { schema: 'todo', table: 'task_links' },
+] as const;
+
+async function itemHasDependents(deps: { userId: string; db: AskDb }, shop: SchemaClient, id: string): Promise<boolean> {
+  const { data: item, error } = await shop
+    .from('inventory_items')
+    .select('status, for_sale, group_id, return_planned')
+    .eq('id', id)
+    .eq('user_id', deps.userId)
+    .maybeSingle();
+  if (error) throw new Error(`inventory_items: ${error.message}`);
+  if (!item) return false;
+  const row = item as Row;
+  if (row.status !== 'owned' || row.for_sale === true || row.return_planned === true || typeof row.group_id === 'string') return true;
+  for (const dependent of ITEM_DEPENDENTS) {
+    const client = dependent.schema === 'public' ? shop : await deps.db(dependent.schema);
+    const { data, error: readError } = await client.from(dependent.table).select('id').eq('inventory_item_id', id).limit(1);
+    if (readError) throw new Error(`${dependent.table}: ${readError.message}`);
+    if ((data ?? []).length > 0) return true;
+  }
+  return false;
+}
 
 function isTable(value: unknown): value is ShoppingTable {
   return typeof value === 'string' && value in TABLES;
@@ -542,7 +974,12 @@ export async function undoShoppingChange(
 
   // Memberships before the list they are on, so a list Dash made is empty when it is reached.
   const added = [...(undo.added ?? [])].sort((a, b) => Number(a.table === 'item_lists') - Number(b.table === 'item_lists'));
+  let kept = 0;
   for (const row of added) {
+    if (row.table === 'inventory_items' && (await itemHasDependents(deps, shop, row.id))) {
+      kept += 1;
+      continue;
+    }
     if (row.table === 'item_lists') {
       const { data: still, error } = await shop.from('inventory_item_lists').select('id').eq('list_id', row.id).limit(1);
       if (error) throw new Error(`inventory_item_lists: ${error.message}`);
@@ -561,6 +998,12 @@ export async function undoShoppingChange(
     restored += (data ?? []).length;
   }
 
+  if (restored === 0 && kept > 0) {
+    return {
+      ok: false,
+      error: `${kept === 1 ? 'The item Dash added has' : `All ${kept} items Dash added have`} been put on a list, sold, grouped or linked since, so Dash kept ${kept === 1 ? 'it' : 'them'}. Remove ${kept === 1 ? 'it' : 'them'} from the inventory instead.`,
+    };
+  }
   if (restored === 0) {
     return { ok: false, error: 'Everything this changed has changed again since, so undoing would lose the later changes.' };
   }
@@ -577,7 +1020,7 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   {
     name: 'change_item',
     description:
-      "Change one item they own in Shopping, when they ask: its name, variant or notes (these reach every copy in its stack, as the item page's save does), a line added to its notes (\"planning to list it myself\"), the name of the group of copies it is in, or the price they mean to sell it for. Give only what changes; an empty variant or notes clears it. Marking items for sale or to return, grouping, ungrouping, separating or saying they got rid of an item is change_items.",
+      "Change one item they own in Shopping, when they ask: its name, variant or notes (these reach every copy in its stack, as the item page's save does), a line added to its notes (\"planning to list it myself\"), the name of the group of copies it is in, the price they mean to sell it for, a book's or game's condition, or confirming the edition it was matched to. Give only what changes; an empty variant or notes clears it. Marking items for sale or to return, grouping, ungrouping, separating or saying they got rid of an item is change_items.",
     input_schema: {
       type: 'object',
       properties: {
@@ -589,6 +1032,15 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
         group_name: { type: 'string', description: 'The name of the group of copies the item is in.' },
         sell_price: { type: 'number', description: 'The price they mean to sell it for, in dollars. It beats every price lookup.' },
         clear_sell_price: { type: 'boolean', description: 'True to clear a sell price set by hand.' },
+        condition: {
+          type: 'string',
+          description:
+            'For a book: new, like_new, very_good, good or acceptable. For a board game: new_sealed, like_new, complete_used, incomplete or damaged. Empty clears it.',
+        },
+        confirm_edition: {
+          type: 'boolean',
+          description: 'True when they say the edition Shopping matched for a book or game is the right one, clearing the confirm prompt.',
+        },
       },
       required: ['item_ref'],
       additionalProperties: false,
@@ -617,6 +1069,43 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
       additionalProperties: false,
     },
     run: itemLists,
+  },
+  {
+    name: 'add_items',
+    description: `Add things they own to their Shopping inventory, when they tell you they bought or have them ("I bought a copy of Dune", a list of the board games on their shelf), as the add pages do. Each item takes a kind: book (an isbn is looked up in the book catalogs; without one, give the title and what they said of authors, publisher, year and edition), game (a board game, by its title, with year, publisher or barcode when known), or other (anything else, with an optional variant and the name of one of their categories). At most ${ADD_MAX} items. Do not add what an order email already brought in: look it up first when unsure.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          maxItems: ADD_MAX,
+          items: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: [...ADD_KINDS], description: 'book, game (a board game) or other.' },
+              title: { type: 'string', description: 'The title or name. A book with an isbn may leave it out.' },
+              isbn: { type: 'string', description: 'For a book: its ISBN-10 or ISBN-13.' },
+              authors: { type: 'array', items: { type: 'string' }, description: 'For a book typed in by hand: its authors.' },
+              publisher: { type: 'string', description: 'For a book or game: the publisher.' },
+              year: { type: 'integer', description: 'For a book or game: the year it was published.' },
+              edition: { type: 'string', description: 'For a book: the edition, such as "2nd" or "paperback".' },
+              barcode: { type: 'string', description: 'The UPC or EAN printed on the box, for a game or other item.' },
+              variant: { type: 'string', description: 'For other: a colour, size or model.' },
+              category: { type: 'string', description: 'For other: the name of one of their Shopping categories.' },
+              notes: { type: 'string', description: 'Notes kept on the item.' },
+              cost: { type: 'number', description: 'What they paid, in dollars. Leave out when unknown.' },
+              acquired_on: { type: 'string', description: 'The day they got it, YYYY-MM-DD. Today when left out.' },
+            },
+            required: ['kind'],
+            additionalProperties: false,
+          },
+          description: 'The items to add, each with its kind.',
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+    run: addItems,
   },
 ];
 

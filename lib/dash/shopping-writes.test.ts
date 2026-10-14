@@ -28,6 +28,29 @@ vi.mock('@/lib/inventory/stack-siblings', () => ({
   },
 }));
 
+// The book catalogs: one ISBN they carry, every other one unknown.
+vi.mock('@/lib/books/resolve', () => ({
+  resolveBook: async ({ isbn }: { isbn: string }) =>
+    isbn === '9780441172719'
+      ? {
+          isbn13: '9780441172719',
+          isbn10: '0441172717',
+          title: 'Dune',
+          authors: ['Frank Herbert'],
+          publisher: 'Ace',
+          publishedYear: 1990,
+          edition: null,
+          coverUrl: 'https://covers.example/dune.jpg',
+          weightGrams: null,
+          matchConfidence: 1,
+          needsConfirmation: false,
+          resolutionSource: 'google_books',
+          alternates: [],
+          confirmationReason: null,
+        }
+      : null,
+}));
+
 const ME = '00000000-0000-4000-8000-0000000000cc';
 const SOMEONE = '00000000-0000-4000-8000-0000000000dd';
 const CATAN = '00000000-0000-4000-8000-00000000f001';
@@ -67,9 +90,31 @@ beforeEach(() => {
       item(THEIRS, 'Not mine', { user_id: SOMEONE }),
     ],
     'public.item_groups': [{ id: GROUP, user_id: ME, name: 'Catan', group_key: 'catan' }],
-    'public.book_details': [{ id: DUNE_DETAILS, inventory_item_id: DUNE, isbn_13: null, needs_confirmation: false, manual_expected_price_cents: null }],
+    'public.book_details': [
+      {
+        id: DUNE_DETAILS,
+        inventory_item_id: DUNE,
+        isbn_13: null,
+        condition: null,
+        needs_confirmation: true,
+        candidates: [{ title: 'Dune (1965)' }],
+        confirmation_reason: 'Two editions match.',
+        manual_expected_price_cents: null,
+      },
+    ],
     'public.game_details': [],
-    'public.categories': [],
+    'public.categories': [
+      { id: 'cat-books', user_id: null, slug: 'books', name: 'Books' },
+      { id: 'cat-games', user_id: null, slug: 'board-games', name: 'Board games' },
+      { id: 'cat-kitchen', user_id: null, slug: 'kitchen', name: 'Kitchen' },
+      { id: 'cat-theirs', user_id: SOMEONE, slug: 'tools', name: 'Tools' },
+    ],
+    'public.profiles': [{ id: ME, timezone: 'UTC' }],
+    'public.inventory_item_tags': [],
+    'public.item_uses': [],
+    'public.inventory_item_families': [],
+    'public.returns': [],
+    'todo.task_links': [],
     'public.item_lists': [{ id: GIFTS, user_id: ME, name: 'Gifts', slug: 'gifts', color: null }],
     'public.inventory_item_lists': [],
   };
@@ -182,6 +227,72 @@ describe('change_item', () => {
     expect(await refused('change_item', { item_ref: DUNE, group_name: 'Books' })).toContain('not in a group');
     expect(await refused('change_item', { item_ref: DUNE })).toContain('Say what to change');
     expect(await refused('change_item', { item_ref: DUNE, notes: 'x', add_note: 'y' })).toContain('not both');
+  });
+});
+
+describe("a book's or game's details", () => {
+  it('sets the condition and confirms the edition, and Undo puts the details back', async () => {
+    const kept = await viaAsk('change_item', { item_ref: DUNE, condition: 'very_good', confirm_edition: true });
+    expect(row('book_details', DUNE_DETAILS)).toMatchObject({ condition: 'very_good', needs_confirmation: false, candidates: [], confirmation_reason: null });
+    expect(lastSummary()).toBe('Dash changed "Dune" in Shopping: set its condition to very good and confirmed its edition.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(row('book_details', DUNE_DETAILS)).toMatchObject({ condition: null, needs_confirmation: true, confirmation_reason: 'Two editions match.' });
+  });
+
+  it("refuses a game's condition on a book, and a condition on an item with no details", async () => {
+    expect(await refused('change_item', { item_ref: DUNE, condition: 'complete_used' })).toContain('very_good');
+    expect(await refused('change_item', { item_ref: CATAN, condition: 'good' })).toContain('not a book or a board game');
+  });
+});
+
+describe('add_items', () => {
+  const added = () => tables['public.inventory_items'].filter((r) => ![CATAN, CATAN_TWO, DUNE, THEIRS].includes(r.id as string));
+
+  it('adds a book by its ISBN, a game and a plain item, as the add pages save them, and Undo takes them away', async () => {
+    const kept = await viaAsk('add_items', {
+      items: [
+        { kind: 'book', isbn: '0-441-17271-7' },
+        { kind: 'game', title: 'Wingspan', year: 2019, publisher: 'Stonemaier Games' },
+        { kind: 'other', title: 'Le Creuset Dutch oven', variant: 'Flame, 5.5 qt', category: 'Kitchen', cost: 379.95, acquired_on: '2026-09-01' },
+      ],
+    });
+    const [book, game, oven] = added();
+    expect(book).toMatchObject({ name: 'Dune', variant: 'Frank Herbert', category_id: 'cat-books', source: 'manual', status: 'owned', acquired_at: '2026-10-14' });
+    expect(tables['public.book_details'].find((r) => r.inventory_item_id === book.id)).toMatchObject({ isbn_13: '9780441172719', resolution_source: 'google_books' });
+    expect(game).toMatchObject({ name: 'Wingspan', category_id: 'cat-games' });
+    expect(tables['public.game_details'].find((r) => r.inventory_item_id === game.id)).toMatchObject({ year_published: 2019, needs_confirmation: false });
+    expect(oven).toMatchObject({ category_id: 'cat-kitchen', variant: 'Flame, 5.5 qt', cost_cents: 37995, acquired_at: '2026-09-01' });
+    expect(lastSummary()).toBe('Dash added 3 items to Shopping: Dune, Wingspan and Le Creuset Dutch oven.');
+    expect(changeSentence(kept, true)).toBe('Added Dune, Wingspan and Le Creuset Dutch oven to your inventory');
+
+    expect(await undoChange(deps(), kept.id)).toMatchObject({ ok: true, change: { status: 'undone' } });
+    expect(added()).toHaveLength(0);
+  });
+
+  it('saves a book the catalogs lack by hand with its ISBN, and refuses one with neither title nor a known ISBN', async () => {
+    const result = await made('add_items', { items: [{ kind: 'book', isbn: '9780306406157', title: 'A New Book', authors: ['A. Writer'] }] });
+    expect(result.summary).toBe('Dash added 1 item to Shopping: A New Book.');
+    expect(tables['public.book_details'].at(-1)).toMatchObject({ isbn_13: '9780306406157', resolution_source: 'manual', authors: ['A. Writer'] });
+
+    const before = tables['public.inventory_items'].length;
+    expect(await refused('add_items', { items: [{ kind: 'game', title: 'Azul' }, { kind: 'book', isbn: '9780306406157' }] })).toContain('No catalog has');
+    expect(await refused('add_items', { items: [{ kind: 'book', isbn: '123' }] })).toContain('check digit');
+    expect(await refused('add_items', { items: [{ kind: 'other', title: 'Drill', category: 'Tools' }] })).toContain('no category called');
+    expect(await refused('add_items', { items: [{ kind: 'game' }] })).toContain('title is missing');
+    expect(tables['public.inventory_items']).toHaveLength(before);
+  });
+
+  it('keeps an added item something now hangs off, and takes the rest away', async () => {
+    const kept = await viaAsk('add_items', { items: [{ kind: 'game', title: 'Azul' }, { kind: 'game', title: 'Patchwork' }] });
+    const [azul, patchwork] = added();
+    tables['public.inventory_item_lists'].push({ id: 'm-azul', inventory_item_id: azul.id, list_id: GIFTS });
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(added().map((r) => r.name)).toEqual(['Azul']);
+    expect(added().some((r) => r.id === patchwork.id)).toBe(false);
+
+    const again = await viaAsk('add_items', { items: [{ kind: 'other', title: 'Lamp' }] });
+    row('inventory_items', added().find((r) => r.name === 'Lamp')!.id as string).for_sale = true;
+    expect(await undoChange(deps(), again.id)).toMatchObject({ ok: false, error: expect.stringContaining('Dash kept it') });
   });
 });
 
