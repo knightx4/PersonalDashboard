@@ -46,6 +46,7 @@ export const coreActions: ModuleActions = {
     confirmDashChange: none('theirs'),
     declineDashChange: none('theirs'),
     undoDashChange: none('theirs'),
+    saveDashAnswer: tool('add_todo', 'add_quick_note'),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
