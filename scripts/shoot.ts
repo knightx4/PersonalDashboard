@@ -322,7 +322,7 @@ async function main() {
         await send('Runtime.evaluate', {
           expression: applyExpression(theme) + HIDE_DEV_BADGE,
         });
-        await wait(400);
+        await wait(2500);
         // A newsletter frame (app/news/i/[id]/issue-frame.tsx) is 70vh until
         // it has measured itself, and a full-page capture stretches the
         // viewport, so a shot taken before the measurement arrives showed a
@@ -333,6 +333,11 @@ async function main() {
           expression: FRAMES_MEASURED,
           awaitPromise: true,
         });
+
+        // A canvas map (Idea Space's graph) can still be waiting to paint when
+        // the capture resizes the window; give it a moment so a shot is not
+        // an empty panel (plan #1997.9).
+        await wait(1500);
 
         const windowOnly = WINDOW_ONLY.has(size.name);
         if (SHELL && !windowOnly) {

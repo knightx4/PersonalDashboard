@@ -14,7 +14,7 @@ import { mapHref, parseMapParams, type MapParams } from '@/lib/learn/map/view';
 /**
  * Idea Space's view state, shared by the map, its switches and the rail.
  *
- * Every switch on the page (layout, colour, names, a domain in the legend, the
+ * Every switch on the page (layout, a domain in the legend, the
  * open idea) changes what is drawn from data already on the page, so it is
  * held here and changed at once. The address follows through
  * `history.pushState` (law 5): a reload, a pasted link and the server's first
@@ -106,11 +106,4 @@ export function viewOnClick(apply: () => void) {
 /** A link's press turned into a pick. */
 export function pickOnClick(pick: (id: string | null) => void, id: string | null) {
   return viewOnClick(() => pick(id));
-}
-
-/** The line under the map that says what a tap does, while nothing is open. */
-export function TapHint() {
-  const { selectedId } = usePick();
-  if (selectedId) return null;
-  return <p>Point at or tap an idea to see its six nearest.</p>;
 }

@@ -25,7 +25,18 @@ import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
-import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
+import {
+  IdeaSpaceAroundSurface,
+  IdeaSpacePlaceSurface,
+  IdeaSpaceRecordingChooseSurface,
+  IdeaSpaceRecordingSurface,
+  IdeaSpaceReplaySurface,
+  IdeaSpaceCardSurface,
+  IdeaSpaceDenseSurface,
+  IdeaSpaceDomainsSurface,
+  IdeaSpaceLightsSurface,
+  IdeaSpaceSurface,
+} from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
@@ -5147,10 +5158,10 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouPersonalityEmptySurface />,
   },
   {
-    /* Idea Space (plan #1857): the neighbour map coloured by what you know,
-     * field and domain names on, one idea open in the rail with its nearest
-     * six, the two lists below it, and ideas still waiting for a place.
-     * Fixtures in idea-space-surfaces.tsx. */
+    /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
+     * star as bright as you know it, places named, one idea open in the rail
+     * with its nearest six, the two lists below it, and ideas still waiting
+     * for a place. Fixtures in idea-space-surfaces.tsx. */
     id: 'learn-idea-space',
     label: 'Learn · Idea Space, an idea open',
     module: 'learn',
@@ -5158,13 +5169,90 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceSurface />,
   },
   {
-    /* The same map on its main axes, coloured by domain, with the fields not
-     * placed yet, as it is live until the daily run fills them. */
+    /* The same sky on its main axes with no place named yet, so the
+     * domains are named instead, and one domain picked out in the legend. */
     id: 'learn-idea-space-domains',
     label: 'Learn · Idea Space, by domain',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDomainsSurface />,
+  },
+  {
+    /* The card a pointer shows over a star (plan #1997.6), held open: its
+     * state, evidence, strength, when it was last shown and when it next halves. */
+    id: 'learn-idea-space-card',
+    label: 'Learn · Idea Space, pointing at a star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceCardSurface />,
+  },
+  {
+    /* The timeline under the map moved back seven weeks (plan #1997.8): ideas
+     * written since are left off, and the rest are lit as they were that day,
+     * with the counts for the day above the timeline. */
+    id: 'learn-idea-space-replay',
+    label: 'Learn · Idea Space, replaying an earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceReplaySurface />,
+  },
+  {
+    /* One place opened as a graph (plan #1997.7), with one idea pointed at
+     * so its links show their scores, and the ideas next door round the edge. */
+    id: 'learn-idea-space-place',
+    label: 'Learn · Idea Space, a place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpacePlaceSurface />,
+  },
+  {
+    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    id: 'learn-idea-space-around',
+    label: 'Learn · Idea Space, an idea in no place opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* The moment An idea lights up (plan #1997.10): three ideas set in the
+     * last two days brighten from dark to their strength when the map opens.
+     * The button opens it again, which the recorder presses. */
+    id: 'learn-idea-space-lights',
+    label: 'Learn · Idea Space, an idea lighting up',
+    module: 'learn',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="lights-up"]',
+      shows:
+        'The map opens again with three stars dark, and after a beat they brighten together to the strength each is known at, while every other star and the camera hold still.',
+    },
+    render: () => <IdeaSpaceLightsSurface />,
+  },
+  {
+    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
+     * places and the ideas in them read "A private place" and "Private idea". */
+    id: 'learn-idea-space-recording',
+    label: 'Learn · Idea Space, recording mode on',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingSurface />,
+  },
+  {
+    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    id: 'learn-idea-space-recording-choose',
+    label: 'Learn · Idea Space, choosing places to hide',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingChooseSurface />,
+  },
+  {
+    /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
+    id: 'learn-idea-space-dense',
+    label: 'Learn · Idea Space, ten thousand ideas',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceDenseSurface />,
   },
   {
     /* Clips before any are cut. */

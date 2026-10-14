@@ -55,6 +55,9 @@ export const learnActions: ModuleActions = {
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
   },
+  'app/learn/space/actions.ts': {
+    saveRecordingAction: none('setting'),
+  },
   'app/learn/know/actions.ts': {
     proposeGoal: none('spends'),
     approveChain: none('theirs'),
