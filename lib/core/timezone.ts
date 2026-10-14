@@ -35,6 +35,8 @@
  * somebody in New York an hour out from March to November, on interview times,
  * silently. Nobody who types "EST" means that.
  */
+
+import { canonicalTimeZone, isTimeZone } from '@/lib/core/when';
 const ALIASES: Record<string, string> = {
   et: 'America/New_York',
   est: 'America/New_York',
@@ -67,12 +69,7 @@ const ALIASES: Record<string, string> = {
 
 /** Whether the platform can actually format a date in this zone. */
 export function isValidTimeZone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-GB', { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
+  return isTimeZone(value);
 }
 
 /**
@@ -93,11 +90,7 @@ export function normalizeTimeZone(value: string | null | undefined): string | nu
 
   if (isValidTimeZone(raw)) {
     // Canonical casing, so "europe/london" and "Europe/London" are one value.
-    try {
-      return new Intl.DateTimeFormat('en-GB', { timeZone: raw }).resolvedOptions().timeZone ?? raw;
-    } catch {
-      return raw;
-    }
+    return canonicalTimeZone(raw) ?? raw;
   }
 
   return null;

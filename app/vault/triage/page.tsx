@@ -10,6 +10,7 @@ import { suggestedNotesForInbox } from '@/lib/vault/notes/related';
 import { noteHref } from '@/lib/vault/paths';
 import { QuickNoteTriage, type TriageNote } from './triage';
 import { PageColumn } from '@/components/shell/page-width';
+import { whenDate } from '@/lib/core/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,9 +83,5 @@ export default async function QuickNoteTriagePage() {
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

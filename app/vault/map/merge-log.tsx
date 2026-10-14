@@ -9,6 +9,8 @@ import type { MergeLogItem, MergeLogPage, MergeLogRow, MergeLogSide } from '@/li
 import { noteHref } from '@/lib/vault/paths';
 import { SurvivorName, UndoMergeButton } from './merge-log-controls';
 import { MERGE_NAME } from './merge-name';
+import { formatNumber } from '@/lib/money';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Every merge the map has made, with an undo on each (plan #821).
@@ -20,7 +22,8 @@ import { MERGE_NAME } from './merge-name';
  * and the model's reason for calling them one.
  */
 
-const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
+/** "14 October", the day a merge or a sweep happened. */
+const dayOf = (iso: string) => whenDate(iso, { timeZone: 'UTC', month: 'long', year: 'never' });
 
 export function MergeLog({ log }: { log: MergeLogPage }) {
   const { counts, rows, page, pages } = log;
@@ -58,8 +61,8 @@ function MergeRow({ row }: { row: MergeLogRow }) {
       <div className="flex items-start gap-3">
         <p className="min-w-0 flex-1 text-small text-ink-muted">
           {row.kind === 'theme' ? 'Themes' : 'Positions'} merged{' '}
-          {dateFormat.format(new Date(row.mergedAt))}
-          {row.undoneAt && <>, undone {dateFormat.format(new Date(row.undoneAt))}</>}
+          {dayOf(row.mergedAt)}
+          {row.undoneAt && <>, undone {dayOf(row.undoneAt)}</>}
         </p>
         {!row.undoneAt && survivorLive && <UndoMergeButton mergeId={row.id} />}
       </div>
@@ -212,5 +215,5 @@ function Pager({ page, pages }: { page: number; pages: number }) {
 }
 
 function count(n: number, one: string, many: string): string {
-  return `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+  return `${formatNumber(n)} ${n === 1 ? one : many}`;
 }

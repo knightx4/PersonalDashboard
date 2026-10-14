@@ -17,7 +17,7 @@ import { completionMoment } from '@/components/motion/complete';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/core/when';
+import { whenAt } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -226,14 +226,7 @@ function LinkedRow({
 }
 
 function formatDue(task: Task, timezone: string): string {
-  if (task.dueAt) {
-    return formatClock(task.dueAt, { timeZone: timezone, day: 'numeric', month: 'short' });
-  }
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(`${task.dueOn}T00:00:00Z`));
+  return whenAt(task.dueAt ?? `${task.dueOn}`, { timeZone: timezone });
 }
 
 /** A link to the agenda, for a section that has more than it can show. */

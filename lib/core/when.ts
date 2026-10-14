@@ -174,3 +174,195 @@ export function whenAgo(at: WhenInput, options: WhenOptions): string {
   if (diff === -1) return 'yesterday';
   return whenDay(at, options);
 }
+
+// -- plan #1957.6: zones, fixed dates and months ------------------------------
+//
+// What the other workspaces needed and the functions above do not give. The
+// zone helpers are arithmetic rather than words: they read an instant's parts
+// on the 24-hour clock, for a time input's value, a day's key or a zone's
+// offset. `whenDate`, `whenMonth` and `whenWeekday` write a date that does not
+// move with today: a byline, a heading over a calendar, a month in a list.
+
+/** The zone the browser runs in, or null where the platform will not say. */
+export function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The zone's own spelling ("europe/london" reads "Europe/London"), or null when the platform does not know it. */
+export function canonicalTimeZone(zone: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: zone }).resolvedOptions().timeZone ?? zone;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the platform can place a moment in this zone. */
+export function isTimeZone(zone: string): boolean {
+  return canonicalTimeZone(zone) !== null;
+}
+
+export interface ZoneParts {
+  year: number;
+  /** 1 to 12. */
+  month: number;
+  day: number;
+  /** 0 to 23. */
+  hour: number;
+  minute: number;
+  second: number;
+  /** 0 is Sunday, as `Date.getDay` counts. */
+  weekday: number;
+}
+
+/** The calendar and the 24-hour clock an instant reads as in a zone. */
+export function zoneParts(at: WhenInput, timeZone: string): ZoneParts {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  }).formatToParts(at instanceof Date ? at : new Date(at));
+  const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const year = pick('year');
+  const month = pick('month');
+  const day = pick('day');
+  return {
+    year,
+    month,
+    day,
+    hour: pick('hour') % 24,
+    minute: pick('minute'),
+    second: pick('second'),
+    weekday: new Date(Date.UTC(year, month - 1, day)).getUTCDay(),
+  };
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** The day an instant falls on in a zone, as `YYYY-MM-DD`: a date input's value and a day's key. */
+export function zoneDay(at: WhenInput, timeZone: string): string {
+  const p = zoneParts(at, timeZone);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+/** The clock an instant reads in a zone, as `HH:MM` on the 24-hour clock: a time input's value. */
+export function zoneClock(at: WhenInput, timeZone: string): string {
+  const p = zoneParts(at, timeZone);
+  return `${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+/** How far ahead of UTC a zone is at an instant, in milliseconds (to the whole second). */
+export function zoneOffset(at: WhenInput, timeZone: string): number {
+  const instant = (at instanceof Date ? at : new Date(at)).getTime();
+  const p = zoneParts(instant, timeZone);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - Math.floor(instant / 1000) * 1000;
+}
+
+/** A zone's offset as a picker hints it: "GMT", "GMT-4", "GMT+5:30". */
+export function zoneOffsetLabel(timeZone: string, at: WhenInput = Date.now()): string {
+  const minutes = Math.round(zoneOffset(at, timeZone) / MINUTE);
+  if (minutes === 0) return 'GMT';
+  const sign = minutes < 0 ? '-' : '+';
+  const abs = Math.abs(minutes);
+  const rest = abs % 60;
+  return `GMT${sign}${Math.floor(abs / 60)}${rest ? `:${pad2(rest)}` : ''}`;
+}
+
+const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+export interface WhenDateOptions {
+  /** The zone an instant is read in. A bare `YYYY-MM-DD` names its own day and ignores it. */
+  timeZone: string;
+  /** "Oct", the default, or "October". */
+  month?: 'short' | 'long';
+  /** The weekday before the date: "Wed 14 Oct", "Wednesday 14 October". None by default. */
+  weekday?: 'short' | 'long';
+  /** The year after it: always (the default), never, or only when it is not this year. */
+  year?: 'always' | 'never' | 'auto';
+  /** The moment "this year" is measured from, for `year: 'auto'`. */
+  now?: WhenInput;
+}
+
+/**
+ * A date that does not move with today: "14 Oct 2026", "14 October 2026",
+ * "Wednesday 14 October". For a byline, a heading over a day, or a date read
+ * as a record rather than as how near it is; `whenDay` is for the rest.
+ */
+export function whenDate(at: WhenInput, options: WhenDateOptions): string {
+  const { timeZone, month = 'short', weekday, year = 'always', now = Date.now() } = options;
+  const day = civilDay(at, timeZone);
+  const name = month === 'long' ? MONTHS_LONG[day.month - 1] : MONTHS[day.month - 1];
+  let text = `${day.day} ${name}`;
+  if (year === 'always' || (year === 'auto' && day.year !== civilDay(now, timeZone).year)) {
+    text = `${text} ${day.year}`;
+  }
+  if (!weekday) return text;
+  const dayName = weekdayOf(day);
+  return `${weekday === 'short' ? dayName.slice(0, 3) : dayName} ${text}`;
+}
+
+/** A month: "October 2026", "Oct 2026", or the name alone with `year: false`. Takes a bare `YYYY-MM` too. */
+export function whenMonth(
+  at: WhenInput,
+  options: { timeZone: string; month?: 'short' | 'long'; year?: boolean },
+): string {
+  const { timeZone, month = 'long', year = true } = options;
+  const civil =
+    typeof at === 'string' && /^\d{4}-\d{2}$/.test(at)
+      ? { year: Number(at.slice(0, 4)), month: Number(at.slice(5, 7)), day: 1 }
+      : civilDay(at, timeZone);
+  const name = month === 'long' ? MONTHS_LONG[civil.month - 1] : MONTHS[civil.month - 1];
+  return year ? `${name} ${civil.year}` : name;
+}
+
+/**
+ * Two days as one span, each part said once: "1 – 7 Sep 2026", "31 Aug – 6
+ * Sep 2026", "31 Dec 2025 – 6 Jan 2026". With `year: 'never'` the years are
+ * left off even across one: "31 Dec – 6 Jan".
+ */
+export function whenRange(
+  from: WhenInput,
+  to: WhenInput,
+  options: { timeZone: string; month?: 'short' | 'long'; year?: 'always' | 'never' },
+): string {
+  const { timeZone, month = 'short', year = 'always' } = options;
+  const a = civilDay(from, timeZone);
+  const b = civilDay(to, timeZone);
+  const names = month === 'long' ? MONTHS_LONG : MONTHS;
+  const withYear = year === 'always';
+  const sameYear = a.year === b.year;
+  const end = `${b.day} ${names[b.month - 1]}${withYear ? ` ${b.year}` : ''}`;
+  let start = String(a.day);
+  if (!sameYear || a.month !== b.month) start = `${start} ${names[a.month - 1]}`;
+  if (withYear && !sameYear) start = `${start} ${a.year}`;
+  return `${start} – ${end}`;
+}
+
+/** A weekday's name: "Wednesday", or "Wed" short. */
+export function whenWeekday(at: WhenInput, options: { timeZone: string; style?: 'short' | 'long' }): string {
+  const name = weekdayOf(civilDay(at, options.timeZone));
+  return options.style === 'short' ? name.slice(0, 3) : name;
+}

@@ -11,6 +11,8 @@
  * testable without a database or a request.
  */
 
+import { zoneClock, zoneDay, zoneOffset, zoneParts } from '@/lib/core/when';
+
 /**
  * The instant a wall clock names in a zone.
  *
@@ -28,34 +30,13 @@ export function wallClockToInstant(day: string, time: string, timezone: string):
   let instant = wanted;
 
   for (let pass = 0; pass < 2; pass += 1) {
-    const offset = offsetOf(new Date(instant), timezone);
+    const offset = zoneOffset(instant, timezone);
     const next = wanted - offset;
     if (next === instant) break;
     instant = next;
   }
 
   return new Date(instant).toISOString();
-}
-
-/** How far ahead of UTC a zone is, in milliseconds, at a given instant. */
-function offsetOf(at: Date, timezone: string): number {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(at);
-
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
-  const local = Date.parse(
-    `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`,
-  );
-
-  return local - at.getTime();
 }
 
 /**
@@ -67,13 +48,7 @@ function offsetOf(at: Date, timezone: string): number {
  * rolling over into a start that would be after its own end.
  */
 export function nextHourSlot(now: Date, timezone: string): { start: string; end: string } {
-  const hour = Number(
-    new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      hour: '2-digit',
-      hourCycle: 'h23',
-    }).format(now),
-  );
+  const { hour } = zoneParts(now, timezone);
 
   const start = Math.min(hour + 1, 23);
   const clock = (value: number) => `${String(value).padStart(2, '0')}:00`;
@@ -90,33 +65,16 @@ export function nextHourSlot(now: Date, timezone: string): { start: string; end:
  * date input seeded from UTC would open on the wrong day and quietly move it
  * a day back the moment anything else was changed.
  *
- * `formatToParts` rather than arithmetic on the Date, because the browser's
- * own zone is not the one being asked about.
+ * Read through when.ts rather than arithmetic on the Date, because the
+ * browser's own zone is not the one being asked about.
  */
-function partsIn(iso: string, timezone: string): Record<string, string> {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date(iso));
-
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
 
 /** `YYYY-MM-DD`, as a date input wants it. */
 export function dayIn(iso: string, timezone: string): string {
-  const part = partsIn(iso, timezone);
-  return `${part.year}-${part.month}-${part.day}`;
+  return zoneDay(iso, timezone);
 }
 
 /** `HH:MM`, as a time input wants it. */
 export function clockIn(iso: string, timezone: string): string {
-  const part = partsIn(iso, timezone);
-  // Midnight comes back as "24" from some ICU versions in en-GB with
-  // hour12: false, which no time input will accept.
-  return `${part.hour === '24' ? '00' : part.hour}:${part.minute}`;
+  return zoneClock(iso, timezone);
 }

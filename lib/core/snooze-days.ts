@@ -5,6 +5,8 @@
  * clock; the write is in lib/core/inbox-snooze-store.ts.
  */
 
+import { zoneOffset } from '@/lib/core/when';
+
 export const SNOOZE_CHOICES = ['tomorrow', 'next_week'] as const;
 export type SnoozeChoice = (typeof SNOOZE_CHOICES)[number];
 
@@ -38,26 +40,9 @@ export function snoozeDay(choice: string, today: string): string | null {
   return choice > today ? choice : null;
 }
 
-/** The zone's offset from UTC at an instant, in milliseconds. */
-function offsetAt(instant: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-  }).formatToParts(new Date(instant));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-  return asUtc - Math.floor(instant / 1000) * 1000;
-}
-
 /** The instant a calendar day begins in a zone: when a snooze to that day ends. */
 export function dayStartIn(day: string, timeZone: string): Date {
   const midnightUtc = Date.parse(`${day}T00:00:00Z`);
-  const first = midnightUtc - offsetAt(midnightUtc, timeZone);
-  return new Date(midnightUtc - offsetAt(first, timeZone));
+  const first = midnightUtc - zoneOffset(midnightUtc, timeZone);
+  return new Date(midnightUtc - zoneOffset(first, timeZone));
 }

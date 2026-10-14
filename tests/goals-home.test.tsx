@@ -289,7 +289,7 @@ describe('the Goals home', () => {
     const others = html.slice(html.indexOf('Other goals'));
     expect(others).toContain('Learn Spanish');
     expect(others).toContain('Waiting on you');
-    expect(others).toContain('Next: Choose avalanche or snowball, 28 Sept');
+    expect(others).toContain('Next: Choose avalanche or snowball, 28 Sep');
     expect(others).not.toContain('as of');
     const stale = render({
       goals: [dueOn(goal), { ...waiting, current: false }],

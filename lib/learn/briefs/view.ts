@@ -28,6 +28,7 @@ import {
   type BriefStatus,
   type FoundKind,
 } from './model';
+import { whenDate } from '@/lib/core/when';
 
 /** A reading the brief found, with what the quote popover says about it. */
 export type BriefSource = {
@@ -165,7 +166,7 @@ export function sourceLine(source: BriefSource): string {
 }
 
 export function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return whenDate(iso, { timeZone: 'UTC' });
 }
 
 /** The line under a brief in Learn's list. */

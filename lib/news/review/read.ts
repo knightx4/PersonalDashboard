@@ -1,5 +1,5 @@
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { formatClock } from '@/lib/core/when';
+import { formatClock, whenDate } from '@/lib/core/when';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import type { ReviewItem } from './choose';
@@ -97,22 +97,12 @@ export function reviewHref(day: string | null, latest: string | null): string {
 
 /** "Tuesday 6 October", with the year when it is not this year's. */
 export function reviewDayLabel(day: string, now: Date = new Date()): string {
-  const date = new Date(`${day}T12:00:00Z`);
-  // Put together from the parts, since ICU versions differ on a comma after the weekday.
-  const part = (options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(date);
-  const label = `${part({ weekday: 'long' })} ${date.getUTCDate()} ${part({ month: 'long' })}`;
-  return date.getUTCFullYear() === now.getUTCFullYear()
-    ? label
-    : `${label} ${date.getUTCFullYear()}`;
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long', year: 'auto', now });
 }
 
 /** "Mon 5 Oct", for the arrows. */
 export function reviewDayShort(day: string): string {
-  const date = new Date(`${day}T12:00:00Z`);
-  const part = (options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(date);
-  return `${part({ weekday: 'short' })} ${date.getUTCDate()} ${part({ month: 'short' })}`;
+  return whenDate(day, { timeZone: 'UTC', weekday: 'short', year: 'never' });
 }
 
 /** The hour the review is written, as the page says it: "8:00 PM". */

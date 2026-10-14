@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
+import { whenDate } from '@/lib/core/when';
 
 const STATUS_TONES: Record<string, ChipTone> = {
   ordered: 'accent',
@@ -18,14 +19,7 @@ const STATUS_TONES: Record<string, ChipTone> = {
 
 function formatOrderDate(iso: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }
 
 function statusLabel(status: string): string {

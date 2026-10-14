@@ -9,6 +9,7 @@ import {
   type CalendarDay,
   type CalendarEntry,
 } from '@/lib/todo/calendar/month';
+import { zoneParts } from '@/lib/core/when';
 
 /**
  * A day, a week or a month of it -- the three scopes a calendar is read at.
@@ -117,12 +118,7 @@ export function buildRange(
 
 /** The hour of an instant, where the reader is standing. */
 export function hourIn(iso: string, timezone: string): number {
-  const hour = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(iso));
-  return Number(hour);
+  return zoneParts(iso, timezone).hour;
 }
 
 /**
