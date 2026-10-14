@@ -2442,3 +2442,52 @@ describe('account deletion', () => {
     expect(Number(left[0].n)).toBe(0);
   });
 });
+
+describe('vault notes as evidence for ideas (plan #2006.3)', () => {
+  // learn 0122_vault_note_evidence.sql. The daily run asks vault_note_matches
+  // for each idea's nearest notes at 0.6 or above; the person cannot call it.
+  let ideaId = '';
+  let noteId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Note evidence subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, embedding, embedding_model)
+      values (${userA}, ${subject.id}, 'Written-about idea', 'Close to the note.', 'Written by hand for this test.',
+              (array_fill(0.0::real, array[1023]) || array[1.0::real])::extensions.vector, 'voyage-4-lite')
+      returning id`;
+    ideaId = idea.id;
+    const [connection] = await admin<{ id: string }[]>`
+      insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userA}, 'a', 'evidence-vault', 'main', 'encrypted') returning id`;
+    const notes = await admin<{ id: string; path: string }[]>`
+      insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
+      values
+        (${userA}, ${connection.id}, 'Me/Close.md', 'Close', 'A note about the idea, long enough.', 'sha-close', 40),
+        (${userA}, ${connection.id}, 'Me/Far.md', 'Far', 'A note about something else entirely.', 'sha-far', 40)
+      returning id, path`;
+    noteId = notes.find((note) => note.path === 'Me/Close.md')!.id;
+    const farId = notes.find((note) => note.path === 'Me/Far.md')!.id;
+    await admin`
+      insert into obsidian.note_embeddings (note_id, user_id, embedding, embedding_model, body_hash)
+      values
+        (${noteId}, ${userA}, (array_fill(0.01::real, array[1023]) || array[1.0::real])::extensions.vector,
+         'voyage-4-lite', 'hash-close'),
+        (${farId}, ${userA}, (array[1.0::real] || array_fill(0.0::real, array[1023]))::extensions.vector,
+         'voyage-4-lite', 'hash-far')`;
+  });
+
+  it('returns the notes near an idea at the threshold or above, and nothing else', async () => {
+    const rows = await admin<{ concept_id: string; note_id: string; title: string }[]>`
+      select concept_id, note_id, title
+      from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`;
+    expect(rows).toEqual([{ concept_id: ideaId, note_id: noteId, title: 'Close' }]);
+  });
+
+  it('is not open to the person', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`select * from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`),
+    ).rejects.toThrow();
+  });
+});
