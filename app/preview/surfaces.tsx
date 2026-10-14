@@ -290,6 +290,7 @@ import {
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
+  PostsSendSurface,
   PostsSurface,
   PostsWriteSurface,
   PostsXSurface,
@@ -2710,8 +2711,10 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -5559,6 +5562,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsMatchedSurface />,
   },
   {
+    /* Post pressed once (plan #2072): the confirm on a draft with a link,
+     * warning about X's URL rate, and on a thread whose first post is
+     * already up, sending the rest. */
+    id: 'dev-posts-send',
+    label: 'Dev · Posts, posting to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsSendSurface />,
+  },
+  {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
      * header, briefs, Today and Updates in the main column, and Watching,
      * what Dash did, the week and the workspaces in the rail. Inside the
@@ -5838,7 +5851,8 @@ export const SURFACES: readonly Surface[] = [
           account="preview"
           module="news"
           sections={[
-            { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
+            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
             { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },

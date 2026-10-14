@@ -10,6 +10,7 @@ import {
   Bug,
   Building2,
   FileText,
+  FolderInput,
   Fingerprint,
   Flag,
   GalleryHorizontalEnd,
@@ -134,6 +135,9 @@ export const NAV_ICONS = {
   calendar: CalendarDays,
   tasks: List,
   notes: StickyNote,
+  // The vault's quick notes, filed out of the Inbox folder into the vault
+  // (plan #1937.6). Not Inbox, which is every workspace's second section.
+  triage: FolderInput,
   // The vault's map: subjects joined to the positions and notes under them.
   // Not Map, which is the plan's, and not Network, which is Learn's knowledge
   // graph -- the map claims nothing about what you know.
