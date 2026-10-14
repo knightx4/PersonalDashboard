@@ -11,7 +11,7 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The write tools, by name, which is the kind each change is kept under. */
-export const SHOPPING_CHANGE_KINDS = ['change_item', 'item_lists', 'add_items'] as const;
+export const SHOPPING_CHANGE_KINDS = ['change_item', 'item_lists', 'add_items', 'change_saved_item'] as const;
 
 export type ShoppingChangeKind = (typeof SHOPPING_CHANGE_KINDS)[number];
 

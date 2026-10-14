@@ -67,6 +67,7 @@ describe('runConnectorWrite', () => {
       'change_item',
       'item_lists',
       'add_items',
+      'change_saved_item',
       ...VAULT_CHANGE_KINDS,
     ]);
   });
