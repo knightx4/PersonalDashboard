@@ -186,10 +186,10 @@ export const threadsSource: AgendaSource = {
   async defer(ctx, key) {
     const until = new Date(ctx.now);
     until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-    await dismiss(ctx.userId, 'thread', key, until);
+    await dismiss(ctx.userId, 'thread', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
-    await dismiss(ctx.userId, 'thread', key, null);
+    await dismiss(ctx.userId, 'thread', key, null, ctx.clients);
   },
 };

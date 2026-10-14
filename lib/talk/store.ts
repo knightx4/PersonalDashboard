@@ -124,10 +124,11 @@ export async function appendTurns(
         user_id: userId,
         role: turn.role,
         body: turn.body,
-        // Only Dash's turns carry these (conversation_turns_*_ck), and an
-        // empty list is stored as nothing.
+        // Only Dash's turns carry tool calls (conversation_turns_tool_calls_ck).
+        // Citations are an answer's rows, or on a question the rows the
+        // person added with @ (plan #1899.5). An empty list is stored as nothing.
         ...(turn.role === 'assistant' && turn.toolCalls?.length ? { tool_calls: turn.toolCalls } : {}),
-        ...(turn.role === 'assistant' && turn.citations?.length ? { citations: turn.citations } : {}),
+        ...(turn.citations?.length ? { citations: turn.citations } : {}),
       })),
     )
     .select(TURN_SELECT);

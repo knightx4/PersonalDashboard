@@ -37,6 +37,13 @@ export const DEFAULT_EMBEDDING_MODEL: EmbeddingModel = 'voyage-4-lite';
 /** The width `learn.catalogue_segments.embedding` commits to. */
 export const EMBEDDING_DIMENSIONS = 1024;
 
+/**
+ * The widths the Voyage 4 models can return. A narrower vector is the head of
+ * the wider one, so 512 is for a table where size matters more than the last
+ * few points of recall: the ten thousand Wikipedia topics (plan #2016.1).
+ */
+export type EmbeddingDimensions = 256 | 512 | 1024 | 2048;
+
 const ENDPOINT = 'https://api.voyageai.com/v1/embeddings';
 const TIMEOUT_MS = 30_000;
 
@@ -55,6 +62,8 @@ export type EmbeddingRequest = {
   texts: string[];
   model: EmbeddingModel;
   inputType: EmbeddingInputType;
+  /** EMBEDDING_DIMENSIONS unless the column the vectors go into is narrower. */
+  dimensions?: EmbeddingDimensions;
 };
 
 export type EmbeddingBatch = {
@@ -136,7 +145,11 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
  * vector after the gap with the wrong segment, which is the failure that would
  * be hardest to see and impossible to undo.
  */
-export function parseEmbeddingResponse(body: unknown, expected: number): EmbeddingResult {
+export function parseEmbeddingResponse(
+  body: unknown,
+  expected: number,
+  dimensions: EmbeddingDimensions = EMBEDDING_DIMENSIONS,
+): EmbeddingResult {
   const parsed = responseSchema.safeParse(body);
   if (!parsed.success) return fail('malformed', 'response did not have the documented shape');
 
@@ -154,10 +167,10 @@ export function parseEmbeddingResponse(body: unknown, expected: number): Embeddi
     if (row.index >= expected || vectors[row.index] !== undefined) {
       return fail('malformed', `vector index ${row.index} is out of range or repeated`, { tokens });
     }
-    if (row.embedding.length !== EMBEDDING_DIMENSIONS) {
+    if (row.embedding.length !== dimensions) {
       return fail(
         'malformed',
-        `vector ${row.index} has ${row.embedding.length} dimensions, not ${EMBEDDING_DIMENSIONS}`,
+        `vector ${row.index} has ${row.embedding.length} dimensions, not ${dimensions}`,
         { tokens },
       );
     }
@@ -180,7 +193,7 @@ export function embeddingRequestBody(request: EmbeddingRequest): Record<string, 
     input: request.texts,
     model: request.model,
     input_type: request.inputType,
-    output_dimension: EMBEDDING_DIMENSIONS,
+    output_dimension: request.dimensions ?? EMBEDDING_DIMENSIONS,
     // A section longer than the context window is cut rather than refused,
     // which is the right answer for a sweep: the head of a long article
     // section is still the best short statement of what it is about.
@@ -241,6 +254,6 @@ export function voyageClient(
       return fail('malformed', 'response was not JSON');
     }
 
-    return parseEmbeddingResponse(body, request.texts.length);
+    return parseEmbeddingResponse(body, request.texts.length, request.dimensions);
   };
 }

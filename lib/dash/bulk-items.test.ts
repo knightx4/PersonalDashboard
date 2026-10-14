@@ -181,6 +181,64 @@ describe('change_items', () => {
     expect(tables['public.item_groups']).toHaveLength(0);
   });
 
+  it('marks items as given away, and Undo puts them back as owned (plan #1894.5.1)', async () => {
+    for (const id of [KINDLE, LAMP, SOLD]) seen.add(`public.inventory_items:${id}`);
+    const result = ok(await apply({ change: 'dispose', disposal_method: 'gifted', item_refs: [KINDLE, LAMP, SOLD] }));
+    expect(itemRow(KINDLE)).toMatchObject({ status: 'gifted', disposal_method: 'gifted', disposed_at: '2026-10-08' });
+    expect(itemRow(SOLD).status).toBe('sold');
+    expect(result.summary).toBe(
+      'Dash marked 2 items as given away: Kindle Paperwhite and Desk lamp. 1 was left as it was, already set that way or no longer owned.',
+    );
+    const kept = await keep(result);
+    expect(changeSentence(kept, true)).toBe('Marked 2 items as given away: Kindle Paperwhite and Desk lamp');
+
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(itemRow(KINDLE)).toMatchObject({ status: 'owned', disposal_method: null, disposed_at: null });
+    expect(itemRow(LAMP).status).toBe('owned');
+  });
+
+  it('takes proceeds for one item sold, and refuses them over many', async () => {
+    for (const id of [KINDLE, LAMP]) seen.add(`public.inventory_items:${id}`);
+    const many = await apply({ change: 'dispose', disposal_method: 'sold', proceeds: 40, item_refs: [KINDLE, LAMP] });
+    expect(!many.ok && many.error).toContain('one item at a time');
+    ok(await apply({ change: 'dispose', disposal_method: 'sold', proceeds: 40, item_refs: [KINDLE] }));
+    expect(itemRow(KINDLE)).toMatchObject({ status: 'sold', disposal_proceeds_cents: 4000 });
+    const bad = await apply({ change: 'dispose', disposal_method: 'burned', item_refs: [LAMP] });
+    expect(!bad.ok && bad.error).toContain('disposal_method must be one of');
+  });
+
+  it('ungroups every copy in the group, clears the key it claimed, and Undo puts both back', async () => {
+    const GROUP = '00000000-0000-4000-8000-00000000a001';
+    tables['public.item_groups'].push({ id: GROUP, user_id: ME, name: 'Kindle', group_key: 'kindle' });
+    itemRow(KINDLE).group_id = GROUP;
+    itemRow(LAMP).group_id = GROUP;
+    seen.add(`public.inventory_items:${KINDLE}`);
+
+    const result = ok(await apply({ change: 'ungroup', item_refs: [KINDLE] }));
+    expect([itemRow(KINDLE).group_id, itemRow(LAMP).group_id]).toEqual([null, null]);
+    // Kept, keyless, so nothing draws the copies back in and Undo has it to put them into.
+    expect(tables['public.item_groups']).toMatchObject([{ id: GROUP, group_key: null }]);
+    expect(result.summary).toBe(
+      'Dash ungrouped 2 copies, so they stack by their own details again: Kindle Paperwhite and Desk lamp.',
+    );
+
+    expect((await undoChange(deps(), (await keep(result)).id)).ok).toBe(true);
+    expect([itemRow(KINDLE).group_id, itemRow(LAMP).group_id]).toEqual([GROUP, GROUP]);
+    expect(tables['public.item_groups'][0].group_key).toBe('kindle');
+  });
+
+  it('separates a copy into a group of its own, and Undo removes the group it made', async () => {
+    seen.add(`public.inventory_items:${MUG}`);
+    const result = ok(await apply({ change: 'separate', item_refs: [MUG] }));
+    expect(tables['public.item_groups']).toMatchObject([{ name: 'Blue mug', group_key: null }]);
+    expect(itemRow(MUG).group_id).toBe(tables['public.item_groups'][0].id);
+    expect(result.summary).toBe('Dash separated 1 copy from its stack: Blue mug.');
+
+    expect((await undoChange(deps(), (await keep(result)).id)).ok).toBe(true);
+    expect(itemRow(MUG).group_id).toBeNull();
+    expect(tables['public.item_groups']).toHaveLength(0);
+  });
+
   it('refuses rows that are not the person\'s, and changes nothing', async () => {
     for (const id of [KINDLE, THEIRS]) seen.add(`public.inventory_items:${id}`);
     const result = await apply({ change: 'for_sale', item_refs: [KINDLE, THEIRS] });

@@ -11,7 +11,10 @@ import {
 } from '@/lib/ask/changes';
 import { readSubject } from '@/lib/core/dash-actions';
 import { executeProposal } from '@/lib/ask/propose';
-import { executeAskTool } from '@/lib/ask/tools';
+import { executeAskTool, lookupInScope } from '@/lib/ask/tools';
+import { HIT_TABLES } from '@/lib/ask/lookups';
+import type { ModuleId } from '@/lib/modules';
+import type { AskMention } from './ask-input';
 import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
 import { resolveFilteredList } from '@/lib/ask/filtered-list';
@@ -47,7 +50,7 @@ import { appendTurns, listAskChats, listConversations, loadConversation, startAs
 import type { AskChat } from './ask-chats';
 import { chatCostMicros, chatSpan } from './chat-trail';
 import { RECALL_OPERATION } from '@/lib/memory/search';
-import type { TalkTurn } from './talk';
+import type { TalkCitation, TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
 
@@ -82,6 +85,14 @@ export async function askDashInRequest(input: {
   onLookup?: (event: AskLookupEvent) => void;
   /** Hears the answer's text as it is written (plan #1902): the streaming route listens. */
   onText?: (piece: string) => void;
+  /** Hears the question once it is kept (plan #1899.5): the streaming route tells the browser. */
+  onAsked?: Parameters<typeof askDash>[0]['onAsked'];
+  /** Aborts when the person stops the answer (plan #1899.5); what was written is kept. */
+  signal?: AbortSignal;
+  /** Rows added with @, already checked (parseAskMentions). */
+  mentions?: readonly AskMention[];
+  /** The workspace the lookups are kept to, already checked; null for every one. */
+  scope?: ModuleId | null;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -97,6 +108,11 @@ export async function askDashInRequest(input: {
   // Dash is offered the hand-off only when the backup routine can be started.
   const backup = dashBackupRoutine();
   const canHandOff = Boolean(backup.id && backup.token);
+  // A question kept to one workspace (plan #1899.5) looks only there: its
+  // lookups run as though that were the only workspace switched on, and
+  // one outside it is refused. Writes and the page keep the full context.
+  const scope = input.scope && settings.enabledModules.includes(input.scope) ? input.scope : null;
+  const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
 
   return askDash(
     {
@@ -105,7 +121,10 @@ export async function askDashInRequest(input: {
       files: input.files,
       page,
       today,
-      execute: (name, args) => executeAskTool(name, args, ctx),
+      execute: (name, args) =>
+        scope && !lookupInScope(name, scope)
+          ? Promise.resolve({ ok: false as const, error: 'That lookup is outside the workspace this question is kept to.' })
+          : executeAskTool(name, args, lookIn),
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
@@ -117,6 +136,10 @@ export async function askDashInRequest(input: {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
+      onAsked: input.onAsked,
+      signal: input.signal,
+      mentions: mentionCitations(input.mentions ?? []),
+      scope,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -160,6 +183,11 @@ export async function askDashInRequest(input: {
         : {}),
     },
   );
+}
+
+/** The rows added with @ as the question keeps them: an answer's citation shape, by search's tables. */
+export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[] {
+  return mentions.map((m) => ({ table: HIT_TABLES[m.kind], ref: m.id, title: m.title, href: m.href }));
 }
 
 /**

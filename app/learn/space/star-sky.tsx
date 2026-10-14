@@ -83,6 +83,8 @@ export type Star = {
   neighbours: string[];
   /** Not written yet on the day the timeline shows (plan #1997.8), so not drawn. */
   absent?: boolean;
+  /** What backs it, "2 notes and a course", or null with no evidence (plan #2006.6). */
+  backedBy?: string | null;
 };
 
 /** A name for the zoomed-out sky: a place, or a domain while no place is named. */
@@ -1121,6 +1123,7 @@ function StarCard({
   const halves = row ? halvesOn(row, new Date(asOf)) : null;
   const facts: [string, string][] = [['State', STATE_MARK_LABEL[markOf(star.state)]]];
   if (row && star.state !== 'unknown') facts.push(['Evidence', EVIDENCE_TEXT[row.established]]);
+  if (star.backedBy) facts.push(['Backed by', star.backedBy]);
   if (star.strength > 0) facts.push(['Strength', `${Math.round(star.strength * 100)}%`]);
   if (setAt) facts.push(['Last shown', DATE.format(setAt)]);
   if (halves) facts.push(['Next halves', DATE.format(halves)]);

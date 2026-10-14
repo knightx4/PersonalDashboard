@@ -17,6 +17,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { agendaLookup } from './agenda';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
@@ -48,6 +49,7 @@ export const ASK_TOOL_NAMES = [
   'spend_by_merchant',
   'job_applications',
   'todos',
+  'agenda',
   'goal_status',
   'vault_notes',
   'note_positions',
@@ -210,6 +212,18 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       properties: {
         from: { ...DATE_FIELD, description: 'First day, YYYY-MM-DD, inclusive.' },
         to: { ...DATE_FIELD, description: 'Last day, YYYY-MM-DD, inclusive. Defaults to today.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'agenda',
+    description:
+      "The rows other workspaces have put on the person's Todo agenda: job reminders, goal steps they sent to Todo, drafts waiting to be sent, return deadlines, bills and the like, as the Todo page shows them now. Each says in can which of finish, put_off and dismiss it takes. Use it to find the agenda_source and agenda_key that change_agenda_row needs; their own todos are in todos and search.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        words: { type: 'string', description: 'Only rows whose title or detail holds all of these words.' },
       },
       additionalProperties: false,
     },
@@ -413,6 +427,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
+  agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },
@@ -439,6 +454,23 @@ async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Pr
   const parsed = parseChart(input);
   if (!parsed.ok) return parsed;
   return { ok: true, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
+}
+
+/**
+ * Whether a lookup is offered when the person keeps a question to one
+ * workspace (plan #1899.5). A lookup bound to a workspace is offered in its
+ * own. The ones that range over every workspace (search, recall, open_row,
+ * list_rows) are offered too, since the context they run with is narrowed to
+ * that workspace and they leave out the rest themselves. Mail belongs to no
+ * workspace and the Dev lookups only to Dev, so neither is offered elsewhere.
+ * A chart reads nothing and is always offered.
+ */
+export function lookupInScope(name: string, scope: ModuleId): boolean {
+  if (!isAskToolName(name)) return true;
+  if (name === 'search_mail' || name === 'read_mail') return false;
+  if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text') return scope === 'dev';
+  const { module } = LOOKUPS[name];
+  return module === null || module === scope;
 }
 
 export function isAskToolName(name: string): name is AskToolName {

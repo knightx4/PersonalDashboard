@@ -29,7 +29,18 @@ import { isAskPath, roughPageName } from '@/lib/ask/page-name';
 import type { AskListFilter, AskRows } from '@/lib/ask/list-filter';
 import type { AskDashResult } from '@/lib/dash/ask';
 import type { DashChange } from '@/lib/talk/changes';
-import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
+import {
+  heardLookup,
+  readAskStream,
+  STREAM_CUT,
+  type AskedWire,
+  type LookupLine,
+  type LookupWire,
+} from '@/lib/talk/lookups';
+import type { AskMention } from '@/lib/talk/ask-input';
+import type { ModuleId } from '@/lib/modules';
+import type { SearchHit } from '@/lib/search/sources';
+import { useAskBox, type AskBoxStart } from '@/components/talk/ask-box';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -71,6 +82,12 @@ import { Tooltip } from '@/components/ui/tooltip';
  */
 
 /**
+ * What else goes with a question (plan #1899.5): the signal that stops it,
+ * the rows added with @, and the workspace its lookups are kept to.
+ */
+export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+
+/**
  * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
@@ -79,7 +96,8 @@ export type AskSource = ChangePresses & {
    * Ask, and hear each lookup as it starts and finishes (plan #1438) and
    * each piece of the answer as it is written (plan #1902). A source that
    * cannot say either ignores the listener, and the thread shows the waiting
-   * line until the answer lands.
+   * line until the answer lands. When `more.signal` aborts, it resolves with
+   * the question and the answer as kept when it was stopped (plan #1899.5).
    */
   ask: (
     question: string,
@@ -89,6 +107,7 @@ export type AskSource = ChangePresses & {
     files?: UploadedAttachment[],
     list?: AskListFilter | null,
     onText?: (piece: string) => void,
+    more?: AskMore,
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
@@ -113,15 +132,22 @@ async function askLive(
   files?: UploadedAttachment[],
   list: AskListFilter | null = null,
   onText?: (piece: string) => void,
+  more: AskMore = {},
 ): Promise<AskDashResult> {
+  const { signal, rows, scope } = more;
+  // The question as the route kept it, heard before Dash answers: what a
+  // stopped answer is found again by (plan #1899.5).
+  let asked: AskedWire | null = null;
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list }),
+      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
+      signal,
     });
   } catch {
+    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   if (response.status === 401) return { turns: [], error: 'You are signed out. Sign in again to ask Dash.' };
@@ -129,14 +155,56 @@ async function askLive(
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   try {
-    return await readAskStream(
+    const result = await readAskStream(
       response.body,
       (lookup) => onLookup?.(lookup),
       (piece) => onText?.(piece),
+      (heard) => {
+        asked = heard;
+      },
     );
+    if (signal?.aborted && result.error === STREAM_CUT) return keptWhenStopped(asked);
+    return result;
   } catch {
+    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: STREAM_CUT };
   }
+}
+
+/** How long a stopped question is looked for: the route keeps it a moment after the stop. */
+const STOPPED_LOOKS = 10;
+const STOPPED_LOOK_MS = 400;
+
+/**
+ * The question and its answer as the route kept them after Stop (plan
+ * #1899.5). Stopping cuts the stream, so the result line never arrives; the
+ * conversation the `asked` line named is read back until the answer is in
+ * it. A question stopped before it was kept comes back with no turns, which
+ * puts the words back in the box.
+ */
+async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> {
+  if (!asked) return { turns: [], error: 'Stopped before Dash had your question.' };
+  const question = asked.turns.find((turn) => turn.role === 'user');
+  for (let look = 0; look < STOPPED_LOOKS; look++) {
+    await new Promise((resolve) => setTimeout(resolve, STOPPED_LOOK_MS));
+    const opened = await openAskQuestion(asked.conversation.ref).catch(() => null);
+    if (!opened || opened.error) continue;
+    const at = question ? opened.turns.findIndex((turn) => turn.id === question.id) : -1;
+    const since = at >= 0 ? opened.turns.slice(at) : [];
+    if (!since.some((turn) => turn.role === 'assistant')) continue;
+    const ids = new Set(since.map((turn) => turn.id));
+    return {
+      conversation: asked.conversation,
+      turns: since,
+      stop: 'stopped',
+      changes: opened.changes.filter((change) => change.turnId && ids.has(change.turnId)),
+    };
+  }
+  return {
+    conversation: asked.conversation,
+    turns: asked.turns,
+    error: 'Stopped. What Dash had written is being kept; reopen this chat in a moment to read it.',
+  };
 }
 
 const ACTIONS: AskSource = {
@@ -159,6 +227,12 @@ type AskDashHandle = {
    */
   open: (question?: string, rows?: AskRows) => void;
   source: AskSource;
+  /** Whose rows @ in the box searches (plan #1899.5); absent, @ offers none. */
+  account?: string;
+  /** The workspaces the box's scope chip and commands offer. */
+  workspaces?: readonly ModuleId[];
+  /** For the gallery: the rows @ searches in place of the account's. */
+  searchHits?: readonly SearchHit[];
 };
 
 const AskDashContext = createContext<AskDashHandle | null>(null);
@@ -181,11 +255,14 @@ type Session = { key: number; ask?: string; rows?: AskRows };
  * can wrap the whole shell in one fed with fixtures and the shell's own
  * provider leaves the job to it.
  */
+type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits'>;
+
 export function AskDashProvider({
   source,
   page,
   children,
-}: {
+  ...box
+}: AskDashBox & {
   source?: AskSource;
   /** The address the sheet treats as the page, for the gallery; the real one otherwise. */
   page?: string;
@@ -194,7 +271,7 @@ export function AskDashProvider({
   const outer = useContext(AskDashContext);
   if (outer) return <>{children}</>;
   return (
-    <AskDashRoot source={source ?? ACTIONS} page={page}>
+    <AskDashRoot source={source ?? ACTIONS} page={page} {...box}>
       {children}
     </AskDashRoot>
   );
@@ -204,7 +281,10 @@ function AskDashRoot({
   source,
   page,
   children,
-}: {
+  account,
+  workspaces,
+  searchHits,
+}: AskDashBox & {
   source: AskSource;
   page?: string;
   children: React.ReactNode;
@@ -217,7 +297,10 @@ function AskDashRoot({
     setSession({ key: opened.current, ask: ask || undefined, rows });
   }, []);
   const close = useCallback(() => setSession(null), []);
-  const handle = useMemo<AskDashHandle>(() => ({ open, source }), [open, source]);
+  const handle = useMemo<AskDashHandle>(
+    () => ({ open, source, account, workspaces, searchHits }),
+    [open, source, account, workspaces, searchHits],
+  );
 
   // A link in an answer goes somewhere else in the app, and the sheet should
   // not stay over the page it opened.
@@ -278,12 +361,14 @@ export function useAskSend(
   onLookup?: (lookup: LookupWire) => void,
   list: AskListFilter | null = null,
   onText?: (piece: string) => void,
+  /** What else goes with each question as it is sent: its stop signal, the rows added with @ and the scope (plan #1899.5). */
+  more?: () => AskMore,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, onText, page, list });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list };
+    heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more };
   });
   return useCallback<TalkSend>(async (body, files) => {
     const result = await source.ask(
@@ -294,6 +379,7 @@ export function useAskSend(
       files,
       heard.current.list,
       (piece) => heard.current.onText?.(piece),
+      heard.current.more?.(),
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -330,6 +416,7 @@ export function AskThread({
   onConversation,
   onSend,
   onAnswered,
+  boxStart,
   ...thread
 }: {
   id: string;
@@ -356,8 +443,20 @@ export function AskThread({
   ask?: string;
   /** For the preview gallery: the box opens with these words in it. */
   initialDraft?: string;
+  /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
+  boxStart?: AskBoxStart;
 }) {
-  const source = useAskDash()?.source ?? ACTIONS;
+  const handle = useAskDash();
+  const source = handle?.source ?? ACTIONS;
+  // The question on its way, which Stop ends (plan #1899.5).
+  const running = useRef<AbortController | null>(null);
+  // @ rows, / commands and the scope chip in the box (plan #1899.5).
+  const box = useAskBox({
+    account: handle?.account,
+    workspaces: handle?.workspaces,
+    fixtureHits: handle?.searchHits,
+    start: boxStart,
+  });
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
@@ -380,6 +479,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
+    () => ({ ...box.take(), signal: running.current?.signal }),
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -409,12 +509,20 @@ export function AskThread({
           align="end"
         />
       )}
-      send={(body, files) => {
+      send={async (body, files) => {
         onSend?.();
         setLive([]);
         setWritten('');
-        return send(body, files).finally(() => onAnswered?.());
+        const controller = new AbortController();
+        running.current = controller;
+        const result = await send(body, files).finally(() => onAnswered?.());
+        if (running.current === controller) running.current = null;
+        // A question that was not kept goes back in the box, and its rows with it.
+        if (!result.turns?.length) box.restore();
+        return result;
       }}
+      onStop={() => running.current?.abort()}
+      {...box.thread}
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}

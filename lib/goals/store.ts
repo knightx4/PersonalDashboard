@@ -118,9 +118,12 @@ export async function insertArea(
   userId: string,
   name: string,
 ): Promise<string> {
+  // Named by user as well as by RLS: the connector writes on a service-role
+  // client (plan #1894.3), which sees every account's areas.
   const { data: rows, error: readError } = await client
     .from('areas')
     .select('position')
+    .eq('user_id', userId)
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
   const position = nextPosition((rows ?? []).map((row) => row.position as number));

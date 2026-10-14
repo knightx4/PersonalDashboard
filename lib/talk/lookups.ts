@@ -1,9 +1,14 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
-import type { TalkToolCall } from './talk';
+import type { TalkToolCall, TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 
 /**
@@ -46,7 +51,14 @@ export type LookupWire = {
  * answer's text as Dash writes it (plan #1902), each following the last, or
  * the result, which carries the answer as kept.
  */
-export type AskStreamLine = { lookup: LookupWire } | { text: string } | { result: AskDashResult };
+/** The question as kept, sent before Dash is asked (plan #1899.5), so a stopped answer can be found again. */
+export type AskedWire = { conversation: { ref: string; title: string | null }; turns: TalkTurn[] };
+
+export type AskStreamLine =
+  | { asked: AskedWire }
+  | { lookup: LookupWire }
+  | { text: string }
+  | { result: AskDashResult };
 
 /**
  * The write tools (lib/dash/writes.ts, plan #1440), named here because this
@@ -71,6 +83,11 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...LEARN_CHANGE_KINDS,
   ...TODO_CHANGE_KINDS,
   ...YOU_CHANGE_KINDS,
+  ...NEWS_CHANGE_KINDS,
+  ...GOALS_CHANGE_KINDS,
+  ...SHOPPING_CHANGE_KINDS,
+  ...VAULT_CHANGE_KINDS,
+  ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
 ];
 
@@ -128,6 +145,8 @@ export function lookupLabel(name: string, input: unknown): string {
       return 'Checking job applications';
     case 'todos':
       return 'Checking todos';
+    case 'agenda':
+      return 'Checking the Todo agenda';
     case 'goal_status':
       return 'Checking goals';
     case 'vault_notes': {
@@ -245,6 +264,7 @@ export async function readAskStream(
   body: ReadableStream<Uint8Array>,
   onLookup: (wire: LookupWire) => void,
   onText?: (piece: string) => void,
+  onAsked?: (asked: AskedWire) => void,
 ): Promise<AskDashResult> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -264,6 +284,7 @@ export async function readAskStream(
       try {
         if ('lookup' in parsed) onLookup(parsed.lookup);
         else if ('text' in parsed && typeof parsed.text === 'string') onText?.(parsed.text);
+        else if ('asked' in parsed) onAsked?.(parsed.asked);
       } catch {
         // A listener that throws must not lose the answer.
       }

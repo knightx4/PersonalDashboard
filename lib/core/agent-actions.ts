@@ -1,4 +1,4 @@
-import { gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * The actions that belong to no one workspace: signing in, the account, Ask,
@@ -49,7 +49,7 @@ export const coreActions: ModuleActions = {
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
-    stopWatch: gap('Stop a price watch Dash is running.'),
+    stopWatch: tool('stop_watch'),
     undoDashToday: none('theirs'),
   },
   'app/timeline/actions.ts': {

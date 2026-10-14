@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
+import { ArrowUp, AtSign, CircleUser, CornerDownRight, Square } from 'lucide-react';
 import { CommentBody } from '@/components/dev/comment-body';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -22,6 +22,10 @@ import { ReplyCharts } from '@/components/talk/reply-chart';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { Tooltip } from '@/components/ui/tooltip';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
+import { cn } from '@/lib/cn';
+import { boxTrigger, replaceTrigger, type BoxTrigger } from '@/lib/talk/box-commands';
 
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
@@ -45,6 +49,25 @@ import type { UploadedAttachment } from '@/lib/attachments/rules';
 export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
 
 const PENDING = 'pending';
+
+/**
+ * One choice in the menu over the box (plan #1899.5): a row to add with @,
+ * or a command with /. Choosing it puts `insert` where the @ or / and what
+ * followed it were, then calls `onPick`.
+ */
+export type BoxItem = {
+  key: string;
+  label: string;
+  /** What it is, beside the label, quieter. */
+  hint?: string | null;
+  /** Drawn before the label: the row's workspace mark. */
+  mark?: React.ReactNode;
+  insert: string;
+  onPick?: () => void;
+};
+
+/** What the menu over the box offers for what is being typed. */
+export type BoxMenu = { label: string; items: readonly BoxItem[]; empty: string };
 
 /**
  * What a turn's `below` can do to the thread (plan #1899.7): the question
@@ -188,7 +211,9 @@ function Turn({
         {/* A chart Dash drew (plan #1655) belongs to the answer, so it sits
             under the words and above the rows they rest on. */}
         {turn.role === 'assistant' && <ReplyCharts calls={turn.toolCalls} />}
-        {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
+        {turn.citations && turn.citations.length > 0 && (
+          <Cited citations={turn.citations} added={turn.role === 'user'} />
+        )}
         {below}
       </div>
     </li>
@@ -206,15 +231,17 @@ const CITED_LINK = `press-area flex min-w-0 text-ui ${linkVariants({ tone: 'inli
  * Only a question asked of Dash from anywhere carries these; a card's or a
  * story's thread never does, so it draws exactly as it did.
  */
-function Cited({ citations }: { citations: readonly TalkCitation[] }) {
+function Cited({ citations, added = false }: { citations: readonly TalkCitation[]; added?: boolean }) {
+  // On a question, the rows the person added with @ (plan #1899.5).
+  const Glyph = added ? AtSign : CornerDownRight;
   return (
-    <ul className="pt-1" aria-label="What this answer used">
+    <ul className="pt-1" aria-label={added ? 'Rows you added' : 'What this answer used'}>
       {citations.map((citation) => (
         <li
           key={`${citation.table}:${citation.ref}`}
           className="flex min-w-0 items-baseline gap-1.5"
         >
-          <CornerDownRight
+          <Glyph
             className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
             strokeWidth={1.75}
             aria-hidden
@@ -264,6 +291,12 @@ export function TalkThread({
   sendHint,
   initialDraft = '',
   initialFiles = [],
+  onStop,
+  onTrigger,
+  menu,
+  attached,
+  boxStart,
+  questionCitations,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -345,6 +378,22 @@ export function TalkThread({
   initialDraft?: string;
   /** For the preview gallery: the box opens with these files added. */
   initialFiles?: UploadedAttachment[];
+  /**
+   * Stops the answer on its way (plan #1899.5). Given, the box stays open
+   * once a question is sent and Send turns into Stop while Dash answers; a
+   * Stop button stands in for the opener when the box is closed.
+   */
+  onStop?: () => void;
+  /** Hears what the words at the caret ask the menu for: an @ row or a / command, or null. */
+  onTrigger?: (trigger: BoxTrigger | null) => void;
+  /** The menu over the box for the trigger last heard; null or absent draws none. */
+  menu?: BoxMenu | null;
+  /** In the box above the words: the rows added with @. */
+  attached?: React.ReactNode;
+  /** In the box's foot after Add a file: the workspace the lookups are kept to. */
+  boxStart?: React.ReactNode;
+  /** The rows added with @, drawn on the question as it is sent. */
+  questionCitations?: readonly TalkCitation[];
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -368,6 +417,50 @@ export function TalkThread({
   const [sending, startSend] = useTransition();
   const form = useRef<HTMLFormElement>(null);
   const adder = useRef<AddFileHandle>(null);
+  // What the words at the caret ask the menu for (plan #1899.5), and which
+  // of its items is lit. A menu closed with Escape stays closed until the
+  // trigger moves on. Words the box opens with are read as typed, caret at
+  // their end, so the gallery can draw the menu an @ or a / in them opens.
+  const [trigger, setTrigger] = useState<BoxTrigger | null>(() =>
+    onTrigger && initialDraft && startWriting && !ask ? boxTrigger(initialDraft, initialDraft.length) : null,
+  );
+  const [lit, setLit] = useState(0);
+  const [shut, setShut] = useState<number | null>(null);
+  const noteAt = (value: string, caret: number) => {
+    const next = onTrigger ? boxTrigger(value, caret) : null;
+    const same =
+      trigger?.kind === next?.kind && trigger?.query === next?.query && trigger?.start === next?.start;
+    if (same) return;
+    if (!next) setShut(null);
+    setTrigger(next);
+    setLit(0);
+    onTrigger?.(next);
+  };
+  const noteCaret = (box: HTMLTextAreaElement) => noteAt(box.value, box.selectionStart ?? box.value.length);
+  useEffect(() => {
+    if (!trigger || !initialDraft) return;
+    onTrigger?.(trigger);
+    const box = document.getElementById(`${id}-talk`);
+    if (box instanceof HTMLTextAreaElement) box.setSelectionRange(initialDraft.length, initialDraft.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
+  const menuOpen = Boolean(trigger && menu && shut !== trigger.start);
+  const items = menuOpen && menu ? menu.items : [];
+  const choose = (item: BoxItem) => {
+    if (!trigger) return;
+    const next = replaceTrigger(draft, trigger, item.insert);
+    setDraft(next.draft);
+    setTrigger(null);
+    onTrigger?.(null);
+    item.onPick?.();
+    requestAnimationFrame(() => {
+      const box = document.getElementById(`${id}-talk`);
+      if (box instanceof HTMLTextAreaElement) {
+        box.focus();
+        box.setSelectionRange(next.caret, next.caret);
+      }
+    });
+  };
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
 
@@ -383,11 +476,13 @@ export function TalkThread({
       return;
     }
     const sentFiles = withFiles && fromBox ? files : [];
+    const added = fromBox && questionCitations?.length ? [...questionCitations] : [];
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
       body: checked.body,
       createdAt: new Date().toISOString(),
+      ...(added.length > 0 ? { citations: added } : {}),
       ...(sentFiles.length > 0
         ? { files: sentFiles.map((file) => ({ ...file, id: file.path, href: '' })) }
         : {}),
@@ -398,7 +493,10 @@ export function TalkThread({
     if (fromBox) {
       setDraft('');
       setFiles([]);
-      setWriting(false);
+      setTrigger(null);
+      onTrigger?.(null);
+      // With Stop to offer, the box stays where Stop is (plan #1899.5).
+      if (!onStop) setWriting(false);
     }
     setTurns((current) => [...current, question]);
     startSend(async () => {
@@ -525,13 +623,22 @@ export function TalkThread({
       ) : !writing ? (
         <div className="flex items-center gap-1">
           <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
-          {hint}
+          {sending && onStop ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onStop}>
+              <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
+              Stop
+            </Button>
+          ) : (
+            hint
+          )}
         </div>
       ) : (
         <form
           ref={form}
+          className="relative"
           onSubmit={(event) => {
             event.preventDefault();
+            if (sending && onStop) return;
             submit();
           }}
           onBlur={(event) => {
@@ -540,10 +647,44 @@ export function TalkThread({
             setWriting(false);
           }}
         >
+          {menuOpen && menu && (
+            <div
+              id={`${id}-menu`}
+              role="listbox"
+              aria-label={menu.label}
+              className={cn(popoverSurface, 'absolute inset-x-0 bottom-full z-overlay mb-1.5 p-1 sm:right-auto sm:w-80')}
+            >
+              <p className="px-2.5 pb-0.5 pt-1 text-small text-ink-muted">{menu.label}</p>
+              {items.length === 0 ? (
+                <p className="px-2.5 py-1.5 text-ui text-ink-muted">{menu.empty}</p>
+              ) : (
+                items.map((item, index) => (
+                  <button
+                    key={item.key}
+                    id={`${id}-menu-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={index === lit}
+                    tabIndex={-1}
+                    // Kept off the focus path, so the words keep the caret.
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setLit(index)}
+                    onClick={() => choose(item)}
+                    className={cn(menuItemClass(), 'min-h-11 sm:min-h-0', index === lit && 'bg-sunken')}
+                  >
+                    {item.mark}
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {item.hint && <span className="min-w-0 shrink truncate text-small text-ink-muted">{item.hint}</span>}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
           <ComposeBox>
             <label htmlFor={`${id}-talk`} className="sr-only">
               {label}
             </label>
+            {attached}
             <ComposeBody
               id={`${id}-talk`}
               rows={1}
@@ -552,13 +693,44 @@ export function TalkThread({
               maxLength={MAX_TURN}
               placeholder={placeholder}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                noteCaret(event.target);
+              }}
+              onSelect={(event) => noteCaret(event.currentTarget)}
+              {...(onTrigger
+                ? {
+                    'aria-autocomplete': 'list' as const,
+                    'aria-expanded': menuOpen,
+                    'aria-controls': menuOpen ? `${id}-menu` : undefined,
+                    'aria-activedescendant': items.length > 0 ? `${id}-menu-${lit}` : undefined,
+                  }
+                : {})}
               // A picture copied from anywhere goes in as a file, without
               // saving it and choosing it again (note 90a05309).
               onPaste={(event) => {
                 if (adder.current?.paste(event.clipboardData)) event.preventDefault();
               }}
               onKeyDown={(event) => {
+                if (menuOpen && trigger) {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setShut(trigger.start);
+                    return;
+                  }
+                  if (items.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+                    event.preventDefault();
+                    const step = event.key === 'ArrowDown' ? 1 : -1;
+                    setLit((current) => (current + step + items.length) % items.length);
+                    return;
+                  }
+                  if (items.length > 0 && (event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey) {
+                    if (event.nativeEvent.isComposing) return;
+                    event.preventDefault();
+                    choose(items[Math.min(lit, items.length - 1)]);
+                    return;
+                  }
+                }
                 if (event.key === 'Escape') {
                   event.preventDefault();
                   setWriting(false);
@@ -568,6 +740,7 @@ export function TalkThread({
                 if (event.nativeEvent.isComposing) return;
                 if (!draft.trim()) return;
                 event.preventDefault();
+                if (sending && onStop) return;
                 form.current?.requestSubmit();
               }}
             />
@@ -580,21 +753,37 @@ export function TalkThread({
                   disabled={sending}
                   onUploadingChange={setUploading}
                 />
-              ) : (
+              ) : boxStart ? null : (
                 <span />
               )}
+              {boxStart && <div className="flex min-w-0 flex-1 items-center gap-1">{boxStart}</div>}
               <div className="flex shrink-0 items-center gap-1">
                 {sendHint?.(files)}
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="size-7 shrink-0 px-0"
-                  disabled={!draft.trim() || sending || uploading}
-                  title="Send"
-                >
-                  <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
-                  <span className="sr-only">Send</span>
-                </Button>
+                {sending && onStop ? (
+                  // Send turns into Stop while Dash answers (plan #1899.5).
+                  <Tooltip label="Stop the answer and keep what Dash has written">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="size-7 shrink-0 px-0"
+                      aria-label="Stop"
+                      onClick={onStop}
+                    >
+                      <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
+                    </Button>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="size-7 shrink-0 px-0"
+                    disabled={!draft.trim() || sending || uploading}
+                    title="Send"
+                  >
+                    <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
+                    <span className="sr-only">Send</span>
+                  </Button>
+                )}
               </div>
             </div>
           </ComposeBox>

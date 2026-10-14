@@ -6,7 +6,7 @@ import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/chang
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
 import type { DashFile } from './files';
-import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
@@ -20,6 +20,8 @@ import {
   type DashVoice,
   type DashWriter,
 } from './loop';
+import { lookupInScope } from '@/lib/ask/tools';
+import { moduleById, type ModuleId } from '@/lib/modules';
 import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 
 /**
@@ -119,7 +121,28 @@ reword_concept, add_concept_note or change_video. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
-change_event. When they tell you about a place they have lived, or ask to
+change_event. To finish, put off or dismiss a row another workspace put on
+their agenda, find it with agenda and call change_agenda_row. In News, when they ask to mark a newsletter unread, save or
+unsave a story, send one to Learn or make a todo from one, call
+mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
+when they ask to stop a price watch, call stop_watch. In Goals, when they ask
+to add, rename, reorder or archive an area or write what they want from it,
+call change_goal_area; to reword a goal, date it, move it to another area,
+reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
+reopen, block, move or archive a step, count it towards another goal or make
+it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
+links or an information step's form, call change_goal_number, change_goal_link
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox. In Shopping, to
+change one item's name, variant, notes, group name or sell price, call
+change_item; to put items on a list, take them off or rename a list, call
+item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
+ item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To rename a recurring payment, leave it out of the monthly total or count it again, merge two or move some of its charges to another, call change_recurring; to set how long a shop gives them to return things, call return_window; to add someone they shop for or rename one, call change_person. In Jobs, to change a role's title, location, pay, posting or company, call
+change_role; to set how excited they are about one or how they applied, call
+change_application; to rename a company or correct its details, call change_company; to fold duplicate roles into one, call merge_roles; to finish, put off, reword, move or link a reminder to an email, call change_reminder; to finish or put off a row waiting on them, call change_waiting; to link an email to a role, turn a suggested one down or take one off a role, call change_role_email; in Jobs review, to confirm or reopen an application, call review_application, and to clear the flag on events that conflict with a pursuit or flag them again, call review_events. In the Vault, to write; to add or correct a contact, call change_contact; to log that they reached out to someone, correct that entry or mark it answered, call change_touch; when they have messaged a person Dash suggested, call mark_suggestion_sent.
+a note, change or rename one, file a quick note, or rename a theme or a
+thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
+file_quick_note, rename_theme or rename_maya_question; to keep a transcript
+or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
@@ -161,6 +184,16 @@ about anything else, ignore the page and answer as if it had not been said.`;
 /** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 
+/**
+ * Ask's voice for a question kept to one workspace (plan #1899.5): every
+ * tool but the lookups outside it (lookupInScope). Writes stay, since a
+ * change the person asks for is not a lookup.
+ */
+export function scopedVoice(scope: ModuleId | null | undefined): DashVoice {
+  if (!scope) return ASK_VOICE;
+  return { ...ASK_VOICE, tools: ASK_VOICE.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+}
+
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
 export type AskLookupEvent = DashLookupEvent;
@@ -199,9 +232,22 @@ export async function answerQuestion(input: {
   onLookup?: (event: AskLookupEvent) => void;
   /** Hears the answer's text as it is written (plan #1902); present, the calls stream. */
   onText?: (piece: string) => void;
+  /** Stops the answer, keeping what was written (plan #1899.5). */
+  signal?: AbortSignal;
+  /** The workspace the question is kept to (plan #1899.5); null or absent for every one. */
+  scope?: ModuleId | null;
 }): Promise<AskAnswer> {
-  const { page, ...rest } = input;
-  return runDash({ ...rest, voice: ASK_VOICE, context: { surface: 'ask', subject: null, page: page ?? null } });
+  const { page, scope, ...rest } = input;
+  return runDash({
+    ...rest,
+    voice: scopedVoice(scope),
+    context: {
+      surface: 'ask',
+      subject: null,
+      page: page ?? null,
+      scope: scope ? (moduleById(scope)?.label ?? scope) : null,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +368,18 @@ export async function askDash(
     onLookup?: (event: AskLookupEvent) => void;
     /** Hears the answer's text as it is written (plan #1902). */
     onText?: (piece: string) => void;
+    /**
+     * Hears the question once it is kept, before Dash is asked (plan
+     * #1899.5): the streaming route tells the browser, so a question stopped
+     * mid-answer can be found again.
+     */
+    onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
+    /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
+    signal?: AbortSignal;
+    /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
+    mentions?: readonly TalkCitation[];
+    /** The workspace the question is kept to (plan #1899.5). */
+    scope?: ModuleId | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -342,11 +400,23 @@ export async function askDash(
     } else {
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [{ role: 'user', body: question, files: input.files }]);
+    asked = await stores.append(subject, [
+      {
+        role: 'user',
+        body: question,
+        files: input.files,
+        ...(input.mentions?.length ? { citations: input.mentions } : {}),
+      },
+    ]);
   } catch {
     return { turns: [], error: 'Your question was not kept. Try again.' };
   }
   const conversation = { ref: subject.ref, title: subject.title ?? null };
+  try {
+    input.onAsked?.({ conversation, turns: asked });
+  } catch (error) {
+    console.error('ask question listener failed', error);
+  }
 
   if (!input.anthropicApiKey) {
     return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
@@ -453,6 +523,8 @@ export async function askDash(
     now: input.now,
     onLookup: input.onLookup,
     onText: input.onText,
+    signal: input.signal,
+    scope: input.scope,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);

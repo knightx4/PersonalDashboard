@@ -76,6 +76,7 @@ async function countUnplaced(learn: LearnSupabaseClient): Promise<number> {
   const { count, error } = await learn
     .from('area_check_articles')
     .select('id', { count: 'exact', head: true })
+    .eq('level', 3)
     .is('placed_at', null);
   if (error) throw new Error(`Counting unplaced articles failed: ${error.message}`);
   return count ?? 0;
@@ -88,7 +89,8 @@ export async function runAreaCheckTick(): Promise<AreaCheckSummary> {
 
   const { count: total, error: totalError } = await learn
     .from('area_check_articles')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'exact', head: true })
+    .eq('level', 3);
   if (totalError) throw new Error(`Reading the check failed: ${totalError.message}`);
   if ((total ?? 0) === 0) summary.loaded = await loadList(learn);
 
@@ -110,6 +112,9 @@ export async function runAreaCheckTick(): Promise<AreaCheckSummary> {
     const { data, error } = await learn
       .from('area_check_articles')
       .select('title, section')
+      // The check places the Level 3 list; the Level 4 topics (plan #2016.1)
+      // share the table and are never sent to the model.
+      .eq('level', 3)
       .is('placed_at', null)
       .order('title')
       .limit(PLACE_BATCH * CONCURRENCY);

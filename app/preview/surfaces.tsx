@@ -35,6 +35,7 @@ import {
   IdeaSpaceDenseSurface,
   IdeaSpaceDomainsSurface,
   IdeaSpaceLightsSurface,
+  IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
@@ -136,6 +137,7 @@ import {
 } from './learn-course-surfaces';
 import {
   LearnConceptSurface,
+  LearnConceptEvidenceSurface,
   LearnListsSurface,
   LearnNewSurface,
   LearnOpeningSurface,
@@ -262,6 +264,7 @@ import {
   AskMadeChangesSurface,
   DashPageSurface,
   AskAnswerActionsSurface,
+  AskBoxSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -5184,6 +5187,35 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashPageSurface listOpen={false} />,
   },
   {
+    /* Dash's box (plan #1899.5): a question that carried two rows added
+     * with @, shown under it; an answer stopped part way, kept as far as it
+     * got; and the box open on "@cat" with the rows the top bar's search
+     * finds, one already added as a chip, the scope chip on Shopping. */
+    id: 'ask-box-rows',
+    label: 'Dash · Adding a row with @',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="rows" />,
+  },
+  {
+    /* The same box with / typed: the things Dash can already do, each
+     * written into the box for you to finish. */
+    id: 'ask-box-commands',
+    label: 'Dash · The commands / offers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="commands" />,
+  },
+  {
+    /* The scope chip's menu open: Everything, or one workspace Dash's
+     * lookups are kept to, Learn chosen. */
+    id: 'ask-box-scope',
+    label: 'Dash · Keeping the lookups to one workspace',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="scope" />,
+  },
+  {
     /* The presses under each answer (plan #1899.7): the first answer made a
      * todo and saved to the vault, each card with Undo, and Edit pressed on
      * the second, so its question is back in the box. */
@@ -5382,6 +5414,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDenseSurface />,
+  },
+  {
+    /* Evidence lighting the map (plan #2006.6): ideas backed by a note, a
+     * course or your work glow up to the ceiling, and one of them, never
+     * tested, is open in the rail and pointed at, so both cards say what
+     * backs it. */
+    id: 'learn-idea-space-evidence',
+    label: 'Learn · Idea Space, an idea your notes back',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceEvidenceSurface />,
   },
   {
     /* Clips before any are cut. */
@@ -6547,6 +6590,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnConceptSurface />,
+  },
+  {
+    /* An idea no question has been asked about, backed by a course, a note
+     * and your résumé (plan #2006.6): the three listed under where it stands. */
+    id: 'learn-concept-evidence',
+    label: 'Idea · One idea backed by your notes, courses and work',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptEvidenceSurface />,
   },
   {
     id: 'learn-lists',

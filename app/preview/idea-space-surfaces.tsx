@@ -9,6 +9,7 @@ import type { Point } from '@/lib/learn/map/layout';
 import { lightOn } from '@/lib/learn/map/sky';
 import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -353,6 +354,7 @@ function fixture(): IdeaMapView {
         haze: 0,
         placeId: null,
       createdAt: null,
+        evidence: [],
         pca: { x: clamp(1.3 * (field.axes.x + jitter(0.28))), y: clamp(1.3 * (field.axes.y + jitter(0.28))) },
         neighbourMap: { x: clamp(field.at.x + jitter(0.24)), y: clamp(field.at.y + jitter(0.24)) },
         neighbours: [],
@@ -375,6 +377,7 @@ function fixture(): IdeaMapView {
       haze: 0,
       placeId: null,
       createdAt: null,
+      evidence: [],
       pca: { x: jitter(0.6), y: jitter(0.6) },
       neighbourMap: { x: 0.45 + jitter(0.1), y: -0.85 + jitter(0.1) },
       neighbours: [],
@@ -533,6 +536,7 @@ function dense(count: number): IdeaMapView {
       haze: 0,
       placeId: null,
       createdAt: null,
+      evidence: [],
       pca: at,
       neighbourMap: at,
       neighbours: [1, 2, 3, 4, 5, 6].map((step) => ({
@@ -663,4 +667,76 @@ export function IdeaSpaceLightsSurface() {
       <IdeaSpaceView key={visit} view={LIT_FIXTURE} params={DEFAULT_PARAMS} />
     </div>
   );
+}
+
+/**
+ * Evidence lighting the map (plan #2006.6): about a third of the ideas not
+ * known yet are backed by a note, a course or your work, so they glow up to
+ * the ceiling a recognised idea held as inferred would have. One of them, a
+ * DCF idea no question has been asked about, is open in the rail with its
+ * three strongest links and pointed at, so its card says what backs it.
+ */
+const EVIDENCE_BASES: { sourceKind: EvidenceLink['sourceKind']; basis: string; weight: number; similarity: number }[] = [
+  { sourceKind: 'course', basis: 'from MGT 541 Corporate Finance, HH, 2026', weight: 0.95, similarity: 0.71 },
+  {
+    sourceKind: 'note',
+    basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
+    weight: 1,
+    similarity: 0.68,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
+    weight: 1,
+    similarity: 0.63,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your application notes in Stripe Strategy & Operations: "The team wants someone who has valued a business"',
+    weight: 0.4,
+    similarity: 0.62,
+  },
+  { sourceKind: 'note', basis: 'you wrote about this in Pricing power, clipped', weight: 0.25, similarity: 0.61 },
+];
+
+const EVIDENCE_OPEN_NAME = 'Terminal value dominates a DCF';
+
+function linksFor(ideaId: string, from: number, count: number): EvidenceLink[] {
+  return Array.from({ length: count }, (_, i) => {
+    const base = EVIDENCE_BASES[(from + i) % EVIDENCE_BASES.length]!;
+    return {
+      id: `${ideaId}-ev-${i}`,
+      targetKind: 'idea' as const,
+      targetId: ideaId,
+      sourceKind: base.sourceKind,
+      sourceId: `src-${(from + i) % EVIDENCE_BASES.length}`,
+      similarity: base.similarity,
+      weight: base.weight,
+      basis: base.basis,
+      foundAt: AS_OF.toISOString(),
+    };
+  }).sort((a, b) => b.weight - a.weight || b.similarity - a.similarity);
+}
+
+const EVIDENCE_FIXTURE: IdeaMapView = (() => {
+  let unknown = 0;
+  const ideas = VIEW.ideas.map((idea) => {
+    if (idea.name === EVIDENCE_OPEN_NAME) {
+      return { ...idea, state: 'unknown' as const, stateRow: null, evidence: linksFor(idea.id, 0, 5) };
+    }
+    if (idea.state !== 'unknown') return idea;
+    unknown += 1;
+    // Every third idea not known yet: some by a clipping alone, some by your own writing.
+    if (unknown % 3 !== 0) return idea;
+    return { ...idea, evidence: linksFor(idea.id, unknown % EVIDENCE_BASES.length, 1 + (unknown % 2)) };
+  });
+  return {
+    ...VIEW,
+    ideas: lit(ideas).map((idea, i) => ({ ...idea, placeId: VIEW.ideas[i]!.placeId })),
+  };
+})();
+
+export function IdeaSpaceEvidenceSurface() {
+  const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
+  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} />;
 }

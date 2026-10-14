@@ -164,6 +164,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-answer-actions': ['/ask', '/ask/[ref]'],
   'ask-page-used': ['/ask/[ref]'],
   'ask-page-used-sheet': ['/ask/[ref]'],
+  'ask-box-rows': ['/ask', '/ask/[ref]'],
+  'ask-box-commands': ['/ask', '/ask/[ref]'],
+  'ask-box-scope': ['/ask', '/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
@@ -190,6 +193,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-around': ['/learn/space'],
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
+  'learn-idea-space-evidence': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -324,6 +328,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-brief-short-answer-editor': ['/learn/b/[id]'],
   'learn-now-briefs': ['/learn/now'],
   'learn-concept': ['/learn/c/[id]'],
+  'learn-concept-evidence': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
   'learn-new': ['/learn/new'],
@@ -414,6 +419,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/talk/talk-thread.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
+  // Dash's box: @ rows, / commands and the scope chip (plan #1899.5).
+  'ask-box-rows': ['components/talk/ask-box.tsx'],
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
