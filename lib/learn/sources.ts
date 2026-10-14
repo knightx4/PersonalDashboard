@@ -204,6 +204,16 @@ export const learnSources: ModuleSources = {
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
     {
+      table: 'learn.evidence_links',
+      module: 'Learn',
+      holds: 'What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.',
+      weight: 'record',
+      search: ['basis'],
+      title: 'basis',
+      newest: 'found_at',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+    },
+    {
       table: 'learn.briefs',
       module: 'Learn',
       holds: 'Topics they asked Dash to research: the question, why they want it and the short answer.',
