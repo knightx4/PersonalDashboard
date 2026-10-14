@@ -130,6 +130,7 @@ describe('RLS coverage', () => {
       'goals',
       'idea_place_members',
       'idea_places',
+      'idea_topic_parents',
       'imports',
       'learning_log',
       'next_outcomes',
