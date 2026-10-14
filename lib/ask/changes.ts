@@ -9,6 +9,7 @@ import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
+import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
 import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
@@ -785,6 +786,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  // A startup added from Find takes its company out again while nothing holds it (plan #1894.6.7).
+  if (change.kind === 'add_discovered_company') return undoMany(deps, change, surface, undoDiscoveredCompany);
   // A merge of roles puts back every row it moved or took out (plan #1894.6.2).
   if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   // So does an email linked, turned down or unlinked (plan #1894.6.5).

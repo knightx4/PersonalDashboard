@@ -62,10 +62,10 @@ export const jobsActions: ModuleActions = {
     removeExcludedSender: none('setting'),
   },
   'app/jobs/(app)/material/evidence-actions.ts': {
-    addEvidence: GAP,
+    addEvidence: tool('add_evidence'),
     deleteEvidence: none('deletes'),
-    addResumeVersion: GAP,
-    attachResumePdf: GAP,
+    addResumeVersion: tool('add_resume_version'),
+    attachResumePdf: tool('attach_resume_pdf'),
     proposeEvidence: none('spends'),
     acceptEvidence: none('theirs'),
   },
@@ -73,14 +73,14 @@ export const jobsActions: ModuleActions = {
     updateWritingVoice: none('setting'),
   },
   'app/jobs/(app)/settings/career-goal-actions.ts': {
-    addThought: GAP,
-    updateThought: GAP,
+    addThought: tool('change_career_thought'),
+    updateThought: tool('change_career_thought'),
     deleteThought: none('deletes'),
   },
   'app/jobs/(app)/find/actions.ts': {
     saveAim: none('setting'),
     findStartups: none('spends'),
-    addDiscoveredCompany: GAP,
+    addDiscoveredCompany: tool('add_discovered_company'),
   },
   'app/jobs/(app)/find/recommend-actions.ts': {
     suggestPeople: none('spends'),
