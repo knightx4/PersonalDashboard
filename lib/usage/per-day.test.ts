@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fillDays, readSpendPerDay, readViewsPerDay, startOfLocalDay, usageWindow } from '@/lib/usage/per-day';
+import { fillDays, readSpendPerDay, readViewsPerDay, spendTotal, startOfLocalDay, usageWindow } from '@/lib/usage/per-day';
 
 describe('usageWindow', () => {
   it('starts at midnight in the timezone, not in UTC', () => {
@@ -92,5 +92,30 @@ describe('readSpendPerDay', () => {
       { day: '2026-10-14', value: 0 },
     ]);
     expect(spend).toMatchObject({ calls: 6, unpriced: 3 });
+  });
+});
+
+describe('spendTotal', () => {
+  it('adds the days of a period, so the Spend page lists what its bars add up to', () => {
+    const values = fillDays(
+      [
+        { day: '2026-10-12', value: 650_000 },
+        { day: '2026-10-14', value: 1_200_000 },
+      ],
+      '2026-10-14',
+      30,
+    );
+    const total = spendTotal({ values, calls: 4, unpriced: 1 });
+    expect(values).toHaveLength(30);
+    expect(total).toEqual({ calls: 4, micros: 1_850_000, unpriced: 1 });
+    expect(total.micros).toBe(values.reduce((sum, day) => sum + day.value, 0));
+  });
+
+  it('is nothing for a period with nothing in it', () => {
+    expect(spendTotal({ values: fillDays([], '2026-10-14', 30), calls: 0, unpriced: 0 })).toEqual({
+      calls: 0,
+      micros: 0,
+      unpriced: 0,
+    });
   });
 });
