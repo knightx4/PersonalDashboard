@@ -186,6 +186,7 @@ import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import { BriefQuickPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
@@ -4817,6 +4818,54 @@ export const SURFACES: readonly Surface[] = [
         <LearnNowFeed first={[]} ready={0} low={10} subjectId={nowSubjectLong.id} />
       </>
     ),
+  },
+  {
+    /* A research brief's quick read (plan #2023.6): the cards written from
+     * its sources, one at a time, with Not interested at the start of the
+     * forward row. Dismissing one here dismisses it in Learn now too. */
+    id: 'learn-brief-quick',
+    label: 'Brief · Quick read',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] h2',
+      direction: 'left',
+      shows: 'The card follows the finger left, then the next source’s card comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <BriefQuickPreview state="deck" />
+      </div>
+    ),
+  },
+  {
+    /* The quick read while the brief is still researching: no cards yet,
+     * and the way back to the brief. */
+    id: 'learn-brief-quick-empty',
+    label: 'Brief · Quick read, still researching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="researching" />,
+  },
+  {
+    /* The quick read after its last card: done, and back to the brief. */
+    id: 'learn-brief-quick-end',
+    label: 'Brief · Quick read, every card read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <BriefQuickPreview state="end" />,
+  },
+  {
+    /* Learn now with a card from a research brief's source on top (plan
+     * #2023.6): the why line names the research, the source is named under
+     * the title, and Open the brief stands in for Save and Test me. */
+    id: 'learn-now-research-card',
+    label: 'Now · A card from your research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchPreview />,
   },
   {
     /* The courses fold on Learn's Tracks page with no transcript saved: it

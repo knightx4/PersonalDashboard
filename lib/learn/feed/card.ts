@@ -18,7 +18,7 @@ import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video' | 'researched';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -59,21 +59,32 @@ export type FeedCardRow = {
   clip_note_segment_id?: string | null;
   clip_said?: string | null;
   clip_why?: string | null;
+  /**
+   * The source a researched card was written from (plan #2023.6): a reading
+   * on a brief's list. Null on every other card but a queued one.
+   */
+  reading?: CardReading | null;
 };
+
+/** A brief's source, as a researched card shows it. */
+export type CardReading = { title: string | null; open_url: string | null; summary: string | null; brief_id: string | null };
 
 type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
 type CatalogueSegment = { heading: string | null; text: string; section_anchor: string | null };
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video';
+  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video' | 'researched';
   /**
    * A section card, made from a Wikipedia section, a lesson written for a
    * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), the
-   * optional check on a unit you have finished (plan #971), or an idea you
-   * kept, to explain back (plan #1054).
+   * optional check on a unit you have finished (plan #971), an idea you
+   * kept, to explain back (plan #1054), or a source a research brief found
+   * (plan #2023.6).
    */
-  kind: 'section' | 'lesson' | 'check' | 'teach';
+  kind: 'section' | 'lesson' | 'check' | 'teach' | 'research';
+  /** The brief a research card came from, for its link back. Absent on every other card. */
+  briefId?: string | null;
   /**
    * The idea's name, or "Article: Section" on a card written before ideas. A
    * lesson's is its concept's name.
@@ -286,6 +297,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
   if (row.reason === 'lesson') return toLessonCard(row);
   if (row.reason === 'unit_check') return toCheckCard(row);
   if (row.reason === 'teach_back') return toTeachCard(row);
+  if (row.reason === 'researched') return toResearchCard(row);
   if (!row.item || !row.segment || !row.summary || !row.why) return null;
   if (row.reason === 'video') return toVideoCard(row, row.item, row.segment);
   const { shown, rest, restMinutes } = splitForReading(row.segment.text);
@@ -365,6 +377,51 @@ function toVideoCard(row: FeedCardRow, item: CatalogueItem, segment: CatalogueSe
     site: 'your playlist',
     licence: null,
     video: { videoId, title: item.title, start, end: row.video_end_seconds ?? null },
+  };
+}
+
+/**
+ * A card from a research brief's source (plan #2023.6): titled by its idea,
+ * with the brief's question in its why line. The source is named once, as
+ * the link at the foot that opens its own page, so there is no "From" line
+ * under the title. There is no section text to fold in, since the card was
+ * written from the page or the summary of it.
+ */
+function toResearchCard(row: FeedCardRow): FeedCard | null {
+  const reading = row.reading ?? null;
+  const title = row.idea_name?.trim();
+  if (!reading || !title || !row.summary || !row.why) return null;
+  const url = reading.open_url?.trim() || null;
+  const site = url ? siteName(url) : null;
+  const source = reading.title?.trim() || site || 'The source';
+  return {
+    id: row.id,
+    reason: 'researched',
+    kind: 'research',
+    briefId: reading.brief_id,
+    title,
+    source: null,
+    track: null,
+    article: source,
+    section: null,
+    why: row.why,
+    takeaway: row.takeaway?.trim() || null,
+    context: row.context?.trim() || null,
+    hook: row.hook?.trim() || null,
+    summary: row.summary,
+    example: row.example?.trim() || null,
+    question: row.check_question && row.check_answer ? row.check_question : null,
+    answer: row.check_question && row.check_answer ? row.check_answer : null,
+    mentions: keepMentions(row.mentions),
+    depth: null,
+    difficulty: isCardDifficulty(row.difficulty) ? row.difficulty : null,
+    returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
+    shown: [],
+    rest: [],
+    restMinutes: 0,
+    link: url,
+    site,
+    licence: null,
   };
 }
 

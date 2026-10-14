@@ -82,8 +82,7 @@
     "targets": 5
   },
   "learn-now-deck": {
-    "targets": 1,
-    "dock": 3
+    "targets": 1
   },
   "learn-subject-chain": {
     "targets": 4
