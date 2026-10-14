@@ -244,6 +244,12 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'Approve the goal this thread is on, when Dash proposed it and the comment says to approve it. It opens the goal and its proposed steps, and Undo on Home puts them back. Refused for a goal that was not proposed or is already approved.',
     { type: 'object', properties: {}, additionalProperties: false },
   ),
+  write(
+    'start_errand_run',
+    [GOAL_THREAD_TABLE],
+    'Start Dash working on the errand this thread is on, when the comment tells you to get started on it. The same run as Ask Dash on the errand page. Refused for a goal that is not an errand and while a run is going.',
+    { type: 'object', properties: {}, additionalProperties: false },
+  ),
   handoff(
     'take_step',
     [GOAL_THREAD_TABLE],

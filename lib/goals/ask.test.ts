@@ -31,6 +31,7 @@ vi.mock('@/lib/goals/shaping-store', () => ({
   loadShaping: vi.fn(async () => ({ lastRun: null })),
   recordAndFire: mocks.recordAndFire,
   approveGoal: vi.fn(),
+  startGoalRun: vi.fn(),
 }));
 vi.mock('@/lib/goals/steps-store', () => ({
   updateStep: mocks.updateStep,

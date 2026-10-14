@@ -143,7 +143,15 @@ The goal's own tools:
   the call is refused: say so, and do not suggest it was approved. Do not
   approve because a comment is warm or answers a question; it has to say so.
 
-Use those four only when the comment asks for the change. A question about
+- start_errand_run. When the goal is an errand (the message says "This goal is an
+  errand") and the comment tells you to get started on it ("start on this", "go
+  ahead and do it", "get Dash on it"), start the run now, as Ask Dash on the
+  errand does. Takes no arguments. Refused when the goal is not an errand or
+  a run is already going: say why, and do not say it started. It cannot be
+  undone; it can be stopped on the errand. Do not start one because a comment
+  is a question or mentions the errand.
+
+Use those five when the comment asks for the change. A question about
 whether a step belongs elsewhere, is still needed, or would be better as an
 errand, is answered in words.
 - take_step. When a comment on a step tells you to do that step or get it
@@ -299,6 +307,10 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
       goalStatus: map.goal.status,
       steps: map.steps,
       goalAreaId: map.goal.areaId,
+      canRun: input.canRun,
+      routine: input.routine,
+      goalErrand: map.goal.errand ?? false,
+      goalDueOn: map.goal.dueOn ?? null,
       step: input.itemId === input.goalId ? null : findStep(map.steps, input.itemId),
       refs,
     }),
