@@ -60,7 +60,7 @@ add_track_reading, reword_concept, add_concept_note and change_video, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
-Goals change_goal_area and change_goal. This
+Goals change_goal_area, change_goal and change_goal_step. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

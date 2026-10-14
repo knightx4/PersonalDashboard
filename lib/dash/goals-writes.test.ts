@@ -19,6 +19,8 @@ const OTHERS = '33333333-3333-4333-8333-333333333333';
 const GOAL = '44444444-4444-4444-8444-444444444444';
 const GOAL_2 = '55555555-5555-4555-8555-555555555555';
 const STEP = '66666666-6666-4666-8666-666666666666';
+const STEP_2 = '77777777-7777-4777-8777-777777777777';
+const THEIR_STEP = '88888888-8888-4888-8888-888888888888';
 
 const area = (id: string, name: string, position: number, fields: Record<string, unknown> = {}) => ({
   id,
@@ -54,8 +56,12 @@ function tables(): FakeTables {
     'goals.items': [
       goal(GOAL, 'Run a half marathon', 1),
       goal(GOAL_2, 'Sleep eight hours', 2),
-      goal(STEP, 'Buy shoes', 3, { level: 'step', parent_id: GOAL }),
+      goal(STEP, 'Buy shoes', 3, { level: 'step', parent_id: GOAL, detail: null, acceptance: null, starts_on: null, kind: 'mine' }),
+      goal(STEP_2, 'Run 5k', 4, { level: 'step', parent_id: GOAL, kind: 'mine' }),
+      goal(THEIR_STEP, 'Not mine', 5, { level: 'step', parent_id: GOAL, user_id: THEM }),
     ],
+    'goals.item_goals': [],
+    'goals.dependencies': [],
   };
 }
 
@@ -223,6 +229,102 @@ describe('the Goals writes', () => {
       expect(reopened.after).toMatchObject({ status: 'open' });
       const parked = await made('change_goal', data, { change: 'park', goal_ref: GOAL });
       expect(parked.summary).toBe('Dash parked the goal "Run a half marathon". It is taken back up from All goals.');
+    });
+  });
+
+  describe('change_goal_step', () => {
+    it('edits a step in one write, as the person, and keeps the row as it was', async () => {
+      const data = tables();
+      const histories: unknown[] = [];
+      const change = await made(
+        'change_goal_step',
+        data,
+        { change: 'edit', step_ref: STEP, title: 'Buy trail shoes', done_when: 'Shoes in the hall', due_on: '2026-11-01' },
+        histories,
+      );
+      expect(change.kind).toBe('change_goal_step');
+      expect(change.subjectRef).toBe(`goals.items:${STEP}`);
+      expect(change.before).toMatchObject({ title: 'Buy shoes' });
+      expect(change.after).toMatchObject({ title: 'Buy trail shoes', acceptance: 'Shoes in the hall', due_on: '2026-11-01' });
+      expect(change.summary).toBe(
+        'Dash changed the step "Buy shoes": reworded it to "Buy trail shoes", set when it is done and set it due by 2026-11-01.',
+      );
+      expect(change.input.href).toBe(`/goals/${GOAL}/s/${STEP}`);
+      expect(histories).toEqual([{}]);
+      expect(await refused('change_goal_step', data, { change: 'edit', step_ref: STEP, title: 'Buy trail shoes' })).toMatch(
+        /Nothing to change/,
+      );
+    });
+
+    it("refuses a step that is not the person's, and a goal", async () => {
+      expect(await refused('change_goal_step', tables(), { change: 'drop', step_ref: THEIR_STEP })).toMatch(/no step of theirs/);
+      expect(await refused('change_goal_step', tables(), { change: 'drop', step_ref: GOAL })).toMatch(/is a goal, not a step/);
+    });
+
+    it('drops, blocks and reopens a step from the states each starts from', async () => {
+      const data = tables();
+      const dropped = await made('change_goal_step', data, { change: 'drop', step_ref: STEP });
+      expect(dropped.after).toMatchObject({ status: 'dropped' });
+      expect(await refused('change_goal_step', data, { change: 'block', step_ref: STEP, needs: 'Money' })).toBe(
+        'That step is dropped, so it cannot be blocked.',
+      );
+      const reopened = await made('change_goal_step', data, { change: 'reopen', step_ref: STEP });
+      expect(reopened.after).toMatchObject({ status: 'open' });
+      expect(await refused('change_goal_step', data, { change: 'block', step_ref: STEP })).toMatch(/needs is missing/);
+      const blocked = await made('change_goal_step', data, { change: 'block', step_ref: STEP, needs: 'The shop to open' });
+      expect(blocked.after).toMatchObject({ status: 'blocked', block_ask: 'The shop to open', block_kind: 'outside' });
+      expect(blocked.undo).toBeNull();
+    });
+
+    it("moves a step among the person's own siblings, saying why it has no Undo", async () => {
+      const data = tables();
+      const change = await made('change_goal_step', data, { change: 'move_down', step_ref: STEP });
+      expect(row(data, 'goals.items', STEP_2).position).toBe(10);
+      expect(row(data, 'goals.items', STEP).position).toBe(20);
+      expect(row(data, 'goals.items', THEIR_STEP).position).toBe(5);
+      expect(change.undo).toEqual({ none: expect.stringContaining('reorders the steps beside it') });
+    });
+
+    it('archives a step and restores it', async () => {
+      const data = tables();
+      await made('change_goal_step', data, { change: 'archive', step_ref: STEP });
+      expect(await refused('change_goal_step', data, { change: 'drop', step_ref: STEP })).toBe('That step is archived. Restore it first.');
+      const restored = await made('change_goal_step', data, { change: 'restore', step_ref: STEP });
+      expect(restored.after).toMatchObject({ archived_at: null });
+    });
+
+    it('counts a step towards another goal and stops it, each a link row', async () => {
+      const data = tables();
+      const linked = await made('change_goal_step', data, { change: 'count_towards', step_ref: STEP, goal_ref: GOAL_2 });
+      expect(linked.op).toBe('insert');
+      expect(linked.subjectRef).toMatch(/^goals\.item_goals:/);
+      expect(data['goals.item_goals']).toHaveLength(1);
+      expect(await refused('change_goal_step', data, { change: 'count_towards', step_ref: STEP, goal_ref: GOAL })).toBe(
+        'That step is under that goal already.',
+      );
+      const unlinked = await made('change_goal_step', data, { change: 'stop_counting', step_ref: STEP, goal_ref: GOAL_2 });
+      expect(unlinked.op).toBe('update');
+      expect(unlinked.after).toMatchObject({ archived_at: expect.any(String) });
+      const relinked = await made('change_goal_step', data, { change: 'count_towards', step_ref: STEP, goal_ref: GOAL_2 });
+      expect(relinked.op).toBe('update');
+      expect(relinked.after).toMatchObject({ archived_at: null });
+    });
+
+    it('makes a step wait on another and stops it, the removal undone by putting the row back', async () => {
+      const data = tables();
+      const waits = await made('change_goal_step', data, { change: 'wait_on', step_ref: STEP_2, other_step_ref: STEP });
+      expect(waits.op).toBe('insert');
+      expect(waits.after).toMatchObject({ item_id: STEP_2, depends_on_id: STEP, user_id: ME });
+      expect(await refused('change_goal_step', data, { change: 'wait_on', step_ref: STEP, other_step_ref: STEP })).toBe(
+        'A step cannot wait on itself.',
+      );
+      expect(await refused('change_goal_step', data, { change: 'wait_on', step_ref: STEP, other_step_ref: THEIR_STEP })).toMatch(
+        /no step of theirs/,
+      );
+      const removed = await made('change_goal_step', data, { change: 'stop_waiting', step_ref: STEP_2, other_step_ref: STEP });
+      expect(removed.op).toBe('delete');
+      expect(removed.before).toMatchObject({ item_id: STEP_2, depends_on_id: STEP });
+      expect(data['goals.dependencies']).toHaveLength(0);
     });
   });
 });

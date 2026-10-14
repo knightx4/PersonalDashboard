@@ -63,9 +63,11 @@ import { GOALS_WRITE_TOOLS } from './goals-writes';
  *   News's four and stop_watch  an issue marked unread, a story saved or
  *                    unsaved, sent to Learn or made a todo, and a price
  *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
- *   Goals' two       an area added, renamed, noted, moved or archived, and a
+ *   Goals' three     an area added, renamed, noted, moved or archived, a
  *                    goal edited, moved, archived, closed, parked or
- *                    reopened (lib/dash/goals-writes.ts, plan #1894.7.1).
+ *                    reopened (lib/dash/goals-writes.ts, plan #1894.7.1),
+ *                    and a step edited, dropped, reopened, blocked, moved,
+ *                    archived, linked or made to wait (plan #1894.7.2).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
  *

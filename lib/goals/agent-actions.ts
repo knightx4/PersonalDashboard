@@ -1,4 +1,4 @@
-import { GAP, gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the Goals pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const goalsActions: ModuleActions = {
@@ -18,14 +18,14 @@ export const goalsActions: ModuleActions = {
   },
   'app/goals/[goalId]/actions.ts': {
     addStep: tool('add_goal_step'),
-    editStep: GAP,
-    setStepStatusAction: gap('close_goal_step closes a step; no tool sets any other status.'),
+    editStep: tool('change_goal_step'),
+    setStepStatusAction: tool('close_goal_step', 'change_goal_step'),
     setStepOnTodoAction: tool('schedule_goal_step'),
     countRhythmAction: tool('file_count'),
-    moveStepAction: GAP,
-    archiveStepAction: GAP,
-    linkStepAction: GAP,
-    unlinkStepAction: GAP,
+    moveStepAction: tool('change_goal_step'),
+    archiveStepAction: tool('change_goal_step'),
+    linkStepAction: tool('change_goal_step'),
+    unlinkStepAction: tool('change_goal_step'),
   },
   'app/goals/runs/[runId]/actions.ts': {
     undoRunChangeAction: none('theirs'),
@@ -51,10 +51,10 @@ export const goalsActions: ModuleActions = {
     forgetDocumentKindAction: GAP,
   },
   'app/goals/[goalId]/block-actions.ts': {
-    setGoalStepStatus: gap('close_goal_step closes a step; no tool sets any other status.'),
-    blockGoalStep: GAP,
-    addGoalStepDependency: GAP,
-    removeGoalStepDependency: GAP,
+    setGoalStepStatus: tool('close_goal_step', 'change_goal_step'),
+    blockGoalStep: tool('change_goal_step'),
+    addGoalStepDependency: tool('change_goal_step'),
+    removeGoalStepDependency: tool('change_goal_step'),
   },
   'app/goals/[goalId]/flag-actions.ts': {
     answerFlagAction: none('theirs'),
