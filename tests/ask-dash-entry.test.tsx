@@ -41,6 +41,7 @@ const SOURCE: AskSource = {
   confirm: never,
   decline: never,
   undo: never,
+  save: never,
 };
 
 function Probe({ query }: { query: string }) {

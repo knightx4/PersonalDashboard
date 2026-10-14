@@ -47,6 +47,22 @@ export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{
 const PENDING = 'pending';
 
 /**
+ * What a turn's `below` can do to the thread (plan #1899.7): the question
+ * the turn answered, and the two ways to ask it again. Both add turns at the
+ * end, so a thread stays one line of turns.
+ */
+export type TurnControls = {
+  /** The person's turn before this one; null for a turn with none before it. */
+  question: string | null;
+  /** A reply is being written, so another question would wait. */
+  busy: boolean;
+  /** Send `body` as a new question now, leaving the box as it is. */
+  resend: (body: string) => void;
+  /** Open the box with `body` in it, to change and send. */
+  edit: (body: string) => void;
+};
+
+/**
  * Who answers in the thread: Dash unless the caller says otherwise. Maya's
  * threads in the vault (plan #1286) pass Maya's name and its owl, so the
  * thread never names Dash for words Maya wrote.
@@ -281,9 +297,10 @@ export function TalkThread({
   ask?: string;
   /**
    * What to draw under a turn, after the rows it used: the changes Dash
-   * proposed in an Ask Dash answer (plan #1190). Left out, nothing is.
+   * proposed in an Ask Dash answer (plan #1190), and the presses under each
+   * answer (plan #1899.7), which `thread` lets ask again. Left out, nothing is.
    */
-  below?: (turn: TalkTurn) => React.ReactNode;
+  below?: (turn: TalkTurn, thread: TurnControls) => React.ReactNode;
   /** Who answers: Dash when left out. */
   assistant?: TalkAssistant;
   /**
@@ -354,13 +371,18 @@ export function TalkThread({
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
 
-  const submit = (raw: string = draft) => {
+  /**
+   * Send a question. From the box, the box empties and its files go with it;
+   * a question sent again from under an answer (`fromBox` false) leaves
+   * whatever is in the box where it is.
+   */
+  const submit = (raw: string = draft, fromBox = true) => {
     const checked = turnBody(raw);
     if ('error' in checked) {
       setError(checked.error);
       return;
     }
-    const sentFiles = withFiles ? files : [];
+    const sentFiles = withFiles && fromBox ? files : [];
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
@@ -373,9 +395,11 @@ export function TalkThread({
     setError(null);
     setFailed(null);
     setLanded(null);
-    setDraft('');
-    setFiles([]);
-    setWriting(false);
+    if (fromBox) {
+      setDraft('');
+      setFiles([]);
+      setWriting(false);
+    }
     setTurns((current) => [...current, question]);
     startSend(async () => {
       const result = await send(checked.body, sentFiles.length > 0 ? sentFiles : undefined).catch(() => ({
@@ -389,7 +413,7 @@ export function TalkThread({
         setTurns((current) => [...current.filter((turn) => turn.id !== PENDING), ...kept]);
         if (result.error) setFailed(result.error);
         else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
-        if (kept.length === 0) {
+        if (kept.length === 0 && fromBox) {
           setDraft(checked.body);
           setFiles(sentFiles);
           setWriting(true);
@@ -403,6 +427,30 @@ export function TalkThread({
     const timer = setTimeout(() => setLanded(null), DONE_FOR_MS);
     return () => clearTimeout(timer);
   }, [landed]);
+
+  const resend = (body: string) => {
+    if (sending) return;
+    submit(body, false);
+  };
+  const edit = (body: string) => {
+    setError(null);
+    setDraft(body);
+    setWriting(true);
+    // The box may already be open, where autoFocus does not fire again.
+    requestAnimationFrame(() => {
+      const box = document.getElementById(`${id}-talk`);
+      if (box instanceof HTMLTextAreaElement) {
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+      }
+    });
+  };
+  const questionBefore = (index: number): string | null => {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (turns[i].role === 'user') return turns[i].body;
+    }
+    return null;
+  };
 
   // Once per mount, including under Strict Mode's second effect run: a
   // question sent twice is two answers paid for.
@@ -424,7 +472,11 @@ export function TalkThread({
               turn={turn}
               grouped={turns[index - 1]?.role === turn.role}
               now={now}
-              below={turn.id === PENDING ? undefined : below?.(turn)}
+              below={
+                turn.id === PENDING
+                  ? undefined
+                  : below?.(turn, { question: questionBefore(index), busy: sending, resend, edit })
+              }
               assistant={assistant}
               state={turn.id === landed ? 'done' : undefined}
               onCard={onCard}

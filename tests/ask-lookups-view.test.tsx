@@ -28,6 +28,7 @@ const SOURCE: AskSource = {
   confirm: never,
   decline: never,
   undo: never,
+  save: never,
 };
 
 describe('the lookups in the thread', () => {

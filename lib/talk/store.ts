@@ -12,6 +12,7 @@ import {
   type TalkTurn,
   type TalkTurnRow,
 } from './talk';
+import { chatWorkspaces, dayIn, type AskChat } from './ask-chats';
 
 /**
  * Reading and writing conversations through the person's own session
@@ -207,6 +208,58 @@ export async function listConversations(
         createdAt: row.created_at,
         lastAt,
         turnCount: turns.length,
+      };
+    })
+    .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+}
+
+type ChatRow = {
+  id: string;
+  subject_ref: string;
+  title: string | null;
+  created_at: string;
+  conversation_turns:
+    | { created_at: string; citations: TalkTurnRow['citations']; tool_calls: TalkTurnRow['tool_calls'] }[]
+    | null;
+};
+
+/**
+ * The person's chats with Dash for the list on /ask (plan #1899.2), most
+ * recently added to first, each with the workspaces it read or changed. Those
+ * are worked out from each turn's citations and lookups (lib/talk/ask-chats.ts)
+ * and only the workspace ids leave the server, since a turn's lookups can run
+ * to tens of kilobytes.
+ */
+export async function listAskChats(
+  core: CoreSupabaseClient,
+  timezone: string,
+  limit = 200,
+): Promise<AskChat[]> {
+  const { data, error } = await core
+    .from('conversations')
+    .select('id, subject_ref, title, created_at, conversation_turns (created_at, citations, tool_calls)')
+    .eq('subject_kind', 'ask')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading your chats with Dash failed: ${error.message}`);
+
+  return ((data ?? []) as ChatRow[])
+    .map((row) => {
+      const turns = row.conversation_turns ?? [];
+      const lastAt = turns.reduce((last, turn) => (turn.created_at > last ? turn.created_at : last), row.created_at);
+      return {
+        id: row.id,
+        ref: row.subject_ref,
+        title: row.title,
+        lastAt,
+        day: dayIn(lastAt, timezone),
+        workspaces: chatWorkspaces(
+          turns.map((turn) => ({
+            citations: Array.isArray(turn.citations) ? turn.citations : null,
+            toolCalls: Array.isArray(turn.tool_calls) ? turn.tool_calls : null,
+          })),
+        ),
       };
     })
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
