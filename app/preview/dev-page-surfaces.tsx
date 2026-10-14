@@ -1088,7 +1088,7 @@ export function AccountSurface({
   /** Only the newest capture token, as the list reads once the first is made. */
   onlyFirstToken?: boolean;
 }) {
-  return column(
+  return (
     <>
       <AccountView
         tab={tab}
@@ -1106,7 +1106,7 @@ export function AccountSurface({
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
         capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
-    </>,
+    </>
   );
 }
 

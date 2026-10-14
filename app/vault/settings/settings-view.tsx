@@ -1,6 +1,5 @@
 import { AlertTriangle, GitBranch } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { SettingsPage } from '@/components/patterns/settings-page';
 import { Chip } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
@@ -14,7 +13,6 @@ import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
 import { formatClock } from '@/lib/clock';
 import { Tooltip } from '@/components/ui/tooltip';
-import { PageColumn } from '@/components/shell/page-width';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Connected',
@@ -37,8 +35,9 @@ const WRITE_ACCESS_LABEL: Record<Exclude<WriteAccess, 'reconnect'>, string> = {
 };
 
 /**
- * Vault settings, drawn from what the page read (page.tsx), so the gallery
- * can draw it from fixtures (plan #1605). `connection` null is the connect
+ * Vault settings on the settings page pattern (plan #1937.11), drawn from
+ * what the page read (page.tsx), so the gallery can draw it from fixtures
+ * (plan #1605). `connection` null is the connect
  * form; `progress` is null exactly when it is.
  */
 export function VaultSettingsView({
@@ -54,177 +53,216 @@ export function VaultSettingsView({
   writeAccess: WriteAccess;
   progress: SyncProgress | null;
 }) {
-  return (
-    <PageColumn>
-      <PageHeader
+  if (!connection) {
+    return (
+      <SettingsPage
         title="Vault settings"
-        description="Where your notes come from, and how they get here."
-      />
-
-      {!connection ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Connect your vault</CardTitle>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <p className="text-body leading-relaxed text-ink-muted">
-              Keep your Obsidian vault in a private GitHub repository — the{' '}
-              <strong className="font-medium text-ink">Obsidian Git</strong> plugin will commit and
-              push it on a schedule — and this mirrors every markdown file in it. Images, PDFs and
-              other attachments are never requested, so they never leave your machine.
-            </p>
-            <ConnectVaultForm submitLabel="Connect vault" />
-          </CardBody>
-        </Card>
-      ) : (
-        <div className="space-y-5">
-          <Card>
-            <CardHeader className="flex items-start justify-between gap-3">
-              <CardTitle>
-                {connection.repoOwner}/{connection.repoName}
-              </CardTitle>
-              {connection.status === 'active' ? (
-                <span className="shrink-0 text-small text-ink-muted">
-                  {STATUS_LABEL[connection.status]}
-                </span>
-              ) : (
-                <Tooltip
-                  label={STATUS_HINT[connection.status] ?? 'The vault is not syncing'}
-                  align="end"
-                  className="shrink-0"
-                >
-                  <Chip tone="caution" tabIndex={0}>
-                    <AlertTriangle strokeWidth={1.75} aria-hidden />
-                    {STATUS_LABEL[connection.status] ?? connection.status}
-                  </Chip>
-                </Tooltip>
-              )}
-            </CardHeader>
-            <CardBody className="space-y-3">
-              <ValueList>
-                <ValueRow
-                  align="end"
-                  label="Branch"
-                  value={
-                    <span className="inline-flex items-center gap-1">
-                      <GitBranch className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                      {connection.branch}
-                    </span>
-                  }
-                />
-                {connection.subpath && <ValueRow align="end" label="Folder" value={connection.subpath} />}
-                <ValueRow align="end" label="Notes" value={String(count ?? 0)} />
-                <ValueRow
-                  align="end"
-                  label="Last synced"
-                  value={connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
-                />
-                {writeAccess !== 'reconnect' && (
-                  <ValueRow
-                    align="end"
-                    label="Editing"
-                    value={
-                      <span className={writeAccess === 'no' ? 'text-caution' : undefined}>
-                        {WRITE_ACCESS_LABEL[writeAccess]}
-                      </span>
-                    }
-                  />
-                )}
-              </ValueList>
-
-              {progress && <SyncProgressBar progress={progress} />}
-
-              {connection.lastError && (
-                <Note tone="caution">Last run reported: {connection.lastError}</Note>
-              )}
-
-              {/* The shared fold, with the count on the closed line. It was a
-                  bare <details> in its own box, with no chevron -- so it did
-                  not look like the folds everywhere else in the app, and its
-                  summary said "Recent runs" without saying how many, which is
-                  law 10's exact complaint: a fold that hides whether it is
-                  worth opening has moved the work rather than saved it. The
-                  box goes with it; this already sits inside a card. */}
-              {runs.length > 0 && (
-                <Disclosure
-                  title="Recent runs"
-                  meta={runs.length === 1 ? '1 run' : `${runs.length} runs`}
-                >
-                  <ul className="divide-y divide-border">
-                    {runs.map((run) => (
-                      <li key={run.id} className="row-pad flex flex-wrap items-baseline gap-x-3">
-                        <span className="w-24 text-small font-medium text-ink">
-                          {run.type === 'backfill' ? 'First sync' : 'Update'}
-                        </span>
-                        <span className="tabular w-32 text-small text-ink-muted">
-                          {run.startedAt ? formatWhen(run.startedAt) : '—'}
-                        </span>
-                        <span
-                          className={
-                            run.status === 'failed'
-                              ? 'flex-1 text-small text-caution'
-                              : 'flex-1 text-small text-ink-muted'
-                          }
-                        >
-                          {describeRun(run)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </Disclosure>
-              )}
-
-              <p className="text-ui text-ink-muted">
-                Syncing runs once a day, on the same schedule as the mailbox. Press Sync now to
-                pull anything you have pushed since.
-              </p>
-
-              <div className="flex items-center gap-2 pt-1">
-                <SyncNowButton active={progress?.phase === 'running'} />
-                <VaultMoreMenu connectionId={connection.id} />
+        href="/vault/settings"
+        sections={[
+          {
+            id: 'connect',
+            title: 'Connect your vault',
+            content: (
+              <div className="space-y-4">
+                <p className="text-body leading-relaxed text-ink-muted">
+                  Keep your Obsidian vault in a private GitHub repository — the{' '}
+                  <strong className="font-medium text-ink">Obsidian Git</strong> plugin will commit
+                  and push it on a schedule — and this mirrors every markdown file in it. Images,
+                  PDFs and other attachments are never requested, so they never leave your machine.
+                </p>
+                <ConnectVaultForm submitLabel="Connect vault" />
               </div>
-            </CardBody>
-          </Card>
+            ),
+          },
+        ]}
+      />
+    );
+  }
 
-          <Card>
-            <CardBody>
-              <Disclosure
-                title={connection.status === 'needs_reauth' ? 'Reconnect' : 'Update the connection'}
-                meta={`${connection.repoOwner}/${connection.repoName}`}
-                defaultOpen={connection.status === 'needs_reauth' || writeAccess === 'no'}
-                bodyClassName="mt-3"
+  return (
+    <SettingsPage
+      title="Vault settings"
+      href="/vault/settings"
+      sections={[
+        {
+          id: 'sync',
+          title: 'Sync',
+          hint: 'Syncing runs once a day, on the same schedule as the mailbox. Press Sync now to pull anything you have pushed since.',
+          content: (
+            <SyncSection
+              connection={connection}
+              count={count}
+              runs={runs}
+              writeAccess={writeAccess}
+              progress={progress}
+            />
+          ),
+        },
+        {
+          id: 'connection',
+          title: 'Connection',
+          content: <ConnectionSection connection={connection} writeAccess={writeAccess} />,
+        },
+      ]}
+    />
+  );
+}
+
+/** Where the vault is read from, how far the sync has got, and its runs. */
+function SyncSection({
+  connection,
+  count,
+  runs,
+  writeAccess,
+  progress,
+}: {
+  connection: VaultConnectionSummary;
+  count: number | null;
+  runs: SyncRunSummary[];
+  writeAccess: WriteAccess;
+  progress: SyncProgress | null;
+}) {
+  return (
+    <div className="space-y-3">
+      <ValueList>
+        <ValueRow
+          align="end"
+          label="Repository"
+          value={`${connection.repoOwner}/${connection.repoName}`}
+        />
+        <ValueRow
+          align="end"
+          label="Status"
+          value={
+            connection.status === 'active' ? (
+              STATUS_LABEL[connection.status]
+            ) : (
+              <Tooltip
+                label={STATUS_HINT[connection.status] ?? 'The vault is not syncing'}
+                align="end"
               >
-                <div className="space-y-4">
-                  {connection.status === 'needs_reauth' && (
-                    <p className="text-body leading-relaxed text-ink-muted">
-                      Fine-grained tokens expire — a year at most — so this is routine rather than
-                      a fault. Generate a new one with <strong>Contents: Read and write</strong>{' '}
-                      and paste it below. Your notes and sync position are kept, so nothing is
-                      re-read.
-                    </p>
-                  )}
-                  {writeAccess === 'no' && (
-                    <p className="text-body leading-relaxed text-ink-muted">
-                      This token can read the vault but not write to it, so edits made here will
-                      not save. Generate one with <strong>Contents: Read and write</strong> on this
-                      repository and paste it below. Your notes and sync position are kept.
-                    </p>
-                  )}
-                  <ConnectVaultForm
-                    defaults={{
-                      repo: `${connection.repoOwner}/${connection.repoName}`,
-                      branch: connection.branch,
-                      subpath: connection.subpath,
-                    }}
-                    submitLabel="Save connection"
-                  />
-                </div>
-              </Disclosure>
-            </CardBody>
-          </Card>
-        </div>
+                <Chip tone="caution" tabIndex={0}>
+                  <AlertTriangle strokeWidth={1.75} aria-hidden />
+                  {STATUS_LABEL[connection.status] ?? connection.status}
+                </Chip>
+              </Tooltip>
+            )
+          }
+        />
+        <ValueRow
+          align="end"
+          label="Branch"
+          value={
+            <span className="inline-flex items-center gap-1">
+              <GitBranch className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
+              {connection.branch}
+            </span>
+          }
+        />
+        {connection.subpath && <ValueRow align="end" label="Folder" value={connection.subpath} />}
+        <ValueRow align="end" label="Notes" value={String(count ?? 0)} />
+        <ValueRow
+          align="end"
+          label="Last synced"
+          value={connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
+        />
+        {writeAccess !== 'reconnect' && (
+          <ValueRow
+            align="end"
+            label="Editing"
+            value={
+              <span className={writeAccess === 'no' ? 'text-caution' : undefined}>
+                {WRITE_ACCESS_LABEL[writeAccess]}
+              </span>
+            }
+          />
+        )}
+      </ValueList>
+
+      {progress && <SyncProgressBar progress={progress} />}
+
+      {connection.lastError && <Note tone="caution">Last run reported: {connection.lastError}</Note>}
+
+      {/* The shared fold, with the count on the closed line: a fold that
+          hides whether it is worth opening has moved the work rather than
+          saved it (law 10). */}
+      {runs.length > 0 && (
+        <Disclosure title="Recent runs" meta={runs.length === 1 ? '1 run' : `${runs.length} runs`}>
+          <ul className="divide-y divide-border">
+            {runs.map((run) => (
+              <li key={run.id} className="row-pad flex flex-wrap items-baseline gap-x-3">
+                <span className="w-24 text-small font-medium text-ink">
+                  {run.type === 'backfill' ? 'First sync' : 'Update'}
+                </span>
+                <span className="tabular w-32 text-small text-ink-muted">
+                  {run.startedAt ? formatWhen(run.startedAt) : '—'}
+                </span>
+                <span
+                  className={
+                    run.status === 'failed'
+                      ? 'flex-1 text-small text-caution'
+                      : 'flex-1 text-small text-ink-muted'
+                  }
+                >
+                  {describeRun(run)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
       )}
-    </PageColumn>
+
+      <div className="flex items-center gap-2 pt-1">
+        <SyncNowButton active={progress?.phase === 'running'} />
+        <VaultMoreMenu connectionId={connection.id} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Changing the repository, branch, folder or token. Open when the token has
+ * lapsed or cannot write, since that is then the thing on the page to do.
+ */
+function ConnectionSection({
+  connection,
+  writeAccess,
+}: {
+  connection: VaultConnectionSummary;
+  writeAccess: WriteAccess;
+}) {
+  return (
+    <Disclosure
+      title={connection.status === 'needs_reauth' ? 'Reconnect' : 'Update the connection'}
+      meta={`${connection.repoOwner}/${connection.repoName}`}
+      defaultOpen={connection.status === 'needs_reauth' || writeAccess === 'no'}
+      bodyClassName="mt-3"
+    >
+      <div className="space-y-4">
+        {connection.status === 'needs_reauth' && (
+          <p className="text-body leading-relaxed text-ink-muted">
+            Fine-grained tokens expire — a year at most — so this is routine rather than a fault.
+            Generate a new one with <strong>Contents: Read and write</strong> and paste it below.
+            Your notes and sync position are kept, so nothing is re-read.
+          </p>
+        )}
+        {writeAccess === 'no' && (
+          <p className="text-body leading-relaxed text-ink-muted">
+            This token can read the vault but not write to it, so edits made here will not save.
+            Generate one with <strong>Contents: Read and write</strong> on this repository and
+            paste it below. Your notes and sync position are kept.
+          </p>
+        )}
+        <ConnectVaultForm
+          defaults={{
+            repo: `${connection.repoOwner}/${connection.repoName}`,
+            branch: connection.branch,
+            subpath: connection.subpath,
+          }}
+          submitLabel="Save connection"
+        />
+      </div>
+    </Disclosure>
   );
 }
 

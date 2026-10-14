@@ -216,4 +216,8 @@ export const learnActions: ModuleActions = {
     transcribePlaylistAction: none('spends'),
     setWatchListPlaylistAction: none('setting'),
   },
+  'app/learn/settings/actions.ts': {
+    setOfferSubjects: none('setting'),
+    setTeachBackRate: none('setting'),
+  },
 };

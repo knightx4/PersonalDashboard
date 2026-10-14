@@ -113,7 +113,7 @@ export function InboxSection({
   const banner = inboxBanner(bannerCode);
 
   return (
-    <section id="inboxes" className="scroll-mt-6">
+    <div>
       {banner && (
         <Banner
           className="mb-3"
@@ -198,6 +198,6 @@ export function InboxSection({
         </div>
       )}
 
-    </section>
+    </div>
   );
 }

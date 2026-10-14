@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
-import { CardSection } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { sectionSubject } from '@/lib/core/section-path';
-import { tabFrom, type Tab } from '@/lib/tabs';
+import { tabFrom, type Tab, type TabAddress } from '@/lib/tabs';
 import { TabbedSections } from './tabbed-sections';
 
 /**
@@ -47,6 +47,7 @@ export function SettingsPage({
   description,
   sections,
   tab,
+  address,
 }: {
   /** The page's name, such as "Learn settings". */
   title: string;
@@ -61,20 +62,25 @@ export function SettingsPage({
   sections: readonly SettingsSection[];
   /** `searchParams.tab`, which opens a tab on a page with more than three sections. */
   tab?: string | readonly string[];
+  /**
+   * How the tab is kept in the address, for a page that had `#anchor` links
+   * before it had tabs: `anchors` sends each old anchor to the tab holding it.
+   */
+  address?: TabAddress;
 }) {
   const tabbed = sections.length > SETTINGS_TABS_AFTER;
   const tabs: Tab[] = sections.map((section) => ({ id: section.id, label: section.title }));
-  const open = tabbed ? tabFrom(tab, tabs) : null;
+  const open = tabbed ? tabFrom(tab, tabs, address) : null;
 
   return (
     <PageColumn>
       <PageHeader subject={sectionSubject(href, title)} title={title} description={description} />
       {tabbed ? (
-        <TabbedSections tabs={tabs} label={title}>
+        <TabbedSections tabs={tabs} label={title} address={address}>
           {sections
             .filter((section) => section.id === open)
             .map((section) => (
-              <Section key={section.id} section={section} />
+              <Section key={section.id} section={section} tabbed />
             ))}
         </TabbedSections>
       ) : (
@@ -88,8 +94,20 @@ export function SettingsPage({
   );
 }
 
-function Section({ section }: { section: SettingsSection }) {
+/**
+ * One section's card. Behind a tab the card has no heading of its own: the
+ * open tab right above it already names it (law 9).
+ */
+function Section({ section, tabbed }: { section: SettingsSection; tabbed?: boolean }) {
   const content = typeof section.content === 'function' ? section.content() : section.content;
+  if (tabbed) {
+    return (
+      <Card id={section.id} padding="dense" data-slot="section">
+        {section.hint && <p className="mb-3 text-small text-ink-muted">{section.hint}</p>}
+        {content}
+      </Card>
+    );
+  }
   return (
     <CardSection id={section.id} title={section.title} hint={section.hint}>
       {content}
