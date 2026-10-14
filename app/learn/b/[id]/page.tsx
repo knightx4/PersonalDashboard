@@ -4,6 +4,9 @@ import { loadBrief } from '@/lib/learn/briefs/load';
 import { BriefView } from './brief-view';
 
 export const dynamic = 'force-dynamic';
+// Try again runs the research after its response (actions.ts#retryBrief):
+// three calls and up to ten searches, a few minutes.
+export const maxDuration = 300;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
