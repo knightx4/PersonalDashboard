@@ -34,6 +34,7 @@ import { graphHeight, paramsFor, type IdeaGraph, type Opened } from '@/lib/learn
 import { halvesOn, stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import type { LightThen } from '@/lib/learn/map/timeline';
 import { cn } from '@/lib/cn';
+import { LEVEL4_FROM, nameTopics, topicTier, type TopicOnMap } from '@/lib/learn/map/topics';
 import { usePick } from './pick';
 import { PlaceGraph } from './place-graph';
 
@@ -87,6 +88,9 @@ export type Star = {
   backedBy?: string | null;
 };
 
+/** A topic of the frame (plan #2016.5) where the current layout puts it. */
+export type SkyTopic = TopicOnMap & { at: Point };
+
 /** A name for the zoomed-out sky: a place, or a domain while no place is named. */
 export type SkyName = { id: string; kind: 'place' | 'domain'; text: string; at: Point; weight: number };
 
@@ -113,6 +117,12 @@ const NAME_REACH = 4;
 const PLACE_FONT = '400 11px';
 const IDEA_FONT = '400 11px';
 const FOCUS_FONT = '600 13px';
+const TOPIC3_FONT = '600 10px';
+const TOPIC4_FONT = 'italic 400 11px';
+const MORE_FONT = '400 10px';
+/** A Level 3 topic's diamond and a Level 4 one's, half across, in pixels. */
+const TOPIC3_R = 3.5;
+const TOPIC4_R = 2.5;
 const NAME_LINE = 16;
 /** What is left of a star outside the idea in focus or the domain picked out. */
 const FADED = 0.22;
@@ -172,9 +182,15 @@ export function StarSky({
   pointingAt = null,
   graph = null,
   replay = null,
+  topics = [],
+  zoomOn = null,
 }: {
   stars: readonly Star[];
   names: readonly SkyName[];
+  /** Wikipedia's topics as the map's frame (plan #2016.5): every Level 3 one and the Level 4 ones unlocked. */
+  topics?: readonly SkyTopic[];
+  /** The gallery opens the sky flown into this topic, as a press on its name would. */
+  zoomOn?: string | null;
   /** Vault notes, in the layout's units. */
   dust: readonly Point[];
   /** The moment the strengths are for, as an ISO string. */
@@ -214,6 +230,10 @@ export function StarSky({
   const heldRef = useRef<Point | null>(null);
   /** The place names drawn last, where a tap opens them. */
   const nameBoxes = useRef<{ name: SkyName; box: Box }[]>([]);
+  /** The topic names and "+23 more" counts drawn last, where a tap flies into the topic. */
+  const topicBoxes = useRef<{ id: string; box: Box }[]>([]);
+  /** The topic the map was last flown into, whose name is kept first. */
+  const lastTopic = useRef<string | null>(zoomOn);
   /** The frame's height on the whole map, which a graph grows from. */
   const baseH = useRef<number | null>(null);
   const [mapH, setMapH] = useState<number | null>(null);
@@ -251,9 +271,9 @@ export function StarSky({
   const focusIndex = focusId ? (byId.get(focusId) ?? -1) : -1;
 
   // Kept for the draw, which runs outside React.
-  const latest = useRef({ stars: lit, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
+  const latest = useRef({ stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
   useEffect(() => {
-    latest.current = { stars: lit, names, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
+    latest.current = { stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
   });
 
   // -- Measuring the frame --------------------------------------------------
@@ -279,7 +299,7 @@ export function StarSky({
   const draw = useCallback(() => {
     raf.current = null;
     const el = canvas.current;
-    const { stars, names, dust, focusIndex, domain, size, pointingAt, open, behind } = latest.current;
+    const { stars, names, topics, dust, focusIndex, domain, size, pointingAt, open, behind } = latest.current;
     if (!el || !size || !camera.current || !shown.current) return;
     const ctx = el.getContext('2d');
     if (!ctx) return;
@@ -343,6 +363,43 @@ export function StarSky({
       ctx.rect(x - speck / 2, y - speck / 2, speck, speck);
     }
     ctx.fill();
+
+    // The topics, faint diamonds under the stars: every Level 3 one, and
+    // from LEVEL4_FROM the Level 4 ones something has unlocked.
+    const tier = topicTier(zoom);
+    const shownTopics = open ? [] : topics.filter((topic) => topic.level === 3 || tier > 0);
+    const diamond = (x: number, y: number, r: number) => {
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+    };
+    const onScreen = (x: number, y: number) => x >= -6 && y >= -6 && x <= w + 6 && y <= h + 6;
+    // The landmarks nothing touches are drawn after the names, round them.
+    if (shownTopics.length > 0) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = SKY.topicUnlocked;
+      ctx.beginPath();
+      for (const topic of shownTopics) {
+        if (!topic.touched || topic.state === 'lit') continue;
+        const x = sx(topic.at.x);
+        const y = sy(topic.at.y);
+        if (onScreen(x, y)) diamond(x, y, topic.level === 3 ? TOPIC3_R : TOPIC4_R);
+      }
+      ctx.stroke();
+      const [r, g, b] = SKY.topicLit;
+      for (const topic of shownTopics) {
+        if (topic.state !== 'lit') continue;
+        const x = sx(topic.at.x);
+        const y = sy(topic.at.y);
+        if (!onScreen(x, y)) continue;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.45 + 0.55 * topic.strength})`;
+        ctx.beginPath();
+        diamond(x, y, (topic.level === 3 ? TOPIC3_R : TOPIC4_R) + 0.5);
+        ctx.fill();
+      }
+    }
 
     // Who stands out: the idea in focus and its six nearest, or the domain picked in the legend.
     const focus = focusIndex >= 0 && !stars[focusIndex]!.absent ? stars[focusIndex] : undefined;
@@ -486,7 +543,8 @@ export function StarSky({
     ctx.globalAlpha = 1;
 
     // The idea in focus: threads to its six nearest and rings round them.
-    const taken: Box[] = [];
+    // No name goes under the zoom buttons in the corner.
+    const taken: Box[] = [ZOOM_PANEL(w, h)];
     if (focus) {
       const fx = sx(px[focusIndex]!);
       const fy = sy(py[focusIndex]!);
@@ -528,6 +586,14 @@ export function StarSky({
       if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
       marks.add(x, y, starLook(stars[i]!.strength, 0, zoom).core / 2);
     }
+    // Nor over a topic's diamond. A faint landmark gives way to a name instead.
+    for (const topic of shownTopics) {
+      if (!topic.touched) continue;
+      const x = sx(topic.at.x);
+      const y = sy(topic.at.y);
+      if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
+      marks.add(x, y, (topic.level === 3 ? TOPIC3_R : TOPIC4_R) + 1);
+    }
     fontFamily.current ??= getComputedStyle(el).fontFamily || 'sans-serif';
     const family = fontFamily.current;
     const measure = (font: string, text: string) => {
@@ -540,7 +606,9 @@ export function StarSky({
       }
       return width;
     };
+    const drawnNames: Box[] = [];
     const write = (placed: PlacedName[], font: string, colour: string) => {
+      drawnNames.push(...placed.map((p) => p.box));
       ctx.font = `${font} ${family}`;
       ctx.textBaseline = 'middle';
       ctx.lineJoin = 'round';
@@ -569,7 +637,7 @@ export function StarSky({
     nameBoxes.current = [];
     if (open) {
       // An open graph names its own ideas; the sky behind it stays unnamed.
-    } else if (zoom < IDEA_NAMES_FROM) {
+    } else if (tier === 0) {
       const byName = new Map(names.map((name) => [name.id, name]));
       const candidates: NameCandidate[] = names.map((name) => ({
         id: name.id,
@@ -582,7 +650,36 @@ export function StarSky({
       const placed = placeNames(candidates, w, h, NAME_LINE, taken, MAX_PLACE_NAMES, (box) => marks.covers(box));
       nameBoxes.current = placed.map((p) => ({ name: byName.get(p.id)!, box: p.box }));
       write(placed, PLACE_FONT, SKY.placeName);
-    } else {
+      taken.push(...placed.map((p) => p.box));
+    }
+    // The topics' names, at most seven at each level, strongest first.
+    topicBoxes.current = [];
+    if (!open && shownTopics.length > 0) {
+      const named = nameTopics({
+        topics: shownTopics,
+        tier,
+        at: (topic) => ({ x: sx(topic.at.x), y: sy(topic.at.y) }),
+        width: w,
+        height: h,
+        lineHeight: NAME_LINE,
+        measure: (topic, level) =>
+          typeof topic === 'string'
+            ? measure(MORE_FONT, topic)
+            : measure(level === 3 ? TOPIC3_FONT : TOPIC4_FONT, level === 3 ? topic.title.toUpperCase() : topic.title),
+        gap: TOPIC3_R + 4,
+        taken,
+        covers: (box) => marks.covers(box),
+        first: lastTopic.current,
+      });
+      write(named.level3, TOPIC3_FONT, SKY.topicName);
+      write(named.level4, TOPIC4_FONT, SKY.topicName4);
+      write(named.more, MORE_FONT, SKY.topicMore);
+      for (const p of [...named.level3, ...named.level4, ...named.more]) {
+        taken.push(p.box);
+        topicBoxes.current.push({ id: p.id, box: p.box });
+      }
+    }
+    if (!open && zoom >= IDEA_NAMES_FROM) {
       const candidates: NameCandidate[] = [];
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i]!;
@@ -605,6 +702,23 @@ export function StarSky({
         SKY.ideaName,
       );
     }
+
+    // Level 3 landmarks nothing touches, faint, and never under a name.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = SKY.topicLandmark;
+    ctx.beginPath();
+    for (const topic of shownTopics) {
+      if (topic.touched) continue;
+      const x = sx(topic.at.x);
+      const y = sy(topic.at.y);
+      if (!onScreen(x, y)) continue;
+      const r = TOPIC3_R + 2;
+      if (drawnNames.some((b) => x + r > b.x && x - r < b.x + b.w && y + r > b.y && y - r < b.y + b.h)) continue;
+      diamond(x, y, TOPIC3_R);
+    }
+    ctx.stroke();
 
     // The gallery's held card follows its star.
     const held = pointingAt ? byIdOf(stars, pointingAt) : -1;
@@ -648,6 +762,33 @@ export function StarSky({
     redraw();
   }, [stars, redraw]);
 
+  /**
+   * The camera over a topic: its own mark, its Level 4 topics and its ideas,
+   * close enough that what is inside it shows. A Level 3 topic opens to its
+   * Level 4 topics, a Level 4 one to its ideas' names.
+   */
+  const topicCamera = useCallback(
+    (id: string, w: number, h: number): Camera | null => {
+      const topic = topics.find((t) => t.id === id);
+      if (!topic) return null;
+      const points: Point[] = [topic.at];
+      for (const t of topics) if (t.parentId === id) points.push(t.at);
+      for (const ideaId of topic.ideaIds) {
+        const star = starOf.get(ideaId);
+        if (star) points.push(star.at);
+      }
+      const fit = fitCamera(points, w, h, PLACE_INSET);
+      // A Level 3 topic opens to where its Level 4 topics are named and its
+      // ideas are not yet; a Level 4 one to its ideas' names.
+      const [low, high] =
+        topic.level === 3
+          ? [LEVEL4_FROM * 1.05, IDEA_NAMES_FROM * 0.95]
+          : [IDEA_NAMES_FROM * 1.05, MAX_ZOOM];
+      return { ...fit, k: Math.min(Math.max(fit.k, fitK.current * low), fitK.current * high) };
+    },
+    [topics, starOf],
+  );
+
   // The stars' places: a new layout moves every star from where it was.
   useEffect(() => {
     const xs = new Float32Array(stars.length);
@@ -665,7 +806,8 @@ export function StarSky({
       const fit = fitCamera(stars.map((star) => star.at), size.w, size.h);
       const first = camera.current === null;
       fitK.current = fit.k;
-      if (first || reducedMotion()) camera.current = fit;
+      if (first) camera.current = (zoomOn && topicCamera(zoomOn, size.w, size.h)) || fit;
+      else if (reducedMotion()) camera.current = fit;
       else flight.current = { from: camera.current!, to: fit, start: performance.now(), ms: MOVE_MS };
     }
     redraw();
@@ -677,8 +819,10 @@ export function StarSky({
   useEffect(() => {
     if (!size) return;
     const fit = fitCamera(stars.map((star) => star.at), size.w, baseH.current ?? size.h);
-    if (!camera.current) camera.current = fit;
-    else if (!latest.current.open) camera.current = { ...camera.current, k: camera.current.k * (fit.k / fitK.current) };
+    if (!camera.current) {
+      fitK.current = fit.k;
+      camera.current = (zoomOn && topicCamera(zoomOn, size.w, size.h)) || fit;
+    } else if (!latest.current.open) camera.current = { ...camera.current, k: camera.current.k * (fit.k / fitK.current) };
     fitK.current = fit.k;
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -687,7 +831,7 @@ export function StarSky({
   // Anything else drawn changed: the focus, the domain picked out, the names.
   useEffect(() => {
     redraw();
-  }, [focusIndex, params.domain, names, dust, behind, open, lit, redraw]);
+  }, [focusIndex, params.domain, names, topics, dust, behind, open, lit, redraw]);
 
   // -- Moving the camera ---------------------------------------------------
   const flyTo = useCallback(
@@ -711,6 +855,17 @@ export function StarSky({
       flyTo(zoomAbout(from, at ?? { x: size.w / 2, y: size.h / 2 }, factor, size.w, size.h, fitK.current));
     },
     [flyTo, size],
+  );
+
+  const flyToTopic = useCallback(
+    (id: string) => {
+      if (!size) return;
+      const to = topicCamera(id, size.w, size.h);
+      if (!to) return;
+      lastTopic.current = id;
+      flyTo(to);
+    },
+    [flyTo, size, topicCamera],
   );
 
   const showAll = useCallback(() => {
@@ -853,6 +1008,19 @@ export function StarSky({
     }
     return null;
   };
+  /** The topic whose name or "+23 more" is under a point, if any. */
+  const topicAt = (at: Point): string | null => {
+    for (const { id, box } of topicBoxes.current) {
+      if (
+        at.x >= box.x - NAME_REACH &&
+        at.x <= box.x + box.w + NAME_REACH &&
+        at.y >= box.y - NAME_REACH &&
+        at.y <= box.y + box.h + NAME_REACH
+      )
+        return id;
+    }
+    return null;
+  };
   const [overName, setOverName] = useState(false);
 
   const down = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -873,7 +1041,7 @@ export function StarSky({
     if (!last) {
       // A mouse passing over: the star under it is pointed at, and a name shows it can be pressed.
       if (event.pointerType !== 'mouse') return;
-      const onName = nameAt(at) !== null;
+      const onName = nameAt(at) !== null || topicAt(at) !== null;
       if (onName !== overName) setOverName(onName);
       const i = onName ? -1 : nearest(at, POINT_REACH);
       const id = i >= 0 ? stars[i]!.id : null;
@@ -916,6 +1084,12 @@ export function StarSky({
     if (name) {
       if (name.kind === 'place') openGraph({ kind: 'place', id: name.id });
       else set({ domain: params.domain === name.id ? null : name.id, idea: null });
+      return;
+    }
+    // A topic's name, or the count of those not named, flies into it.
+    const topicId = topicAt(at);
+    if (topicId) {
+      flyToTopic(topicId);
       return;
     }
     const i = nearest(at, event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH);
@@ -1048,6 +1222,9 @@ export function StarSky({
     </div>
   );
 }
+
+/** Where the zoom buttons sit in the frame's corner, kept clear of names. */
+const ZOOM_PANEL = (w: number, h: number): Box => ({ x: w - 56, y: h - 140, w: 56, h: 140 });
 
 /** Zoom buttons keep the sky's light-on-dark colours whatever the theme's tokens say. */
 const ZOOM_BUTTON = 'text-inherit hover:bg-white/10 hover:text-white focus-visible:outline-white';

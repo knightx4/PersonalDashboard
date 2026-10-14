@@ -136,6 +136,7 @@ describe('loadIdeaMap', () => {
         'idea_place_members',
         'vault_dust',
         'evidence_links',
+        'idea_topic_parents',
       ]),
     );
   });
