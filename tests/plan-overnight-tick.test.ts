@@ -1636,10 +1636,16 @@ describe('sweepQuietRuns', () => {
             return chain;
           },
           // Started and stale runs, read by status (plan #1825).
-          in: async (column: string) =>
-            column === 'status'
-              ? { data: started.filter((row) => row.user_id === userId), error: null }
-              : { data: [], error: null },
+          // The sweep's own read across accounts ends in `limit`.
+          in: (column: string) =>
+            Object.assign(
+              Promise.resolve(
+                column === 'status'
+                  ? { data: started.filter((row) => row.user_id === userId), error: null }
+                  : { data: [], error: null },
+              ),
+              { limit: async () => ({ data: started, error: null }) },
+            ),
           limit: async () => ({ data: started, error: null }),
           update: (values: Record<string, unknown>) => ({
             eq: async (_column: string, id: string) => {

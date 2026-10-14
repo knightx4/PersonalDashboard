@@ -99,3 +99,12 @@ export const RUN_ACTIVITY_LABEL: Record<RunActivityKind, string> = {
 
 /** What a run that went quiet and was acknowledged is closed with. */
 export const ACKNOWLEDGED_STALE_ERROR = 'It stopped writing lines, and you acknowledged it.';
+
+/**
+ * What a stale plan run is closed with when nothing came back for two hours:
+ * no line from it and no change anywhere under its feature. The runner then
+ * treats the feature as free and starts a fresh session on it, which carries
+ * on from the feature branch the dead one pushed.
+ */
+export const ABANDONED_STALE_ERROR =
+  'It stopped writing lines and nothing under its feature changed for two hours, so it was ended and the runner can start it again.';
