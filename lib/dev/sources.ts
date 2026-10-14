@@ -54,9 +54,12 @@ export const devSources: ModuleSources = {
       weight: 'record',
       search: ['angle', 'body'],
       title: 'angle',
+      // Whether each draft went up, so Dash can tell which workspaces still
+      // have no post (note 5c73c50e).
+      facts: ['status', 'image_paths', 'posted_url', 'posted_at', 'dropped_at'],
       href: () => '/dev/posts',
       section: POSTS,
-      note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
+      note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread. image_paths are the pictures attached to it.',
     },
     {
       table: 'public.x_posts',

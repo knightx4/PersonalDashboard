@@ -89,24 +89,27 @@ describe('parseDraftPayload', () => {
     );
   });
 
-  it('refuses a draft that grounds nothing at all', () => {
+  it('keeps a draft that cites nothing, since it may answer from the posting', () => {
     const result = parseDraftPayload(
-      { answer: 'I am a hard worker.', evidence_item_ids: [] },
+      { answer: 'Sent is building one API for every channel.', evidence_item_ids: [] },
       offered,
       [],
     );
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.evidenceItemIds).toEqual([]);
   });
 
-  it('refuses a draft whose every citation was invented', () => {
+  it('keeps a draft whose every citation was invented, and flags it', () => {
     const result = parseDraftPayload(
       { answer: 'I did a thing.', evidence_item_ids: ['nope'] },
       offered,
       [],
     );
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error).toMatch(/does not exist/);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.evidenceItemIds).toEqual([]);
+    expect(result.draft.unsupportedClaims.join(' ')).toMatch(/does not exist/);
   });
 
   it('carries the unsupported claims through rather than smoothing them over', () => {

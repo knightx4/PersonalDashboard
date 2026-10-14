@@ -560,7 +560,7 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Search: `angle`, `body`
 - Name a row by `angle`; link it by `id`
 - Opens at `/dev/posts`
-- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread. image_paths are the pictures attached to it.
 
 ### `public.x_posts` (Dev)
 
