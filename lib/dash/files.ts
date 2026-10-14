@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import sharp from 'sharp';
 import { docxText } from '@/lib/goals/docx';
 
 /**
@@ -11,8 +12,8 @@ import { docxText } from '@/lib/goals/docx';
  *
  * A file that cannot be read is still named to Dash, with the reason, so the
  * answer can say so rather than act as though nothing was sent: an old .doc
- * (only .docx has a text reader here), a picture over the model's size limit,
- * a PDF over its page limit, or files past what one request can carry.
+ * (only .docx has a text reader here), a picture that cannot be opened or
+ * made small enough, a PDF over its page limit, or files past what one request can carry.
  */
 
 type ImageType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
@@ -55,11 +56,48 @@ function cut(text: string): string {
   return text.length > TEXT_MAX_CHARS ? `${text.slice(0, TEXT_MAX_CHARS)}\n[cut here: the file goes on]` : text;
 }
 
+/**
+ * The sizes tried, in order, on a picture over IMAGE_MAX_BYTES: the longest
+ * side and the JPEG quality. 2000 px is more than the model looks at, and
+ * 1568 px is the size it scales larger pictures down to anyway.
+ */
+const SHRINK_STEPS: readonly { side: number; quality: number }[] = [
+  { side: 2000, quality: 85 },
+  { side: 2000, quality: 70 },
+  { side: 1568, quality: 70 },
+  { side: 1568, quality: 50 },
+];
+
+/**
+ * A smaller JPEG copy of a picture too large to send, or the reason there is
+ * none. Only the copy sent to the model changes; the stored file is never
+ * rewritten. A transparent PNG is flattened onto white, and a GIF gives its
+ * first frame.
+ */
+async function shrinkImage(bytes: Uint8Array): Promise<{ data: Buffer } | { why: string }> {
+  try {
+    for (const { side, quality } of SHRINK_STEPS) {
+      const data = await sharp(bytes)
+        .rotate()
+        .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
+        .flatten({ background: '#ffffff' })
+        .jpeg({ quality })
+        .toBuffer();
+      if (data.length <= IMAGE_MAX_BYTES) return { data };
+    }
+  } catch {
+    return { why: 'the picture could not be opened' };
+  }
+  return { why: 'the picture is still over the 3.75 MB Dash can look at after shrinking it' };
+}
+
 /** One stored file, as Dash will read it. */
-export function readFile(name: string, contentType: string, bytes: Uint8Array): DashFile {
+export async function readFile(name: string, contentType: string, bytes: Uint8Array): Promise<DashFile> {
   if (IMAGE_TYPES.has(contentType)) {
     if (bytes.length > IMAGE_MAX_BYTES) {
-      return { name, kind: 'unread', why: 'the picture is over the 3.75 MB Dash can look at' };
+      const shrunk = await shrinkImage(bytes);
+      if ('why' in shrunk) return { name, kind: 'unread', why: shrunk.why };
+      return { name, kind: 'image', mediaType: 'image/jpeg', data: shrunk.data.toString('base64') };
     }
     return { name, kind: 'image', mediaType: contentType as ImageType, data: Buffer.from(bytes).toString('base64') };
   }
