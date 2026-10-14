@@ -373,9 +373,95 @@ describe('files sent with a capture (plan #1714)', () => {
     const world = setup();
     expect(await makeCaptureKind('order', { text: 'a kettle for $30' }, world.writers)).toMatchObject({
       ok: false,
-      error: 'That cannot be added from here.',
+      error: 'That cannot be added from here. Open its list and press Add there.',
     });
     expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('makes a role from a sentence through its writer, opens it, and records it as yours (plan #1950.4)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      role: async (input) => {
+        asked.push(input);
+        return { ok: true, roleId: ROLE.id, title: 'Product Analyst at Stripe' };
+      },
+    };
+    const made = await makeCaptureKind('job-role', { text: 'Product Analyst at Stripe' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([{ url: null, title: 'Product Analyst', company: 'Stripe' }]);
+    expect(made.filed).toMatchObject({ place: 'jobs', ref: `job_search.roles:${ROLE.id}`, page: `/jobs/roles/${ROLE.id}` });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({
+      kind: 'add_job_lead',
+      summary: 'You saved Product Analyst at Stripe to your leads.',
+      undo: { aimed: true },
+    });
+    // Without a writer bound, as on the shortcuts' route, it says so.
+    expect(await makeCaptureKind('job-role', { text: 'Analyst at Ramp' }, world.writers)).toMatchObject({ ok: false });
+  });
+
+  it('starts a topic with the list pasted under it, opens it, and Undo takes it back (plan #1950.4)', async () => {
+    const world = setup();
+    world.tables['learn.tracks'] = [];
+    world.tables['learn.readings'] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      topic: async ({ title, readings }) => {
+        const trackId = fakeId();
+        world.tables['learn.tracks'].push({ id: trackId, user_id: ME, title });
+        for (const reading of readings) {
+          // Written before the record, as the writer does.
+          world.tables['learn.readings'].push({ id: fakeId(), user_id: ME, track_id: trackId, title: reading.title, created_at: '2026-10-01T00:00:00Z' });
+        }
+        return { ok: true, trackId, readings: readings.length };
+      },
+    };
+    const made = await makeCaptureKind('learn-topic', { text: 'Central banking\n- Lords of Finance\n- The Alchemists' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const trackId = world.tables['learn.tracks'][0].id as string;
+    expect(made.filed).toMatchObject({ place: null, page: `/learn/t/${trackId}`, where: 'Learn · Reading lists' });
+    expect(world.tables['learn.readings']).toHaveLength(2);
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe(
+      'You started the topic "Central banking" with 2 readings.',
+    );
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['learn.tracks']).toEqual([]);
+  });
+
+  it('opens a link saved before without recording it, so Undo cannot take an older reading (plan #1950.4)', async () => {
+    const world = setup();
+    const reading = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      reading: async () => ({ ok: true, readingId: reading, title: 'How rates work', created: false }),
+    };
+    const made = await makeCaptureKind('learn-reading', { text: 'https://example.com/rates' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(made.filed).toMatchObject({ actionId: null, page: `/learn/r/${reading}` });
+    expect(made.errors).toEqual(['"How rates work" was on your reading lists already.']);
+    expect(world.tables['core.dash_actions']).toEqual([]);
+    expect(await makeCaptureKind('learn-reading', { text: 'no link here' }, writers)).toMatchObject({ ok: false });
+  });
+
+  it('starts a quiz over named notes and pasted text, and opens it (plan #1950.4)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const quiz = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      quiz: async (input) => {
+        asked.push(input);
+        return { ok: true, quizId: quiz, title: 'Monetary policy' };
+      },
+    };
+    const made = await makeCaptureKind('learn-quiz', { text: 'Rates move prices.\n[[Monetary policy]]' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([{ paste: 'Rates move prices.', notes: ['Monetary policy'] }]);
+    expect(made.filed).toMatchObject({ page: `/learn/quiz/${quiz}` });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_quiz', subject_ref: `learn.quizzes:${quiz}` });
   });
 
   it('refuses an aimed add with nothing typed, and a note with no role', async () => {

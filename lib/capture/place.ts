@@ -96,7 +96,7 @@ export function captureFiling(
 
 /** One part, once filed: where it went and what undoes it. */
 export type FiledCapture = {
-  /** Where the sort filed it; null for a kind only an Add button makes (plan #1950.3.1). */
+  /** Null for a kind only an Add button makes, which no place files (plan #1950.4). */
   place: CapturePlace | null;
   /** The words filed. */
   text: string;

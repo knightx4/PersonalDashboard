@@ -143,7 +143,7 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
         icon={MessageSquareText}
         title="No questions captured yet"
         description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically. Questions are deduped by fingerprint, so the same question asked in different words lands on one row."
-        action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+        action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         secondaryAction={{ label: 'Get the bookmarklet', href: '/jobs/settings#bookmarklet' }}
       />
     );

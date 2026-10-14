@@ -685,10 +685,56 @@ const LEAD_TITLE_MAX = 300;
  * either; the company stays.
  */
 async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  return saveJobLead(ctx, { url: text(args, 'url') || null, title: text(args, 'title'), company: text(args, 'company') });
+}
+
+/** What saving a lead needs: the person, their workspaces, their clients and a way to read a posting. */
+export type JobLeadContext = Pick<DashWriteContext, 'userId' | 'enabledModules' | 'db' | 'readPosting'>;
+
+/**
+ * The add_job_lead write for capture's Add a role (plan #1950.4): the same
+ * checks, the same reading of the link and the same rows, from a link or a
+ * title and company the capture field named. Never throws.
+ */
+export async function writeJobLead(
+  ctx: JobLeadContext,
+  input: { url: string | null; title: string; company: string },
+): Promise<DashWriteResult> {
+  try {
+    return await saveJobLead(ctx, input);
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: leadRefusalForPerson(error.message) };
+    console.error('dash write add_job_lead failed', error);
+    return { ok: false, error: 'The role could not be saved. Nothing was changed.' };
+  }
+}
+
+/**
+ * The refusals add_job_lead words for the model, said to the person instead:
+ * capture shows them under the field, where there is no one to ask them.
+ */
+function leadRefusalForPerson(message: string): string {
+  if (message.startsWith('That posting is saved already')) {
+    const title = message.match(/as the role "([^"]+)"/)?.[1];
+    return title ? `That posting is saved already, as ${title}.` : 'That posting is saved already.';
+  }
+  if (message.startsWith('The posting at that link could not be read')) {
+    return 'The posting at that link could not be read. Add the role and the company after it, such as Analyst at Ramp.';
+  }
+  if (message.startsWith('The company is missing')) {
+    return 'Dash could not tell the company from that link. Add it after the link, such as at Ramp.';
+  }
+  return message;
+}
+
+async function saveJobLead(
+  ctx: JobLeadContext,
+  input: { url: string | null; title: string; company: string },
+): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
-  const url = text(args, 'url') || null;
-  let title = text(args, 'title');
-  let companyName = text(args, 'company');
+  const url = input.url?.trim() || null;
+  let title = input.title.trim();
+  let companyName = input.company.trim();
   if (url && !/^https?:\/\/\S+$/i.test(url)) throw new Refused('url is not a web link starting http:// or https://.');
   if (!url && (!title || !companyName)) {
     throw new Refused('Give the posting link, or the role title and the company. Ask them for whichever is missing.');

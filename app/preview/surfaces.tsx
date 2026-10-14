@@ -43,6 +43,7 @@ import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
+import { AimedJobsLearnSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
@@ -76,7 +77,6 @@ import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
-import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
 import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
@@ -141,11 +141,9 @@ import {
   LearnConceptSurface,
   LearnConceptEvidenceSurface,
   LearnListsSurface,
-  LearnNewSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
   LearnProbeSurface,
-  LearnQuizNewSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
   LearnReadingSurface,
@@ -4346,20 +4344,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ContactDetail contact={contact} timezone="Europe/London" />,
   },
   {
-    id: 'jobs-role-new',
-    label: 'Role · New',
-    module: 'jobs',
-    width: 'wide',
-    // Opened on Referral, so the field naming who referred you is drawn too.
-    // The padding is the room the app shell keeps under a page for the dock,
-    // so Add role, pinned above the dock, sits where it does in the app.
-    render: () => (
-      <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
-        <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
-      </div>
-    ),
-  },
-  {
     id: 'jobs-find',
     label: 'Find',
     module: 'jobs',
@@ -5045,6 +5029,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'page',
     render: () => <ShoppingListAddsSurface />,
+  },
+  {
+    /* Capture aimed at the Jobs and Learn kinds (plan #1950.4): a role from
+     * a posting link while the page is read, a topic with a reading list
+     * pasted under it, and a quiz naming a note the vault does not have. */
+    id: 'shell-capture-aimed-jobs-learn',
+    label: 'Capture · Aimed at a role, a topic or a quiz',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AimedJobsLearnSurface />,
   },
 
   {
@@ -6585,13 +6579,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnListsSurface />,
   },
   {
-    id: 'learn-new',
-    label: 'Reading lists · Start one',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnNewSurface />,
-  },
-  {
     id: 'learn-opening',
     label: 'Before you start · The opening questions, answered',
     module: 'learn',
@@ -6611,13 +6598,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnQuizTakeSurface />,
-  },
-  {
-    id: 'learn-quiz-new',
-    label: 'Quiz · Start one',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnQuizNewSurface />,
   },
   {
     id: 'learn-reading',

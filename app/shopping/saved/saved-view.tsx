@@ -138,10 +138,12 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
             title={EMPTY[status].title}
             description={EMPTY[status].description}
             // Saving opens capture aimed at a link (plan #1950.3.1).
-            action={status === 'saved' ? undefined : { label: 'Back to saved', href: '/shopping/saved' }}
-          >
-            {status === 'saved' && <AimButton aim={{ kind: 'saved-item' }} label="Save your first link" size="md" />}
-          </EmptyState>
+            action={
+              status === 'saved'
+                ? { label: 'Save your first link', aim: { kind: 'saved-item' } }
+                : { label: 'Back to saved', href: '/shopping/saved' }
+            }
+          />
         </PageColumn>
       ) : (
         <ListPage header={header} tools={tools} foot={`${items.length} ${status}`}>

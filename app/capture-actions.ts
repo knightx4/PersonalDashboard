@@ -28,7 +28,10 @@ import { fileVaultNote, undoVaultCapture, vaultWritable } from '@/lib/capture/va
 import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actions';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import { writeRoleNote } from '@/lib/dash/writes';
+import { writeJobLead, writeRoleNote } from '@/lib/dash/writes';
+import { writeQuiz, writeReading, writeTopic } from '@/lib/capture/learn';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { createVaultClient } from '@/lib/vault/auth/server';
 import { serverEnv } from '@/lib/env';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { CAPTURE_BODY_MAX } from '@/lib/goals/capture';
@@ -236,6 +239,16 @@ async function rowWriters(
     },
     vault: (text) => fileVaultNote(userId, text),
     record: (entry) => recordDashAction(deps, entry),
+    role: async (input) => {
+      const written = await writeJobLead({ userId, enabledModules: modules, db: requestAskDb() }, input);
+      if (!written.ok) return { ok: false as const, error: written.error };
+      const lead = written.input as { roleId: string; roleTitle: string; companyName: string };
+      return { ok: true as const, roleId: lead.roleId, title: `${lead.roleTitle} at ${lead.companyName}` };
+    },
+    reading: async (url) => writeReading(await createLearnClient(), userId, url),
+    topic: async (input) => writeTopic(await createLearnClient(), userId, input),
+    quiz: async (input) =>
+      writeQuiz(await createLearnClient(), modules.includes('vault') ? createVaultClient : null, userId, input),
     ...(files.length > 0
       ? {
           attach: async (ref: string) => {

@@ -1,36 +1,35 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, type ButtonProps } from '@/components/ui/button';
 import { useCaptureAim } from '@/components/shell/capture-aim';
 import type { CaptureAim } from '@/lib/capture/actions';
 
 /**
- * A page's Add button that opens capture aimed at its kind (plan #1950.3.1):
- * the button a header or an empty list leads with, where AddTrigger is the
- * quiet line inside a section. One press opens the panel, one more makes the
- * row and opens it.
- *
- * Outside the shell (the gallery) there is no capture to open, and the
- * button does nothing.
+ * A list's Add button drawn as a button rather than a quiet line (plan
+ * #1950.4): the header action on a page whose main offer is adding, such as
+ * Add a role on the pipeline. It opens capture aimed at the kind, the same as
+ * `AddTrigger`; outside the shell (the gallery) the press does nothing.
  */
 export function AimButton({
   aim,
   label,
   variant = 'primary',
   size = 'sm',
+  className,
 }: {
   aim: CaptureAim;
   label: string;
-  variant?: 'primary' | 'secondary';
-  size?: 'sm' | 'md';
+  variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
+  className?: string;
 }) {
   const openAimed = useCaptureAim();
 
   return (
-    <button type="button" onClick={() => openAimed?.(aim)} className={buttonVariants({ variant, size })}>
-      <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+    <Button type="button" variant={variant} size={size} className={className} onClick={() => openAimed?.(aim)}>
+      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
       {label}
-    </button>
+    </Button>
   );
 }
