@@ -15,6 +15,7 @@ import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
 import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
 import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
@@ -508,6 +509,15 @@ const rolePanels: PanelProps = {
       summary: 'From the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+    {
+      id: 'e4',
+      kind: 'screen_scheduled',
+      occurredAt: '2026-09-04T16:10:00.000Z',
+      source: 'email',
+      summary: 'Phone screen with Dana Okafor, 15 September',
+      needsReview: false,
+      gmailHref: null,
     },
     {
       id: 'e2',
@@ -3453,6 +3463,26 @@ export const SURFACES: readonly Surface[] = [
         {...rolePanels}
         status="drafting"
         defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answer-draft',
+    label: 'Role · An answer with its draft',
+    module: 'jobs',
+    width: 'wide',
+    // The draft beside a question after Draft is pressed (note ad554975): one
+    // drawn from the posting alone, citing nothing from the bank.
+    render: () => (
+      <AnswerCard
+        answer={rolePanels.answers[0]}
+        closed={false}
+        initialDraft={{
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          evidenceItemIds: [],
+          unsupportedClaims: ['for two years'],
+          bannedFound: [],
+        }}
       />
     ),
   },

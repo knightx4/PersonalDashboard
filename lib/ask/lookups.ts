@@ -182,7 +182,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   // something else (a note by path, a company by slug), so an id is taken too.
   const byId = refColumn !== 'id' && refColumn !== owner && isUuid(ref);
   const columns = [
-    ...new Set([refColumn, ...(refColumn !== owner ? ['id'] : []), source.title, ...source.search]),
+    ...new Set([refColumn, ...(refColumn !== owner ? ['id'] : []), source.title, ...source.search, ...(source.facts ?? [])]),
   ];
 
   const client = await ctx.db(schema);
@@ -199,7 +199,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   const canonical = String(row[refColumn] ?? row.id ?? ref);
   const href = (BETTER_HREFS[table] ?? source.href!)(canonical);
   const detail: Record<string, string | null> = {};
-  for (const column of source.search) detail[column] = clip(asText(row[column]), 1500);
+  for (const column of [...source.search, ...(source.facts ?? [])]) detail[column] = clip(asText(row[column]), 1500);
   const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
   if (comments) detail.comments = comments;
 

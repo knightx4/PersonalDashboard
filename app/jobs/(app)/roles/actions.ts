@@ -473,7 +473,8 @@ export async function lookUpJobDescription(roleId: string): Promise<JdLookupResu
 }
 
 /**
- * Drafting one answer from the bank.
+ * Drafting one answer: the best answer to the question, drawing on the bank
+ * and the posting (note ad554975).
  *
  * The draft comes back to the caller and is not written anywhere. It lands
  * beside the textarea, not in it, and only an Insert followed by a Save puts
@@ -501,7 +502,7 @@ export async function draftAnswerFromEvidence(
     .select(
       `id, word_limit,
        questions!application_answers_question_id_fkey!inner ( text, canonical_answer ),
-       applications!inner ( roles!inner ( title, requirement_matches, companies!inner ( name ) ) )`,
+       applications!inner ( roles!inner ( title, jd_text, requirement_matches, companies!inner ( name ) ) )`,
     )
     .eq('id', parsed.data.answerId)
     .eq('user_id', user.id)
@@ -514,6 +515,7 @@ export async function draftAnswerFromEvidence(
   const role = (row.applications as unknown as {
     roles: {
       title: string;
+      jd_text: string | null;
       requirement_matches: RequirementMatch[] | null;
       companies: { name: string } | null;
     };
@@ -543,12 +545,6 @@ export async function draftAnswerFromEvidence(
     strength: item.strength as number,
   }));
 
-  if (items.length === 0) {
-    return {
-      draft: null,
-      error: 'Your evidence bank is empty. Fill it in Material — a draft from nothing is a blank page with extra steps.',
-    };
-  }
 
   // The shortlist is against the question rather than the description: this
   // one answer is about one thing, and sending the whole bank invites the
@@ -579,6 +575,7 @@ export async function draftAnswerFromEvidence(
       banned: banned.length > 0 ? banned : DEFAULT_BANNED_CONSTRUCTIONS,
       canonicalAnswer: question.canonical_answer,
       requirementSummary: wants || null,
+      posting: role.jd_text,
     },
   );
   await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-answer' }, spend);
