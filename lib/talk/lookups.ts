@@ -5,6 +5,7 @@ import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -72,6 +73,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...TODO_CHANGE_KINDS,
   ...YOU_CHANGE_KINDS,
   ...NEWS_CHANGE_KINDS,
+  ...GOALS_CHANGE_KINDS,
 ];
 
 /**

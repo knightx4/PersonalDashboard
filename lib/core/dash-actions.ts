@@ -4,6 +4,7 @@ import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -174,6 +175,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...TODO_CHANGE_KINDS,
   ...YOU_CHANGE_KINDS,
   ...NEWS_CHANGE_KINDS,
+  ...GOALS_CHANGE_KINDS,
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
@@ -339,6 +341,8 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     { schema: 'learn', table: 'aims', column: 'goal_id' },
     { schema: 'public', table: 'raised_items', column: 'goal_id' },
   ],
+  // An area an agent added (plan #1894.7.1): the goals filed under it since.
+  'goals.areas': [{ schema: 'goals', table: 'items', column: 'area_id' }],
   'goals.collections': [
     { schema: 'goals', table: 'records', column: 'collection_id' },
     { schema: 'goals', table: 'items', column: 'collection_id' },

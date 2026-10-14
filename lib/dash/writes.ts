@@ -25,6 +25,7 @@ import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
+import { GOALS_WRITE_TOOLS } from './goals-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -62,6 +63,9 @@ import { NEWS_WRITE_TOOLS } from './news-writes';
  *   News's four and stop_watch  an issue marked unread, a story saved or
  *                    unsaved, sent to Learn or made a todo, and a price
  *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
+ *   Goals' two       an area added, renamed, noted, moved or archived, and a
+ *                    goal edited, moved, archived, closed, parked or
+ *                    reopened (lib/dash/goals-writes.ts, plan #1894.7.1).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
  *
@@ -1087,6 +1091,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...YOU_WRITE_TOOLS,
   // News's, and stopping a watch, which the connector offers too (plan #1894.9.4).
   ...NEWS_WRITE_TOOLS,
+  // Goals' areas and goals, which the connector offers too (plan #1894.7.1).
+  ...GOALS_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

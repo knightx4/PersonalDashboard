@@ -56,6 +56,8 @@ describe('runConnectorWrite', () => {
       'send_story_to_learn',
       'make_todo_from_story',
       'stop_watch',
+      'change_goal_area',
+      'change_goal',
     ]);
   });
 

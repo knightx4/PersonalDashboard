@@ -3,18 +3,18 @@ import { GAP, gap, none, tool, type ModuleActions } from '@/lib/agent-actions/ty
 /** What the Goals pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const goalsActions: ModuleActions = {
   'app/goals/actions.ts': {
-    addArea: GAP,
-    renameAreaAction: GAP,
-    setAreaNoteAction: GAP,
+    addArea: tool('change_goal_area'),
+    renameAreaAction: tool('change_goal_area'),
+    setAreaNoteAction: tool('change_goal_area'),
     planAreaAction: none('spends'),
     approveAreaAction: none('theirs'),
-    moveAreaAction: GAP,
-    archiveAreaAction: GAP,
+    moveAreaAction: tool('change_goal_area'),
+    archiveAreaAction: tool('change_goal_area'),
     addGoal: tool('add_goal'),
-    editGoal: gap("set_goal_done_when sets the done-when; the wording, due date and area have no tool yet (plan #1894.7)."),
-    moveGoalAction: GAP,
-    archiveGoalAction: GAP,
-    settleGoalAction: GAP,
+    editGoal: tool('set_goal_done_when', 'change_goal'),
+    moveGoalAction: tool('change_goal'),
+    archiveGoalAction: tool('change_goal'),
+    settleGoalAction: tool('change_goal'),
   },
   'app/goals/[goalId]/actions.ts': {
     addStep: tool('add_goal_step'),

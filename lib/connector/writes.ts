@@ -22,6 +22,7 @@ import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subject
 import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
 import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
+import { GOALS_WRITES, runGoalsWrite } from '@/lib/dash/goals-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 
 /**
@@ -484,6 +485,43 @@ const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * Goals' area and goal changes (plan #1894.7.1, lib/dash/goals-writes.ts), the
+ * same tools Ask has, run here on the service-role goals clients for the
+ * verified person. Each is recorded with recordDashAction rather than the
+ * bare record above, since a move or an area's archive keeps the sentence
+ * saying why it has no Undo.
+ */
+const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account || !ctx.goals) refuse();
+    if (!ctx.account.enabledModules.includes('goals')) {
+      throw new AskInputError('The Goals workspace is switched off, so nothing can be changed there.');
+    }
+    const made = await runGoalsWrite(write, { userId: ctx.userId, goals: await ctx.db('goals'), write: ctx.goals }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    if (!recorded) console.error('[connector write] record', made.kind);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
 type SharedWrite =
   | 'add_quick_note'
@@ -615,6 +653,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...TODO_TOOLS,
   ...YOU_TOOLS,
   ...NEWS_TOOLS,
+  ...GOALS_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */
