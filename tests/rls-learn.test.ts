@@ -119,6 +119,7 @@ describe('RLS coverage', () => {
       'concept_state',
       'concept_subjects',
       'concepts',
+      'course_embeddings',
       'course_reads',
       'curriculum_units',
       'essay_notes',
@@ -2566,7 +2567,9 @@ describe('vault notes as evidence for ideas (plan #2006.3)', () => {
     ideaId = idea.id;
     const [connection] = await admin<{ id: string }[]>`
       insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
-      values (${userA}, 'a', 'evidence-vault', 'main', 'encrypted') returning id`;
+      values (${userA}, 'a', 'evidence-vault', 'main', 'encrypted')
+      on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
+      returning id`;
     const notes = await admin<{ id: string; path: string }[]>`
       insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
       values
