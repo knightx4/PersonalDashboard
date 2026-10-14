@@ -63,7 +63,7 @@ save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
 change_goal_link, change_goal_form and change_goals_inbox, and in Shopping change_item, item_lists, add_items and change_saved_item, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
-change_course, and in Jobs change_role, change_application, change_company and merge_roles. This
+change_course, and in Jobs change_role, change_application, change_company, merge_roles, change_reminder and change_waiting. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

@@ -74,6 +74,8 @@ describe('runConnectorWrite', () => {
       'change_application',
       'change_company',
       'merge_roles',
+      'change_reminder',
+      'change_waiting',
     ]);
   });
 

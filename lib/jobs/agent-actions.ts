@@ -17,10 +17,10 @@ export const jobsActions: ModuleActions = {
     mergeRoles: tool('merge_roles'),
   },
   'app/jobs/(app)/_home/actions.ts': {
-    completeReminder: GAP,
-    snoozeReminder: GAP,
-    completeWaiting: GAP,
-    snoozeWaiting: GAP,
+    completeReminder: tool('change_reminder'),
+    snoozeReminder: tool('change_reminder'),
+    completeWaiting: tool('change_waiting'),
+    snoozeWaiting: tool('change_waiting'),
   },
   'app/jobs/(app)/_home/prepare-actions.ts': {
     prepareWithDash: none('spends'),
@@ -136,8 +136,8 @@ export const jobsActions: ModuleActions = {
     writeRoundPrepNote: none('spends'),
   },
   'app/jobs/(app)/roles/[id]/timeline-actions.ts': {
-    updateReminder: GAP,
-    linkReminderMessage: GAP,
+    updateReminder: tool('change_reminder'),
+    linkReminderMessage: tool('change_reminder'),
   },
   'app/jobs/(app)/roles/[id]/comment-actions.ts': {
     addRoleComment: none('theirs'),
