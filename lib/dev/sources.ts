@@ -1,5 +1,5 @@
 import { planRefHref } from '@/lib/comments/refs';
-import type { ModuleSources, Page } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Page, type Section } from '@/lib/sources/types';
 
 /**
  * The dev workspace's tables, as Goals reads them (lib/sources/types.ts).
@@ -20,11 +20,30 @@ const PAGES: Record<string, Page> = {
     title: 'title',
     reads: ['number'],
     href: (row) => (typeof row.number === 'number' ? planRefHref(row.number) : null),
+    section: { href: '/dev/plan', label: 'Plan' },
+    // A step sits under its feature, and a sub-step under its step.
+    parent: parentBy('parent_id', 'public.plan_items'),
   },
-  'public.ideas': { title: 'body', href: (row) => `/dev/ideas#idea-${row.id}` },
-  'public.feedback_items': { title: 'body', href: (row) => `/dev/bugs#note-${row.id}` },
-  'public.raised_items': { title: 'title', href: (row) => `/dev/inbox#raise-${row.id}` },
+  'public.ideas': {
+    title: 'body',
+    href: (row) => `/dev/ideas#idea-${row.id}`,
+    section: { href: '/dev/ideas', label: 'Ideas' },
+  },
+  'public.feedback_items': {
+    title: 'body',
+    href: (row) => `/dev/bugs#note-${row.id}`,
+    section: { href: '/dev/bugs', label: 'Bugs and requests' },
+  },
+  'public.raised_items': {
+    title: 'title',
+    href: (row) => `/dev/inbox#raise-${row.id}`,
+    section: { href: '/dev/inbox', label: 'Inbox' },
+  },
 };
+
+/** The sections of Dev's nav the sources below sit under (app/dev/layout.tsx). */
+const POSTS: Section = { href: '/dev/posts', label: 'Posts' };
+const SPECS: Section = { href: '/dev/specs', label: 'Specs' };
 
 export const devSources: ModuleSources = {
   sources: [
@@ -36,6 +55,7 @@ export const devSources: ModuleSources = {
       search: ['angle', 'body'],
       title: 'angle',
       href: () => '/dev/posts',
+      section: POSTS,
       note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
     },
     {
@@ -46,6 +66,7 @@ export const devSources: ModuleSources = {
       search: ['text'],
       title: 'text',
       href: () => '/dev/posts',
+      section: POSTS,
       note: 'created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.',
     },
     {
@@ -56,6 +77,7 @@ export const devSources: ModuleSources = {
       search: ['summary'],
       title: 'module',
       href: () => '/dev/specs',
+      section: SPECS,
       note: "module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.",
     },
   ],

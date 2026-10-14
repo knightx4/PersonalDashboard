@@ -16,6 +16,9 @@ export const filesSources: ModuleSources = {
       search: ['title', 'summary', 'body'],
       title: 'title',
       href: fileHref,
+      // A file sits under the step it was written for, in Goals' section.
+      section: null,
+      parent: { reads: ['origin'], ref: (row) => (typeof row.origin === 'string' ? row.origin : null) },
       note: "Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'; origin 'goals.items:<id>' is the step it was written for, and each step has one file, revised in versions through goals.file_result. read_at is null while they have not read the current version. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.",
     },
   ],
