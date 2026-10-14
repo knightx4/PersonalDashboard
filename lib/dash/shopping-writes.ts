@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isUuid, type AskDb, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import { namedItems } from '@/lib/ask/change-view';
 import type { ShoppingChangeInput, ShoppingChangeKind } from '@/lib/ask/shopping-changes';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
@@ -26,6 +26,11 @@ import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import { displayName } from '@/lib/inventory/group-units';
 import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
 import { pickListGradient } from '@/lib/lists/gradients';
+import { PERSON_COLOURS } from '@/lib/people/load';
+import { mergePayments, moveCharges, renamePayment, setPaymentCounted } from '@/lib/recurring/corrections';
+import { payeeKey } from '@/lib/recurring/extraction';
+import { PAYEE_MAX } from '@/lib/recurring/limits';
+import { MOVED_NO_UNDO } from '@/lib/recurring/record';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
 import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
@@ -63,6 +68,16 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   review_orders the review queue: confirm, unconfirm, discard and restore
  *                 orders, dismiss and undismiss waiting emails, and attach one
  *                 to the order it is about. Deleting an order stays on the page.
+ *   change_recurring
+ *                 a recurring payment renamed, left out of the monthly total
+ *                 or counted again, merged into another, or some of its
+ *                 charges moved to another payment (plan #1894.5.5). A merge
+ *                 and a move have no Undo, as the mail reader's own moves
+ *                 have none: each changes the charges and both payments.
+ *   return_window a shop's return window set, or a shop of their own added
+ *                 with one, as Shopping's settings do (plan #1894.5.5).
+ *   change_person someone they shop for added, renamed or given another
+ *                 colour (plan #1894.5.5). Removing one stays on the page.
  *
  * Both Ask and the connector run them, as News's (lib/dash/news-writes.ts):
  * Ask on the person's own clients, the connector on service-role ones for the
@@ -89,9 +104,9 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
 
 export type ShoppingWriteEnv = {
   userId: string;
-  /** The public schema, where every Shopping table is. */
+  /** The public schema, where every Shopping table but people is. */
   shop: SchemaClient;
-  /** Every schema, for the one change that reads an email again from Gmail (core). Without it, the subject is read alone. */
+  /** Every schema, for core.people and for reading an email again from Gmail (core). Without it, the subject is read alone. */
   db?: AskDb;
 };
 
@@ -110,7 +125,24 @@ const TABLES = {
   ingested_messages: { owned: false },
   shipments: { owned: false },
   returns: { owned: true },
+  recurring_payments: { owned: true },
+  merchant_return_policies: { owned: true },
+  // A shop of their own keeps its owner in created_by_user_id (OWNER_COLUMN).
+  merchants: { owned: false },
+  // In core, not public (TABLE_SCHEMA).
+  people: { owned: true },
 } as const;
+
+/** The tables outside public. */
+const TABLE_SCHEMA: Partial<Record<keyof typeof TABLES, AskSchema>> = { people: 'core' };
+
+/** The tables whose owner is kept under another name than user_id. */
+const OWNER_COLUMN: Partial<Record<keyof typeof TABLES, string>> = { merchants: 'created_by_user_id' };
+
+/** The column that says whose a row is, or null for a table that keeps none. */
+function ownerColumn(table: keyof typeof TABLES): string | null {
+  return OWNER_COLUMN[table] ?? (TABLES[table].owned ? 'user_id' : null);
+}
 
 export type ShoppingTable = keyof typeof TABLES;
 
@@ -125,6 +157,8 @@ export type ShoppingUndo = {
   rows?: { table: ShoppingTable; id: string; before: Row; after: Row }[];
   added?: { table: ShoppingTable; id: string }[];
   removed?: { table: ShoppingTable; values: Row }[];
+  /** Why there is no Undo, for a change that cannot be put back row by row (noUndoReason). */
+  none?: string;
 };
 
 /** A Shopping change as made, before a surface keeps it. */
@@ -1717,6 +1751,481 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
   };
 }
 
+// ---------------------------------------------------------------------------
+// change_recurring
+// ---------------------------------------------------------------------------
+
+const RECURRING_CHANGES = ['rename', 'leave_out', 'count', 'merge', 'move'] as const;
+type RecurringChange = (typeof RECURRING_CHANGES)[number];
+const RECURRING = 'public.recurring_payments';
+const RECURRING_HREF = '/shopping/recurring';
+/** The Recurring page and the agenda, which lists bills and renewals by payee. */
+const RECURRING_PATHS = ['/shopping/recurring', '/todo'];
+/** What working a payment out again from its charges can change. */
+const SUMMARY_COLUMNS = ['status', 'amount_cents', 'currency', 'period', 'next_date', 'last_charged_on'] as const;
+export const MERGED_NO_UNDO =
+  'There is no Undo, because the merge moved every charge onto the kept payment and worked its amount out again. To split them, move the charges on the Recurring page.';
+
+const flatName = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '');
+
+/** Their payment by the name it shows under, the key the mail files it by, or a name a merge left on it. */
+async function findPayment(env: ShoppingWriteEnv, name: string | undefined, key: string): Promise<Row> {
+  if (!name) throw new ShoppingRefused(`Name the payment by ${key}, as it shows on the Recurring page.`);
+  const { data, error } = await env.shop.from('recurring_payments').select('*').eq('user_id', env.userId);
+  if (error) throw new Error(`Reading their recurring payments failed: ${error.message}`);
+  const rows = (data ?? []) as Row[];
+  const byName = rows.filter((row) => flatName(row.payee) === flatName(name));
+  if (byName.length === 1) return byName[0];
+  const payee = payeeKey(name);
+  const byKey = rows.find((row) => row.payee_key === payee);
+  if (byKey) return byKey;
+  const { data: alias, error: aliasError } = await env.shop
+    .from('recurring_payee_aliases')
+    .select('payment_id')
+    .eq('user_id', env.userId)
+    .eq('payee_key', payee)
+    .maybeSingle();
+  if (aliasError) throw new Error(`Reading their payment names failed: ${aliasError.message}`);
+  const aliased = alias ? rows.find((row) => row.id === (alias as Row).payment_id) : undefined;
+  if (aliased) return aliased;
+  if (rows.length === 0) throw new ShoppingRefused('They have no recurring payments in Shopping yet.');
+  const names = rows.slice(0, 25).map((row) => `"${named(row.payee, '')}"`);
+  throw new ShoppingRefused(
+    `They have no recurring payment called "${name}". Theirs are ${names.join(', ')}${rows.length > 25 ? ' and more' : ''}.`,
+  );
+}
+
+/** "$9.99 on 2026-09-01", for naming a charge back to the model. */
+function chargeLine(charge: Row): string {
+  const amount = typeof charge.amount_cents === 'number' ? `${formatMoney(charge.amount_cents)} ` : '';
+  return `${amount}on ${String(charge.occurred_on)}`;
+}
+
+async function changeRecurring(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const change = (typeof args.change === 'string' ? args.change.trim() : '') as RecurringChange;
+  if (!RECURRING_CHANGES.includes(change)) throw new ShoppingRefused(`change must be one of ${RECURRING_CHANGES.join(', ')}.`);
+  const payment = await findPayment(env, textArg(args, 'payment', PAYEE_MAX), 'payment');
+  const id = payment.id as string;
+  const shown = named(payment.payee, 'the payment');
+  const client = env.shop as SupabaseClient;
+  const input = (verb: string, what: string, rest: string): ShoppingChangeInput => ({
+    verb,
+    what,
+    rest,
+    href: RECURRING_HREF,
+    where: 'Open Recurring',
+    paths: RECURRING_PATHS,
+  });
+  const rowFor = (ref: string, title: string): AskRow => ({ table: RECURRING, ref, title, href: RECURRING_HREF });
+
+  if (change === 'rename') {
+    const to = textArg(args, 'rename_to', PAYEE_MAX)?.replace(/\s+/g, ' ');
+    if (!to) throw new ShoppingRefused('Give the new name as rename_to.');
+    if (to === payment.payee) throw new ShoppingRefused(`"${shown}" is called that already.`);
+    const result = await renamePayment(client, { userId: env.userId, paymentId: id, payee: to });
+    if (result.error) throw new ShoppingRefused(result.error);
+    const after = await ownRow(env.shop, 'recurring_payments', id, env.userId, 'recurring payment');
+    const now = named(after.payee, to);
+    return {
+      kind: 'change_recurring',
+      input: input('Renamed', shown, ` to "${now}"`),
+      subjectRef: toRef(RECURRING, id),
+      op: 'update',
+      before: payment,
+      after,
+      undo: { rows: [{ table: 'recurring_payments', id, before: { payee: payment.payee }, after: { payee: after.payee } }] },
+      summary: `Dash renamed the recurring payment "${shown}" to "${now}".`,
+      row: rowFor(id, now),
+    };
+  }
+
+  if (change === 'leave_out' || change === 'count') {
+    const counted = change === 'count';
+    if (counted && payment.status !== 'ignored') throw new ShoppingRefused(`"${shown}" is counted in the monthly total already.`);
+    if (!counted && payment.status === 'ignored') throw new ShoppingRefused(`"${shown}" is left out of the monthly total already.`);
+    const result = await setPaymentCounted(client, { userId: env.userId, paymentId: id, counted });
+    if (result.error) throw new ShoppingRefused(result.error);
+    const after = await ownRow(env.shop, 'recurring_payments', id, env.userId, 'recurring payment');
+    const keys = SUMMARY_COLUMNS.filter((key) => !same(payment[key], after[key]));
+    return {
+      kind: 'change_recurring',
+      input: counted ? input('Counted', shown, ' in the monthly total again') : input('Left', shown, ' out of the monthly total'),
+      subjectRef: toRef(RECURRING, id),
+      op: 'update',
+      before: payment,
+      after,
+      undo: { rows: [{ table: 'recurring_payments', id, before: pick(payment, keys), after: pick(after, keys) }] },
+      summary: counted
+        ? `Dash counted the recurring payment "${shown}" in the monthly total again.`
+        : `Dash left the recurring payment "${shown}" out of the monthly total.`,
+      row: rowFor(id, shown),
+    };
+  }
+
+  if (change === 'merge') {
+    const into = await findPayment(env, textArg(args, 'into', PAYEE_MAX), 'into');
+    if (into.id === id) throw new ShoppingRefused(`"${shown}" and the payment to merge it into are the same one.`);
+    const kept = named(into.payee, 'the payment');
+    const result = await mergePayments(client, { userId: env.userId, paymentId: id, intoId: into.id as string });
+    if (result.error) throw new ShoppingRefused(result.error);
+    const after = await ownRow(env.shop, 'recurring_payments', into.id as string, env.userId, 'recurring payment');
+    return {
+      kind: 'change_recurring',
+      input: input('Merged', shown, ` into "${kept}"`),
+      subjectRef: toRef(RECURRING, into.id as string),
+      op: 'update',
+      before: into,
+      after,
+      undo: { none: MERGED_NO_UNDO },
+      summary: `Dash merged the recurring payment "${shown}" into "${kept}", moving its charges there.`,
+      row: rowFor(into.id as string, kept),
+    };
+  }
+
+  // move: some of its charges, named by the day each was charged, to another payment or a new one.
+  const { data: chargeData, error: chargeError } = await env.shop
+    .from('recurring_charges')
+    .select('id, occurred_on, amount_cents, currency')
+    .eq('user_id', env.userId)
+    .eq('payment_id', id)
+    .order('occurred_on', { ascending: true });
+  if (chargeError) throw new Error(`Reading the charges failed: ${chargeError.message}`);
+  const charges = (chargeData ?? []) as Row[];
+  const listed = charges.map(chargeLine).join(', ');
+  const raw = args.charged_on;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new ShoppingRefused(
+      `Name the charges to move by charged_on, the days they were charged. "${shown}" has ${charges.length ? `charges of ${listed}` : 'no charges'}.`,
+    );
+  }
+  const days = new Set(raw.map((day) => (typeof day === 'string' ? day.trim() : '')));
+  const picked = charges.filter((charge) => days.has(String(charge.occurred_on)));
+  const missed = [...days].filter((day) => !charges.some((charge) => String(charge.occurred_on) === day));
+  if (missed.length > 0) {
+    throw new ShoppingRefused(`"${shown}" has no charge on ${missed.join(', ')}. Its charges are ${listed || 'none'}.`);
+  }
+  const intoName = textArg(args, 'into', PAYEE_MAX);
+  const newPayee = textArg(args, 'new_payee', PAYEE_MAX);
+  if (!intoName === !newPayee) {
+    throw new ShoppingRefused('Give into, a payment they have, or new_payee, the name of a new one, and not both.');
+  }
+  const target = intoName ? await findPayment(env, intoName, 'into') : null;
+  const { data: idsBefore, error: idsError } = await env.shop.from('recurring_payments').select('id').eq('user_id', env.userId);
+  if (idsError) throw new Error(`Reading their recurring payments failed: ${idsError.message}`);
+  const existed = new Set(((idsBefore ?? []) as Row[]).map((row) => row.id as string));
+  const result = await moveCharges(client, {
+    userId: env.userId,
+    paymentId: id,
+    chargeIds: picked.map((charge) => charge.id as string),
+    to: target ? { paymentId: target.id as string } : { payee: newPayee ?? '' },
+  });
+  if (result.error || !result.paymentId) throw new ShoppingRefused(result.error ?? 'Those charges could not be moved.');
+  const after = await ownRow(env.shop, 'recurring_payments', result.paymentId, env.userId, 'recurring payment');
+  const made = !existed.has(result.paymentId);
+  const there = named(after.payee, 'the payment');
+  const count = picked.length === 1 ? 'one charge' : `${picked.length} charges`;
+  return {
+    kind: 'change_recurring',
+    input: input('Moved', count, ` from "${shown}" to ${made ? 'a new payment, ' : ''}"${there}"`),
+    subjectRef: toRef(RECURRING, result.paymentId),
+    op: made ? 'insert' : 'update',
+    before: made ? null : (target ?? null),
+    after,
+    undo: { none: MOVED_NO_UNDO },
+    summary: `Dash moved ${count} from the recurring payment "${shown}" to ${made ? 'a new payment, ' : ''}"${there}".`,
+    row: rowFor(result.paymentId, there),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// return_window
+// ---------------------------------------------------------------------------
+
+const POLICIES_HREF = '/shopping/settings';
+/** Every page that reads a return window, as Shopping's settings refresh them. */
+const POLICY_PATHS = ['/shopping/settings', '/shopping/returns', '/shopping/inventory', '/shopping/orders', '/shopping/dashboard'];
+const windowWords = (days: unknown) => (typeof days === 'number' ? `a ${days}-day return window` : 'no return window');
+
+/** A shop's slug as Shopping's settings make one, before the owner's suffix. */
+function shopSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 50) || 'merchant'
+  );
+}
+
+async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const name = textArg(args, 'shop', 80);
+  if (!name || name.length < 2) throw new ShoppingRefused('Name the shop by shop, at least 2 characters.');
+  const useDefault = args.use_default === true;
+  let days: number | null | undefined;
+  if (given(args, 'days')) {
+    const value = args.days;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 730) {
+      throw new ShoppingRefused('days is a whole number of days from 1 to 730.');
+    }
+    days = value;
+  }
+  if (args.no_window === true) {
+    if (days !== undefined) throw new ShoppingRefused('Give days or no_window, not both.');
+    days = null;
+  }
+  if (useDefault && days !== undefined) throw new ShoppingRefused('Give one of days, no_window or use_default.');
+  if (!useDefault && days === undefined) throw new ShoppingRefused('Say what the window is: days, no_window for none, or use_default.');
+
+  const { data, error } = await env.shop
+    .from('merchants')
+    .select('id, name, slug, is_global, created_by_user_id, default_return_window_days');
+  if (error) throw new Error(`Reading the shops failed: ${error.message}`);
+  // The service role reads every account's shops: only the shared ones and theirs are theirs to name.
+  const theirs = ((data ?? []) as Row[]).filter((m) => m.is_global === true || m.created_by_user_id === env.userId);
+  const slug = shopSlug(name);
+  const ownSlug = `${slug}-${env.userId.slice(0, 8)}`;
+  const merchant =
+    theirs.find((m) => flatName(m.name) === flatName(name)) ?? theirs.find((m) => m.slug === slug || m.slug === ownSlug);
+
+  if (!merchant) {
+    if (args.new_shop !== true) {
+      throw new ShoppingRefused(`There is no shop called "${name}" in Shopping. If it is a shop to add, call again with new_shop true.`);
+    }
+    if (useDefault) throw new ShoppingRefused('A new shop has no default window to use: give days or no_window.');
+    const { data: made, error: madeError } = await env.shop
+      .from('merchants')
+      .insert({
+        name,
+        slug: ownSlug,
+        domains: [],
+        created_by_user_id: env.userId,
+        is_global: false,
+        default_return_window_days: days ?? null,
+      })
+      .select('*')
+      .single();
+    if (madeError || !made) throw new Error(`Adding the shop failed: ${madeError?.message ?? 'no row'}`);
+    const id = (made as Row).id as string;
+    const shown = named(name, 'the shop');
+    return {
+      kind: 'return_window',
+      input: {
+        verb: 'Added',
+        what: shown,
+        rest: ` with ${windowWords(days)}`,
+        href: POLICIES_HREF,
+        where: 'Open the return windows',
+        paths: POLICY_PATHS,
+      },
+      subjectRef: toRef('public.merchants', id),
+      op: 'insert',
+      before: null,
+      after: made as Row,
+      undo: { added: [{ table: 'merchants', id }] },
+      summary: `Dash added the shop "${shown}" to Shopping with ${windowWords(days)}.`,
+      row: { table: 'public.merchants', ref: id, title: shown, href: POLICIES_HREF },
+    };
+  }
+
+  const shown = named(merchant.name, 'the shop');
+  const fallback = (merchant.default_return_window_days as number | null) ?? null;
+  const target = useDefault ? fallback : (days as number | null);
+  const { data: policyData, error: policyError } = await env.shop
+    .from('merchant_return_policies')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('merchant_id', merchant.id)
+    .maybeSingle();
+  if (policyError) throw new Error(`Reading their return windows failed: ${policyError.message}`);
+  const policy = (policyData as Row | null) ?? null;
+  const now = policy ? ((policy.return_window_days as number | null) ?? null) : fallback;
+  if (same(now, target)) throw new ShoppingRefused(`${shown} has ${windowWords(target)} already.`);
+  // The settings page takes a window back to the default by deleting the person's own.
+  // Dash never deletes, so it writes the default in.
+  const said = useDefault ? `the default, ${windowWords(target)}` : windowWords(target);
+  const input: ShoppingChangeInput = {
+    verb: 'Set',
+    what: shown,
+    rest: ` to ${said}`,
+    href: POLICIES_HREF,
+    where: 'Open the return windows',
+    paths: POLICY_PATHS,
+  };
+  const summary = `Dash set ${shown}'s return window to ${said}.`;
+  if (policy) {
+    const { data: after, error: updateError } = await env.shop
+      .from('merchant_return_policies')
+      .update({ return_window_days: target })
+      .eq('id', policy.id)
+      .eq('user_id', env.userId)
+      .select('*')
+      .single();
+    if (updateError || !after) throw new Error(`Setting the return window failed: ${updateError?.message ?? 'no row'}`);
+    return {
+      kind: 'return_window',
+      input,
+      subjectRef: toRef('public.merchant_return_policies', policy.id as string),
+      op: 'update',
+      before: policy,
+      after: after as Row,
+      undo: {
+        rows: [
+          {
+            table: 'merchant_return_policies',
+            id: policy.id as string,
+            before: { return_window_days: policy.return_window_days ?? null },
+            after: { return_window_days: target },
+          },
+        ],
+      },
+      summary,
+      row: { table: 'public.merchant_return_policies', ref: policy.id as string, title: shown, href: POLICIES_HREF },
+    };
+  }
+  const { data: made, error: insertError } = await env.shop
+    .from('merchant_return_policies')
+    .insert({ user_id: env.userId, merchant_id: merchant.id, return_window_days: target })
+    .select('*')
+    .single();
+  if (insertError || !made) throw new Error(`Setting the return window failed: ${insertError?.message ?? 'no row'}`);
+  const id = (made as Row).id as string;
+  return {
+    kind: 'return_window',
+    input,
+    subjectRef: toRef('public.merchant_return_policies', id),
+    op: 'insert',
+    before: null,
+    after: made as Row,
+    undo: { added: [{ table: 'merchant_return_policies', id }] },
+    summary,
+    row: { table: 'public.merchant_return_policies', ref: id, title: shown, href: POLICIES_HREF },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// change_person
+// ---------------------------------------------------------------------------
+
+const PERSON_CHANGES = ['add', 'edit'] as const;
+type PersonChange = (typeof PERSON_CHANGES)[number];
+const PEOPLE = 'core.people';
+const PEOPLE_HREF = '/shopping/settings';
+/** Every page that shows a person's name or badge, as the settings refresh them. */
+const PEOPLE_PATHS = ['/shopping/settings', '/shopping/orders', '/shopping/inventory', '/shopping/dashboard'];
+
+function personName(value: string | undefined, key: string): string {
+  const name = value?.replace(/\s+/g, ' ');
+  if (!name) throw new ShoppingRefused(`Give ${key}, their name.`);
+  if (name.length > 60) throw new ShoppingRefused(`${key} is longer than 60 characters.`);
+  return name;
+}
+
+function personColour(args: Args): string | undefined {
+  const colour = textArg(args, 'colour', 20)?.toLowerCase();
+  if (colour === undefined || colour === '') return undefined;
+  if (!(PERSON_COLOURS as readonly string[]).includes(colour)) throw new ShoppingRefused(`colour is one of ${PERSON_COLOURS.join(', ')}.`);
+  return colour;
+}
+
+async function changePerson(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const change = (typeof args.change === 'string' ? args.change.trim() : '') as PersonChange;
+  if (!PERSON_CHANGES.includes(change)) throw new ShoppingRefused(`change must be one of ${PERSON_CHANGES.join(', ')}.`);
+  if (!env.db) throw new Error('change_person needs the core schema');
+  const core = await env.db('core');
+  const { data, error } = await core.from('people').select('*').eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the people they shop for failed: ${error.message}`);
+  const people = (data ?? []) as Row[];
+  const colour = personColour(args);
+  const input = (verb: string, what: string, rest: string): ShoppingChangeInput => ({
+    verb,
+    what,
+    rest,
+    href: PEOPLE_HREF,
+    where: 'Open the people',
+    paths: PEOPLE_PATHS,
+  });
+
+  if (change === 'add') {
+    const name = personName(textArg(args, 'name', 200), 'name');
+    if (people.some((p) => flatName(p.name) === flatName(name))) throw new ShoppingRefused(`${name} is on their list of people already.`);
+    // The first person added becomes the default, as the settings page makes them.
+    const { data: made, error: madeError } = await core
+      .from('people')
+      .insert({ user_id: env.userId, name, colour: colour ?? 'brand', is_default: people.length === 0 })
+      .select('*')
+      .single();
+    if (madeError?.code === '23505') throw new ShoppingRefused(`${name} is on their list of people already.`);
+    if (madeError || !made) throw new Error(`Adding the person failed: ${madeError?.message ?? 'no row'}`);
+    const id = (made as Row).id as string;
+    return {
+      kind: 'change_person',
+      input: input('Added', name, ' to the people you shop for'),
+      subjectRef: toRef(PEOPLE, id),
+      op: 'insert',
+      before: null,
+      after: made as Row,
+      undo: { added: [{ table: 'people', id }] },
+      summary: `Dash added ${name} to the people they shop for in Shopping.`,
+      row: { table: PEOPLE, ref: id, title: name, href: PEOPLE_HREF },
+    };
+  }
+
+  const asked = textArg(args, 'person', 200);
+  if (!asked) throw new ShoppingRefused('Name the person to change by person.');
+  const person = people.find((p) => flatName(p.name) === flatName(asked));
+  if (!person) {
+    const names = people.map((p) => named(p.name, '')).join(', ');
+    throw new ShoppingRefused(
+      people.length
+        ? `There is nobody called ${asked} on their list. The people they shop for are ${names}.`
+        : 'They have nobody on their list of people yet: add them first.',
+    );
+  }
+  const shown = named(person.name, 'them');
+  const values: Row = {};
+  const renameTo = textArg(args, 'rename_to', 200);
+  if (renameTo !== undefined) {
+    const name = personName(renameTo, 'rename_to');
+    if (name !== person.name) {
+      if (people.some((p) => p.id !== person.id && flatName(p.name) === flatName(name))) {
+        throw new ShoppingRefused(`Somebody called ${name} is on their list already.`);
+      }
+      values.name = name;
+    }
+  }
+  if (colour !== undefined && colour !== person.colour) values.colour = colour;
+  if (Object.keys(values).length === 0) {
+    throw new ShoppingRefused(`Say what changes for ${shown}: a rename_to or colour that differs from now.`);
+  }
+  const { data: after, error: updateError } = await core
+    .from('people')
+    .update(values)
+    .eq('id', person.id)
+    .eq('user_id', env.userId)
+    .select('*')
+    .single();
+  if (updateError?.code === '23505') throw new ShoppingRefused('Somebody with that name is on their list already.');
+  if (updateError || !after) throw new Error(`Changing the person failed: ${updateError?.message ?? 'no row'}`);
+  const said = sentence([
+    ...('name' in values ? [`renamed them ${named(values.name, '')}`] : []),
+    ...('colour' in values ? [`gave them the colour ${String(values.colour)}`] : []),
+  ]);
+  const keys = Object.keys(values);
+  return {
+    kind: 'change_person',
+    input: input('Changed', shown, `: ${said}`),
+    subjectRef: toRef(PEOPLE, person.id as string),
+    op: 'update',
+    before: person,
+    after: after as Row,
+    undo: { rows: [{ table: 'people', id: person.id as string, before: pick(person, keys), after: pick(after as Row, keys) }] },
+    summary: `Dash changed ${shown} in the people they shop for: ${said}.`,
+    row: { table: PEOPLE, ref: person.id as string, title: named((after as Row).name, shown), href: PEOPLE_HREF },
+  };
+}
+
 async function itemHasDependents(deps: { userId: string; db: AskDb }, shop: SchemaClient, id: string): Promise<boolean> {
   const { data: item, error } = await shop
     .from('inventory_items')
@@ -1796,9 +2305,15 @@ export async function undoShoppingChange(
   deps: { userId: string; db: AskDb },
   recorded: Record<string, unknown> | null,
 ): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  if (typeof recorded?.none === 'string' && recorded.none.trim() !== '') return { ok: false, error: recorded.none.trim() };
   const undo = shoppingUndo(recorded);
   if (!undo) return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
   const shop = await deps.db('public');
+  const clientFor = async (table: ShoppingTable) => (TABLE_SCHEMA[table] ? deps.db(TABLE_SCHEMA[table]) : shop);
+  const owned = <Q extends { eq: (column: string, value: unknown) => Q }>(query: Q, table: ShoppingTable): Q => {
+    const owner = ownerColumn(table);
+    return owner ? query.eq(owner, deps.userId) : query;
+  };
   let restored = 0;
 
   // An order Dash added goes back whole or not at all: taking it away takes its units, its shipments and its returns.
@@ -1813,8 +2328,7 @@ export async function undoShoppingChange(
   }
 
   for (const row of undo.rows ?? []) {
-    let query = shop.from(row.table).update(row.before).eq('id', row.id);
-    if (TABLES[row.table].owned) query = query.eq('user_id', deps.userId);
+    let query = owned((await clientFor(row.table)).from(row.table).update(row.before).eq('id', row.id), row.table);
     for (const [column, value] of Object.entries(row.after)) {
       if (!scalar(value)) continue;
       query = value === null ? query.is(column, null) : query.eq(column, value);
@@ -1847,20 +2361,25 @@ export async function undoShoppingChange(
       }
       if (carried) continue;
     }
-    let query = shop.from(row.table).delete().eq('id', row.id);
-    if (TABLES[row.table].owned) query = query.eq('user_id', deps.userId);
-    const { data, error } = await query.select('id');
+    if (await addedHasDependents(deps, row)) {
+      kept += 1;
+      continue;
+    }
+    const { data, error } = await owned((await clientFor(row.table)).from(row.table).delete().eq('id', row.id), row.table).select('id');
     if (error) throw new Error(`${row.table}: ${error.message}`);
     restored += (data ?? []).length;
   }
 
   for (const row of undo.removed ?? []) {
-    const { data, error } = await shop.from(row.table).upsert(row.values, { onConflict: 'id', ignoreDuplicates: true }).select('id');
+    const { data, error } = await (await clientFor(row.table)).from(row.table).upsert(row.values, { onConflict: 'id', ignoreDuplicates: true }).select('id');
     if (error) throw new Error(`${row.table}: ${error.message}`);
     restored += (data ?? []).length;
   }
 
   if (restored === 0 && kept > 0) {
+    if (added.some((row) => row.table === 'people' || row.table === 'merchants')) {
+      return { ok: false, error: 'What Dash added has orders, items or a return window on it since, so Dash kept it.' };
+    }
     return {
       ok: false,
       error: `${kept === 1 ? 'The item Dash added has' : `All ${kept} items Dash added have`} been put on a list, sold, grouped or linked since, so Dash kept ${kept === 1 ? 'it' : 'them'}. Remove ${kept === 1 ? 'it' : 'them'} from the inventory instead.`,
@@ -1870,6 +2389,35 @@ export async function undoShoppingChange(
     return { ok: false, error: 'Everything this changed has changed again since, so undoing would lose the later changes.' };
   }
   return { ok: true, restored };
+}
+
+/**
+ * What can hang off a person or a shop Dash added (plan #1894.5.5): the
+ * orders and items put on the person, the mailbox given to them; the orders,
+ * saved items and return window on the shop. Deleting the row would blank or
+ * take those with it, so an added row that has any is kept.
+ */
+const ADDED_DEPENDENTS: Partial<Record<ShoppingTable, readonly { schema: AskSchema; table: string; column: string }[]>> = {
+  people: [
+    { schema: 'public', table: 'orders', column: 'person_id' },
+    { schema: 'public', table: 'inventory_items', column: 'person_id' },
+    { schema: 'core', table: 'email_accounts', column: 'person_id' },
+  ],
+  merchants: [
+    { schema: 'public', table: 'orders', column: 'merchant_id' },
+    { schema: 'public', table: 'saved_items', column: 'merchant_id' },
+    { schema: 'public', table: 'merchant_return_policies', column: 'merchant_id' },
+    { schema: 'public', table: 'merchant_exclusions', column: 'merchant_id' },
+  ],
+};
+
+async function addedHasDependents(deps: { userId: string; db: AskDb }, row: { table: ShoppingTable; id: string }): Promise<boolean> {
+  for (const dependent of ADDED_DEPENDENTS[row.table] ?? []) {
+    const { data, error } = await (await deps.db(dependent.schema)).from(dependent.table).select('id').eq(dependent.column, row.id).limit(1);
+    if (error) throw new Error(`${dependent.table}: ${error.message}`);
+    if ((data ?? []).length > 0) return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -2072,6 +2620,65 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
       additionalProperties: false,
     },
     run: reviewOrders,
+  },
+  {
+    name: 'change_recurring',
+    description:
+      "Tidy their recurring payments in Shopping, the subscriptions and bills read from their mail, when they ask. Name a payment by payment, the name it shows under on the Recurring page. change rename gives it rename_to as its name; leave_out takes it off the monthly total and the agenda, and count puts it back; merge folds it into the payment named by into, moving every charge there, when the two are the same thing under two names; move takes some of its charges, named by charged_on (the days they were charged, YYYY-MM-DD), to the payment named by into or to a new one named by new_payee, when one row holds more than one subscription. A merge and a move have no Undo, so say so. A refusal lists their payments and a payment's charges.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...RECURRING_CHANGES], description: 'rename, leave_out, count, merge or move.' },
+        payment: { type: 'string', description: 'The payment by the name it shows under.' },
+        rename_to: { type: 'string', description: 'For rename: the new name.' },
+        into: { type: 'string', description: 'For merge, and for a move to a payment they have: that payment by its name.' },
+        new_payee: { type: 'string', description: 'For a move to a new payment: its name, such as "Apple TV+".' },
+        charged_on: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 500,
+          description: 'For move: the days the charges to move were charged, YYYY-MM-DD.',
+        },
+      },
+      required: ['change', 'payment'],
+      additionalProperties: false,
+    },
+    run: changeRecurring,
+  },
+  {
+    name: 'return_window',
+    description:
+      "Set how long a shop gives them to return things, as Shopping's settings do, when they say (\"Target gives me 90 days\"). Name the shop by shop; give days (1 to 730), no_window when the shop takes no returns, or use_default to go back to the window Shopping knows for it. A shop Shopping does not know is added as one of theirs when new_shop is true, with the window given.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        shop: { type: 'string', description: 'The shop by its name.' },
+        days: { type: 'integer', minimum: 1, maximum: 730, description: 'The return window in days.' },
+        no_window: { type: 'boolean', description: 'True when the shop takes no returns.' },
+        use_default: { type: 'boolean', description: 'True to use the window Shopping knows for the shop.' },
+        new_shop: { type: 'boolean', description: 'True to add the shop when Shopping does not know it.' },
+      },
+      required: ['shop'],
+      additionalProperties: false,
+    },
+    run: returnWindow,
+  },
+  {
+    name: 'change_person',
+    description: `Work the list of people they shop for in Shopping (the household members orders and items are put on), when they ask. change add puts someone on it by name, with an optional colour for their badge; edit renames the person named by person to rename_to or gives them another colour. Colours: ${PERSON_COLOURS.join(', ')}. Removing someone is done in Shopping's settings, not by you.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...PERSON_CHANGES], description: 'add or edit.' },
+        name: { type: 'string', description: 'For add: their name, up to 60 characters.' },
+        person: { type: 'string', description: 'For edit: the person by the name on the list.' },
+        rename_to: { type: 'string', description: 'For edit: the new name.' },
+        colour: { type: 'string', enum: [...PERSON_COLOURS], description: 'The colour of their badge.' },
+      },
+      required: ['change'],
+      additionalProperties: false,
+    },
+    run: changePerson,
   },
 ];
 

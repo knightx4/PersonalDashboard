@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import { changeSentence } from '@/lib/ask/change-view';
+import type { AskSchema } from '@/lib/ask/db';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordDashAction, undoneByAsk } from '@/lib/core/dash-actions';
@@ -58,6 +59,44 @@ const CATAN_TWO = '00000000-0000-4000-8000-00000000f002';
 const DUNE = '00000000-0000-4000-8000-00000000f003';
 const THEIRS = '00000000-0000-4000-8000-00000000f004';
 const DUNE_DETAILS = '00000000-0000-4000-8000-00000000d001';
+const NETFLIX = '00000000-0000-4000-8000-00000000a001';
+const APPLE = '00000000-0000-4000-8000-00000000a002';
+const APPLE_TV = '00000000-0000-4000-8000-00000000a003';
+const PAYMENT_THEIRS = '00000000-0000-4000-8000-00000000a004';
+const SAM = '00000000-0000-4000-8000-00000000b001';
+
+function payment(id: string, payee: string, key: string): Record<string, unknown> {
+  return {
+    id,
+    user_id: ME,
+    payee,
+    payee_key: key,
+    sender_domain: null,
+    kind: 'subscription',
+    amount_cents: 999,
+    currency: 'USD',
+    period: 'month',
+    next_date: null,
+    status: 'active',
+    last_charged_on: null,
+  };
+}
+
+function charge(id: string, paymentId: string, on: string, cents: number): Record<string, unknown> {
+  return {
+    id,
+    user_id: ME,
+    payment_id: paymentId,
+    event: 'charge',
+    amount_cents: cents,
+    previous_amount_cents: null,
+    currency: 'USD',
+    period: 'month',
+    occurred_on: on,
+    due_on: null,
+    created_at: `${on}T00:00:00Z`,
+  };
+}
 const GROUP = '00000000-0000-4000-8000-00000000a001';
 const GIFTS = '00000000-0000-4000-8000-00000000b001';
 const SAVED_ONE = '00000000-0000-4000-8000-00000000c001';
@@ -119,7 +158,10 @@ beforeEach(() => {
     'todo.task_links': [],
     'public.item_lists': [{ id: GIFTS, user_id: ME, name: 'Gifts', slug: 'gifts', color: null }],
     'public.inventory_item_lists': [],
-    'public.merchants': [{ id: 'm-amazon', slug: 'amazon', name: 'Amazon', domains: ['amazon.com'] }],
+    'public.merchants': [
+      { id: 'm-amazon', slug: 'amazon', name: 'Amazon', domains: ['amazon.com'], is_global: true, created_by_user_id: null, default_return_window_days: 30 },
+      { id: 'm-theirs', slug: 'corner-shop-00000000', name: 'Corner Shop', domains: [], is_global: false, created_by_user_id: SOMEONE, default_return_window_days: 7 },
+    ],
     'public.saved_items': [
       {
         id: SAVED_ONE,
@@ -136,10 +178,32 @@ beforeEach(() => {
       },
       { id: SAVED_THEIRS, user_id: SOMEONE, url: 'https://shop.example/x', title: 'Theirs', status: 'saved' },
     ],
+    'public.recurring_payments': [
+      payment(NETFLIX, 'Netflix', 'netflix'),
+      payment(APPLE, 'Apple', 'apple'),
+      payment(APPLE_TV, 'Apple TV+', 'appletv'),
+      { ...payment(PAYMENT_THEIRS, 'Netflix', 'netflix'), user_id: SOMEONE },
+    ],
+    'public.recurring_charges': [
+      charge('ch-n1', NETFLIX, '2026-08-01', 1599),
+      charge('ch-n2', NETFLIX, '2026-09-01', 1599),
+      charge('ch-a1', APPLE, '2026-08-05', 999),
+      charge('ch-a2', APPLE, '2026-09-05', 299),
+      charge('ch-t1', APPLE_TV, '2026-07-05', 999),
+    ],
+    'public.recurring_payee_aliases': [],
+    'public.merchant_return_policies': [],
+    'public.merchant_exclusions': [],
+    'public.orders': [],
+    'core.email_accounts': [],
+    'core.people': [{ id: SAM, user_id: ME, name: 'Sam', colour: 'brand', is_default: true }],
   };
 });
 
-const env = () => ({ userId: ME, shop: fakeSchemaDb(tables)('public') });
+const env = () => {
+  const client = fakeSchemaDb(tables);
+  return { userId: ME, shop: client('public'), db: async (schema: AskSchema) => client(schema) };
+};
 const write = (name: string) => SHOPPING_WRITES.find((entry) => entry.name === name)!;
 
 async function made(name: string, input: Record<string, unknown>): Promise<ShoppingMade> {
@@ -485,9 +549,9 @@ describe('the order writes (plan #1894.5.4)', () => {
   });
 
   it('keeps an added order once something hangs off it, and saves a receipt or a waiting email as its source', async () => {
-    const kept = await viaAsk('add_order', { merchant: 'Corner Shop', from_receipt: true, lines: [{ name: 'Bread', unit_price: 3 }] });
+    const kept = await viaAsk('add_order', { merchant: 'Bakery Co', from_receipt: true, lines: [{ name: 'Bread', unit_price: 3 }] });
     const added = tables['public.orders'].find((r) => r.source === 'receipt_photo')!;
-    expect(tables['public.merchants'].some((m) => m.name === 'Corner Shop' && m.created_by_user_id === ME)).toBe(true);
+    expect(tables['public.merchants'].some((m) => m.name === 'Bakery Co' && m.created_by_user_id === ME)).toBe(true);
     tables['public.shipments'].push({ id: 'ship-1', order_id: added.id });
     expect(await undoChange(deps(), kept.id)).toMatchObject({ ok: false });
     expect(tables['public.orders'].some((r) => r.id === added.id)).toBe(true);
@@ -558,5 +622,123 @@ describe('the order writes (plan #1894.5.4)', () => {
     expect(await refused('review_orders', { move: 'undismiss', message_refs: [WAITING] })).toMatch(/None of those was dismissed/);
     expect(await refused('add_order', { lines: [] })).toMatch(/at least one/);
     expect(await refused('order_item_tags', { change: 'add', order_item_ref: LINE_THEIRS, tag: 'gift' })).toMatch(/no order line of theirs/);
+  });
+});
+
+describe('change_recurring', () => {
+  it('renames a payment by the name it shows under, and Undo puts the name back', async () => {
+    const kept = await viaAsk('change_recurring', { change: 'rename', payment: 'netflix', rename_to: 'Netflix Premium' });
+    expect(row('recurring_payments', NETFLIX).payee).toBe('Netflix Premium');
+    expect(row('recurring_payments', PAYMENT_THEIRS).payee).toBe('Netflix');
+    expect(lastSummary()).toBe('Dash renamed the recurring payment "Netflix" to "Netflix Premium".');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(row('recurring_payments', NETFLIX).payee).toBe('Netflix');
+  });
+
+  it('leaves a payment out of the total and counts it again, each undone', async () => {
+    const out = await viaAsk('change_recurring', { change: 'leave_out', payment: 'Netflix' });
+    expect(row('recurring_payments', NETFLIX).status).toBe('ignored');
+    expect(lastSummary()).toBe('Dash left the recurring payment "Netflix" out of the monthly total.');
+    expect((await undoChange(deps(), out.id)).ok).toBe(true);
+    expect(row('recurring_payments', NETFLIX).status).toBe('active');
+
+    row('recurring_payments', APPLE).status = 'ignored';
+    const back = await viaAsk('change_recurring', { change: 'count', payment: 'Apple' });
+    expect(row('recurring_payments', APPLE).status).toBe('active');
+    expect((await undoChange(deps(), back.id)).ok).toBe(true);
+    expect(row('recurring_payments', APPLE).status).toBe('ignored');
+  });
+
+  it('merges one payment into another and records it with no Undo', async () => {
+    const kept = await viaAsk('change_recurring', { change: 'merge', payment: 'Apple TV+', into: 'Apple' });
+    expect(tables['public.recurring_payments'].some((r) => r.id === APPLE_TV)).toBe(false);
+    expect(tables['public.recurring_charges'].find((r) => r.id === 'ch-t1')!.payment_id).toBe(APPLE);
+    expect(tables['public.recurring_payee_aliases']).toMatchObject([{ user_id: ME, payee_key: 'appletv', payment_id: APPLE }]);
+    expect(lastSummary()).toBe('Dash merged the recurring payment "Apple TV+" into "Apple", moving its charges there.');
+    expect(tables['core.dash_actions'].at(-1)?.undo).toMatchObject({ none: expect.stringContaining('There is no Undo') });
+    expect(await undoChange(deps(), kept.id)).toMatchObject({ ok: false });
+  });
+
+  it('moves charges named by their day to a new payment', async () => {
+    await viaAsk('change_recurring', { change: 'move', payment: 'Apple', charged_on: ['2026-09-05'], new_payee: 'iCloud' });
+    const made = tables['public.recurring_payments'].find((r) => r.payee === 'iCloud')!;
+    expect(made).toMatchObject({ user_id: ME, payee_key: 'icloud' });
+    expect(tables['public.recurring_charges'].find((r) => r.id === 'ch-a2')!.payment_id).toBe(made.id);
+    expect(lastSummary()).toBe('Dash moved one charge from the recurring payment "Apple" to a new payment, "iCloud".');
+  });
+
+  it('refuses a payment they do not have, listing theirs, and a day with no charge, listing its charges', async () => {
+    expect(await refused('change_recurring', { change: 'rename', payment: 'Spotify', rename_to: 'x' })).toBe(
+      'They have no recurring payment called "Spotify". Theirs are "Netflix", "Apple", "Apple TV+".',
+    );
+    expect(await refused('change_recurring', { change: 'move', payment: 'Apple', charged_on: ['2026-01-01'], into: 'Netflix' })).toContain(
+      'Its charges are $9.99 on 2026-08-05, $2.99 on 2026-09-05.',
+    );
+  });
+});
+
+describe('return_window', () => {
+  it("sets a shop's window as their own, and Undo takes it back to the default", async () => {
+    const kept = await viaAsk('return_window', { shop: 'amazon', days: 60 });
+    expect(tables['public.merchant_return_policies']).toMatchObject([{ user_id: ME, merchant_id: 'm-amazon', return_window_days: 60 }]);
+    expect(lastSummary()).toBe("Dash set Amazon's return window to a 60-day return window.");
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(tables['public.merchant_return_policies']).toHaveLength(0);
+  });
+
+  it('changes a window they set and goes back to the default without deleting', async () => {
+    await viaAsk('return_window', { shop: 'Amazon', days: 60 });
+    const back = await viaAsk('return_window', { shop: 'Amazon', use_default: true });
+    expect(tables['public.merchant_return_policies']).toMatchObject([{ return_window_days: 30 }]);
+    expect(lastSummary()).toBe("Dash set Amazon's return window to the default, a 30-day return window.");
+    expect((await undoChange(deps(), back.id)).ok).toBe(true);
+    expect(tables['public.merchant_return_policies']).toMatchObject([{ return_window_days: 60 }]);
+  });
+
+  it("adds a shop of their own only when asked, and never names another account's", async () => {
+    expect(await refused('return_window', { shop: 'Corner Shop', days: 14 })).toMatch(/no shop called "Corner Shop".*new_shop true/);
+    const kept = await viaAsk('return_window', { shop: 'Corner Shop', days: 14, new_shop: true });
+    const made = tables['public.merchants'].find((m) => m.created_by_user_id === ME)!;
+    expect(made).toMatchObject({ name: 'Corner Shop', is_global: false, default_return_window_days: 14 });
+    expect(made.slug).toBe(`corner-shop-${ME.slice(0, 8)}`);
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(tables['public.merchants'].some((m) => m.created_by_user_id === ME)).toBe(false);
+  });
+
+  it('refuses a window it has already and a bad number', async () => {
+    expect(await refused('return_window', { shop: 'Amazon', days: 30 })).toBe('Amazon has a 30-day return window already.');
+    expect(await refused('return_window', { shop: 'Amazon', days: 0 })).toMatch(/1 to 730/);
+  });
+});
+
+describe('change_person', () => {
+  const people = () => tables['core.people'];
+
+  it('adds someone they shop for, and Undo takes them off while nothing is on them', async () => {
+    const kept = await viaAsk('change_person', { change: 'add', name: 'Alex', colour: 'green' });
+    expect(people().find((p) => p.name === 'Alex')).toMatchObject({ user_id: ME, colour: 'green', is_default: false });
+    expect(lastSummary()).toBe('Dash added Alex to the people they shop for in Shopping.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(people().some((p) => p.name === 'Alex')).toBe(false);
+
+    const again = await viaAsk('change_person', { change: 'add', name: 'Alex' });
+    const alex = people().find((p) => p.name === 'Alex')!;
+    tables['public.orders'].push({ id: 'o-1', user_id: ME, person_id: alex.id });
+    expect(await undoChange(deps(), again.id)).toMatchObject({ ok: false, error: expect.stringContaining('Dash kept it') });
+  });
+
+  it('renames and recolours someone, and Undo puts them back', async () => {
+    const kept = await viaAsk('change_person', { change: 'edit', person: 'sam', rename_to: 'Samantha', colour: 'pink' });
+    expect(people()[0]).toMatchObject({ name: 'Samantha', colour: 'pink' });
+    expect(lastSummary()).toBe('Dash changed Sam in the people they shop for: renamed them Samantha and gave them the colour pink.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(people()[0]).toMatchObject({ name: 'Sam', colour: 'brand' });
+  });
+
+  it('refuses a name already on the list and someone not on it', async () => {
+    expect(await refused('change_person', { change: 'add', name: 'SAM' })).toBe('SAM is on their list of people already.');
+    expect(await refused('change_person', { change: 'edit', person: 'Jo', colour: 'pink' })).toBe(
+      'There is nobody called Jo on their list. The people they shop for are Sam.',
+    );
   });
 });

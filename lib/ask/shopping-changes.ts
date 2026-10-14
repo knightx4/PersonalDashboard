@@ -19,6 +19,9 @@ export const SHOPPING_CHANGE_KINDS = [
   'add_order',
   'order_item_tags',
   'review_orders',
+  'change_recurring',
+  'return_window',
+  'change_person',
 ] as const;
 
 export type ShoppingChangeKind = (typeof SHOPPING_CHANGE_KINDS)[number];
