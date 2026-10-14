@@ -4,10 +4,15 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { readSubQuestions } from '@/lib/learn/briefs/model';
+import { SUB_QUESTIONS_MIN } from '@/lib/learn/briefs/research';
+import { researchBriefAfterResponse } from '@/lib/learn/briefs/research-run';
+import { recordLearnSpend } from '@/lib/learn/spend';
 
 /**
  * The brief page's writes (plan #2023.4): the short answer, the weekly check's
- * switch, archive, and Try again on a failed run. Every write goes through the
+ * switch, archive, and Try again on a failed run, which starts the research
+ * again. Every write goes through the
  * session client, so row-level security decides which brief is touched.
  */
 
@@ -77,24 +82,49 @@ export async function setBriefArchived(briefId: string, archived: boolean): Prom
 
 /**
  * Try again on a failed run: puts the brief back to researching with the
- * error cleared, and the page starts watching for it to fill in.
+ * error cleared, at the stage the run will start from, and starts the run
+ * once the response has gone (plan #2023.2's runner, as Ask Dash starts it in
+ * #2023.3). The run keeps the sub-questions the brief already has, skipping
+ * the framing call when there are enough, and reuses readings already on the
+ * list. The page re-reads itself while it researches.
  *
- * Starting the run itself belongs to the research runner (plan #2023.2,
- * built alongside this step). Until that is merged this only resets the row;
- * the merge connects the runner here, after the update.
+ * Only a failed brief is reset, so a second press while the first run is
+ * going starts nothing. The page sets maxDuration for the run.
  */
 // latency: pending
 export async function retryBrief(briefId: string): Promise<{ error?: string }> {
   const user = await requireUser();
   if (!Id.safeParse(briefId).success) return { error: 'That brief could not be found.' };
   const supabase = await createLearnClient();
-  const { error } = await supabase
+  const { data: current, error: readError } = await supabase
     .from('briefs')
-    .update({ status: 'researching', error: null, updated_at: new Date().toISOString() })
+    .select('sub_questions')
     .eq('id', briefId)
     .eq('user_id', user.id)
-    .eq('status', 'failed');
+    .maybeSingle();
+  if (readError) return { error: `Could not start it again: ${readError.message}` };
+  if (!current) return { error: 'That brief could not be found.' };
+  const framed = readSubQuestions((current as { sub_questions: unknown }).sub_questions).length >= SUB_QUESTIONS_MIN;
+  const { data: reset, error } = await supabase
+    .from('briefs')
+    .update({
+      status: 'researching',
+      stage: framed ? 'searching' : 'framing',
+      error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', briefId)
+    .eq('user_id', user.id)
+    .eq('status', 'failed')
+    .select('id');
   if (error) return { error: `Could not start it again: ${error.message}` };
+  if ((reset ?? []).length > 0) {
+    // The recorder is spelled out, rather than left to the runner's default,
+    // so the paid-actions walk can see what this press records.
+    researchBriefAfterResponse(supabase, user.id, briefId, {
+      recordSpend: (owner, reports) => recordLearnSpend(owner, 'research-topic', reports),
+    });
+  }
   page(briefId);
   return {};
 }

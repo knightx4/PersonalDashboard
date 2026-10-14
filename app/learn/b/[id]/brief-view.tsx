@@ -12,16 +12,15 @@ import { Switch } from '@/components/ui/field';
 import { LiveDot } from '@/components/ui/live-dot';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
+import { PaidHint } from '@/components/ui/paid-hint';
+import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
 import {
-  FOUND_KIND_LABELS,
   briefStage,
   dayLabel,
   sectionSources,
   sourceLine,
-  type Brief,
-  type BriefCitation,
+  type BriefOnPage,
   type BriefPage,
-  type BriefSection,
   type BriefSource,
 } from '@/lib/learn/briefs/view';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
@@ -151,8 +150,8 @@ function Section({
                 <li key={i}>
                   <Quote
                     citation={citation}
-                    source={sources[citation.readingId]}
-                    defaultOpen={openQuote === `${section.subQuestionId}:${i}`}
+                    source={sources[citation.reading_id]}
+                    defaultOpen={openQuote === `${section.sub_question_id}:${i}`}
                   />
                 </li>
               ))}
@@ -217,20 +216,23 @@ function Failed({ brief }: { brief: Brief }) {
     <Card padding="standard" role="alert" className="flex flex-col items-start gap-3">
       <p className="text-body font-semibold text-ink">The research stopped before it finished</p>
       <p className="text-ui text-ink-muted">{brief.error?.trim() || 'Dash did not say why.'}</p>
-      <Button
-        type="button"
-        variant="primary"
-        pending={pending}
-        onClick={() =>
-          start(async () => {
-            const result = await retryBrief(brief.id);
-            if (result.error) setError(result.error);
-            else router.refresh();
-          })
-        }
-      >
-        Try again
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="primary"
+          pending={pending}
+          onClick={() =>
+            start(async () => {
+              const result = await retryBrief(brief.id);
+              if (result.error) setError(result.error);
+              else router.refresh();
+            })
+          }
+        >
+          Try again
+        </Button>
+        <PaidHint action="app/learn/b/[id]/actions.ts#retryBrief" what="Cost of researching it again" />
+      </div>
       {error && <p className="text-small text-danger">{error}</p>}
     </Card>
   );
@@ -261,7 +263,7 @@ function ShortAnswer({ brief, editing }: { brief: Brief; editing: boolean }) {
   );
 }
 
-function Rail({ brief, sourcesFound }: { brief: Brief; sourcesFound: number }) {
+function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
   const [error, setError] = useState<string | null>(null);
@@ -363,7 +365,7 @@ export function BriefView({
   const { brief, sources } = page;
   const sourcesFound = Object.keys(sources).length;
   useLiveWhileResearching(brief.status === 'researching', live);
-  const sections = new Map(brief.sections.map((section) => [section.subQuestionId, section]));
+  const sections = new Map(brief.sections.map((section) => [section.sub_question_id, section]));
 
   const main = (
     <div className="flex flex-col gap-4">

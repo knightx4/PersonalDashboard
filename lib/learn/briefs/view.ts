@@ -1,29 +1,33 @@
 /**
- * A research brief as its page reads it (plan #2023.4).
+ * A research brief as its page draws it (plan #2023.4).
  *
- * `learn.briefs` keeps the sub-questions and the sections as jsonb (migration
- * learn 0116). The research run writes them (plan #2023.2); this file reads
- * them back for /learn/b/[id] and Learn's list of open briefs, tolerating any
- * entry that is not the expected shape by leaving it out rather than failing
- * the page.
+ * The brief's own shapes, and reading a row into them, are model.ts's (plan
+ * #2023.2), which the research run writes with. This file adds only what the
+ * page needs on top: the reading list's title, the sources by reading id for
+ * the quote popovers, the summary Learn's list shows, and the words for each.
  *
  * While a brief is researching, the page names the stage it is on
  * (`briefStage`). The run records it in `stage` (framing, searching or
- * writing; learn migration 0117, plan #2023.2); where that is empty, the stage
- * is read from what the run has written so far: no sub-questions yet means it
- * is still framing them, sub-questions with no readings means it is
- * searching, readings with no sections means it is reading, and some sections
- * means it is writing the answers.
+ * writing; learn migration 0117); where that is empty, the stage is read from
+ * what the run has written so far: no sub-questions yet means it is still
+ * framing them, sub-questions with no readings means it is searching, and
+ * anything further means it is writing the answers.
  */
 
-export type BriefStatus = 'researching' | 'ready' | 'failed';
-export type BriefDepth = 'quick' | 'standard' | 'deep';
-export type BriefRunStage = 'framing' | 'searching' | 'writing';
-export type FoundKind = 'regulator' | 'professional_body' | 'firm' | 'press' | 'vendor';
-
-export type BriefSubQuestion = { id: string; text: string };
-export type BriefCitation = { readingId: string; quote: string };
-export type BriefSection = { subQuestionId: string; position: string; citations: BriefCitation[] };
+import {
+  BRIEF_COLUMNS,
+  BRIEF_STAGES,
+  FOUND_KINDS,
+  FOUND_KIND_LABELS,
+  STAGE_LABELS,
+  briefFromRow,
+  type Brief,
+  type BriefRow,
+  type BriefSection,
+  type BriefStage,
+  type BriefStatus,
+  type FoundKind,
+} from './model';
 
 /** A reading the brief found, with what the quote popover says about it. */
 export type BriefSource = {
@@ -37,30 +41,11 @@ export type BriefSource = {
   url: string | null;
 };
 
-export type Brief = {
-  id: string;
-  trackId: string | null;
-  trackTitle: string | null;
-  question: string;
-  angle: string;
-  depth: BriefDepth;
-  subQuestions: BriefSubQuestion[];
-  status: BriefStatus;
-  /** What the run says it is doing, when it has said. */
-  stage: BriefRunStage | null;
-  error: string | null;
-  sections: BriefSection[];
-  shortAnswer: string;
-  shortAnswerBy: 'dash' | 'you';
-  watchOn: boolean;
-  watchedAt: string | null;
-  archivedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+/** The brief as its page draws it: the row, and the title of the reading list it made. */
+export type BriefOnPage = Brief & { trackTitle: string | null };
 
 /** The brief with the readings its run found, by reading id. */
-export type BriefPage = { brief: Brief; sources: Record<string, BriefSource> };
+export type BriefPage = { brief: BriefOnPage; sources: Record<string, BriefSource> };
 
 /** One open brief in Learn's list. */
 export type BriefSummary = {
@@ -71,135 +56,54 @@ export type BriefSummary = {
   updatedAt: string;
 };
 
-export const FOUND_KIND_LABELS: Record<FoundKind, string> = {
-  regulator: 'Regulator',
-  professional_body: 'Professional body',
-  firm: 'Firm',
-  press: 'Press',
-  vendor: 'Vendor',
-};
+/** The page's columns: the brief's own and its reading list's title. */
+export const BRIEF_PAGE_COLUMNS = `${BRIEF_COLUMNS}, tracks!briefs_track_fk ( title )`;
 
-const STATUSES: readonly BriefStatus[] = ['researching', 'ready', 'failed'];
-const STAGES: readonly BriefRunStage[] = ['framing', 'searching', 'writing'];
-const DEPTHS: readonly BriefDepth[] = ['quick', 'standard', 'deep'];
-const KINDS = Object.keys(FOUND_KIND_LABELS) as FoundKind[];
-
-function str(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-export function parseSubQuestions(value: unknown): BriefSubQuestion[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry, i) => {
-    if (typeof entry === 'string') return str(entry) ? [{ id: String(i + 1), text: entry }] : [];
-    const row = record(entry);
-    const text = row ? str(row.text) : null;
-    if (!row || !text) return [];
-    const id = str(row.id) ?? (typeof row.id === 'number' ? String(row.id) : String(i + 1));
-    return [{ id, text }];
-  });
-}
-
-export function parseSections(value: unknown): BriefSection[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const row = record(entry);
-    if (!row) return [];
-    const subQuestionId =
-      str(row.sub_question_id) ?? (typeof row.sub_question_id === 'number' ? String(row.sub_question_id) : null);
-    const position = str(row.position);
-    if (!subQuestionId || !position) return [];
-    const citations = Array.isArray(row.citations)
-      ? row.citations.flatMap((c) => {
-          const cite = record(c);
-          const readingId = cite ? str(cite.reading_id) : null;
-          const quote = cite ? str(cite.quote) : null;
-          return readingId && quote ? [{ readingId, quote }] : [];
-        })
-      : [];
-    return [{ subQuestionId, position, citations }];
-  });
-}
-
-export type BriefRow = {
-  id: string;
-  track_id: string | null;
-  question: string;
-  angle: string | null;
-  depth: string;
-  sub_questions: unknown;
-  status: string;
-  stage?: string | null;
-  error: string | null;
-  sections: unknown;
-  short_answer: string | null;
-  short_answer_by: string;
-  watch_on: boolean;
-  watched_at: string | null;
-  archived_at: string | null;
-  created_at: string;
-  updated_at: string;
+/** A brief row as the page reads it, with the reading list's title joined in. */
+export type BriefPageRow = BriefRow & {
   tracks?: { title: string | null } | { title: string | null }[] | null;
 };
 
-export function toBrief(row: BriefRow): Brief {
+export function toBriefOnPage(row: BriefPageRow): BriefOnPage {
   const track = Array.isArray(row.tracks) ? row.tracks[0] : row.tracks;
-  return {
-    id: row.id,
-    trackId: row.track_id,
-    trackTitle: track?.title ?? null,
-    question: row.question,
-    angle: row.angle ?? '',
-    depth: DEPTHS.includes(row.depth as BriefDepth) ? (row.depth as BriefDepth) : 'standard',
-    subQuestions: parseSubQuestions(row.sub_questions),
-    status: STATUSES.includes(row.status as BriefStatus) ? (row.status as BriefStatus) : 'researching',
-    stage: STAGES.includes(row.stage as BriefRunStage) ? (row.stage as BriefRunStage) : null,
-    error: row.error,
-    sections: parseSections(row.sections),
-    shortAnswer: row.short_answer ?? '',
-    shortAnswerBy: row.short_answer_by === 'you' ? 'you' : 'dash',
-    watchOn: row.watch_on,
-    watchedAt: row.watched_at,
-    archivedAt: row.archived_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return { ...briefFromRow(row), trackTitle: track?.title ?? null };
 }
 
 export function foundKind(value: unknown): FoundKind | null {
-  return KINDS.includes(value as FoundKind) ? (value as FoundKind) : null;
+  return FOUND_KINDS.includes(value as FoundKind) ? (value as FoundKind) : null;
 }
 
-/** Where a researching brief has got to, named from what it has written so far. */
-export type BriefStage = { label: string; detail: string };
+/** What the page says about a researching brief: the stage's name and a line on it. */
+export type StageLine = { stage: BriefStage; label: string; detail: string };
 
 export function briefStage(
   brief: Pick<Brief, 'subQuestions' | 'sections' | 'stage'>,
   sourcesFound: number,
-): BriefStage {
+): StageLine {
   const asked = brief.subQuestions.length;
-  if (brief.stage === 'framing' || asked === 0) {
-    return { label: 'Framing the questions', detail: 'Working out the three to five questions your topic breaks into.' };
-  }
-  if (brief.stage === 'searching' || (brief.stage === null && sourcesFound === 0)) {
+  const stage: BriefStage =
+    brief.stage && BRIEF_STAGES.includes(brief.stage)
+      ? brief.stage
+      : asked === 0
+        ? 'framing'
+        : sourcesFound === 0
+          ? 'searching'
+          : 'writing';
+  const label = STAGE_LABELS[stage];
+  if (stage === 'framing' || asked === 0) {
     return {
-      label: 'Searching for sources',
-      detail: `Searching the web for each of the ${asked} questions below.`,
+      stage: 'framing',
+      label: STAGE_LABELS.framing,
+      detail: 'Working out the three to five questions your topic breaks into.',
     };
   }
-  const answered = new Set(brief.sections.map((s) => s.subQuestionId)).size;
-  if (answered === 0 && brief.stage === null) {
-    return {
-      label: 'Reading the sources',
-      detail: `${sourcesFound} ${sourcesFound === 1 ? 'source' : 'sources'} found. Reading them for what they say on each question.`,
-    };
+  if (stage === 'searching') {
+    return { stage, label, detail: `Searching the web for each of the ${asked} questions below.` };
   }
+  const answered = new Set(brief.sections.map((s) => s.sub_question_id)).size;
   return {
-    label: 'Writing the answers',
+    stage,
+    label,
     detail:
       answered === 0
         ? `Reading ${sourcesFound} ${sourcesFound === 1 ? 'source' : 'sources'} and writing an answer to each question.`
@@ -212,7 +116,7 @@ export function sectionSources(section: BriefSection, sources: Record<string, Br
   const seen = new Set<string>();
   const out: BriefSource[] = [];
   for (const cite of section.citations) {
-    const source = sources[cite.readingId];
+    const source = sources[cite.reading_id];
     if (!source || seen.has(source.readingId)) continue;
     seen.add(source.readingId);
     out.push(source);

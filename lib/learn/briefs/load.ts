@@ -1,12 +1,12 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { readSubQuestions, type BriefStatus } from './model';
 import {
+  BRIEF_PAGE_COLUMNS,
   foundKind,
-  parseSubQuestions,
-  toBrief,
+  toBriefOnPage,
   type BriefPage,
-  type BriefRow,
+  type BriefPageRow,
   type BriefSource,
-  type BriefStatus,
   type BriefSummary,
 } from './view';
 
@@ -14,9 +14,6 @@ import {
  * Reads for the brief page and Learn's list of open briefs (plan #2023.4).
  * Row-level security limits every read to the signed-in person's own briefs.
  */
-
-const BRIEF_COLUMNS =
-  'id, track_id, question, angle, depth, sub_questions, status, stage, error, sections, short_answer, short_answer_by, watch_on, watched_at, archived_at, created_at, updated_at, tracks!briefs_track_fk ( title )';
 
 type SourceRow = {
   id: string;
@@ -42,7 +39,7 @@ function toSource(row: SourceRow): BriefSource {
 /** One brief and the readings its run found, or null when it is not theirs or not there. */
 export async function loadBrief(supabase: LearnSupabaseClient, id: string): Promise<BriefPage | null> {
   const [brief, readings] = await Promise.all([
-    supabase.from('briefs').select(BRIEF_COLUMNS).eq('id', id).maybeSingle(),
+    supabase.from('briefs').select(BRIEF_PAGE_COLUMNS).eq('id', id).maybeSingle(),
     supabase
       .from('readings')
       .select('id, title, found_kind, found_at, open_url, sources ( title, year, canonical_url )')
@@ -54,7 +51,7 @@ export async function loadBrief(supabase: LearnSupabaseClient, id: string): Prom
   if (readings.error) throw new Error(`Could not read the brief's sources: ${readings.error.message}`);
   const sources: Record<string, BriefSource> = {};
   for (const row of (readings.data ?? []) as unknown as SourceRow[]) sources[row.id] = toSource(row);
-  return { brief: toBrief(brief.data as unknown as BriefRow), sources };
+  return { brief: toBriefOnPage(brief.data as unknown as BriefPageRow), sources };
 }
 
 /** The briefs not archived, newest first, for Learn's home. */
@@ -71,7 +68,7 @@ export async function loadOpenBriefs(supabase: LearnSupabaseClient, limit = 10):
       id: row.id,
       question: row.question,
       status: (['researching', 'ready', 'failed'].includes(row.status) ? row.status : 'researching') as BriefStatus,
-      subQuestions: parseSubQuestions(row.sub_questions).length,
+      subQuestions: readSubQuestions(row.sub_questions).length,
       updatedAt: row.updated_at,
     }),
   );

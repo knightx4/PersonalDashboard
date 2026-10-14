@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   briefStage,
-  parseSections,
-  parseSubQuestions,
+  foundKind,
   sectionSources,
   sourceLine,
   summaryLine,
-  toBrief,
-  type BriefRow,
+  toBriefOnPage,
+  type BriefPageRow,
   type BriefSource,
 } from './view';
 
-const row: BriefRow = {
+const row: BriefPageRow = {
   id: 'b1',
   track_id: 't1',
   question: 'How do SOX controls apply to AI?',
@@ -36,39 +35,34 @@ const row: BriefRow = {
   short_answer_by: 'dash',
   watch_on: false,
   watched_at: null,
+  quiet_checks: 0,
   archived_at: null,
   created_at: '2026-10-13T09:00:00Z',
   updated_at: '2026-10-13T09:00:00Z',
   tracks: [{ title: 'SOX and AI' }],
 };
 
-describe('reading a brief row', () => {
-  it('keeps the shapes it knows and the track title', () => {
-    const brief = toBrief(row);
+describe('reading a brief row for its page', () => {
+  it("reads the row with model.ts's shapes and adds the track title", () => {
+    const brief = toBriefOnPage(row);
     expect(brief.trackTitle).toBe('SOX and AI');
     expect(brief.subQuestions).toHaveLength(2);
     expect(brief.sections[0]?.citations).toHaveLength(3);
+    expect(brief.sections[0]?.sub_question_id).toBe('a');
     expect(brief.angle).toBe('');
     expect(brief.watchOn).toBe(false);
     expect(brief.stage).toBeNull();
   });
 
-  it('leaves out entries that are not the expected shape', () => {
-    expect(parseSubQuestions([{ id: 1, text: 'Numbered' }, { text: '' }, 'Plain', 7])).toEqual([
-      { id: '1', text: 'Numbered' },
-      { id: '3', text: 'Plain' },
-    ]);
-    expect(parseSections([{ sub_question_id: 'a' }, null, { sub_question_id: 'b', position: 'Yes', citations: [{}] }])).toEqual([
-      { subQuestionId: 'b', position: 'Yes', citations: [] },
-    ]);
-    expect(parseSections('not an array')).toEqual([]);
+  it('has no track title when the brief has no reading list yet', () => {
+    expect(toBriefOnPage({ ...row, track_id: null, tracks: null }).trackTitle).toBeNull();
+    expect(toBriefOnPage({ ...row, tracks: { title: 'One' } }).trackTitle).toBe('One');
   });
 
-  it('falls back on unknown status, depth and stage', () => {
-    const brief = toBrief({ ...row, status: 'odd', depth: 'odd', stage: 'odd' });
-    expect(brief.status).toBe('researching');
-    expect(brief.depth).toBe('standard');
-    expect(brief.stage).toBeNull();
+  it('reads only the found kinds the column allows', () => {
+    expect(foundKind('professional_body')).toBe('professional_body');
+    expect(foundKind('blog')).toBeNull();
+    expect(foundKind(null)).toBeNull();
   });
 });
 
@@ -77,18 +71,22 @@ describe('the stage a researching brief is on', () => {
   const asked = { ...none, subQuestions: [{ id: 'a', text: 'Q' }, { id: 'b', text: 'Q2' }] };
 
   it('is read from what the run has written when it has not said', () => {
-    expect(briefStage(none, 0).label).toBe('Framing the questions');
-    expect(briefStage(asked, 0).label).toBe('Searching for sources');
-    expect(briefStage(asked, 3).label).toBe('Reading the sources');
+    expect(briefStage(none, 0).stage).toBe('framing');
+    expect(briefStage(asked, 0).stage).toBe('searching');
+    expect(briefStage(asked, 3).stage).toBe('writing');
     expect(
-      briefStage({ ...asked, sections: [{ subQuestionId: 'a', position: 'P', citations: [] }] }, 3).detail,
+      briefStage({ ...asked, sections: [{ sub_question_id: 'a', position: 'P', citations: [] }] }, 3).detail,
     ).toBe('1 of 2 questions answered so far.');
   });
 
-  it('follows the stage the run recorded', () => {
-    expect(briefStage({ ...asked, stage: 'framing' }, 0).label).toBe('Framing the questions');
-    expect(briefStage({ ...asked, stage: 'searching' }, 4).label).toBe('Searching for sources');
+  it('follows the stage the run recorded, with its label', () => {
+    expect(briefStage({ ...asked, stage: 'framing' }, 0).label).toBe('Breaking the question down');
+    expect(briefStage({ ...asked, stage: 'searching' }, 4).label).toBe('Searching and reading sources');
     expect(briefStage({ ...asked, stage: 'writing' }, 4).label).toBe('Writing the answers');
+  });
+
+  it('says framing while there are no sub-questions, whatever the stage', () => {
+    expect(briefStage({ ...none, stage: 'searching' }, 0).stage).toBe('framing');
   });
 });
 
@@ -104,7 +102,7 @@ describe('sources', () => {
   });
 
   it('lists each cited reading once, in the order first quoted', () => {
-    const brief = toBrief(row);
+    const brief = toBriefOnPage(row);
     const found = sectionSources(brief.sections[0]!, { r1: source('r1'), r2: source('r2') });
     expect(found.map((s) => s.readingId)).toEqual(['r1', 'r2']);
   });
