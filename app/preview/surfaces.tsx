@@ -510,6 +510,15 @@ const rolePanels: PanelProps = {
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
     },
     {
+      id: 'e4',
+      kind: 'screen_scheduled',
+      occurredAt: '2026-09-04T16:10:00.000Z',
+      source: 'email',
+      summary: 'Phone screen with Dana Okafor, 15 September',
+      needsReview: false,
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/4',
+    },
+    {
       id: 'e2',
       kind: 'confirmation',
       occurredAt: '2026-09-01T08:30:00.000Z',
