@@ -517,7 +517,7 @@ const rolePanels: PanelProps = {
       source: 'email',
       summary: 'Phone screen with Dana Okafor, 15 September',
       needsReview: false,
-      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/4',
+      gmailHref: null,
     },
     {
       id: 'e2',
