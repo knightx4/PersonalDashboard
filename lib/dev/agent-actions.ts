@@ -76,6 +76,7 @@ export const devActions: ModuleActions = {
     editPostAngle: none('own', "The person's say on what their post is about; the posts skill writes the first angle."),
     addPostImage: none('own', 'Attaches a picture the person uploaded from their device.'),
     removePostImage: none('deletes'),
+    postToX: none('outside', 'Publishes under the person\'s name and spends on their X account, so it waits for their confirmed press.'),
     confirmXMatch: none('theirs'),
     dismissXMatch: none('theirs'),
     checkX: none('outside', 'Reads the account on X.'),
