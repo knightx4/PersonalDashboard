@@ -712,11 +712,10 @@ function AnythingPanel({
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
-      showLanding(
-        from,
-        { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where },
-        text,
-      );
+      // The box files only into the sort's places, so the first always has one.
+      if (first.place) {
+        showLanding(from, { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where }, text);
+      }
     });
   }
 
@@ -1126,6 +1125,21 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const [error, setError] = useState<string | null>(aimProblem(aim));
   const [pending, start] = useTransition();
   const panelRef = useRef<HTMLFormElement>(null);
+  // A kind whose press reads with a model shows its $ figure, asked for once
+  // when the panel opens, as the one box asks for its own (plan #1950.3.1).
+  const [costs, setCosts] = useState<PaidCosts>({});
+  useEffect(() => {
+    if (!kind.paid) return;
+    let live = true;
+    captureBoxCosts()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [kind.paid]);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   usePanelChrome(onClose, panelRef);
@@ -1212,6 +1226,13 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
             fieldRef.current = node;
           }}
           onSubmit={submit}
+          hint={
+            kind.paid ? (
+              <PaidCostsProvider costs={costs}>
+                <PaidHint action="app/capture-actions.ts#makeAimedCapture" what="Cost of reading it" align="end" />
+              </PaidCostsProvider>
+            ) : null
+          }
         />
       </form>
     </div>

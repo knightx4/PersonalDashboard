@@ -143,6 +143,9 @@ function spokenPart(item: FiledCapture): string {
     }
     case 'vault':
       return "Kept in your vault's Inbox.";
+    default:
+      // A kind only an Add button makes, which the address never files.
+      return `Added to ${item.where}.`;
   }
 }
 

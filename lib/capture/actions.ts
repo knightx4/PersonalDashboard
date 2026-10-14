@@ -199,7 +199,14 @@ export function matchCaptureActions(
  * by the same ids, so this file stays free of server code and the panel can
  * import it.
  */
-export type CaptureKindId = 'todo' | 'goal-update' | 'job-note' | 'vault-note';
+export type CaptureKindId =
+  | 'todo'
+  | 'goal-update'
+  | 'job-note'
+  | 'vault-note'
+  | 'order'
+  | 'inventory-item'
+  | 'saved-item';
 
 /**
  * The one thing a kind may need besides its title. A todo takes a day; a
@@ -209,8 +216,11 @@ export type CaptureKindNeeds = 'day' | 'role' | null;
 
 export type CaptureKind = {
   id: CaptureKindId;
-  /** The place Dash's sort files this kind as. */
-  place: CapturePlace;
+  /**
+   * The place Dash's sort files this kind as. Null for a kind only an Add
+   * button makes, such as an order, which the sort never files.
+   */
+  place: CapturePlace | null;
   /** Whose workspace the row belongs to. */
   module: ModuleId;
   /** The panel's title when aimed: "Add a todo". */
@@ -229,6 +239,8 @@ export type CaptureKind = {
   section: string;
   /** The panel action that takes this kind unaimed, from the palette. */
   action: CaptureActionId;
+  /** Set when one press makes a model call, so the panel shows its $ hint. */
+  paid?: true;
 };
 
 export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
@@ -281,6 +293,45 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     makes: 'row',
     section: '/vault',
     action: 'vault',
+  },
+  // Shopping's three lists (plan #1950.3.1). The sort never files these, so
+  // they have no place and no panel action of their own.
+  order: {
+    id: 'order',
+    place: null,
+    module: 'shopping',
+    label: 'Add an order',
+    placeholder: 'What did you buy, where, and what did it cost?',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/orders',
+    action: 'anything',
+    paid: true,
+  },
+  'inventory-item': {
+    id: 'inventory-item',
+    place: null,
+    module: 'shopping',
+    label: 'Add something you own',
+    placeholder: 'Its name, or the ISBN of a book',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/inventory',
+    action: 'anything',
+  },
+  'saved-item': {
+    id: 'saved-item',
+    place: null,
+    module: 'shopping',
+    label: 'Save a link',
+    placeholder: 'Paste the link to the thing',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/saved',
+    action: 'anything',
   },
 };
 

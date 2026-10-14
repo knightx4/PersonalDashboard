@@ -37,6 +37,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
+import { makeShoppingItem, makeShoppingOrder, makeShoppingSaved } from '@/app/shopping/capture-writers';
 
 /**
  * The one capture box's server side (plan #1581, feature #1579): where a
@@ -216,17 +217,17 @@ export async function fileCaptureBox(
 
 /**
  * The writers capture makes rows with, bound to the signed-in person: the
- * same ones for the one box and for an Add button aimed at a kind.
+ * same ones for the one box and for an Add button aimed at a kind, apart
+ * from those only one of them reaches (writersFor and aimedWriters below).
  */
-async function writersFor(
+async function rowWriters(
   userId: string,
   modules: ModuleId[],
   files: readonly UploadedAttachment[],
-): Promise<CaptureWriters> {
+): Promise<Omit<CaptureWriters, 'goals'>> {
   const deps = await requestDashDeps(userId);
   return {
     todo: (text, day = 'today') => addTask({}, todoCaptureForm(text, day)),
-    goals: (text) => fileGoalCapture(text),
     jobs: async (roleId, text) => {
       const written = await writeRoleNote({ userId, enabledModules: modules, db: requestAskDb() }, roleId, text);
       return written.ok
@@ -243,6 +244,33 @@ async function writersFor(
           },
         }
       : {}),
+  };
+}
+
+/** The one box's writers: every place the sort files into, a goal update among them. */
+async function writersFor(
+  userId: string,
+  modules: ModuleId[],
+  files: readonly UploadedAttachment[],
+): Promise<CaptureWriters> {
+  return { ...(await rowWriters(userId, modules, files)), goals: (text) => fileGoalCapture(text) };
+}
+
+/**
+ * An aimed add's writers: every kind that makes one row, Shopping's among
+ * them (plan #1950.3.1). A goal update is never made here, since aiming it
+ * opens Goals' own panel, so its writer only says so; keeping it out is also
+ * what keeps this press's $ hint to the order read alone.
+ */
+async function aimedWriters(userId: string, modules: ModuleId[]): Promise<CaptureWriters> {
+  return {
+    ...(await rowWriters(userId, modules, [])),
+    goals: async () => ({ error: 'Log what happened from its own panel.' }),
+    shopping: {
+      order: (text) => makeShoppingOrder(text),
+      item: (text) => makeShoppingItem(text),
+      saved: (text) => makeShoppingSaved(text),
+    },
   };
 }
 
@@ -280,7 +308,7 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
     return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
   }
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role }, await writersFor(user.id, modules, []));
+    const made = await makeCaptureKind(kindId, { text, day, role }, await aimedWriters(user.id, modules));
     if (!made.ok) return { ok: false, error: made.error };
     revalidatePath(kind.section, 'layout');
     revalidatePath('/home');
@@ -327,13 +355,19 @@ export async function undoCaptureBox(actionId: string): Promise<CaptureBoxUndo> 
   }
 }
 
-/** The $ figure for the box's File it button, asked for once when the box opens. */
+/**
+ * The $ figures for the box's File it button and for an aimed Add that reads
+ * with a model (an order, plan #1950.3.1), asked for once when a panel opens.
+ */
 // latency: pending
 export async function captureBoxCosts(): Promise<PaidCosts> {
   const user = await requireUser();
   try {
     const core = await createCoreClient();
-    return await estimatePaidActions(core, user.id, ['app/capture-actions.ts#fileCaptureBox']);
+    return await estimatePaidActions(core, user.id, [
+      'app/capture-actions.ts#fileCaptureBox',
+      'app/capture-actions.ts#makeAimedCapture',
+    ]);
   } catch {
     return {};
   }

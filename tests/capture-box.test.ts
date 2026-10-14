@@ -335,6 +335,49 @@ describe('files sent with a capture (plan #1714)', () => {
     );
   });
 
+  it('makes a Shopping row from an aimed add, opens its page, and Undo takes it back (plan #1950.3.1)', async () => {
+    const world = setup();
+    world.tables['public.saved_items'] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      shopping: {
+        order: async () => ({ ok: false, error: 'not this one' }),
+        item: async () => ({ ok: false, error: 'not this one' }),
+        saved: async (text) => {
+          const id = fakeId();
+          world.tables['public.saved_items'].push({ id, user_id: ME, url: text, title: 'Green kettle' });
+          return { ok: true, id, title: 'Green kettle' };
+        },
+      },
+    };
+
+    const made = await makeCaptureKind('saved-item', { text: 'https://example.com/kettle' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const id = world.tables['public.saved_items'][0].id as string;
+    expect(made.filed).toMatchObject({
+      place: null,
+      where: 'Shopping · Saved',
+      ref: `public.saved_items:${id}`,
+      page: `/shopping/saved/${id}`,
+    });
+    const [action] = world.tables['core.dash_actions'];
+    expect(action).toMatchObject({ surface: 'capture', kind: 'add_saved_item', undo: { aimed: true } });
+    expect(String(action.summary)).toBe('You saved "Green kettle".');
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['public.saved_items']).toEqual([]);
+  });
+
+  it('says so when a Shopping kind is aimed where there are no Shopping writers', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('order', { text: 'a kettle for $30' }, world.writers)).toMatchObject({
+      ok: false,
+      error: 'That cannot be added from here.',
+    });
+    expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+
   it('refuses an aimed add with nothing typed, and a note with no role', async () => {
     const world = setup();
     expect(await makeCaptureKind('todo', { text: '   ' }, world.writers)).toMatchObject({ ok: false });

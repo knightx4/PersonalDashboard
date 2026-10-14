@@ -96,7 +96,8 @@ export function captureFiling(
 
 /** One part, once filed: where it went and what undoes it. */
 export type FiledCapture = {
-  place: CapturePlace;
+  /** Where the sort filed it; null for a kind only an Add button makes (plan #1950.3.1). */
+  place: CapturePlace | null;
   /** The words filed. */
   text: string;
   /** Where it went, as the box and the landing name it: "Todo · Today". */
