@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen, SquarePen } from 'lucide-react';
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRight, PanelRightClose, PanelRightOpen, SquarePen, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { scrim } from '@/components/ui/popover';
 import Link from '@/components/ui/link';
 import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -18,8 +20,9 @@ import { cn } from '@/lib/cn';
  * at reading width, on a card, with its box at its foot. The list can be hidden, as in
  * other chat apps: the button above it folds it to a thin strip holding New
  * chat and the button to show it again, the chat then sits centred, and the
- * choice is kept on that device. A glance column on the right (what Dash read
- * and changed) joins later, and folds away the same way.
+ * choice is kept on that device. The open chat is drawn by
+ * `ConversationChat`, which puts the glance column (what Dash read and
+ * changed, plan #1899.4) on its right and folds it away the same way.
  *
  * Below 720 pixels the list is the page, and a chat opens over it: `open`
  * says a chat is open, and then only the chat is drawn, with its own way back
@@ -29,7 +32,10 @@ import { cn } from '@/lib/cn';
 /** Where the list's open or hidden state is kept, per device. */
 export const CONVERSATION_LIST_KEY = 'pt_conversation_list';
 
-function readListOpen(key: string): boolean {
+/** Where the glance column's open or folded state is kept, per device. */
+export const CONVERSATION_GLANCE_KEY = 'pt_conversation_glance';
+
+function readOpen(key: string): boolean {
   try {
     return window.localStorage.getItem(key) !== 'hidden';
   } catch {
@@ -37,11 +43,11 @@ function readListOpen(key: string): boolean {
   }
 }
 
-function keepListOpen(key: string, open: boolean) {
+function keepOpen(key: string, open: boolean) {
   try {
     window.localStorage.setItem(key, open ? 'shown' : 'hidden');
   } catch {
-    /* Blocked storage: the list opens shown each visit. */
+    /* Blocked storage: the list and the column open shown each visit. */
   }
 }
 
@@ -65,7 +71,7 @@ export function Conversation({
   storageKey?: string;
   /** For the gallery: start hidden or shown without reading storage. */
   initialListOpen?: boolean;
-  /** The open chat. */
+  /** The open chat, drawn by ConversationChat. */
   children: React.ReactNode;
 }) {
   const [listOpen, setListOpen] = useState(initialListOpen ?? true);
@@ -73,13 +79,13 @@ export function Conversation({
     if (initialListOpen !== undefined) return;
     // Read after hydration, so the server's render and the first client one agree.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- per-device storage is only readable here
-    setListOpen(readListOpen(storageKey));
+    setListOpen(readOpen(storageKey));
   }, [storageKey, initialListOpen]);
 
   const toggle = useCallback(
     (next: boolean) => {
       setListOpen(next);
-      keepListOpen(storageKey, next);
+      keepOpen(storageKey, next);
     },
     [storageKey],
   );
@@ -133,11 +139,174 @@ export function Conversation({
 
       <section
         aria-label="Open chat"
-        className={cn('min-w-0', !open && 'max-[719px]:hidden')}
+        // A container, so the glance column sits beside the chat only where
+        // the chat keeps its room: with the list shown on a laptop it opens
+        // as a sheet instead.
+        className={cn('@container/chat min-w-0', !open && 'max-[719px]:hidden')}
       >
-        {/* The chat on one card, so neither side of it sits bare on the page. */}
-        <Card padding="standard" className="mx-auto w-full max-w-prose">{children}</Card>
+        {children}
       </section>
     </PageWide>
+  );
+}
+
+/**
+ * The open chat in the conversation pattern (plans #1899.2, #1899.4): its
+ * title, then the thread, on one card at reading width, and the glance
+ * column beside it when there is one. On a phone the way back to the list
+ * sits above the title with the column's button beside it, so the title
+ * keeps the card's whole width.
+ *
+ * The column sits on the right once the chat's own space is 48rem wide, so
+ * the chat keeps at least about 32rem; a button in the chat's header folds
+ * it away and the choice is kept on that device. Where there is less room (a
+ * laptop with the list shown, a phone) the same button opens the column as a
+ * sheet from the right. The sheet is drawn only while open.
+ */
+export function ConversationChat({
+  title,
+  back,
+  glance,
+  storageKey = CONVERSATION_GLANCE_KEY,
+  initialGlanceOpen,
+  initialSheetOpen = false,
+  children,
+}: {
+  /** The chat's title. */
+  title: string;
+  /** On a phone, the way back to the list the chat is drawn over. */
+  back: { href: string; label: string };
+  /** The column of what was used, with its name and its short name for the button. */
+  glance?: { label: string; short: string; content: React.ReactNode };
+  storageKey?: string;
+  /** For the gallery: start folded or shown without reading storage. */
+  initialGlanceOpen?: boolean;
+  /** For the gallery: draw the sheet open. */
+  initialSheetOpen?: boolean;
+  /** The thread. */
+  children: React.ReactNode;
+}) {
+  const [glanceOpen, setGlanceOpen] = useState(initialGlanceOpen ?? true);
+  const [sheetOpen, setSheetOpen] = useState(initialSheetOpen);
+  useEffect(() => {
+    if (initialGlanceOpen !== undefined) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- per-device storage is only readable here
+    setGlanceOpen(readOpen(storageKey));
+  }, [storageKey, initialGlanceOpen]);
+
+  useEffect(() => {
+    if (!sheetOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setSheetOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [sheetOpen]);
+
+  const toggleGlance = useCallback(() => {
+    const next = !glanceOpen;
+    setGlanceOpen(next);
+    keepOpen(storageKey, next);
+  }, [glanceOpen, storageKey]);
+
+  const beside = glance && glanceOpen;
+  const name = glance?.label.toLowerCase() ?? '';
+
+  // One item, so the tooltip's wrapper around the hidden button takes no place of its own.
+  const glanceButtons = glance && (
+    <span className="flex shrink-0 items-center">
+      {/* Where the column has no room: it opens as a sheet. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="shrink-0 @min-[48rem]/chat:hidden"
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen}
+        onClick={() => setSheetOpen(true)}
+      >
+        <PanelRight className="size-4" strokeWidth={1.75} aria-hidden />
+        {glance.short}
+      </Button>
+      {/* Where it has: the column folds away and comes back. */}
+      <Tooltip label={glanceOpen ? `Hide ${name}` : `Show ${name}`} align="end">
+        <Button
+          variant="ghost"
+          size="sm"
+          pressed={glanceOpen}
+          className="hidden shrink-0 @min-[48rem]/chat:inline-flex"
+          aria-expanded={glanceOpen}
+          aria-label={glanceOpen ? `Hide ${name}` : `Show ${name}`}
+          onClick={toggleGlance}
+        >
+          {glanceOpen ? (
+            <PanelRightClose className="size-4" strokeWidth={1.75} aria-hidden />
+          ) : (
+            <PanelRightOpen className="size-4" strokeWidth={1.75} aria-hidden />
+          )}
+          {glance.short}
+        </Button>
+      </Tooltip>
+    </span>
+  );
+
+  return (
+    <div className={cn('grid grid-cols-1 gap-x-6', beside && '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_15rem]')}>
+      {/* The chat on one card, so neither side of it sits bare on the page. */}
+      <Card padding="standard" className="mx-auto w-full min-w-0 max-w-prose">
+        <div className="mb-4">
+          <div className="mb-1 flex items-center justify-between gap-2 min-[720px]:hidden">
+            <Link
+              href={back.href}
+              className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+            >
+              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {back.label}
+            </Link>
+            {glanceButtons}
+          </div>
+          <div className="flex items-start gap-2">
+            <h1 className="font-display line-clamp-2 min-w-0 flex-1 break-words text-title font-semibold tracking-tight text-ink">
+              {title}
+            </h1>
+            <span className="hidden shrink-0 min-[720px]:flex">{glanceButtons}</span>
+          </div>
+        </div>
+        {children}
+      </Card>
+
+      {beside && (
+        <aside
+          aria-label={glance.label}
+          className="hidden min-w-0 @min-[48rem]/chat:sticky @min-[48rem]/chat:top-16 @min-[48rem]/chat:block @min-[48rem]/chat:max-h-[calc(100dvh-6rem)] @min-[48rem]/chat:self-start @min-[48rem]/chat:overflow-y-auto"
+        >
+          {/* On a card of its own, as the chat is; its heading a label, so the chat's title is the one title. */}
+          <Card padding="standard">
+            <h2 className="text-ui font-semibold text-ink">{glance.label}</h2>
+            <div className="mt-3">{glance.content}</div>
+          </Card>
+        </aside>
+      )}
+
+      {glance && sheetOpen && (
+        <div className="fixed inset-0 z-overlay" role="dialog" aria-modal="true" aria-label={glance.label}>
+          <button type="button" aria-label={`Close ${name}`} onClick={() => setSheetOpen(false)} className={scrim} />
+          <div className="absolute inset-y-0 right-0 flex w-[min(22rem,88vw)] flex-col border-l border-border bg-surface">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-ui font-semibold text-ink">{glance.label}</h2>
+              <Tooltip label={`Close ${name}`} align="end">
+                <IconButton label={`Close ${name}`} onClick={() => setSheetOpen(false)}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">{glance.content}</div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

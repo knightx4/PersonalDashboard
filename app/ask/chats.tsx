@@ -19,8 +19,9 @@ import { useClockNow } from '@/lib/use-clock-now';
 /**
  * The list of Dash's chats beside the open one on /ask (plan #1899.2): New
  * chat, the workspace chips that narrow the list, then the chats grouped
- * Today, Yesterday, This week and Earlier. The changes Dash made sit folded
- * at the top until the column beside the chat takes them over (#1899.4).
+ * Today, Yesterday, This week and Earlier. Every change Dash made, across
+ * all chats, sits folded at the foot; one chat's changes are in the column
+ * beside it (#1899.4).
  */
 
 /** A workspace's own colour, as a dot beside its name. */

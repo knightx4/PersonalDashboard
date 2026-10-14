@@ -324,6 +324,7 @@ export function AskThread({
   openHandoffs = 0,
   onConversation,
   onSend,
+  onAnswered,
   ...thread
 }: {
   id: string;
@@ -339,6 +340,8 @@ export function AskThread({
   onConversation?: (ref: string) => void;
   /** Heard on every question sent, before the answer comes. */
   onSend?: () => void;
+  /** Heard once each answer has come back, kept or not: the Dash page re-reads what the chat used (plan #1899.4). */
+  onAnswered?: () => void;
   label: string;
   placeholder?: string;
   hint?: React.ReactNode;
@@ -403,7 +406,7 @@ export function AskThread({
         onSend?.();
         setLive([]);
         setWritten('');
-        return send(body, files);
+        return send(body, files).finally(() => onAnswered?.());
       }}
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}

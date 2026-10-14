@@ -14,9 +14,11 @@ import { DashCredit } from '@/components/ui/dash-mark';
 import { SONNET } from '@/lib/core/models';
 import { PageColumn } from '@/components/shell/page-width';
 import { AppShell } from '@/components/shell/app-shell';
-import { Conversation } from '@/components/patterns/conversation';
+import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import { AskChats } from '@/app/ask/chats';
-import { ChatHeader, NewDashChat } from '@/app/ask/view';
+import { CHATS_BACK, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/ask/view';
+import { ChatUsed } from '@/app/ask/used';
+import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import type { AskChat } from '@/lib/talk/ask-chats';
 
 /**
@@ -505,23 +507,22 @@ export const DASH_CHATS: AskChat[] = [
   },
 ];
 
-const DASH_MADE: MadeChange[] = [
-  {
-    ...CHANGE_BASE,
-    id: 'dm1',
-    turnId: 'm',
-    kind: 'add_todo',
-    input: { title: 'List the Catan lot', body: null, dueOn: '2026-10-16', dueTime: null, pinned: false },
-    conversationId: '00000000-0000-4000-8000-000000000021',
-    status: 'done',
-    subjectRef: 'todo.tasks:dm1-row',
-    writtenTable: 'todo.tasks',
-    writtenRef: 'dm1-row',
-    createdAt: chatAt(CHAT_TODAY, 9),
-    doneAt: chatAt(CHAT_TODAY, 9),
-    question: 'What did I spend on eBay flips this quarter?',
-  },
-];
+const DASH_MADE_CHANGE: MadeChange = {
+  ...CHANGE_BASE,
+  id: 'dm1',
+  turnId: 'm',
+  kind: 'add_todo',
+  input: { title: 'List the Catan lot', body: null, dueOn: '2026-10-16', dueTime: null, pinned: false },
+  conversationId: '00000000-0000-4000-8000-000000000021',
+  status: 'done',
+  subjectRef: 'todo.tasks:dm1-row',
+  writtenTable: 'todo.tasks',
+  writtenRef: 'dm1-row',
+  createdAt: chatAt(CHAT_TODAY, 9),
+  doneAt: chatAt(CHAT_TODAY, 9),
+  question: 'What did I spend on eBay flips this quarter?',
+};
+const DASH_MADE: MadeChange[] = [DASH_MADE_CHANGE];
 
 const DASH_PRESSES = {
   confirm: pressed('done'),
@@ -529,14 +530,66 @@ const DASH_PRESSES = {
   undo: pressed('undone'),
 };
 
+/**
+ * The open chat's turns for the page (plan #1899.4): the eBay answer with
+ * the lookups behind it, a receipt sent with the follow-up, and the todo
+ * Dash added, so the column beside it has something in every part.
+ */
+function dashPageTurns(question: string): TalkTurn[] {
+  const [asked, answered] = answerTo(question);
+  const orders = answered.citations!.slice(0, 3);
+  return [
+    { ...asked, createdAt: chatAt(CHAT_TODAY, 9) },
+    {
+      ...answered,
+      createdAt: chatAt(CHAT_TODAY, 9),
+      toolCalls: [
+        { name: 'spend_by_merchant', input: { merchant: 'eBay' }, result: { ok: true, rows: orders } },
+        {
+          name: 'search',
+          input: { query: 'unsold eBay flips' },
+          result: {
+            ok: true,
+            rows: [{ table: 'shopping.inventory', ref: 'i1', title: 'Catan lot, still unsold in your inventory', href: '/shopping/inventory/i1' }],
+          },
+        },
+        { name: 'todos', input: {}, result: { ok: true, rows: [answered.citations![3]] } },
+      ],
+    },
+    {
+      id: 'q2',
+      role: 'user',
+      body: 'Add a todo to list the Catan lot by Friday. The receipt is attached.',
+      createdAt: chatAt(CHAT_TODAY, 10),
+      files: [{ id: 'f1', name: 'ebay-receipt-catan-lot.pdf', contentType: 'application/pdf', size: 48_000, href: '#' }],
+    },
+    {
+      id: 'a2',
+      role: 'assistant',
+      body: 'Done: I added "List the Catan lot" to your todos, due Friday.',
+      createdAt: chatAt(CHAT_TODAY, 10),
+      toolCalls: [{ name: 'add_todo', input: { title: 'List the Catan lot' }, result: { ok: true, rows: [] } }],
+    },
+  ];
+}
+
+const DASH_CHAT_CHANGES: DashChange[] = [{ ...DASH_MADE_CHANGE, turnId: 'a2' }];
+
 export function DashPageSurface({
   chat = 'open',
   listOpen = true,
+  usedOpen,
+  sheetOpen = false,
 }: {
   chat?: 'open' | 'new';
   listOpen?: boolean;
+  /** The column of what Dash used, shown or folded. */
+  usedOpen?: boolean;
+  /** The column opened as a sheet, as it opens where there is no room for it. */
+  sheetOpen?: boolean;
 }) {
   const open = DASH_CHATS[0];
+  const turns = dashPageTurns(open.title ?? '');
   return (
     <AskDashProvider source={FIXTURES}>
       <AppShell
@@ -567,17 +620,39 @@ export function DashPageSurface({
           }
         >
           {chat === 'open' ? (
-            <>
-              <ChatHeader title={open.title ?? 'A question'} />
+            <ConversationChat
+              title={open.title ?? 'A question'}
+              back={CHATS_BACK}
+              initialGlanceOpen={usedOpen ?? true}
+              initialSheetOpen={sheetOpen}
+              glance={{
+                label: USED_LABEL,
+                short: USED_SHORT,
+                content: (
+                  <ChatUsed
+                    used={{
+                      rows: chatReadRows(turns),
+                      changes: DASH_CHAT_CHANGES,
+                      lookups: chatLookups(turns),
+                      files: chatFiles(turns),
+                      costMicros: 41_000,
+                    }}
+                    presses={DASH_PRESSES}
+                    today={CHAT_TODAY}
+                  />
+                ),
+              }}
+            >
               <AskThread
                 id="dash-page-preview"
                 conversationRef={open.ref}
-                turns={answerTo(open.title ?? '')}
+                turns={turns}
+                changes={DASH_CHAT_CHANGES}
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 startWriting
               />
-            </>
+            </ConversationChat>
           ) : (
             <NewDashChat />
           )}

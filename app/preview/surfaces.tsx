@@ -5163,12 +5163,33 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),
-     * with the chat centred at its reading width. */
+     * with the chat centred at its reading width. The column of what Dash
+     * used is folded too, to its button in the chat's header (#1899.4). */
     id: 'ask-page-hidden',
     label: 'Dash · The list hidden',
     module: 'jobs',
     width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
+  },
+  {
+    /* What Dash used in the open chat (plan #1899.4): with the list hidden
+     * there is room, so the column sits beside the chat: the rows read, the
+     * change made with Undo, the lookups, the file sent and the cost. A
+     * phone has no room, so the chat shows the Used button. */
+    id: 'ask-page-used',
+    label: 'Dash · What Dash used, beside the chat',
+    module: 'jobs',
+    width: 'page',
     render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* The same column opened as a sheet from the right, as it opens on a
+     * phone and on a laptop with the list shown. */
+    id: 'ask-page-used-sheet',
+    label: 'Dash · What Dash used, as a sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface sheetOpen />,
   },
 
   {
