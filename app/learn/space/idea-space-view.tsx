@@ -17,6 +17,7 @@ import { PickProvider } from './pick';
 import { PageColumn } from '@/components/shell/page-width';
 import { PlaceRail } from './place-rail';
 import { RecordingCard } from './recording-card';
+import { TopicRail } from './topic-rail';
 import { NOT_RECORDING, viewFor, type Recording } from '@/lib/learn/map/recording';
 
 /**
@@ -47,6 +48,7 @@ export function IdeaSpaceView({
   recording: saved = NOT_RECORDING,
   save,
   chooseOpen,
+  zoomOn,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -61,6 +63,8 @@ export function IdeaSpaceView({
   save?: (recording: Recording) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** The gallery draws the recording card's list of places open. */
   chooseOpen?: boolean;
+  /** The gallery opens the map flown into this topic (plan #2016.5). */
+  zoomOn?: string | null;
 }) {
   const [recording, setRecording] = useState(saved);
   // Names are made private here, once, so nothing below can draw one.
@@ -76,7 +80,11 @@ export function IdeaSpaceView({
         ],
       }}
       title="Idea Space"
-      description={view && view.ideas.length > 0 ? `${plural(view.ideas.length, 'idea')}.` : undefined}
+      description={
+        view && view.ideas.length > 0
+          ? `${plural(view.ideas.length, 'idea')}${view.missing > 0 ? `, and ${countText(view.missing)} waiting for the daily run to place ${view.missing === 1 ? 'it' : 'them'}` : ''}.`
+          : undefined
+      }
     />
   );
 
@@ -116,13 +124,14 @@ export function IdeaSpaceView({
         main={
           <>
             {header}
-            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} />
+            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} zoomOn={zoomOn} />
           </>
         }
         rail={
           <>
             <ChosenIdea ideas={view.ideas} places={view.places} />
             <PlaceRail view={view} />
+            <TopicRail frame={view.topics} />
             <RecordingCard places={whole?.places ?? []} recording={recording} onChange={setRecording} save={save} chooseOpen={chooseOpen} />
             <SameIdeas view={view} nameOf={nameOf} />
             <UntestedNearKnown view={view} nameOf={nameOf} />

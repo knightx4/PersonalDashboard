@@ -10,6 +10,7 @@ import { lightOn } from '@/lib/learn/map/sky';
 import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import { topicsFor } from './idea-space-topics';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -466,6 +467,7 @@ function fixture(): IdeaMapView {
       .filter((row) => row.known.length >= 3)
       .sort((a, b) => b.known.length - a.known.length),
     areas: { fields, domains, fieldsMissing: 31 },
+    topics: topicsFor(shown, fields, AS_OF.toISOString()),
     missing: 3,
   };
 }
@@ -739,4 +741,13 @@ const EVIDENCE_FIXTURE: IdeaMapView = (() => {
 export function IdeaSpaceEvidenceSurface() {
   const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
   return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} />;
+}
+
+/**
+ * The map flown into one Level 3 topic (plan #2016.5): Economics, with
+ * twenty-two Level 4 topics unlocked inside it, seven of them named,
+ * strongest first, and the rest folded into a count under its name.
+ */
+export function IdeaSpaceTopicsSurface() {
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" />;
 }
