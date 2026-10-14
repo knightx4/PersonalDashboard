@@ -9,6 +9,7 @@ import {
   fieldsDue,
   usersWithIdeasDue,
 } from '@/lib/learn/embed/idea-sweep';
+import { refreshNoteEvidence, type RefreshNoteEvidenceResult } from '@/lib/learn/evidence/notes-store';
 import { refreshVaultDust, type RefreshDustResult } from '@/lib/learn/map/dust-store';
 import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/lib/learn/places/store';
 
@@ -26,7 +27,9 @@ import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/l
  * with or without the embedding key, since it only reads stored vectors, and
  * one person's failure is reported without stopping the next. Last, each
  * vault note is matched with the idea it is most like, for the dust behind
- * the map (plan #1997.6): `dust` in the result.
+ * the map (plan #1997.6): `dust` in the result. Then each idea is linked to
+ * the vault notes nearest it, as evidence of what you know (plan #2006.3):
+ * `noteEvidence` in the result.
  */
 const BUDGET_MS = 90_000;
 /** Ideas per person per run; a first run fills the ~150 missing today. */
@@ -39,6 +42,7 @@ export type LearnEmbeddingsDaily = {
   fields: EmbedSweepResult | null;
   places: { userId: string; result: RecomputePlacesResult | { error: string } }[];
   dust: { userId: string; result: RefreshDustResult | { error: string } }[];
+  noteEvidence: { userId: string; result: RefreshNoteEvidenceResult | { error: string } }[];
 };
 
 export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
@@ -66,10 +70,11 @@ export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
 
 async function runMaps(
   learn: ReturnType<typeof createLearnServiceSupabase>,
-): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust'>> {
+): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust' | 'noteEvidence'>> {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || undefined;
   const places: LearnEmbeddingsDaily['places'] = [];
   const dust: LearnEmbeddingsDaily['dust'] = [];
+  const noteEvidence: LearnEmbeddingsDaily['noteEvidence'] = [];
   const failed = (error: unknown) => ({ error: error instanceof Error ? error.message : 'failed' });
   for (const userId of await usersWithIdeas(learn)) {
     try {
@@ -82,6 +87,11 @@ async function runMaps(
     } catch (error) {
       dust.push({ userId, result: failed(error) });
     }
+    try {
+      noteEvidence.push({ userId, result: await refreshNoteEvidence(learn, userId) });
+    } catch (error) {
+      noteEvidence.push({ userId, result: failed(error) });
+    }
   }
-  return { places, dust };
+  return { places, dust, noteEvidence };
 }
