@@ -204,6 +204,9 @@ export type CaptureKindId =
   | 'goal-update'
   | 'job-note'
   | 'vault-note'
+  | 'order'
+  | 'inventory-item'
+  | 'saved-item'
   // Jobs and Learn (plan #1950.4)
   | 'job-role'
   | 'learn-reading'
@@ -241,6 +244,8 @@ export type CaptureKind = {
   section: string;
   /** The panel action that takes this kind unaimed, from the palette. */
   action: CaptureActionId;
+  /** Set when one press makes a model call, so the panel shows its $ hint. */
+  paid?: true;
 };
 
 export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
@@ -293,6 +298,45 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     makes: 'row',
     section: '/vault',
     action: 'vault',
+  },
+  // Shopping's three lists (plan #1950.3.1). The sort never files these, so
+  // they have no place and no panel action of their own.
+  order: {
+    id: 'order',
+    place: null,
+    module: 'shopping',
+    label: 'Add an order',
+    placeholder: 'What did you buy, where, and what did it cost?',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/orders',
+    action: 'anything',
+    paid: true,
+  },
+  'inventory-item': {
+    id: 'inventory-item',
+    place: null,
+    module: 'shopping',
+    label: 'Add something you own',
+    placeholder: 'Its name, or the ISBN of a book',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/inventory',
+    action: 'anything',
+  },
+  'saved-item': {
+    id: 'saved-item',
+    place: null,
+    module: 'shopping',
+    label: 'Save a link',
+    placeholder: 'Paste the link to the thing',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/saved',
+    action: 'anything',
   },
   // Jobs and Learn (plan #1950.4): made only from an Add button, so no place.
   'job-role': {

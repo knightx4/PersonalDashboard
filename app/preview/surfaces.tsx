@@ -42,6 +42,7 @@ import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
+import { ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -5009,6 +5010,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <AimedCaptureSurface />,
+  },
+  {
+    /* Capture aimed at Shopping's three lists (plan #1950.3.1): an order
+     * from a sentence with its $ hint, an ISBN being added, a link missing,
+     * and the toast one press leaves. */
+    id: 'shell-capture-aimed-shopping',
+    label: 'Capture · Aimed at an order, an item or a link',
+    module: 'shopping',
+    width: 'narrow',
+    render: () => <ShoppingAimedSurface />,
+  },
+  {
+    /* The Add buttons on Orders and Inventory (plan #1950.3.1), in the
+     * header and on the empty list, each opening capture aimed at its kind. */
+    id: 'shopping-list-adds',
+    label: 'Shopping · Add on Orders and Inventory',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingListAddsSurface />,
   },
   {
     /* Capture aimed at the Jobs and Learn kinds (plan #1950.4): a role from

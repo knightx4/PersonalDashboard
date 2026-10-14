@@ -103,6 +103,7 @@ export function AimedCaptureForm({
   error,
   fieldRef,
   onSubmit,
+  hint,
 }: {
   kind: CaptureKind;
   /** The role a note goes on, which the page aiming it already knew. */
@@ -115,6 +116,8 @@ export function AimedCaptureForm({
   error: string | null;
   fieldRef?: (node: HTMLInputElement | HTMLTextAreaElement | null) => void;
   onSubmit: () => void;
+  /** The $ hint beside Add, for a kind whose press makes a model call. */
+  hint?: React.ReactNode;
 }) {
   const field = 'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
@@ -166,6 +169,7 @@ export function AimedCaptureForm({
           </span>
         )}
         <span className="ml-auto flex items-center gap-2">
+          {hint}
           <Button type="submit" size="sm" pending={pending}>
             <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
             {pending ? 'Adding…' : 'Add'}

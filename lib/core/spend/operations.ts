@@ -71,6 +71,9 @@ export const SPEND_OPERATIONS = {
     'read-shelf-photo',
     // Reading a paper receipt photo into an order. Haiku.
     'read-receipt-photo',
+    // Reading a sentence typed into capture as an order (plan #1950.3.1).
+    // Haiku, one short call per order added from the Orders page's Add.
+    'read-order-sentence',
     // Splitting a pasted list of books into titles and authors. Haiku, one
     // call per paste.
     'parse-paste-list',

@@ -188,6 +188,9 @@ export const PAID_ACTIONS = {
   // typed, sorting it first when no guess had come back, and a goal update
   // goes through Goals' own filing.
   'app/capture-actions.ts#fileCaptureBox': ['place-capture', 'file-capture'],
+  // An Add button aimed at an order (plan #1950.3.1): the sentence is read as
+  // an order before it is made.
+  'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence'],
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],
