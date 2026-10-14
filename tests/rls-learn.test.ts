@@ -119,11 +119,13 @@ describe('RLS coverage', () => {
       'concept_state',
       'concept_subjects',
       'concepts',
+      'course_embeddings',
       'course_reads',
       'curriculum_units',
       'essay_notes',
       'essay_research',
       'essays',
+      'evidence_links',
       'feed_cards',
       'goals',
       'idea_place_members',
@@ -162,6 +164,7 @@ describe('RLS coverage', () => {
       'video_clips',
       'video_transcripts',
       'watch_list',
+      'work_passages',
     ]);
   });
 });
@@ -2372,6 +2375,159 @@ describe('vault notes as dust on Idea Space (plan #1997.6)', () => {
   });
 });
 
+describe('evidence for ideas (plan #2006.1)', () => {
+  // learn 0121_evidence_links.sql. The daily run writes the links; the person
+  // only reads their own, a source is linked to a target once, and a link to
+  // an idea goes with the idea.
+  let ideaId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Evidence subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Backed idea', 'Has evidence.', 'Written by hand for this test.')
+      returning id`;
+    ideaId = idea.id;
+    await admin`
+      insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+      values (${userA}, 'idea', ${ideaId}, 'note', 'note-1', 0.7, 1, 'you wrote about this in Notes')`;
+  });
+
+  it('shows the owner their links and nobody else, and leaves the writing to the daily run', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from evidence_links`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from evidence_links`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'course', 'c1', 0.7, 0.5, 'from a course')`),
+    ).rejects.toThrow();
+  });
+
+  it('keeps one link for a target and a source, and weights between 0 and 1', async () => {
+    await expect(
+      admin`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'note', 'note-1', 0.7, 1, 'again')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'note', 'note-2', 0.7, 1.5, 'too heavy')`,
+    ).rejects.toThrow();
+  });
+
+  it('goes with the idea', async () => {
+    await admin`delete from concepts where id = ${ideaId}`;
+    expect(await admin`select 1 from evidence_links where target_id = ${ideaId}`).toHaveLength(0);
+  });
+});
+
+describe('ideas linked to work history (plan #2006.5)', () => {
+  // learn 0124_work_evidence.sql. The daily run copies the Career notes'
+  // embedded blocks and the latest résumé's passages into work_passages,
+  // then links each idea to the passages it matches. The résumé and Career
+  // notes count fully and application notes 0.4.
+  const NEAR = `(array_fill(0.0::real, array[1023]) || array[1.0::real])::extensions.vector`;
+  let ideaId = '';
+  let resumeId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Work subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, embedding, embedding_model)
+      values (${userA}, ${subject.id}, 'Revenue testing', 'Testing all revenue beats sampling.',
+              'Written by hand for this test.', ${sql.unsafe(NEAR)}, 'voyage-4-lite')
+      returning id`;
+    ideaId = idea.id;
+    // One vault per account, which the dust tests above may already have made.
+    const [connection] = await admin<{ id: string }[]>`
+      insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userA}, 'a', 'work-vault', 'main', 'encrypted')
+      on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
+      returning id`;
+    const notes: [string, string][] = [
+      ['Career/EY.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
+      ['Career/Job Applications/Acme.md', '> [!NOTE] What they want\n> Someone who tests revenue in full.'],
+    ];
+    for (const [path, body] of notes) {
+      const [note] = await admin<{ id: string }[]>`
+        insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
+        values (${userA}, ${connection.id}, ${path}, ${path.split('/').pop()!.replace(/\.md$/, '')},
+                ${body}, ${`sha-${path}`}, ${body.length})
+        returning id`;
+      await admin`
+        insert into obsidian.note_blocks (note_id, user_id, position, start_offset, end_offset,
+                                          text_hash, source_hash, embedding, embedding_model)
+        values (${note.id}, ${userA}, 0, 0, ${body.length}, ${`hash-${path}`}, 'source',
+                ${sql.unsafe(NEAR)}, 'voyage-4-lite')`;
+    }
+    const [resume] = await admin<{ id: string }[]>`
+      insert into job_search.resume_versions (user_id, label, text_content)
+      values (${userA}, 'Résumé', 'EXPERIENCE') returning id`;
+    resumeId = resume.id;
+  });
+
+  const passages = [
+    {
+      position: 0,
+      body: 'EXPERIENCE\nBuilt an automated revenue testing system',
+      first_line: 'Built an automated revenue testing system',
+      text_hash: 'resume-hash',
+    },
+  ];
+
+  it('copies the Career notes and the résumé into passages, weighting application notes less', async () => {
+    const [synced] = await admin<{ n: number }[]>`
+      select learn.sync_work_passages(${userA}::uuid, ${resumeId}::uuid, 'Résumé',
+                                      ${sql.json(passages)}) as n`;
+    expect(synced!.n).toBe(3);
+    const rows = await admin<{ origin: string; weight: number; first_line: string; embedded: boolean }[]>`
+      select origin, weight, first_line, embedding is not null as embedded
+      from work_passages where user_id = ${userA} order by origin`;
+    expect(rows).toEqual([
+      { origin: 'application', weight: 0.4, first_line: 'Someone who tests revenue in full.', embedded: true },
+      { origin: 'career', weight: 1, first_line: 'Took the lead on the revenue testing tool at work.', embedded: true },
+      { origin: 'resume', weight: 1, first_line: 'Built an automated revenue testing system', embedded: false },
+    ]);
+  });
+
+  it('links the idea to every passage it matches, the résumé and role notes above application notes', async () => {
+    // What the daily run's embedding pass does for a résumé passage.
+    await admin`
+      update work_passages set embedding = ${sql.unsafe(NEAR)}, embedding_model = 'voyage-4-lite'
+      where user_id = ${userA} and origin = 'resume'`;
+    const [linked] = await admin<{ n: number }[]>`select learn.refresh_work_evidence(${userA}::uuid) as n`;
+    expect(linked!.n).toBe(3);
+    const links = await admin<{ weight: number; basis: string }[]>`
+      select weight, basis from evidence_links
+      where target_id = ${ideaId} and source_kind = 'work' order by weight desc, basis`;
+    expect(links).toEqual([
+      { weight: 1, basis: 'From your note EY: "Took the lead on the revenue testing tool at work."' },
+      { weight: 1, basis: 'From your résumé: "Built an automated revenue testing system"' },
+      { weight: 0.4, basis: 'From your application notes in Acme: "Someone who tests revenue in full."' },
+    ]);
+  });
+
+  it('shows the owner their passages and nobody else, and leaves the writing to the daily run', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from work_passages`)).toHaveLength(3);
+    expect(await asUser(userB, (tx) => tx`select id from work_passages`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`select learn.refresh_work_evidence(${userA}::uuid)`),
+    ).rejects.toThrow();
+  });
+
+  it('removes a passage that has gone, and its link with it', async () => {
+    await admin`select learn.sync_work_passages(${userA}::uuid, null, null, '[]'::jsonb)`;
+    await admin`select learn.refresh_work_evidence(${userA}::uuid)`;
+    expect(await admin`select 1 from work_passages where user_id = ${userA} and origin = 'resume'`).toHaveLength(0);
+    expect(
+      await admin`select 1 from evidence_links where target_id = ${ideaId} and source_kind = 'work'`,
+    ).toHaveLength(2);
+  });
+});
+
 describe('account deletion', () => {
   it('takes the whole module with it, on the foreign keys', async () => {
     // The delete-account route ends at auth.admin.deleteUser(). Four more
@@ -2391,5 +2547,56 @@ describe('account deletion', () => {
            + (select count(*) from readings where user_id = ${doomed})
            + (select count(*) from imports where user_id = ${doomed}) as n`;
     expect(Number(left[0].n)).toBe(0);
+  });
+});
+
+describe('vault notes as evidence for ideas (plan #2006.3)', () => {
+  // learn 0122_vault_note_evidence.sql. The daily run asks vault_note_matches
+  // for each idea's nearest notes at 0.6 or above; the person cannot call it.
+  let ideaId = '';
+  let noteId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Note evidence subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, embedding, embedding_model)
+      values (${userA}, ${subject.id}, 'Written-about idea', 'Close to the note.', 'Written by hand for this test.',
+              (array_fill(0.0::real, array[1023]) || array[1.0::real])::extensions.vector, 'voyage-4-lite')
+      returning id`;
+    ideaId = idea.id;
+    const [connection] = await admin<{ id: string }[]>`
+      insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userA}, 'a', 'evidence-vault', 'main', 'encrypted')
+      on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
+      returning id`;
+    const notes = await admin<{ id: string; path: string }[]>`
+      insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
+      values
+        (${userA}, ${connection.id}, 'Me/Close.md', 'Close', 'A note about the idea, long enough.', 'sha-close', 40),
+        (${userA}, ${connection.id}, 'Me/Far.md', 'Far', 'A note about something else entirely.', 'sha-far', 40)
+      returning id, path`;
+    noteId = notes.find((note) => note.path === 'Me/Close.md')!.id;
+    const farId = notes.find((note) => note.path === 'Me/Far.md')!.id;
+    await admin`
+      insert into obsidian.note_embeddings (note_id, user_id, embedding, embedding_model, body_hash)
+      values
+        (${noteId}, ${userA}, (array_fill(0.01::real, array[1023]) || array[1.0::real])::extensions.vector,
+         'voyage-4-lite', 'hash-close'),
+        (${farId}, ${userA}, (array[1.0::real] || array_fill(0.0::real, array[1023]))::extensions.vector,
+         'voyage-4-lite', 'hash-far')`;
+  });
+
+  it('returns the notes near an idea at the threshold or above, and nothing else', async () => {
+    const rows = await admin<{ concept_id: string; note_id: string; title: string }[]>`
+      select concept_id, note_id, title
+      from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`;
+    expect(rows).toEqual([{ concept_id: ideaId, note_id: noteId, title: 'Close' }]);
+  });
+
+  it('is not open to the person', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`select * from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`),
+    ).rejects.toThrow();
   });
 });

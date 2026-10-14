@@ -399,6 +399,14 @@ Essays they are writing or have published: the draft, the brief (question, claim
 - Opens at `/learn/e/<id>`
 - Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.
 
+### `learn.evidence_links` (Learn)
+
+What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.
+
+- Search: `basis`
+- Name a row by `basis`; link it by `id`
+- target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
+
 ### `todo.tasks` (Todo)
 
 Tasks they gave themselves, open and done.

@@ -204,6 +204,16 @@ export const learnSources: ModuleSources = {
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
     {
+      table: 'learn.evidence_links',
+      module: 'Learn',
+      holds: 'What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.',
+      weight: 'record',
+      search: ['basis'],
+      title: 'basis',
+      newest: 'found_at',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+    },
+    {
       table: 'learn.briefs',
       module: 'Learn',
       holds: 'Topics they asked Dash to research: the question, why they want it and the short answer.',
@@ -230,11 +240,16 @@ export const learnSources: ModuleSources = {
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
+    { table: 'learn.work_passages', reason: 'Passages of the résumé and Career notes, copied and embedded daily to link ideas to work history; the résumé and the notes are the sources.' },
     { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },
     { table: 'learn.concept_mentions', reason: 'Graph structure; read through concepts.' },
     {
       table: 'learn.course_reads',
       reason: 'Which transcript courses have been read into Learn; the ideas are in concepts.',
+    },
+    {
+      table: 'learn.course_embeddings',
+      reason: 'Each transcript course as the text and vector it is matched to ideas by; the course is in you.courses and the links in evidence_links.',
     },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },

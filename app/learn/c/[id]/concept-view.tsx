@@ -31,6 +31,8 @@ import { MapBranch, UnlocksMap } from './unlocks-map';
 import { isLit, litRecently } from '@/lib/learn/graph/lit';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { EvidenceList } from '@/components/learn/evidence-list';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
 
 /**
  * What /learn/c/[id] draws, from what its page read: the page hands its reads
@@ -170,11 +172,22 @@ export type ConceptPageProps = {
   opening: OpeningQuestion | null;
   material: ClaimMaterialView;
   notes: CardNote[];
+  /** What backs the idea, strongest first, at most three (plan #2006.6). */
+  evidence?: EvidenceLink[];
   timezone: string;
   now: Date;
 };
 
-export function ConceptPageView({ view, probes, opening, material, notes, timezone, now }: ConceptPageProps) {
+export function ConceptPageView({
+  view,
+  probes,
+  opening,
+  material,
+  notes,
+  evidence = [],
+  timezone,
+  now,
+}: ConceptPageProps) {
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
 
   const connected =
@@ -243,6 +256,14 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
         {/* Why the node is in this subject at all, which is a different claim
             from what you know about it. */}
         <p className="mt-2 text-small text-ink-muted">{concept.basis}</p>
+
+        {/* The notes, courses and work that back it (plan #2006.6), and how
+            far they light an idea nobody has asked about. */}
+        <EvidenceList
+          links={evidence}
+          untested={concept.testedAt === null && concept.established !== 'tested'}
+          className="mt-4"
+        />
 
         {/* Offered whatever state the claim is in: this page is where you ask
             for material on one claim, known or untested alike (#1070). */}

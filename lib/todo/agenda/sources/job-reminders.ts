@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import {
   addressOnly,
@@ -132,7 +131,7 @@ export const jobRemindersSource: AgendaSource = {
   },
 
   async complete(ctx, key) {
-    const supabase = await createJobsClient();
+    const supabase = await (ctx.clients ?? sessionClients).jobs();
     await supabase
       .from('reminders')
       .update({ completed_at: new Date().toISOString() })
@@ -151,7 +150,7 @@ export const jobRemindersSource: AgendaSource = {
     const until = new Date(ctx.now);
     until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
 
-    const supabase = await createJobsClient();
+    const supabase = await (ctx.clients ?? sessionClients).jobs();
     await supabase
       .from('reminders')
       .update({ due_at: until.toISOString() })

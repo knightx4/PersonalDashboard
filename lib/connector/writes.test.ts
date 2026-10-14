@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { CONNECTOR_WRITE_TOOLS, runConnectorWrite, type ConnectorWriteContext } from './writes';
 
 /**
@@ -24,7 +25,7 @@ function ctx(): ConnectorWriteContext {
 }
 
 describe('runConnectorWrite', () => {
-  it('offers the Learn writes, then the quick note, the idea and the job lead, then the rest of Learn, then Todo', () => {
+  it('offers the Learn writes, then the quick note, the idea and the job lead, then Goals, then the rest of Learn, then Todo', () => {
     expect(CONNECTOR_WRITE_TOOLS.map((entry) => entry.definition.name)).toEqual([
       'add_to_reading_list',
       'log_learning',
@@ -32,6 +33,11 @@ describe('runConnectorWrite', () => {
       'add_quick_note',
       'add_idea',
       'add_job_lead',
+      'add_goal',
+      'add_goal_step',
+      'close_goal_step',
+      'set_goal_done_when',
+      'change_items',
       'change_reading',
       'add_learn_track',
       'add_track_reading',
@@ -44,9 +50,45 @@ describe('runConnectorWrite', () => {
       'link_todo',
       'add_event',
       'change_event',
+      'change_agenda_row',
       'add_place',
       'change_place',
       'save_job',
+      'mark_issue_unread',
+      'save_story',
+      'send_story_to_learn',
+      'make_todo_from_story',
+      'stop_watch',
+      'change_goal_area',
+      'change_goal',
+      'change_goal_step',
+      'change_goal_number',
+      'change_goal_link',
+      'change_goal_form',
+      'change_goals_inbox',
+      'change_item',
+      'item_lists',
+      'add_items',
+      'change_saved_item',
+      'add_order',
+      'order_item_tags',
+      'review_orders',
+      'change_recurring',
+      'return_window',
+      'change_person',
+      ...VAULT_CHANGE_KINDS,
+      'change_role',
+      'change_application',
+      'change_company',
+      'merge_roles',
+      'change_reminder',
+      'change_waiting',
+      'change_role_email',
+      'review_application',
+      'review_events',
+      'change_contact',
+      'change_touch',
+      'mark_suggestion_sent',
     ]);
   });
 
@@ -151,6 +193,96 @@ describe('the writes shared with Ask Dash', () => {
     expect(await runConnectorWrite(tool('add_event'), context, { title: 'Lunch', start_day: '2026-10-16', all_day: true })).toEqual({
       ok: false,
       error: 'The Todo workspace is switched off, so nothing can be changed there.',
+    });
+  });
+
+  describe('goals (plan #1894.3)', () => {
+    const AREA = '00000000-0000-4000-8000-000000000f01';
+    const GOAL = '00000000-0000-4000-8000-000000000f02';
+    const STEP = '00000000-0000-4000-8000-000000000f03';
+
+    async function withGoals() {
+      const made = await shared({ enabledModules: ['goals'], today: '2026-10-14' });
+      const { fakeSchemaDb } = await import('../../tests/stubs/fake-schema-db');
+      const actors: (string | undefined)[] = [];
+      made.tables['goals.areas'] = [{ id: AREA, user_id: ME, name: 'Health', position: 1, archived_at: null }];
+      made.tables['goals.items'] = [
+        {
+          id: GOAL,
+          user_id: ME,
+          level: 'goal',
+          parent_id: null,
+          area_id: AREA,
+          title: 'Run a half marathon',
+          status: 'open',
+          acceptance: null,
+          approved_at: '2026-10-01T00:00:00Z',
+          archived_at: null,
+          position: 1,
+        },
+        {
+          id: STEP,
+          user_id: ME,
+          level: 'step',
+          kind: 'mine',
+          parent_id: GOAL,
+          title: 'Buy running shoes',
+          status: 'open',
+          archived_at: null,
+          position: 1,
+        },
+      ];
+      const client = fakeSchemaDb(made.tables);
+      made.context.db = async (schema) => client(schema);
+      made.context.core = client('core');
+      made.context.goals = async (history) => {
+        actors.push(history.actor);
+        return client('goals') as never;
+      };
+      return { ...made, actors };
+    }
+
+    it("sets a goal's done-when and records it for Undo", async () => {
+      const { tables, context } = await withGoals();
+      const result = await runConnectorWrite(tool('set_goal_done_when'), context, {
+        goal_ref: GOAL,
+        done_when: 'I finish a half marathon under two hours',
+      });
+      expect(result).toMatchObject({ ok: true, rows: [{ table: 'goals.items', ref: GOAL }] });
+      expect(tables['goals.items'][0]).toMatchObject({ acceptance: 'I finish a half marathon under two hours' });
+      expect(tables['core.dash_actions']).toEqual([
+        expect.objectContaining({ surface: 'routine', kind: 'set_goal_done_when', subject_ref: `goals.items:${GOAL}`, op: 'update' }),
+      ]);
+    });
+
+    it('adds a step under a goal and closes a step, as Dash', async () => {
+      const { tables, context, actors } = await withGoals();
+      const added = await runConnectorWrite(tool('add_goal_step'), context, { goal_ref: GOAL, title: 'Run 10k' });
+      expect(added).toMatchObject({ ok: true, rows: [{ table: 'goals.items' }] });
+      expect(tables['goals.items'].find((row) => row.title === 'Run 10k')).toMatchObject({ parent_id: GOAL, level: 'step', user_id: ME });
+
+      const closed = await runConnectorWrite(tool('close_goal_step'), context, { step_ref: STEP });
+      expect(closed).toMatchObject({ ok: true, rows: [{ table: 'goals.items', ref: STEP }] });
+      expect(tables['goals.items'].find((row) => row.id === STEP)).toMatchObject({ status: 'done' });
+      expect(actors).toEqual(['claude', 'claude']);
+      expect(tables['core.dash_actions'].map((row) => row.kind)).toEqual(['add_goal_step', 'close_goal_step']);
+    });
+
+    it("refuses another person's goal", async () => {
+      const { tables, context } = await withGoals();
+      tables['goals.items'][0].user_id = 'someone else';
+      const result = await runConnectorWrite(tool('set_goal_done_when'), context, { goal_ref: GOAL, done_when: 'Done' });
+      expect(result).toEqual({ ok: false, error: 'That goal is not one of theirs, or it has been archived.' });
+      expect(tables['core.dash_actions']).toEqual([]);
+    });
+
+    it('refuses when Goals is off', async () => {
+      const { context } = await withGoals();
+      context.account = { enabledModules: ['dev'], today: '2026-10-14' };
+      expect(await runConnectorWrite(tool('close_goal_step'), context, { step_ref: STEP })).toEqual({
+        ok: false,
+        error: 'The Goals workspace is switched off, so nothing can be changed there.',
+      });
     });
   });
 

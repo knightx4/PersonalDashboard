@@ -73,6 +73,30 @@ describe('what to ask about next', () => {
     expect(nextConcept([concepts[0], concepts[1]], noneAsked)?.id).toBe('recognised');
   });
 
+  it('offers an untested idea your notes back for a confirming question first', () => {
+    // Plan #2006.6: after a misconception, and best backed first.
+    const concepts = [
+      concept('shaky', 'shaky'),
+      concept('untouched', 'unknown'),
+      concept('noted', 'unknown'),
+      concept('well-noted', 'unknown'),
+      concept('faint', 'unknown'),
+    ];
+    const evidence = new Map([
+      ['noted', 0.15],
+      ['well-noted', 0.275],
+      ['faint', 0.05],
+    ]);
+    expect(nextConcept(concepts, noneAsked, undefined, evidence)?.id).toBe('well-noted');
+    expect(nextConcept([concepts[0], concepts[4]], noneAsked, undefined, evidence)?.id).toBe('shaky');
+    expect(
+      nextConcept([concept('wrong', 'misconception'), concepts[3]], noneAsked, undefined, evidence)?.id,
+    ).toBe('wrong');
+    // Once tested, evidence no longer moves it up.
+    const tested = { ...concepts[3], state: 'recognised' as const, established: 'tested' as const, testedAt: '2026-10-01' };
+    expect(nextConcept([concepts[0], tested], noneAsked, undefined, evidence)?.id).toBe('shaky');
+  });
+
   it('spreads out rather than circling one node', () => {
     // Two nodes in the same state: the one asked about least often wins, which
     // is what stops a session filling the bar off a single claim.
