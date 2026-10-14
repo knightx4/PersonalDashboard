@@ -3,7 +3,7 @@ import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } fr
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { CLASSIFICATIONS, eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
 import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
@@ -1790,8 +1790,11 @@ export type RowsUndo = {
   inserted: { table: string; id: string }[];
 };
 
-/** The tables a review change's undo may name. Every one keeps a user_id. */
-const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events']);
+/**
+ * The tables a review change's undo may name. All but the email verdicts
+ * keep a user_id; an email's owner is read through job_search.inbox_messages.
+ */
+const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events', 'job_search.ingested_messages']);
 
 const REVIEW_HREF = '/jobs/review';
 const EVENTS_MAX = 50;
@@ -1937,6 +1940,106 @@ async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// review_emails
+// ---------------------------------------------------------------------------
+
+/**
+ * Emails waiting in Jobs review dismissed, or dismissed ones brought back
+ * (plan #1894.6.4.2). A dismissal writes what the page's d key and bulk bar
+ * write: the email is marked not relevant and skipped, and its suggested
+ * link is cleared. Bringing one back puts it in the queue again with the
+ * classification it now has, or the one the call gives. The record keeps
+ * every email's classification and link from before, so the Undo puts each
+ * back as it was, whichever way the change went.
+ *
+ * The verdict rows have no user_id; the person's ownership is read through
+ * job_search.inbox_messages, which carries it, as change_role_email does.
+ */
+const MESSAGE_COLUMNS = ['classification', 'parse_status', 'resulting_application_id', 'link_method', 'link_confidence', 'error'] as const;
+const DISMISSED = { classification: 'not_relevant', parse_status: 'skipped', resulting_application_id: null, link_method: null, link_confidence: null, error: null };
+const EMAILS_MAX = 50;
+const pickMessage = (row: Row): Row => Object.fromEntries(MESSAGE_COLUMNS.map((column) => [column, row[column] ?? null]));
+
+/** The emails a call names, read through the inbox view by the person's user id; refused unless every one is theirs. */
+async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
+  const list = Array.isArray(refs) ? refs : [];
+  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as search_mail or a lookup returned them.');
+  if (list.length > EMAILS_MAX) throw new JobsRefused(`Up to ${EMAILS_MAX} emails at a time.`);
+  const byId = new Map<string, Row>();
+  for (const raw of list) {
+    let ref = typeof raw === 'string' ? raw.trim() : '';
+    if (ref.startsWith('job_search.inbox_messages:')) ref = ref.slice('job_search.inbox_messages:'.length);
+    let query = env.jobs.from('inbox_messages').select('*').eq('user_id', env.userId);
+    if (isUuid(ref)) query = query.eq('id', ref);
+    else {
+      const at = ref.indexOf(':');
+      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref search_mail or a lookup returned for the email.');
+      query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error(`Reading the email failed: ${error.message}`);
+    if (!data) throw new JobsRefused('One of those is not an email the job search has read. Look them up first.');
+    byId.set((data as Row).id as string, data as Row);
+  }
+  return [...byId.values()];
+}
+
+async function reviewEmails(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const verb = text(args, 'verb');
+  if (verb !== 'dismiss' && verb !== 'restore') throw new JobsRefused('verb must be dismiss or restore.');
+  if (verb === 'dismiss' && given(args, 'classification')) throw new JobsRefused('classification goes with restore.');
+  const classification = given(args, 'classification')
+    ? (oneOf(args, 'classification', CLASSIFICATIONS.filter((c) => c !== 'not_relevant'), false) as MessageClassification)
+    : null;
+  const found = await namedEmails(env, args.email_refs);
+  const emails =
+    verb === 'dismiss'
+      ? found.filter((row) => row.parse_status === 'needs_review')
+      : found.filter((row) => row.parse_status === 'skipped' && row.classification === 'not_relevant');
+  if (emails.length === 0) {
+    throw new JobsRefused(verb === 'dismiss' ? 'None of those is waiting in Jobs review.' : 'None of those has been dismissed.');
+  }
+
+  const undo: RowsUndo = { updated: [], inserted: [] };
+  let firstAfter: Row | null = null;
+  for (const row of emails) {
+    const set: Row = verb === 'dismiss' ? DISMISSED : { parse_status: 'needs_review', ...(classification ? { classification } : {}) };
+    const { data, error } = await env.jobs.from('ingested_messages').update(set).eq('id', row.id as string).select('*');
+    if (error) throw new Error(`Changing the email failed: ${error.message}`);
+    const after = ((data ?? []) as Row[])[0];
+    if (!after) continue;
+    firstAfter ??= after;
+    undo.updated.push({ table: MESSAGES, id: row.id as string, before: pickMessage(row), after: pickMessage(after) });
+  }
+  if (!firstAfter) throw new Error('Changing the emails failed: no row was written.');
+
+  const first = emails[0];
+  const what = emails.length === 1 ? quotedBody(first.subject, 'an email') : `${emails.length} emails`;
+  const label = classification ? classification.replace(/_/g, ' ') : null;
+  return {
+    kind: 'review_emails',
+    input: {
+      verb: verb === 'dismiss' ? 'Dismissed' : 'Brought back',
+      what,
+      rest: verb === 'dismiss' ? ' from Jobs review' : ` to Jobs review${label ? ` as ${label}` : ''}`,
+      href: REVIEW_HREF,
+      where: 'Open Jobs review',
+      paths: [REVIEW_HREF],
+    },
+    subjectRef: toRef('job_search.inbox_messages', first.id as string),
+    op: 'update',
+    before: first,
+    after: firstAfter,
+    summary:
+      verb === 'dismiss'
+        ? `Dash dismissed ${what} from Jobs review.`
+        : `Dash brought back ${what} to Jobs review${label ? ` as ${label}` : ''}.`,
+    row: { table: 'job_search.inbox_messages', ref: first.id as string, title: what, href: REVIEW_HREF },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
 function rowsUndo(value: Record<string, unknown> | null): RowsUndo | null {
   if (!value) return null;
   const updated = Array.isArray(value.updated) ? (value.updated as RowsUndo['updated']) : [];
@@ -1964,7 +2067,11 @@ export async function undoJobsRows(
   const name = (table: string) => table.slice('job_search.'.length);
   let restored = 0;
   for (const row of undo.updated) {
-    let query = jobs.from(name(row.table)).update(row.before).eq('id', row.id).eq('user_id', deps.userId);
+    let query = jobs.from(name(row.table)).update(row.before).eq('id', row.id);
+    if (row.table === 'job_search.ingested_messages') {
+      const { data: own } = await jobs.from('inbox_messages').select('id').eq('id', row.id).eq('user_id', deps.userId).maybeSingle();
+      if (!own) continue;
+    } else query = query.eq('user_id', deps.userId);
     for (const [column, value] of Object.entries(row.after)) {
       if (!scalar(value)) continue;
       query = value === null ? query.is(column, null) : query.eq(column, value);
@@ -2665,6 +2772,25 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: reviewEvents,
+  },
+  {
+    name: 'review_emails',
+    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: refs from search_mail, or job_search.inbox_messages refs.' },
+        verb: { type: 'string', enum: ['dismiss', 'restore'], description: 'dismiss to take them out of the queue; restore to bring dismissed ones back.' },
+        classification: {
+          type: 'string',
+          enum: CLASSIFICATIONS.filter((c) => c !== 'not_relevant'),
+          description: 'With restore, when they say what the email is: the kind it comes back as.',
+        },
+      },
+      required: ['email_refs', 'verb'],
+      additionalProperties: false,
+    },
+    run: reviewEmails,
   },
   {
     name: 'change_contact',
