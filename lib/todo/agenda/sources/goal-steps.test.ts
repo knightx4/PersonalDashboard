@@ -88,7 +88,7 @@ describe('goalStepsSource', () => {
 
   it('closes the step when it is ticked', async () => {
     await goalStepsSource.complete!(ctx, 'goal_steps:s1');
-    expect(setStepStatus).toHaveBeenCalledWith(undefined, 's1', 'done');
+    expect(setStepStatus).toHaveBeenCalledWith({}, 's1', 'done');
   });
 
   it('refuses to tick a rhythm or question left on a page opened before', async () => {

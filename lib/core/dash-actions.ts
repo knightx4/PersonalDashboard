@@ -3,6 +3,11 @@ import { parseRef } from '@/lib/core/refs';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS, JOBS_MANY_ROW_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 
 /**
@@ -141,6 +146,7 @@ const SCHEMAS: ReadonlySet<string> = new Set<AskSchema>([
   'learn',
   'news',
   'goals',
+  'you',
 ]);
 
 /**
@@ -176,12 +182,29 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...LEARN_CHANGE_KINDS,
   ...TODO_CHANGE_KINDS,
   ...YOU_CHANGE_KINDS,
+  ...NEWS_CHANGE_KINDS,
+  ...GOALS_CHANGE_KINDS,
+  ...SHOPPING_CHANGE_KINDS,
+  ...VAULT_CHANGE_KINDS,
+  ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
 ];
 
+/**
+ * The kinds whose record keeps every row the change touched in `undo`, which
+ * Ask's own undo puts back (lib/ask/changes.ts, undoMany). The connector
+ * records them as a routine's (plan #1894.5.1), and they go there too, since
+ * the rule here sees only the one row the record names.
+ */
+export const MANY_ROW_KINDS: readonly string[] = ['change_items', ...SHOPPING_CHANGE_KINDS, ...JOBS_MANY_ROW_KINDS];
+
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
 export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boolean {
-  return action.surface === 'ask' || (action.surface === 'thread' && WRITE_TOOL_KINDS.includes(action.kind));
+  return (
+    action.surface === 'ask' ||
+    (action.surface === 'thread' && WRITE_TOOL_KINDS.includes(action.kind)) ||
+    (action.surface === 'routine' && MANY_ROW_KINDS.includes(action.kind))
+  );
 }
 
 /**
@@ -355,6 +378,8 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     { schema: 'learn', table: 'aims', column: 'goal_id' },
     { schema: 'public', table: 'raised_items', column: 'goal_id' },
   ],
+  // An area an agent added (plan #1894.7.1): the goals filed under it since.
+  'goals.areas': [{ schema: 'goals', table: 'items', column: 'area_id' }],
   'goals.collections': [
     { schema: 'goals', table: 'records', column: 'collection_id' },
     { schema: 'goals', table: 'items', column: 'collection_id' },

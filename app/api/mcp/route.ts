@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { createServiceSchemaSupabase } from '@/inngest/supabase-admin';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
+import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 import type { AskDb, AskSchema, SchemaClient } from '@/lib/ask/db';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
@@ -24,6 +25,14 @@ import { embedVaultNotes } from '@/lib/vault/notes/embed';
  * writes (Learn's, plan #1808, and a quick note, an idea or a job lead, plan
  * #1894.2) run on service-role clients made here, for that same user id, and
  * never on the token.
+ *
+ * The goal writes (plan #1894.3) run on a service-role goals client. Ask Dash
+ * writes a goal and its done-when on the person's session, which
+ * goals.history records as theirs and goals.items_claude_guard lets through,
+ * because they asked in their own words; the connector is the person asking
+ * too, so a write that names no actor is recorded as theirs in the same way.
+ * Closing a step names Dash (`actor: 'claude'`) on both, and the guard
+ * applies.
  */
 
 export const runtime = 'nodejs';
@@ -87,6 +96,7 @@ function writeContext(userId: string): ConnectorWriteContext {
     learn: createLearnServiceSupabase(),
     core,
     db: serviceAskDb(),
+    goals: async (history) => createGoalsServiceSupabase({ ...history, actor: history.actor ?? 'me' }),
     fileQuickNote: (text) => fileQuickNote(userId, core, text),
     later: (work) => after(work),
     recordSpend: async (owner, operation, reports) => {
