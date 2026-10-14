@@ -37,6 +37,7 @@ import {
   type CaptureAction,
   type CaptureActionId,
   type CaptureAim,
+  type CaptureKindId,
 } from '@/lib/capture/actions';
 import { AimedCaptureForm, CaptureAimContext, DayChips } from '@/components/shell/capture-aim';
 import { useToast, type ToastInput } from '@/components/ui/toast';
@@ -52,7 +53,7 @@ import {
 import { type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
-import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import type { PaidAction, PaidCosts } from '@/lib/core/spend/paid-actions';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
   ESTIMATE_CHIPS,
@@ -1107,6 +1108,20 @@ function carriedToast(): ToastInput | null {
 }
 
 /**
+ * The paid press an aimed Add makes, by kind, where it makes one: an order is
+ * read with a model (plan #1950.3.1), a goal in the Learn area is placed and
+ * given a plan, and a note for Dev is triaged once saved (plan #1950.5).
+ */
+const AIMED_PRESS: Partial<Record<CaptureKindId, { action: PaidAction; what: string }>> = {
+  order: { action: 'app/capture-actions.ts#makeAimedCapture', what: 'Cost of reading it' },
+  goal: {
+    action: 'app/capture-actions.ts#makeAimedCapture:goal',
+    what: 'Cost of placing a goal in the Learn area and writing its plan',
+  },
+  'dev-note': { action: 'app/capture-actions.ts#makeAimedCapture:dev-note', what: 'Cost of sorting the note' },
+};
+
+/**
  * Capture aimed at a kind (plan #1950.1): what an Add button on a list
  * opens. The kind is already chosen, so there is no sort and no place chips:
  * the title, the one more thing the kind needs, and Add. One press makes the
@@ -1128,6 +1143,22 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const [uploads, setUploads] = useState<UploadedAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const panelRef = useRef<HTMLFormElement>(null);
+  // A kind whose press reads with a model shows its $ figure, asked for once
+  // when the panel opens, as the one box asks for its own (plan #1950.3.1).
+  const [costs, setCosts] = useState<PaidCosts>({});
+  const press = AIMED_PRESS[kind.id];
+  useEffect(() => {
+    if (!press) return;
+    let live = true;
+    captureBoxCosts()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [press]);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   usePanelChrome(onClose, panelRef);
@@ -1231,6 +1262,13 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
             fieldRef.current = node;
           }}
           onSubmit={submit}
+          hint={
+            press ? (
+              <PaidCostsProvider costs={costs}>
+                <PaidHint action={press.action} what={press.what} align="end" />
+              </PaidCostsProvider>
+            ) : null
+          }
         />
       </form>
     </div>

@@ -48,6 +48,7 @@ import { writePlanItem } from '@/lib/plan/capture-write';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
+import { makeShoppingItem, makeShoppingOrder, makeShoppingSaved } from '@/app/shopping/capture-writers';
 
 /**
  * The one capture box's server side (plan #1581, feature #1579): where a
@@ -216,7 +217,7 @@ export async function fileCaptureBox(
   }
 
   const settings = await loadAccountSettings(user.id);
-  const writers = await writersFor(user, settings.enabledModules as ModuleId[], files);
+  const writers = await writersFor(user.id, settings.enabledModules as ModuleId[], files);
   const result = await fileCaptureParts(filing.parts, writers);
   if (files.length > 0) revalidatePath('/todo', 'layout');
   if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
@@ -243,20 +244,17 @@ const NOT_FROM_THE_BOX: AimedOnlyWriters = {
 
 /**
  * The writers capture makes rows with, bound to the signed-in person: the
- * same ones for the one box and for an Add button aimed at a kind, with the
- * kinds only an Add button makes passed in by the aimed add alone.
+ * same ones for the one box and for an Add button aimed at a kind, apart
+ * from those only one of them reaches (writersFor and aimedWriters below).
  */
-async function writersFor(
-  user: SessionUser,
+async function rowWriters(
+  userId: string,
   modules: ModuleId[],
   files: readonly UploadedAttachment[],
-  aimedOnly: AimedOnlyWriters = NOT_FROM_THE_BOX,
-): Promise<CaptureWriters> {
-  const userId = user.id;
+): Promise<Omit<CaptureWriters, 'goals'>> {
   const deps = await requestDashDeps(userId);
   return {
     todo: (text, day = 'today') => addTask({}, todoCaptureForm(text, day)),
-    goals: (text) => fileGoalCapture(text),
     jobs: async (roleId, text) => {
       const written = await writeRoleNote({ userId, enabledModules: modules, db: requestAskDb() }, roleId, text);
       return written.ok
@@ -264,7 +262,7 @@ async function writersFor(
         : { ok: false as const, error: written.error };
     },
     vault: (text) => fileVaultNote(userId, text),
-    ...aimedOnly,
+    ...NOT_FROM_THE_BOX,
     record: (entry) => recordDashAction(deps, entry),
     role: async (input) => {
       const written = await writeJobLead({ userId, enabledModules: modules, db: requestAskDb() }, input);
@@ -324,6 +322,39 @@ function aimedOnlyWriters(user: SessionUser): AimedOnlyWriters {
   };
 }
 
+/** The one box's writers: every place the sort files into, a goal update among them. */
+async function writersFor(
+  userId: string,
+  modules: ModuleId[],
+  files: readonly UploadedAttachment[],
+): Promise<CaptureWriters> {
+  return { ...(await rowWriters(userId, modules, files)), goals: (text) => fileGoalCapture(text) };
+}
+
+/**
+ * An aimed add's writers: every kind that makes one row, Shopping's among
+ * them (plan #1950.3.1), and the goal, area, plan, idea and Dev note kinds
+ * the box never reaches (plan #1950.5). A goal update is never made here, since aiming it
+ * opens Goals' own panel, so its writer only says so; keeping it out is also
+ * what keeps this press's $ hint to the order read alone.
+ */
+async function aimedWriters(
+  user: SessionUser,
+  modules: ModuleId[],
+  files: readonly UploadedAttachment[],
+): Promise<CaptureWriters> {
+  return {
+    ...(await rowWriters(user.id, modules, files)),
+    ...aimedOnlyWriters(user),
+    goals: async () => ({ error: 'Log what happened from its own panel.' }),
+    shopping: {
+      order: (text) => makeShoppingOrder(text),
+      item: (text) => makeShoppingItem(text),
+      saved: (text) => makeShoppingSaved(text),
+    },
+  };
+}
+
 const KIND_IDS = Object.keys(CAPTURE_KINDS) as [CaptureKindId, ...CaptureKindId[]];
 const Aimed = z.object({
   kind: z.enum(KIND_IDS),
@@ -364,7 +395,11 @@ export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unkno
   // Files only for a kind that takes them (plan #1713): a note for Dev.
   const files = kind.files ? parseUploadedAttachments(uploaded, user.id) : [];
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role, under, page }, await writersFor(user, modules, files, aimedOnlyWriters(user)));
+    const made = await makeCaptureKind(
+      kindId,
+      { text, day, role, under, page },
+      await aimedWriters(user, modules, files),
+    );
     if (!made.ok) return { ok: false, error: made.error };
     // A note for Dev refreshes nothing: any revalidation renders the page
     // you are on again before answering, and a note is filed from every page,
@@ -417,13 +452,21 @@ export async function undoCaptureBox(actionId: string): Promise<CaptureBoxUndo> 
   }
 }
 
-/** The $ figure for the box's File it button, asked for once when the box opens. */
+/**
+ * The $ figures for the box's File it button and for an aimed Add that reads
+ * with a model (an order, plan #1950.3.1), asked for once when a panel opens.
+ */
 // latency: pending
 export async function captureBoxCosts(): Promise<PaidCosts> {
   const user = await requireUser();
   try {
     const core = await createCoreClient();
-    return await estimatePaidActions(core, user.id, ['app/capture-actions.ts#fileCaptureBox']);
+    return await estimatePaidActions(core, user.id, [
+      'app/capture-actions.ts#fileCaptureBox',
+      'app/capture-actions.ts#makeAimedCapture',
+      'app/capture-actions.ts#makeAimedCapture:goal',
+      'app/capture-actions.ts#makeAimedCapture:dev-note',
+    ]);
   } catch {
     return {};
   }

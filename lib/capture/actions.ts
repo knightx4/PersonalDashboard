@@ -211,6 +211,9 @@ export type CaptureKindId =
   | 'plan-step'
   | 'idea'
   | 'dev-note'
+  | 'order'
+  | 'inventory-item'
+  | 'saved-item'
   // Jobs and Learn (plan #1950.4)
   | 'job-role'
   | 'learn-reading'
@@ -392,6 +395,44 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     action: 'anything',
     everyone: true,
     files: true,
+  },
+  // Shopping's three lists (plan #1950.3.1). The sort never files these, so
+  // they have no place and no panel action of their own.
+  order: {
+    id: 'order',
+    place: null,
+    module: 'shopping',
+    label: 'Add an order',
+    placeholder: 'What did you buy, where, and what did it cost?',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/orders',
+    action: 'anything',
+  },
+  'inventory-item': {
+    id: 'inventory-item',
+    place: null,
+    module: 'shopping',
+    label: 'Add something you own',
+    placeholder: 'Its name, or the ISBN of a book',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/inventory',
+    action: 'anything',
+  },
+  'saved-item': {
+    id: 'saved-item',
+    place: null,
+    module: 'shopping',
+    label: 'Save a link',
+    placeholder: 'Paste the link to the thing',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/saved',
+    action: 'anything',
   },
   // Jobs and Learn (plan #1950.4): made only from an Add button, so no place.
   'job-role': {

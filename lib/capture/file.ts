@@ -55,6 +55,12 @@ export type CaptureWriters = {
   idea: (body: string) => Promise<CaptureRowWrite>;
   /** A note in Dev's queue, with the page it was filed from. */
   devNote: (body: string, pagePath: string | null) => Promise<CaptureRowWrite>;
+  /**
+   * Shopping's order, item and saved thing (plan #1950.3.1). Absent where
+   * only the sort files, such as the shortcuts' capture-token route, since
+   * the sort never files these.
+   */
+  shopping?: ShoppingWriters;
   /** recordDashAction, bound to the person. */
   record: (entry: DashActionEntry) => Promise<string | null>;
   // Jobs and Learn (plan #1950.4), made only from an Add button. Optional, so
@@ -76,6 +82,17 @@ export type CaptureWriters = {
   attach?: (ref: string) => Promise<number>;
 };
 
+/** What a Shopping writer reports: the row it made and what to call it, or why not. */
+export type ShoppingMade = { ok: true; id: string; title: string } | { ok: false; error: string };
+
+export type ShoppingWriters = {
+  /** An order from a sentence, read by the model when there is one. */
+  order: (text: string) => Promise<ShoppingMade>;
+  /** Something owned: a book from an ISBN, anything else by its name. */
+  item: (text: string) => Promise<ShoppingMade>;
+  /** A saved thing from the link in what was typed. */
+  saved: (text: string) => Promise<ShoppingMade>;
+};
 export type LearnReadingWritten =
   | { ok: true; readingId: string; title: string; created: boolean }
   | { ok: false; error: string };
@@ -236,6 +253,50 @@ async function makeOneRow(
 /** "Goals · Health", or the workspace alone when nothing is under it. */
 function within(workspace: string, under: CaptureUnder | null | undefined): string {
   return under ? `${workspace} · ${under.title}` : workspace;
+}
+
+/**
+ * A Shopping kind's make: the writer, then the record, then where it went.
+ * Each row opens on its own page, where its details are put right.
+ */
+function shoppingMaker(spec: {
+  writer: keyof ShoppingWriters;
+  table: 'orders' | 'inventory_items' | 'saved_items';
+  kind: string;
+  list: string;
+  section: string;
+  said: (title: string) => string;
+}): Maker {
+  return async ({ text }, writers, by, errors) => {
+    if (!writers.shopping) return { ok: false, error: CANNOT_HERE };
+    const result = await writers.shopping[spec.writer](text);
+    if (!result.ok) return { ok: false, error: result.error };
+    const subjectRef = `public.${spec.table}:${result.id}`;
+    const files = await attachTo(writers, [subjectRef], errors);
+    const actionId = await writers.record({
+      surface: 'capture',
+      kind: spec.kind,
+      subjectRef,
+      op: 'insert',
+      summary: `${by === 'dash' ? 'Dash' : 'You'} ${spec.said(quoted(result.title))}`,
+      undo: aimedUndo(by),
+    });
+    return {
+      ok: true,
+      filed: {
+        ...(files ? { files } : {}),
+        place: null,
+        text,
+        where: `Shopping · ${spec.list}`,
+        href: spec.section,
+        actionId,
+        goals: null,
+        undoneAt: null,
+        ref: subjectRef,
+        page: `${spec.section}/${result.id}`,
+      },
+    };
+  };
 }
 
 /**
@@ -487,6 +548,32 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
     );
   },
 
+  order: shoppingMaker({
+    writer: 'order',
+    table: 'orders',
+    kind: 'add_order',
+    list: 'Orders',
+    section: '/shopping/orders',
+    said: (title) => `added the order "${title}".`,
+  }),
+
+  'inventory-item': shoppingMaker({
+    writer: 'item',
+    table: 'inventory_items',
+    kind: 'add_inventory_item',
+    list: 'Inventory',
+    section: '/shopping/inventory',
+    said: (title) => `added "${title}" to your inventory.`,
+  }),
+
+  'saved-item': shoppingMaker({
+    writer: 'saved',
+    table: 'saved_items',
+    kind: 'add_saved_item',
+    list: 'Saved',
+    section: '/shopping/saved',
+    said: (title) => `saved "${title}".`,
+  }),
   // Jobs and Learn (plan #1950.4): one row each, made only from an Add button.
 
   'job-role': async ({ text }, writers, by) => {

@@ -32,6 +32,8 @@ export const MODELS = {
   booksPasteList: HAIKU,
   /** lib/books/receipt-photo.ts */
   booksReceiptPhoto: HAIKU,
+  /** lib/orders/sentence-model.ts, an order from a sentence typed into capture */
+  shoppingOrderSentence: HAIKU,
   /** lib/comments/ask.ts, Dash's reply on a dev row (lib/dash/models.ts devThread) */
   devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
