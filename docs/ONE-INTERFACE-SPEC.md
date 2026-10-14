@@ -454,10 +454,10 @@ baseline it measures and takes the pending mark off.
 
 **R1.** Every workspace's first two sections are named Now and Inbox, in
 that order, and its settings link is set.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R2.** Only an Inbox carries a badge.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R3.** A page for one row draws its path from `refPath`.
 Checked by: count `row-pages-without-path`, baseline 33, target 0.

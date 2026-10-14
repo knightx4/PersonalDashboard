@@ -119,7 +119,7 @@ function devSections(
   const waiting = devWaiting(raised, plan, specChanges, runQuestions, snoozes);
 
   /**
-   * Home is first because it is the page the day starts on: what is running,
+   * Now (Home until plan #1937.6) is first because it is the page the day starts on: what is running,
    * the summary of the last 24 hours, and every conversation you have had with
    * Dash. The Inbox beside it holds the questions a session needs answered
    * before it can carry on. A question nobody reads is a session that guessed.
@@ -150,7 +150,8 @@ function devSections(
   return [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
-    { href: '/dev/raised', label: 'Home', icon: 'devHome' },
+    // Named Now, as every workspace's first section is (plan #1937.6).
+    { href: '/dev/raised', label: 'Now', icon: 'devHome' },
     // Everything waiting on you, the way an inbox holds what is addressed to
     // you. Home carried it until the summary and the conversations pushed it
     // down the page; the badge is the length of this list.
