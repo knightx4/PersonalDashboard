@@ -13,6 +13,8 @@ import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { CAREER_WRITES } from './career-writes';
+import { JobsRefused } from './jobs-refused';
 
 /**
  * The Jobs changes an agent makes when asked (plan #1894.6.1, feature
@@ -131,7 +133,7 @@ export type JobsWrite = {
 };
 
 /** A refusal the model reads and says in words. */
-export class JobsRefused extends Error {}
+export { JobsRefused };
 
 type Args = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -2848,6 +2850,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     },
     run: markSuggestionSent,
   },
+  // From Material, Settings and Find (plan #1894.6.7), in lib/dash/career-writes.ts.
+  ...CAREER_WRITES,
 ];
 
 /** Runs one Jobs write. Never throws: a refusal or a failure is the sentence the model reads. */

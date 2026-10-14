@@ -93,6 +93,11 @@ describe('runConnectorWrite', () => {
       'change_contact',
       'change_touch',
       'mark_suggestion_sent',
+      'add_evidence',
+      'add_resume_version',
+      'attach_resume_pdf',
+      'change_career_thought',
+      'add_discovered_company',
     ]);
   });
 
