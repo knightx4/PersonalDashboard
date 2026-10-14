@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
-import { JOBS_WRITES, runJobsWrite, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
+import { JOBS_WRITES, runJobsWrite, undoJobsRows, undoRoleEmail, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
 
 /**
  * The Jobs writes an agent makes (plan #1894.6.1): each names one row, read
@@ -385,5 +385,85 @@ describe('change_role_email (plan #1894.6.5)', () => {
     expect(await refused('change_role_email', withMail(APP_2), { action: 'link', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/another role/);
     expect(await refused('change_role_email', withMail(), { action: 'unlink', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/not linked to this role/);
     expect(await refused('change_role_email', withMail(), { action: 'nope', application_ref: APP_1, email_ref: MESSAGE })).toMatch(/action must be/);
+  });
+});
+
+describe('review_application and review_events (plan #1894.6.4.1)', () => {
+  const EVENT_2 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const THEIRS = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function withReview(): FakeTables {
+    const t = tables();
+    t['job_search.applications'] = [
+      { id: APP_1, user_id: ME, role_id: ROLE, attempt: 1, status: 'applied', needs_review: true, status_manual_override: null },
+      { id: APP_2, user_id: ME, role_id: ROLE, attempt: 2, status: 'rejected', needs_review: false, status_manual_override: null },
+      { id: THEIRS, user_id: SOMEONE, role_id: ROLE, attempt: 3, status: 'applied', needs_review: true, status_manual_override: null },
+    ];
+    t['job_search.application_events'] = [
+      { id: EVENT, user_id: ME, application_id: APP_2, kind: 'interview_scheduled', summary: 'Invite after a rejection', needs_review: true, acknowledged_at: null },
+      { id: EVENT_2, user_id: ME, application_id: APP_2, kind: 'email', summary: 'Following up', needs_review: true, acknowledged_at: null },
+      { id: THEIRS, user_id: SOMEONE, application_id: THEIRS, kind: 'email', summary: 'Not mine', needs_review: true, acknowledged_at: null },
+    ];
+    return t;
+  }
+  const undoOn = (t: FakeTables) => ({ userId: ME, db: async (schema: Parameters<ReturnType<typeof fakeSchemaDb>>[0]) => fakeSchemaDb(t)(schema) });
+
+  it('confirms an application the inbox found, and its Undo flags it again', async () => {
+    const t = withReview();
+    const change = await made('review_application', t, { application_ref: APP_1, verb: 'confirm' });
+    expect(change.subjectRef).toBe(`job_search.applications:${APP_1}`);
+    expect(change.after).toMatchObject({ needs_review: false });
+    expect(change.summary).toBe('Dash confirmed Role from email at Acme as a real pursuit, from Jobs review.');
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: true, restored: 1 });
+    expect(t['job_search.applications'][0]).toMatchObject({ needs_review: true });
+  });
+
+  it('reopens a closed pursuit with its timeline line, and its Undo takes both back', async () => {
+    const t = withReview();
+    const change = await made('review_application', t, { application_ref: APP_2, verb: 'reopen', status: 'in_process' });
+    expect(change.after).toMatchObject({ status_manual_override: 'in_process' });
+    const line = t['job_search.application_events'].find((e) => e.kind === 'status_override');
+    expect(line).toMatchObject({ user_id: ME, application_id: APP_2, source: 'manual', summary: 'Reopened by hand as in process' });
+    expect(change.summary).toBe('Dash reopened the pursuit Role from email at Acme as in process.');
+
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: true, restored: 2 });
+    expect(t['job_search.applications'][1]).toMatchObject({ status_manual_override: null });
+    expect(t['job_search.application_events'].some((e) => e.kind === 'status_override')).toBe(false);
+  });
+
+  it('keeps the timeline line when the pursuit has moved on since', async () => {
+    const t = withReview();
+    const change = await made('review_application', t, { application_ref: APP_2, verb: 'reopen', status: 'final_round' });
+    t['job_search.applications'][1].status_manual_override = 'offer';
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: false });
+    expect(t['job_search.application_events'].some((e) => e.kind === 'status_override')).toBe(true);
+  });
+
+  it('refuses an open pursuit to reopen, one already confirmed, and one that is not theirs', async () => {
+    expect(await refused('review_application', withReview(), { application_ref: APP_1, verb: 'reopen', status: 'in_process' })).toMatch(/not closed/);
+    expect(await refused('review_application', withReview(), { application_ref: APP_2, verb: 'confirm' })).toMatch(/not waiting/);
+    expect(await refused('review_application', withReview(), { application_ref: THEIRS, verb: 'confirm' })).toMatch(/no application of theirs/);
+    expect(await refused('review_application', withReview(), { application_ref: APP_2, verb: 'reopen' })).toMatch(/status must be one of/);
+  });
+
+  it('acknowledges flagged events, and its Undo flags each again', async () => {
+    const t = withReview();
+    const change = await made('review_events', t, { event_refs: [EVENT, EVENT_2], verb: 'acknowledge' });
+    const mine = () => t['job_search.application_events'].slice(0, 2);
+    expect(mine().every((e) => e.needs_review === false && typeof e.acknowledged_at === 'string')).toBe(true);
+    expect(change.summary).toBe('Dash acknowledged 2 events on Role from email at Acme in Jobs review.');
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: true, restored: 2 });
+    expect(mine().every((e) => e.needs_review === true && e.acknowledged_at === null)).toBe(true);
+  });
+
+  it('takes an acknowledgement back, and refuses an event that is not theirs or one with nothing to do', async () => {
+    const t = withReview();
+    t['job_search.application_events'][0] = { ...t['job_search.application_events'][0], needs_review: false, acknowledged_at: '2026-10-01T00:00:00.000Z' };
+    const change = await made('review_events', t, { event_refs: [EVENT], verb: 'take_back' });
+    expect(t['job_search.application_events'][0]).toMatchObject({ needs_review: true, acknowledged_at: null });
+    expect(change.summary).toBe('Dash took back the acknowledgement of "Invite after a rejection" on Role from email at Acme in Jobs review.');
+
+    expect(await refused('review_events', withReview(), { event_refs: [EVENT, THEIRS], verb: 'acknowledge' })).toMatch(/not an event of theirs/);
+    expect(await refused('review_events', withReview(), { event_refs: [EVENT], verb: 'take_back' })).toMatch(/None of those has been acknowledged/);
   });
 });

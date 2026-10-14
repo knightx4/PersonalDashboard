@@ -83,6 +83,8 @@ describe('runConnectorWrite', () => {
       'change_reminder',
       'change_waiting',
       'change_role_email',
+      'review_application',
+      'review_events',
     ]);
   });
 

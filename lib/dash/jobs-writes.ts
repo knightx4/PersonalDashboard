@@ -8,7 +8,7 @@ import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
 import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
-import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
@@ -37,6 +37,12 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                       to another day, or linked to the email behind it.
  *   change_waiting      a "Waiting on you" row done or put off a week.
  *
+ *
+ * and, from Jobs review (plan #1894.6.4.1):
+ *
+ *   review_application  an application the inbox found confirmed, or a
+ *                       closed one reopened by hand.
+ *   review_events       flagged events acknowledged, or flagged again.
  *
  * and, from a role's mail (plan #1894.6.5):
  *
@@ -1372,6 +1378,223 @@ export async function undoRoleEmail(
 }
 
 // ---------------------------------------------------------------------------
+// review_application and review_events
+// ---------------------------------------------------------------------------
+
+/**
+ * Working the Jobs review queue (plan #1894.6.4.1): an application the inbox
+ * found, confirmed as real or reopened by hand, and events flagged as
+ * conflicting, acknowledged or taken back. Each can touch more than one row
+ * (a reopen writes the application and a status_override event; an
+ * acknowledgement can take a whole selection), so the record keeps every row
+ * in `undo` as RowsUndo and undoJobsRows puts them back.
+ */
+export type RowsUndo = {
+  /** Rows changed in place: `before` is put back where the row still holds `after`. */
+  updated: { table: string; id: string; before: Row; after: Row }[];
+  /** Rows the change wrote, taken out again once every update has gone back. */
+  inserted: { table: string; id: string }[];
+};
+
+/** The tables a review change's undo may name. Every one keeps a user_id. */
+const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events']);
+
+const REVIEW_HREF = '/jobs/review';
+const EVENTS_MAX = 50;
+const REOPEN_STATUSES = ['in_process', 'final_round'] as const;
+
+async function reviewApplication(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const verb = text(args, 'verb');
+  if (verb !== 'confirm' && verb !== 'reopen') throw new JobsRefused('verb must be confirm or reopen.');
+  const before = await namedApplication(env, args);
+  const id = before.id as string;
+  const undo: RowsUndo = { updated: [], inserted: [] };
+  let label = '';
+
+  if (verb === 'confirm') {
+    if (given(args, 'status')) throw new JobsRefused('status goes with reopen.');
+    if (before.needs_review !== true) throw new JobsRefused('That application is not waiting to be confirmed.');
+    const { error } = await env.jobs.from('applications').update({ needs_review: false }).eq('id', id).eq('user_id', env.userId);
+    if (error) throw new Error(`Confirming the application failed: ${error.message}`);
+    undo.updated.push({ table: APPLICATIONS, id, before: { needs_review: true }, after: { needs_review: false } });
+  } else {
+    const status = oneOf(args, 'status', REOPEN_STATUSES, false) as (typeof REOPEN_STATUSES)[number];
+    if (!TERMINAL_STATUSES.includes(before.status as ApplicationStatus)) {
+      throw new JobsRefused('That pursuit is not closed, so there is nothing to reopen. Moving it to another stage is move_roles.');
+    }
+    label = status.replace(/_/g, ' ');
+    // As the page reopens one: the event says so on the timeline, and the override sets the stage.
+    const { data: event, error: eventError } = await env.jobs
+      .from('application_events')
+      .insert({
+        user_id: env.userId,
+        application_id: id,
+        kind: 'status_override',
+        occurred_at: new Date().toISOString(),
+        source: 'manual',
+        summary: `Reopened by hand as ${label}`,
+        payload: { status },
+      })
+      .select('id')
+      .single();
+    if (eventError || !event) throw new Error(`Recording the reopen failed: ${eventError?.message ?? 'no row'}`);
+    undo.inserted.push({ table: 'job_search.application_events', id: (event as Row).id as string });
+    const { error } = await env.jobs.from('applications').update({ status_manual_override: status }).eq('id', id).eq('user_id', env.userId);
+    if (error) {
+      await env.jobs.from('application_events').delete().eq('id', (event as Row).id as string).eq('user_id', env.userId);
+      throw new Error(`Reopening the application failed: ${error.message}`);
+    }
+    undo.updated.push({
+      table: APPLICATIONS,
+      id,
+      before: { status_manual_override: before.status_manual_override ?? null },
+      after: { status_manual_override: status },
+    });
+  }
+
+  const after = await ownRow(env.jobs, 'applications', id, env.userId, 'application');
+  const roleId = before.role_id as string;
+  const role = await ownRow(env.jobs, 'roles', roleId, env.userId, 'role');
+  const name = roleName(role, await companyName(env, role.company_id));
+  const href = roleHref(roleId);
+  return {
+    kind: 'review_application',
+    input: {
+      verb: verb === 'confirm' ? 'Confirmed' : 'Reopened',
+      what: name,
+      rest: verb === 'confirm' ? ' as a real pursuit, from Jobs review' : ` as ${label}`,
+      href,
+      where: 'Open the role',
+      paths: [...rolePaths(roleId), REVIEW_HREF],
+    },
+    subjectRef: toRef(APPLICATIONS, id),
+    op: 'update',
+    before,
+    after,
+    summary: verb === 'confirm' ? `Dash confirmed ${name} as a real pursuit, from Jobs review.` : `Dash reopened the pursuit ${name} as ${label}.`,
+    row: { table: ROLES, ref: roleId, title: name, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const verb = text(args, 'verb');
+  if (verb !== 'acknowledge' && verb !== 'take_back') throw new JobsRefused('verb must be acknowledge or take_back.');
+  const refs = Array.isArray(args.event_refs) ? args.event_refs : [];
+  if (refs.length === 0) throw new JobsRefused('Name the events: event_refs, as list_rows on job_search.application_events returned them.');
+  if (refs.length > EVENTS_MAX) throw new JobsRefused(`Up to ${EVENTS_MAX} events at a time.`);
+  const ids = [...new Set(refs.map((ref) => idOf(typeof ref === 'string' ? ref.trim() : '', 'event')))];
+
+  const { data, error: readError } = await env.jobs.from('application_events').select('*').in('id', ids).eq('user_id', env.userId);
+  if (readError) throw new Error(`Reading the events failed: ${readError.message}`);
+  const found = (data ?? []) as Row[];
+  if (found.length < ids.length) throw new JobsRefused('One of those is not an event of theirs. Look them up first.');
+  const events =
+    verb === 'acknowledge' ? found.filter((row) => row.needs_review === true) : found.filter((row) => row.acknowledged_at != null);
+  if (events.length === 0) {
+    throw new JobsRefused(verb === 'acknowledge' ? 'None of those is flagged for review.' : 'None of those has been acknowledged.');
+  }
+
+  const changed = events.map((row) => row.id as string);
+  const set = verb === 'acknowledge' ? { needs_review: false, acknowledged_at: new Date().toISOString() } : { needs_review: true, acknowledged_at: null };
+  const { data: written, error } = await env.jobs
+    .from('application_events')
+    .update(set)
+    .in('id', changed)
+    .eq('user_id', env.userId)
+    .select('*');
+  if (error) throw new Error(`Changing the events failed: ${error.message}`);
+  const afterById = new Map(((written ?? []) as Row[]).map((row) => [row.id as string, row]));
+
+  // Matched on acknowledged_at alone: the sync trigger may re-derive the flag, and the stamp is what this wrote.
+  const undo: RowsUndo = {
+    updated: events.map((row) => ({
+      table: 'job_search.application_events',
+      id: row.id as string,
+      before: { needs_review: row.needs_review, acknowledged_at: row.acknowledged_at ?? null },
+      after: { acknowledged_at: afterById.get(row.id as string)?.acknowledged_at ?? set.acknowledged_at },
+    })),
+    inserted: [],
+  };
+
+  const first = events[0];
+  const roles = new Set(events.map((row) => row.application_id));
+  const role = roles.size === 1 ? await applicationRole(env, first.application_id) : null;
+  const what = events.length === 1 ? quotedBody(first.summary, 'the event') : `${events.length} events`;
+  const done = verb === 'acknowledge' ? 'acknowledged' : 'took back the acknowledgement of';
+  const href = role ? roleHref(role.id) : REVIEW_HREF;
+  return {
+    kind: 'review_events',
+    input: {
+      verb: verb === 'acknowledge' ? 'Acknowledged' : 'Flagged again',
+      what,
+      rest: role ? ` on ${role.name}, in Jobs review` : ', in Jobs review',
+      href: REVIEW_HREF,
+      where: 'Open Jobs review',
+      paths: [REVIEW_HREF, ...(role ? rolePaths(role.id) : [])],
+    },
+    subjectRef: toRef('job_search.application_events', first.id as string),
+    op: 'update',
+    before: first,
+    after: afterById.get(first.id as string) ?? first,
+    summary: `Dash ${done} ${what}${role ? ` on ${role.name}` : ''} in Jobs review.`,
+    row: { table: 'job_search.application_events', ref: first.id as string, title: what, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+function rowsUndo(value: Record<string, unknown> | null): RowsUndo | null {
+  if (!value) return null;
+  const updated = Array.isArray(value.updated) ? (value.updated as RowsUndo['updated']) : [];
+  const inserted = Array.isArray(value.inserted) ? (value.inserted as RowsUndo['inserted']) : [];
+  const ok =
+    updated.every((row) => ROWS_TABLES.has(row.table) && isUuid(row.id) && row.before && row.after) &&
+    inserted.every((row) => ROWS_TABLES.has(row.table) && isUuid(row.id));
+  return ok && updated.length + inserted.length > 0 ? { updated, inserted } : null;
+}
+
+/**
+ * Undo a review change from what its record kept (RowsUndo): each row goes
+ * back where it still holds what Dash left, and the rows the change wrote
+ * come out only when every one did, so a reopen whose pursuit has moved on
+ * since keeps its timeline line. Ask's undo calls it for every surface
+ * (lib/ask/changes.ts, undoMany).
+ */
+export async function undoJobsRows(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = rowsUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this change touched, so it cannot be undone.' };
+  const jobs = await deps.db('job_search');
+  const name = (table: string) => table.slice('job_search.'.length);
+  let restored = 0;
+  for (const row of undo.updated) {
+    let query = jobs.from(name(row.table)).update(row.before).eq('id', row.id).eq('user_id', deps.userId);
+    for (const [column, value] of Object.entries(row.after)) {
+      if (!scalar(value)) continue;
+      query = value === null ? query.is(column, null) : query.eq(column, value);
+    }
+    const { data, error } = await query.select('id');
+    if (error) throw new Error(`${row.table}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  if (restored < undo.updated.length && undo.inserted.length > 0) {
+    return { ok: false, error: 'That pursuit has changed again since, so undoing would lose the later change.' };
+  }
+  for (const row of undo.inserted) {
+    const { data, error } = await jobs.from(name(row.table)).delete().eq('id', row.id).eq('user_id', deps.userId).select('id');
+    if (error) throw new Error(`${row.table}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  if (restored === 0) {
+    return { ok: false, error: 'Everything this change touched has changed again since, so undoing would lose the later changes.' };
+  }
+  return { ok: true, restored };
+}
+
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -1523,6 +1746,37 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: changeRoleEmail,
+  },
+  {
+    name: 'review_application',
+    description:
+      'Work an application in Jobs review when they ask: confirm one the inbox found as a real pursuit, or reopen a closed one (rejected, withdrawn or gone quiet) as in process or final round, as when a recruiter comes back. Name it by application_ref, or role_ref for the role\'s latest application.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_ref: { type: 'string', description: 'The job_search.applications ref job_applications returned.' },
+        role_ref: { type: 'string', description: "Instead of application_ref: the job_search.roles ref, for the role's latest application." },
+        verb: { type: 'string', enum: ['confirm', 'reopen'], description: 'confirm a pursuit the inbox found; reopen a closed one.' },
+        status: { type: 'string', enum: [...REOPEN_STATUSES], description: 'With reopen: the stage it goes back to.' },
+      },
+      required: ['verb'],
+      additionalProperties: false,
+    },
+    run: reviewApplication,
+  },
+  {
+    name: 'review_events',
+    description: `Acknowledge events flagged in Jobs review when they ask (mail that conflicts with where a pursuit stands, such as an invite after a rejection): each stays on the timeline and the flag clears. take_back flags them again. Up to ${EVENTS_MAX} at a time, named by their job_search.application_events refs, which list_rows on job_search.application_events returns.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_refs: { type: 'array', items: { type: 'string' }, description: 'The job_search.application_events refs.' },
+        verb: { type: 'string', enum: ['acknowledge', 'take_back'], description: 'acknowledge to clear the flags; take_back to flag them again.' },
+      },
+      required: ['event_refs', 'verb'],
+      additionalProperties: false,
+    },
+    run: reviewEvents,
   },
 ];
 
