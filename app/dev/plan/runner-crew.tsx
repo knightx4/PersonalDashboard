@@ -71,16 +71,17 @@ function PillName({ slot }: { slot: RunnerSlot }) {
   const name = slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App');
   const title = work.title ?? 'A run with no step recorded';
   return (
-    <>
+    <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="sr-only">Working on </span>
-      {name}{' '}
-      {/* The title is long and the pill is a quarter of the card, so it
-          waits in a tip on the number, and in the panel the pill opens. */}
-      <Tooltip label={title}>
-        <span className="tabular font-medium">{work.ref ?? title}</span>
+      <span className="shrink-0">{name}</span>
+      {/* The title is long and the row is narrow, so it fills what is left and
+          is cut where it meets the time; the whole of it waits in a tip, and
+          in the panel the row opens. */}
+      <Tooltip label={title} className="min-w-0">
+        <span className="tabular min-w-0 truncate font-medium">{work.ref ?? title}</span>
       </Tooltip>
       <span className="sr-only">, {title}</span>
-    </>
+    </span>
   );
 }
 
