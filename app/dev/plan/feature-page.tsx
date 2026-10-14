@@ -478,21 +478,21 @@ export function FeaturePage({
             {node.detail && node.kind !== 'decision' && (
               <DetailPart>
                 <p className="whitespace-pre-wrap text-body text-ink">
-                  <LinkedText text={readable(node.detail)} />
+                  <LinkedText text={readable(node.detail)} refs="all" />
                 </p>
               </DetailPart>
             )}
             {node.acceptance && (
               <DetailPart label="Done when">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={readable(node.acceptance)} />
+                  <LinkedText text={readable(node.acceptance)} refs="all" />
                 </p>
               </DetailPart>
             )}
             {node.blockAsk && (
               <DetailPart label="Needs">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={readable(node.blockAsk)} />
+                  <LinkedText text={readable(node.blockAsk)} refs="all" />
                 </p>
               </DetailPart>
             )}

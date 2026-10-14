@@ -34,13 +34,14 @@
 const REF = /(^|[^A-Za-z0-9_&#])#(\d{1,5}(?:\.\d+)*)(?![A-Za-z0-9_]|\.\d)/;
 
 /**
- * Where a step number is read. `all`, because a link must reach a closed one,
- * and searched for the number, so the plan arrives filtered to that step
- * rather than scrolled to it among the rest (note 843f7506). The same address
- * the app-wide search sends a step to.
+ * Where a step reference opens: the step's own page (plan #1931.4), which is
+ * its feature's page with the Steps tab open at its row. The page takes a
+ * number or an outline, so an outline the reader has no titles for can still
+ * be linked without looking it up first. It used to be the whole plan filtered
+ * to the number, which is the list rather than the row.
  */
-export function planRefHref(number: number): string {
-  return `/dev/plan?view=all&q=${encodeURIComponent(`#${number}`)}#plan-${number}`;
+export function planRefHref(ref: number | string): string {
+  return `/dev/plan/${encodeURIComponent(String(ref))}`;
 }
 
 /** The id a plan row carries, so the link above lands on it. */
@@ -48,7 +49,20 @@ export function planRowId(number: number): string {
   return `plan-${number}`;
 }
 
-export type RefPart = { text: string; ref: number | null };
+/**
+ * `ref` is the step's number. `outline` is set instead, with `ref` null, for
+ * an outline the titles did not place when there were no titles to place it
+ * with: it still links, by its outline, and the step's page reads it back.
+ */
+export type RefPart = { text: string; ref: number | null; outline?: string };
+
+/**
+ * Which references to read. `all` is every `#494` and `#1073.4`. `outlines`
+ * is only the dotted kind, for text where a bare `#3` is far more often a list
+ * number or a count than a step (a reply from Dash, note 7cf4109a; a goal's
+ * description), and `#1073.4` is never anything else.
+ */
+export type RefReading = 'all' | 'outlines';
 
 /**
  * A body split into its step references and the words around them.
@@ -60,8 +74,14 @@ export type RefPart = { text: string; ref: number | null };
  * A stored `#1084` is the step's number. A written `#1073.4` is its outline,
  * read back to the number through `titles`; an outline the titles do not
  * place stays as words, since linking `#1073` from it would name the wrong row.
+ * Without titles at all, an outline comes back as `outline` and links by
+ * itself, since the step's page reads an outline as well as a number.
  */
-export function splitOnRefs(text: string, titles?: PlanRefTitles): RefPart[] {
+export function splitOnRefs(
+  text: string,
+  titles?: PlanRefTitles,
+  reading: RefReading = 'all',
+): RefPart[] {
   const parts: RefPart[] = [];
   const scan = new RegExp(REF.source, 'g');
   let from = 0;
@@ -78,14 +98,24 @@ export function splitOnRefs(text: string, titles?: PlanRefTitles): RefPart[] {
   };
 
   for (let hit = scan.exec(text); hit; hit = scan.exec(text)) {
-    const ref = numberOf(hit[2]);
-    if (ref === null) continue;
+    const written = hit[2];
+    const dotted = written.includes('.');
+    if (!dotted && reading === 'outlines') continue;
+    const ref = numberOf(written);
+    // An outline with no titles to place it is linked by the outline itself.
+    // With titles that do not place it, it names no step, and stays words.
+    const outline = ref === null && dotted && titles === undefined ? written : null;
+    if (ref === null && outline === null) continue;
     // The match carries the character before the `#`, which belongs to the
     // words around it rather than to the reference.
     const before = hit[1] ?? '';
     const start = hit.index + before.length;
     if (start > from) parts.push({ text: text.slice(from, start), ref: null });
-    parts.push({ text: text.slice(start, scan.lastIndex), ref });
+    parts.push(
+      outline === null
+        ? { text: text.slice(start, scan.lastIndex), ref }
+        : { text: text.slice(start, scan.lastIndex), ref: null, outline },
+    );
     from = scan.lastIndex;
   }
 
@@ -137,4 +167,12 @@ export function planRefText(number: number, titles?: PlanRefTitles): string {
 export function planRefLabel(number: number, titles?: PlanRefTitles): string {
   const title = titles?.[number]?.title;
   return title ? `${planRefText(number, titles)} — ${title}` : `Step #${number} on the plan`;
+}
+
+/**
+ * The step a linked part names: its number, or its outline where no titles
+ * placed it. Null for words. What `planRefHref` and the preview take.
+ */
+export function refTarget(part: RefPart): number | string | null {
+  return part.ref ?? part.outline ?? null;
 }

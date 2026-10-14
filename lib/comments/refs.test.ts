@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRefHref, planRefLabel, planRefText, planRowId, splitOnRefs } from './refs';
+import { planRefHref, planRefLabel, planRefText, planRowId, refTarget, splitOnRefs } from './refs';
 
 /** The refs found in a body, in order. */
 function refs(text: string): number[] {
@@ -88,14 +88,31 @@ describe('splitOnRefs', () => {
 });
 
 describe('planRefHref', () => {
-  // `all`, not the default view: a link has to reach a step that is finished,
-  // dropped or filed away, and the open view by definition does not hold those.
-  it('points at the widest view, anchored on the row', () => {
-    expect(planRefHref(494)).toBe('/dev/plan?view=all&q=%23494#plan-494');
+  // The step's own page, which opens its feature's Steps tab at the row
+  // (plan #1931.4), rather than the whole plan filtered to it.
+  it('points at the step, by number or by outline', () => {
+    expect(planRefHref(494)).toBe('/dev/plan/494');
+    expect(planRefHref('1490.11')).toBe('/dev/plan/1490.11');
   });
 
-  it('agrees with the id the row carries', () => {
-    expect(planRefHref(494).endsWith(`#${planRowId(494)}`)).toBe(true);
+  it('names the row the page anchors on', () => {
+    expect(planRowId(494)).toBe('plan-494');
+  });
+});
+
+describe('splitOnRefs, by outline alone', () => {
+  it('links an outline with no titles by the outline itself', () => {
+    expect(splitOnRefs('see #1490.11 next')).toEqual([
+      { text: 'see ', ref: null },
+      { text: '#1490.11', ref: null, outline: '1490.11' },
+      { text: ' next', ref: null },
+    ]);
+    expect(refTarget({ text: '#1490.11', ref: null, outline: '1490.11' })).toBe('1490.11');
+  });
+
+  it('reads only outlines where a bare number is a list number', () => {
+    const parts = splitOnRefs('#3 is done, and #1490.11 is next', undefined, 'outlines');
+    expect(parts.map(refTarget).filter((target) => target !== null)).toEqual(['1490.11']);
   });
 });
 
