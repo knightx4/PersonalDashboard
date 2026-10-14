@@ -6,6 +6,7 @@ import type { TaskInput } from '@/lib/todo/tasks/input';
 import { readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
+import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -765,6 +766,11 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 
   if (change.kind === 'add_quick_note') return undoQuickNote(deps, change, surface);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  if (change.kind === 'add_interview_round') {
+    // The round's row is the record's; its interview is checked here.
+    const moved = await roundConversationMoved(deps.db, change.undo);
+    if (moved) return { ok: false, error: moved, change };
+  }
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,

@@ -227,7 +227,7 @@ Status is derived from this table. Nothing writes `applications.status` directly
 |---|---|---|
 | user_id, application_id | uuid | |
 | round | int | |
-| kind | enum | `recruiter_screen`, `hiring_manager`, `technical`, `case`, `panel`, `onsite`, `final`, `informal` |
+| kind | enum | `recruiter_screen`, `hiring_manager`, `technical`, `case`, `take_home`, `panel`, `onsite`, `final`, `informal` |
 | scheduled_at, duration_minutes | timestamptz, int | |
 | format | enum | `phone`, `video`, `onsite` |
 | status | enum | `scheduled`, `completed`, `cancelled`, `rescheduled` |

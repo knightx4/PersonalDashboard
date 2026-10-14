@@ -3,6 +3,7 @@ import { parseRef } from '@/lib/core/refs';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -175,6 +176,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...LEARN_CHANGE_KINDS,
   ...TODO_CHANGE_KINDS,
   ...YOU_CHANGE_KINDS,
+  ...INTERVIEW_CHANGE_KINDS,
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
