@@ -227,12 +227,12 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.evidence_links',
       module: 'Learn',
-      holds: 'What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.',
+      holds: 'What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.',
       weight: 'record',
       search: ['basis'],
       title: 'basis',
       newest: 'found_at',
-      note: 'target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
     },
     {
       table: 'learn.briefs',
@@ -254,7 +254,7 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.area_check_articles',
       reason:
-        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases and the embedding columns are bookkeeping for matching them.",
+        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
@@ -267,6 +267,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
+    { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
     { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
     { table: 'learn.work_passages', reason: 'Passages of the résumé and Career notes, copied and embedded daily to link ideas to work history; the résumé and the notes are the sources.' },
     { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },

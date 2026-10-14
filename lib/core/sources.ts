@@ -34,6 +34,17 @@ export const coreSources: ModuleSources = {
       note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
     },
     {
+      // A source so Dash can say whether a hand-off has finished (note 59c210be).
+      table: 'core.dash_handoffs',
+      module: 'Home',
+      holds: 'What they asked Dash that it handed to the backup routine, and how far that has got.',
+      weight: 'record',
+      search: ['request'],
+      title: 'request',
+      facts: ['status', 'error', 'conversation_id', 'run_id'],
+      note: "status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.",
+    },
+    {
       table: 'core.conversation_turns',
       module: 'Learn',
       holds: 'What they asked or explained, and what Dash replied, turn by turn.',
@@ -119,7 +130,6 @@ export const coreSources: ModuleSources = {
     { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
-    { table: 'core.dash_handoffs', reason: 'Requests Ask Dash handed to the backup routine and whether it replied; the rows the routine wrote are sources in their own modules.' },
     { table: 'core.dash_actions', reason: 'Every change Dash made or proposed, from any surface, with the row it wrote, its values before and after, and whether it was done, declined or undone; the rows it wrote are sources in their own modules.' },
     { table: 'core.day_briefs', reason: 'The morning brief: up to three picks from the agenda, replies, bills, goals and Dash\'s results, derived each day.' },
     { table: 'core.drafted_messages', reason: 'Follow-ups and return requests Dash wrote from the pipeline and orders, waiting to be sent.' },

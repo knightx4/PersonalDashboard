@@ -41,6 +41,20 @@ export const SKY = {
   placeName: 'rgba(196, 203, 232, 0.78)',
   ideaName: 'rgba(232, 236, 255, 0.9)',
   focusName: '#ffffff',
+  /**
+   * Wikipedia's topics (plan #2016.5), drawn as diamonds so they never read
+   * as stars: a Level 3 landmark nothing touches, a topic something touches,
+   * and one lit by what you know, as r, g, b. Then their names: Level 3 in
+   * capitals and quieter, Level 4 plain, and the count of those not named.
+   */
+  topicLandmark: 'rgba(150, 162, 210, 0.3)',
+  topicUnlocked: 'rgba(176, 188, 232, 0.75)',
+  topicLit: [240, 214, 150] as const,
+  /** A lit topic's diamond in the legend and the rail, on the page: deeper, to read on a light page too. */
+  topicLitSwatch: '#b8913a',
+  topicName: 'rgba(176, 188, 228, 0.8)',
+  topicName4: 'rgba(222, 228, 250, 0.9)',
+  topicMore: 'rgba(176, 188, 228, 0.7)',
   /** A dark band behind a name, so it reads over a bright star. */
   nameShadow: 'rgba(4, 6, 13, 0.6)',
   /** The lines and rings that join an idea to its six nearest. */
@@ -213,6 +227,8 @@ export type NameCandidate = {
   width: number;
   /** How far from `at` to put the name: 0 centres it on the point, as a place's name. */
   gap: number;
+  /** Also try a line above and below the four spots beside the point, for a name that must find room. */
+  wide?: boolean;
 };
 
 export type Box = { x: number; y: number; w: number; h: number };
@@ -252,6 +268,16 @@ export function placeNames(
             { x: at.x - gap - w, y: at.y - h / 2, w, h },
             { x: at.x - w / 2, y: at.y - gap - h, w, h },
             { x: at.x - w / 2, y: at.y + gap, w, h },
+            ...(name.wide
+              ? [
+                  { x: at.x + gap, y: at.y - h * 1.5, w, h },
+                  { x: at.x + gap, y: at.y + h * 0.5, w, h },
+                  { x: at.x - gap - w, y: at.y - h * 1.5, w, h },
+                  { x: at.x - gap - w, y: at.y + h * 0.5, w, h },
+                  { x: at.x - w / 2, y: at.y - gap - 2 * h, w, h },
+                  { x: at.x - w / 2, y: at.y + gap + h, w, h },
+                ]
+              : []),
           ]
         : [
             [0, 0],

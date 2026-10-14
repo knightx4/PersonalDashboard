@@ -15,6 +15,7 @@ import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
 import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
 import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
@@ -37,6 +38,7 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTopicsSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
@@ -44,6 +46,7 @@ import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -284,6 +287,7 @@ import {
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
+  PostsSendSurface,
   PostsSurface,
   PostsWriteSurface,
   PostsXSurface,
@@ -503,6 +507,15 @@ const rolePanels: PanelProps = {
       summary: 'From the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+    {
+      id: 'e4',
+      kind: 'screen_scheduled',
+      occurredAt: '2026-09-04T16:10:00.000Z',
+      source: 'email',
+      summary: 'Phone screen with Dana Okafor, 15 September',
+      needsReview: false,
+      gmailHref: null,
     },
     {
       id: 'e2',
@@ -3451,6 +3464,26 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answer-draft',
+    label: 'Role · An answer with its draft',
+    module: 'jobs',
+    width: 'wide',
+    // The draft beside a question after Draft is pressed (note ad554975): one
+    // drawn from the posting alone, citing nothing from the bank.
+    render: () => (
+      <AnswerCard
+        answer={rolePanels.answers[0]}
+        closed={false}
+        initialDraft={{
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          evidenceItemIds: [],
+          unsupportedClaims: ['for two years'],
+          bannedFound: [],
+        }}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-interviews',
     label: 'Role · Interviews',
     module: 'jobs',
@@ -5389,6 +5422,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceEvidenceSurface />,
   },
   {
+    /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
+     * its Level 4 topics drawn and seven of them named, strongest first,
+     * with the rest counted under the Level 3 name. */
+    id: 'learn-idea-space-topics',
+    label: 'Learn · Idea Space, inside a topic',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTopicsSurface />,
+  },
+  {
     /* Clips before any are cut. */
     id: 'learn-clips-empty',
     label: 'Learn · Clips, none cut yet',
@@ -5475,6 +5518,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsMatchedSurface />,
+  },
+  {
+    /* Post pressed once (plan #2072): the confirm on a draft with a link,
+     * warning about X's URL rate, and on a thread whose first post is
+     * already up, sending the rest. */
+    id: 'dev-posts-send',
+    label: 'Dev · Posts, posting to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsSendSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
@@ -6019,6 +6072,44 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <RefPreviewSurface />,
+  },
+
+  /* The per-day bar chart for the usage pages (plan #2036.1): a month of
+   * page views, a month of spend with one busy day, a month with one day of
+   * activity and a month with none. Its two hidden parts follow: the readout
+   * held on a day, as pointing or tapping shows it, and the empty period. */
+  {
+    id: 'usage-day-bars',
+    label: 'Usage · Per-day bar chart',
+    module: 'dev',
+    width: 'wide',
+    render: () => <DayBarsSurface />,
+  },
+  {
+    id: 'usage-day-bars-readout',
+    label: 'Usage · Per-day bar chart, pointing at a day',
+    module: 'dev',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-day-bars]',
+      shows: 'Tapping the chart lights the bar under the finger, dims the rest, and names its day and value under the chart.',
+    },
+    render: () => <DayBarsReadoutSurface />,
+  },
+  {
+    id: 'account-spend-overview',
+    label: 'Account · Spend, chart above the totals',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendOverviewSurface />,
+  },
+  {
+    id: 'usage-day-bars-empty',
+    label: 'Usage · Per-day bar chart, nothing in the period',
+    module: 'dev',
+    width: 'wide',
+    render: () => <DayBarsEmptySurface />,
   },
 
   /* The day closing on the agenda (plan #1556): played by ticking the last

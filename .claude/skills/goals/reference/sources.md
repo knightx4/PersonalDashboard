@@ -401,11 +401,11 @@ Essays they are writing or have published: the draft, the brief (question, claim
 
 ### `learn.evidence_links` (Learn)
 
-What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.
+What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.
 
 - Search: `basis`
 - Name a row by `basis`; link it by `id`
-- target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
+- target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
 
 ### `todo.tasks` (Todo)
 
@@ -536,6 +536,14 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
+### `core.dash_handoffs` (Home)
+
+What they asked Dash that it handed to the backup routine, and how far that has got.
+
+- Search: `request`
+- Name a row by `request`; link it by `id`
+- status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.
+
 ### `core.attachments` (Home)
 
 Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.
@@ -552,7 +560,7 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Search: `angle`, `body`
 - Name a row by `angle`; link it by `id`
 - Opens at `/dev/posts`
-- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread. image_paths are the pictures attached to it.
 
 ### `public.x_posts` (Dev)
 

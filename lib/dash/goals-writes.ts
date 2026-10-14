@@ -9,6 +9,7 @@ import {
   insertArea,
   moveGoal,
   renameArea,
+  insertGoal,
   setAreaNote,
   setGoalArchived,
   settleGoal,
@@ -490,6 +491,7 @@ const STEP_CHANGES = [
   'stop_waiting',
   'set_aside',
   'bring_back',
+  'make_errand',
 ] as const;
 type StepChange = (typeof STEP_CHANGES)[number];
 
@@ -674,7 +676,59 @@ async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
       }
       return changed('Brought back', '', `Dash brought the step "${title}" back now, clearing its start date of ${starts}.`);
     }
+    case 'make_errand':
+      return makeErrand(env, before, goal, args);
   }
+}
+
+const ERRAND_UNDO =
+  'Two rows changed: the new errand and the archived step. Archive the errand on its page and restore the step on its goal to take it back.';
+
+/**
+ * The step as its own errand, the move a goal comment's
+ * promote_step_to_errand makes (plan #2035.2), for Ask Dash (note 16a21d3a):
+ * an errand titled as the step, carrying its detail, due on the day given or
+ * the step's own, in the area named or the goal's. Then the step is archived.
+ * No run is started.
+ */
+async function makeErrand(env: GoalsWriteEnv, before: Row, goal: Row, args: Args): Promise<GoalsMade> {
+  const status = before.status as string;
+  if (status !== 'open' && status !== 'blocked') {
+    throw new GoalsRefused(`That step is ${STEP_STATUS_WORDS[status] ?? status}, so it cannot become an errand.`);
+  }
+  const dueOn = text(args, 'due_on') || ((before.due_on as string | null) ?? '');
+  if (!dueOn) throw new GoalsRefused('An errand needs a date it is due by, and the step has none: ask them which day.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) throw new GoalsRefused('due_on must be YYYY-MM-DD.');
+  const wanted = text(args, 'area');
+  const area = wanted ? await findArea(env, wanted) : await ownRow(env.goals, 'areas', goal.area_id as string, env.userId);
+  if (!area || area.archived_at != null) throw new GoalsRefused("The goal's area is archived: name the area the errand goes in.");
+
+  const title = named(before.title, 'the step');
+  const detail = (before.detail as string | null)?.trim() || null;
+  const errandId = await guarded('The errand could not be saved', async () =>
+    insertGoal(await env.write({}), env.userId, area.id as string, {
+      title: before.title as string,
+      errand: true,
+      dueOn,
+      detail,
+    }),
+  );
+  if (!errandId) throw new GoalsRefused('That area is no longer there.');
+  const archived = await setStepArchived(await env.write({}), before.id as string, true);
+  const goalTitle = named(goal.title, 'the goal');
+  const where = archived ? `, and archived the step from "${goalTitle}"` : `. The step could not be archived, so it is still on "${goalTitle}"`;
+  const made = await reportStep(env, before, goal, {
+    verb: 'Made an errand of',
+    rest: ` due ${dueOn}`,
+    summary: `Dash made the step "${title}" its own errand in ${named(area.name, 'its area')}, due ${dueOn}${where}.`,
+    undo: ERRAND_UNDO,
+  });
+  const href = goalHref(errandId);
+  return {
+    ...made,
+    input: { ...made.input, href, where: 'Open the errand', paths: [...made.input.paths, href] },
+    row: { table: ITEM, ref: errandId, title, href },
+  };
 }
 
 function todayOf(env: GoalsWriteEnv): string {
@@ -1512,7 +1566,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_step',
     description:
-      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), or bring a set-aside step back now (bring_back). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
+      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), bring a set-aside step back now (bring_back), or make it its own errand, due on due_on or the step's own date, in area or the goal's, and archive the step (make_errand). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1521,7 +1575,11 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
         title: { type: 'string', description: 'For edit: the new wording.' },
         detail: { type: 'string', description: "For edit: the step's detail; empty to clear it." },
         done_when: { type: 'string', description: 'For edit: when the step counts as done; empty to clear it.' },
-        due_on: { type: 'string', description: 'For edit: the date it is due by, YYYY-MM-DD; empty to clear it.' },
+        due_on: {
+          type: 'string',
+          description: "For edit: the date it is due by, YYYY-MM-DD; empty to clear it. For make_errand: the errand's due date, when they give one.",
+        },
+        area: { type: 'string', description: "For make_errand: the area the errand goes in, by name or goals.areas ref; the goal's area when left out." },
         starts_on: { type: 'string', description: 'For edit: the date it starts, YYYY-MM-DD; empty to clear it.' },
         kind: {
           type: 'string',

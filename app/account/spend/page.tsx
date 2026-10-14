@@ -3,9 +3,11 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { shellFor, type ShellFrame } from '@/lib/shell/shell-for';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
+import { SpendOverview } from './spend-overview';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars, todayInTimezone } from '@/lib/money';
+import { readSpendPerDay, spendTotal, usageWindow } from '@/lib/usage/per-day';
 import { loadSpend } from '@/lib/core/spend/load';
 import { compareEstimates, EVERY_OPERATION } from '@/lib/core/spend/comparison';
 import { ESTIMATE_WINDOW_DAYS, loadCostRanges, MEASURED_MIN_RUNS } from '@/lib/core/spend/estimate';
@@ -21,7 +23,6 @@ import {
   totalOf,
   type SpendGroup,
   type SpendRow,
-  type SpendTotal,
 } from '@/lib/core/spend/summary';
 
 export const dynamic = 'force-dynamic';
@@ -50,26 +51,6 @@ function formatTokens(tokens: number): string {
   if (tokens < 1000) return String(tokens);
   if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(tokens < 10_000 ? 1 : 0)}k`;
   return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
-
-function Total({ label, total }: { label: string; total: SpendTotal }) {
-  return (
-    <div className={cardVariants({ padding: 'dense' })}>
-      <p className="text-ui text-ink-muted">{label}</p>
-      <p className="mt-1 text-heading text-ink tabular-nums">
-        {total.calls === 0 ? '—' : formatMicroDollars(total.micros)}
-      </p>
-      <p className="mt-0.5 text-small text-ink-muted">
-        {total.calls === 0
-          ? 'nothing yet'
-          : `${total.calls} ${total.calls === 1 ? 'call' : 'calls'}${
-              total.unpriced > 0
-                ? ` · ${total.unpriced} not priced, so the total is short by them`
-                : ''
-            }`}
-      </p>
-    </div>
-  );
 }
 
 function GroupRow({ group }: { group: SpendGroup }) {
@@ -142,6 +123,10 @@ async function spendContent({ user, settings, owner }: ShellFrame) {
 
   const timezone = settings.timezone;
   const localDateOf = (instant: string) => todayInTimezone(timezone, new Date(instant));
+  // The chart and the thirty-day card read the same whole local days, so the
+  // bars add up to the amount beside them (plan #2036.3).
+  const days = usageWindow(timezone);
+  const perDay = rows.length > 0 ? await readSpendPerDay(supabase, timezone, days) : null;
   const thisMonth = sinceLocalDate(rows, monthStart(todayInTimezone(timezone)), localDateOf);
 
   const groups = rollUp(rows);
@@ -174,10 +159,14 @@ async function spendContent({ user, settings, owner }: ShellFrame) {
       )}
       {rows.length > 0 && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Total label="This month" total={totalOf(thisMonth)} />
-            <Total label="All time" total={totalOf(rows)} />
-          </div>
+          <SpendOverview
+            values={perDay?.values ?? []}
+            today={days.today}
+            span={days.span}
+            last30={perDay ? spendTotal(perDay) : { calls: 0, micros: 0, unpriced: 0 }}
+            thisMonth={totalOf(thisMonth)}
+            allTime={totalOf(rows)}
+          />
 
           <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
           <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>

@@ -31,6 +31,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
   'jobs-moment-forward': ['/jobs/pipeline'],
@@ -189,6 +190,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],
+  'learn-idea-space-topics': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -198,6 +200,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
+  'dev-posts-send': ['/dev/posts'],
   'home-page': ['/home'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
@@ -231,6 +234,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
+  'account-spend-overview': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
   'dev-status-tips': ['/dev/plan', '/dev/ideas', '/dev/inbox', '/dev/bugs'],
@@ -242,6 +246,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   // A ref link's preview held open (plan #1931.4): in comments, Dash's
   // replies and plan details.
   'ref-preview': ['/dev/plan', '/dev/inbox', '/goals'],
+  // The per-day bar chart (plan #2036.1), made for the two usage pages: drawn
+  // with data, the readout held on a day, and a period with nothing in it.
+  'usage-day-bars': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-readout': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-empty': ['/dev/usage', '/account/spend'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'todo-agenda-header': ['/todo'],
@@ -441,6 +450,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).
   'ref-preview': ['components/ui/ref-link.tsx'],
+  // The per-day bar chart in each state it has (plan #2036.1).
+  'usage-day-bars': ['components/ui/day-bar-chart.tsx'],
   // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
   // Without this a change to Button or Card reached every surface in the
   // gallery, and each had to be settled by hand. A new file in components/ui

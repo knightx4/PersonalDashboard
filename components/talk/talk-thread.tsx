@@ -47,6 +47,26 @@ export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{
 const PENDING = 'pending';
 
 /**
+ * The thread's own turns with any written elsewhere slotted in by time.
+ * A check-back that lands while a question is on its way reads that question
+ * as already kept, and the answer too if it has been written: those belong to
+ * the question still pending here, so they are left out until its answer
+ * lands, rather than drawing the question twice (note f94be0c9).
+ */
+export function withIncoming(own: readonly TalkTurn[], incoming: readonly TalkTurn[] | undefined): readonly TalkTurn[] {
+  if (!incoming?.length) return own;
+  const have = new Set(own.map((turn) => turn.id));
+  let added = incoming.filter((turn) => !have.has(turn.id));
+  const pending = own.find((turn) => turn.id === PENDING);
+  if (pending) {
+    const echo = added.findLastIndex((turn) => turn.role === 'user' && turn.body.trim() === pending.body.trim());
+    if (echo !== -1) added = added.filter((turn) => turn.createdAt < added[echo].createdAt);
+  }
+  if (added.length === 0) return own;
+  return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
  * Who answers in the thread: Dash unless the caller says otherwise. Maya's
  * threads in the vault (plan #1286) pass Maya's name and its owl, so the
  * thread never names Dash for words Maya wrote.
@@ -331,13 +351,7 @@ export function TalkThread({
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
-  const turns = useMemo(() => {
-    if (!incoming?.length) return own;
-    const have = new Set(own.map((turn) => turn.id));
-    const added = incoming.filter((turn) => !have.has(turn.id));
-    if (added.length === 0) return own;
-    return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }, [own, incoming]);
+  const turns = useMemo(() => withIncoming(own, incoming), [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
   const [draft, setDraft] = useState(initialDraft);
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);

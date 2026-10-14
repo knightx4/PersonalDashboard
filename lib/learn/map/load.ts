@@ -12,6 +12,8 @@ import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-ma
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
 import { lightOn } from './sky';
+import { buildTopicFrame, type TopicFrame } from './topics';
+import { loadTopicRows } from './topics-load';
 
 /**
  * Reading the Idea Space map (plan #1855).
@@ -81,6 +83,11 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
   /** The named places, biggest first. A place the daily run has not named yet is left out. */
   places: PlaceOnMap[];
   dust: DustOnMap[];
+  /**
+   * Wikipedia's Level 3 topics and the Level 4 ones something touches, as the
+   * map's frame (plan #2016.5), or null when they could not be read.
+   */
+  topics: TopicFrame | null;
 };
 
 type ConceptRow = {
@@ -134,7 +141,7 @@ export async function loadIdeaMap(
       return query.order(order).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
     };
 
-  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows] = await Promise.all([
+  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows, topicRows] = await Promise.all([
     readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding, created_at', 'id')),
     readAll<StateRow>(
       own(
@@ -164,6 +171,11 @@ export async function loadIdeaMap(
     }).catch((error: unknown) => {
       console.error('[learn idea map] evidence', error instanceof Error ? error.message : error);
       return [] as EvidenceRow[];
+    }),
+    // The topic frame (plan #2016.5). Without it the map draws as before.
+    loadTopicRows(learn, userId).catch((error: unknown) => {
+      console.error('[learn idea map] topics', error instanceof Error ? error.message : error);
+      return null;
     }),
   ]);
 
@@ -264,8 +276,18 @@ export async function loadIdeaMap(
     });
   }
 
+  const topics = topicRows
+    ? buildTopicFrame(
+        topicRows,
+        map.ideas.map((idea) => ({ id: idea.id, pca: idea.pca, neighbourMap: idea.neighbourMap, stateRow: stateRowOf(idea.id) })),
+        areaMap.fields,
+        asOf,
+      )
+    : null;
+
   return {
     ...map,
+    topics,
     missing: concepts.length - embedded.length,
     asOf: asOf.toISOString(),
     places,

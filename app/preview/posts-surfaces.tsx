@@ -1,4 +1,7 @@
+import { PostItem } from '@/app/dev/posts/post-item';
 import { PostList, PostsScreen } from '@/app/dev/posts/posts-view';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { XPostList } from '@/app/dev/posts/x-posts';
 import { SectionFold } from '@/components/ui/disclosure';
 import { WritePost } from '@/app/dev/posts/write-post';
@@ -81,6 +84,19 @@ const ROWS = [
     dropped_at: '2026-09-29T10:00:00Z',
     created_at: '2026-09-29T09:00:00Z',
   },
+  {
+    // A link the person added: X bills it at the URL rate, so its Post says $0.200.
+    ...base,
+    id: 'p5',
+    angle: 'The gallery draws every screen before it is wired',
+    status: 'suggested',
+    draft: ['d'],
+    body: [
+      'Every screen in my app is drawn in a gallery from sample data and photographed on a phone and a laptop before it touches real data. Write-up here: https://example.com/gallery',
+    ],
+    source_plan_item_ids: [],
+    created_at: '2026-10-02T07:00:00Z',
+  },
 ];
 
 const STEPS = [
@@ -101,8 +117,50 @@ export function PostsSurface() {
   return (
     <PostsScreen
       page={page}
-      x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T06:00:00Z' }}
+      x={{ state: 'connected', handle: 'selveybuilds', lastSyncedAt: '2026-10-02T06:00:00Z', canPost: true }}
     />
+  );
+}
+
+/**
+ * Post pressed once (plan #2072), the hidden part of each waiting draft: the
+ * confirm saying where it goes and what X charges. The first holds a link,
+ * so the warning about the URL rate shows. The second is a thread of three
+ * whose first post went up before a send stopped, so Post sends the rest.
+ */
+export function PostsSendSurface() {
+  const page = buildPostsPage({
+    posts: [
+      socialPostFromRow(ROWS[4]),
+      socialPostFromRow({
+        ...base,
+        id: 'p6',
+        angle: 'Posting from the dashboard, one confirmed press at a time',
+        status: 'suggested',
+        draft: ['d'],
+        body: [
+          'My dashboard can now post a draft to X itself. One press shows what it costs, a second sends it.',
+          'A thread goes out one post at a time, each a reply to the one before, and the ids are kept as they come back.',
+          'If X stops it halfway, the next press carries on from the last post that went up instead of starting again.',
+        ],
+        x_thread_ids: ['1845000000000000001'],
+        source_plan_item_ids: [],
+        created_at: '2026-10-02T10:00:00Z',
+      }),
+    ],
+    steps: [],
+    notes: [],
+    run: null,
+    now: NOW,
+  });
+  return (
+    <PageColumn>
+      <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+        {page.suggested.map((card) => (
+          <PostItem key={card.post.id} card={card} postAs="selveybuilds" postArmed />
+        ))}
+      </ul>
+    </PageColumn>
   );
 }
 
@@ -223,6 +281,8 @@ export function PostsNoDraftSurface() {
  * longest X allows. The lines a cancelled and a refused sign-in leave sit in
  * the second and third. Connected, the row offers Check X now (plan #1819);
  * the last one shows the line a read X stopped at its rate limit leaves.
+ * The first connected row is a sign-in from before posting was added (plan
+ * #2072), which says to disconnect and connect once more.
  */
 export function PostsXSurface() {
   return (
@@ -230,11 +290,12 @@ export function PostsXSurface() {
       <XConnection view={{ state: 'unconfigured', setupStep: 1816 }} />
       <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
       <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
-      <XConnection view={{ state: 'connected', handle: 'selveyknightdev', lastSyncedAt: null }} />
+      <XConnection view={{ state: 'connected', handle: 'selveyknightdev', lastSyncedAt: null, canPost: false }} />
       <XConnection
         view={{
           state: 'connected',
           handle: 'selveybuilds',
+          canPost: true,
           lastSyncedAt: '2026-10-11T12:00:00Z',
           problem:
             'X’s rate limit was reached, so the read stopped. The next read picks up where this one stopped.',
