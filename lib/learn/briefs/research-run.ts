@@ -7,6 +7,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { pageUrl } from '@/lib/learn/essays/research';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createTrack } from '@/lib/learn/tracks/save';
+import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
 import type { BriefSection, BriefStage, SubQuestion } from './model';
 import { BRIEF_COLUMNS, briefFromRow, type Brief, type BriefRow } from './model';
 import { chooseReadings, type ChosenReading } from './research';
@@ -220,7 +221,8 @@ export async function researchBrief(
 }
 
 /**
- * Research a brief once the response has gone. Called from a server action
+ * Research a brief once the response has gone, then write its sources into
+ * Learn now cards. Called from a server action
  * or route handler, where `after` may still use the session's cookies for the
  * reads, the writes and the spend record. The route needs a maxDuration long
  * enough for three calls and up to ten searches, a few minutes.
@@ -231,5 +233,10 @@ export function researchBriefAfterResponse(
   briefId: string,
   options: { recordSpend?: RecordSpend } = {},
 ): void {
-  after(() => researchBrief(supabase, userId, briefId, options).then(() => undefined));
+  after(async () => {
+    const outcome = await researchBrief(supabase, userId, briefId, options);
+    // Each source becomes a Learn now card and a card in the brief's quick
+    // read (plan #2023.6), written as soon as the brief is ready.
+    if (outcome.ok && outcome.readings > 0) await writeCardsForBrief(userId, briefId);
+  });
 }

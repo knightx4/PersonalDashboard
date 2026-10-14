@@ -28,6 +28,7 @@ import { loadOutlinesDue, loadPlanLayoutsDue } from '@/lib/learn/lessons/plan-st
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { writeClipCards, type ClipCardPassResult } from '@/lib/learn/clips/clip-card-run';
+import { writeBriefCards, type BriefCardPassResult } from './brief-cards';
 import { loadTranscript } from '@/lib/learn/youtube/transcripts';
 import { writeClipNotes } from '@/lib/learn/feed/clip-note-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
@@ -70,6 +71,16 @@ export const VIDEO_CARDS_MS = 60_000;
  * card pass's own minute. A person saves a few clips an hour, each one call.
  */
 export const CLIP_CARDS_MS = 30_000;
+
+/**
+ * Time the brief card pass (plan #2023.6) may start writes in, after the clip
+ * pass. A ready brief's cards are written when its research ends, so this
+ * only picks up writes that failed there, one call each.
+ */
+export const BRIEF_CARDS_MS = 30_000;
+
+/** Time writing one brief's cards after its research may start writes in. */
+export const BRIEF_CARDS_AFTER_RESEARCH_MS = 90_000;
 
 /**
  * The pieces pass (plan #1140) is not started with less than this left: it
@@ -178,8 +189,9 @@ async function loadPicked(
     .eq('user_id', userId)
     .eq('status', 'picked')
     // A card from a video stretch is written by the video card pass, which
-    // has the transcript it needs (plan #1067).
-    .neq('reason', 'video')
+    // has the transcript it needs (plan #1067), and one from a brief's source
+    // by the brief card pass, which has the reading (plan #2023.6).
+    .not('reason', 'in', '(video,researched)')
     .order('created_at', { ascending: true })
     .limit(limit);
   if (error) throw new Error(`Reading your picked cards failed: ${error.message}`);
@@ -467,6 +479,7 @@ async function topUpWith(
 export type FeedTopUpResult = {
   videos: VideoCardPassResult | null;
   clips: ClipCardPassResult | null;
+  briefs: BriefCardPassResult | null;
   people: TopUpSummary[];
 };
 
@@ -537,12 +550,48 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
     console.error('[learn feed top-up] clip cards', error instanceof Error ? error.message : error);
     return null;
   });
+  // A brief's sources whose cards failed when its research ended.
+  const briefs = await writeBriefCards(context.learn, {
+    deadline: Date.now() + BRIEF_CARDS_MS,
+    write: (userId, card) =>
+      writePickedCard(context.learn, context.apiKey, userId, card, (spend, embedSpend) =>
+        keepCardSpend(context.core, userId, spend, embedSpend),
+      ),
+  }).catch((error: unknown) => {
+    console.error('[learn feed top-up] brief cards', error instanceof Error ? error.message : error);
+    return null;
+  });
   const people: TopUpSummary[] = [];
   for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }
-  return { videos, clips, people };
+  return { videos, clips, briefs, people };
+}
+
+/**
+ * Write one ready brief's sources into Learn now cards, one card each
+ * (plan #2023.6). Called once the brief's research has ended, after the
+ * response, so its cards are in Learn now and its quick read within a minute
+ * or two. Never throws: a card that fails stays picked for the hourly top-up.
+ */
+export async function writeCardsForBrief(userId: string, briefId: string): Promise<BriefCardPassResult | null> {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('Writing cards needs ANTHROPIC_API_KEY to be set.');
+    const learn = createLearnServiceSupabase();
+    const core = createCoreServiceSupabase();
+    return await writeBriefCards(learn, {
+      deadline: Date.now() + BRIEF_CARDS_AFTER_RESEARCH_MS,
+      userId,
+      briefId,
+      write: (owner, card) =>
+        writePickedCard(learn, apiKey, owner, card, (spend, embedSpend) => keepCardSpend(core, owner, spend, embedSpend)),
+    });
+  } catch (error) {
+    console.error('[learn brief cards]', error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 /**

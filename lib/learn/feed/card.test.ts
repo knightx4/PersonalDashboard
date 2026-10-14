@@ -296,3 +296,48 @@ describe('a card from a video on your playlist (plan #1067)', () => {
     expect(toFeedCard({ ...video, video_start_seconds: null })).toBeNull();
   });
 });
+
+describe('a card from a research brief source (plan #2023.6)', () => {
+  const researched = (overrides: Partial<FeedCardRow> = {}) =>
+    row({
+      reason: 'researched',
+      idea_name: 'Tested models in key controls',
+      takeaway: 'A model inside a key control has to be tested like the control.',
+      why: 'For your research: How do SOX controls apply to AI?',
+      item: null,
+      segment: null,
+      reading: {
+        title: 'AI and internal control over financial reporting',
+        open_url: 'https://www.example-regulator.gov/ai-icfr',
+        summary: 'What auditors expect.',
+        brief_id: 'b1',
+      },
+      ...overrides,
+    });
+
+  it('is a research card titled by its idea, from its source, linking to the page', () => {
+    const card = toFeedCard(researched());
+    expect(card).toMatchObject({
+      reason: 'researched',
+      kind: 'research',
+      briefId: 'b1',
+      title: 'Tested models in key controls',
+      source: null,
+      article: 'AI and internal control over financial reporting',
+      why: 'For your research: How do SOX controls apply to AI?',
+      link: 'https://www.example-regulator.gov/ai-icfr',
+      site: 'example-regulator.gov',
+      shown: [],
+    });
+    expect(canMakeTrack(card!)).toBe(false);
+  });
+
+  it('names the site when the source has no title, and shows nothing without its reading', () => {
+    const untitled = toFeedCard(
+      researched({ reading: { title: null, open_url: 'https://www.example.org/x', summary: null, brief_id: 'b1' } }),
+    );
+    expect(untitled?.article).toBe('example.org');
+    expect(toFeedCard(researched({ reading: null }))).toBeNull();
+    expect(toFeedCard(researched({ idea_name: null }))).toBeNull();
+  });
+});
