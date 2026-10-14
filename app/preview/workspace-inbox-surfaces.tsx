@@ -13,7 +13,7 @@ import { queueRow } from '@/lib/inbox/queue-rows';
 
 const write = (message: string): InboxWrite => ({ action: async () => ({ message }), fields: {} });
 const done = { label: 'Done', tone: 'primary' as const, write: write('Done.') };
-const later = { label: 'Later', tone: 'ghost' as const, write: write('Put off for now.') };
+const putOff = write('Put off for now.');
 const decline = write('Declined.');
 const onYou = { state: 'on_you' as const };
 
@@ -28,7 +28,8 @@ const SHOPPING: InboxRow[] = [
     line: 'Screwfix · was due Mon 13 Oct',
     href: '/shopping/orders/o1',
     move: onYou,
-    verbs: [{ label: 'Open the order', tone: 'primary', href: '/shopping/orders/o1' }, { label: 'Returns', tone: 'secondary', href: '/shopping/returns' }, later],
+    putOff,
+    verbs: [{ label: 'Open the order', tone: 'primary', href: '/shopping/orders/o1' }, { label: 'Returns', tone: 'secondary', href: '/shopping/returns' }],
     decline,
   },
   {
@@ -38,7 +39,8 @@ const SHOPPING: InboxRow[] = [
     line: 'The window closes in four days · due today',
     href: '/shopping/orders/o2',
     move: onYou,
-    verbs: [done, { label: 'Open the order', tone: 'secondary', href: '/shopping/orders/o2' }, { label: 'Send in Gmail', tone: 'secondary', href: '#' }, later],
+    putOff,
+    verbs: [done, { label: 'Open the order', tone: 'secondary', href: '/shopping/orders/o2' }, { label: 'Send in Gmail', tone: 'secondary', href: '#' }],
     decline,
   },
   {
@@ -48,7 +50,8 @@ const SHOPPING: InboxRow[] = [
     line: '£148.00 · due Sat 18 Oct',
     href: '/shopping/recurring',
     move: onYou,
-    verbs: [{ label: 'Open Recurring', tone: 'primary', href: '/shopping/recurring' }, later],
+    putOff,
+    verbs: [{ label: 'Open Recurring', tone: 'primary', href: '/shopping/recurring' }],
     decline,
   },
 ];
@@ -62,7 +65,8 @@ const JOBS: InboxRow[] = [
     line: 'Applied three weeks ago with no reply · was due Fri 10 Oct',
     href: '/jobs/roles/r1',
     move: onYou,
-    verbs: [done, { label: 'Monzo', tone: 'secondary', href: '/jobs/roles/r1' }, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }, later],
+    putOff,
+    verbs: [done, { label: 'Monzo', tone: 'secondary', href: '/jobs/roles/r1' }, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }],
   },
   {
     ref: 'job_search.applications:a2',
@@ -71,7 +75,8 @@ const JOBS: InboxRow[] = [
     line: 'They wrote on Tue 7 Oct',
     href: '/jobs/roles/r2',
     move: onYou,
-    verbs: [{ label: 'Open the role', tone: 'primary', href: '/jobs/roles/r2' }, later],
+    putOff,
+    verbs: [{ label: 'Open the role', tone: 'primary', href: '/jobs/roles/r2' }],
     decline,
   },
   {
@@ -81,7 +86,8 @@ const JOBS: InboxRow[] = [
     line: 'Dash asked on the role',
     href: '/jobs/roles/r3',
     move: onYou,
-    verbs: [{ label: 'Reply', tone: 'primary', href: '/jobs/roles/r3' }, later],
+    putOff,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/jobs/roles/r3' }],
     decline,
   },
 ];
@@ -93,14 +99,16 @@ const TODO: InboxRow[] = [
     title: 'Book the boiler service before the first cold week of the winter',
     line: '1 of 3 left',
     move: onYou,
-    verbs: [done, later],
+    putOff,
+    verbs: [done],
   },
   {
     ref: 'todo.tasks:t2',
     section: 'actions',
     title: 'Sort the loft',
     move: onYou,
-    verbs: [done, later],
+    putOff,
+    verbs: [done],
   },
   {
     ref: 'todo.tasks:t3',
@@ -109,7 +117,8 @@ const TODO: InboxRow[] = [
     line: 'Dash asked on Buy hinges for the shed door',
     href: '/todo',
     move: onYou,
-    verbs: [{ label: 'Reply', tone: 'primary', href: '/todo' }, later],
+    putOff,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/todo' }],
     decline,
   },
 ];
@@ -123,7 +132,8 @@ const VAULT: InboxRow[] = [
     line: 'Dash asked on Lease 2026',
     href: '/vault/n/Inbox/Lease%202026',
     move: onYou,
-    verbs: [{ label: 'Reply', tone: 'primary', href: '/vault/n/Inbox/Lease%202026' }, later],
+    putOff,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/vault/n/Inbox/Lease%202026' }],
     decline,
   },
 ];
@@ -137,7 +147,8 @@ const LEARN: InboxRow[] = [
     line: 'Dash asked on Bayesian updating',
     href: '/learn/c/c1',
     move: onYou,
-    verbs: [{ label: 'Reply', tone: 'primary', href: '/learn/c/c1' }, later],
+    putOff,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/learn/c/c1' }],
     decline,
   },
 ];

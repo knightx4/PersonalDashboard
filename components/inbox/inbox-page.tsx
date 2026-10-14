@@ -90,6 +90,12 @@ export type InboxRow = {
   question?: InboxQuestion;
   /** Later: `choice` is added to the fields (tomorrow, next_week or a day). */
   later?: InboxWrite;
+  /**
+   * Later as one press, for a row whose own workspace decides how far it is
+   * put off (an agenda item's source: a reminder's due date, a draft's day).
+   * Drawn where the menu would be; a row has one or the other.
+   */
+  putOff?: InboxWrite;
   /** Decline: the row was proposed to you and you turned it down. */
   decline?: InboxWrite;
   /** It was put off, and the day it was put off to has come. */
@@ -231,7 +237,7 @@ function ShapeRow({ row }: { row: InboxRow }) {
         </p>
       ) : (
         <>
-          {(row.question || verbs.length > 0 || row.later || row.decline) && (
+          {(row.question || verbs.length > 0 || row.later || row.putOff || row.decline) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {row.question && <Answer row={row} run={run} pending={pending} />}
               {verbs.map((verb) =>
@@ -270,6 +276,17 @@ function ShapeRow({ row }: { row: InboxRow }) {
                 )}
                 {row.later && (
                   <SnoozeMenu label={row.title} onChoose={(choice) => run(row.later!, { choice })} />
+                )}
+                {!row.later && row.putOff && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    pending={pending}
+                    onClick={() => run(row.putOff!)}
+                  >
+                    {INBOX_WORDS.later}
+                  </Button>
                 )}
               </span>
             </div>

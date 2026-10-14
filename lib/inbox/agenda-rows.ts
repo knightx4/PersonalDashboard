@@ -1,5 +1,4 @@
 import type { InboxRow, InboxSectionKey, InboxVerb, InboxWrite } from '@/components/inbox/inbox-page';
-import { INBOX_WORDS } from '@/components/inbox/inbox-words';
 import type { AgendaEntry } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, SourceId } from '@/lib/todo/agenda/sources';
 import { entryRef } from '@/lib/todo/agenda/workspace';
@@ -98,9 +97,6 @@ function itemRow(
   if (item.action) {
     verbs.push({ label: item.action.label, tone: 'secondary', href: item.action.href });
   }
-  if (can.defer) {
-    verbs.push({ label: INBOX_WORDS.later, tone: 'ghost', write: { action: actions.later, fields } });
-  }
 
   return {
     ref: item.ref,
@@ -110,6 +106,7 @@ function itemRow(
     href: item.link?.href,
     move: { state: 'on_you' },
     verbs,
+    putOff: can.defer ? { action: actions.later, fields } : undefined,
     decline: can.dismiss ? { action: actions.decline, fields } : undefined,
   };
 }
@@ -135,10 +132,8 @@ export function agendaInboxRow(
       ),
       href: entry.anchor?.href,
       move: { state: 'on_you' },
-      verbs: [
-        { label: 'Done', tone: 'primary', write: { action: actions.doneTask, fields } },
-        { label: INBOX_WORDS.later, tone: 'ghost', write: { action: actions.laterTask, fields } },
-      ],
+      verbs: [{ label: 'Done', tone: 'primary', write: { action: actions.doneTask, fields } }],
+      putOff: { action: actions.laterTask, fields },
     };
   }
   if (entry.item) return itemRow(entry.item, actions, abilities, today);
