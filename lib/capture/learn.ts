@@ -104,3 +104,18 @@ export async function writeQuiz(
     return { ok: false, error: 'Could not start that quiz. Try again.' };
   }
 }
+
+/** One thing to read, added to the end of a track (plan #1950.6). */
+export async function writeTrackReading(
+  learn: LearnSupabaseClient,
+  userId: string,
+  trackId: string,
+  title: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  try {
+    return { ok: true, id: await addManualReading(learn, userId, { trackId, title: title.slice(0, 500), why: null }) };
+  } catch (error) {
+    console.error('capture: adding to a track failed', error);
+    return { ok: false, error: 'Could not add that. Try again.' };
+  }
+}

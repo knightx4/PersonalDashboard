@@ -218,7 +218,9 @@ export type CaptureKindId =
   | 'job-role'
   | 'learn-reading'
   | 'learn-topic'
-  | 'learn-quiz';
+  | 'learn-quiz'
+  // Learn (plan #1950.6): one thing to read, on the track the page is open on.
+  | 'track-reading';
 
 /**
  * The one thing a kind may need besides its title. A todo takes a day; a
@@ -455,6 +457,18 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     placeholder: 'Paste a link to read later',
     field: 'line',
     needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'track-reading': {
+    id: 'track-reading',
+    place: null,
+    module: 'learn',
+    label: 'Add something to read',
+    placeholder: 'Something specific you want to learn',
+    field: 'line',
+    needs: 'under',
     makes: 'row',
     section: '/learn',
     action: 'anything',
