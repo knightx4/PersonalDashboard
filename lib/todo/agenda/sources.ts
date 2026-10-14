@@ -127,6 +127,13 @@ export interface AgendaItem {
    * for your availability, not "Reply to Monzo" beside it.
    */
   covers?: string[];
+  /**
+   * What an Inbox row's one press says when opening the link is the only
+   * thing to do, such as "Open the role" (plan #1937.9). The link's label then
+   * goes in the row's line, where it names what the row is about. Left out,
+   * the press is labelled with the link's label.
+   */
+  press?: string;
 }
 
 /**

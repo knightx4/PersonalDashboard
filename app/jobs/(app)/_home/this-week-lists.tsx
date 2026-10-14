@@ -69,34 +69,39 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
               return (
                 <li
                   key={group?.id ?? lead.id}
-                  className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1"
+                  className="row-pad relative gap-x-3 gap-y-1 sm:flex sm:items-baseline"
                 >
-                  <span className="tabular w-full text-ui font-medium text-ink sm:w-44">
+                  {/* The when in a column of its own, so every round's role
+                      starts at the same edge and what is left wraps under it
+                      rather than under the date. */}
+                  <span className="tabular block text-ui font-medium text-ink sm:w-44 sm:shrink-0">
                     {formatInterviewWhen(lead.scheduledAt, lead.timeKnown, timezone)}
                   </span>
-                  <Link
-                    href={`/jobs/roles/${lead.roleId}?tab=interviews&interview=${lead.id}`}
-                    className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-                  >
-                    {/* The whole row opens the same place -- prep materials on
-                        the role's Interviews tab -- so this stretches to cover
-                        it rather than being the one sliver of the row that
-                        responds to a click. */}
-                    <span className="absolute inset-0" aria-hidden />
-                    {lead.companyName} · {lead.roleTitle}
-                  </Link>
-                  <span className="text-small text-ink-muted">{detail}</span>
-                  {joinable?.meetingUrl && (
-                    <a
-                      href={joinable.meetingUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={cn(linkVariants(), 'press-area inline-flex items-center gap-1 text-small font-medium')}
+                  <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Link
+                      href={`/jobs/roles/${lead.roleId}?tab=interviews&interview=${lead.id}`}
+                      className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                     >
-                      <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
-                      Join
-                    </a>
-                  )}
+                      {/* The whole row opens the same place -- prep materials on
+                          the role's Interviews tab -- so this stretches to cover
+                          it rather than being the one sliver of the row that
+                          responds to a click. */}
+                      <span className="absolute inset-0" aria-hidden />
+                      {lead.companyName} · {lead.roleTitle}
+                    </Link>
+                    <span className="text-small text-ink-muted">{detail}</span>
+                    {joinable?.meetingUrl && (
+                      <a
+                        href={joinable.meetingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn(linkVariants(), 'press-area inline-flex items-center gap-1 text-small font-medium')}
+                      >
+                        <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
+                        Join
+                      </a>
+                    )}
+                  </span>
                 </li>
               );
             })}

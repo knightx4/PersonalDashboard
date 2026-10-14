@@ -22,8 +22,18 @@ import type { AgendaItem, AgendaSource } from '@/lib/todo/agenda/sources';
 
 const PREFIX = 'job_waiting:';
 
+/** "Tue 7 Oct", the day the email came, in the reader's zone. */
+function wroteOn(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(iso));
+}
+
 /** Pure: the agenda items for the requests waiting on you. Exported for tests. */
-export function waitingItems(rows: readonly WaitingOnYou[]): AgendaItem[] {
+export function waitingItems(rows: readonly WaitingOnYou[], timezone: string): AgendaItem[] {
   return rows.map((row) => {
     const company = row.companyName.trim() || 'the company';
     const role = `${company}${row.roleTitle ? ` · ${row.roleTitle}` : ''}`;
@@ -39,7 +49,8 @@ export function waitingItems(rows: readonly WaitingOnYou[]): AgendaItem[] {
       at: null,
       link: { href: `/jobs/roles/${row.roleId}`, label: role },
       action: null,
-      detail: summary ? role : null,
+      // Who asked, and how long it has been waiting.
+      detail: `${summary ? `${role} · ` : ''}wrote ${wroteOn(row.occurredAt, timezone)}`,
       completable: true,
       workspace: 'jobs',
       covers: [`job_search.applications:${row.applicationId}`],
@@ -60,7 +71,7 @@ export const jobWaitingSource: AgendaSource = {
 
   async fetch(ctx) {
     const supabase = await (ctx.clients ?? sessionClients).jobs();
-    return waitingItems(await loadWaitingOnYou(supabase, ctx.userId, ctx.now));
+    return waitingItems(await loadWaitingOnYou(supabase, ctx.userId, ctx.now), ctx.timezone);
   },
 
   async complete(ctx, key) {

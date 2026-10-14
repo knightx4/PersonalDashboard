@@ -60,6 +60,21 @@ describe('agendaInboxRow', () => {
     expect(row.decline?.fields).toEqual({ source: 'return_deadlines', key: 'return:o1' });
   });
 
+  it('labels the press with its own verb and moves the link’s label into the line', () => {
+    const application = item({
+      source: 'applications',
+      ref: 'job_search.applications:a1',
+      title: 'Do the Starling assessment',
+      day: null,
+      detail: null,
+      link: { href: '/jobs/roles/r1', label: 'Product Designer' },
+      press: 'Open the role',
+    });
+    const row = agendaInboxRow(entry(application), ACTIONS, { applications: { ...ALL, complete: false } }, '2026-03-10')!;
+    expect(row.verbs?.map((v) => [v.label, v.href])).toEqual([['Open the role', '/jobs/roles/r1']]);
+    expect(row.line).toBe('Product Designer');
+  });
+
   it('keeps the link on the title when there is something else to press', () => {
     const row = agendaInboxRow(
       entry(item({ completable: true, action: { href: '/shopping/returns', label: 'Returns' } })),

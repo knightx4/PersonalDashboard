@@ -1447,7 +1447,7 @@ const todayPageBoard: TodayBoard = {
 };
 const todayPageSince: SinceView = {
   state: 'loaded',
-  hint: 'Since 8 Sept, 18:40',
+  hint: 'Since 8 Sept, 6:40 PM BST',
   stopped: [],
   entries: [
     {

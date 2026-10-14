@@ -53,6 +53,8 @@ export function applicationItems(rows: readonly ApplicationMoveRow[]): AgendaIte
         action: null,
         detail: null,
         completable: false,
+        // In an Inbox the one press opens the role, and the role names the row.
+        press: row.roleId ? 'Open the role' : undefined,
       } satisfies AgendaItem;
     });
 }

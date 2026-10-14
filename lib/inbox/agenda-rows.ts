@@ -94,14 +94,16 @@ function itemRow(
   if (item.action) {
     verbs.push({ label: item.action.label, tone: verbs.length === 0 ? 'primary' : 'secondary', href: item.action.href });
   } else if (item.link && verbs.length === 0) {
-    verbs.push({ label: item.link.label, tone: 'primary', href: item.link.href });
+    verbs.push({ label: item.press ?? item.link.label, tone: 'primary', href: item.link.href });
   }
+  // A press that says what it does leaves the link's label to say what the row is about.
+  const about = item.press && item.link && !item.detail ? item.link.label : null;
 
   return {
     ref: item.ref,
     section: itemSection(item),
     title: item.title,
-    line: line(item.detail, dueLine(item.day, today)),
+    line: line(item.detail ?? about, dueLine(item.day, today)),
     href: item.link?.href,
     move: { state: 'on_you' },
     verbs,
