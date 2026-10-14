@@ -1,4 +1,13 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import type { ModuleSources, Section } from '@/lib/sources/types';
+
+/**
+ * The sections of Shopping's nav its rows sit under (app/shopping/layout.tsx).
+ * None of them sits under another row: an order's merchant has no page.
+ */
+const ORDERS: Section = { href: '/shopping/orders', label: 'Orders' };
+const INVENTORY: Section = { href: '/shopping/inventory', label: 'Inventory' };
+const SAVED: Section = { href: '/shopping/saved', label: 'Saved' };
+const SHARE: Section = { href: '/shopping/share', label: 'Share' };
 
 /**
  * Shopping's tables in public, as Goals reads them (lib/sources/types.ts).
@@ -16,6 +25,7 @@ export const shoppingSources: ModuleSources = {
       search: ['title', 'notes', 'url'],
       title: 'title',
       href: (id) => `/shopping/saved/${id}`,
+      section: SAVED,
     },
     {
       table: 'public.inventory_items',
@@ -25,6 +35,7 @@ export const shoppingSources: ModuleSources = {
       search: ['name', 'short_name', 'notes', 'search_tags'],
       title: 'name',
       href: (id) => `/shopping/inventory/${id}`,
+      section: INVENTORY,
     },
     {
       table: 'public.order_items',
@@ -70,6 +81,7 @@ export const shoppingSources: ModuleSources = {
                 : null,
         },
         href: (row) => `/shopping/orders/${row.id}`,
+        section: ORDERS,
       },
     },
     { table: 'public.shipments', reason: 'Parcel tracking.' },
@@ -104,7 +116,7 @@ export const shoppingSources: ModuleSources = {
     {
       table: 'public.share_links',
       reason: 'Lists shared with other people.',
-      page: { title: 'title', href: (row) => `/shopping/share/${row.id}` },
+      page: { title: 'title', href: (row) => `/shopping/share/${row.id}`, section: SHARE },
     },
     { table: 'public.share_link_items', reason: 'Lists shared with other people.' },
     { table: 'public.share_link_events', reason: 'Lists shared with other people.' },

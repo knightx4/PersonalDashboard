@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { MODULES } from '@/lib/modules';
 import {
   catalogueMarkdown,
   NOT_SOURCES,
+  PAGES,
   SOURCE_SCHEMAS,
   SOURCES,
   sourceHref,
@@ -45,5 +47,34 @@ describe('the catalogue of sources', () => {
   it('matches the file the goals routine reads (run npm run sources:write)', () => {
     const file = readFileSync(join(process.cwd(), '.claude/skills/goals/reference/sources.md'), 'utf8');
     expect(file).toBe(catalogueMarkdown());
+  });
+
+  it('puts every page under a section of its workspace’s nav', () => {
+    const root = process.cwd();
+    for (const { table, page } of PAGES) {
+      const { section } = page;
+      // Null is a row that sits under another; it has to say which.
+      if (section === null) {
+        expect(page.parent, table).toBeDefined();
+        continue;
+      }
+      const workspace = MODULES.find((m) => section.href === m.prefix || section.href.startsWith(`${m.prefix}/`));
+      if (!workspace) {
+        // The app's own pages, outside every workspace: the page has to exist.
+        expect(existsSync(join(root, 'app', section.href, 'page.tsx')), `${table}: ${section.href}`).toBe(true);
+        continue;
+      }
+      if (section.href === workspace.settings?.href) {
+        expect(section.label, table).toBe('Settings');
+        continue;
+      }
+      const layout = [`app${workspace.prefix}/layout.tsx`, `app${workspace.prefix}/(app)/layout.tsx`].find((f) =>
+        existsSync(join(root, f)),
+      );
+      expect(layout, `${table}: no layout for ${workspace.id}`).toBeDefined();
+      const text = readFileSync(join(root, layout!), 'utf8');
+      expect(text, `${table}: ${section.href} is not a tab in ${layout}`).toContain(`href: '${section.href}'`);
+      expect(text, `${table}: ${section.label} is not a tab in ${layout}`).toContain(`label: '${section.label}'`);
+    }
   });
 });

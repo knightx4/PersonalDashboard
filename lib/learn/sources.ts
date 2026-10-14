@@ -1,4 +1,12 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
+const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
+const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
+const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
+const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+/** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
+const GOALS_HOME: Section = { href: '/goals', label: 'Home' };
 
 /**
  * Learn's tables, as Goals reads them (lib/sources/types.ts). What someone
@@ -15,6 +23,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'about'],
       title: 'name',
       href: () => '/goals',
+      section: GOALS_HOME,
+      parent: parentBy('goal_id', 'goals.items'),
       note: 'Each aim is a goal in the Learn area on /goals (aims.goal_id, goals 0066), and the goal owns its name, line and whether it is active. Read the goal rather than counting both.',
     },
     {
@@ -25,6 +35,7 @@ export const learnSources: ModuleSources = {
       search: ['name', 'note'],
       title: 'name',
       href: (id) => `/learn/s/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.goals',
@@ -42,6 +53,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'question'],
       title: 'title',
       href: (id) => `/learn/t/${id}`,
+      section: READING_LISTS,
     },
     {
       table: 'learn.readings',
@@ -51,6 +63,8 @@ export const learnSources: ModuleSources = {
       search: ['title', 'why', 'note'],
       title: 'title',
       href: (id) => `/learn/r/${id}`,
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.learning_log',
@@ -77,6 +91,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'claim'],
       title: 'name',
       href: (id) => `/learn/c/${id}`,
+      section: SUBJECTS,
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.curriculum_units',
@@ -137,6 +153,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'preparing_for'],
       title: 'title',
       href: (id) => `/learn/quiz/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.imports',
@@ -189,6 +206,7 @@ export const learnSources: ModuleSources = {
       page: {
         title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
         href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        section: VIDEOS,
         reads: ['video_id'],
       },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
@@ -201,6 +219,7 @@ export const learnSources: ModuleSources = {
       search: ['path', 'draft_body'],
       title: 'path',
       href: (id) => `/learn/e/${id}`,
+      section: ESSAYS,
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
   ],
@@ -231,7 +250,12 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.opening_sweeps',
       reason: 'Placement bookkeeping.',
-      page: { title: 'asked', href: (row) => `/learn/opening/${row.id}` },
+      page: {
+        title: 'asked',
+        href: (row) => `/learn/opening/${row.id}`,
+        section: SUBJECTS,
+        parent: parentBy('subject_id', 'learn.subjects'),
+      },
     },
     { table: 'learn.piece_practice', reason: 'Practice tasks Dash wrote; read through what was handed in for them.' },
     { table: 'learn.plan_projects', reason: 'Final projects Dash wrote; read through what was handed in for them.' },
