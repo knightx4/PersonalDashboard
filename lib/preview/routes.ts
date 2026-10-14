@@ -129,6 +129,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-brief-quick-empty': ['/learn/b/[id]/quick'],
   'learn-brief-quick-end': ['/learn/b/[id]/quick'],
   'learn-now-research-card': ['/learn/now'],
+  'learn-now-research-card-new': ['/learn/now'],
   'learn-courses-empty': ['/learn/know'],
   'learn-courses-list': ['/learn/know'],
   'learn-course-check': ['/learn/know'],
@@ -309,6 +310,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'mail-message': ['/mail/[id]'],
   // A researched topic (plan #2023.4): ready, and its hidden parts.
   'learn-brief': ['/learn/b/[id]'],
+  'learn-brief-new-sources': ['/learn/b/[id]'],
   'learn-brief-researching': ['/learn/b/[id]'],
   'learn-brief-failed': ['/learn/b/[id]'],
   'learn-brief-quote-source': ['/learn/b/[id]'],

@@ -120,6 +120,43 @@ export function LearnBriefSurface() {
   return <BriefView page={readyPage} live={false} />;
 }
 
+/**
+ * Watched, with two sources weekly checks found since (plan #2023.8): the
+ * newer not opened yet, so marked new, and each with its line on what it
+ * changes in the answer.
+ */
+export function LearnBriefNewSourcesSurface() {
+  const watched: BriefPage = {
+    brief: { ...ready, watchOn: true, watchedAt: '2026-10-13T06:00:00Z', quietChecks: 0 },
+    sources: {
+      ...sources,
+      [R(6)]: {
+        readingId: R(6),
+        title: 'Staff guidance on inspecting controls that rely on machine learning models in the financial close',
+        kind: 'regulator',
+        year: 2026,
+        foundAt: '2026-10-13T06:01:00Z',
+        url: 'https://example.org/pcaob-staff-guidance',
+        change:
+          'Inspectors will now ask for the log of every model change in the period, which makes change management the first thing to test rather than one item among several.',
+        isNew: true,
+      },
+      [R(7)]: {
+        readingId: R(7),
+        title: 'What controllers told us about AI in the close',
+        kind: 'press',
+        year: null,
+        foundAt: '2026-10-06T06:01:00Z',
+        url: 'https://example.org/press-controllers',
+        change:
+          'Adds that most companies still keep a person reviewing every AI-prepared entry, so the tool is rarely a key control on its own yet.',
+        isNew: false,
+      },
+    },
+  };
+  return <BriefView page={watched} live={false} />;
+}
+
 /** A quote's source, as hovering or tapping the first quote shows it. */
 export function LearnBriefQuoteSourceSurface() {
   return <BriefView page={readyPage} live={false} openQuote="1:0" />;

@@ -39,6 +39,13 @@ export type BriefSource = {
   /** When the run found it. */
   foundAt: string | null;
   url: string | null;
+  /**
+   * What it changes in the answer, for a source a weekly check found (plan
+   * #2023.8); null for the first run's sources.
+   */
+  change?: string | null;
+  /** Found by a weekly check and not opened yet: marked new on the page and its card. */
+  isNew?: boolean;
 };
 
 /** The brief as its page draws it: the row, and the title of the reading list it made. */
@@ -122,6 +129,30 @@ export function sectionSources(section: BriefSection, sources: Record<string, Br
     out.push(source);
   }
   return out;
+}
+
+/** The sources weekly checks found, newest first, for the brief's "New since you asked". */
+export function sourcesFoundSince(sources: Record<string, BriefSource>): BriefSource[] {
+  return Object.values(sources)
+    .filter((source) => source.change)
+    .sort((a, b) => (b.foundAt ?? '').localeCompare(a.foundAt ?? ''));
+}
+
+/** Whether a source a check found is still new: it has not been opened from the list. */
+export function isNewSource(change: string | null | undefined, status: string | null | undefined): boolean {
+  return Boolean(change) && status === 'queued';
+}
+
+/**
+ * The line under a source a check found: its kind, the day it was found and
+ * the year it came out, so newest first can be read down the list.
+ */
+export function foundLine(source: BriefSource): string {
+  const parts: string[] = [];
+  if (source.kind) parts.push(FOUND_KIND_LABELS[source.kind]);
+  if (source.foundAt) parts.push(`found ${dayLabel(source.foundAt)}`);
+  if (source.year) parts.push(`published ${source.year}`);
+  return parts.join(' · ') || 'Kind and date not known';
 }
 
 /** The quote popover's second line: the kind and the date, as far as known. */

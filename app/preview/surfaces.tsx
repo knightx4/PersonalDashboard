@@ -179,6 +179,7 @@ import {
   LearnBriefResearchingSurface,
   LearnBriefShortAnswerEditorSurface,
   LearnBriefSurface,
+  LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
 import { educationGroups, educationCounts } from './education-fixtures';
@@ -186,7 +187,7 @@ import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
-import { BriefQuickPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
+import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
@@ -4868,6 +4869,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnNowResearchPreview />,
   },
   {
+    /* The same card when a brief's weekly check found its source (plan
+     * #2023.8): marked as a new source until it is opened. */
+    id: 'learn-now-research-card-new',
+    label: 'Now · A new source from a watched topic',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowResearchNewPreview />,
+  },
+  {
     /* The courses fold on Learn's Tracks page with no transcript saved: it
      * points to You's Work & school tab (plan #1391). */
     id: 'learn-courses-empty',
@@ -6611,6 +6621,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnBriefSurface />,
+  },
+  {
+    id: 'learn-brief-new-sources',
+    label: 'Research brief · New sources since you asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefNewSourcesSurface />,
   },
   {
     id: 'learn-brief-researching',

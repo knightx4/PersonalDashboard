@@ -66,16 +66,20 @@ function atStage(stage: BriefStage, extra: Record<string, unknown> = {}) {
   return { status: 'researching', stage, error: null, ...extra };
 }
 
+/** A source going on a brief's list: from the run, or from a weekly check with its line on what it changes. */
+export type ReadingToSave = Omit<ChosenReading, 'page'> & { change?: string };
+
 /**
  * Put the chosen sources on the list: one reading each, or the reading
  * already there for that link. Returns the reading id for each, in order.
+ * The weekly check (plan #2023.8) saves its new sources the same way.
  */
-async function saveReadings(
+export async function saveReadings(
   supabase: LearnSupabaseClient,
   userId: string,
-  brief: Brief,
+  brief: Pick<Brief, 'id' | 'question'>,
   trackId: string,
-  chosen: readonly ChosenReading[],
+  chosen: readonly ReadingToSave[],
 ): Promise<string[]> {
   const { data: existing, error: readError } = await supabase
     .from('readings')
@@ -108,6 +112,7 @@ async function saveReadings(
             brief_id: brief.id,
             found_at: now,
             found_kind: c.kind,
+            ...(c.change ? { found_change: c.change } : {}),
             ...(c.summary
               ? { summary: c.summary, summary_at: now, summary_from: 'link', summary_label: c.url, summary_truncated: false }
               : {}),

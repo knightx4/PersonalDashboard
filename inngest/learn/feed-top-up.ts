@@ -573,16 +573,22 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
  * Write one ready brief's sources into Learn now cards, one card each
  * (plan #2023.6). Called once the brief's research has ended, after the
  * response, so its cards are in Learn now and its quick read within a minute
- * or two. Never throws: a card that fails stays picked for the hourly top-up.
+ * or two. The weekly check (plan #2023.8) calls it too, with its own
+ * deadline, for the sources it added. Never throws: a card that fails, or one
+ * the deadline leaves unwritten, is written by the hourly top-up.
  */
-export async function writeCardsForBrief(userId: string, briefId: string): Promise<BriefCardPassResult | null> {
+export async function writeCardsForBrief(
+  userId: string,
+  briefId: string,
+  deadline: number = Date.now() + BRIEF_CARDS_AFTER_RESEARCH_MS,
+): Promise<BriefCardPassResult | null> {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('Writing cards needs ANTHROPIC_API_KEY to be set.');
     const learn = createLearnServiceSupabase();
     const core = createCoreServiceSupabase();
     return await writeBriefCards(learn, {
-      deadline: Date.now() + BRIEF_CARDS_AFTER_RESEARCH_MS,
+      deadline,
       userId,
       briefId,
       write: (owner, card) =>

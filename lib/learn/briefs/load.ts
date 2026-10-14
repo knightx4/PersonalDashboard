@@ -3,6 +3,7 @@ import { readSubQuestions, type BriefStatus } from './model';
 import {
   BRIEF_PAGE_COLUMNS,
   foundKind,
+  isNewSource,
   toBriefOnPage,
   type BriefPage,
   type BriefPageRow,
@@ -21,6 +22,8 @@ type SourceRow = {
   found_kind: string | null;
   found_at: string | null;
   open_url: string | null;
+  found_change?: string | null;
+  status?: string | null;
   sources: { title: string | null; year: number | null; canonical_url: string | null } | null;
 };
 
@@ -33,6 +36,8 @@ function toSource(row: SourceRow): BriefSource {
     year: source?.year ?? null,
     foundAt: row.found_at,
     url: row.open_url ?? source?.canonical_url ?? null,
+    change: row.found_change ?? null,
+    isNew: isNewSource(row.found_change, row.status),
   };
 }
 
@@ -42,7 +47,7 @@ export async function loadBrief(supabase: LearnSupabaseClient, id: string): Prom
     supabase.from('briefs').select(BRIEF_PAGE_COLUMNS).eq('id', id).maybeSingle(),
     supabase
       .from('readings')
-      .select('id, title, found_kind, found_at, open_url, sources ( title, year, canonical_url )')
+      .select('id, title, found_kind, found_at, open_url, found_change, status, sources ( title, year, canonical_url )')
       .eq('brief_id', id)
       .order('position'),
   ]);

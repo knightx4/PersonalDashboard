@@ -35,7 +35,7 @@ export const CARD_SELECT =
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
   'source_item:catalogue_items!feed_cards_source_item_id_fkey(title, canonical_url, licence), ' +
   'source_segment:catalogue_segments!feed_cards_source_segment_id_fkey(heading, text, section_anchor), ' +
-  'reading:readings!feed_cards_reading_id_fkey(title, open_url, summary, brief_id)';
+  'reading:readings!feed_cards_reading_id_fkey(title, open_url, summary, brief_id, found_change, status)';
 
 /**
  * Which cards a page of the deck is dealt from: how many, as of when, and

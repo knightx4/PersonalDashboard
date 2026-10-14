@@ -222,6 +222,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/cron/daily/route.ts#GET':
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':
     "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
   'app/you/personality/actions.ts#restoreTypedAction':

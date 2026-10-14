@@ -13,6 +13,7 @@ import {
   FileSearch,
   GraduationCap,
   Play,
+  Sparkle,
   Sprout,
   Weight,
   X,
@@ -689,6 +690,12 @@ function DeckCard({
         <article ref={body} className="card-pad min-w-0">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small text-ink-muted">
             <span>{card.why}</span>
+            {card.fresh && (
+              <Chip>
+                <Sparkle strokeWidth={1.75} aria-hidden />
+                New source
+              </Chip>
+            )}
             {card.depth && (
               <Chip>{DEPTH_LABEL[card.depth]}</Chip>
             )}

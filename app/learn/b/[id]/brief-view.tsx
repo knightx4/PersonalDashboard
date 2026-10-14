@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Sparkle } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Button } from '@/components/ui/button';
@@ -13,12 +13,15 @@ import { LiveDot } from '@/components/ui/live-dot';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { Chip } from '@/components/ui/chip';
+import { watchLine } from '@/lib/learn/briefs/watch';
 import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
 import {
   briefStage,
-  dayLabel,
   sectionSources,
+  foundLine,
   sourceLine,
+  sourcesFoundSince,
   type BriefOnPage,
   type BriefPage,
   type BriefSource,
@@ -265,6 +268,42 @@ function ShortAnswer({ brief, editing }: { brief: Brief; editing: boolean }) {
   );
 }
 
+/**
+ * The sources the weekly check found since the brief was written (plan
+ * #2023.8), newest first: each with the line on what it changes in the
+ * answer, and marked new until it is opened from the list.
+ */
+function NewSince({ sources }: { sources: BriefSource[] }) {
+  if (sources.length === 0) return null;
+  return (
+    <Card padding="standard" className="flex flex-col gap-3">
+      <h2 className="text-body font-semibold text-ink">New since you asked</h2>
+      <ul className="flex flex-col divide-y divide-border">
+        {sources.map((source) => (
+          <li key={source.readingId} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Link
+                href={`/learn/r/${source.readingId}`}
+                className={cn('inline-flex min-h-11 items-center text-ui [overflow-wrap:anywhere] lg:min-h-8', linkVariants())}
+              >
+                {source.title}
+              </Link>
+              {source.isNew && (
+                <Chip>
+                  <Sparkle strokeWidth={1.75} aria-hidden />
+                  New
+                </Chip>
+              )}
+            </p>
+            <p className="max-w-prose text-body text-ink">{source.change}</p>
+            <p className="text-small text-ink-muted">{foundLine(source)}</p>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
@@ -296,7 +335,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
           <span>
             <span className="block text-ui text-ink">Check every week</span>
             <span className="block text-small text-ink-muted">
-              {brief.watchedAt ? `Last checked ${dayLabel(brief.watchedAt)}` : 'Not checked yet'}
+              {watchLine(brief)}
             </span>
           </span>
           <Switch
@@ -399,6 +438,7 @@ export function BriefView({
             <QuickReadButton briefId={brief.id} />
           </div>
           <ShortAnswer brief={brief} editing={editing} />
+          <NewSince sources={sourcesFoundSince(sources)} />
           {brief.subQuestions.map((sub, i) => (
             <Section
               key={sub.id}

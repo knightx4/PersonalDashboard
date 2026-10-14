@@ -137,3 +137,17 @@ const nowCards: FeedCard[] = [
 export function LearnNowResearchPreview() {
   return <LearnNowFeed first={nowCards} ready={12} low={10} />;
 }
+
+/**
+ * Learn now with a card from a source a brief's weekly check found on top
+ * (plan #2023.8): the card is marked as a new source until it is opened.
+ */
+export function LearnNowResearchNewPreview() {
+  return (
+    <LearnNowFeed
+      first={nowCards.map((card, index) => (index === 0 ? { ...card, fresh: true } : card))}
+      ready={12}
+      low={10}
+    />
+  );
+}

@@ -67,7 +67,15 @@ export type FeedCardRow = {
 };
 
 /** A brief's source, as a researched card shows it. */
-export type CardReading = { title: string | null; open_url: string | null; summary: string | null; brief_id: string | null };
+export type CardReading = {
+  title: string | null;
+  open_url: string | null;
+  summary: string | null;
+  brief_id: string | null;
+  /** Set when a brief's weekly check found the source (plan #2023.8). */
+  found_change?: string | null;
+  status?: string | null;
+};
 
 type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
 type CatalogueSegment = { heading: string | null; text: string; section_anchor: string | null };
@@ -85,6 +93,11 @@ export type FeedCard = {
   kind: 'section' | 'lesson' | 'check' | 'teach' | 'research';
   /** The brief a research card came from, for its link back. Absent on every other card. */
   briefId?: string | null;
+  /**
+   * A research card whose source a brief's weekly check found and that has
+   * not been opened yet (plan #2023.8): the card is marked new.
+   */
+  fresh?: boolean;
   /**
    * The idea's name, or "Article: Section" on a card written before ideas. A
    * lesson's is its concept's name.
@@ -399,6 +412,7 @@ function toResearchCard(row: FeedCardRow): FeedCard | null {
     reason: 'researched',
     kind: 'research',
     briefId: reading.brief_id,
+    fresh: Boolean(reading.found_change) && reading.status === 'queued',
     title,
     source: null,
     track: null,
