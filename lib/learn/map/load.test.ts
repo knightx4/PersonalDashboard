@@ -64,6 +64,32 @@ const ROWS = {
   ],
 };
 
+describe('loadIdeaMap evidence (plan #2006.6)', () => {
+  it('lights an untested idea from its evidence, capped, and keeps its links strongest first', async () => {
+    const link = (id: string, weight: number, similarity: number) => ({
+      id,
+      target_kind: 'idea',
+      target_id: 'i2',
+      source_kind: 'note',
+      source_id: id,
+      similarity,
+      weight,
+      basis: `you wrote about this in ${id}`,
+      found_at: '2026-10-01T00:00:00Z',
+    });
+    const { client } = fakeClient({
+      ...ROWS,
+      evidence_links: [link('clip', 0.25, 0.6), link('own', 1, 0.7)],
+    });
+    const view = await loadIdeaMap(client, undefined, new Date('2026-10-14T00:00:00Z'));
+    const retention = view.ideas.find((i) => i.id === 'i2')!;
+    expect(retention.state).toBe('unknown');
+    expect(retention.strength).toBeCloseTo(0.275);
+    expect(retention.evidence.map((e) => e.id)).toEqual(['own', 'clip']);
+    expect(view.ideas.find((i) => i.id === 'i3')!.evidence).toEqual([]);
+  });
+});
+
 describe('loadIdeaMap', () => {
   it('maps every embedded idea with its state, track, field and domain', async () => {
     const { client } = fakeClient(ROWS);
@@ -102,7 +128,15 @@ describe('loadIdeaMap', () => {
       calls.filter((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === USER).map((c) => c.table),
     );
     expect(narrowed).toEqual(
-      new Set(['concepts', 'concept_state', 'subjects', 'idea_places', 'idea_place_members', 'vault_dust']),
+      new Set([
+        'concepts',
+        'concept_state',
+        'subjects',
+        'idea_places',
+        'idea_place_members',
+        'vault_dust',
+        'evidence_links',
+      ]),
     );
   });
 

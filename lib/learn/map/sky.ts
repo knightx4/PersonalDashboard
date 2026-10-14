@@ -1,5 +1,5 @@
 import type { StateBasis } from '@/lib/learn/graph/model';
-import { spillOver, strength, type StrengthInput } from '@/lib/learn/strength';
+import { spillOver, strengthWithEvidence, type EvidenceWeight, type StrengthInput } from '@/lib/learn/strength';
 import type { Point } from './layout';
 import { DOMAIN_HUES } from './view';
 
@@ -360,6 +360,8 @@ export type LightInput = {
   /** The idea's state row, or null when it has none (never seen). */
   stateRow: StrengthInput | null;
   neighbours: readonly { id: string; similarity: number }[];
+  /** Notes, courses and work that back it (plan #2006.6); an untested idea glows from them up to EVIDENCE_CEILING. */
+  evidence?: readonly EvidenceWeight[];
 };
 
 export type Light = { strength: number; haze: number };
@@ -367,11 +369,13 @@ export type Light = { strength: number; haze: number };
 /**
  * Every idea's strength on `on`, and the haze each idea not known yet takes
  * from the known ideas among its nearest (lib/learn/strength.ts). Takes the
- * date, so a timeline can light the map as it stood on any day.
+ * date, so a timeline can light the map as it stood on any day. An untested
+ * idea with evidence found by then takes its evidence's score when that is
+ * higher than its own.
  */
 export function lightOn(ideas: readonly LightInput[], on: Date): Map<string, Light> {
   const strengthOf = new Map<string, number>();
-  for (const idea of ideas) strengthOf.set(idea.id, idea.stateRow ? strength(idea.stateRow, on) : 0);
+  for (const idea of ideas) strengthOf.set(idea.id, strengthWithEvidence(idea.stateRow, idea.evidence ?? [], on));
   const out = new Map<string, Light>();
   for (const idea of ideas) {
     const unknown = !idea.stateRow || idea.stateRow.state === 'unknown';

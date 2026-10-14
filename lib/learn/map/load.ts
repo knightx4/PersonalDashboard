@@ -6,6 +6,8 @@ import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 import { loadPlaces } from '@/lib/learn/places/load';
 import type { StrengthInput } from '@/lib/learn/strength';
+import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
+import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
 import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
@@ -45,6 +47,11 @@ export type IdeaOnMap = MapIdea & {
   placeId: string | null;
   /** When the idea was written, which the timeline replays from (plan #1997.8). */
   createdAt: string | null;
+  /**
+   * The notes, courses and work that back it, strongest first (plan #2006.6).
+   * The strength above already counts them; the card lists the first three.
+   */
+  evidence: EvidenceLink[];
 };
 
 /** A named place on the map, at the middle of its ideas in each layout. */
@@ -127,7 +134,7 @@ export async function loadIdeaMap(
       return query.order(order).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
     };
 
-  const [concepts, states, subjects, fields, domains, placeRead, dustRows] = await Promise.all([
+  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows] = await Promise.all([
     readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding, created_at', 'id')),
     readAll<StateRow>(
       own(
@@ -149,7 +156,24 @@ export async function loadIdeaMap(
       console.error('[learn idea map] dust', error instanceof Error ? error.message : error);
       return [] as DustRow[];
     }),
+    // What backs each idea (plan #2006.6). Without it the map lights as before.
+    readAll<EvidenceRow>((from, to) => {
+      let query = learn.from('evidence_links').select(EVIDENCE_COLUMNS).eq('target_kind', 'idea');
+      if (userId) query = query.eq('user_id', userId);
+      return query.order('id').range(from, to);
+    }).catch((error: unknown) => {
+      console.error('[learn idea map] evidence', error instanceof Error ? error.message : error);
+      return [] as EvidenceRow[];
+    }),
   ]);
+
+  const evidenceOf = new Map<string, EvidenceRow[]>();
+  for (const row of evidenceRows) {
+    const list = evidenceOf.get(row.target_id) ?? [];
+    list.push(row);
+    evidenceOf.set(row.target_id, list);
+  }
+  const linksOf = (id: string): EvidenceLink[] => evidenceFromRows(evidenceOf.get(id) ?? []);
 
   const rowOfState = new Map(states.map((row) => [row.concept_id, row]));
   const stateOf = new Map(states.map((row) => [row.concept_id, row.state]));
@@ -207,7 +231,16 @@ export async function loadIdeaMap(
       : null;
   };
   const light = lightOn(
-    map.ideas.map((idea) => ({ id: idea.id, stateRow: stateRowOf(idea.id), neighbours: idea.neighbours })),
+    map.ideas.map((idea) => ({
+      id: idea.id,
+      stateRow: stateRowOf(idea.id),
+      neighbours: idea.neighbours,
+      evidence: evidenceOf.get(idea.id)?.map((row) => ({
+        weight: row.weight,
+        similarity: row.similarity,
+        foundAt: row.found_at,
+      })),
+    })),
     asOf,
   );
 
@@ -274,6 +307,7 @@ export async function loadIdeaMap(
         haze: light.get(idea.id)?.haze ?? 0,
         placeId: placeRead?.placeOf.get(idea.id) ?? null,
         createdAt: row.created_at ?? null,
+        evidence: linksOf(idea.id),
       };
     }),
   };

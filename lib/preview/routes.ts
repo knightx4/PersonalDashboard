@@ -184,6 +184,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-around': ['/learn/space'],
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
+  'learn-idea-space-evidence': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -317,6 +318,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-brief-short-answer-editor': ['/learn/b/[id]'],
   'learn-now-briefs': ['/learn/now'],
   'learn-concept': ['/learn/c/[id]'],
+  'learn-concept-evidence': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
   'learn-new': ['/learn/new'],
