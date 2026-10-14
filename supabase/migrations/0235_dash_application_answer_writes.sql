@@ -21,13 +21,21 @@ declare
   kinds text[];
   listed text;
 begin
-  select coalesce(array_agg(distinct m[1]), '{}')
-    into kinds
-    from pg_constraint c,
-         regexp_matches(pg_get_constraintdef(c.oid), '''([a-z][a-z0-9_]*)''::text', 'g') as m
-   where c.conrelid = 'core.dash_actions'::regclass
-     and c.conname = 'dash_actions_kind_ck'
-     and m[1] <> 'ask';
+  select coalesce(array_agg(distinct k), '{}') into kinds
+    from (
+      -- '{a,b,c}'::text[], the form 0234 writes the constraint back in
+      select unnest(string_to_array(m[1], ',')) as k
+        from pg_constraint c,
+             regexp_matches(pg_get_constraintdef(c.oid), '''\{([a-z0-9_,]*)\}''::text\[\]', 'g') as m
+       where c.conrelid = 'core.dash_actions'::regclass and c.conname = 'dash_actions_kind_ck'
+      union
+      -- 'a'::text, 'b'::text
+      select m[1]
+        from pg_constraint c,
+             regexp_matches(pg_get_constraintdef(c.oid), '''([a-z][a-z0-9_]*)''::text', 'g') as m
+       where c.conrelid = 'core.dash_actions'::regclass and c.conname = 'dash_actions_kind_ck'
+    ) s
+   where k ~ '^[a-z][a-z0-9_]*$' and k <> 'ask';
 
   -- A list that came back short means the constraint was not read; stop
   -- rather than shrink it to three kinds.
