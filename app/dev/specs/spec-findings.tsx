@@ -1,4 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -17,12 +18,7 @@ import {
 
 /** "Monday 5 October". UTC, as the weekly schedule is. */
 function day(at: string): string {
-  return new Date(at).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  return whenDate(at, { timeZone: 'UTC', weekday: 'long', month: 'long' });
 }
 
 const DECIDED: Record<string, string> = { applied: 'Written into the spec', declined: 'Declined' };

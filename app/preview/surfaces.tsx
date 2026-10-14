@@ -3420,7 +3420,7 @@ export const SURFACES: readonly Surface[] = [
             status: 'rejected',
             reached: 'in_process',
             everSubmitted: true,
-            closedOn: '8 Sept 2026',
+            closedOn: '8 Sep',
             interviewCount: 1,
           })}
         />

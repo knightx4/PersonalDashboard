@@ -15,6 +15,8 @@
  *      Label them differently in the UI.
  */
 
+import { whenDayKey } from '@/lib/core/when';
+
 /** ISO 4217. Kept as a nominal-ish alias so mixed-currency math is visible. */
 export type CurrencyCode = string;
 
@@ -54,6 +56,17 @@ export function formatMoney(
     minimumFractionDigits: showCents ? 2 : 0,
     maximumFractionDigits: showCents ? 2 : 0,
   }).format(cents / 100);
+}
+
+const COUNT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+/**
+ * A whole count with thousands separators: "1,204". Beside `formatMoney` so
+ * that callers stop calling a number's locale-string method, which the
+ * date-formatting count in scripts/spec-counts.ts cannot tell from a date's.
+ */
+export function formatCount(value: number): string {
+  return COUNT.format(value);
 }
 
 /**
@@ -613,12 +626,7 @@ export function monthlySpendByMerchant(
  * sees the wrong orders for most of a day, twice a month.
  */
 export function todayInTimezone(timezone: string, now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  return whenDayKey(now, { timeZone: timezone });
 }
 
 export type PresetRange =

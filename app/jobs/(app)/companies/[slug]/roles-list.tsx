@@ -7,7 +7,7 @@ import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Checkbox, FieldError, Label, Select } from '@/components/ui/field';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDate, formatDateInline } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { mergeRoles } from '../actions';
 
@@ -180,7 +180,7 @@ export function RolesList({
               if (!role) return null;
               return (
                 <option key={id} value={id}>
-                  {role.title} — first seen {formatDate(role.firstSeenAt, timezone)}
+                  {role.title} — first seen {formatDateInline(role.firstSeenAt, timezone)}
                 </option>
               );
             })}

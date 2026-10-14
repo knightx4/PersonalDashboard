@@ -174,3 +174,126 @@ export function whenAgo(at: WhenInput, options: WhenOptions): string {
   if (diff === -1) return 'yesterday';
   return whenDay(at, options);
 }
+
+// -- calendar parts, dates kept as dates, ranges (plan #1957.5) --------------
+//
+// For the places a relative day would be wrong: a heading that has to keep its
+// date, a range, a weekday on its own. And the zone arithmetic callers did with
+// Intl by hand: the day key, the hour, the offset, the zone's short name.
+
+const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** The calendar day in the zone as `YYYY-MM-DD`, for keys and date inputs. A bare date comes back as it is. */
+export function whenDayKey(at: WhenInput, options: Pick<WhenOptions, 'timeZone'>): string {
+  const c = civilDay(at, options.timeZone);
+  return `${c.year}-${pad2(c.month)}-${pad2(c.day)}`;
+}
+
+/** The hour of the day in the zone, 0 to 23, for arithmetic such as a greeting. */
+export function whenHour(at: WhenInput, options: Pick<WhenOptions, 'timeZone'>): number {
+  const hour = new Intl.DateTimeFormat('en-GB', { timeZone: options.timeZone, hour: '2-digit', hourCycle: 'h23' })
+    .formatToParts(at instanceof Date ? at : new Date(at))
+    .find((p) => p.type === 'hour')?.value;
+  return Number(hour) % 24;
+}
+
+/** "Monday", or "Mon" with `style: 'short'`. */
+export function whenWeekday(
+  at: WhenInput,
+  options: Pick<WhenOptions, 'timeZone'> & { style?: 'long' | 'short' },
+): string {
+  const name = weekdayOf(civilDay(at, options.timeZone));
+  return options.style === 'short' ? name.slice(0, 3) : name;
+}
+
+export interface WhenDateOptions extends WhenOptions {
+  /** A weekday before the date: "Sunday 4 October", "Sun 4 Oct". None by default. */
+  weekday?: 'long' | 'short';
+  /** "Oct", the default, or "October". */
+  month?: 'short' | 'long';
+  /**
+   * `auto`, the default, writes the year only when it is not this year;
+   * `never` leaves it off, for a line about the days just gone or coming.
+   */
+  year?: 'auto' | 'always' | 'never';
+}
+
+function dateText(c: Civil, month: 'short' | 'long', withYear: boolean): string {
+  const name = (month === 'long' ? MONTHS_LONG : MONTHS)[c.month - 1];
+  return withYear ? `${c.day} ${name} ${c.year}` : `${c.day} ${name}`;
+}
+
+/**
+ * The date itself, never Today or a weekday in its place: "4 Oct", "4 October
+ * 2025", "Sunday 4 October". For headings and lines that must keep their date.
+ */
+export function whenDate(at: WhenInput, options: WhenDateOptions): string {
+  const { timeZone, now = Date.now(), weekday, month = 'short', year = 'auto' } = options;
+  const day = civilDay(at, timeZone);
+  const withYear = year === 'always' || (year === 'auto' && day.year !== civilDay(now, timeZone).year);
+  const text = dateText(day, month, withYear);
+  if (!weekday) return text;
+  const name = weekdayOf(day);
+  return `${weekday === 'short' ? name.slice(0, 3) : name} ${text}`;
+}
+
+/**
+ * Two days as one range, saying each part once: "20 to 26 Sep", "28 Sep to
+ * 4 Oct", "28 Dec 2025 to 3 Jan 2026". The year follows `whenDate`'s rule.
+ */
+export function whenRange(from: WhenInput, to: WhenInput, options: Omit<WhenDateOptions, 'weekday'>): string {
+  const { timeZone, now = Date.now(), month = 'short', year = 'auto' } = options;
+  const start = civilDay(from, timeZone);
+  const end = civilDay(to, timeZone);
+  const withYear =
+    year === 'always' ||
+    start.year !== end.year ||
+    (year === 'auto' && end.year !== civilDay(now, timeZone).year);
+  const last = dateText(end, month, withYear);
+  if (start.year !== end.year) return `${dateText(start, month, true)} to ${last}`;
+  if (start.month !== end.month) return `${dateText(start, month, false)} to ${last}`;
+  if (start.day === end.day) return last;
+  return `${start.day} to ${last}`;
+}
+
+/** The zone's short name at that moment: "EDT", "BST", or "GMT+2" where it has none. */
+export function whenZoneName(at: WhenInput, options: Pick<WhenOptions, 'timeZone'>): string {
+  return (
+    new Intl.DateTimeFormat('en-US', { timeZone: options.timeZone, timeZoneName: 'short' })
+      .formatToParts(at instanceof Date ? at : new Date(at))
+      .find((p) => p.type === 'timeZoneName')?.value ?? options.timeZone
+  );
+}
+
+/** How far the zone's wall clock is ahead of UTC at that moment, in milliseconds. */
+export function whenOffset(at: WhenInput, options: Pick<WhenOptions, 'timeZone'>): number {
+  const date = at instanceof Date ? at : new Date(at);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: options.timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+  return wall - (date.getTime() - date.getUTCMilliseconds());
+}

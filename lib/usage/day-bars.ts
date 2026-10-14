@@ -1,4 +1,4 @@
-import { formatMicroDollars } from '@/lib/money';
+import { formatCount, formatMicroDollars } from '@/lib/money';
 
 /**
  * The numbers behind the per-day bar chart (plan #2036.1): one slot for every
@@ -76,13 +76,13 @@ export function formatDayValue(value: number, measure: DayMeasure): string {
     return value === 0 ? 'nothing spent' : formatMicroDollars(value, { fromCent: true });
   }
   if (value === 0) return `no ${measure.many}`;
-  return `${value.toLocaleString('en-US')} ${value === 1 ? measure.one : measure.many}`;
+  return `${formatCount(value)} ${value === 1 ? measure.one : measure.many}`;
 }
 
 /** A value on the scale, with no noun: "41", "$2.40". */
 export function formatScale(value: number, measure: DayMeasure): string {
   if (measure.kind === 'spend') return formatMicroDollars(value, { fromCent: true });
-  return value.toLocaleString('en-US');
+  return formatCount(value);
 }
 
 /** "in 30 days", "today" for a period of one. */

@@ -1,4 +1,5 @@
 import Link from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 import { ChevronRight, History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
@@ -537,23 +538,10 @@ function postable(entry: ChangelogEntry): boolean {
  * heading that disagreed with the grouping under it.
  */
 function formatDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long', year: 'always' });
 }
 
 /** "4 Oct" for a summary line, with the year only when it is not this one. */
 function formatShortDay(day: string): string {
-  const date = new Date(`${day}T00:00:00Z`);
-  const thisYear = date.getUTCFullYear() === new Date().getUTCFullYear();
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: thisYear ? undefined : 'numeric',
-    timeZone: 'UTC',
-  }).format(date);
+  return whenDate(day, { timeZone: 'UTC' });
 }

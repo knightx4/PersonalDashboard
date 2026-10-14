@@ -11,7 +11,7 @@ import {
   type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/core/timezone';
-import { formatClock } from '@/lib/core/when';
+import { whenDate, whenDay, whenTime, whenZoneName, type WhenInput } from '@/lib/core/when';
 import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { lastTurnEvent } from '@/lib/jobs/move';
 
@@ -283,19 +283,27 @@ export function formatCompBand(minCents: number | null, maxCents: number | null)
   return format((minCents ?? maxCents)!);
 }
 
-export function formatDate(iso: string | null, timezone = 'UTC'): string {
+/**
+ * The day, as when.ts says it: "Today", "Friday", "12 Oct", "12 Oct 2025".
+ * Through safeTimeZone, because the value comes from a free-text profile
+ * field: Intl throws on a zone it does not know, and an uncaught throw in a
+ * server component is a 500, not a wrong date. See lib/core/timezone.ts.
+ */
+export function formatDate(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    // Through safeTimeZone, because the value comes from a free-text profile
-    // field: Intl throws on a zone it does not know, and an uncaught throw in
-    // a server component is a 500, not a wrong date. See lib/core/timezone.ts.
-    timeZone: safeTimeZone(timezone),
-  }).format(date);
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  return whenDay(iso, { timeZone: safeTimeZone(timezone), now });
+}
+
+/**
+ * The date itself, never "Today" or a weekday: "12 Oct", "12 Oct 2025". For a
+ * date inside a sentence ("Rejected on 12 Oct", "last checked 12 Oct"), where
+ * a relative day would read "on Today".
+ */
+export function formatDateInline(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
+  if (!iso) return '—';
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  return whenDate(iso, { timeZone: safeTimeZone(timezone), now });
 }
 
 /**
@@ -311,19 +319,16 @@ export function formatInterviewWhen(
   iso: string | null,
   timeKnown: boolean,
   timezone = 'UTC',
+  now: WhenInput = Date.now(),
 ): string {
   if (!iso) return 'Date to be set';
-  return timeKnown ? formatDateTime(iso, timezone) : formatDate(iso, timezone);
+  return timeKnown ? formatDateTime(iso, timezone, now) : formatDate(iso, timezone, now);
 }
 
-export function formatDateTime(iso: string | null, timezone = 'UTC'): string {
+/** The day and the time, with the zone it was read in: "Tomorrow, 2:30 PM EDT". */
+export function formatDateTime(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return formatClock(date, {
-    day: 'numeric',
-    month: 'short',
-    timeZone: safeTimeZone(timezone),
-    timeZoneName: 'short',
-  });
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  const timeZone = safeTimeZone(timezone);
+  return `${whenDay(iso, { timeZone, now })}, ${whenTime(iso, { timeZone })} ${whenZoneName(iso, { timeZone })}`;
 }

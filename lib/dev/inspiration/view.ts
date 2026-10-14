@@ -3,6 +3,7 @@ import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { watchAt } from '@/lib/learn/youtube/format';
 import { checkRunning } from './lock';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * What the Inspiration tab draws (plan #1412), assembled from the rows the
@@ -320,11 +321,5 @@ export function parseInspirationView(value: string | string[] | undefined): Insp
 
 /** 2 Oct, or 2 Oct 2025 when it is not this year. UTC, so server and test agree. */
 export function dayLabel(iso: string, now: Date = new Date()): string {
-  const date = new Date(iso);
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(date.getUTCFullYear() === now.getUTCFullYear() ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC', now });
 }

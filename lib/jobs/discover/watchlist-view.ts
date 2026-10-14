@@ -5,6 +5,7 @@
  * same rows; watchlist-load.ts reads them.
  */
 import { agoText } from '@/lib/jobs/suggest/search-runs';
+import { formatCount } from '@/lib/money';
 
 export type DiscoveredCompany = {
   id: string;
@@ -103,6 +104,6 @@ export function describeDiscovery(run: DiscoveryRunView | null, now: Date = new 
   return {
     running: false,
     tone: 'plain',
-    text: `The startup search ${when} read ${run.offered.toLocaleString('en-US')} hiring startups that fit your preferences, kept ${run.added + run.refreshed} and found ${boards}.`,
+    text: `The startup search ${when} read ${formatCount(run.offered)} hiring startups that fit your preferences, kept ${run.added + run.refreshed} and found ${boards}.`,
   };
 }

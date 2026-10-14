@@ -1,4 +1,5 @@
 import { planRowId } from '@/lib/comments/refs';
+import { whenDate } from '@/lib/core/when';
 import { sessionOrigin } from './origin';
 import { outlineIndex, readableRefs, stepRef, type OutlineIndex } from './ref';
 import { flatten, type PlanNode } from './tree';
@@ -534,24 +535,8 @@ export function activityDays(
   return days;
 }
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 /** `7 October 2026`, read off the stored day, in UTC as the rest of Dev is. */
 export function dayHeading(day: string): string {
-  const month = MONTH_NAMES[Number(day.slice(5, 7)) - 1];
-  const date = Number(day.slice(8, 10));
-  return month && date ? `${date} ${month} ${day.slice(0, 4)}` : day;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  return whenDate(day, { timeZone: 'UTC', month: 'long', year: 'always' });
 }

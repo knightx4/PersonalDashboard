@@ -8,6 +8,8 @@
  * posting's own text states. Pure, so the Roles list and the tests share it.
  */
 
+import { formatCount } from '@/lib/money';
+
 export const WORKPLACE_PREFERENCES = ['remote', 'hybrid', 'on_site'] as const;
 export type WorkplacePreference = (typeof WORKPLACE_PREFERENCES)[number];
 
@@ -60,7 +62,7 @@ export function readPreferences(row: Record<string, unknown> | null | undefined)
 
 /** Whole dollars (or pounds, or euros) with thousands separators. */
 export function formatPay(cents: number): string {
-  return Math.round(cents / 100).toLocaleString('en-US');
+  return formatCount(Math.round(cents / 100));
 }
 
 /** The preferences as lines for a prompt; empty when none is set. */

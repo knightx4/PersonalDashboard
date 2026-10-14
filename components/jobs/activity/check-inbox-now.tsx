@@ -2,7 +2,7 @@
 
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDateInline } from '@/lib/jobs/applications/load';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
 
 export type CheckableAccount = {
@@ -52,7 +52,7 @@ export function CheckInboxNow({ accounts }: { accounts: readonly CheckableAccoun
               <span className="text-small text-ink-muted">{account.emailAddress}</span>
             )}
             <span className="tabular text-small text-ink-muted">
-              last checked {formatDate(account.lastSyncedAt)}
+              last checked {formatDateInline(account.lastSyncedAt)}
             </span>
           </div>
           {jobs[account.id] && <SyncProgressBar accountId={account.id} job={jobs[account.id]} />}

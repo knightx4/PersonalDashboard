@@ -1,3 +1,5 @@
+import { whenDayKey } from '@/lib/core/when';
+
 /**
  * Rounds that are really one occasion.
  *
@@ -31,12 +33,7 @@ export type InterviewSection<T extends GroupableInterview, G extends InterviewGr
 
 /** The calendar day an instant falls on, in the reader's zone. */
 export function dayIn(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso));
+  return whenDayKey(iso, { timeZone: timezone });
 }
 
 /**

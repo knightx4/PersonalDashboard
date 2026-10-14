@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { whenDate } from '@/lib/core/when';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, FieldError } from '@/components/ui/field';
@@ -31,7 +32,7 @@ export type ReviewSurface = {
 
 /** "5 Oct". In UTC, so the server's render and the browser's agree. */
 function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return whenDate(iso, { timeZone: 'UTC' });
 }
 
 /**

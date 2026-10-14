@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/core/when';
+import { whenDate, whenTime } from '@/lib/core/when';
 import { formatMoney } from '@/lib/money';
 import type { Candidate, CandidateKind } from './facts';
 
@@ -79,11 +79,7 @@ function amount(cents: number, currency: string | null): string {
 }
 
 function shortDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T12:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC', month: 'long', year: 'never' });
 }
 
 function plural(count: number, word: string): string {
@@ -95,7 +91,7 @@ export function reasonFor(candidate: Candidate, context: Context): string {
   switch (candidate.kind) {
     case 'interview': {
       const when = candidate.at
-        ? `Interview today at ${formatClock(candidate.at, { timeZone: context.timezone })}`
+        ? `Interview today at ${whenTime(candidate.at, { timeZone: context.timezone })}`
         : 'Interview today';
       return candidate.detail ? `${when} (${candidate.detail})` : when;
     }

@@ -1,4 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -111,5 +112,5 @@ export function CheckBacksPanel({
 
 /** "12 Oct": the due day, for the moment before a client page's clock has ticked. */
 function dueDay(dueAt: string): string {
-  return new Date(dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return whenDate(dueAt, { timeZone: 'UTC' });
 }

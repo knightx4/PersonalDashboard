@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { whenDay, whenTime } from '@/lib/core/when';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -88,21 +89,9 @@ export function gapLabel(newer: Date | string, older: Date | string): string | n
   return `${months} months earlier`;
 }
 
+/** The row's day as when.ts says it ("Today", "Monday", "4 Oct") and its time. */
 function parts(time: Date | string, timeZone: string) {
-  const date = time instanceof Date ? time : new Date(time);
-  const day = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  }).format(date);
-  const clock = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date);
-  return { day, clock };
+  return { day: whenDay(time, { timeZone }), clock: whenTime(time, { timeZone }) };
 }
 
 export function Timeline({

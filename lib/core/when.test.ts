@@ -5,9 +5,16 @@ import {
   hourLabel,
   whenAgo,
   whenAt,
+  whenDate,
   whenDay,
+  whenDayKey,
+  whenHour,
+  whenOffset,
+  whenRange,
   whenSpan,
   whenTime,
+  whenWeekday,
+  whenZoneName,
 } from './when';
 
 // Wednesday 14 October 2026, 15:05 in New York (19:05 UTC).
@@ -146,5 +153,68 @@ describe('whenAgo', () => {
 
   it('reads a moment ahead as its day', () => {
     expect(whenAgo('2026-10-15T19:05:00Z', ny)).toBe('Tomorrow');
+  });
+});
+
+// -- calendar parts, dates kept as dates, ranges (plan #1957.5) --------------
+
+describe('whenDayKey', () => {
+  it('gives the day in the zone, and a bare date back as it is', () => {
+    expect(whenDayKey('2026-10-15T02:00:00Z', ny)).toBe('2026-10-14');
+    expect(whenDayKey('2026-10-15T02:00:00Z', { timeZone: 'UTC' })).toBe('2026-10-15');
+    expect(whenDayKey('2026-03-05', ny)).toBe('2026-03-05');
+  });
+});
+
+describe('whenHour', () => {
+  it('reads the hour on a 24-hour clock in the zone', () => {
+    expect(whenHour(NOW, ny)).toBe(15);
+    expect(whenHour('2026-10-14T04:30:00Z', ny)).toBe(0);
+    expect(whenHour(NOW, { timeZone: 'UTC' })).toBe(19);
+  });
+});
+
+describe('whenWeekday', () => {
+  it('names the weekday, long or short', () => {
+    expect(whenWeekday('2026-10-14', ny)).toBe('Wednesday');
+    expect(whenWeekday('2026-10-15T02:00:00Z', { ...ny, style: 'short' })).toBe('Wed');
+  });
+});
+
+describe('whenDate', () => {
+  it('keeps the date, with the year only when it is not this year', () => {
+    expect(whenDate('2026-10-14', ny)).toBe('14 Oct');
+    expect(whenDate('2025-10-14', ny)).toBe('14 Oct 2025');
+    expect(whenDate('2026-10-14', { ...ny, year: 'always' })).toBe('14 Oct 2026');
+    expect(whenDate('2025-10-14', { ...ny, year: 'never' })).toBe('14 Oct');
+  });
+
+  it('writes long months and a weekday before the date', () => {
+    expect(whenDate('2026-10-04', { ...ny, weekday: 'long', month: 'long' })).toBe('Sunday 4 October');
+    expect(whenDate('2026-10-04', { ...ny, weekday: 'short' })).toBe('Sun 4 Oct');
+  });
+
+  it('reads an instant on its day in the zone', () => {
+    expect(whenDate('2026-10-15T02:00:00Z', ny)).toBe('14 Oct');
+  });
+});
+
+describe('whenRange', () => {
+  it('says the month and year once', () => {
+    expect(whenRange('2026-09-20', '2026-09-26', { ...ny, month: 'long', year: 'always' })).toBe(
+      '20 to 26 September 2026',
+    );
+    expect(whenRange('2026-09-27', '2026-10-03', ny)).toBe('27 Sep to 3 Oct');
+    expect(whenRange('2025-12-28', '2026-01-03', ny)).toBe('28 Dec 2025 to 3 Jan 2026');
+    expect(whenRange('2026-10-04', '2026-10-04', ny)).toBe('4 Oct');
+  });
+});
+
+describe('whenZoneName and whenOffset', () => {
+  it('name the zone and its offset at that moment', () => {
+    expect(whenZoneName(NOW, ny)).toBe('EDT');
+    expect(whenOffset(NOW, ny)).toBe(-4 * 3_600_000);
+    expect(whenOffset('2026-12-14T19:05:00Z', ny)).toBe(-5 * 3_600_000);
+    expect(whenOffset(NOW, { timeZone: 'UTC' })).toBe(0);
   });
 });
