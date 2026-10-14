@@ -9,7 +9,7 @@ import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { recordAttachments } from '@/lib/attachments/store';
-import { aimProblem, CAPTURE_KINDS, type CaptureKindId } from '@/lib/capture/actions';
+import { aimProblem, CAPTURE_KINDS, type CaptureKindId, type ScannedThing } from '@/lib/capture/actions';
 import { fileCaptureParts, makeCaptureKind, type CaptureFiled, type CaptureWriters } from '@/lib/capture/file';
 import { captureFiling, offeredCapturePlaces, type FiledCapture } from '@/lib/capture/place';
 import {
@@ -52,7 +52,10 @@ import {
   makeShoppingItem,
   makeShoppingOrder,
   makeShoppingOrderFromEmail,
+  makeShoppingReceipt,
   makeShoppingSaved,
+  makeShoppingScanned,
+  nameShoppingBarcode,
 } from '@/app/shopping/capture-writers';
 
 /**
@@ -356,6 +359,8 @@ async function aimedWriters(
       order: (text, emailId) => (emailId ? makeShoppingOrderFromEmail(emailId) : makeShoppingOrder(text)),
       item: (text) => makeShoppingItem(text),
       saved: (text) => makeShoppingSaved(text),
+      receipt: (photo) => makeShoppingReceipt(photo),
+      scanned: (thing) => makeShoppingScanned(thing),
     },
   };
 }
@@ -373,6 +378,23 @@ const Aimed = z.object({
   under: z.object({ id: z.string().min(1).max(64), title: z.string().max(300) }).optional(),
   /** The page a note for Dev was filed from. */
   page: z.string().max(300).optional(),
+  /**
+   * A receipt photo taken in the panel (plan #1950.3.2), as the data URL the
+   * browser shrank it to (lib/images/prepare-photo.ts, 1600px on its longest
+   * side), which stays well under the action's 1MB body.
+   */
+  photo: z.string().startsWith('data:image/').max(1_000_000).optional(),
+  /** What a barcode scanned in the panel named (plan #1950.3.2). */
+  scanned: z
+    .object({
+      kind: z.enum(['book', 'game']),
+      title: z.string().max(500),
+      byline: z.string().max(500).nullable(),
+      image: z.string().max(2000).nullable(),
+      code: z.string().max(20),
+      record: z.string().max(50_000),
+    })
+    .optional(),
 });
 export type CaptureAimedInput = z.infer<typeof Aimed>;
 
@@ -389,7 +411,7 @@ export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unkno
   const user = await requireUser();
   const parsed = Aimed.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
-  const { kind: kindId, text, day, role, under, page, emailId } = parsed.data;
+  const { kind: kindId, text, day, role, under, page, emailId, photo, scanned } = parsed.data;
   const kind = CAPTURE_KINDS[kindId];
   const problem = aimProblem({ kind: kindId, role, under });
   if (problem) return { ok: false, error: problem };
@@ -404,7 +426,16 @@ export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unkno
   try {
     const made = await makeCaptureKind(
       kindId,
-      { text, day, role, under, page, emailId },
+      {
+        text,
+        day,
+        role,
+        under,
+        page,
+        emailId,
+        ...(photo && kind.camera === 'receipt' ? { photo } : {}),
+        ...(scanned && kind.camera === 'barcode' ? { scanned } : {}),
+      },
       await aimedWriters(user, modules, files),
     );
     if (!made.ok) return { ok: false, error: made.error };
@@ -420,6 +451,24 @@ export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unkno
   } catch (error) {
     console.error('capture: making an aimed row failed', kindId, error);
     return { ok: false, error: 'That could not be added. Try again.' };
+  }
+}
+
+export type CaptureNamed = { ok: true; thing: ScannedThing } | { ok: false; error: string };
+
+/**
+ * What a barcode scanned in capture names (plan #1950.3.2): the book or game,
+ * looked up as soon as the scan lands so the panel shows it before Add.
+ */
+// latency: pending
+export async function nameCapturedBarcode(code: string): Promise<CaptureNamed> {
+  await requireUser();
+  if (typeof code !== 'string' || code.length > 20) return { ok: false, error: 'That barcode did not read cleanly.' };
+  try {
+    return await nameShoppingBarcode(code);
+  } catch (error) {
+    console.error('capture: naming a barcode failed', error);
+    return { ok: false, error: 'The catalogs did not answer just now. Try again, or type the name.' };
   }
 }
 
@@ -473,6 +522,7 @@ export async function captureBoxCosts(): Promise<PaidCosts> {
       'app/capture-actions.ts#makeAimedCapture',
       'app/capture-actions.ts#makeAimedCapture:goal',
       'app/capture-actions.ts#makeAimedCapture:dev-note',
+      'app/capture-actions.ts#makeAimedCapture:receipt',
     ]);
   } catch {
     return {};

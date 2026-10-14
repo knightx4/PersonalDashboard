@@ -77,6 +77,7 @@ export const coreActions: ModuleActions = {
     fileCaptureBox: tool('add_quick_note', 'add_todo', 'add_role_note', 'add_goal_step'),
     undoCaptureBox: none('theirs'),
     captureBoxCosts: none('page'),
+    nameCapturedBarcode: none('page'),
     makeAimedCapture: {
       tool: [
         'add_todo',

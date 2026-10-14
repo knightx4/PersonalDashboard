@@ -265,6 +265,29 @@ export type CaptureKind = {
   everyone?: boolean;
   /** Takes files with it, as the header's note did (plan #1713). */
   files?: boolean;
+  /**
+   * The camera step inside the panel (plan #1950.3.2), in place of typing:
+   * a receipt photo the order is read from, or a barcode naming the book or
+   * game to add. Typing still works beside it.
+   */
+  camera?: 'receipt' | 'barcode';
+};
+
+/**
+ * What a scanned barcode named (plan #1950.3.2): a book or a game, with the
+ * catalog's record as JSON, which the press saves as it is so the add does
+ * not look the code up a second time. The server checks the record against
+ * the book or game schema before writing it.
+ */
+export type ScannedThing = {
+  kind: 'book' | 'game';
+  title: string;
+  /** The authors, or the year and publisher: the line under the title. */
+  byline: string | null;
+  /** The cover or the box, where the catalog has one. */
+  image: string | null;
+  code: string;
+  record: string;
 };
 
 export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
@@ -409,6 +432,7 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     makes: 'row',
     section: '/shopping/orders',
     action: 'anything',
+    camera: 'receipt',
   },
   'inventory-item': {
     id: 'inventory-item',
@@ -421,6 +445,7 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     makes: 'row',
     section: '/shopping/inventory',
     action: 'anything',
+    camera: 'barcode',
   },
   'saved-item': {
     id: 'saved-item',

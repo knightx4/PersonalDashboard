@@ -188,6 +188,9 @@ export const PAID_ACTIONS = {
   // An Add button aimed at an order (plan #1950.3.1): the sentence is read as
   // an order before it is made.
   'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence'],
+  // The same press with a receipt photo taken in the panel (plan #1950.3.2):
+  // the photo is read as the order instead of the sentence.
+  'app/capture-actions.ts#makeAimedCapture:receipt': ['read-receipt-photo'],
   // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
   // placed and given a plan after the response (plan #1490), as one added
   // from the old New goal form was.

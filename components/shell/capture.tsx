@@ -40,6 +40,7 @@ import {
   type CaptureKindId,
 } from '@/lib/capture/actions';
 import { AimedCaptureForm, CaptureAimContext, DayChips } from '@/components/shell/capture-aim';
+import { useCaptureCamera } from '@/components/shell/capture-camera';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import { useRouter } from 'next/navigation';
 import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
@@ -84,6 +85,7 @@ import {
   captureBoxCosts,
   fileCaptureBox,
   makeAimedCapture,
+  nameCapturedBarcode,
   sortCaptureBox,
   undoCaptureBox,
 } from '@/app/capture-actions';
@@ -1121,6 +1123,12 @@ const AIMED_PRESS: Partial<Record<CaptureKindId, { action: PaidAction; what: str
   'dev-note': { action: 'app/capture-actions.ts#makeAimedCapture:dev-note', what: 'Cost of sorting the note' },
 };
 
+/** An order's press once a receipt photo is taken in the panel (plan #1950.3.2). */
+const RECEIPT_PRESS = {
+  action: 'app/capture-actions.ts#makeAimedCapture:receipt',
+  what: 'Cost of reading the receipt',
+} as const satisfies { action: PaidAction; what: string };
+
 /**
  * Capture aimed at a kind (plan #1950.1): what an Add button on a list
  * opens. The kind is already chosen, so there is no sort and no place chips:
@@ -1146,7 +1154,10 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   // A kind whose press reads with a model shows its $ figure, asked for once
   // when the panel opens, as the one box asks for its own (plan #1950.3.1).
   const [costs, setCosts] = useState<PaidCosts>({});
-  const press = AIMED_PRESS[kind.id];
+  // A receipt photo or a barcode, for a kind that takes one (plan #1950.3.2).
+  const camera = useCaptureCamera(kind, nameCapturedBarcode, setError);
+  // With a receipt photo taken, Add reads the photo rather than the sentence.
+  const press = camera.photo ? RECEIPT_PRESS : AIMED_PRESS[kind.id];
   useEffect(() => {
     if (!press) return;
     let live = true;
@@ -1164,7 +1175,7 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   usePanelChrome(onClose, panelRef);
 
   function submit() {
-    if (pending || !text.trim()) return;
+    if (pending || camera.busy || (!text.trim() && !camera.photo && !camera.scanned)) return;
     const problem = aimProblem(aim);
     if (problem) {
       setError(problem);
@@ -1183,6 +1194,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           ...(aim.role ? { role: aim.role } : {}),
           ...(aim.under ? { under: aim.under } : {}),
           ...(aim.page ? { page: aim.page } : {}),
+          ...(camera.photo ? { photo: camera.photo } : {}),
+          ...(camera.scanned ? { scanned: camera.scanned } : {}),
         },
         uploads,
       );
@@ -1212,7 +1225,7 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           : {}),
       };
       onClose();
-      void sendToPlace({ from, to: landingTarget(kind.section), label: text, name: made.where });
+      void sendToPlace({ from, to: landingTarget(kind.section), label: made.text, name: made.where });
       toast(notice);
       if (page) {
         carryToast(notice);
@@ -1262,6 +1275,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
             fieldRef.current = node;
           }}
           onSubmit={submit}
+          attached={camera.attached}
+          tools={camera.tools}
           hint={
             press ? (
               <PaidCostsProvider costs={costs}>

@@ -42,7 +42,7 @@ import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
-import { ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
+import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface } from './capture-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
@@ -5007,6 +5007,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'narrow',
     render: () => <ShoppingAimedSurface />,
+  },
+  {
+    /* The camera step inside capture aimed at Shopping (plan #1950.3.2): a
+     * receipt photo taken, the barcode viewfinder open, a scan being looked
+     * up, the book it named, and a barcode nothing lists. */
+    id: 'shell-capture-aimed-camera',
+    label: 'Capture · A receipt photo and a barcode scan',
+    module: 'shopping',
+    width: 'narrow',
+    render: () => <ShoppingAimedCameraSurface />,
   },
   {
     /* The Add buttons on Orders and Inventory (plan #1950.3.1), in the
