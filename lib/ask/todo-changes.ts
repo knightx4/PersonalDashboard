@@ -1,5 +1,6 @@
 import { isLearnChangeKind, type LearnChangeInput, type LearnChangeKind } from './learn-changes';
 import { isYouChangeKind, type YouChangeKind } from './you-changes';
+import { isInterviewChangeKind, type InterviewChangeKind } from './interview-changes';
 
 /**
  * The Todo changes Dash makes straight away (plan #1894.9.1), beyond add,
@@ -23,12 +24,17 @@ export function isTodoChangeKind(kind: string): kind is TodoChangeKind {
   return (TODO_CHANGE_KINDS as readonly string[]).includes(kind);
 }
 
-/** The kinds whose card reads back the sentence its tool wrote: Learn's, Todo's and You's. */
-export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind;
+/** The kinds whose card reads back the sentence its tool wrote: Learn's, Todo's, You's and the interview ones. */
+export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | InterviewChangeKind;
 
 /** Whether a kept change is one whose card reads back what its tool wrote. */
 export function isWrittenCard<C extends { kind: string; input: unknown }>(
   change: C,
 ): change is Extract<C, { kind: WrittenCardKind }> {
-  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind);
+  return (
+    isTodoChangeKind(change.kind) ||
+    isLearnChangeKind(change.kind) ||
+    isYouChangeKind(change.kind) ||
+    isInterviewChangeKind(change.kind)
+  );
 }
