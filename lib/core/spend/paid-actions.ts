@@ -126,8 +126,6 @@ export const PAID_ACTIONS = {
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
 
   // Learn: reading lists
-  'app/learn/new/actions.ts#parseImport': ['parse-references'],
-  'app/learn/new/actions.ts#resolveCandidate': ['resolve-reference'],
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],
   'app/learn/r/[id]/actions.ts#findSources': ['suggest-sources'],
   'app/learn/r/[id]/actions.ts#openReading': ['locate-passage'],
@@ -232,6 +230,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
+  'app/capture-actions.ts#makeAimedCapture':
+    "An Add button aimed at a kind (plan #1950.1). Its paid path is a goal update, filed by Goals' own model call, and Log what happened opens Goals' own panel rather than this one, which prices it there; every other kind makes its row with no model call.",
   'app/capture-actions.ts#sortCaptureBox':
     'Called by the one capture box when typing pauses, to say where the sentence will go (plan #1581). There is no button, only the field; the File it hint prices it under app/capture-actions.ts#fileCaptureBox.',
   'app/goals/actions.ts#editGoal':

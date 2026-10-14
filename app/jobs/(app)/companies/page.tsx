@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import { AimButton } from '@/components/shell/aim-button';
 import { Building2 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -6,7 +6,6 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { buttonVariants } from '@/components/ui/button';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { SearchField } from '@/components/shell/search-field';
@@ -128,7 +127,7 @@ export default async function CompaniesPage({
           icon={Building2}
           title="No companies yet"
           description="A company appears here the moment you add a role at it. You can also add a few up front so inbound mail has something to match against on the first inbox scan."
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         />
       </PageWide>
     );
@@ -147,9 +146,7 @@ export default async function CompaniesPage({
         actions={
           <>
             <DisplayMenu menu={menu} />
-            <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-              Add a role
-            </Link>
+            <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
           </>
         }
       />

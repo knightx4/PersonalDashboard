@@ -712,11 +712,10 @@ function AnythingPanel({
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
-      showLanding(
-        from,
-        { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where },
-        text,
-      );
+      // The box files only what the sort placed, so a part always has a place.
+      if (first.place) {
+        showLanding(from, { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where }, text);
+      }
     });
   }
 

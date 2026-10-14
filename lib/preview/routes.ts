@@ -94,7 +94,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-material-voice': ['/jobs/material'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
-  'jobs-role-new': ['/jobs/roles/new'],
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
@@ -147,6 +146,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-search-bar': ['/home'],
   'shell-capture': ['/home'],
   'shell-capture-aimed': ['/home'],
+  'shell-capture-aimed-jobs-learn': ['/home'],
   'shell-note': ['/dev/bugs'],
   'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
@@ -326,11 +326,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-concept-evidence': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
-  'learn-new': ['/learn/new'],
   'learn-opening': ['/learn/opening/[id]'],
   'learn-quiz': ['/learn/quiz/[id]'],
   'learn-quiz-take': ['/learn/quiz/[id]/take'],
-  'learn-quiz-new': ['/learn/quiz/new'],
   'learn-reading': ['/learn/r/[id]'],
   'learn-reading-text': ['/learn/r/[id]'],
   'learn-reading-summary': ['/learn/r/[id]'],
@@ -427,6 +425,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // aimed at a kind by an Add button (plan #1950.1).
   'shell-capture': ['components/shell/capture.tsx'],
   'shell-capture-aimed': ['components/shell/capture-aim.tsx'],
+  'shell-capture-aimed-jobs-learn': ['components/shell/capture-aim.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],

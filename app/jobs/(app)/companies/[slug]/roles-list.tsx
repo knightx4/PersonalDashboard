@@ -53,7 +53,7 @@ export function RolesList({
         icon={Briefcase}
         title="No roles saved at this company yet"
         description="A role you add here is what the inbox links its mail to."
-        action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+        action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         className="border-0 py-8"
       />
     );
