@@ -210,7 +210,12 @@ export type CaptureKindId =
   | 'plan-feature'
   | 'plan-step'
   | 'idea'
-  | 'dev-note';
+  | 'dev-note'
+  // Jobs and Learn (plan #1950.4)
+  | 'job-role'
+  | 'learn-reading'
+  | 'learn-topic'
+  | 'learn-quiz';
 
 /**
  * The one thing a kind may need besides its title. A todo takes a day; a
@@ -227,7 +232,10 @@ export type CaptureUnder = { id: string; title: string };
 
 export type CaptureKind = {
   id: CaptureKindId;
-  /** The place Dash's sort files this kind as. Null: only an Add button makes it. */
+  /**
+   * The place Dash's sort files this kind as, or null for a kind only an Add
+   * button makes, which the sort never files into.
+   */
   place: CapturePlace | null;
   /** Whose workspace the row belongs to. */
   module: ModuleId;
@@ -384,6 +392,55 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     action: 'anything',
     everyone: true,
     files: true,
+  },
+  // Jobs and Learn (plan #1950.4): made only from an Add button, so no place.
+  'job-role': {
+    id: 'job-role',
+    place: null,
+    module: 'jobs',
+    label: 'Add a role',
+    placeholder: 'Paste the posting link, or write the role at the company',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/jobs',
+    action: 'anything',
+  },
+  'learn-reading': {
+    id: 'learn-reading',
+    place: null,
+    module: 'learn',
+    label: 'Save a reading',
+    placeholder: 'Paste a link to read later',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'learn-topic': {
+    id: 'learn-topic',
+    place: null,
+    module: 'learn',
+    label: 'Start a topic',
+    placeholder: 'What you want to learn about. Paste a reading list on the lines below it.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'learn-quiz': {
+    id: 'learn-quiz',
+    place: null,
+    module: 'learn',
+    label: 'Start a quiz',
+    placeholder: 'Paste what to be quizzed on, or name notes as [[Note title]]',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
   },
 };
 

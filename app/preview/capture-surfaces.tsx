@@ -260,3 +260,55 @@ function AddedToast() {
   }, [toast]);
   return null;
 }
+
+/**
+ * Capture aimed at the Jobs and Learn kinds (plan #1950.4): Add a role with a
+ * posting link pasted, pressed and still reading the page, so the loading
+ * state is drawn; Start a topic with a reading list pasted under its name;
+ * and Start a quiz over a named note, refused because the vault has no note
+ * by that name.
+ */
+export function AimedJobsLearnSurface() {
+  return (
+    <div className="space-y-8 py-4">
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['job-role']}
+          text="https://boards.greenhouse.io/latticepay/jobs/7716204003"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['learn-topic']}
+          text={
+            'Central banking\n- Lords of Finance, Liaquat Ahamed: the chapters on 1927\n- The Alchemists by Neil Irwin\n- https://www.bankofengland.co.uk/explainers/how-does-monetary-policy-work'
+          }
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS['learn-quiz']}
+          text="[[Monetary transmission]]"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error="There is no note called Monetary transmission in your vault."
+          onSubmit={nothing}
+        />
+      </Aimed>
+    </div>
+  );
+}

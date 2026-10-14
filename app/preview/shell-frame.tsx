@@ -115,7 +115,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         label: 'Reading lists',
         icon: 'tracks',
         exact: true,
-        alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
+        alsoMatches: ['/learn/t/', '/learn/r/'],
       },
       {
         href: '/learn/videos',

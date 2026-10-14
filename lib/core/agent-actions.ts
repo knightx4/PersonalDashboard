@@ -75,17 +75,23 @@ export const coreActions: ModuleActions = {
   'app/capture-actions.ts': {
     sortCaptureBox: none('page'),
     fileCaptureBox: tool('add_quick_note', 'add_todo', 'add_role_note', 'add_goal_step'),
-    makeAimedCapture: tool(
-      'add_todo',
-      'add_role_note',
-      'add_quick_note',
-      'add_goal',
-      'change_goal_area',
-      'add_step',
-      'add_idea',
-      'file_note',
-    ),
     undoCaptureBox: none('theirs'),
     captureBoxCosts: none('page'),
+    makeAimedCapture: {
+      tool: [
+        'add_todo',
+        'add_role_note',
+        'add_quick_note',
+        'add_job_lead',
+        'add_track_reading',
+        'add_learn_track',
+        'add_goal',
+        'change_goal_area',
+        'add_step',
+        'add_idea',
+        'file_note',
+      ],
+      note: 'An Add button aimed at one kind (plan #1950.1, #1950.4, #1950.5). Dash makes each with its own tool; a quiz it does not start, since the questions written next are paid.',
+    },
   },
 };

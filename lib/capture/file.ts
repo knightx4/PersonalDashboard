@@ -23,6 +23,9 @@ import { capturePartLabel, filedDestination, type FiledCapture } from '@/lib/cap
 import { roleName, type CapturePart, type CaptureSortRole } from '@/lib/capture/sort';
 import type { CaptureDay } from '@/lib/capture/todo';
 import type { FiledEntry } from '@/lib/goals/capture';
+import { findLink } from '@/lib/learn/tracks/link-meta';
+import { quizFromText, topicFromText, type QuizFromText, type TopicFromText } from '@/lib/capture/learn-text';
+import { roleFromText, type RoleFromText } from '@/lib/capture/role';
 
 /** One row written, or the sentence saying why not. */
 export type CaptureRowWrite = { ok: true; id: string } | { ok: false; error: string };
@@ -54,6 +57,17 @@ export type CaptureWriters = {
   devNote: (body: string, pagePath: string | null) => Promise<CaptureRowWrite>;
   /** recordDashAction, bound to the person. */
   record: (entry: DashActionEntry) => Promise<string | null>;
+  // Jobs and Learn (plan #1950.4), made only from an Add button. Optional, so
+  // a caller that files only what the sort chose (the shortcuts' route) does
+  // not bind them; a kind whose writer is absent says it cannot be added there.
+  /** writeJobLead: the company, the role and an application as a lead. */
+  role?: (input: RoleFromText) => Promise<{ ok: true; roleId: string; title: string } | { ok: false; error: string }>;
+  /** saveLink: a link on Saved links, or the reading it is already. */
+  reading?: (url: string) => Promise<LearnReadingWritten>;
+  /** createTrack, with the readings pasted under the name. */
+  topic?: (input: TopicFromText) => Promise<LearnTopicWritten>;
+  /** createQuiz over pasted material and named notes. */
+  quiz?: (input: QuizFromText) => Promise<LearnQuizWritten>;
   /**
    * Record the files sent with the capture against one row it filed (plan
    * #1714), and say how many there are. Absent when nothing was sent, as from
@@ -61,6 +75,12 @@ export type CaptureWriters = {
    */
   attach?: (ref: string) => Promise<number>;
 };
+
+export type LearnReadingWritten =
+  | { ok: true; readingId: string; title: string; created: boolean }
+  | { ok: false; error: string };
+export type LearnTopicWritten = { ok: true; trackId: string; readings: number } | { ok: false; error: string };
+export type LearnQuizWritten = { ok: true; quizId: string; title: string } | { ok: false; error: string };
 
 export type CaptureFiled = {
   filed: FiledCapture[];
@@ -466,7 +486,122 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
       errors,
     );
   },
+
+  // Jobs and Learn (plan #1950.4): one row each, made only from an Add button.
+
+  'job-role': async ({ text }, writers, by) => {
+    if (!writers.role) return { ok: false, error: CANNOT_HERE };
+    const named = roleFromText(text);
+    if ('error' in named) return { ok: false, error: named.error };
+    const result = await writers.role(named);
+    if (!result.ok) return { ok: false, error: result.error };
+    const subjectRef = `job_search.roles:${result.roleId}`;
+    const actionId = await writers.record({
+      surface: 'capture',
+      kind: 'add_job_lead',
+      subjectRef,
+      op: 'insert',
+      summary: by === 'dash' ? `Dash saved ${result.title} to your leads.` : `You saved ${result.title} to your leads.`,
+      undo: aimedUndo(by),
+    });
+    return {
+      ok: true,
+      filed: made(text, 'jobs', 'Job search · Leads', '/jobs/pipeline', actionId, subjectRef, `/jobs/roles/${result.roleId}`),
+    };
+  },
+
+  'learn-reading': async ({ text }, writers, by, errors) => {
+    if (!writers.reading) return { ok: false, error: CANNOT_HERE };
+    const url = findLink(text);
+    if (!url) return { ok: false, error: 'Paste a link that starts with http:// or https://.' };
+    const result = await writers.reading(url);
+    if (!result.ok) return { ok: false, error: result.error };
+    const subjectRef = `learn.readings:${result.readingId}`;
+    // A link saved before is opened where it is, with nothing recorded: an
+    // Undo on it would take away a reading this press did not make.
+    const actionId = result.created
+      ? await writers.record({
+          surface: 'capture',
+          kind: 'add_reading',
+          subjectRef,
+          op: 'insert',
+          summary:
+            by === 'dash'
+              ? `Dash saved "${quoted(result.title)}" to Saved links.`
+              : `You saved "${quoted(result.title)}" to Saved links.`,
+          undo: aimedUndo(by),
+        })
+      : null;
+    if (!result.created) errors.push(`"${quoted(result.title)}" was on your reading lists already.`);
+    return {
+      ok: true,
+      filed: made(text, null, 'Learn · Saved links', '/learn/lists', actionId, subjectRef, `/learn/r/${result.readingId}`),
+    };
+  },
+
+  'learn-topic': async ({ text }, writers, by) => {
+    if (!writers.topic) return { ok: false, error: CANNOT_HERE };
+    const topic = topicFromText(text);
+    if ('error' in topic) return { ok: false, error: topic.error };
+    const result = await writers.topic(topic);
+    if (!result.ok) return { ok: false, error: result.error };
+    const subjectRef = `learn.tracks:${result.trackId}`;
+    const count = result.readings === 0 ? '' : ` with ${result.readings} ${result.readings === 1 ? 'reading' : 'readings'}`;
+    const actionId = await writers.record({
+      surface: 'capture',
+      kind: 'add_learn_track',
+      subjectRef,
+      op: 'insert',
+      summary:
+        by === 'dash'
+          ? `Dash started the topic "${quoted(topic.title)}"${count}.`
+          : `You started the topic "${quoted(topic.title)}"${count}.`,
+      undo: aimedUndo(by),
+    });
+    return {
+      ok: true,
+      filed: made(topic.title, null, 'Learn · Reading lists', '/learn/lists', actionId, subjectRef, `/learn/t/${result.trackId}`),
+    };
+  },
+
+  'learn-quiz': async ({ text }, writers, by) => {
+    if (!writers.quiz) return { ok: false, error: CANNOT_HERE };
+    const quiz = quizFromText(text);
+    if ('error' in quiz) return { ok: false, error: quiz.error };
+    const result = await writers.quiz(quiz);
+    if (!result.ok) return { ok: false, error: result.error };
+    const subjectRef = `learn.quizzes:${result.quizId}`;
+    const actionId = await writers.record({
+      surface: 'capture',
+      kind: 'add_quiz',
+      subjectRef,
+      op: 'insert',
+      summary:
+        by === 'dash' ? `Dash started the quiz "${quoted(result.title)}".` : `You started the quiz "${quoted(result.title)}".`,
+      undo: aimedUndo(by),
+    });
+    return {
+      ok: true,
+      filed: made(text, null, 'Learn · Quizzes', '/learn/know', actionId, subjectRef, `/learn/quiz/${result.quizId}`),
+    };
+  },
 };
+
+/** What a kind says when its writer is not bound where it was asked for. */
+const CANNOT_HERE = 'That cannot be added from here. Open its list and press Add there.';
+
+/** A row an Add button made, as the panel and the toast read it. */
+function made(
+  text: string,
+  place: FiledCapture['place'],
+  where: string,
+  href: string,
+  actionId: string | null,
+  ref: string,
+  page: string,
+): FiledCapture {
+  return { place, text, where, href, actionId, goals: null, undoneAt: null, ref, page };
+}
 
 /**
  * Make one row of a kind the person aimed capture at. A failure is the

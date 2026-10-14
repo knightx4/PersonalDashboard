@@ -1,13 +1,12 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { ComposeBody, FieldError } from '@/components/ui/field';
 import { useSettled } from '@/components/plan-tree/use-settled';
-import { useCaptureAim } from '@/components/shell/capture-aim';
+import { AimButton } from '@/components/shell/aim-button';
 import type { CaptureAim } from '@/lib/capture/actions';
 import { cn } from '@/lib/cn';
 import { planScopeLabel, type PlanScope } from '@/lib/plan/projects';
@@ -153,13 +152,7 @@ function featureAim(module: PlanScope | null): CaptureAim {
  * the description and the done-when are written.
  */
 export function NewFeatureButton({ module = null }: { module?: PlanScope | null }) {
-  const aim = useCaptureAim();
-  return (
-    <Button type="button" variant="secondary" size="sm" onClick={() => aim?.(featureAim(module))}>
-      <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-      New feature
-    </Button>
-  );
+  return <AimButton aim={featureAim(module)} label="New feature" variant="secondary" />;
 }
 
 /** "Add a feature" at the foot of a module's section: capture aimed at a feature there. */
