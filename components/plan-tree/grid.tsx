@@ -15,9 +15,9 @@ import { cn } from '@/lib/cn';
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
 // because a column that widens under the pointer moves every row beside it.
-// Status sits directly after Health, because the two are read together -- "how
-// far along, and who has it" is one question asked twice -- and a column
-// between them would make that a comparison across the row.
+// Assignee sits directly after Status, because the two are read together --
+// "how far along, and who has it" -- and a column between them would make
+// that a comparison across the row.
 export const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_2rem_2rem] items-center gap-x-2 ' +
   'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
@@ -26,13 +26,15 @@ export const ROW_GRID =
 export const LEVEL = 'w-5';
 
 /**
- * The labels over the columns. `status` and `priority` name the third and
- * fourth, which a page other than the plan may fill with something of its own.
+ * The labels over the columns: Step, Status, Assignee, Priority, Steps
+ * (plan #2069.1). `assignee` and `priority` name the third and fourth, which
+ * a page other than the plan may fill with something of its own, as a goal's
+ * page does with When.
  */
 export function ColumnHeader({
   priority = 'Priority',
-  status = 'Status',
-}: { priority?: string; status?: string } = {}) {
+  assignee = 'Assignee',
+}: { priority?: string; assignee?: string } = {}) {
   return (
     <li
       aria-hidden
@@ -42,9 +44,9 @@ export function ColumnHeader({
       )}
     >
       <span>Step</span>
-      <span className="hidden sm:block">Health</span>
+      <span className="hidden sm:block">Status</span>
       <span className="sm:hidden" />
-      <span className="hidden sm:block">{status}</span>
+      <span className="hidden sm:block">{assignee}</span>
       <span className="hidden sm:block">{priority}</span>
       <span className="hidden sm:block">Steps</span>
       <span />

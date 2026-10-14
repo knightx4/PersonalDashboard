@@ -745,6 +745,32 @@ substep (on a step), edits, moves the row up or down among its siblings, or
 deletes it with its count of rows beneath in the confirm. The foot of each
 module adds a feature.
 
+**The columns.** Every row sits on the same five columns, headed Step,
+Status, Assignee, Priority and Steps (plan #2069.1).
+
+- **Status** is the row's health from `healthOf`, its word and shape, and
+  pressing it changes the stored status. Its tooltip names the steps a
+  waiting row waits on, and on a row with a session working it or a step
+  beneath it, which steps those are.
+- **Assignee** is who the row is on, from `assigneeOf` in
+  `lib/plan/tree.ts`: your initial, Dash's mark, or both. A question, a
+  setup job and a proposal are yours; otherwise `isClaudes` decides, so a
+  step you kept is yours and every other is Dash's. A row with steps
+  beneath it reads from its open leaf steps, and shows both when they are
+  split; the tooltip then says how many each holds. Dash's mark moves only
+  while `lib/plan/liveness.ts` says a session is working the row or a step
+  beneath it, and goes still under reduced motion. The word sits beside the
+  marks from sm up; on a phone the marks stand on the line under the title.
+  The cell is `AssigneeCell` in `components/plan-tree/assignee-cell.tsx`,
+  shared with a goal's page.
+- **Priority** and **Steps** are as before: *Next* or *Someday* with the
+  size, and the done and open count on a row with steps beneath.
+
+A row waiting on another step says so on the Needs line under its title:
+"Needs: #2016.4 to close first", or the day of the check it waits for. No
+column says whose move it is; the feature's own page keeps that as a
+property.
+
 A decision is marked where a build step's checkbox would be, with a `?`. Its
 health reads *Unanswered* rather than *Ready* — on a question, "ready" would
 read as ready to be built, which is the one thing it is not — and its health

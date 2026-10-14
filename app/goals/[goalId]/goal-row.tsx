@@ -737,7 +737,7 @@ export function GoalRow({
       // Who the step is on, where the plan says whose move it is (note
       // 6d242e62). That is a different fact from the move, so it keeps its own
       // words rather than MoveLabel's; the goal's move is on GoalProgress.
-      move={
+      assignee={
         node.who.title ? (
           <Tooltip label={node.who.title}>
             <span className="inline-flex">

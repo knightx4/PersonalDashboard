@@ -53,12 +53,12 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * a session, the run behind a claim, commit checks, priority and size --
  * passed in by the page rather than written here. What is left is what any
  * page of steps shares: the tree guides and the fold, the number and title,
- * the health word you press to change, whose move it is, the count of what
+ * the health word you press to change, who it is on, the count of what
  * is beneath, and the opened panel with the detail, Done when,
  * Needs, the note, the questions, what it waits on and the thread.
  *
  * A page fills it in three steps: `useTreeRow` for the row's own state, which
- * the page's menus need; its own health, move and menus, worked out from that
+ * the page's menus need; its own health, assignee and menus, worked out from that
  * state; then `TreeRow` with those and any slots it uses. `body` is the slot
  * for what only that page has, drawn in the panel under the note.
  */
@@ -188,7 +188,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   trail,
   row,
   health,
-  move,
+  assignee,
   statusMenu,
   menu,
   actions,
@@ -234,7 +234,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   heading?: boolean;
   /**
    * `grid` is the dev plan's row: the shared columns under a header, with the
-   * outline number, health word, move, priority and count of what is beneath.
+   * outline number, health word, assignee, priority and count of what is beneath.
    * `list` is a goal's row (plan #1078): the status control before the title
    * as a glyph, the title with its marks, the `priority` cell at the end
    * (under the title on a phone), and the menu. The panel is the same.
@@ -248,10 +248,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   row: TreeRowState;
   health: TreeHealth;
   /**
-   * The cell beside health: on the plan, whose move it is, drawn with
-   * `MoveLabel` (components/ui/move-label.tsx); on a goal, who the step is on.
+   * The cell beside health: who the row is on, drawn with `AssigneeCell`
+   * (components/plan-tree/assignee-cell.tsx) on the plan (plan #2069.1).
+   * From sm up it fills the third column; on a phone it stands at the end of
+   * the line under the title, where the cell's word is hidden.
    */
-  move: React.ReactNode;
+  assignee: React.ReactNode;
   /** What pressing the health word offers. */
   statusMenu: ActionMenuItem[];
   /** The row's own menu, at the end of the line. */
@@ -781,6 +783,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
           >
             <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
             {healthMenu}
+            {assignee && <span className="flex shrink-0 items-center">{assignee}</span>}
             {need && !open ? (
               <span className="min-w-0 truncate text-small text-ink">
                 <span className="font-medium text-caution">Needs: </span>
@@ -798,19 +801,18 @@ export function TreeRow<E extends TreeCatalogEntry>({
           </div>
         )}
 
-        {/* Whose move it is, beside how far along it is.
+        {/* Who it is on, beside how far along it is (plan #2069.1).
 
-            A word and a tone, and deliberately no hexagon: the hexagons belong
-            to health, they are a scale from empty to full, and a second column
-            of them beside it would read as a second position on the same scale
-            rather than as an answer to a different question. The one shape is
-            Dash's working mark, which MoveLabel puts beside "Dash is on it".
+            Your initial, Dash's mark or both, and no hexagon: the hexagons
+            belong to Status, a scale from empty to full, and this answers a
+            different question. What it waits on and whether a session is
+            working it now are in the Status tooltip and the Needs line.
 
-            Not a menu, where health is one. Health is set by hand; this is
-            derived from what is already true of the row -- who it is assigned
-            to, what it waits on, whether it is a question -- so there is
-            nothing here to pick. Changing it means handing the step over or
-            answering what it asks, which are the buttons already on the row. */}
+            Not a menu, where Status is one. It is derived from what is already
+            true of the row -- who it is assigned to, whether it is a question
+            or a setup job -- so there is nothing here to pick. Changing it
+            means keeping the step or handing it back, which is the Mine button
+            already on the row. */}
         {list ? (
           priority &&
           !heading && (
@@ -820,10 +822,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )
         ) : (
           <>
-            {/* Wraps rather than clips: "Waiting on 26 Oct" is wider than the
-                column, and a cut word lost the day it waits for (note 5025f689). */}
-            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">
-              {move}
+            {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
+            <span className="hidden min-w-0 text-small sm:flex sm:h-7 sm:items-center">
+              {assignee}
             </span>
 
             <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>

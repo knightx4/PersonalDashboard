@@ -246,6 +246,7 @@ import {
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
   PlanTreeSurface,
+  PlanAssigneeTipSurface,
   PlanTableSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
@@ -3786,6 +3787,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanTreeSurface />,
+  },
+  {
+    /* The Assignee column's tooltip held open (plan #2069.1): who a row is
+     * on, and on a split feature how many steps each holds. */
+    id: 'dev-plan-tree-assignee-tip',
+    label: 'Plan · who a row is on, tooltip open',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanAssigneeTipSurface />,
   },
   {
     /* The plan's Table view (plan #1669): one row per open feature, grouped
