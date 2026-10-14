@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
+import sharp from 'sharp';
 import { askDash, type AskStores } from './ask';
 import { filesEstimate, fileTokens } from './file-cost';
 import { fileBlocks, IMAGE_MAX_BYTES, pdfPageCount, readFile, SEND_MAX_BYTES, withinRequest, type DashFile } from './files';
@@ -13,23 +14,49 @@ const bytes = (text: string) => new TextEncoder().encode(text);
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 describe('readFile', () => {
-  it('sends a picture and a PDF as they are, and text files as text', () => {
-    expect(readFile('bill.png', 'image/png', bytes('png'))).toEqual({
+  it('sends a picture and a PDF as they are, and text files as text', async () => {
+    expect(await readFile('bill.png', 'image/png', bytes('png'))).toEqual({
       name: 'bill.png',
       kind: 'image',
       mediaType: 'image/png',
       data: Buffer.from('png').toString('base64'),
     });
-    expect(readFile('bill.pdf', 'application/pdf', bytes('%PDF /Type /Page'))).toMatchObject({ kind: 'pdf' });
-    expect(readFile('rows.csv', 'text/csv', bytes('a,b\n1,2'))).toEqual({ name: 'rows.csv', kind: 'text', text: 'a,b\n1,2' });
+    expect(await readFile('bill.pdf', 'application/pdf', bytes('%PDF /Type /Page'))).toMatchObject({ kind: 'pdf' });
+    expect(await readFile('rows.csv', 'text/csv', bytes('a,b\n1,2'))).toEqual({ name: 'rows.csv', kind: 'text', text: 'a,b\n1,2' });
   });
 
-  it('names what it cannot read, with the reason', () => {
-    expect(readFile('old.doc', 'application/msword', bytes('x'))).toMatchObject({ kind: 'unread', why: expect.stringMatching(/\.doc/) });
-    expect(readFile('broken.docx', DOCX, bytes('not a zip'))).toMatchObject({ kind: 'unread' });
-    expect(readFile('huge.jpg', 'image/jpeg', new Uint8Array(IMAGE_MAX_BYTES + 1))).toMatchObject({ kind: 'unread' });
+  it('names what it cannot read, with the reason', async () => {
+    expect(await readFile('old.doc', 'application/msword', bytes('x'))).toMatchObject({ kind: 'unread', why: expect.stringMatching(/\.doc/) });
+    expect(await readFile('broken.docx', DOCX, bytes('not a zip'))).toMatchObject({ kind: 'unread' });
     const long = bytes(Array.from({ length: 101 }, () => '<< /Type /Page >>').join('\n') + ' /Type /Pages');
-    expect(readFile('book.pdf', 'application/pdf', long)).toMatchObject({ kind: 'unread', why: expect.stringMatching(/101 pages/) });
+    expect(await readFile('book.pdf', 'application/pdf', long)).toMatchObject({ kind: 'unread', why: expect.stringMatching(/101 pages/) });
+  });
+
+  // Plan #2032.1: a picture over the limit is sent as a smaller copy.
+  it('shrinks a picture over the limit to a JPEG under it, keeping its shape', async () => {
+    const png = await sharp({
+      create: { width: 2400, height: 1600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.5 }, noise: { type: 'gaussian', mean: 128, sigma: 60 } },
+    })
+      .png()
+      .toBuffer();
+    expect(png.length).toBeGreaterThan(6_000_000);
+
+    const read = await readFile('scan.png', 'image/png', new Uint8Array(png));
+    expect(read).toMatchObject({ name: 'scan.png', kind: 'image', mediaType: 'image/jpeg' });
+    if (read.kind !== 'image') throw new Error('not an image');
+    const sent = Buffer.from(read.data, 'base64');
+    expect(sent.length).toBeLessThanOrEqual(IMAGE_MAX_BYTES);
+    const { width, height } = await sharp(sent).metadata();
+    expect(Math.max(width, height)).toBeLessThanOrEqual(2000);
+    expect(width / height).toBeCloseTo(2400 / 1600, 2);
+  }, 30_000);
+
+  it('leaves a picture it cannot open unread, and says so', async () => {
+    expect(await readFile('huge.jpg', 'image/jpeg', new Uint8Array(IMAGE_MAX_BYTES + 1))).toEqual({
+      name: 'huge.jpg',
+      kind: 'unread',
+      why: 'the picture could not be opened',
+    });
   });
 
   it('counts page objects, not the page tree', () => {
