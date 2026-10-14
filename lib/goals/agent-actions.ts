@@ -47,8 +47,8 @@ export const goalsActions: ModuleActions = {
   'app/goals/[goalId]/document-actions.ts': {
     readIntoFormAction: none('spends'),
     addSuggestedFieldAction: none('theirs'),
-    saveDocumentKindAction: GAP,
-    forgetDocumentKindAction: GAP,
+    saveDocumentKindAction: tool('change_goal_form'),
+    forgetDocumentKindAction: tool('change_goal_form'),
   },
   'app/goals/[goalId]/block-actions.ts': {
     setGoalStepStatus: tool('close_goal_step', 'change_goal_step'),
@@ -74,22 +74,22 @@ export const goalsActions: ModuleActions = {
     saveRecordAction: tool('file_goal_record'),
     savePreviewAction: none('page'),
     confirmRecordAction: none('theirs'),
-    archiveRecordAction: GAP,
-    saveQuestionsAction: GAP,
+    archiveRecordAction: tool('change_goal_form'),
+    saveQuestionsAction: tool('change_goal_form'),
   },
   'app/goals/[goalId]/link-actions.ts': {
-    linkAimAction: GAP,
-    linkJobSearchAction: GAP,
-    unlinkAction: GAP,
+    linkAimAction: tool('change_goal_link'),
+    linkJobSearchAction: tool('change_goal_link'),
+    unlinkAction: tool('change_goal_link'),
   },
   'app/goals/[goalId]/reading-actions.ts': {
-    setMeasureAction: GAP,
+    setMeasureAction: tool('change_goal_number'),
     addReadingAction: tool('file_reading'),
     deleteReadingAction: none('deletes'),
-    setNumberFromAction: GAP,
+    setNumberFromAction: tool('change_goal_number'),
   },
   'app/goals/[goalId]/context-actions.ts': {
-    setContextStatusAction: GAP,
+    setContextStatusAction: none('theirs'),
   },
   'app/goals/[goalId]/shaping-actions.ts': {
     workOnGoalAction: tool('pass_to_routine'),
@@ -105,7 +105,7 @@ export const goalsActions: ModuleActions = {
     turnDownHelpAction: none('theirs'),
   },
   'app/goals/files/[fileId]/read-actions.ts': {
-    markFileReadAction: GAP,
+    markFileReadAction: none('own', 'Opening the file marks it read, which means the person read it.'),
   },
   'app/goals/home-actions.ts': {
     setAsideAction: GAP,

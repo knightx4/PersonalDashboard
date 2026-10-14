@@ -327,4 +327,165 @@ describe('the Goals writes', () => {
       expect(data['goals.dependencies']).toHaveLength(0);
     });
   });
+
+  // plan #1894.7.3
+  const LOANS = '99999999-9999-4999-8999-999999999999';
+  const FORM_STEP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const AIM = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const THEIR_AIM = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const CHASE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const CITI = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const STATEMENT = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function formTables(): FakeTables {
+    const data = tables();
+    data['goals.items']!.push(
+      goal(FORM_STEP, 'Gather the loans', 6, {
+        level: 'step',
+        parent_id: GOAL,
+        kind: 'mine',
+        collection_id: LOANS,
+        questions: [{ key: 'total', question: 'What is the total?' }],
+      }),
+    );
+    data['goals.collections'] = [
+      {
+        id: LOANS,
+        user_id: ME,
+        name: 'Loans',
+        archived_at: null,
+        fields: [
+          { key: 'lender', label: 'Lender', type: 'text' },
+          { key: 'balance', label: 'Balance', type: 'money' },
+        ],
+      },
+    ];
+    data['goals.collection_goals'] = [{ id: 'cg', user_id: ME, collection_id: LOANS, goal_id: GOAL, archived_at: null }];
+    data['goals.records'] = [
+      { id: CHASE, user_id: ME, collection_id: LOANS, data: { lender: 'Chase', balance: 1200 }, position: 1, archived_at: null },
+      { id: CITI, user_id: ME, collection_id: LOANS, data: { lender: 'Citi', balance: 300 }, position: 2, archived_at: null },
+    ];
+    data['goals.document_kinds'] = [
+      { id: STATEMENT, user_id: ME, collection_id: LOANS, name: 'Chase statement', recognise: '', senders: [], skipped: [], field_notes: { balance: 'The closing one' }, archived_at: null },
+    ];
+    data['goals.links'] = [];
+    data['learn.aims'] = [
+      { id: AIM, user_id: ME, name: 'Learn Spanish', archived_at: null },
+      { id: THEIR_AIM, user_id: THEM, name: 'Learn French', archived_at: null },
+    ];
+    return data;
+  }
+
+  describe('change_goal_number', () => {
+    it("sets a goal's unit and target, and clears them", async () => {
+      const data = formTables();
+      const set = await made('change_goal_number', data, { change: 'measure', goal_ref: GOAL, unit: 'km', target: 21 });
+      expect(set.kind).toBe('change_goal_number');
+      expect(set.summary).toBe('Dash set the goal "Run a half marathon" to be measured in km, aiming for 21.');
+      expect(row(data, 'goals.items', GOAL)).toMatchObject({ unit: 'km', target: 21 });
+      expect(await refused('change_goal_number', data, { change: 'measure', goal_ref: GOAL, unit: 'km', target: 21 })).toBe(
+        'That goal is measured that way already.',
+      );
+      await made('change_goal_number', data, { change: 'measure', goal_ref: GOAL, unit: '' });
+      expect(row(data, 'goals.items', GOAL)).toMatchObject({ unit: null, target: null });
+    });
+
+    it('works the number out from a collection serving the goal, refusing a choice it does not have', async () => {
+      const data = formTables();
+      expect(await refused('change_goal_number', data, { change: 'number_from', goal_ref: GOAL, from: 'Total pay of Jobs' })).toMatch(
+        /can come from: "Total balance of Loans", "Latest balance of Loans", "Number of Loans"/,
+      );
+      const from = await made('change_goal_number', data, { change: 'number_from', goal_ref: GOAL, from: 'total balance of loans' });
+      expect(from.subjectRef).toBe(`goals.items:${GOAL}`);
+      expect(row(data, 'goals.items', GOAL)).toMatchObject({
+        number_from_collection_id: LOANS,
+        number_from_field: 'balance',
+        number_from_how: 'sum',
+        unit: '$',
+      });
+      expect(await refused('change_goal_number', data, { change: 'number_from', goal_ref: GOAL_2, from: 'Number of Loans' })).toBe(
+        'No collection serves that goal, so its number can only be typed in.',
+      );
+    });
+  });
+
+  describe('change_goal_link', () => {
+    it("links a goal to the person's own Learn goal by name and unlinks it", async () => {
+      const data = formTables();
+      expect(await refused('change_goal_link', data, { change: 'link_aim', goal_ref: GOAL, aim: 'Learn French' })).toMatch(
+        /no Learn goal called "Learn French". Theirs are "Learn Spanish"/,
+      );
+      const linked = await made('change_goal_link', data, { change: 'link_aim', goal_ref: GOAL, aim: 'learn spanish' });
+      expect(linked.op).toBe('insert');
+      expect(linked.subjectRef).toMatch(/^goals\.links:/);
+      expect(linked.after).toMatchObject({ item_id: GOAL, kind: 'aim', target_id: AIM, user_id: ME });
+      expect(await refused('change_goal_link', data, { change: 'link_aim', goal_ref: GOAL, aim: 'Learn Spanish' })).toMatch(/already/);
+      const unlinked = await made('change_goal_link', data, { change: 'unlink_aim', goal_ref: GOAL, aim: 'Learn Spanish' });
+      expect(unlinked.op).toBe('update');
+      expect(unlinked.after).toMatchObject({ archived_at: expect.any(String) });
+    });
+
+    it('links a goal to the job search', async () => {
+      const data = formTables();
+      const linked = await made('change_goal_link', data, { change: 'link_job_search', goal_ref: GOAL });
+      expect(linked.summary).toBe('Dash linked the goal "Run a half marathon" to the job search.');
+      expect(linked.after).toMatchObject({ kind: 'job_search', target_id: null });
+      expect(await refused('change_goal_link', data, { change: 'unlink_job_search', goal_ref: GOAL_2 })).toBe(
+        'That goal is not linked to the job search.',
+      );
+    });
+  });
+
+  describe('change_goal_form', () => {
+    it('sets the questions, keeping the key of a wording already there', async () => {
+      const data = formTables();
+      expect(await refused('change_goal_form', data, { change: 'set_questions', step_ref: FORM_STEP })).toMatch(
+        /The step asks "What is the total\?"/,
+      );
+      await made('change_goal_form', data, {
+        change: 'set_questions',
+        step_ref: FORM_STEP,
+        questions: ['What is the total?', 'Which is the dearest?'],
+      });
+      expect(row(data, 'goals.items', FORM_STEP).questions).toEqual([
+        { key: 'total', question: 'What is the total?' },
+        { key: 'which_is_the_dearest', question: 'Which is the dearest?' },
+      ]);
+      expect(await refused('change_goal_form', data, { change: 'set_questions', step_ref: STEP, questions: [] })).toMatch(/has no form/);
+    });
+
+    it('archives a row named by its words and brings it back', async () => {
+      const data = formTables();
+      expect(await refused('change_goal_form', data, { change: 'archive_record', step_ref: FORM_STEP, record: 'Amex' })).toBe(
+        'No row matches "Amex". The rows are "Chase, 1200", "Citi, 300".',
+      );
+      const archived = await made('change_goal_form', data, { change: 'archive_record', step_ref: FORM_STEP, record: 'chase' });
+      expect(archived.subjectRef).toBe(`goals.records:${CHASE}`);
+      expect(archived.summary).toBe('Dash archived the row "Chase, 1200" on the step "Gather the loans".');
+      expect(row(data, 'goals.records', CHASE).archived_at).not.toBeNull();
+      await made('change_goal_form', data, { change: 'restore_record', step_ref: FORM_STEP, record: 'Chase' });
+      expect(row(data, 'goals.records', CHASE).archived_at).toBeNull();
+    });
+
+    it('edits a kind of document, keeping its field notes, and forgets it', async () => {
+      const data = formTables();
+      const edited = await made('change_goal_form', data, {
+        change: 'edit_document_kind',
+        step_ref: FORM_STEP,
+        document_kind: 'chase statement',
+        senders: ['statements@chase.com'],
+      });
+      expect(edited.subjectRef).toBe(`goals.document_kinds:${STATEMENT}`);
+      expect(row(data, 'goals.document_kinds', STATEMENT)).toMatchObject({
+        name: 'Chase statement',
+        senders: ['statements@chase.com'],
+        field_notes: { balance: 'The closing one' },
+      });
+      await made('change_goal_form', data, { change: 'forget_document_kind', step_ref: FORM_STEP, document_kind: 'Chase statement' });
+      expect(row(data, 'goals.document_kinds', STATEMENT).archived_at).not.toBeNull();
+      expect(await refused('change_goal_form', data, { change: 'forget_document_kind', step_ref: FORM_STEP, document_kind: 'Chase statement' })).toBe(
+        'That form has learned no kinds of document yet.',
+      );
+    });
+  });
 });

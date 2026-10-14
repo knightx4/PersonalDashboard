@@ -6,7 +6,9 @@ import type { LearnChangeInput } from './learn-changes';
  * renamed, reordered, archived or given a note, and a goal reworded, given a
  * date or an area, reordered, archived, closed, parked or reopened, and a
  * step edited, dropped, reopened, blocked, moved, archived, counted towards
- * another goal or made to wait on another step (plan #1894.7.2).
+ * another goal or made to wait on another step (plan #1894.7.2), and a
+ * goal's measure or links, or an information step's form, changed (plan
+ * #1894.7.3).
  *
  * They take the shape Learn's six set out (lib/ask/learn-changes.ts): the
  * tool that made the change wrote the sentence and the link when it made it
@@ -15,7 +17,14 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The write tools, by name, which is the kind each change is kept under. */
-export const GOALS_CHANGE_KINDS = ['change_goal_area', 'change_goal', 'change_goal_step'] as const;
+export const GOALS_CHANGE_KINDS = [
+  'change_goal_area',
+  'change_goal',
+  'change_goal_step',
+  'change_goal_number',
+  'change_goal_link',
+  'change_goal_form',
+] as const;
 
 export type GoalsChangeKind = (typeof GOALS_CHANGE_KINDS)[number];
 

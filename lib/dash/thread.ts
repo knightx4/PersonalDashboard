@@ -60,7 +60,8 @@ add_track_reading, reword_concept, add_concept_note and change_video, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
-Goals change_goal_area, change_goal and change_goal_step, and in Shopping change_item and item_lists, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
+change_goal_link and change_goal_form, and in Shopping change_item and item_lists, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course. This
 row's own tools are described below.

@@ -16,6 +16,14 @@ import {
   updateGoal,
 } from '@/lib/goals/store';
 import { stepHref } from '@/lib/goals/all-goals';
+import { MAX_QUESTIONS, MAX_QUESTION_LENGTH, questionKey, readQuestions, type StepQuestion } from '@/lib/goals/answers';
+import type { CollectionField } from '@/lib/goals/collections';
+import { archiveRecord, restoreRecord } from '@/lib/goals/collections-store';
+import { KIND_NAME_MAX, RECOGNISE_MAX, SKIPPED_LABEL_MAX, SKIPPED_MAX, parseSenders } from '@/lib/goals/document-kinds';
+import { editKind, forgetKind } from '@/lib/goals/document-kinds-store';
+import { linkTarget, unlinkTarget } from '@/lib/goals/links-store';
+import { numberFromChoices, parseMeasureFields, type NumberSource } from '@/lib/goals/readings';
+import { setGoalMeasure, setNumberFrom } from '@/lib/goals/readings-store';
 import { RHYTHM_PERIODS, STEP_KINDS, parseStepFields, type StepFields } from '@/lib/goals/steps';
 import {
   blockStep,
@@ -23,6 +31,7 @@ import {
   insertDependency,
   linkStep,
   setStepArchived,
+  setStepQuestions,
   setStepStatus,
   unlinkStep,
   updateStep,
@@ -43,6 +52,13 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                     or blocked, moved up or down, archived or restored,
  *                     counted towards another goal or no longer, and made to
  *                     wait on another step or no longer (plan #1894.7.2).
+ *   change_goal_number  a goal's unit and target set or cleared, or its
+ *                     number worked out from a collection serving it.
+ *   change_goal_link  a goal linked to a Learn goal or the job search, or
+ *                     unlinked.
+ *   change_goal_form  an information step's questions set, a row archived or
+ *                     brought back, and a kind of document edited or
+ *                     forgotten (plan #1894.7.3).
  *
  * They are the Goals home's own writes (app/goals/actions.ts), made with the
  * same store functions. Each names one row as its subject, so the one undo
@@ -424,12 +440,12 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
 async function reportGoal(
   env: GoalsWriteEnv,
   before: Row,
-  words: { verb: string; rest: string; summary: string; undo: string | null },
+  words: { verb: string; rest: string; summary: string; undo: string | null; kind?: GoalsChangeKind },
 ): Promise<GoalsMade> {
   const id = before.id as string;
   const after = await ownRow(env.goals, 'items', id, env.userId);
   return {
-    kind: 'change_goal',
+    kind: words.kind ?? 'change_goal',
     input: { verb: words.verb, what: named(before.title, 'the goal'), rest: words.rest, href: goalHref(id), where: 'Open the goal', paths: [...GOAL_PATHS, goalHref(id)] },
     subjectRef: toRef(ITEM, id),
     op: 'update',
@@ -844,6 +860,405 @@ async function reportStep(
 }
 
 // ---------------------------------------------------------------------------
+// change_goal_number, change_goal_link and change_goal_form (plan #1894.7.3)
+// ---------------------------------------------------------------------------
+
+/** A live goal of the person's by its goals.items ref, refused with a sentence when it is not one. */
+async function ownGoal(env: GoalsWriteEnv, id: string): Promise<Row> {
+  if (!id) throw new GoalsRefused('goal_ref is missing: give the goals.items ref a lookup returned for the goal.');
+  if (!isUuid(id)) throw new GoalsRefused("goal_ref must be a goal's goals.items ref, as a lookup returned it.");
+  const row = await ownRow(env.goals, 'items', id, env.userId);
+  if (!row) throw new GoalsRefused('There is no goal of theirs with that ref. Look it up first.');
+  if (row.level !== 'goal') throw new GoalsRefused('That is a step, not a goal.');
+  if (row.archived_at != null) throw new GoalsRefused('That goal is archived. Restore it first.');
+  return row;
+}
+
+function oneOf<T extends string>(args: Args, choices: readonly T[]): T {
+  const change = text(args, 'change');
+  if (!(choices as readonly string[]).includes(change)) throw new GoalsRefused(`change must be one of ${choices.join(', ')}.`);
+  return change as T;
+}
+
+const NUMBER_CHANGES = ['measure', 'number_from'] as const;
+
+/** The collections serving a goal, read through the person's own rows. */
+async function goalSources(env: GoalsWriteEnv, goalId: string): Promise<NumberSource[]> {
+  const served = await env.goals
+    .from('collection_goals')
+    .select('collection_id')
+    .eq('user_id', env.userId)
+    .eq('goal_id', goalId)
+    .is('archived_at', null);
+  if (served.error) throw new Error(`Reading the goal's collections failed: ${served.error.message}`);
+  const ids = ((served.data ?? []) as Row[]).map((row) => row.collection_id as string);
+  if (ids.length === 0) return [];
+  const { data, error } = await env.goals
+    .from('collections')
+    .select('id, name, fields')
+    .eq('user_id', env.userId)
+    .in('id', ids)
+    .is('archived_at', null);
+  if (error) throw new Error(`Reading the collections failed: ${error.message}`);
+  return ((data ?? []) as Row[])
+    .map((row) => ({ id: row.id as string, name: String(row.name), fields: (row.fields ?? []) as CollectionField[] }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A goal's unit and target, or where its number is worked out from (the goal page's number panel). */
+async function changeGoalNumber(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
+  const change = oneOf(args, NUMBER_CHANGES);
+  const before = await ownGoal(env, text(args, 'goal_ref'));
+  const id = before.id as string;
+  const title = named(before.title, 'the goal');
+  const report = (verb: string, rest: string, summary: string) =>
+    reportGoal(env, before, { verb, rest, summary, undo: null, kind: 'change_goal_number' });
+
+  if (change === 'measure') {
+    const target = args.target;
+    const parsed = parseMeasureFields((key) => {
+      if (key === 'unit') return text(args, 'unit');
+      if (key === 'target') return typeof target === 'number' ? String(target) : text(args, 'target');
+      return undefined;
+    });
+    if (!parsed.ok) throw new GoalsRefused(parsed.error);
+    const { unit, target: wanted } = parsed.value;
+    if ((before.unit ?? null) === unit && (before.target == null ? null : Number(before.target)) === wanted) {
+      throw new GoalsRefused('That goal is measured that way already.');
+    }
+    if (!(await setGoalMeasure(await env.write({}), id, { unit, target: wanted }))) {
+      throw new GoalsRefused('That goal has just changed.');
+    }
+    if (!unit) return report('Stopped measuring', '', `Dash stopped measuring the goal "${title}" by a number.`);
+    const aim = wanted === null ? '' : `, aiming for ${wanted}`;
+    return report('Measured', ` in ${unit}${aim}`, `Dash set the goal "${title}" to be measured in ${unit}${aim}.`);
+  }
+
+  const choices = numberFromChoices(await goalSources(env, id));
+  const wanted = text(args, 'from');
+  const choice = wanted ? choices.find((c) => c.label.toLowerCase() === wanted.toLowerCase()) : null;
+  if (wanted && !choice) {
+    throw new GoalsRefused(
+      choices.length > 0
+        ? `That goal's number can come from: ${choices.map((c) => `"${c.label}"`).join(', ')}.`
+        : 'No collection serves that goal, so its number can only be typed in.',
+    );
+  }
+  const from = choice?.from ?? null;
+  const same =
+    (before.number_from_collection_id ?? null) === (from?.collectionId ?? null) &&
+    (before.number_from_field ?? null) === (from?.field ?? null) &&
+    (before.number_from_how ?? null) === (from?.how ?? null);
+  if (same) throw new GoalsRefused(choice ? `That goal's number is the ${choice.label.toLowerCase()} already.` : "That goal's number is typed in already.");
+  if (!(await setNumberFrom(await env.write({}), id, from, choice?.unit ?? null))) {
+    throw new GoalsRefused('That goal has just changed.');
+  }
+  return choice
+    ? report('Worked out', ` from the ${choice.label.toLowerCase()}`, `Dash set the goal "${title}" to take its number from the ${choice.label.toLowerCase()}.`)
+    : report('Set', ' to take readings typed in', `Dash set the goal "${title}" to take its number from readings typed in.`);
+}
+
+const LINK_CHANGES = ['link_aim', 'unlink_aim', 'link_job_search', 'unlink_job_search'] as const;
+const LINKS = 'goals.links';
+
+/** One of the person's live Learn goals, by its learn.aims ref or its name. */
+async function findAim(env: GoalsWriteEnv, wanted: string): Promise<Row> {
+  if (!wanted) throw new GoalsRefused('aim is missing: name the Learn goal, or give its learn.aims ref.');
+  const { data, error } = await env.goals
+    .schema('learn')
+    .from('aims')
+    .select('id, name')
+    .eq('user_id', env.userId)
+    .is('archived_at', null);
+  if (error) throw new Error(`Reading the Learn goals failed: ${error.message}`);
+  const aims = (data ?? []) as Row[];
+  const key = wanted.toLowerCase();
+  const found = aims.find((a) => a.id === wanted || String(a.name).trim().toLowerCase() === key);
+  if (found) return found;
+  throw new GoalsRefused(
+    aims.length > 0
+      ? `They have no Learn goal called "${wanted}". Theirs are ${aims.map((a) => `"${a.name}"`).join(', ')}.`
+      : 'They have no Learn goals yet.',
+  );
+}
+
+/** Linking a goal to a Learn goal or to the job search, or no longer: a goals.links row, archived to unlink. */
+async function changeGoalLink(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
+  const change = oneOf(args, LINK_CHANGES);
+  const goal = await ownGoal(env, text(args, 'goal_ref'));
+  const goalId = goal.id as string;
+  const title = named(goal.title, 'the goal');
+  const toAim = change === 'link_aim' || change === 'unlink_aim';
+  const aim = toAim ? await findAim(env, text(args, 'aim')) : null;
+  const targetId = aim ? (aim.id as string) : null;
+  const target = aim ? `the Learn goal "${named(aim.name, 'it')}"` : 'the job search';
+
+  const readLink = async (): Promise<Row | null> => {
+    let query = env.goals
+      .from('links')
+      .select('*')
+      .eq('user_id', env.userId)
+      .eq('item_id', goalId)
+      .eq('kind', toAim ? 'aim' : 'job_search');
+    query = targetId ? query.eq('target_id', targetId) : query.is('target_id', null);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error(`Reading the goal's links failed: ${error.message}`);
+    return (data as Row | null) ?? null;
+  };
+  const before = await readLink();
+  const live = before != null && before.archived_at == null;
+  const linking = change === 'link_aim' || change === 'link_job_search';
+
+  if (linking) {
+    if (live) throw new GoalsRefused(`That goal is linked to ${target} already.`);
+    const linked = await linkTarget(await env.write({}), env.userId, goalId, toAim ? 'aim' : 'job_search', targetId);
+    if (!linked) throw new GoalsRefused(`That goal could not be linked to ${target}.`);
+  } else {
+    if (!live) throw new GoalsRefused(`That goal is not linked to ${target}.`);
+    if (!(await unlinkTarget(await env.write({}), before.id as string))) throw new GoalsRefused('That link has already gone.');
+  }
+  const after = await readLink();
+  if (!after) throw new Error('The link was written but could not be read back.');
+  return {
+    kind: 'change_goal_link',
+    input: {
+      verb: linking ? 'Linked' : 'Unlinked',
+      what: title,
+      rest: `${linking ? ' to' : ' from'} ${target}`,
+      href: goalHref(goalId),
+      where: 'Open the goal',
+      paths: [...GOAL_PATHS, goalHref(goalId)],
+    },
+    subjectRef: toRef(LINKS, after.id as string),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    undo: null,
+    summary: linking ? `Dash linked the goal "${title}" to ${target}.` : `Dash unlinked the goal "${title}" from ${target}.`,
+    row: { table: ITEM, ref: goalId, title, href: goalHref(goalId) },
+  };
+}
+
+const FORM_CHANGES = ['set_questions', 'archive_record', 'restore_record', 'edit_document_kind', 'forget_document_kind'] as const;
+type FormChange = (typeof FORM_CHANGES)[number];
+const RECORDS = 'goals.records';
+const KINDS = 'goals.document_kinds';
+
+/** A record as the person reads it: its first few values, in the form's order. */
+function describeRecord(fields: CollectionField[], data: unknown): string {
+  const values = (data ?? {}) as Record<string, unknown>;
+  const parts = fields
+    .filter((f) => !f.removed)
+    .map((f) => values[f.key])
+    .filter((v) => v !== null && v !== undefined && v !== '')
+    .slice(0, 3)
+    .map(String);
+  return parts.length > 0 ? parts.join(', ') : 'an empty row';
+}
+
+/** One record in the step's collection, by its goals.records ref or by words in its values. */
+async function findRecord(env: GoalsWriteEnv, collectionId: string, fields: CollectionField[], wanted: string, archived: boolean): Promise<Row> {
+  if (!wanted) throw new GoalsRefused('record is missing: give words from the row, such as its name, or its goals.records ref.');
+  let query = env.goals.from('records').select('*').eq('user_id', env.userId).eq('collection_id', collectionId);
+  query = archived ? query.not('archived_at', 'is', null) : query.is('archived_at', null);
+  const { data, error } = await query.order('position', { ascending: true });
+  if (error) throw new Error(`Reading the rows failed: ${error.message}`);
+  const rows = (data ?? []) as Row[];
+  const byId = rows.find((r) => r.id === wanted);
+  if (byId) return byId;
+  const words = wanted.toLowerCase().split(/\s+/).filter(Boolean);
+  const said = (r: Row) => Object.values((r.data ?? {}) as Record<string, unknown>).map(String).join(' ').toLowerCase();
+  const matches = rows.filter((r) => words.every((w) => said(r).includes(w)));
+  if (matches.length === 1) return matches[0];
+  const list = (matches.length > 1 ? matches : rows).slice(0, 10).map((r) => `"${describeRecord(fields, r.data)}"`).join(', ');
+  if (rows.length === 0) throw new GoalsRefused(archived ? 'That form has no archived rows.' : 'That form has no rows.');
+  throw new GoalsRefused(
+    matches.length > 1
+      ? `More than one row matches "${wanted}": ${list}. Say which.`
+      : `No ${archived ? 'archived ' : ''}row matches "${wanted}". The rows are ${list}.`,
+  );
+}
+
+/** One of the kinds of document the step's form has learned, by its name or goals.document_kinds ref. */
+async function findKind(env: GoalsWriteEnv, collectionId: string, wanted: string): Promise<Row> {
+  if (!wanted) throw new GoalsRefused('document_kind is missing: name the kind of document, or give its goals.document_kinds ref.');
+  const { data, error } = await env.goals
+    .from('document_kinds')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('collection_id', collectionId)
+    .is('archived_at', null);
+  if (error) throw new Error(`Reading the kinds of document failed: ${error.message}`);
+  const kinds = (data ?? []) as Row[];
+  const key = wanted.toLowerCase();
+  const found = kinds.find((k) => k.id === wanted || String(k.name).trim().toLowerCase() === key);
+  if (found) return found;
+  throw new GoalsRefused(
+    kinds.length > 0
+      ? `That form knows no kind of document called "${wanted}". It knows ${kinds.map((k) => `"${k.name}"`).join(', ')}.`
+      : 'That form has learned no kinds of document yet.',
+  );
+}
+
+function stringList(args: Args, key: string): string[] | null {
+  const value = args[key];
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value.split('\n');
+  if (Array.isArray(value)) return value.map((v) => (typeof v === 'string' ? v : String(v)));
+  throw new GoalsRefused(`${key} must be a list of lines.`);
+}
+
+/** The questions as the person's form keeps them: a wording already there keeps its key, so its answer stays with it. */
+function nextQuestions(existing: StepQuestion[], wanted: string[]): StepQuestion[] {
+  const out: StepQuestion[] = [];
+  const taken = new Set(existing.map((q) => q.key));
+  for (const raw of wanted) {
+    const question = raw.trim().replace(/\s+/g, ' ');
+    if (!question) continue;
+    if (question.length > MAX_QUESTION_LENGTH) throw new GoalsRefused(`A question can be at most ${MAX_QUESTION_LENGTH} characters.`);
+    const kept = existing.find((q) => q.question.trim().toLowerCase() === question.toLowerCase() && !out.some((o) => o.key === q.key));
+    if (kept) {
+      out.push({ key: kept.key, question });
+      continue;
+    }
+    const key = questionKey(question, taken);
+    taken.add(key);
+    out.push({ key, question });
+  }
+  if (out.length > MAX_QUESTIONS) throw new GoalsRefused(`A step can hold at most ${MAX_QUESTIONS} questions.`);
+  return out;
+}
+
+/** An information step's form: its questions, its rows, and the kinds of document it has learned to read. */
+async function changeGoalForm(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
+  const change: FormChange = oneOf(args, FORM_CHANGES);
+  const step = await ownStep(env, text(args, 'step_ref'), 'step_ref');
+  if (step.archived_at != null) throw new GoalsRefused('That step is archived. Restore it first.');
+  const collectionId = step.collection_id as string | null;
+  if (!collectionId) throw new GoalsRefused('That step has no form. Only a step that gathers information has one.');
+  const collection = await ownRow(env.goals, 'collections', collectionId, env.userId);
+  if (!collection) throw new GoalsRefused('The collection behind that step is gone.');
+  const fields = (collection.fields ?? []) as CollectionField[];
+  const goal = await goalAbove(env, step);
+  const stepId = step.id as string;
+  const goalId = goal.id as string;
+  const title = named(step.title, 'the step');
+  const href = stepHref(goalId, stepId);
+  const made = (
+    table: string,
+    before: Row,
+    after: Row | null,
+    words: { verb: string; what: string; rest: string; summary: string },
+  ): GoalsMade => ({
+    kind: 'change_goal_form',
+    input: { verb: words.verb, what: words.what, rest: words.rest, href, where: 'Open the step', paths: [...GOAL_PATHS, goalHref(goalId)] },
+    subjectRef: toRef(table, before.id as string),
+    op: 'update',
+    before,
+    after,
+    undo: null,
+    summary: words.summary,
+    row: { table: ITEM, ref: stepId, title, href },
+  });
+
+  switch (change) {
+    case 'set_questions': {
+      const existing = readQuestions(step.questions);
+      const wanted = stringList(args, 'questions');
+      if (wanted === null) {
+        throw new GoalsRefused(
+          existing.length > 0
+            ? `questions is missing: send the whole list. The step asks ${existing.map((q) => `"${q.question}"`).join(', ')}.`
+            : 'questions is missing: send the whole list. The step asks nothing yet.',
+        );
+      }
+      const questions = nextQuestions(existing, wanted);
+      if (JSON.stringify(questions) === JSON.stringify(existing)) throw new GoalsRefused('The step asks those questions already.');
+      const status = await guarded('They could not be saved', async () => setStepQuestions(await env.write({}), stepId, questions));
+      if (!status) throw new GoalsRefused('That step no longer has a form.');
+      const after = await ownRow(env.goals, 'items', stepId, env.userId);
+      const closed = step.status !== 'done' && status === 'done' ? ' Every one already had its answer, so the step closed.' : '';
+      return made(ITEM, step, after, {
+        verb: questions.length > 0 ? 'Set the questions on' : 'Cleared the questions on',
+        what: title,
+        rest: '',
+        summary:
+          questions.length > 0
+            ? `Dash set the ${questions.length === 1 ? 'question' : `${questions.length} questions`} the step "${title}" asks.${closed}`
+            : `Dash cleared the questions on the step "${title}".`,
+      });
+    }
+    case 'archive_record':
+    case 'restore_record': {
+      const archiving = change === 'archive_record';
+      const before = await findRecord(env, collectionId, fields, text(args, 'record'), !archiving);
+      const client = await env.write({});
+      const changed = archiving ? await archiveRecord(client, before.id as string) : await restoreRecord(client, before.id as string);
+      if (!changed) throw new GoalsRefused('That row has already changed.');
+      const after = await ownRow(env.goals, 'records', before.id as string, env.userId);
+      const said = describeRecord(fields, before.data);
+      return made(RECORDS, before, after, {
+        verb: archiving ? 'Archived' : 'Brought back',
+        what: said,
+        rest: ` on ${title}`,
+        summary: archiving
+          ? `Dash archived the row "${said}" on the step "${title}".`
+          : `Dash brought back the row "${said}" on the step "${title}".`,
+      });
+    }
+    case 'edit_document_kind': {
+      const before = await findKind(env, collectionId, text(args, 'document_kind'));
+      const name = 'name' in args ? text(args, 'name') : String(before.name);
+      if (!name) throw new GoalsRefused('Give the kind a name.');
+      if (name.length > KIND_NAME_MAX) throw new GoalsRefused(`A name can be at most ${KIND_NAME_MAX} characters.`);
+      const recognise = 'recognise' in args ? text(args, 'recognise') : String(before.recognise ?? '');
+      if (recognise.length > RECOGNISE_MAX) throw new GoalsRefused(`How to recognise it can be at most ${RECOGNISE_MAX} characters.`);
+      const sendersSent = stringList(args, 'senders');
+      const senders = sendersSent === null ? ((before.senders ?? []) as string[]) : parseSenders(sendersSent.join('\n'));
+      const skippedSent = stringList(args, 'skipped');
+      const skipped =
+        skippedSent === null
+          ? ((before.skipped ?? []) as string[])
+          : [...new Set(skippedSent.map((line) => line.trim().slice(0, SKIPPED_LABEL_MAX)).filter(Boolean))].slice(0, SKIPPED_MAX);
+      const edit = { name, recognise, senders, skipped };
+      if (
+        name === before.name &&
+        recognise === (before.recognise ?? '') &&
+        JSON.stringify(senders) === JSON.stringify(before.senders ?? []) &&
+        JSON.stringify(skipped) === JSON.stringify(before.skipped ?? [])
+      ) {
+        throw new GoalsRefused('Nothing to change: give a new name, recognise, senders or skipped.');
+      }
+      const result = await editKind(await env.write({}), before.id as string, {
+        ...edit,
+        fieldNotes: (before.field_notes ?? {}) as Record<string, string>,
+      });
+      if (!result.ok) throw new GoalsRefused(result.error);
+      const after = await ownRow(env.goals, 'document_kinds', before.id as string, env.userId);
+      const was = named(before.name, 'the kind');
+      return made(KINDS, before, after, {
+        verb: 'Changed',
+        what: was,
+        rest: name !== before.name ? ` to ${name}` : '',
+        summary: `Dash changed how the step "${title}" reads ${was}${name !== before.name ? `, now called ${name}` : ''}.`,
+      });
+    }
+    case 'forget_document_kind': {
+      const before = await findKind(env, collectionId, text(args, 'document_kind'));
+      if (!(await forgetKind(await env.write({}), before.id as string))) throw new GoalsRefused('That kind is already gone.');
+      const after = await ownRow(env.goals, 'document_kinds', before.id as string, env.userId);
+      const was = named(before.name, 'the kind');
+      return made(KINDS, before, after, {
+        verb: 'Forgot',
+        what: was,
+        rest: ` on ${title}`,
+        summary: `Dash made the step "${title}" forget ${was}, so the next one is read as new.`,
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -922,6 +1337,62 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       additionalProperties: false,
     },
     run: changeGoalStep,
+  },
+  {
+    name: 'change_goal_number',
+    description:
+      "Change how one of the person's goals is measured, when they ask: set the unit and the target it aims for (change measure, with unit and target; an empty unit stops measuring it by a number), or work its number out from a collection serving it, or go back to readings typed in (number_from, with from naming the choice, such as \"Total balance of Loans\"; empty for typed readings). Name the goal by the goals.items ref a lookup returned. A wrong from is refused with the choices the goal has.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...NUMBER_CHANGES], description: 'What to change.' },
+        goal_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the goal.' },
+        unit: { type: 'string', description: 'For measure: what the number counts ("km", "$", "books"); empty to stop measuring.' },
+        target: { type: 'number', description: 'For measure: the number it aims for. Leave out for none.' },
+        from: { type: 'string', description: 'For number_from: the choice, as "Total <field> of <collection>", "Latest <field> of <collection>" or "Number of <collection>"; empty for readings typed in.' },
+      },
+      required: ['change', 'goal_ref'],
+      additionalProperties: false,
+    },
+    run: changeGoalNumber,
+  },
+  {
+    name: 'change_goal_link',
+    description:
+      "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Name the goal by the goals.items ref a lookup returned, and the Learn goal by its name as they have it. Nothing in Learn or the job search is changed.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...LINK_CHANGES], description: 'What to link or unlink.' },
+        goal_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the goal.' },
+        aim: { type: 'string', description: 'For link_aim and unlink_aim: the Learn goal, by its name or learn.aims ref.' },
+      },
+      required: ['change', 'goal_ref'],
+      additionalProperties: false,
+    },
+    run: changeGoalLink,
+  },
+  {
+    name: 'change_goal_form',
+    description:
+      "Change the form on one of the person's steps that gathers information, when they ask: set the questions it asks (change set_questions, with questions as the whole list; a wording kept keeps its answer, and an empty list clears them), archive one of its rows or bring an archived one back (archive_record, restore_record, with record as words from the row such as its name), change a kind of document it has learned to read (edit_document_kind, with document_kind and any of name, recognise, senders and skipped), or forget one so the next is read as new (forget_document_kind). Name the step by the goals.items ref a lookup returned. A row or kind that does not match is refused with the ones there are.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...FORM_CHANGES], description: 'What to change on the form.' },
+        step_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the step.' },
+        questions: { type: 'array', items: { type: 'string' }, description: 'For set_questions: every question the step should ask, in order.' },
+        record: { type: 'string', description: 'For archive_record and restore_record: words from the row, or its goals.records ref.' },
+        document_kind: { type: 'string', description: 'For edit_document_kind and forget_document_kind: the kind by its name.' },
+        name: { type: 'string', description: 'For edit_document_kind: its new name.' },
+        recognise: { type: 'string', description: 'For edit_document_kind: how to tell a document of this kind.' },
+        senders: { type: 'array', items: { type: 'string' }, description: 'For edit_document_kind: who sends it, each a name or address.' },
+        skipped: { type: 'array', items: { type: 'string' }, description: 'For edit_document_kind: the labels on it that are left out.' },
+      },
+      required: ['change', 'step_ref'],
+      additionalProperties: false,
+    },
+    run: changeGoalForm,
   },
 ];
 

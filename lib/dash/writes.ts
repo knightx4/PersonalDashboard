@@ -67,11 +67,13 @@ import { VAULT_WRITE_TOOLS } from './vault-writes';
  *   News's four and stop_watch  an issue marked unread, a story saved or
  *                    unsaved, sent to Learn or made a todo, and a price
  *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
- *   Goals' three     an area added, renamed, noted, moved or archived, a
+ *   Goals' six       an area added, renamed, noted, moved or archived, a
  *                    goal edited, moved, archived, closed, parked or
  *                    reopened (lib/dash/goals-writes.ts, plan #1894.7.1),
  *                    and a step edited, dropped, reopened, blocked, moved,
- *                    archived, linked or made to wait (plan #1894.7.2).
+ *                    archived, linked or made to wait (plan #1894.7.2),
+ *                    and a goal's measure, links or step form changed
+ *                    (plan #1894.7.3).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
  *   Shopping's       change_item (one item's name, variant, notes, group

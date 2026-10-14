@@ -128,7 +128,9 @@ to add, rename, reorder or archive an area or write what they want from it,
 call change_goal_area; to reword a goal, date it, move it to another area,
 reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
-it wait on another step, call change_goal_step. In Shopping, to
+it wait on another step, call change_goal_step; to set a goal's measure, its
+links or an information step's form, call change_goal_number, change_goal_link
+or change_goal_form. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists. In the Vault, to write
