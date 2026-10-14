@@ -1,9 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { startEssayFromBrief } from '@/lib/learn/briefs/essay';
 import { readSubQuestions } from '@/lib/learn/briefs/model';
 import { SUB_QUESTIONS_MIN } from '@/lib/learn/briefs/research';
 import { researchBriefAfterResponse } from '@/lib/learn/briefs/research-run';
@@ -127,4 +129,32 @@ export async function retryBrief(briefId: string): Promise<{ error?: string }> {
   }
   page(briefId);
   return {};
+}
+
+/**
+ * Start an essay from the brief (plan #2023.5): opens a new essay on the
+ * brief's question with the brief pinned beside the draft, or the essay
+ * already started from it. Makes no model call, so it records no spend; the
+ * interview's later questions are priced where they are asked.
+ */
+// latency: pending
+export async function startEssayOnBrief(briefId: string): Promise<{ error: string }> {
+  const user = await requireUser();
+  if (!Id.safeParse(briefId).success) return { error: 'That brief could not be found.' };
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase
+    .from('briefs')
+    .select('id, question')
+    .eq('id', briefId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (error) return { error: `Could not start the essay: ${error.message}` };
+  if (!data) return { error: 'That brief could not be found.' };
+  let essayId: string;
+  try {
+    essayId = await startEssayFromBrief(supabase, user.id, data as { id: string; question: string });
+  } catch (caught) {
+    return { error: caught instanceof Error ? caught.message : 'Could not start the essay.' };
+  }
+  redirect(`/learn/e/${essayId}`);
 }

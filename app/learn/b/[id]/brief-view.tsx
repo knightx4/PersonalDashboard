@@ -23,6 +23,8 @@ import {
   type BriefPage,
   type BriefSource,
 } from '@/lib/learn/briefs/view';
+import { QuickReadButton } from './quick/quick-read-button';
+import { StartEssayButton } from './start-essay-button';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
 
 /** How often a researching brief asks the server for what the run has written. */
@@ -275,7 +277,10 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
       <CardSection title="Reading list">
         <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-ui">
           {brief.trackId ? (
-            <Link href={`/learn/t/${brief.trackId}`} className={linkVariants()}>
+            <Link
+              href={`/learn/t/${brief.trackId}`}
+              className={linkVariants({ className: 'inline-flex min-h-11 items-center lg:min-h-0' })}
+            >
               {brief.trackTitle ?? 'The sources it found'}
             </Link>
           ) : (
@@ -389,6 +394,10 @@ export function BriefView({
       {brief.status === 'failed' && <Failed brief={brief} />}
       {brief.status === 'ready' && (
         <>
+          <div className="flex flex-wrap items-center gap-3">
+            <StartEssayButton briefId={brief.id} />
+            <QuickReadButton briefId={brief.id} />
+          </div>
           <ShortAnswer brief={brief} editing={editing} />
           {brief.subQuestions.map((sub, i) => (
             <Section

@@ -46,6 +46,7 @@ export async function createEssay(
   supabase: LearnSupabaseClient,
   userId: string,
   pins: readonly EssayPin[] = [],
+  question = '',
 ): Promise<string> {
   const { data, error } = await supabase
     .from('essays')
@@ -53,7 +54,7 @@ export async function createEssay(
       user_id: userId,
       path: NEW_ESSAY_PATH,
       draft_body: '',
-      brief: newEssayBrief(pins),
+      brief: newEssayBrief(pins, question),
       updated_at: new Date().toISOString(),
     })
     .select('id')
