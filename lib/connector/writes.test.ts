@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { CONNECTOR_WRITE_TOOLS, runConnectorWrite, type ConnectorWriteContext } from './writes';
 
 /**
@@ -56,6 +57,7 @@ describe('runConnectorWrite', () => {
       'send_story_to_learn',
       'make_todo_from_story',
       'stop_watch',
+      ...VAULT_CHANGE_KINDS,
     ]);
   });
 

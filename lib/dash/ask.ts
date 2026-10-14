@@ -123,7 +123,11 @@ change_event. To finish, put off or dismiss a row another workspace put on
 their agenda, find it with agenda and call change_agenda_row. In News, when they ask to mark a newsletter unread, save or
 unsave a story, send one to Learn or make a todo from one, call
 mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
-when they ask to stop a price watch, call stop_watch. When they tell you about a place they have lived, or ask to
+when they ask to stop a price watch, call stop_watch. In the Vault, to write
+a note, change or rename one, file a quick note, or rename a theme or a
+thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
+file_quick_note, rename_theme or rename_maya_question; to keep a transcript
+or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to

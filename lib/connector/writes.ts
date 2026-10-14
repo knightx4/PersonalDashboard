@@ -23,6 +23,7 @@ import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
 import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
+import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -484,6 +485,54 @@ const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * The Vault's changes and correcting a course (plan #1894.9.3,
+ * lib/dash/vault-writes.ts), the same tools Ask has, run here on the
+ * service-role clients for the verified person. A note change keeps in `undo`
+ * what taking its commit back needs, which core.record_dash_action has no
+ * argument for, so these are recorded with recordDashAction, as a shared
+ * write is, and Home's Undo takes the file back (undoneByVault).
+ */
+const VAULT_TOOLS: readonly ConnectorWriteTool[] = VAULT_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    const off = vaultSwitchedOff(write, ctx.account.enabledModules);
+    if (off) throw new AskInputError(`The ${off} workspace is switched off, so nothing can be changed there.`);
+    const vault = await ctx.db('obsidian');
+    const env = {
+      userId: ctx.userId,
+      vault,
+      core: await ctx.db('core'),
+      you: await ctx.db('you'),
+      notes: vaultNotePorts(vault, ctx.userId),
+    };
+    const made = await runVaultWrite(write, env, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    return {
+      ok: true,
+      rows: [made.row],
+      note: recorded ? made.summary : `${made.summary} Its Undo could not be kept, so it is changed back on its page.`,
+    };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
 type SharedWrite =
   | 'add_quick_note'
@@ -615,6 +664,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...TODO_TOOLS,
   ...YOU_TOOLS,
   ...NEWS_TOOLS,
+  ...VAULT_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */

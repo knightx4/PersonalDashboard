@@ -1,4 +1,4 @@
-import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * What the You pages let the person do, and the tool that does each
@@ -19,9 +19,9 @@ export const youActions: ModuleActions = {
   // Transcripts and courses on Work & school, moved from the Vault (plan #1991.3).
   'app/you/work/actions.ts': {
     readTranscriptAction: none('spends'),
-    saveTranscriptAction: GAP,
+    saveTranscriptAction: tool('save_transcript'),
     discardUploadAction: none('page'),
-    updateCourseAction: GAP,
+    updateCourseAction: tool('change_course'),
     removeCourseAction: none('deletes'),
     removeTranscriptAction: none('deletes'),
   },

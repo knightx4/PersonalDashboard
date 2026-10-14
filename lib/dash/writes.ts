@@ -25,6 +25,7 @@ import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
+import { VAULT_WRITE_TOOLS } from './vault-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -64,6 +65,10 @@ import { NEWS_WRITE_TOOLS } from './news-writes';
  *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
+ *   The Vault's six and change_course  a note written, edited, renamed or
+ *                    filed from the Inbox, a theme or a Maya question
+ *                    renamed, and a course corrected (lib/dash/vault-writes.ts,
+ *                    plan #1894.9.3).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1087,6 +1092,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...YOU_WRITE_TOOLS,
   // News's, and stopping a watch, which the connector offers too (plan #1894.9.4).
   ...NEWS_WRITE_TOOLS,
+  // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).
+  ...VAULT_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */
