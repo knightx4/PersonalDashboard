@@ -12,7 +12,10 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The write tools, by name, which is the kind each change is kept under. */
-export const JOBS_CHANGE_KINDS = ['change_role', 'change_application'] as const;
+export const JOBS_CHANGE_KINDS = ['change_role', 'change_application', 'change_company', 'merge_roles'] as const;
+
+/** The Jobs changes that touch many rows, whose Undo is Ask's (MANY_ROW_KINDS in lib/core/dash-actions.ts). */
+export const JOBS_MANY_ROW_KINDS: readonly JobsChangeKind[] = ['merge_roles'];
 
 export type JobsChangeKind = (typeof JOBS_CHANGE_KINDS)[number];
 

@@ -70,6 +70,8 @@ describe('runConnectorWrite', () => {
       ...VAULT_CHANGE_KINDS,
       'change_role',
       'change_application',
+      'change_company',
+      'merge_roles',
     ]);
   });
 

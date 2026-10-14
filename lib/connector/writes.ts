@@ -26,7 +26,7 @@ import { GOALS_WRITES, runGoalsWrite } from '@/lib/dash/goals-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/lib/dash/shopping-writes';
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
-import { JOBS_OFF, JOBS_WRITES, runJobsWrite } from '@/lib/dash/jobs-writes';
+import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -610,8 +610,10 @@ const VAULT_TOOLS: readonly ConnectorWriteTool[] = VAULT_WRITES.map((write) => (
 /**
  * Jobs' role and application edits (plan #1894.6.1, lib/dash/jobs-writes.ts),
  * the same tools Ask has, run here on the service-role job_search client for
- * the verified person and recorded as Dash's. Each changes one row, so the
- * bare record above keeps all its Undo needs.
+ * the verified person and recorded as Dash's. Most change one row, so the
+ * bare record above keeps all its Undo needs. A merge of roles (plan
+ * #1894.6.2) touches many, so its record keeps them all in `undo`, and Home's
+ * Undo puts them back by Ask's rule (MANY_ROW_KINDS in lib/core/dash-actions.ts).
  */
 const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
   definition: {
@@ -622,9 +624,25 @@ const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
   async run(ctx, input) {
     if (!ctx.db || !ctx.account) refuse();
     if (!ctx.account.enabledModules.includes('jobs')) throw new AskInputError(JOBS_OFF);
-    const made = await runJobsWrite(write, { userId: ctx.userId, jobs: await ctx.db('job_search') }, input);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
     if ('ok' in made) throw new AskInputError(made.error);
-    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before);
+    if (!made.undo) {
+      await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before);
+      return { ok: true, rows: [made.row], note: made.summary };
+    }
+    const recorded = await recordDashAction(
+      { userId: ctx.userId, core: ctx.core, db: ctx.db },
+      {
+        surface: 'routine',
+        kind: made.kind,
+        subjectRef: made.subjectRef,
+        op: made.op,
+        summary: made.summary,
+        beforeValues: made.before,
+        undo: made.undo,
+      },
+    );
+    if (!recorded) console.error('[connector write] record', made.kind);
     return { ok: true, rows: [made.row], note: made.summary };
   },
 }));
