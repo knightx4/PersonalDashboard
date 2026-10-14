@@ -342,6 +342,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // page knows, and a page without it draws the text as written.
   const outlines = useMemo(() => outlinesOf(titles), [titles]);
   const readable = (text: string) => readableRefs(text, outlines);
+  // Only the dev plan passes titles; there a bare `#1931` is a feature, and
+  // on a goal it is more likely a list number, so a goal links outlines only.
+  const stepRefs = titles ? 'all' : 'outlines';
   // A setup job still open. Closed, it is an ordinary finished row -- the
   // errand is run, and a box inviting you to run it again would be a lie.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -909,7 +912,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!isDecision && !setupOpen && detailView}
                   {node.detail && !isDecision && !setupOpen && !detailView && (
                     <p className="whitespace-pre-wrap text-ui text-ink-muted">
-                      <LinkedText text={readable(node.detail)} />
+                      <LinkedText text={readable(node.detail)} refs={stepRefs} />
                     </p>
                   )}
                   {(node.acceptance || acceptanceView) && (
@@ -917,7 +920,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       <SectionLabel>Done when</SectionLabel>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
-                          <LinkedText text={readable(node.acceptance ?? '')} />
+                          <LinkedText text={readable(node.acceptance ?? '')} refs={stepRefs} />
                         </p>
                       )}
                     </div>
@@ -929,13 +932,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     <div>
                       <SectionLabel>Needs</SectionLabel>
                       <p className="whitespace-pre-wrap text-ui text-ink">
-                        <LinkedText text={readable(node.blockAsk)} />
+                        <LinkedText text={readable(node.blockAsk)} refs={stepRefs} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
                     <Note className="whitespace-pre-wrap">
-                      <LinkedText text={readable(node.comment)} />
+                      <LinkedText text={readable(node.comment)} refs={stepRefs} />
                     </Note>
                   )}
 

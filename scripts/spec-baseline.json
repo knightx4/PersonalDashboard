@@ -1,6 +1,7 @@
 {
   "agent-action-gaps": 0,
   "conversational-model-paths": 8,
+  "hand-rolled-back-links": 0,
   "icon-stroke-off": 0,
   "learn-nav-tabs": 6,
   "link-tables-per-target-column": 4,
@@ -8,6 +9,7 @@
   "off-token-radius": 0,
   "raw-motion-values": 0,
   "routes-without-surface": 0,
+  "row-pages-without-path": 0,
   "shell-mounts": 1,
   "thread-tables": 1
 }

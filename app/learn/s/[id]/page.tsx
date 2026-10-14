@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
@@ -45,6 +44,8 @@ import {
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -306,17 +307,9 @@ export default async function SubjectPage({
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href="/learn/know"
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Subjects
-        </Link>
-      </p>
 
       <PageHeader
+        subject={await rowSubject(toRef('learn.subjects', id))}
         title={subject.name}
         description={
           counts.total === 0

@@ -21,10 +21,13 @@ const TODAY = '2026-10-07';
 function Header() {
   return (
     <PageHeader
-      crumbs={[
-        { label: 'Personality', href: '/you/personality' },
-        { label: 'Personality test', href: '/you/personality/test' },
-      ]}
+      subject={{
+        ref: null,
+        path: [
+          { label: 'Personality', href: '/you/personality' },
+          { label: 'Personality test', href: '/you/personality/test' },
+        ],
+      }}
       title="Personality test"
     />
   );

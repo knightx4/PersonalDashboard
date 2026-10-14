@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
 import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';
@@ -62,7 +62,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
 
   return (
     <li className="group flex items-stretch transition-colors duration-quick hover:bg-canvas">
-      <Link
+      <RowLink
         href={`/shopping/orders/${order.id}`}
         className={cn(
           'row-pad flex min-w-0 flex-1 items-center gap-3 pl-3 pr-2 transition-colors duration-quick',
@@ -102,7 +102,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
               </span>
             )}
         </p>
-      </Link>
+      </RowLink>
 
       <div className="flex shrink-0 items-center pr-2">
         <OrderRowMenu orderId={order.id} merchantName={order.merchant_name} />

@@ -1,5 +1,13 @@
 import { cn } from '@/lib/cn';
-import { Breadcrumb, type Crumb } from './breadcrumb';
+import { parentCrumb } from '@/lib/core/back-from';
+import { PathLine } from './back-link';
+import type { Crumb } from './breadcrumb';
+
+/**
+ * What a page is about: the ref of its row (null for a list page, or a page
+ * for something that is not a row) and the path from the workspace down to it.
+ */
+export type Subject = { ref: string | null; path: readonly Crumb[] };
 
 /**
  * The page's own heading.
@@ -39,9 +47,22 @@ import { Breadcrumb, type Crumb } from './breadcrumb';
  * and without the wrap they squeezed each other until their labels broke onto
  * two lines inside a button one line tall (seen on a newsletter, plan #788).
  *
- * `crumbs` is the path down to the page (plan #1622), drawn on one line above
- * the heading. The header's margin moves out to hold both, so a page without
- * crumbs is drawn exactly as before.
+ * `subject` is what the page is about and the path down to it (plan #1622,
+ * #1931.2), drawn on one line above the heading: workspace › section › the
+ * rows above › the row. A page for one row makes it with `rowSubject(ref)`
+ * (lib/core/subject.ts), which reads the path from the catalogue by refPath;
+ * a list page with `sectionSubject(href, label)` (lib/core/section-path.ts),
+ * workspace › section. The path is resolved before it gets here, so the
+ * header stays drawable from a client component. The header's margin moves
+ * out to hold both, so a page without a subject is drawn exactly as before.
+ *
+ * With the path comes the one back link (plan #1931.3, components/shell/
+ * back-link.tsx): to the list named by the address's `from`, else to the
+ * path's parent. A row page has it always, as does any page three or more
+ * parts down; a list page (workspace › section) has it only when it was
+ * opened from somewhere with a `from`. `back` names where it goes for a page
+ * whose way back is not its parent, and draws it on a page that would not
+ * otherwise have one.
  */
 export function PageHeader({
   title,
@@ -49,7 +70,8 @@ export function PageHeader({
   actions,
   leading,
   bulk,
-  crumbs,
+  subject,
+  back,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -57,9 +79,12 @@ export function PageHeader({
   leading?: React.ReactNode;
   /** What can be done to a selection, wrapped in SelectionActionBar. */
   bulk?: React.ReactNode;
-  /** The path from the workspace down to this page, the last part this page. */
-  crumbs?: readonly Crumb[];
+  /** What the page is about and the path to it, the last part this page. */
+  subject?: Subject;
+  /** Where the back link goes when the address names no list. */
+  back?: Crumb;
 }) {
+  const crumbs = subject?.path.length ? subject.path : null;
   const header = (
     <div className={cn('group/header grid', !crumbs && 'mb-5')}>
       <div className="col-start-1 row-start-1 flex flex-wrap items-start gap-3 group-has-[[data-selection-bar]]/header:invisible">
@@ -78,8 +103,15 @@ export function PageHeader({
   if (!crumbs) return header;
   return (
     <div className="mb-5">
-      <Breadcrumb crumbs={crumbs} className="mb-2" />
+      <PathLine crumbs={crumbs} fallback={backFallback(subject!, back)} className="mb-2" />
       {header}
     </div>
   );
+}
+
+/** Where a page's back link goes without a `from`, or null for none. */
+function backFallback(subject: Subject, back: Crumb | undefined): Crumb | null {
+  if (back) return back;
+  if (subject.ref === null && subject.path.length < 3) return null;
+  return parentCrumb(subject.path);
 }

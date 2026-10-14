@@ -17,6 +17,7 @@ import {
 } from '@/lib/timeline/months';
 import { TIMELINE_MODULES } from '@/lib/timeline/timeline';
 import { TimelineView } from './view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Timeline' };
 
@@ -75,6 +76,7 @@ export default async function TimelinePage({
   return (
     <>
       <PageHeader
+        subject={sectionSubject('/timeline', 'Timeline')}
         title="Timeline"
         description="What you did across the app, month by month."
         actions={

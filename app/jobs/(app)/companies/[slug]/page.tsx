@@ -10,6 +10,8 @@ import { CompanyPanels } from './panels';
 import { CompanyRoles } from './company-roles';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Company' };
 
@@ -125,6 +127,7 @@ export default async function CompanyDetailPage({
   return (
     <PageColumn>
       <PageHeader
+        subject={await rowSubject(toRef('job_search.companies', company.id as string))}
         leading={
           <CompanyAvatar
             company={{

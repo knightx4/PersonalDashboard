@@ -1,3 +1,4 @@
+import { sectionSubject } from '@/lib/core/section-path';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { HAIKU, MODELS, SONNET } from '@/lib/core/models';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
@@ -264,7 +265,14 @@ const STUDY_FOUND: StudyState = { kind: 'found', items: studyItems, searched: tr
 export function LearnEssaySurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} study={STUDY_FOUND} />
+      <EssayView
+        essay={essay}
+        study={STUDY_FOUND}
+        path={sectionSubject('/learn/essays', 'Essays', {
+          label: 'Why money is the odd good out',
+          href: `/learn/e/${essay.id}`,
+        })}
+      />
     </WithCosts>
   );
 }

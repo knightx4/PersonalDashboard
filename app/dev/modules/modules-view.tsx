@@ -55,10 +55,7 @@ function indexLine(summary: ModuleSummary): string {
 export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSummary[] }) {
   return (
     <PageColumn>
-      <PageHeader
-        crumbs={moduleCrumbs()}
-        title="Modules"
-      />
+      <PageHeader subject={{ ref: null, path: moduleCrumbs() }} title="Modules" />
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
         {summaries.map((summary) => (
           <li key={summary.module.id}>
@@ -494,7 +491,7 @@ export function ModuleView({
 
   return (
     <TabbedDetail
-      crumbs={moduleCrumbs(summary.module)}
+      subject={{ ref: null, path: moduleCrumbs(summary.module) }}
       title={summary.module.label}
       description={summary.module.description}
       glance={glance}

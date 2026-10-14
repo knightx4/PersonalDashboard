@@ -1,5 +1,4 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
+import { sectionSubject } from '@/lib/core/section-path';
 import { PageHeader } from '@/components/shell/page-header';
 import { ImportForm } from './import-form';
 import { StartForm } from './start-form';
@@ -19,17 +18,13 @@ export const dynamic = 'force-dynamic';
 export default function NewTrackPage() {
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href="/learn/lists"
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Reading lists
-        </Link>
-      </p>
-
-      <PageHeader title="New reading list" />
+      <PageHeader
+        subject={sectionSubject('/learn/lists', 'Reading lists', {
+          label: 'New reading list',
+          href: '/learn/new',
+        })}
+        title="New reading list"
+      />
 
       <div className="max-w-2xl space-y-8">
         <section>

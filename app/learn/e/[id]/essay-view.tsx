@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowRight, ChevronLeft } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -51,6 +51,9 @@ import { EssayFinishCard, type FinishView } from './essay-finish';
 import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
 import { Tooltip } from '@/components/ui/tooltip';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -537,6 +540,7 @@ export function EssayView({
   finishView,
   finishStage,
   publishView,
+  path: subject,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -558,6 +562,8 @@ export function EssayView({
   finishView?: FinishView;
   /** The stage the gallery's finished essay is at. */
   finishStage?: EssayStage;
+  /** The path to the essay, from the page (rowSubject); the gallery passes none and keeps the link to Essays. */
+  path?: PageSubject;
   /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
   publishView?: PublishView;
 }) {
@@ -696,13 +702,13 @@ export function EssayView({
     <div className="flex max-w-2xl flex-col">
       <h1 className="sr-only">{title}</h1>
       <div className={cn('mb-6 flex min-h-11 items-center justify-between gap-3', quiet)}>
-        <Link
-          href="/learn/essays"
-          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          Essays
-        </Link>
+        {/* The path, workspace › Essays › this essay, and the one back link
+            (plans #1931.2, #1931.3). */}
+        {subject ? (
+          <PathLine crumbs={subject.path} fallback={parentCrumb(subject.path)} />
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-1">
           <PaidHint action="app/learn/e/[id]/actions.ts#rephraseEssaySelection" what="Cost of a rephrase" />
           <Button

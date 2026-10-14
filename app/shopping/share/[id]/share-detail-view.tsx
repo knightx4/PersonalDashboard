@@ -1,5 +1,4 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -8,6 +7,7 @@ import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
 import { formatClock } from '@/lib/clock';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** One title on the form, as share_page() returns it. */
 export type ShareGroup = {
@@ -48,25 +48,22 @@ export function ShareDetailView({
   tokens,
   events,
   origin,
+  path,
 }: {
   share: { id: string; title: string; status: string };
   groups: ShareGroup[];
   tokens: ShareToken[];
   events: ShareEvent[];
   origin: string;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const answered = groups.filter((g) => g.keepQty + g.sellQty + g.giveawayQty > 0);
 
   return (
     <PageColumn className="[&_a]:press-area">
-      <Link
-        href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
-      </Link>
-
       <PageHeader
+        subject={path}
         title={share.title}
         description={
           share.status === 'active'

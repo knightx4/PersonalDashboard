@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadBrief } from '@/lib/learn/briefs/load';
 import { BriefView } from './brief-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 // Try again runs the research after its response (actions.ts#retryBrief):
@@ -25,5 +27,5 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function BriefPage({ params }: { params: Promise<{ id: string }> }) {
   const page = await read((await params).id);
   if (!page) notFound();
-  return <BriefView page={page} />;
+  return <BriefView page={page} path={await rowSubject(toRef('learn.briefs', page.brief.id))} />;
 }

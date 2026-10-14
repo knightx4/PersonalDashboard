@@ -395,8 +395,14 @@ describe('the top bar title', () => {
     expect(bar).not.toContain('Quick read');
   });
 
-  it('follows the workspace with a link back to the section below its first page', () => {
-    expect(title('/news/story/1')).toContain('href="/news">Quick read<');
-    expect(title('/news/saved/2')).toContain('href="/news/saved">Saved<');
+  // Below a section's first page too: the page's own path says where it sits
+  // (PageHeader's subject, plan #1931.2), so the bar does not say it again.
+  it('names the workspace alone on every page under a section', () => {
+    for (const pathname of ['/news/story/1', '/news/saved', '/news/saved/2']) {
+      const bar = title(pathname);
+      expect(bar, pathname).toContain('>News');
+      expect(bar, pathname).not.toContain('<a');
+      expect(bar, pathname).not.toContain('›');
+    }
   });
 });

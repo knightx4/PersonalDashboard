@@ -11,6 +11,7 @@ import type { MergeLogPage } from '@/lib/vault/map/merge-log';
 import type { SweepView } from '@/lib/vault/map/sweep-read';
 import type { MayaThreadDetail, MayaThreadNote, MayaThreadRow } from '@/lib/vault/maya/store';
 import { syncProgress, type SyncRunSummary } from '@/lib/vault/sync/progress';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The Vault pages that had no picture (plan #1605), each drawn by the view
@@ -202,7 +203,12 @@ const themeMap: ThemeMap = {
 };
 
 export function VaultThemeSurface() {
-  return <ThemeView map={themeMap} />;
+  // The path the page reads from the catalogue: Vault › Map › the theme.
+  const path = sectionSubject('/vault/map', 'Map', {
+    label: themeMap.theme.name,
+    href: `/vault/map/${themeMap.theme.id}`,
+  });
+  return <ThemeView map={themeMap} path={path} />;
 }
 
 // ---- Maya: the threads -----------------------------------------------------
@@ -362,7 +368,14 @@ export function VaultMayaThreadSurface() {
         },
       }}
     >
-      <MayaThreadView thread={thread} cited={cited} />
+      <MayaThreadView
+        thread={thread}
+        cited={cited}
+        path={sectionSubject('/vault/maya', 'Maya', {
+          label: thread.question,
+          href: `/vault/maya/${thread.id}`,
+        })}
+      />
     </PaidCostsProvider>
   );
 }

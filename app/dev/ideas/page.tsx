@@ -4,6 +4,7 @@ import { loadIdeas } from '@/lib/ideas/load';
 import { parseIdeaGrouping, parseIdeaSort } from '@/lib/ideas/view';
 import { IdeasView } from './ideas-view';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Ideas' };
 
@@ -36,9 +37,7 @@ export default async function DevIdeasPage({
 
   return (
     <PageColumn className="space-y-6">
-      <PageHeader
-        title="Ideas"
-      />
+      <PageHeader subject={sectionSubject('/dev/ideas', 'Ideas')} title="Ideas" />
       <IdeasView ideas={ideas} grouping={grouping} sort={sort} />
     </PageColumn>
   );

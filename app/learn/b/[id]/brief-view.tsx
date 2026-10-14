@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Sparkle } from 'lucide-react';
+import { Sparkle } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,9 @@ import {
 import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** How often a researching brief asks the server for what the run has written. */
 const POLL_MS = 4000;
@@ -400,11 +403,14 @@ export function BriefView({
   live = true,
   openQuote,
   editing = false,
+  path,
 }: {
   page: BriefPage;
   live?: boolean;
   openQuote?: string;
   editing?: boolean;
+  /** The path to the brief, from the page (rowSubject); the gallery passes none and keeps the link to Now. */
+  path?: PageSubject;
 }) {
   const { brief, sources } = page;
   const sourcesFound = Object.keys(sources).length;
@@ -413,13 +419,9 @@ export function BriefView({
 
   const main = (
     <div className="flex flex-col gap-4">
-      <Link
-        href="/learn/now"
-        className="-mb-1 inline-flex min-h-11 items-center gap-1 self-start text-ui text-ink-muted hover:text-ink lg:min-h-8"
-      >
-        <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-        Now
-      </Link>
+      {/* The path, Learn › this brief, and the one back link (plans
+          #1931.2, #1931.3). */}
+      {path && <PathLine crumbs={path.path} fallback={parentCrumb(path.path)} className="-mb-1" />}
       <header>
         <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{brief.question}</h1>
       </header>

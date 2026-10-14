@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -96,7 +96,7 @@ function PipelineLine({ row }: { row: PipelineRow }) {
 
   return (
     <li>
-      <Link
+      <RowLink
         href={`/jobs/roles/${row.roleId}`}
         // ui-ok: fixed-control-height -- the number is the experiment. This is
         // a row, not a control, and it is written flat rather than taken from
@@ -161,7 +161,7 @@ function PipelineLine({ row }: { row: PipelineRow }) {
         >
           {shortAge(row.lastActivityAt)}
         </span>
-      </Link>
+      </RowLink>
     </li>
   );
 }

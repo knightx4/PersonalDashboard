@@ -40,6 +40,7 @@ import {
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
+import { RefPreviewSurface } from './ref-preview-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -4509,8 +4510,28 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable />
+      </div>
+    ),
+  },
+  {
+    /* Triage on its second note (plan #1931.5): the first is left for later,
+     * so Previous sits beside the forward press. */
+    id: 'vault-triage-previous',
+    label: 'Vault · Quick note triage, Previous',
+    module: 'vault',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-deck-previous]',
+      shows: 'Previous brings the first note back under the finger, as it was left.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
+        <TriagePreview writable second />
       </div>
     ),
   },
@@ -4522,7 +4543,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview empty writable />
       </>
     ),
@@ -4536,7 +4557,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable={false} />
       </div>
     ),
@@ -4804,7 +4825,15 @@ export const SURFACES: readonly Surface[] = [
     label: 'Now · One card at a time',
     module: 'learn',
     width: 'narrow',
-    render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,
+    interaction: {
+      kind: 'press',
+      target: '[data-deck-previous]',
+      shows: 'Previous puts the card just passed back on top.',
+    },
+    // On its second card (plan #1931.5): the first is passed, so Previous shows.
+    render: () => (
+      <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
+    ),
   },
   {
     /* Now opened from a subject's page (plan #1698), with nothing of it
@@ -5948,6 +5977,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'wide',
     render: () => <UiKit />,
+  },
+
+  /* A ref link's preview held open (plan #1931.4): the hidden part of every
+   * comment, Dash reply and plan detail that names a row. */
+  {
+    id: 'ref-preview',
+    label: 'Design · A ref link previewing its row',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <RefPreviewSurface />,
   },
 
   /* The day closing on the agenda (plan #1556): played by ticking the last

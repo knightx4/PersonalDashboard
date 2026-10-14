@@ -3,6 +3,8 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuiz } from '@/lib/learn/quiz/load';
 import { nextQuestion } from '@/lib/learn/quiz/model';
 import { TakeQuizView } from './take-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,5 +28,14 @@ export default async function TakeQuizPage({ params }: { params: Promise<{ id: s
   const current = nextQuestion(quiz);
   if (!current) redirect(`/learn/quiz/${quiz.id}`);
 
-  return <TakeQuizView quiz={quiz} current={current} />;
+  return (
+    <TakeQuizView
+      quiz={quiz}
+      current={current}
+      path={await rowSubject(toRef('learn.quizzes', id), {
+        label: 'Take',
+        href: `/learn/quiz/${id}/take`,
+      })}
+    />
+  );
 }

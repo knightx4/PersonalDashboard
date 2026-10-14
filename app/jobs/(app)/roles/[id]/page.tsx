@@ -37,6 +37,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { loadThread } from '@/lib/thread/store';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 /** The columns of an interview row the prep key is computed from. */
 type PrepInterviewRow = {
@@ -396,6 +398,7 @@ export default async function RoleDetailPage({
     <PageColumn className="space-y-4">
         <>
           <PageHeader
+            subject={await rowSubject(toRef('job_search.roles', role.id as string))}
             leading={
               <CompanyAvatar
                 company={{

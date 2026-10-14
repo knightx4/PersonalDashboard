@@ -13,7 +13,7 @@
  * the check again; its baseline entry goes with it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { actionGaps } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
@@ -284,6 +284,87 @@ function routesWithoutSurface(root: string): string[] {
   return [...routes].sort();
 }
 
+// -- docs/ONE-INTERFACE-SPEC.md -------------------------------------------------
+
+/**
+ * Part 2: every page for one row says where it sits, drawn from the
+ * catalogue by refPath (lib/core/refs.ts, plan #1931). A page for one row is
+ * a `page.tsx` whose route has a dynamic segment (`[id]`, `[...path]`). It
+ * draws a path when it, or a file it imports from app/ or components/ (two
+ * imports deep, which reaches a page's view and that view's header), passes
+ * `crumbs` or a PageHeader or TabbedDetail `subject`, or draws a Breadcrumb itself. Pages
+ * that only send the visitor on are not counted, nor is /open/[ref], which is
+ * one of those that reads a row first, nor the two pages for someone with no
+ * account (a case page sent to an employer, a shared shelf), which sit in no
+ * workspace and have nowhere to lead back to.
+ */
+const DRAWS_PATH =
+  /\bcrumbs=\{|<Breadcrumb\b|<(?:PageHeader|TabbedDetail)\b[\s\S]{0,2000}?\bsubject=\{/;
+const LOCAL_IMPORT = /\bfrom\s+'((?:\.{1,2}\/|@\/(?:app|components)\/)[^']+)'/g;
+const NOT_ROW_PAGES = new Set(['app/open/[ref]/page.tsx', 'app/jobs/p/[slug]/page.tsx', 'app/s/[token]/page.tsx']);
+/**
+ * The shared shell and patterns pass a path through (PageHeader draws the
+ * Breadcrumb it is given), so importing them is not drawing one.
+ */
+const PASSES_PATH_THROUGH = /^components\/(?:shell|patterns)\//;
+
+function importedFiles(root: string, file: string, text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(LOCAL_IMPORT)) {
+    const spec = m[1];
+    const base = spec.startsWith('@/') ? spec.slice(2) : join(dirname(file), spec);
+    const found = ['.tsx', '.ts', '/index.tsx', '/index.ts']
+      .map((ext) => `${base}${ext}`)
+      .find((candidate) => existsSync(join(root, candidate)));
+    if (found && !PASSES_PATH_THROUGH.test(found)) out.push(found);
+  }
+  return out;
+}
+
+function drawsPath(root: string, file: string, depth: number, seen: Set<string>): boolean {
+  if (seen.has(file)) return false;
+  seen.add(file);
+  const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+  if (DRAWS_PATH.test(text)) return true;
+  if (depth === 0) return false;
+  return importedFiles(root, file, text).some((next) => drawsPath(root, next, depth - 1, seen));
+}
+
+function rowPagesWithoutPath(root: string): string[] {
+  return listFiles(root, ['app'], ['.tsx'])
+    .filter((file) => /\/page\.tsx$/.test(file) && /\/\[/.test(file) && !NOT_ROW_PAGES.has(file))
+    .filter((file) => routeOfFile(file) !== null)
+    .filter((file) => !isRedirectOnly(readFileSync(join(root, file), 'utf8')))
+    .filter((file) => !drawsPath(root, file, 2, new Set()))
+    .sort();
+}
+
+/**
+ * Part 2 (plan #1931.3): a row page has one back link, drawn by PageHeader
+ * through components/shell/back-link.tsx, which keeps the list's filters and
+ * its scroll. A hand-rolled one is a link whose first child is a left arrow or
+ * chevron followed by its label, or a button that calls the router's or the
+ * history's back(). A chevron alone in a link, such as the day before on a
+ * calendar or a review, is a step through siblings and is not counted; nor is
+ * the gallery, which draws pages that are not the app's.
+ */
+const HAND_BACK_LINK =
+  /<(?:Link|a)\b[^>]*\bhref=[^>]*>\s*<(?:ArrowLeft|ChevronLeft)\b[^>]*\/>\s*(?![<\s])/g;
+const HISTORY_BACK = /\b(?:router|history)\.back\(\)/g;
+const BACK_LINK_HOME = new Set(['components/shell/back-link.tsx']);
+
+function handRolledBackLinks(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !BACK_LINK_HOME.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(HAND_BACK_LINK), ...text.matchAll(HISTORY_BACK)].map(
+        (m) => `${file}:${lineAt(text, m.index ?? 0)}`,
+      );
+    })
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -380,6 +461,18 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
         pattern: /<AppShell\b/,
         exclude: /^app\/preview\/|\.test\.tsx$/,
       }),
+  },
+  {
+    name: 'row-pages-without-path',
+    counts: 'pages for one row that draw no path to it',
+    target: 0,
+    measure: rowPagesWithoutPath,
+  },
+  {
+    name: 'hand-rolled-back-links',
+    counts: 'back links a page draws itself rather than through PageHeader',
+    target: 0,
+    measure: handRolledBackLinks,
   },
   {
     // Plan #1895: the actions a page lets the person do that an agent should

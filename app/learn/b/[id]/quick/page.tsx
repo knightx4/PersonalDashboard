@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuickRead } from '@/lib/learn/briefs/quick-read';
+import { toRef } from '@/lib/core/refs';
+import { rowSubject } from '@/lib/core/subject';
 import { QuickRead } from './quick-read';
 
 export const dynamic = 'force-dynamic';
@@ -27,11 +29,10 @@ export default async function BriefQuickReadPage({ params }: { params: Promise<{
   return (
     <PageColumn className="max-w-2xl">
       <PageHeader
-        crumbs={[
-          { label: 'Learn', href: '/learn' },
-          { label: page.brief.question, href: `/learn/b/${page.brief.id}` },
-          { label: 'Quick read', href: `/learn/b/${page.brief.id}/quick` },
-        ]}
+        subject={await rowSubject(toRef('learn.briefs', page.brief.id), {
+          label: 'Quick read',
+          href: `/learn/b/${page.brief.id}/quick`,
+        })}
         title="Quick read"
       />
       <QuickRead briefId={page.brief.id} status={page.brief.status} cards={page.cards} />

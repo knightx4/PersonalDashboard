@@ -1,5 +1,4 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
@@ -9,6 +8,7 @@ import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -16,25 +16,19 @@ export type PiecePageProps = {
   standing: { practicePassed: boolean; checkPassed: boolean };
   /** Ideas from this plan's passed pieces due for review, this piece's own left out. */
   reviews: DueReview[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 };
 
 /** One piece of a learning goal's plan, from what its page read (plan #1602). */
-export function PiecePageView({ page, practice, standing, reviews }: PiecePageProps) {
+export function PiecePageView({ page, practice, standing, reviews, path }: PiecePageProps) {
   const { piece, subject, unit, siblings } = page;
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
 
       <PageHeader
+        subject={path}
         title={piece.title}
         description={`Unit ${unit.ordinal}, ${unit.title} · piece ${piece.ordinal} of ${siblings.length}${
           piece.passedAt ? ' · passed' : ''

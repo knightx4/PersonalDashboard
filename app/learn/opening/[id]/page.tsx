@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadSweep } from '@/lib/learn/graph/opening';
 import { OpeningView } from './opening-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,5 +15,5 @@ export default async function OpeningPage({ params }: { params: Promise<{ id: st
   const sweep = await loadSweep(supabase, id);
   if (!sweep) notFound();
 
-  return <OpeningView sweep={sweep} />;
+  return <OpeningView sweep={sweep} path={await rowSubject(toRef('learn.opening_sweeps', id))} />;
 }

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
 import { RunChanges } from '@/app/goals/runs/[runId]/run-changes';
-import { BackButton, EmailFrame } from '@/app/mail/[id]/reader';
+import { EmailFrame } from '@/app/mail/[id]/reader';
 import { MessageHead } from '@/app/mail/[id]/message-head';
 import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
@@ -157,8 +157,18 @@ export function MailMessageSurface() {
 
   return (
     <PageColumn>
-      <BackButton />
-      <PageHeader title={subject} description={`${MESSAGES.length} messages`} />
+      <PageHeader
+        subject={{
+          ref: null,
+          path: [
+            { label: 'Home', href: '/home' },
+            { label: subject, href: '/mail/t1' },
+          ],
+        }}
+        back={{ label: 'Home', href: '/home' }}
+        title={subject}
+        description={`${MESSAGES.length} messages`}
+      />
       <div className="mb-4 flex flex-wrap gap-2">
         {reply && (
           <a href={reply} className={buttonVariants({ variant: 'primary', size: 'md' })}>

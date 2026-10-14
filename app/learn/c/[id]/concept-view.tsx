@@ -1,5 +1,4 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
@@ -33,6 +32,7 @@ import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
 import { EvidenceList } from '@/components/learn/evidence-list';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * What /learn/c/[id] draws, from what its page read: the page hands its reads
@@ -187,7 +187,8 @@ export function ConceptPageView({
   evidence = [],
   timezone,
   now,
-}: ConceptPageProps) {
+  path,
+}: ConceptPageProps & { path?: PageSubject }) {
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
 
   const connected =
@@ -198,17 +199,8 @@ export function ConceptPageView({
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
 
-      <PageHeader title={concept.name} />
+      <PageHeader subject={path} title={concept.name} />
 
       {/* The claim, the offer to branch off a phrase in it, and the way to
           write it yourself. */}

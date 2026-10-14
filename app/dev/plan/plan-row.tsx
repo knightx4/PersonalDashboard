@@ -228,7 +228,7 @@ function SetupJob({
         <div className="space-y-0.5">
           <QuestionPartLabel>What to set up</QuestionPartLabel>
           <p className="whitespace-pre-wrap text-ui text-ink">
-            <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} />
+            <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} refs="all" />
           </p>
         </div>
         <form action={action} className="space-y-2">

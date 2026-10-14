@@ -36,10 +36,13 @@ export default async function PersonalityTestPage() {
   return (
     <PageColumn>
       <PageHeader
-        crumbs={[
-          { label: 'Personality', href: '/you/personality' },
-          { label: 'Personality test', href: '/you/personality/test' },
-        ]}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'Personality', href: '/you/personality' },
+            { label: 'Personality test', href: '/you/personality/test' },
+          ],
+        }}
         title="Personality test"
       />
       <BigFiveTest latest={latest} />

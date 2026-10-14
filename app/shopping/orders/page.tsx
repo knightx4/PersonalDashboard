@@ -48,6 +48,7 @@ import {
 import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Orders' };
 
@@ -436,6 +437,7 @@ export default async function OrdersPage({
 
       <div className="min-w-0 flex-1">
         <PageHeader
+          subject={sectionSubject('/shopping/orders', 'Orders')}
           title="Orders"
           description="Everything you have bought, newest first."
           actions={

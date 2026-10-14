@@ -3,6 +3,8 @@ import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { getPlace } from '@/lib/you/places-store';
 import { removePlace } from '../actions';
+import { toRef } from '@/lib/core/refs';
+import { rowSubject } from '@/lib/core/subject';
 import { PlaceView } from '../place-view';
 
 export const metadata = { title: 'Place' };
@@ -16,5 +18,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!UUID.test(id)) notFound();
   const place = await getPlace(await createYouClient(), user.id, id);
   if (!place) notFound();
-  return <PlaceView place={place} thisMonth={new Date().toISOString().slice(0, 7)} remove={removePlace} />;
+  return (
+    <PlaceView
+      place={place}
+      thisMonth={new Date().toISOString().slice(0, 7)}
+      remove={removePlace}
+      subject={await rowSubject(toRef('you.places', place.id))}
+    />
+  );
 }

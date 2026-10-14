@@ -109,6 +109,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-quick-note-read-only': ['/vault'],
   'vault-triage': ['/vault/triage'],
   'vault-triage-empty': ['/vault/triage'],
+  'vault-triage-previous': ['/vault/triage'],
   'vault-triage-read-only': ['/vault/triage'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
@@ -235,6 +236,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
   'ui-kit': ['/dev/ui'],
+  // A ref link's preview held open (plan #1931.4): in comments, Dash's
+  // replies and plan details.
+  'ref-preview': ['/dev/plan', '/dev/inbox', '/goals'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
@@ -429,6 +433,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
+  // A ref link with its preview open, loading and gone (plan #1931.4).
+  'ref-preview': ['components/ui/ref-link.tsx'],
   // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
   // Without this a change to Button or Card reached every surface in the
   // gallery, and each had to be settled by hand. A new file in components/ui

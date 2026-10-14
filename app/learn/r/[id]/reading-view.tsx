@@ -1,3 +1,4 @@
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 import Link, { linkVariants } from '@/components/ui/link';
 import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
@@ -66,6 +67,8 @@ export type ReadingViewProps = {
   thread?: readonly DevComment[];
   /** Gallery only: the chat's waiting line and open box. */
   chatState?: { awaitingReply?: boolean; composerOpen?: boolean };
+  /** The path from the catalogue (rowSubject); the gallery passes none and gets it from the reading. */
+  path?: PageSubject;
 };
 
 /**
@@ -82,6 +85,7 @@ export function ReadingView({
   summaryFailure = null,
   thread = [],
   chatState,
+  path,
 }: ReadingViewProps) {
   const byline =
     [reading.source?.author, reading.source?.year ? String(reading.source.year) : null]
@@ -90,12 +94,17 @@ export function ReadingView({
 
   return (
     <TabbedDetail
-      crumbs={[
-        { label: 'Learn', href: '/learn' },
-        { label: 'Lists', href: '/learn/lists' },
-        { label: reading.trackTitle, href: `/learn/t/${reading.trackId}` },
-        { label: reading.subject, href: `/learn/r/${reading.id}` },
-      ]}
+      subject={
+        path ?? {
+          ref: `learn.readings:${reading.id}`,
+          path: [
+            { label: 'Learn', href: '/learn/now' },
+            { label: 'Reading lists', href: '/learn/lists' },
+            { label: reading.trackTitle, href: `/learn/t/${reading.trackId}` },
+            { label: reading.subject, href: `/learn/r/${reading.id}` },
+          ],
+        }
+      }
       title={reading.subject}
       description={byline}
       actions={

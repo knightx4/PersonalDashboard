@@ -161,7 +161,7 @@ function Turn({
             you typed stays as you typed it. */}
         {turn.role === 'assistant' ? (
           <div className="text-body text-ink">
-            <CommentBody body={turn.body} refs={false} />
+            <CommentBody body={turn.body} refs="outlines" />
           </div>
         ) : (
           <p className="text-body whitespace-pre-wrap text-ink">
@@ -449,7 +449,7 @@ export function TalkThread({
                 {working}
                 {written && (
                   <div className="text-body text-ink">
-                    <CommentBody body={written} refs={false} />
+                    <CommentBody body={written} refs="outlines" />
                   </div>
                 )}
               </div>

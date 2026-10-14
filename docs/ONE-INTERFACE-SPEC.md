@@ -460,13 +460,13 @@ Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 43, target 0, pending #1932.
+Checked by: count `row-pages-without-path`, baseline 33, target 0.
 
 **R4.** There is one back-link component.
-Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending #1934.
+Checked by: count `hand-rolled-back-links`, baseline 32, target 0.
 
 **R5.** Back from a row lands on the list at the same scroll offset.
-Checked by: test `tests/flows/search-open-back.test.ts`, pending #1934.
+Checked by: test `tests/flows/search-open-back.test.ts`.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
 Checked by: count `date-formatting-files`, baseline 116, target 1, pending #1961.

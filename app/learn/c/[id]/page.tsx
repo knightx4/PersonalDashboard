@@ -10,6 +10,8 @@ import { loadConceptNotes } from '@/lib/learn/notes/store';
 import { loadEvidenceForIdea } from '@/lib/learn/evidence/links';
 import { CARD_EVIDENCE_LIMIT } from '@/lib/learn/evidence/model';
 import { ConceptPageView } from './concept-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +91,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       evidence={evidence}
       timezone={settings.timezone}
       now={new Date()}
+      path={await rowSubject(toRef('learn.concepts', id))}
     />
   );
 }

@@ -41,6 +41,7 @@ import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 
@@ -202,6 +203,7 @@ export default async function KnowPage({
   return (
     <PageColumn>
       <PageHeader
+        subject={sectionSubject('/learn/know', 'Subjects')}
         title="Subjects"
         description="One graph per subject, and it grows every time you use it."
         actions={

@@ -1,6 +1,7 @@
+import { sectionSubject } from '@/lib/core/section-path';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Flag, ListTree } from 'lucide-react';
+import { Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -66,13 +67,8 @@ export default async function FilePage({
 
   return (
     <PageColumn>
-      <Link
-        href="/goals/files"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Files
-      </Link>
       <PageHeader
+        subject={sectionSubject('/goals/files', 'Files', { label: shown.title, href: fileHref(file.id) })}
         title={shown.title}
         description={
           <>

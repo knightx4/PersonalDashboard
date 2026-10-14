@@ -303,7 +303,7 @@ describe('read_dev_row', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1248 Read a row',
-        href: '/dev/plan?view=all&q=%231248',
+        href: '/dev/plan/1248',
       });
       expect(row.detail).toMatchObject({
         under: '#1319 Let Dash read your Dev pages in full',
@@ -337,7 +337,7 @@ describe('read_dev_row', () => {
       const [row] = result.rows;
       expect(row.title).toBe('#1319.1 Read a row');
       // The link still carries the number, the step's identity.
-      expect(row.href).toBe('/dev/plan?view=all&q=%231248');
+      expect(row.href).toBe('/dev/plan/1248');
       expect(row.detail).toMatchObject({
         step: '#1319.1',
         number: 1248,
@@ -499,7 +499,7 @@ describe('find_dev_text', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1400 Show counts',
-        href: '/dev/plan?view=all&q=%231400',
+        href: '/dev/plan/1400',
         detail: {
           kind: 'comment',
           field: 'comment',
@@ -522,7 +522,7 @@ describe('find_dev_text', () => {
     const result = await find({ query: 'drop step', kinds: ['comment'] }, { tables: outlined });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: '#1390.2 Show counts',
-      href: '/dev/plan?view=all&q=%231400',
+      href: '/dev/plan/1400',
       detail: { excerpt: 'Drop this step, #1320.3 covers it.' },
     });
   });
