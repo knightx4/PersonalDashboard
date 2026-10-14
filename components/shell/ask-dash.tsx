@@ -11,11 +11,11 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import Link, { linkVariants } from '@/components/ui/link';
-import { IconButton } from '@/components/ui/icon-button';
+import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { SquarePen, X } from 'lucide-react';
+import { Maximize2, SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
@@ -520,6 +520,9 @@ export function AskDashPanel({
   // Whether the question on screen has become a conversation, which is when
   // "New question" has something to leave.
   const [started, setStarted] = useState(false);
+  // The chat on screen once it has an address, for the button that opens it
+  // on the full page (plan #1899.2).
+  const [chatRef, setChatRef] = useState<string | null>(null);
   const [costs, setCosts] = useState<PaidCosts>({});
 
   useEffect(() => {
@@ -569,6 +572,7 @@ export function AskDashPanel({
   function show(next: View) {
     setView(next);
     setStarted(next.kind === 'earlier');
+    setChatRef(next.kind === 'earlier' ? next.ref : null);
     setThreadKey((key) => key + 1);
   }
 
@@ -612,6 +616,15 @@ export function AskDashPanel({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
+              <Tooltip label="Open on Dash's page" align="end">
+                <Link
+                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  aria-label="Open on Dash's page"
+                  className={iconButtonVariants()}
+                >
+                  <Maximize2 strokeWidth={1.75} aria-hidden />
+                </Link>
+              </Tooltip>
               {started && (
                 <Tooltip label="New question" align="end">
                   <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
@@ -637,7 +650,10 @@ export function AskDashPanel({
                 source={source}
                 hint={hint}
                 lookingAt={lookingAt}
-                onStarted={() => setStarted(true)}
+                onStarted={(ref) => {
+                  setStarted(true);
+                  setChatRef(ref);
+                }}
                 onReopen={(conversation) =>
                   show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
                 }
@@ -675,7 +691,7 @@ function NewQuestion({
   source: AskSource;
   hint: React.ReactNode;
   lookingAt: React.ReactNode;
-  onStarted: () => void;
+  onStarted: (ref: string) => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));

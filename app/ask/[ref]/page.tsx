@@ -1,19 +1,17 @@
-import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
 import { countOpenAskHandoffs, loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
-import { AskConversation } from '../view';
+import { AskConversation, ChatHeader } from '../view';
 
-export const metadata = { title: 'Question to Dash' };
+export const metadata = { title: 'Dash' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * One question asked of Dash, reopened (plan #1090): the answer with the rows
- * it used, the changes it proposed as cards in their current state (#1190),
- * and the box to ask a follow-up in the same conversation.
+ * One chat with Dash, open beside the list (plans #1090, #1899.2): the
+ * answers with the rows they used, the changes Dash proposed as cards in
+ * their current state (#1190), and the box to carry on. On a phone it is
+ * drawn over the list, with the way back above its title.
  */
 export default async function AskConversationPage({
   params,
@@ -33,14 +31,7 @@ export default async function AskConversationPage({
 
   return (
     <>
-      <Link
-        href="/ask"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Questions to Dash
-      </Link>
-      <PageHeader title={askTitle(first.body)} />
+      <ChatHeader title={askTitle(first.body)} />
       <AskConversation conversationRef={ref} turns={turns} changes={changes} openHandoffs={openHandoffs} />
     </>
   );

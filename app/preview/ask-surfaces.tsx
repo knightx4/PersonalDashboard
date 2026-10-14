@@ -13,6 +13,11 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { SONNET } from '@/lib/core/models';
 import { PageColumn } from '@/components/shell/page-width';
+import { AppShell } from '@/components/shell/app-shell';
+import { Conversation } from '@/components/patterns/conversation';
+import { AskChats } from '@/app/ask/chats';
+import { ChatHeader, NewDashChat } from '@/app/ask/view';
+import type { AskChat } from '@/lib/talk/ask-chats';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -437,5 +442,147 @@ export function AskMadeChangesSurface() {
         </SectionFold>
       </div>
     </PageColumn>
+  );
+}
+
+/**
+ * Dash's page (plan #1899.2): the chats on the left, grouped by day with the
+ * workspaces each used, and the open chat beside them. `chat` says what the
+ * middle holds: a chat opened from the list, or a new one. `listOpen: false`
+ * draws the list hidden to its strip.
+ */
+const CHAT_TODAY = '2026-10-14';
+const chatAt = (day: string, hour: number) => `${day}T${String(hour).padStart(2, '0')}:00:00Z`;
+
+export const DASH_CHATS: AskChat[] = [
+  {
+    id: 'd1',
+    ref: '00000000-0000-4000-8000-000000000021',
+    title: 'What did I spend on eBay flips this quarter?',
+    lastAt: chatAt(CHAT_TODAY, 9),
+    day: CHAT_TODAY,
+    workspaces: ['shopping', 'todo'],
+  },
+  {
+    id: 'd2',
+    ref: '00000000-0000-4000-8000-000000000022',
+    title: 'Which applications have gone quiet for two weeks or more, and who wrote to me last?',
+    lastAt: chatAt(CHAT_TODAY, 8),
+    day: CHAT_TODAY,
+    workspaces: ['jobs'],
+  },
+  {
+    id: 'd3',
+    ref: '00000000-0000-4000-8000-000000000023',
+    title: 'What should I read next on databases?',
+    lastAt: chatAt('2026-10-13', 18),
+    day: '2026-10-13',
+    workspaces: ['learn'],
+  },
+  {
+    id: 'd4',
+    ref: '00000000-0000-4000-8000-000000000024',
+    title: 'Am I on track for the half marathon?',
+    lastAt: chatAt('2026-10-11', 7),
+    day: '2026-10-11',
+    workspaces: ['goals', 'todo'],
+  },
+  {
+    id: 'd5',
+    ref: '00000000-0000-4000-8000-000000000025',
+    title: 'What have I written about burnout?',
+    lastAt: chatAt('2026-10-02', 21),
+    day: '2026-10-02',
+    workspaces: ['vault'],
+  },
+  {
+    id: 'd6',
+    ref: '00000000-0000-4000-8000-000000000026',
+    title: 'How many todos did I finish last week?',
+    lastAt: chatAt('2026-09-28', 12),
+    day: '2026-09-28',
+    workspaces: [],
+  },
+];
+
+const DASH_MADE: MadeChange[] = [
+  {
+    ...CHANGE_BASE,
+    id: 'dm1',
+    turnId: 'm',
+    kind: 'add_todo',
+    input: { title: 'List the Catan lot', body: null, dueOn: '2026-10-16', dueTime: null, pinned: false },
+    conversationId: '00000000-0000-4000-8000-000000000021',
+    status: 'done',
+    subjectRef: 'todo.tasks:dm1-row',
+    writtenTable: 'todo.tasks',
+    writtenRef: 'dm1-row',
+    createdAt: chatAt(CHAT_TODAY, 9),
+    doneAt: chatAt(CHAT_TODAY, 9),
+    question: 'What did I spend on eBay flips this quarter?',
+  },
+];
+
+const DASH_PRESSES = {
+  confirm: pressed('done'),
+  decline: pressed('declined'),
+  undo: pressed('undone'),
+};
+
+export function DashPageSurface({
+  chat = 'open',
+  listOpen = true,
+}: {
+  chat?: 'open' | 'new';
+  listOpen?: boolean;
+}) {
+  const open = DASH_CHATS[0];
+  return (
+    <AskDashProvider source={FIXTURES}>
+      <AppShell
+        account="preview"
+        module={null}
+        sections={[]}
+        displayName="Chris"
+        email="chris@example.com"
+        isOwner
+        counts={{ jobs: '3', todo: '8', shopping: '1' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+        pathname={chat === 'open' ? `/ask/${open.ref}` : '/ask'}
+      >
+        <Conversation
+          label="Chats"
+          open={chat === 'open'}
+          initialListOpen={listOpen}
+          newChat={{ href: '/ask', label: 'New chat' }}
+          list={
+            <AskChats
+              chats={DASH_CHATS}
+              today={CHAT_TODAY}
+              made={DASH_MADE}
+              presses={DASH_PRESSES}
+              active={chat === 'open' ? open.ref : null}
+            />
+          }
+        >
+          {chat === 'open' ? (
+            <>
+              <ChatHeader title={open.title ?? 'A question'} />
+              <AskThread
+                id="dash-page-preview"
+                conversationRef={open.ref}
+                turns={answerTo(open.title ?? '')}
+                label="Ask a follow-up"
+                placeholder="Ask more about this"
+                startWriting
+              />
+            </>
+          ) : (
+            <NewDashChat />
+          )}
+        </Conversation>
+      </AppShell>
+    </AskDashProvider>
   );
 }

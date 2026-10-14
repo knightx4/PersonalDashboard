@@ -60,6 +60,12 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     rule: 'The tabs sit under the page header, in one column, and only the open tab is drawn. Each tab is a link that puts it in the address, so a reload, the back button and a pasted link return to it, and old links and anchors land on the tab that holds them. A tab with something waiting in it carries the count. The row stays on one line, scrolling sideways on a phone with every tab a full press target. Folds may sit inside a tab.',
     component: 'components/patterns/tabbed-sections.tsx',
   },
+  {
+    name: 'conversation',
+    label: 'Conversation',
+    rule: 'From laptop width a list of chats sits on the left and can be hidden to a thin strip holding New chat and the button to show it, the open chat sits at reading width with the box at its foot, and a glance column on the right can be hidden too. Hidden or shown is kept on that device. On a phone the list is the page and a chat opens over it, with the way back above its title.',
+    component: 'components/patterns/conversation.tsx',
+  },
 ];
 
 /**
