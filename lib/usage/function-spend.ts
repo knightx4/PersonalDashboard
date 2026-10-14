@@ -5,7 +5,7 @@ import { LEARN_OPERATIONS } from '@/lib/learn/spend';
 /**
  * Model spend per function over the last 30 days (plan #1692). A function is
  * a workspace and the operation it was doing, the two columns the ledger
- * records for every call. Read from core.function_spend.
+ * records for every call. Read through core.function_spend_since.
  */
 export type FunctionSpend = {
   /** The ledger's `module`: a workspace id, or `core` for the app as a whole. */
@@ -65,14 +65,18 @@ export function functionSpendRows(rows: readonly FunctionSpendRow[]): FunctionSp
 }
 
 /**
- * Spend per function over the last 30 days. Pass the request's own client and
- * the view's RLS keeps it to the signed-in person.
+ * Spend per function over the Usage tab's whole days (plan #2036.2): the 7-
+ * and 30-day sums start at midnight in the person's timezone, so they agree
+ * with the spend-per-day chart. Pass the request's own client and the
+ * ledger's RLS keeps it to the signed-in person.
  */
-export async function readFunctionSpend(client: SupabaseClient): Promise<FunctionSpend[]> {
+export async function readFunctionSpend(
+  client: SupabaseClient,
+  window: { since7: string; since: string },
+): Promise<FunctionSpend[]> {
   const { data, error } = await client
     .schema('core')
-    .from('function_spend')
-    .select('module, operation, spend_7, spend_30, calls_30, unpriced_30');
+    .rpc('function_spend_since', { p_since7: window.since7, p_since30: window.since });
   if (error) throw new Error(`Could not read the spend per function: ${error.message}`);
   return functionSpendRows((data ?? []) as FunctionSpendRow[]);
 }
