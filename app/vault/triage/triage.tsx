@@ -61,7 +61,10 @@ export function QuickNoteTriage({
   notes,
   writable,
   actions = REAL_ACTIONS,
+  alreadyPassed,
 }: {
+  /** Ids of notes to start as already left for later; the gallery draws Previous with it. */
+  alreadyPassed?: readonly string[];
   notes: readonly TriageNote[];
   /** Whether the vault token can write; without it nothing can be filed. */
   writable: boolean;
@@ -133,6 +136,7 @@ export function QuickNoteTriage({
       <Deck
         key={pass}
         items={items}
+        alreadyPassed={alreadyPassed}
         forward="Leave for later"
         done={
           waiting.length === 0 ? (

@@ -90,6 +90,8 @@ import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
 const SWIPE_X = 90;
 const SWIPE_Y = 110;
 const LEAVE_MS = SWIPE_RELEASE_MS;
+/** How many passed cards Previous can bring back, as in Quick read. */
+const BACK_LIMIT = 5;
 
 type Leaving = { id: string; swipe: SwipeAction } | null;
 
@@ -119,7 +121,10 @@ export function LearnNowFeed({
   ready: firstReady,
   low,
   subjectId = null,
+  earlier = [],
 }: {
+  /** Cards already passed this visit, which the gallery uses to draw Previous. */
+  earlier?: FeedCard[];
   first: FeedCard[];
   /**
    * Your notes on each of the first cards' ideas (plan #1113), by card, still
@@ -142,7 +147,14 @@ export function LearnNowFeed({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<Leaving>(null);
-  const [passed, setPassed] = useState(0);
+  const [passed, setPassed] = useState(earlier.length);
+  // The last few cards passed, newest last, for Previous. The ref lets
+  // `advance` read the deck it is passing a card out of.
+  const [back, setBack] = useState<FeedCard[]>(earlier);
+  const deckNow = useRef(deck);
+  useEffect(() => {
+    deckNow.current = deck;
+  }, [deck]);
   const loaded = useRef(first.map((card) => card.id));
   const busy = useRef(false);
   const top = useRef<HTMLDivElement>(null);
@@ -220,11 +232,26 @@ export function LearnNowFeed({
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
     setLeaving(null);
+    const gone = deckNow.current.find((card) => card.id === id);
+    if (gone) setBack((cards) => [...cards, gone].slice(-BACK_LIMIT));
     setDeck((cards) => cards.filter((card) => card.id !== id));
     setPassed((count) => count + 1);
     const box = top.current;
     if (box && box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
   }, []);
+
+  /**
+   * Previous: the card just passed comes back on top, drawn again as it was
+   * loaded. What its swipe recorded stays until it is passed again.
+   */
+  const previous = useCallback(() => {
+    const card = back.at(-1);
+    if (!card || leaving) return;
+    setError(null);
+    setBack((cards) => cards.slice(0, -1));
+    setDeck((cards) => [card, ...cards.filter((other) => other.id !== card.id)]);
+    setPassed((count) => Math.max(0, count - 1));
+  }, [back, leaving]);
 
   const swipe = useCallback(
     (swipeAs: SwipeAction) => {
@@ -312,10 +339,26 @@ export function LearnNowFeed({
             className="mb-2 flex items-baseline justify-between gap-3 text-small text-ink-muted"
             aria-live="polite"
           >
-            <span>
-              {passed > 0
-                ? `${passed} done this visit`
-                : 'Swipe down if you know it, right to work on it, left for later.'}
+            <span className="flex min-w-0 items-baseline gap-3">
+              {back.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={previous}
+                  disabled={leaving !== null}
+                  className="-my-1 shrink-0 active:bg-sunken active:text-ink"
+                  data-deck-previous
+                >
+                  <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Previous
+                </Button>
+              )}
+              <span>
+                {passed > 0
+                  ? `${passed} done this visit`
+                  : 'Swipe down if you know it, right to work on it, left for later.'}
+              </span>
             </span>
             <span className="shrink-0">
               {ahead > 0 ? `${ahead} more loaded` : loading ? 'Loading more…' : ''}
