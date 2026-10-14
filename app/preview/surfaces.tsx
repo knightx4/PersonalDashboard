@@ -41,6 +41,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface } from './day-bars-surfaces';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -5987,6 +5988,37 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <RefPreviewSurface />,
+  },
+
+  /* The per-day bar chart for the usage pages (plan #2036.1): a month of
+   * page views, a month of spend with one busy day, a month with one day of
+   * activity and a month with none. Its two hidden parts follow: the readout
+   * held on a day, as pointing or tapping shows it, and the empty period. */
+  {
+    id: 'usage-day-bars',
+    label: 'Usage · Per-day bar chart',
+    module: 'dev',
+    width: 'wide',
+    render: () => <DayBarsSurface />,
+  },
+  {
+    id: 'usage-day-bars-readout',
+    label: 'Usage · Per-day bar chart, pointing at a day',
+    module: 'dev',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-day-bars]',
+      shows: 'Tapping the chart lights the bar under the finger, dims the rest, and names its day and value under the chart.',
+    },
+    render: () => <DayBarsReadoutSurface />,
+  },
+  {
+    id: 'usage-day-bars-empty',
+    label: 'Usage · Per-day bar chart, nothing in the period',
+    module: 'dev',
+    width: 'wide',
+    render: () => <DayBarsEmptySurface />,
   },
 
   /* The day closing on the agenda (plan #1556): played by ticking the last
