@@ -9,7 +9,9 @@ import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
-import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
+import { undoInterviewRows } from '@/lib/dash/interview-edit-writes';
+import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
@@ -785,16 +787,22 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  // A startup added from Find takes its company out again while nothing holds it (plan #1894.6.7).
+  if (change.kind === 'add_discovered_company') return undoMany(deps, change, surface, undoDiscoveredCompany);
   // A merge of roles puts back every row it moved or took out (plan #1894.6.2).
   if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   // So does an email linked, turned down or unlinked (plan #1894.6.5).
   if (change.kind === 'change_role_email') return undoMany(deps, change, surface, undoRoleEmail);
+  // A role made from a review email takes the role out again while nothing has come to hang on it (plan #1894.6.4.3).
+  if (change.kind === 'add_role_from_email') return undoMany(deps, change, surface, undoRoleFromEmail);
   // A review queue change puts back each row it touched (plan #1894.6.4).
   if ((JOBS_ROWS_KINDS as readonly string[]).includes(change.kind)) return undoMany(deps, change, surface, undoJobsRows);
   // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).
   if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
     return undoMany(deps, change, surface, undoContactRows);
   }
+  // And a paste of application questions (plan #1894.6.8).
+  if (change.kind === 'add_application_questions') return undoMany(deps, change, surface, undoApplicationQuestions);
   if (change.kind === 'add_interview_round') {
     // The round's row is the record's; its interview is checked here.
     const moved = await roundConversationMoved(deps.db, change.undo);
