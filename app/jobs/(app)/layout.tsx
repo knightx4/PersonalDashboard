@@ -55,7 +55,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     sections,
     settingsHref: '/jobs/settings',
     settingsLabel: 'Job search settings',
-    feedbackHref: '/dev/bugs',
     brief: async () => loadJobsBrief(user.id, await countReviewItems(supabase, core, user.id)),
     children,
   });

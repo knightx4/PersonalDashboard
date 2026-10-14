@@ -364,8 +364,10 @@ describe('the Goals home', () => {
     expect(html).toContain('Dash could take these');
     expect(html).not.toContain('A new errand');
     const withArea = render({ areas: [{ id: 'area', name: 'Money' }] });
-    expect(withArea).toContain('A new errand');
-    expect(withArea).toContain('A new goal');
+    // Ask Dash opens on a press (plan #1950.6), so its kinds are not drawn
+    // until then; what an area adds is the button that opens it.
+    expect(withArea).not.toContain('A new errand');
+    expect(withArea).toContain('Ask Dash');
   });
 
   it('welcomes you back and opens what Dash did on the day you come back', () => {

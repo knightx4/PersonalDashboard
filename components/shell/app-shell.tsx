@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { FeedbackButton } from '@/components/shell/feedback-button';
+import { NoteButton } from '@/components/shell/feedback-button';
 import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
 import { ThemeRepair } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
@@ -95,7 +95,6 @@ export function AppShell({
   sections,
   settingsHref,
   settingsLabel,
-  feedbackHref,
   displayName,
   email,
   enabledModules,
@@ -116,7 +115,6 @@ export function AppShell({
   sections: readonly NavSection[];
   settingsHref?: string;
   settingsLabel?: string;
-  feedbackHref?: string;
   displayName: string | null;
   email: string;
   enabledModules?: readonly ModuleId[];
@@ -866,7 +864,7 @@ export function AppShell({
                   <AskDashButton />
                   <CaptureButton />
                   <NotificationsButton notifications={notifications} />
-                  <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
+                  <NoteButton />
 
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
                     <Link

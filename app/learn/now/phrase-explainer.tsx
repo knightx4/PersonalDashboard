@@ -16,7 +16,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import type { MarkedPart } from '@/lib/learn/feed/mentions';
-import { startTrack, type NewTrackState } from '../new/actions';
+import { startTrack, type NewTrackState } from '../lists/actions';
 import { explainPhrase, makePhraseCard, type ExplainedPhrase } from './actions';
 import { Note } from '@/components/ui/note';
 import { IconButton } from '@/components/ui/icon-button';

@@ -5,8 +5,9 @@ import {
   confirmGameEdition,
   switchGameEdition,
   type GameActionState,
-} from '@/app/shopping/inventory/add/games/actions';
+} from '@/app/shopping/inventory/game-actions';
 import { Banner } from '@/components/ui/banner';
+import { PoweredByBgg } from './powered-by-bgg';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
@@ -149,6 +150,7 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
           }`}
         />
       </ValueList>
+      {game.resolutionSource === 'bgg' && <PoweredByBgg />}
 
       {/* The gate is the app's own named shape for "something is wrong and
           only you can fix it, and here is the action": one warn Banner where

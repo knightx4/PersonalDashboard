@@ -1,7 +1,29 @@
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { AimButton } from '@/components/shell/aim-button';
+import type { CaptureAim } from '@/lib/capture/actions';
 import { buttonVariants } from './button';
 import { Sigil } from './sigil';
+
+/** A link, or capture aimed at the kind the empty list holds (plan #1950.4). */
+type EmptyAction = { label: string; href: string } | { label: string; aim: CaptureAim };
+
+function ActionButton({
+  action,
+  variant,
+  size,
+}: {
+  action: EmptyAction;
+  variant: 'primary' | 'secondary' | 'link';
+  size?: 'sm';
+}) {
+  if ('aim' in action) return <AimButton aim={action.aim} label={action.label} variant={variant} size={size ?? 'md'} />;
+  return (
+    <Link href={action.href} className={buttonVariants({ variant, size })}>
+      {action.label}
+    </Link>
+  );
+}
 
 /**
  * Every section needs a real empty state, because a new account starts empty on
@@ -40,7 +62,7 @@ export function EmptyState({
   title: string;
   /** Required at page size; a box or an inline line can go without. */
   description?: string;
-  action?: { label: string; href: string };
+  action?: EmptyAction;
   secondaryAction?: { label: string; href: string };
   tone?: 'empty' | 'finished';
   /** `start` for an explanation long enough to be read: a shared left edge. */
@@ -72,11 +94,7 @@ export function EmptyState({
     return (
       <div className={cn('flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1 text-ui text-ink-muted', className)}>
         <p>{title}</p>
-        {action && (
-          <Link href={action.href} className={buttonVariants({ variant: 'link', size: 'sm' })}>
-            {action.label}
-          </Link>
-        )}
+        {action && <ActionButton action={action} variant="link" size="sm" />}
         {children}
       </div>
     );
@@ -95,11 +113,7 @@ export function EmptyState({
         {description && <p className="mt-1 max-w-sm text-small text-ink-muted">{description}</p>}
         {(action || children) && (
           <div className={cn('mt-3 flex flex-wrap items-center gap-2', start ? 'justify-start' : 'justify-center')}>
-            {action && (
-              <Link href={action.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                {action.label}
-              </Link>
-            )}
+            {action && <ActionButton action={action} variant="secondary" size="sm" />}
             {children}
           </div>
         )}
@@ -136,14 +150,7 @@ export function EmptyState({
       {description && <p className="mt-1.5 max-w-sm text-body leading-relaxed text-ink-muted">{description}</p>}
       {(action || secondaryAction) && (
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          {action && (
-            <Link
-              href={action.href}
-              className={buttonVariants({ variant: finished ? 'secondary' : 'primary' })}
-            >
-              {action.label}
-            </Link>
-          )}
+          {action && <ActionButton action={action} variant={finished ? 'secondary' : 'primary'} />}
           {secondaryAction && (
             <Link
               href={secondaryAction.href}

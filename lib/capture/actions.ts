@@ -18,6 +18,7 @@
 
 import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
+import type { CapturePlace, CaptureSortRole } from '@/lib/capture/sort';
 
 export type CaptureActionId = 'anything' | 'todo' | 'goals' | 'vault';
 
@@ -180,4 +181,395 @@ export function matchCaptureActions(
   }
 
   return matches.sort((a, b) => b.points - a.points);
+}
+
+// ---------------------------------------------------------------------------
+// Kinds: what an Add button aims capture at (plan #1950.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The things capture can make, one per kind of row. An Add button on a list
+ * opens capture aimed at its list's kind: the sort is skipped, the panel asks
+ * for the kind's title and at most one more thing, and one press makes the
+ * row (docs/ONE-INTERFACE-SPEC.md, Part 3). Untargeted text from the header
+ * and ⌥C still goes through Dash's sort, which files each part as one of
+ * these kinds.
+ *
+ * The writer for each kind is in lib/capture/file.ts (CAPTURE_MAKERS), keyed
+ * by the same ids, so this file stays free of server code and the panel can
+ * import it.
+ */
+export type CaptureKindId =
+  | 'todo'
+  | 'goal-update'
+  | 'job-note'
+  | 'vault-note'
+  // Goals and Dev (plan #1950.5): never chosen by the sort, only aimed.
+  | 'goal'
+  | 'goal-area'
+  | 'plan-feature'
+  | 'plan-step'
+  | 'idea'
+  | 'dev-note'
+  | 'order'
+  | 'inventory-item'
+  | 'saved-item'
+  // Jobs and Learn (plan #1950.4)
+  | 'job-role'
+  | 'learn-reading'
+  | 'learn-topic'
+  | 'learn-quiz'
+  // Learn (plan #1950.6): one thing to read, on the track the page is open on.
+  | 'track-reading'
+  // You (plan #1950.7): a place they have lived, from its Add on Places.
+  | 'place';
+
+/**
+ * The one thing a kind may need besides its title. A todo takes a day; a
+ * note on a job takes the role, which the page aiming it already knows. A
+ * goal takes its area and a plan step the row it goes under (`under`).
+ */
+export type CaptureKindNeeds = 'day' | 'role' | 'under' | null;
+
+/**
+ * The row a new one goes under, or the plan module a new feature goes in:
+ * its id and the name the panel shows ("In Health").
+ */
+export type CaptureUnder = { id: string; title: string };
+
+export type CaptureKind = {
+  id: CaptureKindId;
+  /**
+   * The place Dash's sort files this kind as, or null for a kind only an Add
+   * button makes, which the sort never files into.
+   */
+  place: CapturePlace | null;
+  /** Whose workspace the row belongs to. */
+  module: ModuleId;
+  /** The panel's title when aimed: "Add a todo". */
+  label: string;
+  /** The title field before anything is typed. */
+  placeholder: string;
+  field: 'line' | 'prose';
+  needs: CaptureKindNeeds;
+  /**
+   * What one press makes. `row`: one row, whose page then opens. `filing`: a
+   * sentence Dash files against several rows (a goal update), which keeps
+   * its own panel and its Undo on each line, so aiming it opens that panel.
+   */
+  makes: 'row' | 'filing';
+  /** The nav row the chip flies to once the row is made. */
+  section: string;
+  /** The panel action that takes this kind unaimed, from the palette. */
+  action: CaptureActionId;
+  /**
+   * Made by any account, whatever its workspaces: a note for Dev is how
+   * anyone reports a bug, though only the owner has the Dev workspace.
+   */
+  everyone?: boolean;
+  /** Takes files with it, as the header's note did (plan #1713). */
+  files?: boolean;
+  /**
+   * The camera step inside the panel (plan #1950.3.2), in place of typing:
+   * a receipt photo the order is read from, or a barcode naming the book or
+   * game to add. Typing still works beside it.
+   */
+  camera?: 'receipt' | 'barcode';
+};
+
+/**
+ * What a scanned barcode named (plan #1950.3.2): a book or a game, with the
+ * catalog's record as JSON, which the press saves as it is so the add does
+ * not look the code up a second time. The server checks the record against
+ * the book or game schema before writing it.
+ */
+export type ScannedThing = {
+  kind: 'book' | 'game';
+  title: string;
+  /** The authors, or the year and publisher: the line under the title. */
+  byline: string | null;
+  /** The cover or the box, where the catalog has one. */
+  image: string | null;
+  code: string;
+  record: string;
+};
+
+export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
+  todo: {
+    id: 'todo',
+    place: 'todo',
+    module: 'todo',
+    label: 'Add a todo',
+    placeholder: 'What needs doing?',
+    field: 'line',
+    needs: 'day',
+    makes: 'row',
+    section: '/todo',
+    action: 'todo',
+  },
+  'goal-update': {
+    id: 'goal-update',
+    place: 'goals',
+    module: 'goals',
+    label: 'Log what happened',
+    placeholder: 'What happened? It is filed against your goals.',
+    field: 'prose',
+    needs: null,
+    makes: 'filing',
+    section: '/goals',
+    action: 'goals',
+  },
+  'job-note': {
+    id: 'job-note',
+    place: 'jobs',
+    module: 'jobs',
+    label: 'Add a note',
+    placeholder: 'What happened, or what to remember about this role?',
+    field: 'prose',
+    needs: 'role',
+    makes: 'row',
+    section: '/jobs',
+    // No panel action of its own: from the palette a note on a job goes
+    // through the sort, which names the role.
+    action: 'anything',
+  },
+  'vault-note': {
+    id: 'vault-note',
+    place: 'vault',
+    module: 'vault',
+    label: 'Add a quick note',
+    placeholder: 'Whatever is on your mind. It waits in the Inbox.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/vault',
+    action: 'vault',
+  },
+  goal: {
+    id: 'goal',
+    place: null,
+    module: 'goals',
+    label: 'Add a goal',
+    placeholder: 'An outcome that ends, such as pay off the credit cards',
+    field: 'line',
+    needs: 'under',
+    makes: 'row',
+    section: '/goals',
+    action: 'anything',
+  },
+  'goal-area': {
+    id: 'goal-area',
+    place: null,
+    module: 'goals',
+    label: 'Add an area',
+    placeholder: 'A direction that never finishes, such as Career or The city',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/goals',
+    action: 'anything',
+  },
+  'plan-feature': {
+    id: 'plan-feature',
+    place: null,
+    module: 'dev',
+    label: 'Add a feature',
+    placeholder: 'Feature name',
+    field: 'line',
+    // `under` names the module when the page knows it; without it the
+    // feature is for the app as a whole.
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  'plan-step': {
+    id: 'plan-step',
+    place: null,
+    module: 'dev',
+    label: 'Add a step',
+    placeholder: 'What the step does',
+    field: 'line',
+    needs: 'under',
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  idea: {
+    id: 'idea',
+    place: null,
+    module: 'dev',
+    label: 'Add an idea',
+    placeholder: 'Something worth doing one day. It waits on the ideas page.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+  },
+  'dev-note': {
+    id: 'dev-note',
+    place: null,
+    module: 'dev',
+    label: 'Report a bug or ask for a change',
+    placeholder: 'What went wrong, or what it should do.',
+    field: 'prose',
+    // The page it was filed from rides on the aim when there is one; a note
+    // filed on the queue itself has none worth saving.
+    needs: null,
+    makes: 'row',
+    section: '/dev',
+    action: 'anything',
+    everyone: true,
+    files: true,
+  },
+  // Shopping's three lists (plan #1950.3.1). The sort never files these, so
+  // they have no place and no panel action of their own.
+  order: {
+    id: 'order',
+    place: null,
+    module: 'shopping',
+    label: 'Add an order',
+    placeholder: 'What did you buy, where, and what did it cost?',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/orders',
+    action: 'anything',
+    camera: 'receipt',
+  },
+  'inventory-item': {
+    id: 'inventory-item',
+    place: null,
+    module: 'shopping',
+    label: 'Add something you own',
+    placeholder: 'Its name, or the ISBN of a book',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/inventory',
+    action: 'anything',
+    camera: 'barcode',
+  },
+  'saved-item': {
+    id: 'saved-item',
+    place: null,
+    module: 'shopping',
+    label: 'Save a link',
+    placeholder: 'Paste the link to the thing',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/shopping/saved',
+    action: 'anything',
+  },
+  // Jobs and Learn (plan #1950.4): made only from an Add button, so no place.
+  'job-role': {
+    id: 'job-role',
+    place: null,
+    module: 'jobs',
+    label: 'Add a role',
+    placeholder: 'Paste the posting link, or write the role at the company',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/jobs',
+    action: 'anything',
+  },
+  'learn-reading': {
+    id: 'learn-reading',
+    place: null,
+    module: 'learn',
+    label: 'Save a reading',
+    placeholder: 'Paste a link to read later',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'track-reading': {
+    id: 'track-reading',
+    place: null,
+    module: 'learn',
+    label: 'Add something to read',
+    placeholder: 'Something specific you want to learn',
+    field: 'line',
+    needs: 'under',
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'learn-topic': {
+    id: 'learn-topic',
+    place: null,
+    module: 'learn',
+    label: 'Start a topic',
+    placeholder: 'What you want to learn about. Paste a reading list on the lines below it.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  'learn-quiz': {
+    id: 'learn-quiz',
+    place: null,
+    module: 'learn',
+    label: 'Start a quiz',
+    placeholder: 'Paste what to be quizzed on, or name notes as [[Note title]]',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/learn',
+    action: 'anything',
+  },
+  // You (plan #1950.7): the name, then when, in one line. Where it is and a
+  // note are set on the place's own page, which opens once it is made.
+  place: {
+    id: 'place',
+    place: null,
+    module: 'you',
+    label: 'Add a place',
+    placeholder: 'Where, then when: Oak Street, Leeds, 2019 to 2021',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/you/places',
+    action: 'anything',
+  },
+};
+
+/** The kind Dash's sort files a part as, by its place. */
+export function kindForPlace(place: CapturePlace): CaptureKind {
+  const kind = Object.values(CAPTURE_KINDS).find((k) => k.place === place);
+  if (!kind) throw new Error(`No capture kind files into ${place}.`);
+  return kind;
+}
+
+/**
+ * What an Add button hands capture: the kind, and the one more thing when
+ * the page already knows it (the role a note is on). `seed` starts the title.
+ */
+export type CaptureAim = {
+  kind: CaptureKindId;
+  role?: CaptureSortRole;
+  /** The area a goal goes in, the row a step goes under, or a feature's module. */
+  under?: CaptureUnder;
+  /** The page a note for Dev was filed from. */
+  page?: string;
+  seed?: string;
+};
+
+/**
+ * Why an aim cannot be made as it stands, or null when it can. A kind that
+ * needs a role has to be handed one: a note aimed at no role would be filed
+ * nowhere, so the panel says so instead.
+ */
+export function aimProblem(aim: CaptureAim): string | null {
+  const kind = CAPTURE_KINDS[aim.kind];
+  if (!kind) return 'Capture cannot make that.';
+  if (kind.needs === 'role' && !aim.role) return 'Open the role first, then add the note there.';
+  if (kind.needs === 'under' && !aim.under) return 'Open the place it goes under first, then add it there.';
+  return null;
 }

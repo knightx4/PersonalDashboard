@@ -30,22 +30,31 @@ import {
 } from '@/components/shell/capture-places';
 import { usePopover } from '@/lib/use-popover';
 import {
+  aimProblem,
   availableCaptureActions,
+  CAPTURE_KINDS,
   DEFAULT_CAPTURE_ACTION,
   type CaptureAction,
   type CaptureActionId,
+  type CaptureAim,
+  type CaptureKindId,
 } from '@/lib/capture/actions';
-import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
+import { AimedCaptureForm, CaptureAimContext, DayChips } from '@/components/shell/capture-aim';
+import { useCaptureCamera } from '@/components/shell/capture-camera';
+import { useToast, type ToastInput } from '@/components/ui/toast';
+import { useRouter } from 'next/navigation';
+import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
 import { goalsPlaceName } from '@/lib/capture/destination';
 import {
+  filedModule,
   offeredCapturePlaces,
   type FiledCapture,
 } from '@/lib/capture/place';
-import { CAPTURE_PLACE_MODULE, type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
+import { type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
-import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import type { PaidAction, PaidCosts } from '@/lib/core/spend/paid-actions';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
   ESTIMATE_CHIPS,
@@ -72,10 +81,11 @@ import {
   undoGoalCapture,
   type CaptureMoveHint,
 } from '@/app/goals/capture-actions';
-import type { RelativeDay } from '@/lib/todo/tasks/model';
 import {
   captureBoxCosts,
   fileCaptureBox,
+  makeAimedCapture,
+  nameCapturedBarcode,
   sortCaptureBox,
   undoCaptureBox,
 } from '@/app/capture-actions';
@@ -107,6 +117,8 @@ import { Tooltip } from '@/components/ui/tooltip';
 type CaptureHandle = {
   /** Open the panel on an action, optionally with what was already typed. */
   open: (action?: CaptureActionId, seed?: string) => void;
+  /** Open it aimed at a kind, from an Add button on a list (plan #1950.1). */
+  aim: (aim: CaptureAim) => void;
   close: () => void;
   /** The actions this account can use, for the palette's rows. */
   actions: readonly CaptureAction[];
@@ -141,6 +153,9 @@ export function CaptureProvider({
   children: React.ReactNode;
 }) {
   const [session, setSession] = useState<Session | null>(null);
+  /** An Add button's aim, while its panel is open (plan #1950.1). */
+  const [aimed, setAimed] = useState<CaptureAim | null>(null);
+  const toast = useToast();
   // Keyed on the list's contents: the shell hands a fresh array on every
   // render, and a new handle each time would re-render every consumer.
   const moduleKey = modules?.join(',');
@@ -156,12 +171,42 @@ export function CaptureProvider({
     (id: CaptureActionId = DEFAULT_CAPTURE_ACTION, seed = '') => {
       const action = actions.find((a) => a.id === id);
       if (!action) return;
+      setAimed(null);
       setSession({ action, seed });
     },
     [actions],
   );
 
-  const close = useCallback(() => setSession(null), []);
+  const close = useCallback(() => {
+    setSession(null);
+    setAimed(null);
+  }, []);
+
+  /**
+   * Open capture aimed at a kind. A kind that makes one row opens the aimed
+   * panel; a goal update, which files against several, opens its own panel
+   * as the palette does, since its lines each carry their own Undo.
+   */
+  const aim = useCallback(
+    (target: CaptureAim) => {
+      const kind = CAPTURE_KINDS[target.kind];
+      if (!kind) return;
+      if (kind.makes === 'filing') {
+        const action = actions.find((a) => a.id === kind.action);
+        if (action) setSession({ action, seed: target.seed ?? '' });
+        return;
+      }
+      setSession(null);
+      setAimed(target);
+    },
+    [actions],
+  );
+
+  // A row an aimed add made in another workspace's shell: its toast again here.
+  useEffect(() => {
+    const notice = carriedToast();
+    if (notice) toast(notice);
+  }, [toast]);
   /** Where the one box can file for this account (plan #1581). */
   const places = useMemo(
     () =>
@@ -172,8 +217,8 @@ export function CaptureProvider({
   );
 
   const handle = useMemo<CaptureHandle>(
-    () => ({ open, close, actions }),
-    [open, close, actions],
+    () => ({ open, aim, close, actions }),
+    [open, aim, close, actions],
   );
 
   useEffect(() => {
@@ -200,17 +245,26 @@ export function CaptureProvider({
   }, [actions]);
 
   // The page underneath stays exactly where it was while the panel is over it.
+  const covering = session !== null || aimed !== null;
   useEffect(() => {
-    if (!session) return;
+    if (!covering) return;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [session]);
+  }, [covering]);
 
   return (
     <CaptureContext.Provider value={handle}>
-      {children}
+      <CaptureAimContext.Provider value={aim}>{children}</CaptureAimContext.Provider>
+      {aimed && (
+        <AimedPanel
+          // A fresh panel per aim, so a second Add starts empty.
+          key={`${aimed.kind}:${aimed.role?.id ?? aimed.under?.id ?? ''}`}
+          aim={aimed}
+          onClose={close}
+        />
+      )}
       {session && session.action.id === 'anything' && (
         <AnythingPanel
           key={session.action.id}
@@ -521,29 +575,7 @@ function CapturePanel({
             date, because the shell is not handed the account's today; see
             lib/capture/todo.ts. */}
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2">
-          {action.dated && (
-            <>
-              <DayChip label="Today" day="today" picked={day} onPick={setDay} />
-              <DayChip label="Tomorrow" day="tomorrow" picked={day} onPick={setDay} />
-
-              {/* Unframed and quiet, so a row of chips stays a row of chips
-                  rather than growing a boxed field in the middle of it. It
-                  shows a date only when a date is what is picked: with Today
-                  on, the answer is on the chip. */}
-              <input
-                type="date"
-                aria-label="A specific day"
-                value={isCalendarDay(day) ? day : ''}
-                onChange={(event) => setDay(event.target.value)}
-                className={cn(
-                  // ui-ok: fixed-control-height -- sits in a row of Chips, which are h-7, and matches them
-                  'tabular h-7 rounded-control bg-transparent px-2 text-small outline-none transition-colors duration-quick',
-                  'focus:ring-1 focus:ring-accent/40',
-                  isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
-                )}
-              />
-            </>
-          )}
+          {action.dated && <DayChips day={day} onDay={setDay} />}
 
           {/* Said here rather than in a toast: this is where the person is
               looking, and an empty field with nothing said about it reads as
@@ -685,11 +717,9 @@ function AnythingPanel({
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
-      showLanding(
-        from,
-        { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where },
-        text,
-      );
+      // The box files only into places, so every row it filed has a workspace.
+      const workspace = filedModule(first);
+      if (workspace) showLanding(from, { module: workspace, href: first.href, name: first.where }, text);
     });
   }
 
@@ -1063,29 +1093,206 @@ function describeFiledWithin(entry: FiledEntry): string {
 }
 
 /**
- * A day, picked or unpicked in one press.
- *
- * A toggle rather than a pair of radios, the same as the chips on /todo:
- * picking Today and changing your mind has to cost one press, not a trip to a
- * date field to clear it.
+ * The toast for a row an aimed add just made, kept outside React for a few
+ * seconds. Opening the row's page can leave the workspace, and each
+ * workspace's layout mounts its own shell, so the toast that was showing goes
+ * with the old one. The provider that mounts next shows it again, so Undo is
+ * still there on the row's own page.
  */
-function DayChip({
-  label,
-  day,
-  picked,
-  onPick,
-}: {
-  label: string;
-  day: RelativeDay;
-  picked: CaptureDay;
-  onPick: (day: CaptureDay) => void;
-}) {
-  const on = picked === day;
+const CARRY_MS = 6000;
+let carried: { toast: ToastInput; at: number } | null = null;
+
+export function carryToast(toast: ToastInput) {
+  carried = { toast, at: Date.now() };
+}
+
+/** The carried toast, while it is still fresh, for a provider that has just mounted. */
+function carriedToast(): ToastInput | null {
+  if (!carried || Date.now() - carried.at > CARRY_MS) {
+    carried = null;
+    return null;
+  }
+  return carried.toast;
+}
+
+/**
+ * The paid press an aimed Add makes, by kind, where it makes one: an order is
+ * read with a model (plan #1950.3.1), a goal in the Learn area is placed and
+ * given a plan, and a note for Dev is triaged once saved (plan #1950.5).
+ */
+const AIMED_PRESS: Partial<Record<CaptureKindId, { action: PaidAction; what: string }>> = {
+  order: { action: 'app/capture-actions.ts#makeAimedCapture', what: 'Cost of reading it' },
+  goal: {
+    action: 'app/capture-actions.ts#makeAimedCapture:goal',
+    what: 'Cost of placing a goal in the Learn area and writing its plan',
+  },
+  'dev-note': { action: 'app/capture-actions.ts#makeAimedCapture:dev-note', what: 'Cost of sorting the note' },
+};
+
+/** An order's press once a receipt photo is taken in the panel (plan #1950.3.2). */
+const RECEIPT_PRESS = {
+  action: 'app/capture-actions.ts#makeAimedCapture:receipt',
+  what: 'Cost of reading the receipt',
+} as const satisfies { action: PaidAction; what: string };
+
+/**
+ * Capture aimed at a kind (plan #1950.1): what an Add button on a list
+ * opens. The kind is already chosen, so there is no sort and no place chips:
+ * the title, the one more thing the kind needs, and Add. One press makes the
+ * row; the panel closes, the chip flies from the field to the kind's
+ * section, the toast says where it went with Undo, and the row's page opens.
+ *
+ * A failure keeps the panel open with the text where it was, as the other
+ * panels do.
+ */
+function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) {
+  const kind = CAPTURE_KINDS[aim.kind];
+  const router = useRouter();
+  const toast = useToast();
+  const [text, setText] = useState(aim.seed ?? '');
+  const [day, setDay] = useState<CaptureDay>('today');
+  const [error, setError] = useState<string | null>(aimProblem(aim));
+  const [pending, start] = useTransition();
+  // A note for Dev takes files, as the header's note did (plan #1713).
+  const [uploads, setUploads] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const panelRef = useRef<HTMLFormElement>(null);
+  // A kind whose press reads with a model shows its $ figure, asked for once
+  // when the panel opens, as the one box asks for its own (plan #1950.3.1).
+  const [costs, setCosts] = useState<PaidCosts>({});
+  // A receipt photo or a barcode, for a kind that takes one (plan #1950.3.2).
+  const camera = useCaptureCamera(kind, nameCapturedBarcode, setError);
+  // With a receipt photo taken, Add reads the photo rather than the sentence.
+  const press = camera.photo ? RECEIPT_PRESS : AIMED_PRESS[kind.id];
+  useEffect(() => {
+    if (!press) return;
+    let live = true;
+    captureBoxCosts()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [press]);
+  const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+
+  usePanelChrome(onClose, panelRef);
+
+  function submit() {
+    if (pending || camera.busy || (!text.trim() && !camera.photo && !camera.scanned)) return;
+    const problem = aimProblem(aim);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    if (uploading) {
+      setError('Adding the file first.');
+      return;
+    }
+    start(async () => {
+      const result = await makeAimedCapture(
+        {
+          kind: aim.kind,
+          text,
+          ...(kind.needs === 'day' ? { day } : {}),
+          ...(aim.role ? { role: aim.role } : {}),
+          ...(aim.under ? { under: aim.under } : {}),
+          ...(aim.page ? { page: aim.page } : {}),
+          ...(camera.photo ? { photo: camera.photo } : {}),
+          ...(camera.scanned ? { scanned: camera.scanned } : {}),
+        },
+        uploads,
+      );
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const made = result.filed;
+      const from = fieldRef.current?.getBoundingClientRect();
+      const origin = `${window.location.pathname}${window.location.search}`;
+      const page = made.page ?? null;
+      const actionId = made.actionId;
+      const notice: ToastInput = {
+        text: result.errors[0] ?? `Added to ${made.where}.`,
+        undone: 'Taken back.',
+        ...(actionId
+          ? {
+              undo: async () => {
+                carried = null;
+                const undone = await undoCaptureBox(actionId);
+                if (!undone.ok) throw new Error(undone.error);
+                // The row's page has nothing on it now: back to the list.
+                if (page && window.location.pathname === page.split('?')[0]) router.push(origin);
+                else router.refresh();
+              },
+            }
+          : {}),
+      };
+      onClose();
+      void sendToPlace({ from, to: landingTarget(kind.section), label: made.text, name: made.where });
+      toast(notice);
+      if (page) {
+        carryToast(notice);
+        router.push(page);
+      } else if (aim.kind !== 'dev-note') {
+        // A note for Dev leaves the page as it was: it is about this page.
+        router.refresh();
+      }
+    });
+  }
 
   return (
-    <ToggleChip on={on} onClick={() => onPick(on ? '' : day)}>
-      {label}
-    </ToggleChip>
+    <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
+      <button type="button" aria-label="Close" onClick={onClose} className={scrim} />
+      <form
+        ref={panelRef}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={kind.label}
+        tabIndex={-1}
+        className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
+      >
+        <AimedCaptureForm
+          kind={kind}
+          role={aim.role}
+          under={aim.under}
+          page={aim.page}
+          files={
+            kind.files ? (
+              <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+            ) : undefined
+          }
+          text={text}
+          onText={(value) => {
+            setText(value);
+            if (error && !aimProblem(aim)) setError(null);
+          }}
+          day={day}
+          onDay={setDay}
+          pending={pending}
+          error={error}
+          fieldRef={(node) => {
+            fieldRef.current = node;
+          }}
+          onSubmit={submit}
+          attached={camera.attached}
+          tools={camera.tools}
+          hint={
+            press ? (
+              <PaidCostsProvider costs={costs}>
+                <PaidHint action={press.action} what={press.what} align="end" />
+              </PaidCostsProvider>
+            ) : null
+          }
+        />
+      </form>
+    </div>
   );
 }
 

@@ -86,7 +86,7 @@ function learnSections(owner: boolean, readNow: number): NavSection[] {
       label: 'Reading lists',
       icon: 'tracks',
       exact: true,
-      alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
+      alsoMatches: ['/learn/t/', '/learn/r/'],
     },
     // Everything video on one page (plan #1488): your list (plan #1069), the
     // clips cut from it (plan #1400) and the YouTube library, which were three

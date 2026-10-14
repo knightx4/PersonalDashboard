@@ -207,6 +207,5 @@ describe('estimatePaidActions', () => {
     // plan-topic measured, name-areas a guess: the sum is a guess.
     expect(plan.basis).toBe('guess');
     expect(plan.medianMicros).toBeGreaterThan(200_000);
-    expect(costs['app/learn/new/actions.ts#resolveCandidate']!.per).toBe('unit');
   });
 });

@@ -365,6 +365,25 @@ function handRolledBackLinks(root: string): string[] {
     .sort();
 }
 
+/**
+ * Part 3, R8 (plan #1950.3.4): a page whose only job is a form. Such a page
+ * takes the address of the thing it adds, so every `page.tsx` whose route has
+ * a `new` or `add` segment is counted (what were `/you/places/new` and
+ * `/shopping/inventory/add/books`). A page there that only sends the visitor
+ * on draws no form and is not counted. An add belongs in capture, aimed at
+ * the kind from the list's Add button.
+ */
+function formOnlyPages(root: string): string[] {
+  return listFiles(root, ['app'], ['.tsx', '.ts', '.jsx', '.js'])
+    .filter((file) => /\/page\.[jt]sx?$/.test(file))
+    .filter((file) => {
+      const route = routeOfFile(file);
+      return route !== null && route.split('/').some((segment) => segment === 'new' || segment === 'add');
+    })
+    .filter((file) => !isRedirectOnly(readFileSync(join(root, file), 'utf8')))
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -467,6 +486,12 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'pages for one row that draw no path to it',
     target: 0,
     measure: rowPagesWithoutPath,
+  },
+  {
+    name: 'form-only-pages',
+    counts: 'pages under app/ at a new or add address, whose only job is a form',
+    target: 0,
+    measure: formOnlyPages,
   },
   {
     name: 'hand-rolled-back-links',

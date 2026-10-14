@@ -1,11 +1,10 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef } from 'react';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
-import { addPlanItem, updatePlanItem, type PlanActionState } from './actions';
+import { updatePlanItem, type PlanActionState } from './actions';
 import { Button } from '@/components/ui/button';
-import { AddTrigger } from '@/components/ui/add-trigger';
-import { cardVariants } from '@/components/ui/card';
+import { useCaptureAim } from '@/components/shell/capture-aim';
 import {
   ChipSelect,
   ComposeBody,
@@ -31,12 +30,11 @@ import {
 } from '@/lib/plan/load';
 import type { PlanNode } from '@/lib/plan/tree';
 import { catalogLabel, subtreeOf, type PlanCatalogEntry } from './plan-catalog';
-import { cn } from '@/lib/cn';
 import { useSettled } from '@/components/plan-tree/use-settled';
 import { planScopeLabel, type PlanScope } from '@/lib/plan/projects';
 
 /**
- * The add and edit forms for a plan step, and the labels they share.
+ * The edit form for a plan step, the add that opens capture, and the labels they share.
  */
 
 export const STATUS_LABEL = PLAN_STATUS_LABEL;
@@ -152,26 +150,19 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
  * create surface turns into when every property is given a row of its own and
  * a caption repeating what its value already says.
  *
- * `fold` keeps the elaboration out of the way until it is wanted. Adding a
- * step is overwhelmingly a one-line act -- a title and the defaults -- so the
- * add surface opens as a title and a chip row. Editing shows everything,
- * because you opened it to change something and which thing is not knowable.
+ * It shows everything, because you opened it to change something and which
+ * thing is not knowable. A new step is made through capture (`AddStep`).
  */
 function StepFields({
   prefix,
   node,
-  fold = false,
   status,
 }: {
   prefix: string;
   node?: Pick<PlanNode, 'title' | 'detail' | 'acceptance' | 'priority' | 'size' | 'assignee'>;
-  fold?: boolean;
   /** Rendered into the chip row when the surface owns the status too. */
   status?: PlanStatus;
 }) {
-  const [showMore, setShowMore] = useState(!fold);
-  const hasDetail = Boolean(node?.detail || node?.acceptance);
-
   return (
     <div className="space-y-2">
       <ComposeTitle
@@ -183,41 +174,29 @@ function StepFields({
         placeholder="What has to happen"
       />
 
-      {showMore || hasDetail ? (
-        <>
-          <ComposeBody
-            id={`${prefix}-detail`}
-            name="detail"
-            rows={1}
-            defaultValue={node?.detail ?? ''}
-            aria-label="What it involves"
-            placeholder="What it involves…"
-          />
-          {/* The acceptance line earns its caption: it is the one field whose
-           * placeholder cannot say what it is without saying what it is for. */}
-          <div className="border-t border-border pt-2">
-            <ComposeBody
-              id={`${prefix}-acceptance`}
-              name="acceptance"
-              rows={1}
-              defaultValue={node?.acceptance ?? ''}
-              aria-label="Done when"
-              placeholder="Done when… — what the work is checked against"
-            />
-          </div>
-        </>
-      ) : (
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={() => setShowMore(true)}
-          className="-ml-1.5 gap-1"
-        >
-          <span aria-hidden>+</span>
-          Detail and acceptance
-        </Button>
-      )}
+      {/* ui-ok: composer-always-open -- StepFields renders only inside EditStep,
+       * once a row's Edit has been pressed; the rule cannot see that gate. */}
+      <ComposeBody
+        id={`${prefix}-detail`}
+        name="detail"
+        rows={1}
+        defaultValue={node?.detail ?? ''}
+        aria-label="What it involves"
+        placeholder="What it involves…"
+      />
+      {/* The acceptance line earns its caption: it is the one field whose
+       * placeholder cannot say what it is without saying what it is for. */}
+      <div className="border-t border-border pt-2">
+        {/* ui-ok: composer-always-open -- the same Edit surface as above. */}
+        <ComposeBody
+          id={`${prefix}-acceptance`}
+          name="acceptance"
+          rows={1}
+          defaultValue={node?.acceptance ?? ''}
+          aria-label="Done when"
+          placeholder="Done when… — what the work is checked against"
+        />
+      </div>
 
       <div className="flex flex-wrap items-center gap-1">
         {status !== undefined && <StatusChip defaultValue={status} />}
@@ -229,90 +208,36 @@ function StepFields({
   );
 }
 
-/** The level a new row lands at, which is what the add form calls it (PLAN-SPEC, "Levels"). */
-export type AddLevel = 'feature' | 'step' | 'substep';
-
-const ADD_LABEL: Record<AddLevel, { trigger: string; submit: string }> = {
-  feature: { trigger: 'Add a feature', submit: 'Add feature' },
-  step: { trigger: 'Add a step', submit: 'Add step' },
-  substep: { trigger: 'Add a substep', submit: 'Add substep' },
-};
-
 /**
- * A row of your own: a feature at the top of a module, a step under a
- * feature, or a substep under a step.
+ * A row of your own under a feature or a step, made through capture (plan
+ * #1950.5).
  *
- * One form for all three, told apart by the parent it carries. It opens closed,
- * because a plan with six modules and a full form under each would be mostly
- * form.
+ * The row's Add a step (or substep) sets this rendering, and rendering it
+ * opens capture aimed at a step under that row and hands the row back:
+ * capture's panel is where the title is typed, one press makes the step, and
+ * its page opens for the rest. Outside the shell (the gallery) there is no
+ * capture to open, and it draws nothing.
  */
 export function AddStep({
-  module,
   parentId,
-  level = parentId ? 'step' : 'feature',
-  open: openAtStart = false,
+  parentTitle,
   onDone,
 }: {
-  module: PlanScope | null;
-  parentId: string | null;
-  /** What the new row is. A feature when there is no parent, a step under one otherwise. */
-  level?: AddLevel;
-  open?: boolean;
+  parentId: string;
+  /** The row it goes under, as the panel names it: "Under …". */
+  parentTitle: string;
   onDone?: () => void;
 }) {
-  const [open, setOpen] = useState(openAtStart);
-  const [state, action, pending] = useActionState(addPlanItem, {} as PlanActionState);
-
-  useSettled(state, () => {
-    setOpen(false);
+  const aim = useCaptureAim();
+  // Once per press: the row hands this back in onDone, which unmounts it.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asked.current) return;
+    asked.current = true;
+    aim?.({ kind: 'plan-step', under: { id: parentId, title: parentTitle } });
     onDone?.();
-  });
-
-  const prefix = `new-${parentId ?? module ?? 'app'}`;
-
-  if (!open) {
-    // This was a hand-rolled version of AddTrigger, written before there was
-    // one. Same behaviour, one copy.
-    return (
-      <AddTrigger
-        label={ADD_LABEL[level].trigger}
-        onClick={() => setOpen(true)}
-      />
-    );
-  }
-
-  return (
-    <form
-      action={action}
-      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-col gap-(--field-gap)')}
-    >
-      <input type="hidden" name="module" value={module ?? ''} />
-      <input type="hidden" name="parent" value={parentId ?? ''} />
-      <StepFields prefix={prefix} fold status="not_started" />
-      {/* Actions right, on their own line under a rule: the chip row above is
-       * things you set and this is the one thing you press, and running them
-       * together made the submit read as a fourth property. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-        <FieldError>{state.error}</FieldError>
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setOpen(false);
-              onDone?.();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" size="sm" pending={pending}>
-            {pending ? 'Adding…' : ADD_LABEL[level].submit}
-          </Button>
-        </div>
-      </div>
-    </form>
-  );
+  }, [aim, onDone, parentId, parentTitle]);
+  return null;
 }
 
 /** The whole step at once, including where it sits. */

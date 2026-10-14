@@ -1343,13 +1343,7 @@ export function usePlanRow({
         </>
   );
   const addChild = (
-    <AddStep
-          module={node.module}
-          parentId={node.id}
-          level={childLevel}
-          open
-          onDone={() => row.setAddingChild(false)}
-        />
+    <AddStep parentId={node.id} parentTitle={node.title} onDone={() => row.setAddingChild(false)} />
   );
 
   // The one press a feature's own page keeps in its header: the same Send the

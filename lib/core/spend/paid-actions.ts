@@ -85,9 +85,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
-  // Only a goal added to the Learn area costs: it is placed and given a plan
-  // (plan #1490). The hint shows in that area alone.
-  'app/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [
     'generate-track-from-theme',
@@ -126,8 +123,6 @@ export const PAID_ACTIONS = {
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
 
   // Learn: reading lists
-  'app/learn/new/actions.ts#parseImport': ['parse-references'],
-  'app/learn/new/actions.ts#resolveCandidate': ['resolve-reference'],
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],
   'app/learn/r/[id]/actions.ts#findSources': ['suggest-sources'],
   'app/learn/r/[id]/actions.ts#openReading': ['locate-passage'],
@@ -151,10 +146,6 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
   // Shopping
-  'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],
-  'app/shopping/inventory/add/games/actions.ts#extractGamesFromPhoto': ['read-shelf-photo'],
-  'app/shopping/inventory/add/photo-actions.ts#extractBooksFromPhoto': ['read-book-photo'],
-  'app/shopping/orders/receipt/actions.ts#previewReceiptPhoto': ['read-receipt-photo'],
   'app/shopping/sell/actions.ts#priceSellItems': ['estimate-resale-price'],
   'app/shopping/sell/actions.ts#priceOneItem': ['estimate-resale-price'],
   'app/shopping/sell/actions.ts#searchItemPrice': ['estimate-resale-price'],
@@ -162,9 +153,9 @@ export const PAID_ACTIONS = {
   // Not an action: "Import orders from Gmail" and "Sync now" in Shopping
   // settings post here, and the import reads each order confirmation it finds.
   'app/api/inbox/sync/route.ts#POST': ['extract-email-order'],
-  // Not an action either: "Add from this email" on the review list opens this page,
-  // which reads the confirmation into the order form as it renders.
-  'app/shopping/orders/new/page.tsx#NewOrderPage': ['extract-email-order'],
+  // "Add from this email" on the review list reads the confirmation and makes
+  // the order in one press (plan #1950.3.3), through the aimed capture.
+  'app/capture-actions.ts#makeAimedCapture:email': ['extract-email-order'],
 
   // Vault
   'app/vault/n/[...path]/actions.ts#proposeMap': ['map-note', 'embed-map'],
@@ -190,6 +181,19 @@ export const PAID_ACTIONS = {
   // typed, sorting it first when no guess had come back, and a goal update
   // goes through Goals' own filing.
   'app/capture-actions.ts#fileCaptureBox': ['place-capture', 'file-capture'],
+  // An Add button aimed at an order (plan #1950.3.1): the sentence is read as
+  // an order before it is made.
+  'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence'],
+  // The same press with a receipt photo taken in the panel (plan #1950.3.2):
+  // the photo is read as the order instead of the sentence.
+  'app/capture-actions.ts#makeAimedCapture:receipt': ['read-receipt-photo'],
+  // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
+  // placed and given a plan after the response (plan #1490), as one added
+  // from the old New goal form was.
+  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'write-curriculum'],
+  // The header's notes button (plan #1950.5): the note is triaged once it
+  // has saved (plan #1179), as it was from the old popover.
+  'app/capture-actions.ts#makeAimedCapture:dev-note': ['triage-note'],
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],
@@ -229,15 +233,13 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':
-    'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
+    'Triage of a note or idea already saved, showing its type, workspace, priority and any open item it repeats (plan #1179), and scoring an idea against the vision of its workspace (plan #1327). The header panel that called it is gone (plan #1950.5): a note filed through capture is triaged after it saves, priced under app/capture-actions.ts#makeAimedCapture:dev-note. There is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
   'app/capture-actions.ts#sortCaptureBox':
     'Called by the one capture box when typing pauses, to say where the sentence will go (plan #1581). There is no button, only the field; the File it hint prices it under app/capture-actions.ts#fileCaptureBox.',
   'app/goals/actions.ts#editGoal':
     'Saved when a goal\'s title or done-when loses focus after a change, or when it is moved to another area. Only a goal in the Learn area costs: it is placed again and, if it has no plan yet, given one (plan #1490). There is no button, only the field.',
-  'app/shopping/review/actions.ts#readOrderFromEmail':
-    'Nothing calls it. "Add from this email" on the review list opens the order form, whose page makes the same read as it renders, so the hint sits on that link under app/shopping/orders/new/page.tsx#NewOrderPage.',
   'app/api/inbox/sync/continue/route.ts#POST':
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':

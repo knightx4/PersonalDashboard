@@ -13,6 +13,7 @@
 
 import { moduleById, type ModuleId } from '@/lib/modules';
 import { goalsPlaceName, todoDayName, type CaptureDestination } from '@/lib/capture/destination';
+import type { CaptureDay } from '@/lib/capture/todo';
 import {
   availableCapturePlaces,
   CAPTURE_PLACE_LABELS,
@@ -95,7 +96,10 @@ export function captureFiling(
 
 /** One part, once filed: where it went and what undoes it. */
 export type FiledCapture = {
-  place: CapturePlace;
+  /** Null for a kind only an Add button makes, such as a goal (plan #1950.5). */
+  place: CapturePlace | null;
+  /** The workspace the row went into, for a kind with no place. */
+  module?: ModuleId;
   /** The words filed. */
   text: string;
   /** Where it went, as the box and the landing name it: "Todo · Today". */
@@ -114,18 +118,27 @@ export type FiledCapture = {
   undoneAt: string | null;
   /** How many files went with it (plan #1714); absent when none did. */
   files?: number;
+  /** The row made, as `schema.table:id` (plan #1950.1). */
+  ref?: string | null;
+  /** The page the row opens on, which an aimed add goes to; null when it has none. */
+  page?: string | null;
 };
+
+/** The workspace a filed row went into, whether the sort or an Add button chose it. */
+export function filedModule(item: Pick<FiledCapture, 'place' | 'module'>): ModuleId | null {
+  return item.place ? CAPTURE_PLACE_MODULE[item.place] : (item.module ?? null);
+}
 
 /** Where a part went, in the words the box shows and the landing draws. */
 export function filedDestination(
   place: CapturePlace,
-  detail: { role?: CaptureSortRole | null; entries?: readonly FiledEntry[] },
+  detail: { role?: CaptureSortRole | null; entries?: readonly FiledEntry[]; day?: CaptureDay },
 ): CaptureDestination | null {
   const workspace = moduleById(CAPTURE_PLACE_MODULE[place]);
   if (!workspace) return null;
   const inside =
     place === 'todo'
-      ? todoDayName('today')
+      ? todoDayName(detail.day ?? 'today')
       : place === 'goals'
         ? goalsPlaceName(detail.entries ?? [])
         : place === 'jobs' && detail.role
