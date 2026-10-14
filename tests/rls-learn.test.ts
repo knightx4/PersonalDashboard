@@ -124,6 +124,7 @@ describe('RLS coverage', () => {
       'essay_notes',
       'essay_research',
       'essays',
+      'evidence_links',
       'feed_cards',
       'goals',
       'idea_place_members',
@@ -2369,6 +2370,54 @@ describe('vault notes as dust on Idea Space (plan #1997.6)', () => {
   it("goes with the note's embedding", async () => {
     await admin`delete from obsidian.note_embeddings where note_id = ${noteA}`;
     expect(await admin`select 1 from vault_dust where note_id = ${noteA}`).toHaveLength(0);
+  });
+});
+
+describe('evidence for ideas (plan #2006.1)', () => {
+  // learn 0121_evidence_links.sql. The daily run writes the links; the person
+  // only reads their own, a source is linked to a target once, and a link to
+  // an idea goes with the idea.
+  let ideaId = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Evidence subject') returning id`;
+    const [idea] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Backed idea', 'Has evidence.', 'Written by hand for this test.')
+      returning id`;
+    ideaId = idea.id;
+    await admin`
+      insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+      values (${userA}, 'idea', ${ideaId}, 'note', 'note-1', 0.7, 1, 'you wrote about this in Notes')`;
+  });
+
+  it('shows the owner their links and nobody else, and leaves the writing to the daily run', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from evidence_links`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from evidence_links`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'course', 'c1', 0.7, 0.5, 'from a course')`),
+    ).rejects.toThrow();
+  });
+
+  it('keeps one link for a target and a source, and weights between 0 and 1', async () => {
+    await expect(
+      admin`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'note', 'note-1', 0.7, 1, 'again')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`
+        insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
+        values (${userA}, 'idea', ${ideaId}, 'note', 'note-2', 0.7, 1.5, 'too heavy')`,
+    ).rejects.toThrow();
+  });
+
+  it('goes with the idea', async () => {
+    await admin`delete from concepts where id = ${ideaId}`;
+    expect(await admin`select 1 from evidence_links where target_id = ${ideaId}`).toHaveLength(0);
   });
 });
 
