@@ -3,6 +3,7 @@
 import { Fragment, useState, useTransition, type ReactNode } from 'react';
 import { BellRing, Inbox as InboxIcon } from 'lucide-react';
 import { inboxAnchor } from '@/components/inbox/overview';
+import { INBOX_WORDS } from '@/components/inbox/inbox-words';
 import { SnoozeMenu } from '@/components/inbox/snooze-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -43,12 +44,7 @@ export const INBOX_SECTIONS: Record<InboxSectionKey, { title: string; hint: stri
   review: { title: 'To review', hint: 'Need your yes' },
 };
 
-/** The words every Inbox uses for putting a row off and turning one down. */
-export const INBOX_WORDS = {
-  later: 'Later',
-  decline: 'Decline',
-  bringBack: 'Bring back',
-} as const;
+export { INBOX_WORDS };
 
 /** What a verb's write answers: an error to show, or a line to say it worked. */
 export type InboxResult = { error?: string; message?: string } | void;

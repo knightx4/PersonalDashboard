@@ -309,6 +309,14 @@ import {
 } from './goal-page-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import {
+  JobsInboxSurface,
+  LearnInboxSurface,
+  NewsInboxSurface,
+  ShoppingInboxSurface,
+  TodoInboxSurface,
+  VaultInboxSurface,
+} from './workspace-inbox-surfaces';
+import {
   AuthCodeErrorSurface,
   ConsentSurface,
   FrontDoorSurface,
@@ -4027,6 +4035,51 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <InboxPageSurface />,
+  },
+  /* Each workspace's Inbox (plan #1937.5): the agenda's on-you rows cut to
+   * the workspace, with a queue row where it keeps one. News is drawn empty.
+   * Fixtures in workspace-inbox-surfaces.tsx. */
+  {
+    id: 'shopping-inbox',
+    label: 'Shopping · Inbox',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingInboxSurface />,
+  },
+  {
+    id: 'jobs-inbox',
+    label: 'Job search · Inbox',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface />,
+  },
+  {
+    id: 'todo-inbox',
+    label: 'Todo · Inbox',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoInboxSurface />,
+  },
+  {
+    id: 'vault-inbox',
+    label: 'Vault · Inbox',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultInboxSurface />,
+  },
+  {
+    id: 'learn-inbox',
+    label: 'Learn · Inbox',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnInboxSurface />,
+  },
+  {
+    id: 'news-inbox',
+    label: 'News · Inbox, empty',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
