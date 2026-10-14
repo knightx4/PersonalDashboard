@@ -1,7 +1,7 @@
 import { safeTimeZone } from '@/lib/core/timezone';
 import { readStories } from './stories';
 import { NEWS_TOPICS, type NewsTopic } from './topics';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /** One newsletter in the list. The body is not read until you open it. */
 export type NewsIssue = {

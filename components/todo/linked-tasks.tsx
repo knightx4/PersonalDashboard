@@ -17,7 +17,7 @@ import { completionMoment } from '@/components/motion/complete';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**

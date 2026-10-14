@@ -4,7 +4,7 @@ import { CalendarClock } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { ARRIVE_LAST_STEP, arriveAt } from '@/lib/home/first-visit';
 import type { ModuleId } from '@/lib/modules';
 import type { Brief } from '@/lib/shell/brief';

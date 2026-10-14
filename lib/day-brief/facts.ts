@@ -1,7 +1,7 @@
 import type { AgendaPile } from '@/lib/todo/agenda/merge';
 import type { DailyView } from '@/lib/goals/daily';
 import { addDays } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { isInterviewContext } from '@/lib/todo/agenda/sources';
 import { stepHref } from '@/lib/goals/all-goals';
 

@@ -11,7 +11,7 @@ import {
   type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/core/timezone';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { lastTurnEvent } from '@/lib/jobs/move';
 

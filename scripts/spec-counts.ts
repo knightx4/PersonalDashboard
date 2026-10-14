@@ -384,6 +384,14 @@ function formOnlyPages(root: string): string[] {
     .sort();
 }
 
+/**
+ * docs/ONE-INTERFACE-SPEC.md, R6 (plan #1957.4): a date or time becomes words
+ * only in lib/core/when.ts. A file that calls one of the four platform
+ * formatters is counted, except when.ts and the tests.
+ */
+const DATE_FORMATTER = /\b(?:Intl\.DateTimeFormat|toLocaleDateString|toLocaleString|toLocaleTimeString)\b/;
+const WHEN_HOME = 'lib/core/when.ts';
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -419,6 +427,18 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
         pattern: MODEL_ID,
         exclude: /\.test\.tsx?$/,
       }),
+  },
+  {
+    name: 'date-formatting-files',
+    counts: 'files other than lib/core/when.ts that turn a date or a time into words with the platform',
+    target: 0,
+    measure: (root) =>
+      filesMatching(root, {
+        dirs: ['app', 'components', 'lib'],
+        exts: ['.ts', '.tsx'],
+        pattern: DATE_FORMATTER,
+        exclude: /\.test\.tsx?$/,
+      }).filter((file) => file !== WHEN_HOME),
   },
   {
     name: 'link-tables-per-target-column',

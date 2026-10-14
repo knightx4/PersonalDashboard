@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { senderLabel, type NewsSender } from '@/lib/news/issues/list';
 import { readStories } from '@/lib/news/issues/stories';

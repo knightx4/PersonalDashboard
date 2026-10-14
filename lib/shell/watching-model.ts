@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { money } from '@/lib/watch/format';
 import type { Update } from '@/lib/shell/home-model';
 

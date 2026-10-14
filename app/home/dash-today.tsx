@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Timeline, type TimelineEntry } from '@/components/ui/timeline';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import type { DashTodayEntry, DashTodayGroup } from '@/lib/shell/dash-today';
 import type { UndoDashTodayResult } from './actions';
 

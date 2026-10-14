@@ -12,7 +12,7 @@ import { putAway } from '@/components/motion/place';
 import { moduleById, moduleForPath } from '@/lib/modules';
 import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */

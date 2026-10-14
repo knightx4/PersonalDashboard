@@ -5,7 +5,7 @@ import { SectionLabel } from '@/components/ui/section-heading';
 import { Pill, WorkweekOutline, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
-import { hourLabel } from '@/lib/clock';
+import { hourLabel } from '@/lib/core/when';
 import { NewEventLink } from '@/components/todo/new-event-link';
 
 /**
