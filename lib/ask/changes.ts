@@ -8,6 +8,7 @@ import { undoItemChange } from '@/lib/dash/bulk-items';
 import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
+import { undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -782,6 +783,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  // A merge of roles puts back every row it moved or took out (plan #1894.6.2).
+  if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,

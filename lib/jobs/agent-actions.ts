@@ -8,13 +8,13 @@ export const jobsActions: ModuleActions = {
     finishOnboarding: none('setting'),
   },
   'app/jobs/(app)/companies/actions.ts': {
-    updateCompany: GAP,
-    renameCompany: GAP,
+    updateCompany: tool('change_company'),
+    renameCompany: tool('change_company'),
     proposeCompanyEnrichment: none('page'),
     applyCompanyEnrichment: none('theirs'),
     proposeAiCompanyEnrichment: none('spends'),
     applyAiCompanyEnrichment: none('theirs'),
-    mergeRoles: GAP,
+    mergeRoles: tool('merge_roles'),
   },
   'app/jobs/(app)/_home/actions.ts': {
     completeReminder: GAP,

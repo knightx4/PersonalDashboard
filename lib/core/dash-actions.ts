@@ -7,7 +7,7 @@ import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
-import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
+import { JOBS_CHANGE_KINDS, JOBS_MANY_ROW_KINDS } from '@/lib/ask/jobs-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -191,7 +191,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
  * records them as a routine's (plan #1894.5.1), and they go there too, since
  * the rule here sees only the one row the record names.
  */
-export const MANY_ROW_KINDS: readonly string[] = ['change_items', ...SHOPPING_CHANGE_KINDS];
+export const MANY_ROW_KINDS: readonly string[] = ['change_items', ...SHOPPING_CHANGE_KINDS, ...JOBS_MANY_ROW_KINDS];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
 export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boolean {
