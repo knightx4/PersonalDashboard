@@ -262,6 +262,42 @@ function AddedToast() {
 }
 
 /**
+ * Capture aimed at a place, from Add a place on You's Places (plan #1950.7):
+ * a home typed with its street, city and dates, and one with no date, which
+ * is refused with the sentence saying how to write it.
+ */
+export function AimedPlaceSurface() {
+  return (
+    <div className="space-y-8 py-4">
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS.place}
+          text="Flat 3, 41 Kerr Street, Glasgow, March 2019 to August 2021"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error={null}
+          onSubmit={nothing}
+        />
+      </Aimed>
+      <Aimed>
+        <AimedCaptureForm
+          kind={CAPTURE_KINDS.place}
+          text="Oak Street, Leeds"
+          onText={nothing}
+          day=""
+          onDay={nothing}
+          pending={false}
+          error="Put the dates after the name, such as Leeds, 2019 to 2021."
+          onSubmit={nothing}
+        />
+      </Aimed>
+    </div>
+  );
+}
+
+/**
  * Capture aimed at the Jobs and Learn kinds (plan #1950.4): Add a role with a
  * posting link pasted, pressed and still reading the page, so the loading
  * state is drawn; Start a topic with a reading list pasted under its name;

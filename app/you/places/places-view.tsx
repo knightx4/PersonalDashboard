@@ -1,17 +1,22 @@
-import { House, MapPin, Plus } from 'lucide-react';
+import { House, MapPin } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
+import { AimButton } from '@/components/shell/aim-button';
 import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
-import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import Link from '@/components/ui/link';
+import type { CaptureAim } from '@/lib/capture/actions';
 import { isCurrent, placeHref, placeSpan, placeWhere, type Place } from '@/lib/you/places';
 import { sectionSubject } from '@/lib/core/section-path';
+
+/** Add a place opens capture aimed at a place (plan #1950.7): its name, then when. */
+const PLACE_AIM: CaptureAim = { kind: 'place' };
 
 /**
  * You's Places tab (plan #1991.5): the places they have lived, newest first,
  * with the home they live in now marked. The list-and-detail pattern: the
- * header with its one action, one surface of rows, then the count. Pressing a
+ * header with its one action, which opens capture aimed at a place, one
+ * surface of rows, then the count. Pressing a
  * row opens the place, where it is changed or removed.
  *
  * The page and the gallery both draw this, so it takes the places and reads
@@ -24,10 +29,7 @@ export function PlacesView({ places }: { places: readonly Place[] }) {
       title="Places"
       actions={
         places.length > 0 ? (
-          <Link href="/you/places/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-            Add a place
-          </Link>
+          <AimButton aim={PLACE_AIM} label="Add a place" />
         ) : undefined
       }
     />
@@ -41,7 +43,7 @@ export function PlacesView({ places }: { places: readonly Place[] }) {
           icon={MapPin}
           title="No places yet"
           description="Add the places you have lived, with a year or a month for when you moved in and out. Dash reads them when you ask where you were living at some point."
-          action={{ label: 'Add a place', href: '/you/places/new' }}
+          action={{ label: 'Add a place', aim: PLACE_AIM }}
         />
       </PageColumn>
     );

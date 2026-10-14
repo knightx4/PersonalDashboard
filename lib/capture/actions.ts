@@ -220,7 +220,9 @@ export type CaptureKindId =
   | 'learn-topic'
   | 'learn-quiz'
   // Learn (plan #1950.6): one thing to read, on the track the page is open on.
-  | 'track-reading';
+  | 'track-reading'
+  // You (plan #1950.7): a place they have lived, from its Add on Places.
+  | 'place';
 
 /**
  * The one thing a kind may need besides its title. A todo takes a day; a
@@ -520,6 +522,20 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     needs: null,
     makes: 'row',
     section: '/learn',
+    action: 'anything',
+  },
+  // You (plan #1950.7): the name, then when, in one line. Where it is and a
+  // note are set on the place's own page, which opens once it is made.
+  place: {
+    id: 'place',
+    place: null,
+    module: 'you',
+    label: 'Add a place',
+    placeholder: 'Where, then when: Oak Street, Leeds, 2019 to 2021',
+    field: 'line',
+    needs: null,
+    makes: 'row',
+    section: '/you/places',
     action: 'anything',
   },
 };

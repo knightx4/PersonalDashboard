@@ -527,6 +527,31 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(await makeCaptureKind('track-reading', { text: 'No track' }, writers)).toMatchObject({ ok: false });
   });
 
+  it('adds a place from its name and dates in one line, and opens it (plan #1950.7)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const place = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      place: async (row) => {
+        asked.push(row);
+        return { ok: true, id: place };
+      },
+    };
+    const made = await makeCaptureKind('place', { text: '12 Oak Street, Leeds, March 2019 to 2021' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([
+      { name: '12 Oak Street, Leeds', city: null, region: null, country: null, moved_in: '2019-03', moved_out: '2021', note: null },
+    ]);
+    expect(made.filed).toMatchObject({ ref: `you.places:${place}`, page: `/you/places/${place}`, where: 'You · Places' });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_place', subject_ref: `you.places:${place}` });
+
+    // No date, or a date the form would refuse, writes nothing.
+    expect(await makeCaptureKind('place', { text: 'Oak Street' }, writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('place', { text: 'Leeds, 2021 to 2019' }, writers)).toMatchObject({ ok: false });
+    expect(asked).toHaveLength(1);
+  });
+
   it('starts a quiz over named notes and pasted text, and opens it (plan #1950.4)', async () => {
     const world = setup();
     const asked: unknown[] = [];
