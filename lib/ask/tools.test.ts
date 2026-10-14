@@ -249,6 +249,16 @@ describe('open_row', () => {
     expect(expectLinkedRows(task)[0].href).toBe('/todo/all?status=all&focus=t1');
   });
 
+  it('says whether a post went up, beside its text (note 5c73c50e)', async () => {
+    const posts: Tables = {
+      'public.social_posts': [
+        { id: 'p1', user_id: ME, angle: 'Todo, introduced', body: ['Todo is one list.'], status: 'dropped', image_paths: ['/posts/todo.png'], posted_url: null, posted_at: null, dropped_at: '2026-10-14T10:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool('open_row', { table: 'public.social_posts', ref: 'p1' }, context(posts));
+    expect(expectLinkedRows(result)[0].detail).toMatchObject({ status: 'dropped', image_paths: '["/posts/todo.png"]' });
+  });
+
   it('finds nothing of somebody else’s, even by its id', async () => {
     const result = await executeAskTool(
       'open_row',
