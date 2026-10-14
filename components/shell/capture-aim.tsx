@@ -104,6 +104,8 @@ export function AimedCaptureForm({
   fieldRef,
   onSubmit,
   hint,
+  attached,
+  tools,
 }: {
   kind: CaptureKind;
   /** The role a note goes on, which the page aiming it already knew. */
@@ -118,6 +120,13 @@ export function AimedCaptureForm({
   onSubmit: () => void;
   /** The $ hint beside Add, for a kind whose press makes a model call. */
   hint?: React.ReactNode;
+  /**
+   * What takes the field's place while it is there (plan #1950.3.2): a
+   * receipt photo, the barcode viewfinder, or the book a scan named.
+   */
+  attached?: React.ReactNode;
+  /** The camera step's button, at the start of the foot (capture-camera.tsx). */
+  tools?: React.ReactNode;
 }) {
   const field = 'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
@@ -130,7 +139,9 @@ export function AimedCaptureForm({
         <Kbd always>esc</Kbd>
       </div>
 
-      {kind.field === 'prose' ? (
+      {attached ? (
+        attached
+      ) : kind.field === 'prose' ? (
         <textarea
           ref={fieldRef}
           value={text}
@@ -162,6 +173,7 @@ export function AimedCaptureForm({
       )}
 
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2">
+        {tools}
         {kind.needs === 'day' && <DayChips day={day} onDay={onDay} />}
         {kind.needs === 'role' && role && (
           <span className="min-w-0 truncate text-small text-ink-muted">

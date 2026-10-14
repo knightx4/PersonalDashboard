@@ -27,8 +27,12 @@ import { scrapeProductUrl } from '@/lib/saved/scrape-product';
 import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
 import { linkIn, linkTitle, typedIsbn } from '@/lib/capture/shopping-text';
 import type { ShoppingMade } from '@/lib/capture/file';
-import { saveOwnedBook } from './inventory/add/actions';
+import type { ScannedThing } from '@/lib/capture/actions';
+import { classifyScannedCode } from '@/lib/barcodes/scan-code';
+import { saveOwnedBook, searchOwnedBook } from './inventory/add/actions';
+import { saveGame, searchGame } from './inventory/add/games/actions';
 import { saveManualItem } from './inventory/add/item-actions';
+import { readReceiptPhoto, saveReceiptOrder } from './orders/receipt-order';
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
@@ -271,4 +275,87 @@ export async function makeShoppingSaved(text: string): Promise<ShoppingMade> {
     return { ok: false, error: 'It could not be saved. Try again.' };
   }
   return { ok: true, id: (data as { id: string }).id, title };
+}
+
+/**
+ * An order read from a receipt photo (plan #1950.3.2): one press reads it and
+ * makes it, and its own page is where a misread line is put right.
+ */
+export async function makeShoppingReceipt(photo: string): Promise<ShoppingMade> {
+  const user = await requireUser();
+  const read = await readReceiptPhoto(user.id, photo);
+  if (!read.ok) return { ok: false, error: read.error };
+  return saveReceiptOrder(await createClient(), user.id, read.order);
+}
+
+/**
+ * What a scanned barcode names (plan #1950.3.2): a book from the catalogs
+ * when it is an ISBN, and a game from the barcode database and BoardGameGeek
+ * otherwise. Looked up when the scan lands, so the panel shows what Add will
+ * add before it is pressed.
+ */
+export async function nameShoppingBarcode(code: string): Promise<{ ok: true; thing: ScannedThing } | { ok: false; error: string }> {
+  const scanned = classifyScannedCode(code);
+  if (!scanned) return { ok: false, error: 'That barcode did not read cleanly. Scan it again, or type the name.' };
+
+  const query = new FormData();
+  if (scanned.kind === 'isbn') {
+    query.set('query', scanned.isbn13);
+    const found = await searchOwnedBook({}, query);
+    if (!found.book) {
+      return { ok: false, error: found.error ?? 'No catalog lists that book yet. Type its title instead.' };
+    }
+    const book = found.book;
+    return {
+      ok: true,
+      thing: {
+        kind: 'book',
+        title: book.title,
+        byline: book.authors.length > 0 ? book.authors.join(', ') : null,
+        image: book.coverUrl,
+        code: scanned.isbn13,
+        record: JSON.stringify(book),
+      },
+    };
+  }
+
+  query.set('query', scanned.ean13);
+  const found = await searchGame({}, query);
+  if (!found.game) {
+    return { ok: false, error: found.error ?? 'Nothing is listed under that barcode. Type the name instead.' };
+  }
+  const game = found.game;
+  const byline = [game.yearPublished, game.publisher].filter(Boolean).join(' · ');
+  return {
+    ok: true,
+    thing: {
+      kind: 'game',
+      title: game.title,
+      byline: byline || null,
+      image: game.imageUrl,
+      code: scanned.ean13,
+      record: JSON.stringify(game),
+    },
+  };
+}
+
+/** The book or game a scan named, added to what is owned. */
+export async function makeShoppingScanned(thing: ScannedThing): Promise<ShoppingMade> {
+  const form = new FormData();
+  // A scanned ISBN names the edition exactly, as the book scanner treated it;
+  // a game's barcode can match more than one edition, so its row may still ask.
+  form.set('force_confirmed', thing.kind === 'book' ? 'true' : 'false');
+  if (thing.kind === 'book') {
+    form.set('book_json', thing.record);
+    form.set('source', 'manual');
+    const saved = await saveOwnedBook({}, form);
+    const id = saved.savedIds?.[0];
+    if (!id) return { ok: false, error: saved.error ?? 'The book could not be added. Try again.' };
+    return { ok: true, id, title: saved.book?.title ?? thing.title };
+  }
+  form.set('game_json', thing.record);
+  const saved = await saveGame({}, form);
+  const id = saved.savedIds?.[0];
+  if (!id) return { ok: false, error: saved.error ?? 'The game could not be added. Try again.' };
+  return { ok: true, id, title: saved.game?.title ?? thing.title };
 }

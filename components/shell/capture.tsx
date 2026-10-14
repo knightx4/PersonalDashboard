@@ -39,6 +39,7 @@ import {
   type CaptureAim,
 } from '@/lib/capture/actions';
 import { AimedCaptureForm, CaptureAimContext, DayChips } from '@/components/shell/capture-aim';
+import { useCaptureCamera } from '@/components/shell/capture-camera';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import { useRouter } from 'next/navigation';
 import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
@@ -82,6 +83,7 @@ import {
   captureBoxCosts,
   fileCaptureBox,
   makeAimedCapture,
+  nameCapturedBarcode,
   sortCaptureBox,
   undoCaptureBox,
 } from '@/app/capture-actions';
@@ -1141,11 +1143,13 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
     };
   }, [kind.paid]);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  // A receipt photo or a barcode, for a kind that takes one (plan #1950.3.2).
+  const camera = useCaptureCamera(kind, nameCapturedBarcode, setError);
 
   usePanelChrome(onClose, panelRef);
 
   function submit() {
-    if (pending || !text.trim()) return;
+    if (pending || camera.busy || (!text.trim() && !camera.photo && !camera.scanned)) return;
     const problem = aimProblem(aim);
     if (problem) {
       setError(problem);
@@ -1157,6 +1161,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
         text,
         ...(kind.needs === 'day' ? { day } : {}),
         ...(aim.role ? { role: aim.role } : {}),
+        ...(camera.photo ? { photo: camera.photo } : {}),
+        ...(camera.scanned ? { scanned: camera.scanned } : {}),
       });
       if (!result.ok) {
         setError(result.error);
@@ -1184,7 +1190,7 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           : {}),
       };
       onClose();
-      void sendToPlace({ from, to: landingTarget(kind.section), label: text, name: made.where });
+      void sendToPlace({ from, to: landingTarget(kind.section), label: made.text, name: made.where });
       toast(notice);
       if (page) {
         carryToast(notice);
@@ -1226,6 +1232,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
             fieldRef.current = node;
           }}
           onSubmit={submit}
+          attached={camera.attached}
+          tools={camera.tools}
           hint={
             kind.paid ? (
               <PaidCostsProvider costs={costs}>

@@ -7,7 +7,7 @@ import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { recordAttachments } from '@/lib/attachments/store';
-import { aimProblem, CAPTURE_KINDS, type CaptureKindId } from '@/lib/capture/actions';
+import { aimProblem, CAPTURE_KINDS, type CaptureKindId, type ScannedThing } from '@/lib/capture/actions';
 import { fileCaptureParts, makeCaptureKind, type CaptureFiled, type CaptureWriters } from '@/lib/capture/file';
 import { captureFiling, offeredCapturePlaces, type FiledCapture } from '@/lib/capture/place';
 import {
@@ -40,7 +40,14 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
-import { makeShoppingItem, makeShoppingOrder, makeShoppingSaved } from '@/app/shopping/capture-writers';
+import {
+  makeShoppingItem,
+  makeShoppingOrder,
+  makeShoppingReceipt,
+  makeShoppingSaved,
+  makeShoppingScanned,
+  nameShoppingBarcode,
+} from '@/app/shopping/capture-writers';
 
 /**
  * The one capture box's server side (plan #1581, feature #1579): where a
@@ -283,6 +290,8 @@ async function aimedWriters(userId: string, modules: ModuleId[]): Promise<Captur
       order: (text) => makeShoppingOrder(text),
       item: (text) => makeShoppingItem(text),
       saved: (text) => makeShoppingSaved(text),
+      receipt: (photo) => makeShoppingReceipt(photo),
+      scanned: (thing) => makeShoppingScanned(thing),
     },
   };
 }
@@ -294,6 +303,23 @@ const Aimed = z.object({
   /** A todo's day: a word the chips send, or a date the field holds. */
   day: z.string().max(10).optional(),
   role: z.object({ id: z.string().uuid(), title: z.string().max(300), company: z.string().max(300).nullable() }).optional(),
+  /**
+   * A receipt photo taken in the panel (plan #1950.3.2), as the data URL the
+   * browser shrank it to (lib/images/prepare-photo.ts, 1600px on its longest
+   * side), which stays well under the action's 1MB body.
+   */
+  photo: z.string().startsWith('data:image/').max(1_000_000).optional(),
+  /** What a barcode scanned in the panel named (plan #1950.3.2). */
+  scanned: z
+    .object({
+      kind: z.enum(['book', 'game']),
+      title: z.string().max(500),
+      byline: z.string().max(500).nullable(),
+      image: z.string().max(2000).nullable(),
+      code: z.string().max(20),
+      record: z.string().max(50_000),
+    })
+    .optional(),
 });
 export type CaptureAimedInput = z.infer<typeof Aimed>;
 
@@ -310,7 +336,7 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
   const user = await requireUser();
   const parsed = Aimed.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
-  const { kind: kindId, text, day, role } = parsed.data;
+  const { kind: kindId, text, day, role, photo, scanned } = parsed.data;
   const kind = CAPTURE_KINDS[kindId];
   const problem = aimProblem({ kind: kindId, role });
   if (problem) return { ok: false, error: problem };
@@ -321,7 +347,17 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
     return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
   }
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role }, await aimedWriters(user.id, modules));
+    const made = await makeCaptureKind(
+      kindId,
+      {
+        text,
+        day,
+        role,
+        ...(photo && kind.camera === 'receipt' ? { photo } : {}),
+        ...(scanned && kind.camera === 'barcode' ? { scanned } : {}),
+      },
+      await aimedWriters(user.id, modules),
+    );
     if (!made.ok) return { ok: false, error: made.error };
     revalidatePath(kind.section, 'layout');
     revalidatePath('/home');
@@ -329,6 +365,24 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
   } catch (error) {
     console.error('capture: making an aimed row failed', kindId, error);
     return { ok: false, error: 'That could not be added. Try again.' };
+  }
+}
+
+export type CaptureNamed = { ok: true; thing: ScannedThing } | { ok: false; error: string };
+
+/**
+ * What a barcode scanned in capture names (plan #1950.3.2): the book or game,
+ * looked up as soon as the scan lands so the panel shows it before Add.
+ */
+// latency: pending
+export async function nameCapturedBarcode(code: string): Promise<CaptureNamed> {
+  await requireUser();
+  if (typeof code !== 'string' || code.length > 20) return { ok: false, error: 'That barcode did not read cleanly.' };
+  try {
+    return await nameShoppingBarcode(code);
+  } catch (error) {
+    console.error('capture: naming a barcode failed', error);
+    return { ok: false, error: 'The catalogs did not answer just now. Try again, or type the name.' };
   }
 }
 

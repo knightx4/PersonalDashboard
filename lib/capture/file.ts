@@ -18,7 +18,7 @@
 
 import type { DashActionEntry } from '@/lib/core/dash-actions';
 import { refHref } from '@/lib/core/refs';
-import { kindForPlace, type CaptureKindId } from '@/lib/capture/actions';
+import { kindForPlace, type CaptureKindId, type ScannedThing } from '@/lib/capture/actions';
 import { capturePartLabel, filedDestination, type FiledCapture } from '@/lib/capture/place';
 import { roleName, type CapturePart, type CaptureSortRole } from '@/lib/capture/sort';
 import type { CaptureDay } from '@/lib/capture/todo';
@@ -79,6 +79,10 @@ export type ShoppingWriters = {
   item: (text: string) => Promise<ShoppingMade>;
   /** A saved thing from the link in what was typed. */
   saved: (text: string) => Promise<ShoppingMade>;
+  /** An order read from a receipt photo, sent as a data URL (plan #1950.3.2). */
+  receipt?: (photo: string) => Promise<ShoppingMade>;
+  /** The book or game a scanned barcode named (plan #1950.3.2). */
+  scanned?: (thing: ScannedThing) => Promise<ShoppingMade>;
 };
 export type LearnReadingWritten =
   | { ok: true; readingId: string; title: string; created: boolean }
@@ -160,6 +164,10 @@ export type MakeInput = {
   day?: CaptureDay;
   /** The role a note on a job goes on. */
   role?: CaptureSortRole | null;
+  /** A receipt photo an order is read from, in place of the text (plan #1950.3.2). */
+  photo?: string;
+  /** What a scanned barcode named, added in place of the text (plan #1950.3.2). */
+  scanned?: ScannedThing;
 };
 
 export type MakeResult = { ok: true; filed: FiledCapture } | { ok: false; error: string };
@@ -180,17 +188,19 @@ function aimedUndo(by: MadeBy, undo?: Record<string, unknown>): Record<string, u
  * Each row opens on its own page, where its details are put right.
  */
 function shoppingMaker(spec: {
-  writer: keyof ShoppingWriters;
+  write: (input: MakeInput, shopping: ShoppingWriters) => Promise<ShoppingMade>;
   table: 'orders' | 'inventory_items' | 'saved_items';
   kind: string;
   list: string;
   section: string;
   said: (title: string) => string;
 }): Maker {
-  return async ({ text }, writers, by, errors) => {
+  return async (input, writers, by, errors) => {
     if (!writers.shopping) return { ok: false, error: CANNOT_HERE };
-    const result = await writers.shopping[spec.writer](text);
+    const result = await spec.write(input, writers.shopping);
     if (!result.ok) return { ok: false, error: result.error };
+    // A photo or a scan has no words of its own: the row's title stands in.
+    const text = input.text || result.title;
     const subjectRef = `public.${spec.table}:${result.id}`;
     const files = await attachTo(writers, [subjectRef], errors);
     const actionId = await writers.record({
@@ -361,7 +371,9 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
   },
 
   order: shoppingMaker({
-    writer: 'order',
+    // A receipt photo, when one was taken, is what the order is read from.
+    write: ({ text, photo }, shopping) =>
+      photo ? (shopping.receipt?.(photo) ?? cannotHere()) : shopping.order(text),
     table: 'orders',
     kind: 'add_order',
     list: 'Orders',
@@ -370,7 +382,9 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
   }),
 
   'inventory-item': shoppingMaker({
-    writer: 'item',
+    // A scanned book or game, when there is one, is what is added.
+    write: ({ text, scanned }, shopping) =>
+      scanned ? (shopping.scanned?.(scanned) ?? cannotHere()) : shopping.item(text),
     table: 'inventory_items',
     kind: 'add_inventory_item',
     list: 'Inventory',
@@ -379,7 +393,7 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
   }),
 
   'saved-item': shoppingMaker({
-    writer: 'saved',
+    write: ({ text }, shopping) => shopping.saved(text),
     table: 'saved_items',
     kind: 'add_saved_item',
     list: 'Saved',
@@ -489,6 +503,11 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
 /** What a kind says when its writer is not bound where it was asked for. */
 const CANNOT_HERE = 'That cannot be added from here. Open its list and press Add there.';
 
+/** A Shopping step whose writer this caller did not bind, such as the shortcuts' route. */
+async function cannotHere(): Promise<ShoppingMade> {
+  return { ok: false, error: CANNOT_HERE };
+}
+
 /** A row an Add button made, as the panel and the toast read it. */
 function made(
   text: string,
@@ -513,7 +532,7 @@ export async function makeCaptureKind(
   writers: CaptureWriters,
 ): Promise<MakeResult & { errors: string[] }> {
   const text = input.text.trim();
-  if (!text) return { ok: false, error: 'Type something first.', errors: [] };
+  if (!text && !input.photo && !input.scanned) return { ok: false, error: 'Type something first.', errors: [] };
   const errors: string[] = [];
   const made = await CAPTURE_MAKERS[kind]({ ...input, text }, writers, 'you', errors);
   return { ...made, errors };

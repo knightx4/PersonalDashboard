@@ -1,8 +1,6 @@
 import { Package, Receipt } from 'lucide-react';
 import { AimButton } from '@/components/shell/aim-button';
-import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import Link from '@/components/ui/link';
 
 /**
  * The Add buttons on the Orders and Inventory lists (plan #1950.3.1), apart
@@ -10,19 +8,12 @@ import Link from '@/components/ui/link';
  * (shopping-list-adds). Each opens capture aimed at its kind: one press makes
  * the order or the item and opens it.
  *
- * The receipt photo and the books and games flows keep a link of their own
- * until a photo and a barcode are steps inside capture (plan #1950.3.2).
+ * A receipt photo and a barcode scan are steps inside that capture (plan
+ * #1950.3.2), so neither list needs a second button for them.
  */
 
 export function OrdersAddActions() {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Link href="/shopping/orders/receipt" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-        Receipt photo
-      </Link>
-      <AimButton aim={{ kind: 'order' }} label="Add an order" />
-    </div>
-  );
+  return <AimButton aim={{ kind: 'order' }} label="Add an order" />;
 }
 
 /**
@@ -41,14 +32,7 @@ export function OrdersEmpty() {
 }
 
 export function InventoryAddActions() {
-  return (
-    <>
-      <Link href="/shopping/inventory/add" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-        Books and games
-      </Link>
-      <AimButton aim={{ kind: 'inventory-item' }} label="Add something you own" />
-    </>
-  );
+  return <AimButton aim={{ kind: 'inventory-item' }} label="Add something you own" />;
 }
 
 /**

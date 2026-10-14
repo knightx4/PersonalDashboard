@@ -189,8 +189,9 @@ export const PAID_ACTIONS = {
   // goes through Goals' own filing.
   'app/capture-actions.ts#fileCaptureBox': ['place-capture', 'file-capture'],
   // An Add button aimed at an order (plan #1950.3.1): the sentence is read as
-  // an order before it is made.
-  'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence'],
+  // an order before it is made, or the receipt photo taken in the panel is
+  // (plan #1950.3.2).
+  'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence', 'read-receipt-photo'],
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],

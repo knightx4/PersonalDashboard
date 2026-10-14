@@ -147,6 +147,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-capture': ['/home'],
   'shell-capture-aimed': ['/home'],
   'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
+  'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
   'shell-capture-aimed-jobs-learn': ['/home'],
   'shell-note': ['/dev/bugs'],
   'shell-note-saved': ['/dev/bugs'],
@@ -430,6 +431,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Shopping's Add buttons and the capture they aim (plan #1950.3.1).
   'shopping-list-adds': ['app/shopping/list-adds.tsx', 'components/shell/aim-button.tsx'],
   'shell-capture-aimed-jobs-learn': ['components/shell/capture-aim.tsx'],
+  // The receipt photo and barcode scan inside aimed capture (plan #1950.3.2).
+  'shell-capture-aimed-camera': ['components/shell/capture-camera.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],

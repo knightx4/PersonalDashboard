@@ -369,6 +369,52 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(world.tables['public.saved_items']).toEqual([]);
   });
 
+  it('makes an order from a receipt photo and an item from a scan, with nothing typed (plan #1950.3.2)', async () => {
+    const world = setup();
+    const sent: string[] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      shopping: {
+        order: async () => ({ ok: false, error: 'the sentence path ran' }),
+        item: async () => ({ ok: false, error: 'the typed path ran' }),
+        saved: async () => ({ ok: false, error: 'not this one' }),
+        receipt: async (photo) => {
+          sent.push(photo);
+          return { ok: true, id: fakeId(), title: 'Milk and 4 more from Safeway' };
+        },
+        scanned: async (thing) => {
+          sent.push(thing.code);
+          return { ok: true, id: fakeId(), title: thing.title };
+        },
+      },
+    };
+
+    const order = await makeCaptureKind('order', { text: '', photo: 'data:image/jpeg;base64,AAAA' }, writers);
+    if (!order.ok) throw new Error(order.error);
+    expect(order.filed).toMatchObject({ where: 'Shopping · Orders', text: 'Milk and 4 more from Safeway' });
+
+    const item = await makeCaptureKind(
+      'inventory-item',
+      {
+        text: '',
+        scanned: { kind: 'book', title: 'Middlemarch', byline: 'George Eliot', image: null, code: '9780141439549', record: '{}' },
+      },
+      writers,
+    );
+    if (!item.ok) throw new Error(item.error);
+    expect(item.filed).toMatchObject({ where: 'Shopping · Inventory', text: 'Middlemarch' });
+    expect(sent).toEqual(['data:image/jpeg;base64,AAAA', '9780141439549']);
+    expect(String(world.tables['core.dash_actions'][1].summary)).toBe('You added "Middlemarch" to your inventory.');
+  });
+
+  it('still asks for words when there is no photo or scan either', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('order', { text: '  ' }, world.writers)).toMatchObject({
+      ok: false,
+      error: 'Type something first.',
+    });
+  });
+
   it('says so when a Shopping kind is aimed where there are no Shopping writers', async () => {
     const world = setup();
     expect(await makeCaptureKind('order', { text: 'a kettle for $30' }, world.writers)).toMatchObject({
