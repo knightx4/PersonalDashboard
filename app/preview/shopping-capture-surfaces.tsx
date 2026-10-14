@@ -40,6 +40,16 @@ const COSTS: PaidCosts = {
     per: 'run',
     models: [HAIKU],
   },
+  // Reading a receipt photo instead (plan #1950.3.2).
+  'app/capture-actions.ts#makeAimedCapture:receipt': {
+    lowMicros: 2_000,
+    medianMicros: 3_100,
+    highMicros: 4_800,
+    runs: 9,
+    basis: 'measured',
+    per: 'run',
+    models: [HAIKU],
+  },
 };
 
 function Aimed({ children }: { children: React.ReactNode }) {
@@ -168,7 +178,7 @@ export function ShoppingAimedCameraSurface() {
           tools={<ReceiptPhotoButton taken onFile={nothing} />}
           hint={
             <PaidCostsProvider costs={COSTS}>
-              <PaidHint action="app/capture-actions.ts#makeAimedCapture" what="Cost of reading it" align="end" />
+              <PaidHint action="app/capture-actions.ts#makeAimedCapture:receipt" what="Cost of reading the receipt" align="end" />
             </PaidCostsProvider>
           }
         />

@@ -37,6 +37,7 @@ import {
   type CaptureAction,
   type CaptureActionId,
   type CaptureAim,
+  type CaptureKindId,
 } from '@/lib/capture/actions';
 import { AimedCaptureForm, CaptureAimContext, DayChips } from '@/components/shell/capture-aim';
 import { useCaptureCamera } from '@/components/shell/capture-camera';
@@ -46,13 +47,14 @@ import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
 import { goalsPlaceName } from '@/lib/capture/destination';
 import {
+  filedModule,
   offeredCapturePlaces,
   type FiledCapture,
 } from '@/lib/capture/place';
-import { CAPTURE_PLACE_MODULE, type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
+import { type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
-import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import type { PaidAction, PaidCosts } from '@/lib/core/spend/paid-actions';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
   ESTIMATE_CHIPS,
@@ -258,7 +260,7 @@ export function CaptureProvider({
       {aimed && (
         <AimedPanel
           // A fresh panel per aim, so a second Add starts empty.
-          key={`${aimed.kind}:${aimed.role?.id ?? ''}`}
+          key={`${aimed.kind}:${aimed.role?.id ?? aimed.under?.id ?? ''}`}
           aim={aimed}
           onClose={close}
         />
@@ -714,10 +716,9 @@ function AnythingPanel({
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
-      // The box files only what the sort placed, so a part always has a place.
-      if (first.place) {
-        showLanding(from, { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where }, text);
-      }
+      // The box files only into places, so every row it filed has a workspace.
+      const workspace = filedModule(first);
+      if (workspace) showLanding(from, { module: workspace, href: first.href, name: first.where }, text);
     });
   }
 
@@ -1095,7 +1096,7 @@ function describeFiledWithin(entry: FiledEntry): string {
 const CARRY_MS = 6000;
 let carried: { toast: ToastInput; at: number } | null = null;
 
-function carryToast(toast: ToastInput) {
+export function carryToast(toast: ToastInput) {
   carried = { toast, at: Date.now() };
 }
 
@@ -1107,6 +1108,26 @@ function carriedToast(): ToastInput | null {
   }
   return carried.toast;
 }
+
+/**
+ * The paid press an aimed Add makes, by kind, where it makes one: an order is
+ * read with a model (plan #1950.3.1), a goal in the Learn area is placed and
+ * given a plan, and a note for Dev is triaged once saved (plan #1950.5).
+ */
+const AIMED_PRESS: Partial<Record<CaptureKindId, { action: PaidAction; what: string }>> = {
+  order: { action: 'app/capture-actions.ts#makeAimedCapture', what: 'Cost of reading it' },
+  goal: {
+    action: 'app/capture-actions.ts#makeAimedCapture:goal',
+    what: 'Cost of placing a goal in the Learn area and writing its plan',
+  },
+  'dev-note': { action: 'app/capture-actions.ts#makeAimedCapture:dev-note', what: 'Cost of sorting the note' },
+};
+
+/** An order's press once a receipt photo is taken in the panel (plan #1950.3.2). */
+const RECEIPT_PRESS = {
+  action: 'app/capture-actions.ts#makeAimedCapture:receipt',
+  what: 'Cost of reading the receipt',
+} as const satisfies { action: PaidAction; what: string };
 
 /**
  * Capture aimed at a kind (plan #1950.1): what an Add button on a list
@@ -1126,12 +1147,19 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const [day, setDay] = useState<CaptureDay>('today');
   const [error, setError] = useState<string | null>(aimProblem(aim));
   const [pending, start] = useTransition();
+  // A note for Dev takes files, as the header's note did (plan #1713).
+  const [uploads, setUploads] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const panelRef = useRef<HTMLFormElement>(null);
   // A kind whose press reads with a model shows its $ figure, asked for once
   // when the panel opens, as the one box asks for its own (plan #1950.3.1).
   const [costs, setCosts] = useState<PaidCosts>({});
+  // A receipt photo or a barcode, for a kind that takes one (plan #1950.3.2).
+  const camera = useCaptureCamera(kind, nameCapturedBarcode, setError);
+  // With a receipt photo taken, Add reads the photo rather than the sentence.
+  const press = camera.photo ? RECEIPT_PRESS : AIMED_PRESS[kind.id];
   useEffect(() => {
-    if (!kind.paid) return;
+    if (!press) return;
     let live = true;
     captureBoxCosts()
       .then((found) => {
@@ -1141,10 +1169,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
     return () => {
       live = false;
     };
-  }, [kind.paid]);
+  }, [press]);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  // A receipt photo or a barcode, for a kind that takes one (plan #1950.3.2).
-  const camera = useCaptureCamera(kind, nameCapturedBarcode, setError);
 
   usePanelChrome(onClose, panelRef);
 
@@ -1155,15 +1181,24 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
       setError(problem);
       return;
     }
+    if (uploading) {
+      setError('Adding the file first.');
+      return;
+    }
     start(async () => {
-      const result = await makeAimedCapture({
-        kind: aim.kind,
-        text,
-        ...(kind.needs === 'day' ? { day } : {}),
-        ...(aim.role ? { role: aim.role } : {}),
-        ...(camera.photo ? { photo: camera.photo } : {}),
-        ...(camera.scanned ? { scanned: camera.scanned } : {}),
-      });
+      const result = await makeAimedCapture(
+        {
+          kind: aim.kind,
+          text,
+          ...(kind.needs === 'day' ? { day } : {}),
+          ...(aim.role ? { role: aim.role } : {}),
+          ...(aim.under ? { under: aim.under } : {}),
+          ...(aim.page ? { page: aim.page } : {}),
+          ...(camera.photo ? { photo: camera.photo } : {}),
+          ...(camera.scanned ? { scanned: camera.scanned } : {}),
+        },
+        uploads,
+      );
       if (!result.ok) {
         setError(result.error);
         return;
@@ -1195,7 +1230,8 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
       if (page) {
         carryToast(notice);
         router.push(page);
-      } else {
+      } else if (aim.kind !== 'dev-note') {
+        // A note for Dev leaves the page as it was: it is about this page.
         router.refresh();
       }
     });
@@ -1219,6 +1255,13 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
         <AimedCaptureForm
           kind={kind}
           role={aim.role}
+          under={aim.under}
+          page={aim.page}
+          files={
+            kind.files ? (
+              <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+            ) : undefined
+          }
           text={text}
           onText={(value) => {
             setText(value);
@@ -1235,9 +1278,9 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           attached={camera.attached}
           tools={camera.tools}
           hint={
-            kind.paid ? (
+            press ? (
               <PaidCostsProvider costs={costs}>
-                <PaidHint action="app/capture-actions.ts#makeAimedCapture" what="Cost of reading it" align="end" />
+                <PaidHint action={press.action} what={press.what} align="end" />
               </PaidCostsProvider>
             ) : null
           }

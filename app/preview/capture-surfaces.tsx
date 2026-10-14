@@ -207,11 +207,46 @@ export function AimedCaptureSurface() {
             onSubmit={nothing}
           />
         </Aimed>
+        {/* Goals and Dev (plan #1950.5): a goal in the area its New goal was
+            pressed in, and the header's note with the page it is about and a
+            screenshot added. */}
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS.goal}
+            under={{ id: 'area-1', title: 'Health, fitness and getting back to a proper sleep routine' }}
+            text="Run the Brooklyn half marathon in under two hours"
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
+        <Aimed>
+          <AimedCaptureForm
+            kind={CAPTURE_KINDS['dev-note']}
+            page="/dev/plan/1950?tab=steps&view=tree"
+            files={<AddFile value={NOTE_FILES} onChange={nothing} />}
+            text="The step titles run off the side of the screen on my phone"
+            onText={nothing}
+            day=""
+            onDay={nothing}
+            pending={false}
+            error={null}
+            onSubmit={nothing}
+          />
+        </Aimed>
         <AddedToast />
       </div>
     </ToastProvider>
   );
 }
+
+/** A screenshot already added to a note for Dev (plan #1713). */
+const NOTE_FILES: UploadedAttachment[] = [
+  { path: 'preview/plan-scrolls-sideways.png', name: 'plan-scrolls-sideways.png', contentType: 'image/png', size: 412_000 },
+];
 
 function Aimed({ children }: { children: React.ReactNode }) {
   return <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>{children}</div>;

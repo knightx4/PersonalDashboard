@@ -56,7 +56,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
   'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
   'dev-plan-feature-edit': ['/dev/plan/[number]'],
-  'dev-plan-new-feature': ['/dev/plan', '/dev/projects/[id]'],
   'goals-steps-tree': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
@@ -149,8 +148,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
   'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
   'shell-capture-aimed-jobs-learn': ['/home'],
-  'shell-note': ['/dev/bugs'],
-  'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-writing': ['/ask', '/ask/[ref]'],
@@ -425,9 +422,10 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
   // The capture panels, which every shell mounts: the one box, and capture
-  // aimed at a kind by an Add button (plan #1950.1).
+  // aimed at a kind by an Add button (plan #1950.1) or the header's notes
+  // button (plan #1950.5).
   'shell-capture': ['components/shell/capture.tsx'],
-  'shell-capture-aimed': ['components/shell/capture-aim.tsx'],
+  'shell-capture-aimed': ['components/shell/capture-aim.tsx', 'components/shell/feedback-button.tsx'],
   // Shopping's Add buttons and the capture they aim (plan #1950.3.1).
   'shopping-list-adds': ['app/shopping/list-adds.tsx', 'components/shell/aim-button.tsx'],
   'shell-capture-aimed-jobs-learn': ['components/shell/capture-aim.tsx'],
@@ -438,10 +436,6 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'goals-log-done': ['components/goals/log-done.tsx'],
   // A goal's Suggestions section (plan #1739), drawn full and empty.
   'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
-  // The note button's panel, open with files added (plan #1713).
-  'shell-note': ['components/shell/feedback-button.tsx'],
-  // The same panel once a note has saved, with its triage (plan #1674).
-  'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).

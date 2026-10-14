@@ -13,7 +13,10 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadReadOrderContext, readOrderFromMessage } from '@/lib/review/read-order-server';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { serverEnv } from '@/lib/env';
@@ -86,8 +89,13 @@ async function merchantFor(
  * unit, as the order form writes them. A failure part way takes the order
  * back out, so no half-made order is left.
  */
-async function saveOrder(supabase: Client, userId: string, draft: OrderDraft): Promise<ShoppingMade> {
-  const merchant = await merchantFor(supabase, userId, draft.merchantName);
+async function saveOrder(
+  supabase: Client,
+  userId: string,
+  draft: OrderDraft,
+  email?: EmailOrder,
+): Promise<ShoppingMade> {
+  const merchant = email ? email.merchant : await merchantFor(supabase, userId, draft.merchantName);
   const slugs = [...new Set(draft.lines.map((line) => line.categorySlug).filter(Boolean))] as string[];
   const bySlug = new Map<string, { id: string; slug: string; name: string }>();
   if (slugs.length > 0) {
@@ -100,14 +108,17 @@ async function saveOrder(supabase: Client, userId: string, draft: OrderDraft): P
     merchantId: merchant?.id ?? null,
     merchantSlug: merchant?.slug ?? null,
     orderDate: draft.orderDate,
-    taxCents: 0,
-    shippingCents: 0,
-    discountCents: 0,
-    source: 'manual',
+    externalOrderNumber: email?.externalOrderNumber ?? null,
+    taxCents: email?.taxCents ?? 0,
+    shippingCents: email?.shippingCents ?? 0,
+    discountCents: email?.discountCents ?? 0,
+    ...(email ? { currency: email.currency } : {}),
+    source: email ? 'email' : 'manual',
     lines: draft.lines.map((line) => {
       const category = line.categorySlug ? bySlug.get(line.categorySlug) : undefined;
       return {
         name: line.name,
+        variant: line.variant ?? null,
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
         categoryId: category?.id ?? null,
@@ -122,12 +133,12 @@ async function saveOrder(supabase: Client, userId: string, draft: OrderDraft): P
     user_id: userId,
     merchant_id: built.order.merchantId,
     source: built.order.source,
-    external_order_number: null,
+    external_order_number: built.order.externalOrderNumber,
     order_date: built.order.orderDate,
     subtotal_cents: built.order.subtotalCents,
-    tax_cents: 0,
-    shipping_cents: 0,
-    discount_cents: 0,
+    tax_cents: built.order.taxCents,
+    shipping_cents: built.order.shippingCents,
+    discount_cents: built.order.discountCents,
     total_cents: built.order.totalCents,
     currency: built.order.currency,
   });
@@ -185,7 +196,105 @@ async function saveOrder(supabase: Client, userId: string, draft: OrderDraft): P
   );
   if (inventoryError) return undo();
 
+  if (email) {
+    // Conditional on the email still waiting, so a second press, or another
+    // tab, that got this far finds it taken and removes its duplicate order.
+    const { data: linked, error: linkError } = await supabase
+      .from('ingested_messages')
+      .update({ parse_status: 'parsed', resulting_order_id: built.order.id, error: null })
+      .eq('id', email.messageId)
+      .eq('parse_status', 'needs_review')
+      .select('id');
+    if (linkError || !linked || linked.length === 0) {
+      await supabase.from('orders').delete().eq('id', built.order.id);
+      return { ok: false, error: 'That email has already left the review queue.' };
+    }
+    revalidatePath('/shopping/review');
+    // The layout reads the review count for the nav badge.
+    revalidatePath('/', 'layout');
+  }
+
   return { ok: true, id: built.order.id, title: orderDraftTitle(draft) };
+}
+
+/** What an email adds to an order beyond its lines: where it came from and what it charged. */
+type EmailOrder = {
+  messageId: string;
+  merchant: { id: string; slug: string } | null;
+  externalOrderNumber: string | null;
+  currency: string;
+  taxCents: number;
+  shippingCents: number;
+  discountCents: number;
+};
+
+/**
+ * An order from a waiting email: the email is read as the review list's
+ * order form read it, the order is made from what it holds, and the email
+ * leaves the queue linked to it. One press, with nothing to confirm; the
+ * order's page is where a wrong line is put right.
+ */
+export async function makeShoppingOrderFromEmail(messageId: string): Promise<ShoppingMade> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const core = await createCoreClient();
+  const context = await loadReadOrderContext(supabase, user.id);
+  const read = await readOrderFromMessage(supabase, core, context, messageId);
+  if (!read.ok) return { ok: false, error: read.error };
+  const { draft } = read;
+  const lines = draft.lines.filter((line) => line.name.trim());
+  if (lines.length === 0) {
+    return { ok: false, error: 'Dash could not find what was bought in that email. Add it by hand.' };
+  }
+
+  const { data: message } = await supabase
+    .from('ingested_messages')
+    .select('parse_status')
+    .eq('id', messageId)
+    .maybeSingle();
+  if (message?.parse_status !== 'needs_review') {
+    return { ok: false, error: 'That email has already left the review queue.' };
+  }
+
+  let merchant: { id: string; slug: string } | null = null;
+  if (draft.merchantId) {
+    const { data } = await supabase.from('merchants').select('id, slug').eq('id', draft.merchantId).maybeSingle();
+    merchant = (data as { id: string; slug: string } | null) ?? null;
+  } else {
+    merchant = await merchantFor(supabase, user.id, draft.merchantName.trim() || null);
+  }
+
+  const categoryIds = [...new Set(lines.map((line) => line.categoryId).filter(Boolean))] as string[];
+  const slugById = new Map<string, string>();
+  if (categoryIds.length > 0) {
+    const { data } = await supabase.from('categories').select('id, slug').in('id', categoryIds);
+    for (const row of (data ?? []) as { id: string; slug: string }[]) slugById.set(row.id, row.slug);
+  }
+
+  return saveOrder(
+    supabase,
+    user.id,
+    {
+      merchantName: draft.merchantName,
+      orderDate: draft.orderDate,
+      lines: lines.map((line) => ({
+        name: line.name,
+        variant: line.variant,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+        categorySlug: (line.categoryId && slugById.get(line.categoryId)) || null,
+      })),
+    },
+    {
+      messageId,
+      merchant,
+      externalOrderNumber: draft.externalOrderNumber,
+      currency: draft.currency,
+      taxCents: draft.taxCents,
+      shippingCents: draft.shippingCents,
+      discountCents: draft.discountCents,
+    },
+  );
 }
 
 /** An order from a sentence: read by the model when there is one, as one line when not. */

@@ -90,7 +90,6 @@ export type ShellOptions = {
   sections?: FromFrame<readonly NavSection[]>;
   settingsHref?: string;
   settingsLabel?: string;
-  feedbackHref?: string;
   /**
    * The workspace's one-line brief, when it needs more than the frame. Omitted,
    * the shell uses the workspace's own from FRAME_BRIEFS, if it has one.
@@ -177,7 +176,6 @@ export async function shellFor(options: ShellOptions) {
         sections={sections ?? []}
         settingsHref={options.settingsHref}
         settingsLabel={options.settingsLabel}
-        feedbackHref={options.feedbackHref}
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}

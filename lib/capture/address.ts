@@ -143,7 +143,7 @@ function spokenPart(item: FiledCapture): string {
     }
     case 'vault':
       return "Kept in your vault's Inbox.";
-    case null:
+    default:
       return `Added to ${item.where}.`;
   }
 }

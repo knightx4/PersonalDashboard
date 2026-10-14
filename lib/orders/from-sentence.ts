@@ -15,6 +15,8 @@ import { CATEGORY_SLUGS, normalizeCategorySlug } from '@/lib/email/extract/schem
 
 export type OrderDraftLine = {
   name: string;
+  /** Set when the line is read from an email, which states a size or colour. */
+  variant?: string | null;
   quantity: number;
   unitPriceCents: number;
   categorySlug: string | null;
