@@ -59,6 +59,7 @@ describe('runConnectorWrite', () => {
       'stop_watch',
       'change_goal_area',
       'change_goal',
+      'change_goal_step',
       'change_item',
       'item_lists',
     ]);

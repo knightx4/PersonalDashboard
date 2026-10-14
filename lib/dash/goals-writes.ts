@@ -15,6 +15,18 @@ import {
   unarchiveArea,
   updateGoal,
 } from '@/lib/goals/store';
+import { stepHref } from '@/lib/goals/all-goals';
+import { RHYTHM_PERIODS, STEP_KINDS, parseStepFields, type StepFields } from '@/lib/goals/steps';
+import {
+  blockStep,
+  deleteDependency,
+  insertDependency,
+  linkStep,
+  setStepArchived,
+  setStepStatus,
+  unlinkStep,
+  updateStep,
+} from '@/lib/goals/steps-store';
 import { parseAreaName, parseAreaNote, parseGoalFields, reorder } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -27,6 +39,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   change_goal       a goal reworded, given a due date or moved to another
  *                     area, moved up or down, archived or restored, closed,
  *                     parked or reopened.
+ *   change_goal_step  a step reworded or otherwise edited, dropped, reopened
+ *                     or blocked, moved up or down, archived or restored,
+ *                     counted towards another goal or no longer, and made to
+ *                     wait on another step or no longer (plan #1894.7.2).
  *
  * They are the Goals home's own writes (app/goals/actions.ts), made with the
  * same store functions. Each names one row as its subject, so the one undo
@@ -62,7 +78,7 @@ export type GoalsMade = {
   kind: GoalsChangeKind;
   input: GoalsChangeInput;
   subjectRef: string;
-  op: 'insert' | 'update';
+  op: 'insert' | 'update' | 'delete';
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   /** `{ none }` when the change cannot be put back from its one row. */
@@ -426,6 +442,408 @@ async function reportGoal(
 }
 
 // ---------------------------------------------------------------------------
+// change_goal_step
+// ---------------------------------------------------------------------------
+
+const STEP_CHANGES = [
+  'edit',
+  'drop',
+  'reopen',
+  'block',
+  'move_up',
+  'move_down',
+  'archive',
+  'restore',
+  'count_towards',
+  'stop_counting',
+  'wait_on',
+  'stop_waiting',
+] as const;
+type StepChange = (typeof STEP_CHANGES)[number];
+
+const LINK = 'goals.item_goals';
+const DEPENDENCY = 'goals.dependencies';
+
+const MOVE_STEP_UNDO =
+  'Moving a step reorders the steps beside it, so it is moved back on the goal, or by asking Dash to move it the other way.';
+
+const STEP_STATUS_WORDS: Record<string, string> = {
+  open: 'open',
+  blocked: 'blocked',
+  done: 'done',
+  dropped: 'dropped',
+  proposed: 'still a proposal',
+};
+
+function stepChange(args: Args): StepChange {
+  const change = text(args, 'change');
+  if (!(STEP_CHANGES as readonly string[]).includes(change)) {
+    throw new GoalsRefused(`change must be one of ${STEP_CHANGES.join(', ')}.`);
+  }
+  return change as StepChange;
+}
+
+/** A step of the person's by its goals.items ref, refused with a sentence when it is not one. */
+async function ownStep(env: GoalsWriteEnv, id: string, what: string): Promise<Row> {
+  if (!id) throw new GoalsRefused(`${what} is missing: give the goals.items ref a lookup returned for the step.`);
+  if (!isUuid(id)) throw new GoalsRefused(`${what} must be a step's goals.items ref, as a lookup returned it.`);
+  const row = await ownRow(env.goals, 'items', id, env.userId);
+  if (!row) throw new GoalsRefused(`There is no step of theirs with that ${what}. Look it up first.`);
+  if (row.level !== 'step') throw new GoalsRefused(`That ${what} is a goal, not a step. A goal is changed with change_goal.`);
+  return row;
+}
+
+/** The goal at the top of a step's branch, for the link and the sentence. */
+async function goalAbove(env: GoalsWriteEnv, step: Row): Promise<Row> {
+  let at = step.parent_id as string | null;
+  for (let depth = 0; at && depth < 20; depth++) {
+    const up = await ownRow(env.goals, 'items', at, env.userId);
+    if (!up) break;
+    if (up.level === 'goal') return up;
+    at = up.parent_id as string | null;
+  }
+  throw new GoalsRefused('Dash could not find the goal that step sits under.');
+}
+
+/** One place up or down among the step's live siblings, every write narrowed to the person's rows. */
+async function moveOwnStep(env: GoalsWriteEnv, step: Row, direction: 'up' | 'down'): Promise<boolean> {
+  const { data, error } = await env.goals
+    .from('items')
+    .select('id, position, created_at')
+    .eq('user_id', env.userId)
+    .eq('parent_id', step.parent_id as string)
+    .is('archived_at', null)
+    .order('position', { ascending: true });
+  if (error) throw new Error(`Reading the steps failed: ${error.message}`);
+  const siblings = ((data ?? []) as Row[]).sort(
+    (a, b) => Number(a.position) - Number(b.position) || String(a.created_at).localeCompare(String(b.created_at)),
+  );
+  const order = reorder(
+    siblings.map((row) => row.id as string),
+    step.id as string,
+    direction,
+  );
+  if (!order) return false;
+  const client = await env.write({});
+  const results = await Promise.all(
+    order.map((stepId, i) =>
+      client
+        .from('items')
+        .update({ position: (i + 1) * 10 })
+        .eq('id', stepId)
+        .eq('user_id', env.userId),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) throw new Error(failed.error.message);
+  return true;
+}
+
+/** The database's refusal as the sentence the model reads, for a write a trigger or check can turn down. */
+async function guarded<T>(what: string, write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    throw new GoalsRefused(`${what}: ${error instanceof Error ? error.message : 'the database refused it'}`);
+  }
+}
+
+async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
+  const change = stepChange(args);
+  const before = await ownStep(env, text(args, 'step_ref'), 'step_ref');
+  const id = before.id as string;
+  const archived = before.archived_at != null;
+  if (archived !== (change === 'restore')) {
+    throw new GoalsRefused(archived ? 'That step is archived. Restore it first.' : 'That step is not archived.');
+  }
+  const status = before.status as string;
+  if (status === 'proposed' && change !== 'archive' && change !== 'restore') {
+    throw new GoalsRefused('That step is still a proposal. They approve it on the goal first.');
+  }
+  const goal = await goalAbove(env, before);
+  const title = named(before.title, 'the step');
+  const client = () => env.write({});
+  const changed = (verb: string, rest: string, summary: string, undo: string | null = null) =>
+    reportStep(env, before, goal, { verb, rest, summary, undo });
+  const statusWord = STEP_STATUS_WORDS[status] ?? status;
+
+  switch (change) {
+    case 'edit':
+      return editStep(env, before, goal, args);
+    case 'drop': {
+      if (!['open', 'blocked'].includes(status)) throw new GoalsRefused(`That step is ${statusWord}, so it cannot be dropped.`);
+      if (!(await guarded('It could not be dropped', async () => setStepStatus(await client(), id, 'dropped')))) {
+        throw new GoalsRefused('That step has already changed.');
+      }
+      return changed('Dropped', '', `Dash dropped the step "${title}", under the goal "${named(goal.title, 'the goal')}".`);
+    }
+    case 'reopen': {
+      if (status === 'open') throw new GoalsRefused('That step is open already.');
+      if (!(await guarded('It could not be reopened', async () => setStepStatus(await client(), id, 'open')))) {
+        throw new GoalsRefused('That step has already changed.');
+      }
+      return status === 'blocked'
+        ? changed('Unblocked', '', `Dash unblocked the step "${title}" and set it open again.`)
+        : changed('Reopened', '', `Dash reopened the step "${title}", which was ${statusWord}.`);
+    }
+    case 'block': {
+      if (!['open', 'blocked'].includes(status)) throw new GoalsRefused(`That step is ${statusWord}, so it cannot be blocked.`);
+      const ask = text(args, 'needs');
+      if (!ask) throw new GoalsRefused('needs is missing: say in one sentence what the step is waiting for.');
+      if (ask.length > 4000) throw new GoalsRefused('Keep what it needs under 4000 characters.');
+      const kind = text(args, 'block_kind') || 'outside';
+      if (kind !== 'outside' && kind !== 'steps') throw new GoalsRefused('block_kind must be outside or steps.');
+      if (!(await guarded('It could not be blocked', async () => blockStep(await client(), id, ask, kind)))) {
+        throw new GoalsRefused('That step has already changed.');
+      }
+      return changed('Blocked', `: ${named(ask, '')}`, `Dash blocked the step "${title}": it needs ${named(ask, 'something')}.`);
+    }
+    case 'move_up':
+    case 'move_down': {
+      const direction = change === 'move_up' ? 'up' : 'down';
+      if (!(await moveOwnStep(env, before, direction))) {
+        throw new GoalsRefused(`That step is ${direction === 'up' ? 'first' : 'last'} among its siblings already.`);
+      }
+      return changed('Moved', ` ${direction}`, `Dash moved the step "${title}" ${direction} under its parent.`, MOVE_STEP_UNDO);
+    }
+    case 'archive':
+    case 'restore': {
+      if (!(await setStepArchived(await client(), id, change === 'archive'))) throw new GoalsRefused('That step has already changed.');
+      return change === 'archive'
+        ? changed('Archived', '', `Dash archived the step "${title}". Its sub-steps are left as they are.`)
+        : changed('Restored', '', `Dash restored the step "${title}".`);
+    }
+    case 'count_towards':
+    case 'stop_counting':
+      return changeStepLink(env, before, goal, change, args);
+    case 'wait_on':
+    case 'stop_waiting':
+      return changeStepWait(env, before, goal, change, args);
+  }
+}
+
+/** A step's wording, notes, done-when, dates or kind, any of them in one write, as the step's edit form is. */
+async function editStep(env: GoalsWriteEnv, before: Row, goal: Row, args: Args): Promise<GoalsMade> {
+  const id = before.id as string;
+  const title = named(before.title, 'the step');
+  const keys: Record<string, string> = {
+    title: 'title',
+    detail: 'detail',
+    acceptance: 'done_when',
+    dueOn: 'due_on',
+    startsOn: 'starts_on',
+    kind: 'kind',
+    rhythmCount: 'rhythm_count',
+    rhythmPeriod: 'rhythm_period',
+  };
+  const parsed = parseStepFields((key) => {
+    const name = keys[key];
+    if (!name || !(name in args) || args[name] === null || args[name] === undefined) return undefined;
+    const value = args[name];
+    return typeof value === 'number' ? String(value) : value;
+  });
+  if (!parsed.ok) throw new GoalsRefused(parsed.error);
+  const fields: Record<string, unknown> = { ...parsed.value };
+  for (const [column, value] of Object.entries(fields)) {
+    if ((before[column] ?? null) === value) delete fields[column];
+  }
+  if (Object.keys(fields).length === 0) {
+    throw new GoalsRefused('Nothing to change: give a new title, detail, done_when, due_on, starts_on or kind, different from what the step has.');
+  }
+  const starts = (fields.starts_on === undefined ? before.starts_on : fields.starts_on) as string | null;
+  const due = (fields.due_on === undefined ? before.due_on : fields.due_on) as string | null;
+  if (starts && due && starts > due) throw new GoalsRefused('A step has to start on or before the day it is due.');
+
+  if (!(await guarded('It could not be changed', async () => updateStep(await env.write({}), id, fields as StepFields)))) {
+    throw new GoalsRefused('That step has just changed.');
+  }
+
+  const parts: string[] = [];
+  if (fields.title) parts.push(`reworded it to "${fields.title}"`);
+  if ('detail' in fields) parts.push(fields.detail ? 'rewrote its detail' : 'cleared its detail');
+  if ('acceptance' in fields) parts.push(fields.acceptance ? 'set when it is done' : 'cleared its done-when');
+  if ('due_on' in fields) parts.push(fields.due_on ? `set it due by ${fields.due_on}` : 'cleared its due date');
+  if ('starts_on' in fields) parts.push(fields.starts_on ? `set it to start on ${fields.starts_on}` : 'cleared its start date');
+  if ('kind' in fields) parts.push(`made it a ${String(fields.kind) === 'claude' ? 'Dash' : String(fields.kind)} step`);
+  else if ('rhythm_count' in fields || 'rhythm_period' in fields) parts.push('changed how often it comes round');
+  const said = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  return reportStep(env, before, goal, {
+    verb: 'Changed',
+    rest: fields.title ? ` to "${fields.title}"` : '',
+    summary: `Dash changed the step "${title}": ${said}.`,
+    undo: null,
+  });
+}
+
+/** Counting a step towards another goal of theirs, or no longer: a goals.item_goals row. */
+async function changeStepLink(
+  env: GoalsWriteEnv,
+  step: Row,
+  goal: Row,
+  change: 'count_towards' | 'stop_counting',
+  args: Args,
+): Promise<GoalsMade> {
+  const stepId = step.id as string;
+  const goalId = text(args, 'goal_ref');
+  if (!goalId) throw new GoalsRefused('goal_ref is missing: give the goals.items ref of the goal it counts towards.');
+  if (!isUuid(goalId)) throw new GoalsRefused("goal_ref must be a goal's goals.items ref, as a lookup returned it.");
+  const other = await ownRow(env.goals, 'items', goalId, env.userId);
+  if (!other || other.level !== 'goal') throw new GoalsRefused('There is no goal of theirs with that goal_ref. Look it up first.');
+  const otherTitle = named(other.title, 'the goal');
+  const title = named(step.title, 'the step');
+
+  const readLink = async (): Promise<Row | null> => {
+    const { data, error } = await env.goals
+      .from('item_goals')
+      .select('*')
+      .eq('user_id', env.userId)
+      .eq('item_id', stepId)
+      .eq('goal_id', goalId)
+      .maybeSingle();
+    if (error) throw new Error(`Reading the step's goals failed: ${error.message}`);
+    return (data as Row | null) ?? null;
+  };
+  const before = await readLink();
+  const live = before != null && before.archived_at == null;
+
+  if (change === 'count_towards') {
+    if (other.archived_at != null) throw new GoalsRefused('That goal is archived. Restore it first.');
+    if (goalId === goal.id) throw new GoalsRefused('That step is under that goal already.');
+    if (live) throw new GoalsRefused(`That step counts towards "${otherTitle}" already.`);
+    await guarded('It could not be linked', async () => linkStep(await env.write({}), env.userId, stepId, goalId));
+  } else {
+    if (!live) throw new GoalsRefused(`That step does not count towards "${otherTitle}".`);
+    if (!(await unlinkStep(await env.write({}), before.id as string))) throw new GoalsRefused('That link has already gone.');
+  }
+  const after = await readLink();
+  if (!after) throw new Error('The link was written but could not be read back.');
+  const counting = change === 'count_towards';
+  return {
+    kind: 'change_goal_step',
+    input: {
+      verb: counting ? 'Counted' : 'Stopped counting',
+      what: title,
+      rest: ` towards ${otherTitle}`,
+      href: stepHref(goal.id as string, stepId),
+      where: 'Open the step',
+      paths: [...GOAL_PATHS, goalHref(goal.id as string), goalHref(goalId)],
+    },
+    subjectRef: toRef(LINK, after.id as string),
+    op: before ? 'update' : 'insert',
+    before,
+    after,
+    undo: null,
+    summary: counting
+      ? `Dash counted the step "${title}" towards the goal "${otherTitle}" as well.`
+      : `Dash stopped the step "${title}" counting towards the goal "${otherTitle}".`,
+    row: { table: ITEM, ref: stepId, title, href: stepHref(goal.id as string, stepId) },
+  };
+}
+
+/** Making a step wait on another of theirs, or no longer: a goals.dependencies row. */
+async function changeStepWait(
+  env: GoalsWriteEnv,
+  step: Row,
+  goal: Row,
+  change: 'wait_on' | 'stop_waiting',
+  args: Args,
+): Promise<GoalsMade> {
+  const stepId = step.id as string;
+  const other = await ownStep(env, text(args, 'other_step_ref'), 'other_step_ref');
+  const otherId = other.id as string;
+  if (otherId === stepId) throw new GoalsRefused('A step cannot wait on itself.');
+  const title = named(step.title, 'the step');
+  const otherTitle = named(other.title, 'the other step');
+
+  const readWait = async (): Promise<Row | null> => {
+    const { data, error } = await env.goals
+      .from('dependencies')
+      .select('*')
+      .eq('user_id', env.userId)
+      .eq('item_id', stepId)
+      .eq('depends_on_id', otherId)
+      .maybeSingle();
+    if (error) throw new Error(`Reading what the step waits on failed: ${error.message}`);
+    return (data as Row | null) ?? null;
+  };
+  const href = stepHref(goal.id as string, stepId);
+  const input = (verb: string, rest: string): GoalsChangeInput => ({
+    verb,
+    what: title,
+    rest,
+    href,
+    where: 'Open the step',
+    paths: [...GOAL_PATHS, goalHref(goal.id as string)],
+  });
+  const row: AskRow = { table: ITEM, ref: stepId, title, href };
+
+  if (change === 'wait_on') {
+    if (other.archived_at != null) throw new GoalsRefused('That other step is archived.');
+    const refused = await insertDependency(await env.write({}), env.userId, stepId, otherId);
+    if (refused === 'duplicate') throw new GoalsRefused(`That step waits on "${otherTitle}" already.`);
+    if (refused === 'loop') throw new GoalsRefused('That would make the two steps wait on each other.');
+    if (refused === 'not_steps') throw new GoalsRefused('Only a step can wait on another step.');
+    const after = await readWait();
+    if (!after) throw new Error('The wait was written but could not be read back.');
+    return {
+      kind: 'change_goal_step',
+      input: input('Made', ` wait on ${otherTitle}`),
+      subjectRef: toRef(DEPENDENCY, after.id as string),
+      op: 'insert',
+      before: null,
+      after,
+      undo: null,
+      summary: `Dash made the step "${title}" wait on "${otherTitle}": it cannot start until that one is closed.`,
+      row,
+    };
+  }
+
+  const before = await readWait();
+  if (!before) throw new GoalsRefused(`That step does not wait on "${otherTitle}".`);
+  if (!(await deleteDependency(await env.write({}), before.id as string))) throw new GoalsRefused('That wait has already gone.');
+  return {
+    kind: 'change_goal_step',
+    input: input('Stopped', ` waiting on ${otherTitle}`),
+    subjectRef: toRef(DEPENDENCY, before.id as string),
+    op: 'delete',
+    before,
+    after: null,
+    undo: null,
+    summary: `Dash stopped the step "${title}" waiting on "${otherTitle}".`,
+    row,
+  };
+}
+
+async function reportStep(
+  env: GoalsWriteEnv,
+  before: Row,
+  goal: Row,
+  words: { verb: string; rest: string; summary: string; undo: string | null },
+): Promise<GoalsMade> {
+  const id = before.id as string;
+  const goalId = goal.id as string;
+  const after = await ownRow(env.goals, 'items', id, env.userId);
+  return {
+    kind: 'change_goal_step',
+    input: {
+      verb: words.verb,
+      what: named(before.title, 'the step'),
+      rest: words.rest,
+      href: stepHref(goalId, id),
+      where: 'Open the step',
+      paths: [...GOAL_PATHS, goalHref(goalId)],
+    },
+    subjectRef: toRef(ITEM, id),
+    op: 'update',
+    before,
+    after,
+    undo: words.undo ? { none: words.undo } : null,
+    summary: words.summary,
+    row: { table: ITEM, ref: id, title: named(after?.title ?? before.title, 'the step'), href: stepHref(goalId, id) },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -469,6 +887,41 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       additionalProperties: false,
     },
     run: changeGoal,
+  },
+  {
+    name: 'change_goal_step',
+    description:
+      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...STEP_CHANGES], description: 'What to do to the step.' },
+        step_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the step.' },
+        title: { type: 'string', description: 'For edit: the new wording.' },
+        detail: { type: 'string', description: "For edit: the step's detail; empty to clear it." },
+        done_when: { type: 'string', description: 'For edit: when the step counts as done; empty to clear it.' },
+        due_on: { type: 'string', description: 'For edit: the date it is due by, YYYY-MM-DD; empty to clear it.' },
+        starts_on: { type: 'string', description: 'For edit: the date it starts, YYYY-MM-DD; empty to clear it.' },
+        kind: {
+          type: 'string',
+          enum: [...STEP_KINDS],
+          description: 'For edit: mine (theirs to do), claude (for Dash to do), decision, or rhythm (with rhythm_count).',
+        },
+        rhythm_count: { type: 'integer', description: 'For edit, on a rhythm: how many times each period.' },
+        rhythm_period: { type: 'string', enum: [...RHYTHM_PERIODS], description: 'For edit, on a rhythm: per day, week or month.' },
+        needs: { type: 'string', description: 'For block: what the step is waiting for, in one sentence.' },
+        block_kind: {
+          type: 'string',
+          enum: ['outside', 'steps'],
+          description: 'For block: outside when it waits on them or something outside, steps when it clears itself once the steps it waits on close. Default outside.',
+        },
+        goal_ref: { type: 'string', description: 'For count_towards and stop_counting: the goals.items ref of the other goal.' },
+        other_step_ref: { type: 'string', description: 'For wait_on and stop_waiting: the goals.items ref of the step it waits on.' },
+      },
+      required: ['change', 'step_ref'],
+      additionalProperties: false,
+    },
+    run: changeGoalStep,
   },
 ];
 
