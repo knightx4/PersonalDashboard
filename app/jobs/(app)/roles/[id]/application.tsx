@@ -218,13 +218,17 @@ function CoverLetter({
   );
 }
 
-function AnswerCard({
+/** One question and its answer; exported for the preview gallery. */
+export function AnswerCard({
   answer,
   closed,
+  initialDraft = null,
 }: {
   answer: PanelProps['answers'][number];
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** For the preview gallery: the card opens with this draft beside it. */
+  initialDraft?: AnswerDraft | null;
 }) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
@@ -236,7 +240,7 @@ function AnswerCard({
   // answer only through Insert, and the record only through Save -- the
   // compose.ts rule: the model may prepare text, but nothing goes out over
   // your name that you did not put there.
-  const [draft, setDraft] = useState<AnswerDraft | null>(null);
+  const [draft, setDraft] = useState<AnswerDraft | null>(initialDraft);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
