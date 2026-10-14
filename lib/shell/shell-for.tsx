@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import type { Notification } from '@/components/shell/notifications-button';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { getUser } from '@/lib/auth/server';
 import type { SessionUser } from '@/lib/auth/session-user';
 import { loadAccountSettings, type AccountSettings } from '@/lib/core/account/settings';
@@ -191,11 +190,7 @@ export async function shellFor(options: ShellOptions) {
         brief={brief}
         banner={banner}
       >
-        {/* Your initial, for the Assignee cells on the plan and a goal's
-            page (plan #2069.1): the letter the account button carries. */}
-        <YourInitialProvider initial={(settings.displayName || user.email || '').charAt(0).toUpperCase() || null}>
-          {costs ? <PaidCostsProvider costs={costs}>{column}</PaidCostsProvider> : column}
-        </YourInitialProvider>
+        {costs ? <PaidCostsProvider costs={costs}>{column}</PaidCostsProvider> : column}
       </AppShell>
     </div>
   );

@@ -28,9 +28,12 @@ export type AssigneeWho = 'you' | 'dash' | 'both';
 const WORD: Record<AssigneeWho, string> = { you: 'You', dash: 'Dash', both: 'Both' };
 
 /**
- * The person's initial, set once by the shell (lib/shell/shell-for.tsx) so a
- * cell anywhere under it can draw it. Null outside the shell, as in the
- * gallery, where the cell draws a "Y".
+ * The person's initial, set by each page that draws Assignee cells from
+ * `loadYourInitial` (lib/core/account/your-initial.ts): the dev plan
+ * (app/dev/plan/plan-page.tsx) and a feature's page
+ * (app/dev/plan/[number]/page.tsx). A goal's page wraps its steps the same
+ * way (plan #2069.2). Without a provider, as in the gallery, the cell draws a
+ * "Y".
  */
 const InitialContext = createContext<string | null>(null);
 

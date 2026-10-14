@@ -1,4 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
+import { loadYourInitial } from '@/lib/core/account/your-initial';
+import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import type { Metadata } from 'next';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -140,7 +142,11 @@ export default async function FeatureRoute({ params }: { params: Params }) {
     updates[0]?.createdAt,
   );
 
+  // Your initial, for the Assignee cells on the Steps tab (plan #2069.1).
+  const initial = await loadYourInitial(user);
+
   return (
+    <YourInitialProvider initial={initial}>
     <FeaturePage
       feature={feature}
       module={module}
@@ -161,5 +167,6 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       comingBack={comingBack}
       scopeDays={scopeDays}
     />
+    </YourInitialProvider>
   );
 }
