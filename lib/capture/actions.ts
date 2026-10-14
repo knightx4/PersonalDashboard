@@ -18,6 +18,7 @@
 
 import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
+import type { CapturePlace, CaptureSortRole } from '@/lib/capture/sort';
 
 export type CaptureActionId = 'anything' | 'todo' | 'goals' | 'vault';
 
@@ -180,4 +181,134 @@ export function matchCaptureActions(
   }
 
   return matches.sort((a, b) => b.points - a.points);
+}
+
+// ---------------------------------------------------------------------------
+// Kinds: what an Add button aims capture at (plan #1950.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The things capture can make, one per kind of row. An Add button on a list
+ * opens capture aimed at its list's kind: the sort is skipped, the panel asks
+ * for the kind's title and at most one more thing, and one press makes the
+ * row (docs/ONE-INTERFACE-SPEC.md, Part 3). Untargeted text from the header
+ * and ⌥C still goes through Dash's sort, which files each part as one of
+ * these kinds.
+ *
+ * The writer for each kind is in lib/capture/file.ts (CAPTURE_MAKERS), keyed
+ * by the same ids, so this file stays free of server code and the panel can
+ * import it.
+ */
+export type CaptureKindId = 'todo' | 'goal-update' | 'job-note' | 'vault-note';
+
+/**
+ * The one thing a kind may need besides its title. A todo takes a day; a
+ * note on a job takes the role, which the page aiming it already knows.
+ */
+export type CaptureKindNeeds = 'day' | 'role' | null;
+
+export type CaptureKind = {
+  id: CaptureKindId;
+  /** The place Dash's sort files this kind as. */
+  place: CapturePlace;
+  /** Whose workspace the row belongs to. */
+  module: ModuleId;
+  /** The panel's title when aimed: "Add a todo". */
+  label: string;
+  /** The title field before anything is typed. */
+  placeholder: string;
+  field: 'line' | 'prose';
+  needs: CaptureKindNeeds;
+  /**
+   * What one press makes. `row`: one row, whose page then opens. `filing`: a
+   * sentence Dash files against several rows (a goal update), which keeps
+   * its own panel and its Undo on each line, so aiming it opens that panel.
+   */
+  makes: 'row' | 'filing';
+  /** The nav row the chip flies to once the row is made. */
+  section: string;
+  /** The panel action that takes this kind unaimed, from the palette. */
+  action: CaptureActionId;
+};
+
+export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
+  todo: {
+    id: 'todo',
+    place: 'todo',
+    module: 'todo',
+    label: 'Add a todo',
+    placeholder: 'What needs doing?',
+    field: 'line',
+    needs: 'day',
+    makes: 'row',
+    section: '/todo',
+    action: 'todo',
+  },
+  'goal-update': {
+    id: 'goal-update',
+    place: 'goals',
+    module: 'goals',
+    label: 'Log what happened',
+    placeholder: 'What happened? It is filed against your goals.',
+    field: 'prose',
+    needs: null,
+    makes: 'filing',
+    section: '/goals',
+    action: 'goals',
+  },
+  'job-note': {
+    id: 'job-note',
+    place: 'jobs',
+    module: 'jobs',
+    label: 'Add a note',
+    placeholder: 'What happened, or what to remember about this role?',
+    field: 'prose',
+    needs: 'role',
+    makes: 'row',
+    section: '/jobs',
+    // No panel action of its own: from the palette a note on a job goes
+    // through the sort, which names the role.
+    action: 'anything',
+  },
+  'vault-note': {
+    id: 'vault-note',
+    place: 'vault',
+    module: 'vault',
+    label: 'Add a quick note',
+    placeholder: 'Whatever is on your mind. It waits in the Inbox.',
+    field: 'prose',
+    needs: null,
+    makes: 'row',
+    section: '/vault',
+    action: 'vault',
+  },
+};
+
+/** The kind Dash's sort files a part as, by its place. */
+export function kindForPlace(place: CapturePlace): CaptureKind {
+  const kind = Object.values(CAPTURE_KINDS).find((k) => k.place === place);
+  if (!kind) throw new Error(`No capture kind files into ${place}.`);
+  return kind;
+}
+
+/**
+ * What an Add button hands capture: the kind, and the one more thing when
+ * the page already knows it (the role a note is on). `seed` starts the title.
+ */
+export type CaptureAim = {
+  kind: CaptureKindId;
+  role?: CaptureSortRole;
+  seed?: string;
+};
+
+/**
+ * Why an aim cannot be made as it stands, or null when it can. A kind that
+ * needs a role has to be handed one: a note aimed at no role would be filed
+ * nowhere, so the panel says so instead.
+ */
+export function aimProblem(aim: CaptureAim): string | null {
+  const kind = CAPTURE_KINDS[aim.kind];
+  if (!kind) return 'Capture cannot make that.';
+  if (kind.needs === 'role' && !aim.role) return 'Open the role first, then add the note there.';
+  return null;
 }

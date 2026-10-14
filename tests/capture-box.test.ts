@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileCaptureParts, goalRefs, type CaptureWriters } from '@/lib/capture/file';
+import { fileCaptureParts, goalRefs, makeCaptureKind, type CaptureWriters } from '@/lib/capture/file';
 import type { CapturePart } from '@/lib/capture/sort';
 import { markDashActionUndone, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
 import { writeRoleNote } from '@/lib/dash/writes';
 import type { FiledEntry } from '@/lib/goals/capture';
-import { undoDashTodayWith } from '@/lib/shell/dash-today';
+import { dashTodayEntry, undoDashTodayWith } from '@/lib/shell/dash-today';
 import { createCapturedNote, removeCapturedNote, type RemoveNotePorts } from '@/lib/vault/notes/create';
 import type { VaultSource } from '@/lib/vault/providers/types';
 import { fakeDashDeps, fakeId, type FakeTables } from './stubs/fake-schema-db';
@@ -281,6 +281,66 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(out.ok).toBe(true);
     expect(world.tables['core.dash_actions'][0].status).toBe('undone');
     spy.mockRestore();
+  });
+
+  it('makes an aimed todo for the day picked, opens its page, and Undo takes it back', async () => {
+    const world = setup();
+    const days: (string | undefined)[] = [];
+    const todo = world.writers.todo;
+    const writers: CaptureWriters = {
+      ...world.writers,
+      todo: (text, day) => {
+        days.push(day);
+        return todo(text, day);
+      },
+    };
+
+    const made = await makeCaptureKind('todo', { text: '  call the dentist ', day: 'tomorrow' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(days).toEqual(['tomorrow']);
+    const id = world.tables['todo.tasks'][0].id as string;
+    expect(made.filed).toMatchObject({
+      place: 'todo',
+      text: 'call the dentist',
+      where: 'Todo · Tomorrow',
+      ref: `todo.tasks:${id}`,
+      page: `/todo/all?status=all&focus=${id}`,
+    });
+    // Recorded as the person's own, so Home's list of Dash's changes leaves it out.
+    const [action] = world.tables['core.dash_actions'];
+    expect(action).toMatchObject({ surface: 'capture', kind: 'add_todo', undo: { aimed: true } });
+    expect(String(action.summary)).toBe('You added the todo "call the dentist".');
+    expect(
+      dashTodayEntry(
+        { ...(action as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+        '2026-10-14',
+      ),
+    ).toBeNull();
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['todo.tasks']).toEqual([]);
+  });
+
+  it('makes an aimed note on the role it was handed and opens the role', async () => {
+    const world = setup();
+    const made = await makeCaptureKind('job-note', { text: 'Recruiter is Sam', role: ROLE }, world.writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(made.filed).toMatchObject({ place: 'jobs', page: `/jobs/roles/${ROLE.id}` });
+    expect(world.tables['core.conversation_turns']).toMatchObject([
+      { ref: `job_search.roles:${ROLE.id}`, author: 'me', body: 'Recruiter is Sam' },
+    ]);
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe(
+      'You added a note to the role Product Analyst at Stripe.',
+    );
+  });
+
+  it('refuses an aimed add with nothing typed, and a note with no role', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('todo', { text: '   ' }, world.writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('job-note', { text: 'Recruiter is Sam' }, world.writers)).toMatchObject({ ok: false });
+    expect(world.tables['todo.tasks']).toEqual([]);
+    expect(world.tables['core.dash_actions']).toEqual([]);
   });
 
   it('names each Goals row a capture touched once', () => {

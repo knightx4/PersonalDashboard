@@ -13,6 +13,7 @@
 
 import { moduleById, type ModuleId } from '@/lib/modules';
 import { goalsPlaceName, todoDayName, type CaptureDestination } from '@/lib/capture/destination';
+import type { CaptureDay } from '@/lib/capture/todo';
 import {
   availableCapturePlaces,
   CAPTURE_PLACE_LABELS,
@@ -114,18 +115,22 @@ export type FiledCapture = {
   undoneAt: string | null;
   /** How many files went with it (plan #1714); absent when none did. */
   files?: number;
+  /** The row made, as `schema.table:id` (plan #1950.1). */
+  ref?: string | null;
+  /** The page the row opens on, which an aimed add goes to; null when it has none. */
+  page?: string | null;
 };
 
 /** Where a part went, in the words the box shows and the landing draws. */
 export function filedDestination(
   place: CapturePlace,
-  detail: { role?: CaptureSortRole | null; entries?: readonly FiledEntry[] },
+  detail: { role?: CaptureSortRole | null; entries?: readonly FiledEntry[]; day?: CaptureDay },
 ): CaptureDestination | null {
   const workspace = moduleById(CAPTURE_PLACE_MODULE[place]);
   if (!workspace) return null;
   const inside =
     place === 'todo'
-      ? todoDayName('today')
+      ? todoDayName(detail.day ?? 'today')
       : place === 'goals'
         ? goalsPlaceName(detail.entries ?? [])
         : place === 'jobs' && detail.role

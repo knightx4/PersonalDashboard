@@ -41,7 +41,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
-import { CaptureBoxSurface } from './capture-surfaces';
+import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
@@ -5015,6 +5015,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+  {
+    /* Capture aimed at a kind (plan #1950.1), what an Add button on a list
+     * opens: a todo with its day, a note on a role, and the toast with Undo
+     * that one press leaves. */
+    id: 'shell-capture-aimed',
+    label: 'Capture · Aimed by an Add button',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AimedCaptureSurface />,
   },
 
   {

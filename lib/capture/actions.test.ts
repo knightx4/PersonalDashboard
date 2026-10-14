@@ -7,13 +7,39 @@
 import { describe, expect, it } from 'vitest';
 import { score } from '@/lib/search/score';
 import {
+  aimProblem,
   availableCaptureActions,
   CAPTURE_ACTIONS,
+  CAPTURE_KINDS,
   DEFAULT_CAPTURE_ACTION,
   captureAction,
   captureHaystack,
+  kindForPlace,
   matchCaptureActions,
 } from '@/lib/capture/actions';
+import { CAPTURE_PLACES } from '@/lib/capture/sort';
+
+describe('the capture kinds an Add button aims at', () => {
+  it('keys each kind by its own id, with a title field, a section and a panel action', () => {
+    for (const [id, kind] of Object.entries(CAPTURE_KINDS)) {
+      expect(kind.id).toBe(id);
+      expect(kind.label.length).toBeGreaterThan(0);
+      expect(kind.placeholder.length).toBeGreaterThan(0);
+      expect(kind.section.startsWith('/')).toBe(true);
+      expect(captureAction(kind.action)).not.toBeNull();
+    }
+  });
+
+  it('has one kind for every place the sort files into, so the box and an aimed add make rows the same way', () => {
+    for (const place of CAPTURE_PLACES) expect(kindForPlace(place).place).toBe(place);
+  });
+
+  it('refuses a note aimed at no role, and takes a todo as it is', () => {
+    expect(aimProblem({ kind: 'job-note' })).not.toBeNull();
+    expect(aimProblem({ kind: 'job-note', role: { id: 'r', title: 'Analyst', company: null } })).toBeNull();
+    expect(aimProblem({ kind: 'todo' })).toBeNull();
+  });
+});
 
 describe('the capture actions', () => {
   it('gives every action a name, a field and something to type into', () => {
