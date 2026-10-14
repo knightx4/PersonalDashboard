@@ -16,7 +16,7 @@ const ROLE = '33333333-3333-4333-8333-333333333333';
 const EVENT = '44444444-4444-4444-8444-444444444444';
 
 function env(tables: FakeTables): TodoWriteEnv {
-  return { userId: ME, todo: fakeSchemaDb(tables)('todo'), timezone: 'Europe/London' };
+  return { userId: ME, todo: fakeSchemaDb(tables)('todo'), timezone: 'Europe/London', db: async (schema) => fakeSchemaDb(tables)(schema) };
 }
 
 const write = (name: string) => TODO_WRITES.find((entry) => entry.name === name)!;

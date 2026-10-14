@@ -119,7 +119,8 @@ reword_concept, add_concept_note or change_video. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
-change_event. In News, when they ask to mark a newsletter unread, save or
+change_event. To finish, put off or dismiss a row another workspace put on
+their agenda, find it with agenda and call change_agenda_row. In News, when they ask to mark a newsletter unread, save or
 unsave a story, send one to Learn or make a todo from one, call
 mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
 when they ask to stop a price watch, call stop_watch. When they tell you about a place they have lived, or ask to

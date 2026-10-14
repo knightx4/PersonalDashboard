@@ -79,11 +79,11 @@ export const returnDeadlinesSource: AgendaSource = {
   async defer(ctx, key) {
     const until = new Date(ctx.now);
     until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-    await dismiss(ctx.userId, 'return_deadline', key, until);
+    await dismiss(ctx.userId, 'return_deadline', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
-    await dismiss(ctx.userId, 'return_deadline', key, null);
+    await dismiss(ctx.userId, 'return_deadline', key, null, ctx.clients);
   },
 };
 

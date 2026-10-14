@@ -424,7 +424,7 @@ const TODO_TOOLS: readonly ConnectorWriteTool[] = TODO_WRITES.map((write) => ({
     if (!ctx.account.enabledModules.includes('todo')) {
       throw new AskInputError('The Todo workspace is switched off, so nothing can be changed there.');
     }
-    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.account.timezone ?? 'UTC' };
+    const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.account.timezone ?? 'UTC', db: ctx.db };
     const made = await runTodoWrite(write, env, input);
     if ('ok' in made) throw new AskInputError(made.error);
     await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);

@@ -57,7 +57,7 @@ close_todo, add_goal, add_goal_step, close_goal_step, set_goal_done_when,
 mark_returned, add_role_note, add_job_lead, add_idea, add_quick_note,
 change_items and move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note and change_video, and in
-Todo edit_todo, add_todo_item, link_todo, add_event and change_event, and in
+Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch. This
 row's own tools are described below.
