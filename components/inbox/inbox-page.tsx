@@ -177,7 +177,7 @@ function Answer({ row, run, pending }: { row: InboxRow; run: ReturnType<typeof u
   }
   return (
     <form
-      className="flex flex-wrap items-center gap-2"
+      className="flex flex-wrap items-center gap-2 max-sm:w-full"
       onSubmit={(event) => {
         event.preventDefault();
         if (words.trim()) run(question, { [field]: words.trim() });
@@ -222,9 +222,9 @@ function ShapeRow({ row }: { row: InboxRow }) {
         </p>
       ) : (
         <>
-          {row.question && <Answer row={row} run={run} pending={pending} />}
-          {(verbs.length > 0 || row.later || row.decline) && (
+          {(row.question || verbs.length > 0 || row.later || row.decline) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {row.question && <Answer row={row} run={run} pending={pending} />}
               {verbs.map((verb) =>
                 verb.href ? (
                   <Link
