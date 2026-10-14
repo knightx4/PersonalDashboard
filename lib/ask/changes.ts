@@ -9,7 +9,7 @@ import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
-import { undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -790,6 +790,10 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_role_email') return undoMany(deps, change, surface, undoRoleEmail);
   // A review queue change puts back each row it touched (plan #1894.6.4).
   if ((JOBS_ROWS_KINDS as readonly string[]).includes(change.kind)) return undoMany(deps, change, surface, undoJobsRows);
+  // And a contact, a touch or a suggestion marked sent (plan #1894.6.6).
+  if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
+    return undoMany(deps, change, surface, undoContactRows);
+  }
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,
