@@ -22,8 +22,12 @@ import { archiveRecord, restoreRecord } from '@/lib/goals/collections-store';
 import { KIND_NAME_MAX, RECOGNISE_MAX, SKIPPED_LABEL_MAX, SKIPPED_MAX, parseSenders } from '@/lib/goals/document-kinds';
 import { editKind, forgetKind } from '@/lib/goals/document-kinds-store';
 import { linkTarget, unlinkTarget } from '@/lib/goals/links-store';
+import { recordAttended } from '@/lib/goals/suggestions-store';
+import { snoozeRow, unsnoozeRow } from '@/lib/core/inbox-snooze-store';
+import { SNOOZE_CHOICES, dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
 import { numberFromChoices, parseMeasureFields, type NumberSource } from '@/lib/goals/readings';
 import { setGoalMeasure, setNumberFrom } from '@/lib/goals/readings-store';
+import { SET_ASIDE_CHOICES, setAsideFields, setAsideOn, type SetAsideChoice } from '@/lib/goals/set-aside';
 import { RHYTHM_PERIODS, STEP_KINDS, parseStepFields, type StepFields } from '@/lib/goals/steps';
 import {
   blockStep,
@@ -59,6 +63,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   change_goal_form  an information step's questions set, a row archived or
  *                     brought back, and a kind of document edited or
  *                     forgotten (plan #1894.7.3).
+ *   change_goals_inbox  a goal or step snoozed on the Goals Inbox or brought
+ *                     back, and whether they went to an event recorded
+ *                     (plan #1894.7.4). change_goal_step's set_aside and
+ *                     bring_back are the Goals home's Not now.
  *
  * They are the Goals home's own writes (app/goals/actions.ts), made with the
  * same store functions. Each names one row as its subject, so the one undo
@@ -87,6 +95,12 @@ export type GoalsWriteEnv = {
   goals: SchemaClient;
   /** A goals client recording its writes in goals.history as `actor`; `{}` is the person. */
   write: (history: { actor?: GoalsActor }) => Promise<GoalsSupabaseClient>;
+  /** The core schema, for the Goals Inbox's snoozes (change_goals_inbox). Absent, a snooze is refused. */
+  core?: SchemaClient;
+  /** YYYY-MM-DD in the person's timezone; today in UTC when absent. */
+  today?: string;
+  /** The person's IANA timezone, for when a snooze ends; UTC when absent. */
+  timezone?: string;
 };
 
 /** A Goals change as made, before a surface keeps it. */
@@ -474,6 +488,8 @@ const STEP_CHANGES = [
   'stop_counting',
   'wait_on',
   'stop_waiting',
+  'set_aside',
+  'bring_back',
 ] as const;
 type StepChange = (typeof STEP_CHANGES)[number];
 
@@ -635,7 +651,51 @@ async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'wait_on':
     case 'stop_waiting':
       return changeStepWait(env, before, goal, change, args);
+    case 'set_aside': {
+      if (!['open', 'blocked'].includes(status)) throw new GoalsRefused(`That step is ${statusWord}, so there is nothing to set aside.`);
+      const on = asideDay(text(args, 'until'), todayOf(env));
+      const { dueMoved, ...fields } = setAsideFields({ dueOn: (before.due_on as string | null) ?? null }, on);
+      if (!(await guarded('It could not be set aside', async () => updateStep(await client(), id, fields)))) {
+        throw new GoalsRefused('That step has just changed.');
+      }
+      return changed(
+        'Set aside',
+        ` until ${on}`,
+        dueMoved
+          ? `Dash set the step "${title}" aside until ${on}, and moved its due date to that day with it.`
+          : `Dash set the step "${title}" aside until ${on}.`,
+      );
+    }
+    case 'bring_back': {
+      const starts = (before.starts_on as string | null) ?? null;
+      if (!starts || starts <= todayOf(env)) throw new GoalsRefused('That step is not set aside: it has no start date still to come.');
+      if (!(await guarded('It could not be brought back', async () => updateStep(await client(), id, { starts_on: null })))) {
+        throw new GoalsRefused('That step has just changed.');
+      }
+      return changed('Brought back', '', `Dash brought the step "${title}" back now, clearing its start date of ${starts}.`);
+    }
   }
+}
+
+function todayOf(env: GoalsWriteEnv): string {
+  return env.today ?? new Date().toISOString().slice(0, 10);
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A real calendar day after today, or null. */
+function dayAfter(value: string, today: string): string | null {
+  if (!DAY.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) return null;
+  if (new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) return null;
+  return value > today ? value : null;
+}
+
+/** The day a Not now means: one of the Goals home's choices, or a day after today. */
+function asideDay(until: string, today: string): string {
+  if ((SET_ASIDE_CHOICES as readonly string[]).includes(until)) return setAsideOn(until as SetAsideChoice, today);
+  const day = dayAfter(until, today);
+  if (!day) throw new GoalsRefused(`until must be one of ${SET_ASIDE_CHOICES.join(', ')}, or a day after today as YYYY-MM-DD.`);
+  return day;
 }
 
 /** A step's wording, notes, done-when, dates or kind, any of them in one write, as the step's edit form is. */
@@ -1259,6 +1319,152 @@ async function changeGoalForm(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
 }
 
 // ---------------------------------------------------------------------------
+// change_goals_inbox (plan #1894.7.4)
+// ---------------------------------------------------------------------------
+
+const INBOX_CHANGES = ['snooze', 'unsnooze', 'went', 'did_not_go'] as const;
+const SNOOZES = 'core.inbox_snoozes';
+const SUGGESTIONS = 'goals.suggestions';
+const INBOX_HREF = '/goals/inbox';
+const INBOX_PATHS = ['/goals', '/goals/inbox', '/home'];
+
+/** A Goals row the Inbox can snooze: a live goal or step of theirs, by its goals.items ref. */
+async function snoozable(env: GoalsWriteEnv, id: string): Promise<Row> {
+  if (!id) throw new GoalsRefused('row_ref is missing: give the goals.items ref a lookup returned for the goal or step.');
+  if (!isUuid(id)) throw new GoalsRefused("row_ref must be a goal or step's goals.items ref, as a lookup returned it.");
+  const row = await ownRow(env.goals, 'items', id, env.userId);
+  if (!row) throw new GoalsRefused('There is no goal or step of theirs with that row_ref. Look it up first.');
+  if (row.archived_at != null) throw new GoalsRefused('That row is archived, so it is not in the Inbox.');
+  return row;
+}
+
+async function readSnooze(core: SchemaClient, userId: string, ref: string): Promise<Row | null> {
+  const { data, error } = await core.from('inbox_snoozes').select('*').eq('user_id', userId).eq('ref', ref).maybeSingle();
+  if (error) throw new Error(`Reading the snooze failed: ${error.message}`);
+  return (data as Row | null) ?? null;
+}
+
+async function changeGoalsInbox(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
+  const change = oneOf(args, INBOX_CHANGES);
+  if (change === 'went' || change === 'did_not_go') return recordWent(env, change === 'went', text(args, 'event'));
+
+  const core = env.core;
+  if (!core) throw new GoalsRefused('Snoozing is not reachable from here. They can snooze the row on the Goals Inbox.');
+  const item = await snoozable(env, text(args, 'row_ref'));
+  const id = item.id as string;
+  const ref = toRef(ITEM, id);
+  const title = named(item.title, item.level === 'goal' ? 'the goal' : 'the step');
+  const before = await readSnooze(core, env.userId, ref);
+  const row: AskRow = { table: ITEM, ref: id, title, href: INBOX_HREF };
+  const input = (verb: string, rest: string): GoalsChangeInput => ({
+    verb,
+    what: title,
+    rest,
+    href: INBOX_HREF,
+    where: 'Open the Inbox',
+    paths: INBOX_PATHS,
+  });
+
+  if (change === 'snooze') {
+    const day = snoozeDay(text(args, 'until'), todayOf(env));
+    if (!day) throw new GoalsRefused(`until must be ${SNOOZE_CHOICES.join(' or ')}, or a day after today as YYYY-MM-DD.`);
+    const outcome = await snoozeRow(core, { userId: env.userId, ref, until: dayStartIn(day, env.timezone ?? 'UTC') });
+    if (outcome.error) throw new GoalsRefused(outcome.error);
+    const after = await readSnooze(core, env.userId, ref);
+    if (!after) throw new Error('The snooze was written but could not be read back.');
+    return {
+      kind: 'change_goals_inbox',
+      input: input('Snoozed', ` until ${day}`),
+      subjectRef: toRef(SNOOZES, after.id as string),
+      op: before ? 'update' : 'insert',
+      before,
+      after,
+      undo: null,
+      summary: `Dash snoozed "${title}" on the Goals Inbox until ${day}.`,
+      row,
+    };
+  }
+
+  if (!before || Date.parse(String(before.snoozed_until)) <= Date.now()) {
+    throw new GoalsRefused('That row is not snoozed, so it is in the Inbox already.');
+  }
+  const outcome = await unsnoozeRow(core, { userId: env.userId, ref });
+  if (outcome.error) throw new GoalsRefused(outcome.error);
+  return {
+    kind: 'change_goals_inbox',
+    input: input('Brought back', ''),
+    subjectRef: toRef(SNOOZES, before.id as string),
+    op: 'delete',
+    before,
+    after: null,
+    undo: null,
+    summary: `Dash brought "${title}" back to the Goals Inbox from its snooze.`,
+    row,
+  };
+}
+
+/** Whether they went to an event they said they were going to: a goals.suggestions row, named in words. */
+async function recordWent(env: GoalsWriteEnv, went: boolean, wanted: string): Promise<GoalsMade> {
+  if (!wanted) throw new GoalsRefused('event is missing: name the event in their words, or give its goals.suggestions ref.');
+  const { data, error } = await env.goals
+    .from('suggestions')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('reaction', 'going')
+    .is('attended', null);
+  if (error) throw new Error(`Reading the suggestions failed: ${error.message}`);
+  const waiting = (data ?? []) as Row[];
+  const lower = wanted.toLowerCase();
+  const matches = isUuid(wanted)
+    ? waiting.filter((row) => row.id === wanted)
+    : waiting.filter((row) => String(row.title ?? '').toLowerCase().includes(lower));
+  const choices = () =>
+    waiting.length === 0
+      ? 'No event they said they were going to is waiting for an answer.'
+      : `The events waiting for an answer: ${waiting.map((row) => `"${named(row.title, 'an event')}"`).join(', ')}.`;
+  if (matches.length === 0) throw new GoalsRefused(`No event they are going to matches "${wanted}". ${choices()}`);
+  if (matches.length > 1) throw new GoalsRefused(`More than one event matches "${wanted}". ${choices()}`);
+  const before = matches[0];
+  const id = before.id as string;
+  const title = named(before.title, 'the event');
+  const today = todayOf(env);
+  const on = (before.happens_on as string | null) ?? null;
+  if (on && on > today) throw new GoalsRefused(`"${title}" is on ${on}, which is still to come.`);
+
+  // Going to an event for a rhythm also counts once towards it, on a second row, so that answer has no Undo here.
+  let counted = false;
+  if (went && before.item_id) {
+    const item = await ownRow(env.goals, 'items', before.item_id as string, env.userId);
+    counted = item?.kind === 'rhythm';
+  }
+  const changed = await guarded('It could not be recorded', async () => recordAttended(await env.write({}), id, went, today));
+  if (!changed) throw new GoalsRefused('That has already been answered.');
+  const after = await ownRow(env.goals, 'suggestions', id, env.userId);
+  return {
+    kind: 'change_goals_inbox',
+    input: {
+      verb: went ? 'Went to' : 'Did not go to',
+      what: title,
+      rest: '',
+      href: INBOX_HREF,
+      where: 'Open the Inbox',
+      paths: [...INBOX_PATHS, '/todo'],
+    },
+    subjectRef: toRef(SUGGESTIONS, id),
+    op: 'update',
+    before,
+    after,
+    undo: counted
+      ? { none: 'Going was counted towards the rhythm it served as well, so the count is taken back on the goal page.' }
+      : null,
+    summary: went
+      ? `Dash recorded that they went to "${title}"${counted ? ', and counted it towards the rhythm it served' : ''}.`
+      : `Dash recorded that they did not go to "${title}".`,
+    row: { table: SUGGESTIONS, ref: id, title, href: INBOX_HREF },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
 
@@ -1306,7 +1512,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_step',
     description:
-      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
+      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), or bring a set-aside step back now (bring_back). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1332,6 +1538,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
         },
         goal_ref: { type: 'string', description: 'For count_towards and stop_counting: the goals.items ref of the other goal.' },
         other_step_ref: { type: 'string', description: 'For wait_on and stop_waiting: the goals.items ref of the step it waits on.' },
+        until: {
+          type: 'string',
+          description: 'For set_aside: tomorrow, weekend, next_week, next_month, or a day after today as YYYY-MM-DD. A due date before it moves with it.',
+        },
       },
       required: ['change', 'step_ref'],
       additionalProperties: false,
@@ -1394,6 +1604,23 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
     },
     run: changeGoalForm,
   },
+  {
+    name: 'change_goals_inbox',
+    description:
+      "Change a row on the person's Goals Inbox, when they ask: snooze a goal or step there until a day (change snooze, with row_ref and until) or bring a snoozed one back (unsnooze, with row_ref), or record whether they went to an event they said they were going to (went, did_not_go, with event in their words). Name the goal or step by the goals.items ref a lookup returned. An event that does not match is refused with the ones waiting for an answer. Putting a step off on Goals itself, so it leaves Up next, is change_goal_step set_aside.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...INBOX_CHANGES], description: 'What to do.' },
+        row_ref: { type: 'string', description: 'For snooze and unsnooze: the goals.items ref a lookup returned for the goal or step.' },
+        until: { type: 'string', description: 'For snooze: tomorrow, next_week, or a day after today as YYYY-MM-DD.' },
+        event: { type: 'string', description: 'For went and did_not_go: the event, in words from its name, or its goals.suggestions ref.' },
+      },
+      required: ['change'],
+      additionalProperties: false,
+    },
+    run: changeGoalsInbox,
+  },
 ];
 
 /** Runs one Goals write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -1424,7 +1651,14 @@ export const GOALS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = GOAL
     if (!ctx.enabledModules.includes('goals')) {
       return { ok: false, error: 'The Goals workspace is switched off, so nothing can be changed there.' };
     }
-    const env: GoalsWriteEnv = { userId: ctx.userId, goals: await ctx.db('goals'), write: ctx.goals };
+    const env: GoalsWriteEnv = {
+      userId: ctx.userId,
+      goals: await ctx.db('goals'),
+      write: ctx.goals,
+      core: await ctx.db('core'),
+      today: ctx.today,
+      timezone: ctx.timezone,
+    };
     const made = await runGoalsWrite(write, env, input);
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown> };

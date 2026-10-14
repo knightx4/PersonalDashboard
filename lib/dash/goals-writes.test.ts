@@ -21,6 +21,7 @@ const GOAL_2 = '55555555-5555-4555-8555-555555555555';
 const STEP = '66666666-6666-4666-8666-666666666666';
 const STEP_2 = '77777777-7777-4777-8777-777777777777';
 const THEIR_STEP = '88888888-8888-4888-8888-888888888888';
+const TODAY = '2026-10-14';
 
 const area = (id: string, name: string, position: number, fields: Record<string, unknown> = {}) => ({
   id,
@@ -75,6 +76,9 @@ function env(data: FakeTables, histories: unknown[] = []): GoalsWriteEnv {
       histories.push(history);
       return goals as unknown as GoalsSupabaseClient;
     },
+    core: db('core'),
+    today: TODAY,
+    timezone: 'UTC',
   };
 }
 
@@ -485,6 +489,115 @@ describe('the Goals writes', () => {
       expect(row(data, 'goals.document_kinds', STATEMENT).archived_at).not.toBeNull();
       expect(await refused('change_goal_form', data, { change: 'forget_document_kind', step_ref: FORM_STEP, document_kind: 'Chase statement' })).toBe(
         'That form has learned no kinds of document yet.',
+      );
+    });
+  });
+
+  describe('set_aside and bring_back on change_goal_step', () => {
+    it('sets a step aside to the day a choice means, moving a sooner due date with it', async () => {
+      const data = tables();
+      row(data, 'goals.items', STEP).due_on = '2026-10-15';
+      const aside = await made('change_goal_step', data, { change: 'set_aside', step_ref: STEP, until: 'next_week' });
+      expect(row(data, 'goals.items', STEP)).toMatchObject({ starts_on: '2026-10-19', due_on: '2026-10-19' });
+      expect(aside.summary).toBe('Dash set the step "Buy shoes" aside until 2026-10-19, and moved its due date to that day with it.');
+      expect(aside.before).toMatchObject({ starts_on: null, due_on: '2026-10-15' });
+      expect(aside.undo).toBeNull();
+    });
+
+    it('refuses a day that is not after today, and a step of someone else', async () => {
+      expect(await refused('change_goal_step', tables(), { change: 'set_aside', step_ref: STEP, until: TODAY })).toBe(
+        'until must be one of tomorrow, weekend, next_week, next_month, or a day after today as YYYY-MM-DD.',
+      );
+      expect(await refused('change_goal_step', tables(), { change: 'set_aside', step_ref: THEIR_STEP, until: 'tomorrow' })).toBe(
+        'There is no step of theirs with that step_ref. Look it up first.',
+      );
+    });
+
+    it('brings a set-aside step back by clearing its start date, and refuses one that is not set aside', async () => {
+      const data = tables();
+      row(data, 'goals.items', STEP).starts_on = '2026-11-01';
+      const back = await made('change_goal_step', data, { change: 'bring_back', step_ref: STEP });
+      expect(row(data, 'goals.items', STEP).starts_on).toBeNull();
+      expect(back.summary).toBe('Dash brought the step "Buy shoes" back now, clearing its start date of 2026-11-01.');
+      expect(await refused('change_goal_step', data, { change: 'bring_back', step_ref: STEP })).toBe(
+        'That step is not set aside: it has no start date still to come.',
+      );
+    });
+  });
+
+  describe('change_goals_inbox', () => {
+    const EVENT = '99999999-9999-4999-8999-999999999999';
+    const LATER = '99999999-9999-4999-8999-99999999999a';
+    const THEIRS = '99999999-9999-4999-8999-99999999999b';
+    const suggestion = (id: string, title: string, fields: Record<string, unknown> = {}) => ({
+      id,
+      user_id: ME,
+      item_id: null,
+      title,
+      reaction: 'going',
+      attended: null,
+      happens_on: '2026-10-10',
+      ...fields,
+    });
+    function inboxTables(): FakeTables {
+      const data = tables();
+      row(data, 'goals.items', STEP).updated_at = '2026-10-13T09:00:00Z';
+      return {
+        ...data,
+        'core.inbox_snoozes': [],
+        'core.thread_turns': [],
+        'goals.suggestions': [
+          suggestion(EVENT, 'Jazz night at the Blue Note'),
+          suggestion(LATER, 'Pottery open studio', { happens_on: '2026-10-20' }),
+          suggestion(THEIRS, 'Jazz brunch', { user_id: THEM }),
+        ],
+      };
+    }
+
+    it('snoozes a step until the start of the day in their zone, and brings it back', async () => {
+      const data = inboxTables();
+      const snoozed = await made('change_goals_inbox', data, { change: 'snooze', row_ref: STEP, until: 'tomorrow' });
+      const kept = data['core.inbox_snoozes']![0];
+      expect(kept).toMatchObject({ user_id: ME, ref: `goals.items:${STEP}`, row_updated_at: '2026-10-13T09:00:00Z' });
+      expect(new Date(String(kept.snoozed_until)).toISOString()).toBe('2026-10-15T00:00:00.000Z');
+      expect(snoozed).toMatchObject({ kind: 'change_goals_inbox', op: 'insert', subjectRef: `core.inbox_snoozes:${kept.id}` });
+      expect(snoozed.summary).toBe('Dash snoozed "Buy shoes" on the Goals Inbox until 2026-10-15.');
+
+      const back = await made('change_goals_inbox', data, { change: 'unsnooze', row_ref: STEP });
+      expect(data['core.inbox_snoozes']).toEqual([]);
+      expect(back).toMatchObject({ op: 'delete', subjectRef: `core.inbox_snoozes:${kept.id}` });
+      expect(await refused('change_goals_inbox', data, { change: 'unsnooze', row_ref: STEP })).toBe(
+        'That row is not snoozed, so it is in the Inbox already.',
+      );
+    });
+
+    it('refuses to snooze a row of someone else or to a day gone by', async () => {
+      expect(await refused('change_goals_inbox', inboxTables(), { change: 'snooze', row_ref: THEIR_STEP, until: 'tomorrow' })).toBe(
+        'There is no goal or step of theirs with that row_ref. Look it up first.',
+      );
+      expect(await refused('change_goals_inbox', inboxTables(), { change: 'snooze', row_ref: STEP, until: '2026-10-01' })).toBe(
+        'until must be tomorrow or next_week, or a day after today as YYYY-MM-DD.',
+      );
+    });
+
+    it('records that they went to an event named in words, written as the person', async () => {
+      const data = inboxTables();
+      const histories: unknown[] = [];
+      const went = await made('change_goals_inbox', data, { change: 'went', event: 'blue note' }, histories);
+      expect(row(data, 'goals.suggestions', EVENT).attended).toBe(true);
+      expect(row(data, 'goals.suggestions', THEIRS).attended).toBeNull();
+      expect(went).toMatchObject({ op: 'update', subjectRef: `goals.suggestions:${EVENT}`, undo: null });
+      expect(went.before).toMatchObject({ attended: null });
+      expect(went.summary).toBe('Dash recorded that they went to "Jazz night at the Blue Note".');
+      expect(histories).toEqual([{}]);
+    });
+
+    it('refuses an event still to come, and lists the choices for one that does not match', async () => {
+      expect(await refused('change_goals_inbox', inboxTables(), { change: 'did_not_go', event: 'pottery' })).toBe(
+        '"Pottery open studio" is on 2026-10-20, which is still to come.',
+      );
+      expect(await refused('change_goals_inbox', inboxTables(), { change: 'went', event: 'opera' })).toBe(
+        'No event they are going to matches "opera". The events waiting for an answer: "Jazz night at the Blue Note", "Pottery open studio".',
       );
     });
   });

@@ -61,7 +61,7 @@ Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_age
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
-change_goal_link and change_goal_form, and in Shopping change_item, item_lists, add_items and change_saved_item, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+change_goal_link, change_goal_form and change_goals_inbox, and in Shopping change_item, item_lists, add_items and change_saved_item, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role and change_application. This
 row's own tools are described below.
