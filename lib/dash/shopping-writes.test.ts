@@ -60,6 +60,8 @@ const THEIRS = '00000000-0000-4000-8000-00000000f004';
 const DUNE_DETAILS = '00000000-0000-4000-8000-00000000d001';
 const GROUP = '00000000-0000-4000-8000-00000000a001';
 const GIFTS = '00000000-0000-4000-8000-00000000b001';
+const SAVED_ONE = '00000000-0000-4000-8000-00000000c001';
+const SAVED_THEIRS = '00000000-0000-4000-8000-00000000c002';
 
 let tables: FakeTables;
 
@@ -117,6 +119,23 @@ beforeEach(() => {
     'todo.task_links': [],
     'public.item_lists': [{ id: GIFTS, user_id: ME, name: 'Gifts', slug: 'gifts', color: null }],
     'public.inventory_item_lists': [],
+    'public.merchants': [{ id: 'm-amazon', slug: 'amazon', name: 'Amazon', domains: ['amazon.com'] }],
+    'public.saved_items': [
+      {
+        id: SAVED_ONE,
+        user_id: ME,
+        merchant_id: null,
+        url: 'https://shop.example/lamp',
+        title: 'Desk lamp',
+        image_url: null,
+        price_cents: 4500,
+        currency: 'USD',
+        notes: null,
+        status: 'saved',
+        fingerprint_loose: 'desk lamp',
+      },
+      { id: SAVED_THEIRS, user_id: SOMEONE, url: 'https://shop.example/x', title: 'Theirs', status: 'saved' },
+    ],
   };
 });
 
@@ -360,5 +379,41 @@ describe('a change the connector made', () => {
 
     expect(await undoChange(deps(), id!)).toMatchObject({ ok: true, change: { status: 'undone' } });
     expect([row('inventory_items', CATAN).name, row('inventory_items', CATAN_TWO).name]).toEqual(['Catan', 'Catan']);
+  });
+});
+
+describe('change_saved_item', () => {
+  it('saves a product for later, matching its merchant, and Undo takes it away', async () => {
+    const kept = await viaAsk('change_saved_item', { change: 'add', url: 'https://www.amazon.com/dp/B0', title: 'Kettle', price: 39.5 });
+    const saved = tables['public.saved_items'].find((r) => r.title === 'Kettle')!;
+    expect(saved).toMatchObject({ user_id: ME, status: 'saved', price_cents: 3950, currency: 'USD', merchant_id: 'm-amazon' });
+    expect(lastSummary()).toBe('Dash saved "Kettle" for later from Amazon.');
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(tables['public.saved_items'].some((r) => r.title === 'Kettle')).toBe(false);
+  });
+
+  it('edits, marks bought, puts aside and restores, each undone', async () => {
+    const edit = await viaAsk('change_saved_item', { change: 'edit', saved_ref: SAVED_ONE, title: 'Brass desk lamp', price: 52 });
+    expect(row('saved_items', SAVED_ONE)).toMatchObject({ title: 'Brass desk lamp', price_cents: 5200 });
+    expect(lastSummary()).toBe('Dash changed the saved item "Desk lamp": title and price.');
+    expect((await undoChange(deps(), edit.id)).ok).toBe(true);
+    expect(row('saved_items', SAVED_ONE)).toMatchObject({ title: 'Desk lamp', price_cents: 4500 });
+
+    const bought = await viaAsk('change_saved_item', { change: 'bought', saved_ref: SAVED_ONE });
+    expect(row('saved_items', SAVED_ONE).status).toBe('purchased');
+    expect((await undoChange(deps(), bought.id)).ok).toBe(true);
+    expect(row('saved_items', SAVED_ONE).status).toBe('saved');
+
+    await viaAsk('change_saved_item', { change: 'dismiss', saved_ref: SAVED_ONE });
+    expect(row('saved_items', SAVED_ONE).status).toBe('dismissed');
+    await viaAsk('change_saved_item', { change: 'restore', saved_ref: SAVED_ONE });
+    expect(row('saved_items', SAVED_ONE).status).toBe('saved');
+  });
+
+  it("refuses another person's saved item, a no-op, and a bad link", async () => {
+    expect(await refused('change_saved_item', { change: 'dismiss', saved_ref: SAVED_THEIRS })).toMatch(/no saved item of theirs/);
+    expect(await refused('change_saved_item', { change: 'restore', saved_ref: SAVED_ONE })).toMatch(/already/);
+    expect(await refused('change_saved_item', { change: 'edit', saved_ref: SAVED_ONE })).toMatch(/Nothing there differs/);
+    expect(await refused('change_saved_item', { change: 'add', url: 'not a link', title: 'X' })).toMatch(/full product link/);
   });
 });

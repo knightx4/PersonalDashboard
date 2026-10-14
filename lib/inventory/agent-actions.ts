@@ -133,11 +133,11 @@ export const shoppingActions: ModuleActions = {
   },
   'app/shopping/saved/actions.ts': {
     previewSavedUrl: none('page'),
-    createSavedItem: GAP,
-    updateSavedItem: GAP,
-    markSavedPurchased: GAP,
-    dismissSavedItem: GAP,
-    restoreSavedItem: GAP,
+    createSavedItem: tool('change_saved_item'),
+    updateSavedItem: tool('change_saved_item'),
+    markSavedPurchased: tool('change_saved_item'),
+    dismissSavedItem: tool('change_saved_item'),
+    restoreSavedItem: tool('change_saved_item'),
     deleteSavedItem: none('deletes'),
   },
   'app/shopping/sell/actions.ts': {

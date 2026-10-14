@@ -12,6 +12,7 @@ import type { CanonicalBook } from '@/lib/books/types';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
 import { toRef } from '@/lib/core/refs';
 import { fingerprintLoose } from '@/lib/fingerprint';
+import { findMerchantByUrl } from '@/lib/saved/resolve-merchant';
 import { buildOwnedGameRows, type OwnedGameBundle } from '@/lib/games/create-owned-game';
 import type { CanonicalGame } from '@/lib/games/types';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
@@ -37,6 +38,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 confirmed (plan #1894.5.2).
  *   item_lists    items put on one of their lists or taken off it, the list
  *                 made when it is new, or a list renamed.
+ *   change_saved_item
+ *                 the saved-for-later list: a product saved, its title, link,
+ *                 price or notes changed, marked bought, put aside or
+ *                 brought back (plan #1894.5.3). Deleting one stays on the page.
  *   add_items     books, board games and anything else they own added to the
  *                 inventory, as the add pages save them (plan #1894.5.2).
  *                 Undo takes each one away while nothing hangs off it.
@@ -78,6 +83,7 @@ const TABLES = {
   book_details: { owned: false },
   game_details: { owned: false },
   inventory_item_lists: { owned: false },
+  saved_items: { owned: true },
 } as const;
 
 export type ShoppingTable = keyof typeof TABLES;
@@ -904,6 +910,153 @@ const ITEM_DEPENDENTS = [
   { schema: 'todo', table: 'task_links' },
 ] as const;
 
+// ---------------------------------------------------------------------------
+// change_saved_item
+// ---------------------------------------------------------------------------
+
+const SAVED_CHANGES = ['add', 'edit', 'bought', 'dismiss', 'restore'] as const;
+type SavedChange = (typeof SAVED_CHANGES)[number];
+const SAVED = 'public.saved_items';
+const savedHref = (id: string) => `/shopping/saved/${id}`;
+const SAVED_STATUS: Record<'bought' | 'dismiss' | 'restore', { status: string; verb: string; rest: string; said: string }> = {
+  bought: { status: 'purchased', verb: 'Marked', rest: ' as bought', said: 'marked' },
+  dismiss: { status: 'dismissed', verb: 'Put aside', rest: '', said: 'put aside' },
+  restore: { status: 'saved', verb: 'Moved back to saved', rest: '', said: 'moved back to saved' },
+};
+
+function savedUrl(value: string | undefined): string {
+  try {
+    const url = new URL(value ?? '');
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.toString();
+  } catch {
+    // falls through to the refusal
+  }
+  throw new ShoppingRefused('url must be a full product link starting with http:// or https://.');
+}
+
+async function merchantFor(env: ShoppingWriteEnv, link: string): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await env.shop.from('merchants').select('id, slug, name, domains');
+  if (error) throw new Error(`Reading the merchants failed: ${error.message}`);
+  return findMerchantByUrl(
+    link,
+    ((data ?? []) as Row[]).map((m) => ({ id: m.id as string, slug: m.slug as string, name: m.name as string, domains: (m.domains ?? []) as string[] })),
+  );
+}
+
+async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const change = (typeof args.change === 'string' ? args.change.trim() : '') as SavedChange;
+  if (!SAVED_CHANGES.includes(change)) throw new ShoppingRefused(`change must be one of ${SAVED_CHANGES.join(', ')}.`);
+  const paths = ['/shopping/saved'];
+
+  const url = textArg(args, 'url', 2000);
+  const title = textArg(args, 'title', 300);
+  const notes = textArg(args, 'notes', 5000);
+  const imageUrl = textArg(args, 'image_url', 2000);
+  let priceCents: number | null | undefined;
+  if (given(args, 'price')) {
+    const price = args.price;
+    if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) throw new ShoppingRefused('price is a dollar amount such as 12.99.');
+    priceCents = Math.round(price * 100);
+  }
+  if (args.clear_price === true) {
+    if (priceCents !== undefined) throw new ShoppingRefused('Give price or clear_price, not both.');
+    priceCents = null;
+  }
+  const currency = textArg(args, 'currency', 3)?.toUpperCase();
+  if (currency !== undefined && currency.length !== 3) throw new ShoppingRefused('currency is a 3-letter code such as USD.');
+  if (title === '') throw new ShoppingRefused('title cannot be empty.');
+  if (imageUrl) savedUrl(imageUrl);
+
+  if (change === 'add') {
+    if (!url) throw new ShoppingRefused('Give the product link as url.');
+    if (!title) throw new ShoppingRefused('Give a title, so the item can be matched later.');
+    const link = savedUrl(url);
+    const merchant = await merchantFor(env, link);
+    const { data: made, error } = await env.shop
+      .from('saved_items')
+      .insert({
+        user_id: env.userId,
+        url: link,
+        title,
+        image_url: imageUrl || null,
+        price_cents: priceCents ?? null,
+        currency: currency ?? 'USD',
+        notes: notes || null,
+        merchant_id: merchant?.id ?? null,
+        fingerprint_loose: fingerprintLoose(title),
+        status: 'saved',
+      })
+      .select('*')
+      .single();
+    if (error || !made) throw new Error(`Saving the item failed: ${error?.message ?? 'no row'}`);
+    const id = (made as Row).id as string;
+    const shown = named(title, 'the item');
+    return {
+      kind: 'change_saved_item',
+      input: { verb: 'Saved', what: shown, rest: ' for later', href: savedHref(id), where: 'Open the saved item', paths: [...paths, savedHref(id)] },
+      subjectRef: toRef(SAVED, id),
+      op: 'insert',
+      before: null,
+      after: made as Row,
+      undo: { added: [{ table: 'saved_items', id }] },
+      summary: `Dash saved "${shown}" for later${merchant ? ` from ${merchant.name}` : ''}.`,
+      row: { table: SAVED, ref: id, title: shown, href: savedHref(id) },
+    };
+  }
+
+  const id = idOf(args.saved_ref, 'saved_ref', 'saved item');
+  const item = await ownRow(env.shop, 'saved_items', id, env.userId, 'saved item');
+  const shown = named(item.title ?? item.url, 'the saved item');
+  const itemPaths = [...paths, savedHref(id)];
+  const values: Row = {};
+  let input: ShoppingChangeInput;
+  let summary: string;
+
+  if (change === 'edit') {
+    if (url !== undefined && url !== item.url) values.url = savedUrl(url);
+    if (title !== undefined && title !== item.title) {
+      values.title = title;
+      values.fingerprint_loose = fingerprintLoose(title);
+    }
+    if (notes !== undefined && !same(notes || null, item.notes)) values.notes = notes || null;
+    if (imageUrl !== undefined && !same(imageUrl || null, item.image_url)) values.image_url = imageUrl || null;
+    if (priceCents !== undefined && !same(priceCents, item.price_cents)) values.price_cents = priceCents;
+    if (currency !== undefined && currency !== item.currency) values.currency = currency;
+    if ('url' in values) {
+      const hit = await merchantFor(env, values.url as string);
+      if ((hit?.id ?? null) !== item.merchant_id) values.merchant_id = hit?.id ?? null;
+    }
+    if (Object.keys(values).length === 0) {
+      throw new ShoppingRefused('Nothing there differs from what is saved. Give a url, title, notes, image_url, price, clear_price or currency that changes.');
+    }
+    const label: Record<string, string> = { url: 'link', title: 'title', price_cents: 'price', currency: 'currency', notes: 'notes', image_url: 'picture' };
+    const said = sentence(Object.keys(label).filter((key) => key in values).map((key) => label[key]));
+    input = { verb: 'Changed', what: shown, rest: `: ${said}`, href: savedHref(id), where: 'Open the saved item', paths: itemPaths };
+    summary = `Dash changed the saved item "${shown}": ${said}.`;
+  } else {
+    const move = SAVED_STATUS[change];
+    if (item.status === move.status) throw new ShoppingRefused(`"${shown}" is ${move.status === 'saved' ? 'saved' : move.status} already.`);
+    values.status = move.status;
+    input = { verb: move.verb, what: shown, rest: move.rest, href: savedHref(id), where: 'Open the saved item', paths: itemPaths };
+    summary = `Dash ${move.said} the saved item "${shown}".`;
+  }
+
+  const { data: after, error } = await env.shop.from('saved_items').update(values).eq('id', id).eq('user_id', env.userId).select('*').single();
+  if (error || !after) throw new Error(`Changing the saved item failed: ${error?.message ?? 'no row'}`);
+  const keys = Object.keys(values);
+  return {
+    kind: 'change_saved_item',
+    input,
+    subjectRef: toRef(SAVED, id),
+    op: 'update',
+    before: item,
+    after: after as Row,
+    undo: { rows: [{ table: 'saved_items', id, before: pick(item, keys), after: pick(after as Row, keys) }] },
+    summary,
+    row: { table: SAVED, ref: id, title: shown, href: savedHref(id) },
+  };
+}
+
 async function itemHasDependents(deps: { userId: string; db: AskDb }, shop: SchemaClient, id: string): Promise<boolean> {
   const { data: item, error } = await shop
     .from('inventory_items')
@@ -1106,6 +1259,28 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
       additionalProperties: false,
     },
     run: addItems,
+  },
+  {
+    name: 'change_saved_item',
+    description:
+      "Work their saved-for-later list in Shopping, when they ask: add saves a product they might buy (give its url and a title; price, notes and picture are optional), edit changes a saved item's link, title, price, notes or picture, bought marks it bought, dismiss puts it aside, restore brings a dismissed or bought one back to saved. Name a saved item by saved_ref, from a lookup. Deleting a saved item is done on its page, not by you.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...SAVED_CHANGES], description: 'add, edit, bought, dismiss or restore.' },
+        saved_ref: { type: 'string', description: 'For everything but add: the public.saved_items ref a lookup returned.' },
+        url: { type: 'string', description: 'The product link, starting with https://.' },
+        title: { type: 'string', description: 'What the product is called.' },
+        price: { type: 'number', description: 'The price in dollars, such as 12.99.' },
+        clear_price: { type: 'boolean', description: 'For edit: true to clear the price.' },
+        currency: { type: 'string', description: 'A 3-letter currency code; USD when left out on add.' },
+        notes: { type: 'string', description: 'Notes in full, replacing what is there; empty clears them.' },
+        image_url: { type: 'string', description: 'A link to a picture of the product; empty clears it.' },
+      },
+      required: ['change'],
+      additionalProperties: false,
+    },
+    run: changeSavedItem,
   },
 ];
 
