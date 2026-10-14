@@ -129,4 +129,17 @@ describe('Tooltip', () => {
     expect(id).toBeTruthy();
     expect(html).toContain(`id="${id}"`);
   });
+
+  // A server component's child reaches this client component as a lazy
+  // reference, not an element, once the page's payload is large. Cloning it
+  // made an element with no type, which took down the Pipeline.
+  it('draws a child that arrives as a lazy reference', () => {
+    const lazy = {
+      $$typeof: Symbol.for('react.lazy'),
+      _payload: { status: 'fulfilled', value: <span aria-label="Stale">3d</span> },
+      _init: (payload: { value: React.ReactElement }) => payload.value,
+    } as unknown as React.ReactElement<{ title?: string }>;
+    const html = renderToStaticMarkup(<Tooltip label="Time since">{lazy}</Tooltip>);
+    expect(html).toContain('aria-label="Stale"');
+  });
 });

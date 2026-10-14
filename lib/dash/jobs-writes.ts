@@ -2,16 +2,21 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
+import { channelForMessage } from '@/lib/jobs/applications/channel';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { CLASSIFICATIONS, eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
 import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { CAREER_WRITES, companyHeld } from './career-writes';
+import { INTERVIEW_EDIT_WRITES } from './interview-edit-writes';
+import { JobsRefused } from './jobs-refused';
 
 /**
  * The Jobs changes an agent makes when asked (plan #1894.6.1, feature
@@ -23,6 +28,19 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                       or the company it is filed under.
  *   change_application  how excited they are about it, and how they applied
  *                       (the channel, and who referred them).
+ *
+ * and, from a role's application questions and the answer bank (plan
+ * #1894.6.8):
+ *
+ *   add_application_questions  questions an application asks, added to it
+ *                       and to the bank (QuestionsUndo; undoApplicationQuestions
+ *                       takes the paste back).
+ *   save_answer         an answer saved, kept as a draft with what it rests
+ *                       on, approved or marked submitted.
+ *   set_default_answer the answer reused for a question on every
+ *                       application.
+ *
+ * Drafting an answer with a model stays the role page's, since it spends.
  *
  * and, from the company page (plan #1894.6.2):
  *
@@ -48,6 +66,13 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *
  *   change_role_email   an email linked to a role, a suggested one turned down,
  *                       or one taken off a role it was wrongly linked to.
+ *
+ * and, from Jobs review again (plan #1894.6.4.3):
+ *
+ *   add_role_from_email  a new role and application made from an email,
+ *                       with the email linked to it (RoleFromEmailUndo).
+ *                       Linking a review email to a role on file is
+ *                       change_role_email's link.
  *
  *
  * and, from the contacts pages and Find (plan #1894.6.6):
@@ -117,7 +142,7 @@ export type JobsWrite = {
 };
 
 /** A refusal the model reads and says in words. */
-export class JobsRefused extends Error {}
+export { JobsRefused };
 
 type Args = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -420,6 +445,374 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     row: { table: ROLES, ref: roleId, title: name, href },
     undo: null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// add_application_questions, save_answer, set_default_answer
+// ---------------------------------------------------------------------------
+
+const QUESTIONS = 'job_search.questions';
+const ANSWERS = 'job_search.application_answers';
+const MATERIAL_HREF = '/jobs/material';
+const ANSWER_STATUSES = ['draft', 'approved', 'submitted'] as const;
+const QUESTIONS_MAX = 30;
+const QUESTION_MAX = 2000;
+const ANSWER_MAX = 20_000;
+const CLAIMS_MAX = 20;
+
+/**
+ * What add_application_questions keeps so its Undo can take the paste back:
+ * the answer rows it added to the application, the questions it added to the
+ * bank, and the questions already in the bank whose count of times seen it
+ * raised.
+ */
+export type QuestionsUndo = {
+  answers: string[];
+  created: string[];
+  seen: { id: string; before: number; after: number }[];
+};
+
+/** "Why do you want to work here?", cut to a line. */
+function questionLine(value: unknown): string {
+  const line = typeof value === 'string' && value.trim() ? value.trim().replace(/\s+/g, ' ') : 'the question';
+  return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
+}
+
+/** The questions a call gives: a list, or one pasted block split as the role page splits it. */
+function questionTexts(args: Args): string[] {
+  const value = args.questions;
+  const texts =
+    typeof value === 'string'
+      ? splitQuestionBlock(value)
+      : Array.isArray(value)
+        ? value.map((entry) => (typeof entry === 'string' ? entry.trim().replace(/\s+/g, ' ') : '')).filter(Boolean)
+        : [];
+  if (texts.length === 0) throw new JobsRefused('Give the questions: a list, or the block as the form shows it.');
+  if (texts.length > QUESTIONS_MAX) throw new JobsRefused(`Up to ${QUESTIONS_MAX} questions at a time.`);
+  if (texts.some((t) => t.length > QUESTION_MAX)) throw new JobsRefused(`Keep each question under ${QUESTION_MAX} characters.`);
+  return texts;
+}
+
+async function addApplicationQuestions(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const application = await namedApplication(env, args);
+  const applicationId = application.id as string;
+  const texts = questionTexts(args);
+
+  const { data: onIt, error: onItError } = await env.jobs
+    .from('application_answers')
+    .select('question_id')
+    .eq('application_id', applicationId)
+    .eq('user_id', env.userId);
+  if (onItError) throw new Error(`Reading the application's questions failed: ${onItError.message}`);
+  const already = new Set(((onIt ?? []) as Row[]).map((row) => row.question_id as string));
+
+  const undo: QuestionsUndo = { answers: [], created: [], seen: [] };
+  const added: string[] = [];
+  let skipped = 0;
+  try {
+    for (const text of texts) {
+      const fingerprint = questionFingerprint(text);
+      const { data: existing, error: readError } = await env.jobs
+        .from('questions')
+        .select('id, times_seen')
+        .eq('user_id', env.userId)
+        .eq('fingerprint', fingerprint)
+        .limit(1);
+      if (readError) throw new Error(`Reading the question bank failed: ${readError.message}`);
+      const found = ((existing ?? []) as Row[])[0];
+      let questionId: string;
+      if (found) {
+        questionId = found.id as string;
+        // The same question twice on one application is one row, as a second paste of it should be.
+        if (already.has(questionId)) {
+          skipped += 1;
+          continue;
+        }
+        const before = typeof found.times_seen === 'number' ? found.times_seen : 1;
+        const { error } = await env.jobs.from('questions').update({ times_seen: before + 1 }).eq('id', questionId).eq('user_id', env.userId);
+        if (error) throw new Error(`Counting the question failed: ${error.message}`);
+        undo.seen.push({ id: questionId, before, after: before + 1 });
+      } else {
+        const { data: created, error } = await env.jobs
+          .from('questions')
+          .insert({ user_id: env.userId, text, fingerprint, kind: guessQuestionKind(text) })
+          .select('id')
+          .single();
+        if (error || !created) throw new Error(`Adding the question failed: ${error?.message ?? 'no row'}`);
+        questionId = (created as Row).id as string;
+        undo.created.push(questionId);
+      }
+      const { data: answer, error: answerError } = await env.jobs
+        .from('application_answers')
+        .insert({ user_id: env.userId, application_id: applicationId, question_id: questionId })
+        .select('id')
+        .single();
+      if (answerError || !answer) throw new Error(`Adding the question to the application failed: ${answerError?.message ?? 'no row'}`);
+      undo.answers.push((answer as Row).id as string);
+      already.add(questionId);
+      added.push(text);
+    }
+  } catch (error) {
+    // Half a paste is worse than none: take back what went in before the failure.
+    await putBackQuestions({ userId: env.userId, jobs: env.jobs }, undo).catch(() => undefined);
+    throw error;
+  }
+  if (added.length === 0) throw new JobsRefused('Those questions are on that application already.');
+
+  const roleId = application.role_id as string;
+  const role = await ownRow(env.jobs, 'roles', roleId, env.userId, 'role');
+  const name = roleName(role, await companyName(env, role.company_id));
+  const href = roleHref(roleId);
+  const what = added.length === 1 ? `"${questionLine(added[0])}"` : `${added.length} questions`;
+  const also = skipped > 0 ? `, leaving out ${skipped} already on it` : '';
+  const firstAnswer = undo.answers[0];
+  return {
+    kind: 'add_application_questions',
+    input: { verb: 'Added', what, rest: ` to the application for ${name}${also}`, href, where: 'Open the role', paths: [...rolePaths(roleId), MATERIAL_HREF] },
+    subjectRef: toRef(ANSWERS, firstAnswer),
+    op: 'insert',
+    before: null,
+    after: (await ownRow(env.jobs, 'application_answers', firstAnswer, env.userId, 'answer')) as Row,
+    summary: `Dash added ${what} to the application for ${name}${also}.`,
+    row: { table: ROLES, ref: roleId, title: name, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/** The answer a call names: by its ref, or by its question on an application. */
+async function namedAnswer(env: JobsWriteEnv, args: Args): Promise<Row> {
+  const answerRef = text(args, 'answer_ref');
+  if (answerRef) return ownRow(env.jobs, 'application_answers', idOf(answerRef, 'answer'), env.userId, 'answer');
+  const question = text(args, 'question');
+  if (!question) throw new JobsRefused('Name the answer: answer_ref, or question with application_ref or role_ref.');
+  const application = await namedApplication(env, args);
+  const { data, error } = await env.jobs
+    .from('application_answers')
+    .select('*')
+    .eq('application_id', application.id as string)
+    .eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the application's questions failed: ${error.message}`);
+  const answers = (data ?? []) as Row[];
+  const ids = answers.map((row) => row.question_id as string);
+  const { data: bank, error: bankError } = ids.length
+    ? await env.jobs.from('questions').select('id, text, fingerprint').in('id', ids).eq('user_id', env.userId)
+    : { data: [], error: null };
+  if (bankError) throw new Error(`Reading the questions failed: ${bankError.message}`);
+  const questions = (bank ?? []) as Row[];
+  const fingerprint = questionFingerprint(question);
+  const needle = question.toLowerCase();
+  let matches = questions.filter((row) => row.fingerprint === fingerprint);
+  if (matches.length === 0) matches = questions.filter((row) => typeof row.text === 'string' && row.text.toLowerCase().includes(needle));
+  if (matches.length !== 1) {
+    const listing = questions.map((row) => `"${questionLine(row.text)}"`).join('; ');
+    throw new JobsRefused(
+      matches.length === 0
+        ? `That application has no question like that.${listing ? ` It has: ${listing}.` : ' Add it with add_application_questions first.'}`
+        : `More than one question on that application matches: ${matches.map((row) => `"${questionLine(row.text)}"`).join('; ')}. Give more of its words, or answer_ref.`,
+    );
+  }
+  return answers.find((row) => row.question_id === matches[0].id)!;
+}
+
+async function ownEvidence(env: JobsWriteEnv, value: unknown): Promise<string[]> {
+  if (!Array.isArray(value)) throw new JobsRefused('evidence_refs must be a list of job_search.evidence_items refs.');
+  const ids = [...new Set(value.map((ref) => idOf(typeof ref === 'string' ? ref.trim() : '', 'evidence item')))];
+  if (ids.length > 40) throw new JobsRefused('Up to 40 evidence items on one answer.');
+  if (ids.length === 0) return [];
+  const { data, error } = await env.jobs.from('evidence_items').select('id').in('id', ids).eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the evidence failed: ${error.message}`);
+  if ((data ?? []).length < ids.length) throw new JobsRefused('One of those is not an evidence item of theirs. Look them up first.');
+  return ids;
+}
+
+async function saveAnswer(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const before = await namedAnswer(env, args);
+  const id = before.id as string;
+  const update: Row = {};
+
+  if (given(args, 'answer')) {
+    const answer = clearable(args, 'answer', ANSWER_MAX);
+    if (answer === null) throw new JobsRefused('Give the answer\'s words. To leave a question unanswered, leave it as it is.');
+    update.answer = answer;
+  }
+  const status = given(args, 'status') ? (oneOf(args, 'status', ANSWER_STATUSES, false) as (typeof ANSWER_STATUSES)[number]) : null;
+  if (status) update.status = status;
+
+  // A drafted answer keeps what it rests on, as the role page's Keep this draft does.
+  let evidence: string[] = [];
+  if (given(args, 'evidence_refs')) {
+    evidence = await ownEvidence(env, args.evidence_refs);
+    update.evidence_item_ids = evidence;
+  }
+  if (given(args, 'unsupported_claims')) {
+    const claims = Array.isArray(args.unsupported_claims)
+      ? args.unsupported_claims.map((claim) => (typeof claim === 'string' ? claim.trim() : '')).filter(Boolean)
+      : null;
+    if (!claims) throw new JobsRefused('unsupported_claims must be a list of the claims nothing on file backs.');
+    if (claims.length > CLAIMS_MAX) throw new JobsRefused(`Up to ${CLAIMS_MAX} unsupported claims.`);
+    update.unsupported_claims = claims;
+  }
+  if (Object.keys(update).length === 0) throw new JobsRefused('Nothing to change: give answer, status, evidence_refs or unsupported_claims.');
+  if (update.answer === undefined && (typeof before.answer !== 'string' || !before.answer.trim()) && status && status !== 'draft') {
+    throw new JobsRefused('That question has no answer yet, so it cannot be approved or submitted. Give the answer too.');
+  }
+
+  const { data, error } = await env.jobs
+    .from('application_answers')
+    .update(update)
+    .eq('id', id)
+    .eq('user_id', env.userId)
+    .select('*')
+    .single();
+  if (error || !data) throw new Error(`Saving the answer failed: ${error?.message ?? 'no row'}`);
+
+  // Best effort, as the page's: a use count that did not tick is no reason to lose the answer.
+  const added = evidence.filter((item) => !(Array.isArray(before.evidence_item_ids) && before.evidence_item_ids.includes(item)));
+  if (added.length > 0) {
+    try {
+      const { error: bumpError } = await env.jobs.rpc('bump_evidence_use', { item_ids: added });
+      if (bumpError) console.error('save_answer: counting the evidence used failed', bumpError);
+    } catch (bumpError) {
+      console.error('save_answer: counting the evidence used failed', bumpError);
+    }
+  }
+
+  const question = await ownRow(env.jobs, 'questions', before.question_id as string, env.userId, 'question');
+  const application = await ownRow(env.jobs, 'applications', before.application_id as string, env.userId, 'application');
+  const roleId = application.role_id as string;
+  const role = await ownRow(env.jobs, 'roles', roleId, env.userId, 'role');
+  const name = roleName(role, await companyName(env, role.company_id));
+  const href = roleHref(roleId);
+  const what = `the answer to "${questionLine(question.text)}"`;
+  const [verb, rest] =
+    update.answer !== undefined
+      ? ['Saved', status && status !== 'draft' ? ` as ${status}, for ${name}` : ` for ${name}`]
+      : status
+        ? ['Marked', ` ${status}, for ${name}`]
+        : ['Noted what backs', ` for ${name}`];
+  return {
+    kind: 'save_answer',
+    input: { verb, what, rest, href, where: 'Open the role', paths: [...rolePaths(roleId), MATERIAL_HREF] },
+    subjectRef: toRef(ANSWERS, id),
+    op: 'update',
+    before,
+    after: data as Row,
+    summary: `Dash ${verb.toLowerCase()} ${what}${rest}.`,
+    row: { table: ANSWERS, ref: id, title: questionLine(question.text), href },
+    undo: null,
+  };
+}
+
+async function setDefaultAnswer(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  let question: Row;
+  let fromAnswer: string | null = null;
+  const questionRef = text(args, 'question_ref');
+  const answerRef = text(args, 'answer_ref');
+  if (questionRef) {
+    question = await ownRow(env.jobs, 'questions', idOf(questionRef, 'question'), env.userId, 'question');
+  } else if (answerRef) {
+    const answer = await ownRow(env.jobs, 'application_answers', idOf(answerRef, 'answer'), env.userId, 'answer');
+    question = await ownRow(env.jobs, 'questions', answer.question_id as string, env.userId, 'question');
+    fromAnswer = typeof answer.answer === 'string' && answer.answer.trim() ? answer.answer.trim() : null;
+  } else {
+    throw new JobsRefused('Name the question: question_ref, or answer_ref for an answer to reuse.');
+  }
+  const answer = given(args, 'answer') ? clearable(args, 'answer', ANSWER_MAX) : fromAnswer;
+  if (!answer) throw new JobsRefused(answerRef && !given(args, 'answer') ? 'That answer is empty, so there is nothing to reuse. Give the words in answer.' : 'Give the answer\'s words.');
+
+  const id = question.id as string;
+  const { data, error } = await env.jobs
+    .from('questions')
+    .update({ canonical_answer: answer, canonical_answer_updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', env.userId)
+    .select('*')
+    .single();
+  if (error || !data) throw new Error(`Setting the default answer failed: ${error?.message ?? 'no row'}`);
+
+  const line = `"${questionLine(question.text)}"`;
+  return {
+    kind: 'set_default_answer',
+    input: { verb: 'Set', what: 'the answer reused for', rest: ` ${line}`, href: MATERIAL_HREF, where: 'Open the answer bank', paths: [MATERIAL_HREF] },
+    subjectRef: toRef(QUESTIONS, id),
+    op: 'update',
+    before: question,
+    after: data as Row,
+    summary: `Dash set the answer reused for ${line} on every application.`,
+    row: { table: QUESTIONS, ref: id, title: questionLine(question.text), href: MATERIAL_HREF },
+    undo: null,
+  };
+}
+
+function questionsUndo(value: Record<string, unknown> | null): QuestionsUndo | null {
+  if (!value) return null;
+  const answers = Array.isArray(value.answers) ? (value.answers as string[]) : [];
+  const created = Array.isArray(value.created) ? (value.created as string[]) : [];
+  const seen = Array.isArray(value.seen) ? (value.seen as QuestionsUndo['seen']) : [];
+  const ok =
+    answers.every(isUuid) &&
+    created.every(isUuid) &&
+    seen.every((row) => isUuid(row.id) && typeof row.before === 'number' && typeof row.after === 'number');
+  return ok && answers.length > 0 ? { answers, created, seen } : null;
+}
+
+/**
+ * Take a paste of questions back: the answer rows it added come off the
+ * application, the counts it raised go back where they still hold what Dash
+ * left, and the questions it added to the bank come out unless something has
+ * been written on them or another application now holds them.
+ */
+async function putBackQuestions(deps: { userId: string; jobs: SchemaClient }, undo: QuestionsUndo): Promise<number> {
+  let restored = 0;
+  if (undo.answers.length > 0) {
+    const { data, error } = await deps.jobs.from('application_answers').delete().in('id', undo.answers).eq('user_id', deps.userId).select('id');
+    if (error) throw new Error(`${ANSWERS}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  for (const row of undo.seen) {
+    const { data, error } = await deps.jobs
+      .from('questions')
+      .update({ times_seen: row.before })
+      .eq('id', row.id)
+      .eq('user_id', deps.userId)
+      .eq('times_seen', row.after)
+      .select('id');
+    if (error) throw new Error(`${QUESTIONS}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  for (const id of undo.created) {
+    const { data: held, error: heldError } = await deps.jobs.from('application_answers').select('id').eq('question_id', id).eq('user_id', deps.userId).limit(1);
+    if (heldError) throw new Error(`${ANSWERS}: ${heldError.message}`);
+    if ((held ?? []).length > 0) continue;
+    const { data, error } = await deps.jobs.from('questions').delete().eq('id', id).eq('user_id', deps.userId).is('canonical_answer', null).select('id');
+    if (error) throw new Error(`${QUESTIONS}: ${error.message}`);
+    restored += (data ?? []).length;
+  }
+  return restored;
+}
+
+/**
+ * Undo add_application_questions from what its record kept (QuestionsUndo).
+ * Refused whole when an answer has been written into one of the questions
+ * since, so the Undo never takes away words the person or Dash wrote later.
+ * Ask's undo calls it for every surface (lib/ask/changes.ts, undoMany).
+ */
+export async function undoApplicationQuestions(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = questionsUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this change touched, so it cannot be undone.' };
+  const jobs = await deps.db('job_search');
+  const { data, error } = await jobs.from('application_answers').select('id, answer').in('id', undo.answers).eq('user_id', deps.userId);
+  if (error) throw new Error(`${ANSWERS}: ${error.message}`);
+  const answered = ((data ?? []) as Row[]).filter((row) => typeof row.answer === 'string' && row.answer.trim());
+  if (answered.length > 0) {
+    return { ok: false, error: 'One of those questions has been answered since, so undoing would lose the answer.' };
+  }
+  const restored = await putBackQuestions({ userId: deps.userId, jobs }, undo);
+  if (restored === 0) return { ok: false, error: 'Those questions have already come off the application.' };
+  return { ok: true, restored };
 }
 
 // ---------------------------------------------------------------------------
@@ -1408,8 +1801,11 @@ export type RowsUndo = {
   inserted: { table: string; id: string }[];
 };
 
-/** The tables a review change's undo may name. Every one keeps a user_id. */
-const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events']);
+/**
+ * The tables a review change's undo may name. All but the email verdicts
+ * keep a user_id; an email's owner is read through job_search.inbox_messages.
+ */
+const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events', 'job_search.ingested_messages']);
 
 const REVIEW_HREF = '/jobs/review';
 const EVENTS_MAX = 50;
@@ -1555,6 +1951,339 @@ async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// review_emails
+// ---------------------------------------------------------------------------
+
+/**
+ * Emails waiting in Jobs review dismissed, or dismissed ones brought back
+ * (plan #1894.6.4.2). A dismissal writes what the page's d key and bulk bar
+ * write: the email is marked not relevant and skipped, and its suggested
+ * link is cleared. Bringing one back puts it in the queue again with the
+ * classification it now has, or the one the call gives. The record keeps
+ * every email's classification and link from before, so the Undo puts each
+ * back as it was, whichever way the change went.
+ *
+ * The verdict rows have no user_id; the person's ownership is read through
+ * job_search.inbox_messages, which carries it, as change_role_email does.
+ */
+const MESSAGE_COLUMNS = ['classification', 'parse_status', 'resulting_application_id', 'link_method', 'link_confidence', 'error'] as const;
+const DISMISSED = { classification: 'not_relevant', parse_status: 'skipped', resulting_application_id: null, link_method: null, link_confidence: null, error: null };
+const EMAILS_MAX = 50;
+const pickMessage = (row: Row): Row => Object.fromEntries(MESSAGE_COLUMNS.map((column) => [column, row[column] ?? null]));
+
+/** The emails a call names, read through the inbox view by the person's user id; refused unless every one is theirs. */
+async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
+  const list = Array.isArray(refs) ? refs : [];
+  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as search_mail or a lookup returned them.');
+  if (list.length > EMAILS_MAX) throw new JobsRefused(`Up to ${EMAILS_MAX} emails at a time.`);
+  const byId = new Map<string, Row>();
+  for (const raw of list) {
+    let ref = typeof raw === 'string' ? raw.trim() : '';
+    if (ref.startsWith('job_search.inbox_messages:')) ref = ref.slice('job_search.inbox_messages:'.length);
+    let query = env.jobs.from('inbox_messages').select('*').eq('user_id', env.userId);
+    if (isUuid(ref)) query = query.eq('id', ref);
+    else {
+      const at = ref.indexOf(':');
+      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref search_mail or a lookup returned for the email.');
+      query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error(`Reading the email failed: ${error.message}`);
+    if (!data) throw new JobsRefused('One of those is not an email the job search has read. Look them up first.');
+    byId.set((data as Row).id as string, data as Row);
+  }
+  return [...byId.values()];
+}
+
+async function reviewEmails(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const verb = text(args, 'verb');
+  if (verb !== 'dismiss' && verb !== 'restore') throw new JobsRefused('verb must be dismiss or restore.');
+  if (verb === 'dismiss' && given(args, 'classification')) throw new JobsRefused('classification goes with restore.');
+  const classification = given(args, 'classification')
+    ? (oneOf(args, 'classification', CLASSIFICATIONS.filter((c) => c !== 'not_relevant'), false) as MessageClassification)
+    : null;
+  const found = await namedEmails(env, args.email_refs);
+  const emails =
+    verb === 'dismiss'
+      ? found.filter((row) => row.parse_status === 'needs_review')
+      : found.filter((row) => row.parse_status === 'skipped' && row.classification === 'not_relevant');
+  if (emails.length === 0) {
+    throw new JobsRefused(verb === 'dismiss' ? 'None of those is waiting in Jobs review.' : 'None of those has been dismissed.');
+  }
+
+  const undo: RowsUndo = { updated: [], inserted: [] };
+  let firstAfter: Row | null = null;
+  for (const row of emails) {
+    const set: Row = verb === 'dismiss' ? DISMISSED : { parse_status: 'needs_review', ...(classification ? { classification } : {}) };
+    const { data, error } = await env.jobs.from('ingested_messages').update(set).eq('id', row.id as string).select('*');
+    if (error) throw new Error(`Changing the email failed: ${error.message}`);
+    const after = ((data ?? []) as Row[])[0];
+    if (!after) continue;
+    firstAfter ??= after;
+    undo.updated.push({ table: MESSAGES, id: row.id as string, before: pickMessage(row), after: pickMessage(after) });
+  }
+  if (!firstAfter) throw new Error('Changing the emails failed: no row was written.');
+
+  const first = emails[0];
+  const what = emails.length === 1 ? quotedBody(first.subject, 'an email') : `${emails.length} emails`;
+  const label = classification ? classification.replace(/_/g, ' ') : null;
+  return {
+    kind: 'review_emails',
+    input: {
+      verb: verb === 'dismiss' ? 'Dismissed' : 'Brought back',
+      what,
+      rest: verb === 'dismiss' ? ' from Jobs review' : ` to Jobs review${label ? ` as ${label}` : ''}`,
+      href: REVIEW_HREF,
+      where: 'Open Jobs review',
+      paths: [REVIEW_HREF],
+    },
+    subjectRef: toRef('job_search.inbox_messages', first.id as string),
+    op: 'update',
+    before: first,
+    after: firstAfter,
+    summary:
+      verb === 'dismiss'
+        ? `Dash dismissed ${what} from Jobs review.`
+        : `Dash brought back ${what} to Jobs review${label ? ` as ${label}` : ''}.`,
+    row: { table: 'job_search.inbox_messages', ref: first.id as string, title: what, href: REVIEW_HREF },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// add_role_from_email
+// ---------------------------------------------------------------------------
+
+/**
+ * A new role made from an email in Jobs review (plan #1894.6.4.3), as the
+ * page's "new role" option does: the company is found by name or added, the
+ * role and its application are made with the channel the email implies, and
+ * the email is linked to the application by change_role_email's link, which
+ * files the event its classification implies. Linking an email to a role on
+ * file is change_role_email itself.
+ *
+ * The record keeps the link's own undo (RoleEmailUndo) and the rows made.
+ * The Undo puts the email back in the queue, then takes the application, the
+ * role and an added company out, each only while nothing has come to hang on
+ * it since, so a note or an interview added in between is never lost.
+ */
+export type RoleFromEmailUndo = {
+  email: RoleEmailUndo | null;
+  application_id: string;
+  role_id: string;
+  /** The company, when this change added it. */
+  company_added: string | null;
+};
+
+async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const title = text(args, 'title');
+  if (!title) throw new JobsRefused('Give title: what the role is called.');
+  if (title.length > TITLE_MAX) throw new JobsRefused(`Keep title under ${TITLE_MAX} characters.`);
+  const companyGiven = text(args, 'company');
+  if (!companyGiven) throw new JobsRefused('Give company: which company the role is at.');
+  if (companyGiven.length > COMPANY_MAX) throw new JobsRefused(`Keep company under ${COMPANY_MAX} characters.`);
+  let emailRef = text(args, 'email_ref');
+  if (emailRef.startsWith('job_search.inbox_messages:')) emailRef = emailRef.slice('job_search.inbox_messages:'.length);
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  const email = await namedEmail(env, emailRef);
+  const messageId = email.id as string;
+  const { data: stored, error: storedError } = await env.jobs.from('ingested_messages').select('resulting_application_id').eq('id', messageId).maybeSingle();
+  if (storedError) throw new Error(`Reading the email failed: ${storedError.message}`);
+  if (!stored) throw new JobsRefused('That email is no longer in the mailbox.');
+  if ((stored as Row).resulting_application_id) {
+    throw new JobsRefused('That email is linked to a role already. Unlink it there first with change_role_email.');
+  }
+
+  const { data: onFile, error: companyError } = await env.jobs
+    .from('companies')
+    .select('id, name')
+    .eq('user_id', env.userId)
+    .eq('slug', slugify(companyGiven))
+    .maybeSingle();
+  if (companyError) throw new Error(`Reading the company failed: ${companyError.message}`);
+  if (onFile) {
+    const { data: same, error: sameError } = await env.jobs.from('roles').select('id, title').eq('user_id', env.userId).eq('company_id', (onFile as Row).id as string);
+    if (sameError) throw new Error(`Reading the roles failed: ${sameError.message}`);
+    const twin = ((same ?? []) as Row[]).find((role) => typeof role.title === 'string' && role.title.trim().toLowerCase() === title.toLowerCase());
+    if (twin) {
+      throw new JobsRefused(`${roleName(twin, (onFile as Row).name as string)} is on file already (role ${twin.id as string}). Link the email to it with change_role_email instead.`);
+    }
+  }
+
+  const undo: RoleFromEmailUndo = { email: null, application_id: '', role_id: '', company_added: null };
+  const backOut = async (error: unknown): Promise<never> => {
+    try {
+      await putBackRoleFromEmail({ userId: env.userId, db: async () => env.jobs }, undo);
+    } catch (putBack) {
+      console.error('add_role_from_email: putting a failed change back failed', putBack);
+    }
+    throw error;
+  };
+
+  let companyId = onFile ? ((onFile as Row).id as string) : '';
+  if (!companyId) {
+    const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, companyGiven);
+    if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
+    companyId = company.id;
+    undo.company_added = company.id;
+  }
+
+  // Recruiter inbound only when the recruiter wrote first, as the page decides.
+  const channel = channelForMessage(email.classification as string | null);
+  let role: Row;
+  try {
+    const { data: madeRole, error: roleError } = await env.jobs
+      .from('roles')
+      .insert({ user_id: env.userId, company_id: companyId, title, source: channel })
+      .select('*')
+      .single();
+    if (roleError || !madeRole) throw new Error(`Adding the role failed: ${roleError?.message ?? 'no row'}`);
+    role = madeRole as Row;
+    undo.role_id = role.id as string;
+    const { data: application, error: applicationError } = await env.jobs
+      .from('applications')
+      // A person read the email and said this is a real pursuit, so it is not an inferred one.
+      .insert({ user_id: env.userId, role_id: role.id as string, source: channel, created_by: 'manual' })
+      .select('id')
+      .single();
+    if (applicationError || !application) throw new Error(`Adding the application failed: ${applicationError?.message ?? 'no row'}`);
+    undo.application_id = (application as Row).id as string;
+  } catch (error) {
+    return backOut(error);
+  }
+
+  const linked = await runJobsWrite(changeRoleEmailWrite(), env, { action: 'link', application_ref: undo.application_id, email_ref: messageId });
+  if ('ok' in linked) return backOut(new Error(`Linking the email failed: ${linked.error}`));
+  undo.email = roleEmailUndo(linked.undo);
+
+  const roleId = undo.role_id;
+  const name = roleName(role, (onFile as Row | null)?.name ? ((onFile as Row).name as string) : companyGiven);
+  const subject = quotedBody(email.subject, 'an email with no subject');
+  const href = roleHref(roleId);
+  return {
+    kind: 'add_role_from_email',
+    input: {
+      verb: 'Made',
+      what: name,
+      rest: ` from ${subject}, and linked the email to it`,
+      href,
+      where: 'Open the role',
+      paths: [...rolePaths(roleId), REVIEW_HREF],
+    },
+    subjectRef: toRef(ROLES, roleId),
+    op: 'insert',
+    before: null,
+    after: role,
+    summary: `Dash made the role ${name} from ${subject} in Jobs review${undo.company_added ? ', adding the company,' : ''} and linked the email to it.`,
+    row: { table: ROLES, ref: roleId, title: name, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/** change_role_email's entry, which the link runs through. */
+const changeRoleEmailWrite = (): JobsWrite => JOBS_WRITES.find((write) => write.name === 'change_role_email')!;
+
+function roleFromEmailUndo(value: Record<string, unknown> | null): RoleFromEmailUndo | null {
+  if (!value || typeof value.role_id !== 'string' || !isUuid(value.role_id)) return null;
+  const email = value.email && typeof value.email === 'object' ? roleEmailUndo(value.email as Record<string, unknown>) : null;
+  return {
+    email,
+    application_id: typeof value.application_id === 'string' && isUuid(value.application_id) ? value.application_id : '',
+    role_id: value.role_id,
+    company_added: typeof value.company_added === 'string' && isUuid(value.company_added) ? value.company_added : null,
+  };
+}
+
+/** What hangs on an application or a role and would go with it: the Undo leaves a row that holds any. */
+const APPLICATION_HOLDERS: readonly { schema: AskSchema; table: string; column: string; owned: boolean }[] = [
+  { schema: 'job_search', table: 'application_events', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'interviews', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'interview_groups', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'contact_touches', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'notes', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'attachments', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'application_answers', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'cover_letters', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'reminders', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'ingested_messages', column: 'resulting_application_id', owned: false },
+  { schema: 'job_search', table: 'message_link_dismissals', column: 'application_id', owned: true },
+  { schema: 'job_search', table: 'quiet_dismissals', column: 'application_id', owned: true },
+  { schema: 'todo', table: 'task_links', column: 'application_id', owned: false },
+];
+const ROLE_HOLDERS: readonly { schema: AskSchema; table: string; column: string; owned: boolean }[] = [
+  { schema: 'job_search', table: 'applications', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'notes', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'attachments', column: 'role_id', owned: true },
+  { schema: 'job_search', table: 'suggestions', column: 'role_id', owned: true },
+  { schema: 'todo', table: 'task_links', column: 'role_id', owned: false },
+];
+
+/** Whether any row other than `except` hangs on the row `id`. */
+async function held(deps: { userId: string; db: AskDb }, holders: typeof ROLE_HOLDERS, id: string, except: Set<string>): Promise<boolean> {
+  for (const holder of holders) {
+    let query = (await deps.db(holder.schema)).from(holder.table).select('id').eq(holder.column, id);
+    if (holder.owned) query = query.eq('user_id', deps.userId);
+    const { data, error } = await query.limit(except.size + 1);
+    if (error) throw new Error(`${holder.table}: ${error.message}`);
+    if (((data ?? []) as Row[]).some((row) => !except.has(row.id as string))) return true;
+  }
+  return false;
+}
+
+/** Put the email back, then take out the application, the role and an added company nothing else holds; how many rows went back or out. */
+async function putBackRoleFromEmail(deps: { userId: string; db: AskDb }, undo: RoleFromEmailUndo): Promise<number> {
+  const jobs = await deps.db('job_search');
+  let restored = undo.email ? await putBackRoleEmail(deps, undo.email) : 0;
+  const takeOut = async (table: string, id: string) => {
+    const { data, error } = await jobs.from(table).delete().eq('id', id).eq('user_id', deps.userId).select('id');
+    if (error) throw new Error(`${table}: ${error.message}`);
+    return (data ?? []).length;
+  };
+  if (undo.application_id) restored += await takeOut('applications', undo.application_id);
+  if (undo.role_id) restored += await takeOut('roles', undo.role_id);
+  if (undo.company_added && !(await companyHeld(deps, undo.company_added))) {
+    restored += await takeOut('companies', undo.company_added);
+  }
+  return restored;
+}
+
+/**
+ * Undo a role made from an email (RoleFromEmailUndo). Before anything is
+ * changed, the application and the role are checked for rows that came to
+ * hang on them after the link (a note, a reminder, an interview with a time
+ * set, another email), and the Undo is refused while there is one, since
+ * taking the role out would take those with it. Ask's undo calls it for
+ * every surface (lib/ask/changes.ts, undoMany).
+ */
+export async function undoRoleFromEmail(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const undo = roleFromEmailUndo(recorded);
+  if (!undo) return { ok: false, error: 'Dash did not keep what this made, so it cannot be undone.' };
+  const jobs = await deps.db('job_search');
+  const { data: role, error } = await jobs.from('roles').select('id').eq('id', undo.role_id).eq('user_id', deps.userId).maybeSingle();
+  if (error) throw new Error(`roles: ${error.message}`);
+  if (!role) return { ok: false, error: 'That role has been taken out since, so there is nothing to undo.' };
+
+  // The rows the link itself wrote do not count; a round it booked counts once a time is set on it.
+  const own = new Set<string>([...(undo.email?.events_added ?? []), undo.email?.message_id ?? '', undo.application_id]);
+  const round = undo.email?.interview_added;
+  if (round) {
+    const { data: interview } = await jobs.from('interviews').select('id, scheduled_at').eq('id', round.interview_id).eq('user_id', deps.userId).maybeSingle();
+    if (interview && (interview as Row).scheduled_at == null) {
+      own.add(round.interview_id);
+      if (round.group_id) own.add(round.group_id);
+    }
+  }
+  if ((undo.application_id && (await held(deps, APPLICATION_HOLDERS, undo.application_id, own))) || (await held(deps, ROLE_HOLDERS, undo.role_id, own))) {
+    return { ok: false, error: 'The role has gathered more since, such as a note or another email, so undoing would lose it.' };
+  }
+  const restored = await putBackRoleFromEmail(deps, undo);
+  return { ok: true, restored };
+}
+
 function rowsUndo(value: Record<string, unknown> | null): RowsUndo | null {
   if (!value) return null;
   const updated = Array.isArray(value.updated) ? (value.updated as RowsUndo['updated']) : [];
@@ -1582,7 +2311,11 @@ export async function undoJobsRows(
   const name = (table: string) => table.slice('job_search.'.length);
   let restored = 0;
   for (const row of undo.updated) {
-    let query = jobs.from(name(row.table)).update(row.before).eq('id', row.id).eq('user_id', deps.userId);
+    let query = jobs.from(name(row.table)).update(row.before).eq('id', row.id);
+    if (row.table === 'job_search.ingested_messages') {
+      const { data: own } = await jobs.from('inbox_messages').select('id').eq('id', row.id).eq('user_id', deps.userId).maybeSingle();
+      if (!own) continue;
+    } else query = query.eq('user_id', deps.userId);
     for (const [column, value] of Object.entries(row.after)) {
       if (!scalar(value)) continue;
       query = value === null ? query.is(column, null) : query.eq(column, value);
@@ -2105,6 +2838,56 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     run: changeApplication,
   },
   {
+    name: 'add_application_questions',
+    description: `Add the questions an application asks to it, when they give them: each goes into their question bank too, or is matched to the same question already there, and one already on the application is left out. Up to ${QUESTIONS_MAX} at a time. Name the application by application_ref, or role_ref for the role's latest one. Answer them with save_answer.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_ref: { type: 'string', description: 'The job_search.applications ref job_applications returned.' },
+        role_ref: { type: 'string', description: "Instead of application_ref: the job_search.roles ref, for the role's latest application." },
+        questions: { type: 'array', items: { type: 'string' }, description: 'The questions, one per entry, in the words the form uses.' },
+      },
+      required: ['questions'],
+      additionalProperties: false,
+    },
+    run: addApplicationQuestions,
+  },
+  {
+    name: 'save_answer',
+    description:
+      "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. To keep a drafted answer with what it rests on, also give evidence_refs and any unsupported_claims. Give only what to change. Name the answer by answer_ref (list_rows on job_search.application_answers), or by question with application_ref or role_ref. Nothing is sent to the employer.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        answer_ref: { type: 'string', description: 'The job_search.application_answers ref.' },
+        question: { type: 'string', description: 'Instead of answer_ref: the question, or words from it, on the application named below.' },
+        application_ref: { type: 'string', description: 'With question: the job_search.applications ref.' },
+        role_ref: { type: 'string', description: "With question, instead of application_ref: the job_search.roles ref, for the role's latest application." },
+        answer: { type: 'string', description: 'The answer, in full, replacing what is there.' },
+        status: { type: 'string', enum: [...ANSWER_STATUSES], description: 'draft, approved when they are happy with it, or submitted once it went in.' },
+        evidence_refs: { type: 'array', items: { type: 'string' }, description: 'The job_search.evidence_items refs the answer rests on, replacing those kept.' },
+        unsupported_claims: { type: 'array', items: { type: 'string' }, description: 'Claims in the answer nothing on file backs, to check before submitting.' },
+      },
+      additionalProperties: false,
+    },
+    run: saveAnswer,
+  },
+  {
+    name: 'set_default_answer',
+    description:
+      "Make an answer the one reused for a question on every application, when they ask, as the role page's Make this my default answer does. Name the question by question_ref (list_rows on job_search.questions), or by answer_ref to reuse that answer's words; answer gives the words instead.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        question_ref: { type: 'string', description: 'The job_search.questions ref.' },
+        answer_ref: { type: 'string', description: "Instead of question_ref: the job_search.application_answers ref whose question, and words, to use." },
+        answer: { type: 'string', description: 'The default answer, in full. Needed with question_ref.' },
+      },
+      additionalProperties: false,
+    },
+    run: setDefaultAnswer,
+  },
+  {
     name: 'change_company',
     description:
       "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page. Give only the fields to change. Name the company by company_ref, or by its name in company.",
@@ -2235,6 +3018,25 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     run: reviewEvents,
   },
   {
+    name: 'review_emails',
+    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: refs from search_mail, or job_search.inbox_messages refs.' },
+        verb: { type: 'string', enum: ['dismiss', 'restore'], description: 'dismiss to take them out of the queue; restore to bring dismissed ones back.' },
+        classification: {
+          type: 'string',
+          enum: CLASSIFICATIONS.filter((c) => c !== 'not_relevant'),
+          description: 'With restore, when they say what the email is: the kind it comes back as.',
+        },
+      },
+      required: ['email_refs', 'verb'],
+      additionalProperties: false,
+    },
+    run: reviewEmails,
+  },
+  {
     name: 'change_contact',
     description:
       "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words) and notes. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
@@ -2290,6 +3092,26 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     },
     run: markSuggestionSent,
   },
+  {
+    name: 'add_role_from_email',
+    description:
+      "Make a new role from an email in Jobs review when they say it is about a pursuit with nothing on file, as the review page's new role option does: the company (found by name, or added), the role and its application are made, and the email is linked to it, filing the event its classification implies, such as a rejection or an interview invite. Refused when the company already has a role of that title; link the email to a role on file with change_role_email.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_ref: { type: 'string', description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.' },
+        company: { type: 'string', description: 'The company the role is at, by name.' },
+        title: { type: 'string', description: 'What the role is called.' },
+      },
+      required: ['email_ref', 'company', 'title'],
+      additionalProperties: false,
+    },
+    run: addRoleFromEmail,
+  },
+  // From Material, Settings and Find (plan #1894.6.7), in lib/dash/career-writes.ts.
+  ...CAREER_WRITES,
+  // A role's interviews, interviewers and rounds (plan #1894.6.9), in lib/dash/interview-edit-writes.ts.
+  ...INTERVIEW_EDIT_WRITES,
 ];
 
 /** Runs one Jobs write. Never throws: a refusal or a failure is the sentence the model reads. */

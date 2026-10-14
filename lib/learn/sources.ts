@@ -251,7 +251,11 @@ export const learnSources: ModuleSources = {
   notSources: [
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
-    { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
+    {
+      table: 'learn.area_check_articles',
+      reason:
+        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases and the embedding columns are bookkeeping for matching them.",
+    },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },

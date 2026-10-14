@@ -95,7 +95,9 @@ import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
  *                    row finished or put off (plan #1894.6.3); an
  *                    application confirmed or reopened, and flagged events
  *                    acknowledged or flagged again, from Jobs review (plan
- *                    #1894.6.4.1).
+ *                    #1894.6.4.1); emails in Jobs review dismissed or
+ *                    brought back (plan #1894.6.4.2); a new role made from
+ *                    an email in Jobs review (plan #1894.6.4.3).
  *   add_interview_round  a round on a role, with its first interview
  *                    (lib/dash/interview-writes.ts, plan #2044.1).
  *
