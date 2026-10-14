@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { CircleAlert, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CardSection, cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
+import { safeTimeZone } from '@/lib/core/timezone';
 import { GmailLink } from './shared';
 import type { PanelProps } from './types';
 
@@ -109,6 +111,20 @@ const KEY_EVENTS: Record<string, { label: string; dot: string }> = {
   withdrawal: { label: 'Withdrew', dot: 'bg-status-lead' },
 };
 
+/** A stop's date: day and month, and the year only when it is not this year's. */
+function stopDate(iso: string, timezone: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '—';
+  const zone = safeTimeZone(timezone);
+  const year = (d: Date) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: zone }).format(d);
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    ...(year(date) === year(new Date()) ? {} : { year: 'numeric' }),
+    timeZone: zone,
+  }).format(date);
+}
+
 function TimelineStrip({
   events,
   timezone,
@@ -116,23 +132,30 @@ function TimelineStrip({
   const key = events
     .filter((event) => event.kind in KEY_EVENTS)
     .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  // Opens at the newest end, so how the pursuit stands is always in view and
+  // the older stops are what a sideways scroll goes back to.
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = scroller.current;
+    if (node) node.scrollLeft = node.scrollWidth;
+  }, [key.length]);
   if (key.length === 0) return null;
   return (
     // Scrolls sideways when the stops outgrow a phone, rather than squeezing
     // their labels into each other.
-    <div className={cn(cardVariants(), 'card-pad-x row-pad overflow-x-auto')}>
+    <div ref={scroller} className={cn(cardVariants(), 'card-pad-x row-pad overflow-x-auto')}>
       <ol className="flex min-w-max" aria-label="Key events, oldest first">
         {key.map((event, index) => {
           const shown = KEY_EVENTS[event.kind];
           return (
-            <li key={event.id} className="relative flex w-24 shrink-0 flex-col items-center text-center">
+            <li key={event.id} className="relative flex w-20 shrink-0 flex-col items-center text-center">
               {/* The line runs from this dot to the next one. */}
               {index < key.length - 1 && (
                 <span className="absolute left-1/2 top-1 h-0.5 w-full bg-border" aria-hidden />
               )}
               <span className={cn('relative size-2.5 rounded-full ring-2 ring-surface', shown.dot)} aria-hidden />
               <span className="mt-1.5 text-small text-ink">{shown.label}</span>
-              <span className="tabular text-micro text-ink-muted">{formatDate(event.occurredAt, timezone)}</span>
+              <span className="tabular text-micro text-ink-muted">{stopDate(event.occurredAt, timezone)}</span>
             </li>
           );
         })}
