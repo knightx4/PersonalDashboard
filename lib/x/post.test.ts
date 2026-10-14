@@ -40,14 +40,14 @@ describe('the price and the check before sending', () => {
     expect(xSendCheck({ body, sent: 3 })).toMatchObject({ ok: false, requests: 0, priceUsd: 0 });
   });
 
-  it('refuses a post past 280 and the never-in-a-post rules, but lets a link through', () => {
+  it('warns about a post past 280 and the never-in-a-post rules without stopping the send, and prices a link', () => {
     const long = xSendCheck({ body: ['x'.repeat(281)] });
-    expect(long.ok).toBe(false);
-    expect(long.problems.join(' ')).toMatch(/281 characters; the limit is 280/);
+    expect(long.ok).toBe(true);
+    expect(long.warnings.join(' ')).toMatch(/281 characters; the limit is 280/);
     const mention = xSendCheck({ body: ['Thanks @someone for the idea'] });
-    expect(mention.ok).toBe(false);
-    expect(mention.problems.join(' ')).toMatch(/mentions an account/);
-    expect(xSendCheck({ body: ['Read www.example.com'] }).problems).toEqual([]);
+    expect(mention.ok).toBe(true);
+    expect(mention.warnings.join(' ')).toMatch(/mentions an account/);
+    expect(xSendCheck({ body: ['Read www.example.com'] }).warnings).toEqual([]);
   });
 });
 

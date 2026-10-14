@@ -12,11 +12,12 @@ import { X_POST_PRICE_USD, X_POST_WITH_URL_PRICE_USD } from './price';
  * that stops part-way then carries on from the last post that went up rather
  * than posting the start again, which X would refuse as a duplicate anyway.
  *
- * Before anything is sent the draft passes the same check the posts run
- * holds every draft to (lib/dev/post-check.ts): X's 280-character count and
- * the never-in-a-post rules. One rule is softened here. docs/X-POSTS.md keeps
- * links out of Dash's drafts and says the person may add one when posting,
- * so a link is a warning with its price rather than a refusal.
+ * The draft is read against the same check the posts run holds every draft
+ * to (lib/dev/post-check.ts): X's 280-character count and the never-in-a-post
+ * rules. On the tab these are warnings, never a refusal: the person decides,
+ * and X refuses what it will not take (a post past 280) with its own reason.
+ * A link is left out of the warnings, since docs/X-POSTS.md says the person
+ * may add one when posting; it is priced instead.
  *
  * Prices are X's pay-per-use rates, read from the owner's X console on
  * 14 October 2026: a post is one Post: Create request, and a post holding a
@@ -36,10 +37,10 @@ export function postHasLink(text: string): boolean {
 }
 
 export type XSendCheck = {
-  /** False while any problem stands; the Post button is then not offered. */
+  /** False only when nothing is left to send. */
   ok: boolean;
-  /** What stops the send, as the check words it ("post 2 is 291 characters…"). */
-  problems: string[];
+  /** What the check found, as it words it ("post 2 is 291 characters…"). They warn and do not stop the send. */
+  warnings: string[];
   /** The posts, numbered from 1, that hold a link and so cost the URL rate. */
   linkPosts: number[];
   /** How many requests the send makes: the posts not yet on X. */
@@ -48,11 +49,12 @@ export type XSendCheck = {
   priceUsd: number;
 };
 
-/** The check's wording for a link, which the send turns into a warning. */
+/** The check's wording for a link, which the send prices instead of warning about. */
 const LINK_PROBLEM = /has a link or a domain$/;
 
 /**
- * Whether a draft may be sent, and what sending it costs. `sent` is how many
+ * Whether a draft has anything left to send, what sending it costs, and what
+ * the check would warn about. `sent` is how many
  * of its posts are already on X from a send that stopped part-way; they are
  * neither checked again nor paid for again.
  *
@@ -62,7 +64,7 @@ const LINK_PROBLEM = /has a link or a domain$/;
 export function xSendCheck(input: { body: readonly string[]; sent?: number }): XSendCheck {
   const sent = Math.min(input.sent ?? 0, input.body.length);
   const result = checkDraft({ angle: 'A post', posts: input.body });
-  const problems = result.problems.filter((p) => !LINK_PROBLEM.test(p));
+  const warnings = result.problems.filter((p) => !LINK_PROBLEM.test(p));
   const linkPosts: number[] = [];
   let priceUsd = 0;
   input.body.forEach((text, i) => {
@@ -71,8 +73,8 @@ export function xSendCheck(input: { body: readonly string[]; sent?: number }): X
     if (i >= sent) priceUsd += link ? X_POST_WITH_URL_PRICE_USD : X_POST_PRICE_USD;
   });
   return {
-    ok: problems.length === 0 && input.body.length > sent,
-    problems,
+    ok: input.body.length > sent,
+    warnings,
     linkPosts,
     requests: input.body.length - sent,
     // Summed in floating point; three places is what is shown.

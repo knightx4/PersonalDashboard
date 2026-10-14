@@ -602,8 +602,8 @@ const X_SEND_CLAIM_MS = 2 * 60 * 1000;
  * link: the same fields "Is this it?" fills in (confirmXMatch).
  *
  * Never automatic and never more than one draft: the tab sends one id after
- * the person confirms. The draft is checked again here (xSendCheck), since an
- * action can be posted without the page.
+ * the person confirms. The check's findings only warn (xSendCheck); the
+ * person has seen them beside the button, and X refuses what it will not take.
  *
  * A double press sends nothing twice. The send first claims the draft by
  * setting x_sending_at where it is unset (or older than two minutes, so a
@@ -639,12 +639,7 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
   const body = Array.isArray(row.body) ? (row.body as unknown[]).map(String) : [];
   const already = Array.isArray(row.x_thread_ids) ? (row.x_thread_ids as string[]) : [];
   const check = xSendCheck({ body, sent: already.length });
-  if (!check.ok) {
-    return {
-      ok: false,
-      error: check.problems.length ? `Not sent: ${check.problems.join('; ')}.` : 'Nothing left to send.',
-    };
-  }
+  if (!check.ok) return { ok: false, error: 'Nothing left to send.' };
 
   const claimedAt = new Date();
   const staleBefore = new Date(claimedAt.getTime() - X_SEND_CLAIM_MS).toISOString();
