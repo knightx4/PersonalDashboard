@@ -9,6 +9,7 @@ import {
   fieldsDue,
   usersWithIdeasDue,
 } from '@/lib/learn/embed/idea-sweep';
+import { attachTopicParents, type AttachParentsResult } from '@/lib/learn/areas/parents';
 import { refreshNoteEvidence, type RefreshNoteEvidenceResult } from '@/lib/learn/evidence/notes-store';
 import { linkCourses, type LinkCoursesResult } from '@/lib/learn/evidence/course-store';
 import { refreshWorkEvidence, type WorkEvidenceResult } from '@/lib/learn/evidence/work';
@@ -38,18 +39,25 @@ import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/l
  * ideas are linked to the passages of their résumé and Career notes that match
  * them (plan #2006.5): `work` in the result. Résumé passages are embedded only
  * with the key; without it the passages already embedded are still matched.
+ * Last of all, new Level 4 topics are attached to their Level 3 parent and
+ * each new or edited idea to its nearest topic (plan #2016.2): `parents` in
+ * the result. It reads stored vectors only, so it runs without the key too.
  */
 const BUDGET_MS = 90_000;
 /** Ideas per person per run; a first run fills the ~150 missing today. */
 const PER_PERSON_LIMIT = 500;
 /** Embedding one person's course texts; a first run embeds about 95. */
 const COURSE_BUDGET_MS = 45_000;
+/** Attaching topics to parents; the backfill of ten thousand was run by hand, so a day has few. */
+const PARENTS_BUDGET_MS = 60_000;
 
 export type LearnEmbeddingsDaily = {
   skipped?: 'no-key';
   users: { userId: string; ideas: EmbedSweepResult }[];
   /** Null when no field was due, or no account had ideas to bill. */
   fields: EmbedSweepResult | null;
+  /** Topics and ideas attached to their parents (plan #2016.2). */
+  parents: AttachParentsResult | { error: string };
   places: { userId: string; result: RecomputePlacesResult | { error: string } }[];
   dust: { userId: string; result: RefreshDustResult | { error: string } }[];
   noteEvidence: { userId: string; result: RefreshNoteEvidenceResult | { error: string } }[];
@@ -60,7 +68,8 @@ export type LearnEmbeddingsDaily = {
 export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
   const learn = createLearnServiceSupabase();
   if (!process.env.EMBEDDING_API_KEY?.trim()) {
-    return { skipped: 'no-key', users: [], fields: null, ...(await runMaps(learn, { embed: false })) };
+    const maps = await runMaps(learn, { embed: false });
+    return { skipped: 'no-key', users: [], fields: null, ...maps, parents: await runParents(learn) };
   }
 
   const deadline = Date.now() + BUDGET_MS;
@@ -77,7 +86,19 @@ export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
     const payer = users[0]?.userId ?? (await anyIdeaOwner(learn));
     if (payer) fields = await embedFieldsOverRest(learn, payer, { deadline });
   }
-  return { users, fields, ...(await runMaps(learn, { embed: true })) };
+  const maps = await runMaps(learn, { embed: true });
+  return { users, fields, ...maps, parents: await runParents(learn) };
+}
+
+/** Parents come last, so the day's new ideas and topics already have vectors. */
+async function runParents(
+  learn: ReturnType<typeof createLearnServiceSupabase>,
+): Promise<LearnEmbeddingsDaily['parents']> {
+  try {
+    return await attachTopicParents(learn, { deadline: Date.now() + PARENTS_BUDGET_MS });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'failed' };
+  }
 }
 
 async function runMaps(
