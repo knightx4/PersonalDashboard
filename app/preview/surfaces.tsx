@@ -173,6 +173,14 @@ import {
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
+import {
+  LearnBriefFailedSurface,
+  LearnBriefQuoteSourceSurface,
+  LearnBriefResearchingSurface,
+  LearnBriefShortAnswerEditorSurface,
+  LearnBriefSurface,
+  LearnNowBriefsSurface,
+} from './brief-surfaces';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
@@ -6546,6 +6554,50 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnYoutubeVideoSurface />,
   },
 
+  /* A researched topic on its own page, and Now's list of them (plan
+   * #2023.4). Fixtures in brief-surfaces.tsx. */
+  {
+    id: 'learn-brief',
+    label: 'Research brief · Ready, with cited answers',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefSurface />,
+  },
+  {
+    id: 'learn-brief-researching',
+    label: 'Research brief · Still researching',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefResearchingSurface />,
+  },
+  {
+    id: 'learn-brief-failed',
+    label: 'Research brief · The run failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefFailedSurface />,
+  },
+  {
+    id: 'learn-brief-quote-source',
+    label: 'Research brief · A quote’s source showing',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefQuoteSourceSurface />,
+  },
+  {
+    id: 'learn-brief-short-answer-editor',
+    label: 'Research brief · Editing the short answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefShortAnswerEditorSurface />,
+  },
+  {
+    id: 'learn-now-briefs',
+    label: 'Now · Topics you asked Dash to research',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowBriefsSurface />,
+  },
   /* Essays (plan #1865). Fixtures in essay-surfaces.tsx. */
   {
     id: 'learn-essays',

@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -6,6 +6,7 @@ import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTrack, loadTracks } from '@/lib/learn/tracks/load';
 import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
+import { loadBriefForTrack } from '@/lib/learn/briefs/load';
 import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -39,10 +40,14 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
   const progress = rollUpAll(await loadTracks(supabase)).get(track.id) ?? track.progress;
   const remaining = progress.remaining;
 
-  // Which newsletter each story sent from News was in (plan #1368).
-  const origins = await loadReadingOrigins(
-    track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
-  );
+  // Which newsletter each story sent from News was in (plan #1368),
+  // and the research brief that made this list, when one did (plan #2023.4).
+  const [origins, brief] = await Promise.all([
+    loadReadingOrigins(
+      track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
+    ),
+    loadBriefForTrack(supabase, track.id),
+  ]);
 
   return (
     <PageColumn>
@@ -86,6 +91,15 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
               }`
         }
       />
+
+      {brief && (
+        <p className="mb-3 text-ui text-ink-muted">
+          Sources Dash found researching{' '}
+          <Link href={`/learn/b/${brief.id}`} className={linkVariants()}>
+            {brief.question}
+          </Link>
+        </p>
+      )}
 
       {track.question && (
         <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">
