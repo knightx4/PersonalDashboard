@@ -701,6 +701,7 @@ type SharedWrite =
   | 'add_quick_note'
   | 'add_idea'
   | 'add_job_lead'
+  | 'add_interview_round'
   | 'add_goal'
   | 'add_goal_step'
   | 'close_goal_step'
@@ -718,9 +719,10 @@ const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'clo
 /**
  * The shared writes that take any ref the same way: every read in them names
  * the verified person. change_items reads each item and order by user id
- * (plan #1894.5.1).
+ * (plan #1894.5.1). add_interview_round reads the role and its application
+ * by user id too (plan #1894.6.9).
  */
-const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([...NAMES_GOAL_ROWS, 'change_items']);
+const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([...NAMES_GOAL_ROWS, 'change_items', 'add_interview_round']);
 
 /** The shared writes that change Goals, and so need the goals client. */
 const WRITES_GOALS: ReadonlySet<SharedWrite> = new Set(['add_goal', ...NAMES_GOAL_ROWS]);
@@ -799,6 +801,11 @@ const addJobLead = sharedWrite(
   'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. It is listed on Home with an Undo.',
 );
 
+const addInterviewRound = sharedWrite(
+  'add_interview_round',
+  `Add an interview round to one of the person's roles in Dash's Jobs workspace, when they ask ("add a take-home round to the Stripe role"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref job_applications returned; look it up first. The round is numbered after the role's other rounds and holds one interview of the kind given. Give a label only when they named the round, and a date and time only when they gave them. It is listed on Home with an Undo.`,
+);
+
 const addGoal = sharedWrite(
   'add_goal',
   'Add a goal to the person\'s Goals workspace in Dash, under one of their areas, when they ask for a new goal ("add a goal to run a half marathon"). Name the area by its name as they have it; when none of theirs fits, pass new_area true with a short name for one. Write the goal as an outcome. A step under a goal they already have is add_goal_step. It is listed on Home with an Undo.',
@@ -832,6 +839,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addQuickNote,
   addIdea,
   addJobLead,
+  addInterviewRound,
   addGoal,
   addGoalStep,
   closeGoalStep,

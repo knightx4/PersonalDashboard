@@ -10,6 +10,7 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
+import { undoInterviewRows } from '@/lib/dash/interview-edit-writes';
 import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';

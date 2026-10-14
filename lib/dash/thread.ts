@@ -66,7 +66,8 @@ change_goal_link, change_goal_form and change_goals_inbox, and in Shopping chang
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
-add_discovered_company and add_role_from_email. This
+add_discovered_company, add_role_from_email, change_interview, change_interviewer and
+change_interview_round. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

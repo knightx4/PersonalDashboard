@@ -33,6 +33,7 @@ describe('runConnectorWrite', () => {
       'add_quick_note',
       'add_idea',
       'add_job_lead',
+      'add_interview_round',
       'add_goal',
       'add_goal_step',
       'close_goal_step',
@@ -99,6 +100,9 @@ describe('runConnectorWrite', () => {
       'attach_resume_pdf',
       'change_career_thought',
       'add_discovered_company',
+      'change_interview',
+      'change_interviewer',
+      'change_interview_round',
     ]);
   });
 
