@@ -137,6 +137,7 @@ describe('the operation names', () => {
       'name-essay-claims',
       'summarize-reading',
       'name-places',
+      'research-topic',
     ]);
   });
 });

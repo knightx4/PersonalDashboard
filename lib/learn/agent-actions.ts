@@ -17,6 +17,13 @@ export const learnActions: ModuleActions = {
     },
     addConceptNote: tool('add_concept_note'),
   },
+  'app/learn/b/[id]/actions.ts': {
+    saveShortAnswer: none('own'),
+    setBriefWatch: none('setting'),
+    setBriefArchived: none('own'),
+    retryBrief: none('spends'),
+    startEssayOnBrief: none('own'),
+  },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
     clipShownAction: none('own'),

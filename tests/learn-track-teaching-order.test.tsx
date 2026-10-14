@@ -55,6 +55,7 @@ function from(table: string) {
       orders.push(`${column} ${options?.ascending === false ? 'desc' : 'asc'}`),
       builder
     ),
+    limit: () => builder,
     maybeSingle: () => ((single = true), builder),
     then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
       run().then(resolve, reject),
