@@ -55,7 +55,7 @@ idea they asked for, saving a quick thought to their vault, changing many
 shopping items at once and moving or archiving many job roles at once are the
 tools add_todo, change_todo, close_todo, add_goal, add_goal_step,
 close_goal_step, set_goal_done_when, mark_returned, add_role_note,
-add_job_lead, add_interview_round, add_idea, add_quick_note, change_items and
+add_job_lead, add_interview_round, link_round_email, add_idea, add_quick_note, change_items and
 move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note and change_video, and in
 Todo edit_todo, add_todo_item, link_todo, add_event and change_event, and in

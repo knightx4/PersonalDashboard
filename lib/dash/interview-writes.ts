@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskDb } from '@/lib/ask/db';
 import type { InterviewChangeInput, InterviewChangeKind } from '@/lib/ask/interview-changes';
+import { parseMailRef } from '@/lib/ask/mail';
 import { movedColumns, readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
@@ -14,6 +15,9 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *
  *   add_interview_round  a round on a role, with the one conversation in it,
  *                        numbered after the role's other rounds (#2044.1).
+ *
+ *   link_round_email     an email put on a round, as the page's "add email"
+ *                        does (#2044.2). Undo deletes the link row only.
  *
  * The round and its conversation are made by the code the role page's "Add
  * interview" uses (lib/jobs/interview/rounds.ts), so the numbering and the
@@ -210,6 +214,102 @@ export async function roundConversationMoved(
     : null;
 }
 
+/**
+ * Dash names a round by the role it is on and its number ("round 2"), the
+ * numbering add_interview_round reports and the role page shows, since no
+ * lookup returns rounds. The role is taken the way add_interview_round takes
+ * it, by its latest application.
+ */
+async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  if (!ctx.enabledModules.includes('jobs')) {
+    throw new Refused('The Jobs workspace is switched off, so nothing can be changed there.');
+  }
+  const ref = text(args, 'role_ref');
+  if (!ref) throw new Refused('role_ref is missing.');
+  const number = args.round_number;
+  if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) {
+    throw new Refused("round_number must be the round's number on the role, 1 or higher.");
+  }
+  const mailRef = text(args, 'message_ref');
+  if (!mailRef) throw new Refused('message_ref is missing.');
+  if (!ctx.seen('gmail', mailRef)) {
+    throw new Refused('No search_mail in this conversation returned that email. Find it with search_mail and use the ref it gives.');
+  }
+  const named = parseMailRef(mailRef);
+  if (!named) throw new Refused('message_ref must be the ref search_mail returned for the email.');
+
+  const jobs = await ctx.db('job_search');
+  const { applicationId, roleId, roleTitle } = await applicationFor(ctx, jobs, ref);
+
+  const round = await one<{ id: string; label: string | null }>(
+    jobs
+      .from('interview_groups')
+      .select('id, label')
+      .eq('application_id', applicationId)
+      .eq('round_number', number)
+      .eq('user_id', ctx.userId)
+      .limit(1),
+  );
+  if (!round) throw new Refused(`${roleTitle} has no round ${number}.`);
+
+  const message = await one<{ id: string }>(
+    jobs
+      .from('inbox_messages')
+      .select('id')
+      .eq('email_account_id', named.accountId)
+      .eq('provider_message_id', named.messageId)
+      .eq('user_id', ctx.userId)
+      .limit(1),
+  );
+  if (!message) {
+    throw new Refused('That email is not in their mailbox here, or has not been brought in yet, so it cannot be attached.');
+  }
+
+  const roundName = round.label ? `round ${number}, ${round.label}` : `round ${number}`;
+  const existing = await one<{ id: string }>(
+    jobs.from('interview_group_messages').select('id').eq('group_id', round.id).eq('message_id', message.id).limit(1),
+  );
+  if (existing) {
+    return { ok: false, error: `That email is already attached to ${roundName} of ${roleTitle}. Nothing was changed; tell them so.` };
+  }
+
+  const { data, error } = await jobs
+    .from('interview_group_messages')
+    .insert({ user_id: ctx.userId, group_id: round.id, message_id: message.id })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error(error?.message ?? 'The email was not attached.');
+  const linkId = (data as { id: string }).id;
+
+  const href = `/jobs/roles/${roleId}`;
+  const subjectRef = toRef('job_search.interview_group_messages', linkId);
+  const input: InterviewChangeInput = {
+    verb: 'Attached an email to',
+    what: roundName,
+    rest: ` of ${roleTitle}`,
+    href,
+    where: 'Open the role',
+    paths: [href, '/jobs/interviews', '/jobs'],
+  };
+  return {
+    ok: true,
+    kind: 'link_round_email' satisfies InterviewChangeKind,
+    input: input as unknown as Record<string, unknown>,
+    subjectRef,
+    op: 'insert',
+    before: null,
+    after: await readSubject(ctx.db, subjectRef),
+    summary: `Dash attached the email to ${roundName} of ${roleTitle}.`,
+    row: {
+      table: 'job_search.interview_group_messages',
+      ref: linkId,
+      title: `Email on ${roundName}`,
+      href,
+      detail: { role: roleTitle, round: number },
+    },
+  };
+}
+
 /** Runs a write, turning a refusal or a failure into the sentence the model reads. Never throws. */
 function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
   return async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
@@ -256,5 +356,20 @@ export const INTERVIEW_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = 
       additionalProperties: false,
     },
     addInterviewRound,
+  ),
+  tool(
+    'link_round_email',
+    "Attach an email to an interview round on one of their roles in Jobs, when they ask (\"attach the recruiter's invite to round 2\"). Find the email first with search_mail and pass the message ref it returned. Name the round by its role (the job_search.roles or job_search.applications ref a lookup returned) and its number on that role: the number add_interview_round gave, or the one the role page shows. The email is only said to belong to the round; it stays on the role's timeline, and Undo removes just the attachment. If it is already attached this says so and changes nothing.",
+    {
+      type: 'object',
+      properties: {
+        role_ref: { type: 'string', description: 'The job_search.roles or job_search.applications ref a lookup returned.' },
+        round_number: { type: 'integer', minimum: 1, description: "The round's number on that role." },
+        message_ref: { type: 'string', description: 'The ref search_mail returned for the email.' },
+      },
+      required: ['role_ref', 'round_number', 'message_ref'],
+      additionalProperties: false,
+    },
+    linkRoundEmail,
   ),
 ];

@@ -13,7 +13,7 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The interview write tools, by name, which is the kind each change is kept under. */
-export const INTERVIEW_CHANGE_KINDS = ['add_interview_round'] as const;
+export const INTERVIEW_CHANGE_KINDS = ['add_interview_round', 'link_round_email'] as const;
 
 export type InterviewChangeKind = (typeof INTERVIEW_CHANGE_KINDS)[number];
 

@@ -21,6 +21,11 @@ const ROLE = '00000000-0000-4000-8000-000000000c01';
 const APPLICATION = '00000000-0000-4000-8000-000000000c02';
 const OLD_APPLICATION = '00000000-0000-4000-8000-000000000c03';
 const THEIR_ROLE = '00000000-0000-4000-8000-000000000c04';
+const MESSAGE = '00000000-0000-4000-8000-000000000c08';
+const THEIR_MESSAGE = '00000000-0000-4000-8000-000000000c09';
+const ACCOUNT = '00000000-0000-4000-8000-000000000c0a';
+const GMAIL_ID = 'abc123';
+const MAIL_REF = `${ACCOUNT}:${GMAIL_ID}`;
 const FIRST_ROUND = '00000000-0000-4000-8000-000000000c05';
 
 let tables: FakeTables;
@@ -93,6 +98,10 @@ beforeEach(() => {
     ],
     'job_search.interviews': [],
     'job_search.interview_group_messages': [],
+    'job_search.inbox_messages': [
+      { id: MESSAGE, user_id: ME, email_account_id: ACCOUNT, provider_message_id: GMAIL_ID },
+      { id: THEIR_MESSAGE, user_id: OTHER, email_account_id: ACCOUNT, provider_message_id: 'abc999' },
+    ],
   };
 });
 
@@ -207,5 +216,51 @@ describe('add_interview_round', () => {
 
     expect(await undo()).toMatchObject({ ok: false, error: expect.stringContaining('Something has been added to it since') });
     expect(rounds()).toHaveLength(2);
+  });
+});
+
+describe('link_round_email', () => {
+  const link = INTERVIEW_WRITE_TOOLS.find((t) => t.name === 'link_round_email')!;
+  const attach = (input: unknown, ctx = context()) => link.apply(ctx, input);
+  const links = () => tables['job_search.interview_group_messages'];
+  const seeAll = () => {
+    seen.add(`job_search.roles:${ROLE}`);
+    seen.add(`gmail:${MAIL_REF}`);
+  };
+
+  it('attaches the email to the round and undoes by removing only the link', async () => {
+    seeAll();
+    const result = ok(await attach({ role_ref: ROLE, round_number: 1, message_ref: MAIL_REF }));
+    expect(links()).toEqual([expect.objectContaining({ user_id: ME, group_id: FIRST_ROUND, message_id: MESSAGE })]);
+    expect(result).toMatchObject({ kind: 'link_round_email', op: 'insert', summary: 'Dash attached the email to round 1 of Product designer.' });
+
+    const { undo } = await keep(result);
+    expect(await undo()).toMatchObject({ ok: true, change: { status: 'undone' } });
+    expect(links()).toEqual([]);
+    expect(rounds()).toHaveLength(1);
+    expect(tables['job_search.inbox_messages']).toHaveLength(2);
+  });
+
+  it('says so when the email is already attached, and adds nothing', async () => {
+    seeAll();
+    ok(await attach({ role_ref: ROLE, round_number: 1, message_ref: MAIL_REF }));
+    const again = await attach({ role_ref: ROLE, round_number: 1, message_ref: MAIL_REF });
+    expect(!again.ok && again.error).toContain('already attached to round 1');
+    expect(links()).toHaveLength(1);
+  });
+
+  it('refuses a round that does not exist, an email no search returned, and one that is not theirs', async () => {
+    seeAll();
+    const noRound = await attach({ role_ref: ROLE, round_number: 5, message_ref: MAIL_REF });
+    expect(!noRound.ok && noRound.error).toContain('has no round 5');
+    const unseen = await attach({ role_ref: ROLE, round_number: 1, message_ref: `${ACCOUNT}:zzz` });
+    expect(!unseen.ok && unseen.error).toContain('search_mail');
+    seen.add(`gmail:${ACCOUNT}:abc999`);
+    const theirs = await attach({ role_ref: ROLE, round_number: 1, message_ref: `${ACCOUNT}:abc999` });
+    expect(!theirs.ok && theirs.error).toContain('not in their mailbox');
+    seen.add(`job_search.roles:${THEIR_ROLE}`);
+    const theirRole = await attach({ role_ref: THEIR_ROLE, round_number: 1, message_ref: MAIL_REF });
+    expect(!theirRole.ok && theirRole.error).toContain('not one of theirs');
+    expect(links()).toEqual([]);
   });
 });

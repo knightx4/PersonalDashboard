@@ -117,7 +117,7 @@ export const jobsActions: ModuleActions = {
     createInterviewRound: tool('add_interview_round'),
     deleteInterviewRound: none('deletes'),
     saveInterviewGroup: GAP,
-    linkRoundMessage: GAP,
+    linkRoundMessage: tool('link_round_email'),
     unlinkRoundMessage: GAP,
     ungroupInterview: GAP,
     deleteInterview: none('deletes'),
