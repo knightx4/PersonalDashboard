@@ -13,6 +13,7 @@ import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
 import { WriteQuestions } from './write-questions';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One quiz: what it was over, how it went, and every question with what you
@@ -38,7 +39,16 @@ const GLYPH: Record<keyof typeof MARK, GlyphName> = {
 };
 
 /** One quiz from its rows and its material, as read by the page (plan #1602). */
-export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMaterial[] }) {
+export function QuizView({
+  quiz,
+  material,
+  path,
+}: {
+  quiz: Quiz;
+  material: QuizMaterial[];
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
+}) {
   const from = new Map(material.map((piece) => [piece.sourceId, piece]));
   const left = outstandingCount(quiz);
   const right = rightCount(quiz);
@@ -57,6 +67,7 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
       </p>
 
       <PageHeader
+        subject={path}
         title={quiz.title}
         description={
           answered > 0

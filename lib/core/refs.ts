@@ -1,7 +1,7 @@
 import type { Crumb } from '@/components/shell/breadcrumb';
 import type { AskDb, AskSchema } from '@/lib/ask/db';
-import { MODULES } from '@/lib/modules';
 import { pageFor } from '@/lib/sources/catalogue';
+import { HOME_CRUMB, workspaceCrumb } from '@/lib/core/section-path';
 import type { Page, PageRow, Section } from '@/lib/sources/types';
 
 /**
@@ -15,6 +15,8 @@ import type { Page, PageRow, Section } from '@/lib/sources/types';
  * Refs carry no foreign key, so the row may be gone. `refTitles` answers that
  * with `missing`, and the title a page shows for it is NO_LONGER_THERE.
  */
+
+export { HOME_CRUMB };
 
 /** What a page shows for a ref whose row has gone. */
 export const NO_LONGER_THERE = 'no longer there';
@@ -191,18 +193,8 @@ function parentRef(page: Page, row: PageRow, own: string): string | null {
   return ref && ref !== own && parseRef(ref) ? ref : null;
 }
 
-/** Where every path outside a workspace starts: the app's own home. */
-export const HOME_CRUMB: Crumb = { label: 'Home', href: '/home' };
-
 /** How many rows above a row a path looks; deeper data is cut off, not looped. */
 const PATH_DEPTH = 8;
-
-/** The workspace a page lives in, by its address; Home for the app's own pages. */
-function workspaceCrumb(href: string | null): Crumb {
-  const path = href?.split(/[?#]/)[0] ?? '';
-  const workspace = MODULES.find((m) => path === m.prefix || path.startsWith(`${m.prefix}/`));
-  return workspace ? { label: workspace.label, href: workspace.home } : HOME_CRUMB;
-}
 
 /**
  * The path to a row, as the breadcrumb draws it (docs/ONE-INTERFACE-SPEC.md

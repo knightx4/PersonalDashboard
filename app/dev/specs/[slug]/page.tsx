@@ -7,6 +7,7 @@ import { loadLatestFindings } from '@/lib/specs/findings';
 import { SPEC_COUNTERS } from '@/scripts/spec-counts';
 import specBaseline from '@/scripts/spec-baseline.json';
 import { SpecDocView } from './spec-doc-view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * Names and targets only: the counters' `measure` is never called here, since
@@ -49,5 +50,14 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
     ? ruleStates(rules, { baseline: specBaseline as Record<string, number>, counters: COUNTERS })
     : [];
 
-  return <SpecDocView doc={doc} sections={sections} orphans={orphans} states={states} audit={audit} />;
+  return (
+    <SpecDocView
+      doc={doc}
+      sections={sections}
+      orphans={orphans}
+      states={states}
+      audit={audit}
+      path={sectionSubject('/dev/specs', 'Specs', { label: doc.title, href: `/dev/specs/${slug}` })}
+    />
+  );
 }

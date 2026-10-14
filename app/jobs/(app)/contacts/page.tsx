@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ContactsView } from './view';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Contacts' };
 
@@ -34,6 +35,7 @@ export default async function ContactsPage() {
     return (
       <PageColumn>
         <PageHeader
+          subject={sectionSubject('/jobs/contacts', 'Contacts')}
           title="Contacts"
           description="People to talk to, and a record of when you did."
         />
@@ -68,6 +70,7 @@ export default async function ContactsPage() {
   return (
     <PageColumn>
       <PageHeader
+        subject={sectionSubject('/jobs/contacts', 'Contacts')}
         title="Contacts"
         description={
           outbound.length > 0

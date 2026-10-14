@@ -470,7 +470,7 @@ const areas: AreaWithGoals[] = [
 export function GoalsAllSurface() {
   return (
     <PageColumn>
-      <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
+      <PageHeader title="All goals" subject={{ ref: null, path: allGoalsCrumbs() }} />
       <GoalsView
         areas={areas}
         view="open"

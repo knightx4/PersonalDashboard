@@ -12,6 +12,7 @@ import { readTopic } from '@/lib/news/issues/topics';
 import { NewsListView, ViewSwitch } from './list-view';
 import { RecommendedNewsletters } from './recommended';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Newsletters' };
 export const dynamic = 'force-dynamic';
@@ -92,7 +93,7 @@ async function RecommendedPage({ userId }: { userId: string }) {
 
   return (
     <PageColumn className="space-y-4">
-      <PageHeader title="Newsletters" />
+      <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters
         stored={stored}

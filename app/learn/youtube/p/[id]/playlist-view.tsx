@@ -6,6 +6,7 @@ import { transcribePlaylistAction } from '../../actions';
 import { Press } from '../../press';
 import { VideoList } from '../../video-list';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One playlist, in the order the channel published it, with one button for
@@ -16,7 +17,7 @@ import { PageColumn } from '@/components/shell/page-width';
  * but the count is only known after asking, so the label gives the most it
  * can spend.
  */
-export function PlaylistView({ data }: { data: PlaylistPage }) {
+export function PlaylistView({ data, path }: { data: PlaylistPage; path?: PageSubject }) {
   const { channel, playlist, videos } = data;
 
   const missing = videos.filter((video) => video.state !== 'fetched').length;
@@ -35,6 +36,7 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
       </p>
 
       <PageHeader
+        subject={path}
         title={playlist.title}
         description={
           <>

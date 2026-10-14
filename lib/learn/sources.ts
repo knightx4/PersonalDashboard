@@ -5,6 +5,8 @@ const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+/** Briefs are listed on Now (app/learn/now/briefs-list.tsx). */
+const NOW: Section = { href: '/learn/now', label: 'Now' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
 const GOALS_HOME: Section = { href: '/goals', label: 'Home' };
 
@@ -240,6 +242,7 @@ export const learnSources: ModuleSources = {
       search: ['question', 'angle', 'short_answer'],
       title: 'question',
       href: (id) => `/learn/b/${id}`,
+      section: NOW,
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
   ],

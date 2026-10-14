@@ -385,7 +385,7 @@ export function FeaturePage({
 
   return (
     <TabbedDetail
-      crumbs={crumbs}
+      subject={{ ref, path: crumbs }}
       // While the compose surface is open the title and summary are its
       // first two fields, so the header names what is being edited instead
       // of showing them twice.

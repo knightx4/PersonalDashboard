@@ -7,6 +7,8 @@ import { loadPieceStanding, loadPracticeView } from '@/lib/learn/lessons/practic
 import { REVIEWS_AT_PIECE_START, type DueReview } from '@/lib/learn/lessons/review';
 import { loadDueReviews } from '@/lib/learn/lessons/review-store';
 import { PiecePageView } from './piece-page-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,5 +47,16 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
     skip: page.ideas.map((idea) => idea.conceptId),
   }).catch((): DueReview[] => []);
 
-  return <PiecePageView page={page} practice={practice} standing={standing} reviews={reviews} />;
+  return (
+    <PiecePageView
+      page={page}
+      practice={practice}
+      standing={standing}
+      reviews={reviews}
+      path={await rowSubject(toRef('learn.subjects', id), {
+        label: page.piece.title,
+        href: `/learn/s/${id}/p/${pieceId}`,
+      })}
+    />
+  );
 }

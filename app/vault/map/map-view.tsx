@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { MergeLog } from './merge-log';
 import { SweepAction, SweepPanel } from './sweep-panel';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
@@ -31,7 +32,11 @@ export function VaultMapView({
   if (themes.length === 0) {
     return (
       <PageColumn>
-        <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
+        <PageHeader
+          subject={sectionSubject('/vault/map', 'Map')}
+          title="Map"
+          actions={<SweepAction sweep={sweep} />}
+        />
         <SweepPanel sweep={sweep} />
         {/* Themes arrive two ways: the sweep above, and one note's own Map
             section. The empty state names both. */}
@@ -47,7 +52,11 @@ export function VaultMapView({
 
   return (
     <PageColumn>
-      <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
+      <PageHeader
+        subject={sectionSubject('/vault/map', 'Map')}
+        title="Map"
+        actions={<SweepAction sweep={sweep} />}
+      />
       <SweepPanel sweep={sweep} />
 
       <p className="mb-3 text-body text-ink-muted">

@@ -29,6 +29,8 @@ import {
 import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** How often a researching brief asks the server for what the run has written. */
 const POLL_MS = 4000;
@@ -400,11 +402,14 @@ export function BriefView({
   live = true,
   openQuote,
   editing = false,
+  path,
 }: {
   page: BriefPage;
   live?: boolean;
   openQuote?: string;
   editing?: boolean;
+  /** The path to the brief, from the page (rowSubject); the gallery passes none and keeps the link to Now. */
+  path?: PageSubject;
 }) {
   const { brief, sources } = page;
   const sourcesFound = Object.keys(sources).length;
@@ -413,13 +418,19 @@ export function BriefView({
 
   const main = (
     <div className="flex flex-col gap-4">
-      <Link
-        href="/learn/now"
-        className="-mb-1 inline-flex min-h-11 items-center gap-1 self-start text-ui text-ink-muted hover:text-ink lg:min-h-8"
-      >
-        <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-        Now
-      </Link>
+      {/* The path, Learn › this brief, leads back to Now as well, so the page
+          draws it once (plan #1931.2). */}
+      {path ? (
+        <Breadcrumb crumbs={path.path} className="-mb-1" />
+      ) : (
+        <Link
+          href="/learn/now"
+          className="-mb-1 inline-flex min-h-11 items-center gap-1 self-start text-ui text-ink-muted hover:text-ink lg:min-h-8"
+        >
+          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+          Now
+        </Link>
+      )}
       <header>
         <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{brief.question}</h1>
       </header>

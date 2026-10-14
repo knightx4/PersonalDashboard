@@ -4509,7 +4509,7 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable />
       </div>
     ),
@@ -4529,7 +4529,7 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable second />
       </div>
     ),
@@ -4542,7 +4542,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview empty writable />
       </>
     ),
@@ -4556,7 +4556,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable={false} />
       </div>
     ),

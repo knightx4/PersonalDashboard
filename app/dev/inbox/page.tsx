@@ -18,6 +18,7 @@ import { RaisedView } from '@/app/dev/raised/raised-view';
 import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
 import { planRowRef, raiseRef, snoozedItems, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Inbox' };
 
@@ -98,7 +99,7 @@ export default async function DevInboxPage() {
 
   return (
     <PageColumn className="space-y-6">
-      <PageHeader title="Inbox" />
+      <PageHeader subject={sectionSubject('/dev/inbox', 'Inbox')} title="Inbox" />
       <RaisedView
         queue={queue}
         groups={groups}

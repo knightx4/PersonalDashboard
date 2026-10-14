@@ -9,6 +9,8 @@ import type { DevComment } from '@/lib/comments/load';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { OrderDetailView } from './order-detail-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Order' };
 
@@ -161,6 +163,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   return (
     <OrderDetailView
+      path={await rowSubject(toRef('public.orders', id))}
       order={{
         id: order.id,
         title: merchant?.name ?? orderEmailMessage?.subject?.slice(0, 48) ?? 'Order',

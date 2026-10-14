@@ -30,6 +30,7 @@ import { FeedEventCard } from '@/components/todo/feed-event-card';
 import { CalendarPicker } from '@/components/todo/calendar-picker';
 import { StepLink } from './step-link';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Calendar' };
 
@@ -133,7 +134,11 @@ export default async function TodoCalendarPage({
     // A wide page: a calendar is a grid, and seven columns want every bit of
     // the shell's 1400.
     <PageWide>
-      <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
+      <PageHeader
+        subject={sectionSubject('/todo/calendar', 'Calendar')}
+        title="Calendar"
+        description="Everything with a date on it, laid out."
+      />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* The arrows sit either side of the thing they move, the way every

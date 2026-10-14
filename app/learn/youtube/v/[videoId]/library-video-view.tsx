@@ -8,6 +8,7 @@ import type { Paragraph } from '@/lib/learn/youtube/paragraphs';
 import { transcribeVideoAction } from '../../actions';
 import { Press } from '../../press';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One video: the player, and the transcript under it.
@@ -27,7 +28,14 @@ export type LibraryVideoViewProps = {
   stop: number | null;
 };
 
-export function LibraryVideoView({ data, language, paragraphs, start, stop }: LibraryVideoViewProps) {
+export function LibraryVideoView({
+  data,
+  language,
+  paragraphs,
+  start,
+  stop,
+  path,
+}: LibraryVideoViewProps & { path?: PageSubject }) {
   const { video, channel, segments } = data;
   const timed = segments.filter((segment) => segment.tStartSeconds !== null);
   const embedded = segments.filter((segment) => segment.embedded).length;
@@ -47,6 +55,7 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
       )}
 
       <PageHeader
+        subject={path}
         title={video.title}
         description={
           <>

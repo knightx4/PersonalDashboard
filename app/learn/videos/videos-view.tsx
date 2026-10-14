@@ -13,6 +13,7 @@ import { VideoRows } from './video-rows';
 import { CLIPS_HREF, ClipsSection } from './clips-section';
 import { LibrarySection, YOUTUBE_HREF } from './library-section';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export type VideosViewProps = {
   /** Every video on your list. */
@@ -84,7 +85,7 @@ export function VideosView({
   if (all.length === 0) {
     return (
       <PageColumn>
-        <PageHeader title="Videos" />
+        <PageHeader subject={sectionSubject('/learn/videos', 'Videos')} title="Videos" />
         <EmptyState
           icon={MonitorPlay}
           title="No videos yet"
@@ -100,6 +101,7 @@ export function VideosView({
   return (
     <PageColumn>
       <PageHeader
+        subject={sectionSubject('/learn/videos', 'Videos')}
         title="Videos"
         description={`${all.length} on your list${watched > 0 ? `, ${watched} watched` : ''}`}
         actions={

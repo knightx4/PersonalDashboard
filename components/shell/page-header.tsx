@@ -2,6 +2,12 @@ import { cn } from '@/lib/cn';
 import { Breadcrumb, type Crumb } from './breadcrumb';
 
 /**
+ * What a page is about: the ref of its row (null for a list page, or a page
+ * for something that is not a row) and the path from the workspace down to it.
+ */
+export type Subject = { ref: string | null; path: readonly Crumb[] };
+
+/**
  * The page's own heading.
  *
  * Node rather than string on both fields: the role page puts an editable input
@@ -39,9 +45,14 @@ import { Breadcrumb, type Crumb } from './breadcrumb';
  * and without the wrap they squeezed each other until their labels broke onto
  * two lines inside a button one line tall (seen on a newsletter, plan #788).
  *
- * `crumbs` is the path down to the page (plan #1622), drawn on one line above
- * the heading. The header's margin moves out to hold both, so a page without
- * crumbs is drawn exactly as before.
+ * `subject` is what the page is about and the path down to it (plan #1622,
+ * #1931.2), drawn on one line above the heading: workspace › section › the
+ * rows above › the row. A page for one row makes it with `rowSubject(ref)`
+ * (lib/core/subject.ts), which reads the path from the catalogue by refPath;
+ * a list page with `sectionSubject(href, label)` (lib/core/section-path.ts),
+ * workspace › section. The path is resolved before it gets here, so the
+ * header stays drawable from a client component. The header's margin moves
+ * out to hold both, so a page without a subject is drawn exactly as before.
  */
 export function PageHeader({
   title,
@@ -49,7 +60,7 @@ export function PageHeader({
   actions,
   leading,
   bulk,
-  crumbs,
+  subject,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -57,9 +68,10 @@ export function PageHeader({
   leading?: React.ReactNode;
   /** What can be done to a selection, wrapped in SelectionActionBar. */
   bulk?: React.ReactNode;
-  /** The path from the workspace down to this page, the last part this page. */
-  crumbs?: readonly Crumb[];
+  /** What the page is about and the path to it, the last part this page. */
+  subject?: Subject;
 }) {
+  const crumbs = subject?.path.length ? subject.path : null;
   const header = (
     <div className={cn('group/header grid', !crumbs && 'mb-5')}>
       <div className="col-start-1 row-start-1 flex flex-wrap items-start gap-3 group-has-[[data-selection-bar]]/header:invisible">

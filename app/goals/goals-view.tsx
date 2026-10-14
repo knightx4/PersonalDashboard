@@ -365,7 +365,7 @@ function AreaSection({
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
       {page ? (
         <PageHeader
-          crumbs={areaCrumbs(area)}
+          subject={{ ref: `goals.areas:${area.id}`, path: areaCrumbs(area) }}
           title={
             <form action={rename}>
               <input type="hidden" name="id" value={area.id} />

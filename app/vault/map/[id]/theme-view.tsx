@@ -7,26 +7,34 @@ import type { MapSource, ThemeMap } from '@/lib/vault/map/read';
 import { noteHref } from '@/lib/vault/paths';
 import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import { PageColumn } from '@/components/shell/page-width';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One theme on the map, drawn from what the page read (page.tsx), so the
  * gallery can draw it from fixtures (plan #1605).
  */
-export function ThemeView({ map }: { map: ThemeMap }) {
+export function ThemeView({ map, path }: { map: ThemeMap; path?: PageSubject }) {
   const { theme, positions, notes } = map;
   const span = seenSpan(theme.firstSeen, theme.lastSeen);
 
   return (
     <PageColumn>
     <article>
+      {/* The path, Vault › Map › this page, is the way back too, so the
+        page draws it once (plan #1931.2). The gallery passes none. */}
       <div className="mb-4">
-        <Link
-          href="/vault/map"
-          className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Map
-        </Link>
+        {path ? (
+          <Breadcrumb crumbs={path.path} />
+        ) : (
+          <Link
+            href="/vault/map"
+            className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
+          >
+            <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+            Map
+          </Link>
+        )}
       </div>
 
       <header className="mb-6">

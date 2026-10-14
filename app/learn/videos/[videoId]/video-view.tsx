@@ -18,6 +18,7 @@ import { addedLabel } from '../video-rows';
 import { WatchedToggle } from '../watched-toggle';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One video on your list (plan #1069): the player, and beside it the summary,
@@ -38,7 +39,14 @@ export type ListVideoViewProps = {
   relatedError: string | null;
 };
 
-export function ListVideoView({ video, start, cards, related, relatedError }: ListVideoViewProps) {
+export function ListVideoView({
+  video,
+  start,
+  cards,
+  related,
+  relatedError,
+  path,
+}: ListVideoViewProps & { path?: PageSubject }) {
   const meta = [
     video.channel,
     durationLabel(video.durationSeconds),
@@ -57,6 +65,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
       </p>
 
       <PageHeader
+        subject={path}
         title={video.title}
         description={
           <>

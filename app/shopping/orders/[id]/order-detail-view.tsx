@@ -17,6 +17,7 @@ import type { DevComment } from '@/lib/comments/load';
 import { threadRef } from '@/lib/thread/subjects';
 import { OrderActionsMenu } from './order-actions-menu';
 import { OrderItemTags } from '../order-item-tags';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One order as the page shows it. Every amount is already a label in the
@@ -96,13 +97,15 @@ export function OrderDetailView({
   emails,
   items,
   thread,
-}: OrderDetail) {
+  path,
+}: OrderDetail & { path?: PageSubject }) {
   return (
     <DetailPage
       className="[&_a]:press-area max-sm:[&_input]:min-h-11"
       header={
         <>
           <PageHeader
+            subject={path}
             title={order.title}
             description={`${order.order_date}${
               order.external_order_number ? ` · #${order.external_order_number}` : ''

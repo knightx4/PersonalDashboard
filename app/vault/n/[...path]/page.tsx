@@ -1,6 +1,4 @@
-import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
 import {
@@ -37,6 +35,9 @@ import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
 import { NoteEdit } from './note-edit';
 import { PageWide } from '@/components/shell/page-width';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -155,13 +156,12 @@ export default async function NotePage({
               way into the same vault without leaving the note (#577). From lg up
               the same spot holds the way back to a folded column (#1380). */}
           <div className="mb-4 flex items-center justify-between gap-3">
-            <Link
-              href="/vault"
-              className="inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-            >
-              <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              All notes
-            </Link>
+            {/* The note's path, Vault › the note, which leads back to every
+                note as well (plan #1931.2). */}
+            <Breadcrumb
+              crumbs={(await rowSubject(toRef('obsidian.notes', note.id))).path}
+              className="min-w-0"
+            />
 
             {hasVault && (
               <>

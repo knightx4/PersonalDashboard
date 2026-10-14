@@ -47,6 +47,7 @@ import { SendToShare } from '@/components/share/send-to-share';
 import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { askListFilter } from '@/lib/ask/list-filter';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Inventory' };
 
@@ -675,6 +676,7 @@ export default async function InventoryPage({
           }))}
         >
           <PageHeader
+            subject={sectionSubject('/shopping/inventory', 'Inventory')}
             title="Inventory"
             description="Everything you currently own, so you can check before buying it again."
             bulk={<InventoryBulkBar total={finalItems.length} />}

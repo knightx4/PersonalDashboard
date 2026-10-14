@@ -42,7 +42,7 @@ export default async function AllGoalsPage({
     <PageColumn>
       <PageHeader
         title="All goals"
-        crumbs={allGoalsCrumbs()}
+        subject={{ ref: null, path: allGoalsCrumbs() }}
         actions={
           // Files has no tab; the longer pieces Dash wrote are reached from here and from each goal.
           <Link

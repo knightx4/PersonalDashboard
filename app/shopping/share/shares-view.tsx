@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NewShareButton } from './share-ui';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /** One share as the list reads it, with only the counts it shows. */
 export type ShareListRow = {
@@ -46,6 +47,7 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
 
   const header = (
     <PageHeader
+      subject={sectionSubject('/shopping/share', 'Share')}
       title="Shared forms"
       actions={
         <div className="flex items-center gap-2">

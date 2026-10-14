@@ -8,6 +8,7 @@ import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
 import { formatClock } from '@/lib/clock';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** One title on the form, as share_page() returns it. */
 export type ShareGroup = {
@@ -48,12 +49,15 @@ export function ShareDetailView({
   tokens,
   events,
   origin,
+  path,
 }: {
   share: { id: string; title: string; status: string };
   groups: ShareGroup[];
   tokens: ShareToken[];
   events: ShareEvent[];
   origin: string;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const answered = groups.filter((g) => g.keepQty + g.sellQty + g.giveawayQty > 0);
 
@@ -67,6 +71,7 @@ export function ShareDetailView({
       </Link>
 
       <PageHeader
+        subject={path}
         title={share.title}
         description={
           share.status === 'active'

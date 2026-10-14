@@ -33,6 +33,7 @@ import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
 import { EvidenceList } from '@/components/learn/evidence-list';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * What /learn/c/[id] draws, from what its page read: the page hands its reads
@@ -187,7 +188,8 @@ export function ConceptPageView({
   evidence = [],
   timezone,
   now,
-}: ConceptPageProps) {
+  path,
+}: ConceptPageProps & { path?: PageSubject }) {
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
 
   const connected =
@@ -208,7 +210,7 @@ export function ConceptPageView({
         </Link>
       </p>
 
-      <PageHeader title={concept.name} />
+      <PageHeader subject={path} title={concept.name} />
 
       {/* The claim, the offer to branch off a phrase in it, and the way to
           write it yourself. */}

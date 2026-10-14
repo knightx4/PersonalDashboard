@@ -39,6 +39,10 @@ export function Breadcrumb({
                   'flex min-w-0 items-center',
                   // The first part is the workspace and is short; it never gives way.
                   index === 0 && 'shrink-0',
+                  // The page itself gives way first: the heading under the
+                  // path names it in full, while the part above is the way
+                  // back and should keep its name (plan #1931.2).
+                  index === last && index > 0 && 'shrink-[1000]',
                   middle && 'max-sm:hidden',
                 )}
               >

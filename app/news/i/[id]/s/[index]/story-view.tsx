@@ -9,6 +9,7 @@ import { SaveStoryButton } from '@/components/news/save-story-button';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { ArticleLink } from '@/app/news/quick/quick-controls';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One story on its own page, drawn from what the page read (page.tsx), so
@@ -22,6 +23,7 @@ export function StoryView({
   timezone,
   saved,
   sent,
+  path,
 }: {
   back: { href: string; label: string };
   issue: { id: string; receivedAt: string; sender: NewsSender | null };
@@ -30,6 +32,8 @@ export function StoryView({
   timezone: string;
   saved: boolean;
   sent: StorySent | undefined;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const from = issue.sender ? senderLabel(issue.sender) : 'Unknown sender';
   const paragraphs = storyParagraphs(story.text);
@@ -43,6 +47,7 @@ export function StoryView({
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {back.label}
       </Link>
       <PageHeader
+        subject={path}
         title={story.headline}
         description={`${from} · ${formatArrival(issue.receivedAt, timezone)}`}
       />

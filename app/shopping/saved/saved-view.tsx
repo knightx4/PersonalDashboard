@@ -7,6 +7,7 @@ import { toggleChipClass } from '@/components/ui/chip';
 import { formatMoney } from '@/lib/money';
 import { SaveForm } from './save-form';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const STATUSES = [
   { id: 'saved', label: 'Saved' },
@@ -99,7 +100,7 @@ function SavedRow({ item, withPicture }: { item: SavedQueueItem; withPicture: bo
 export function SavedQueueView({ status, items }: { status: SavedStatus; items: SavedQueueItem[] }) {
   const header = (
     <>
-      <PageHeader title="Saved" />
+      <PageHeader subject={sectionSubject('/shopping/saved', 'Saved')} title="Saved" />
       {status === 'saved' && (
         <div className="mb-4">
           <SaveForm compact />

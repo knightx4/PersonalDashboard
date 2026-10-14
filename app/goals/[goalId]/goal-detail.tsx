@@ -1,4 +1,5 @@
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { toRef } from '@/lib/core/refs';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
 import type { GoalPace } from '@/lib/goals/pace';
@@ -46,7 +47,10 @@ export function GoalDetail({
   const tabs = GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t));
   return (
     <TabbedDetail
-      crumbs={goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' })}
+      subject={{
+        ref: toRef('goals.items', goal.id),
+        path: goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' }),
+      }}
       title={
         <span className="flex items-center gap-2.5">
           <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
