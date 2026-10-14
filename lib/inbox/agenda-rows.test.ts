@@ -60,6 +60,20 @@ describe('agendaInboxRow', () => {
     expect(row.decline?.fields).toEqual({ source: 'return_deadlines', key: 'return:o1' });
   });
 
+  it('keeps the link on the title when there is something else to press', () => {
+    const row = agendaInboxRow(
+      entry(item({ completable: true, action: { href: '/shopping/returns', label: 'Returns' } })),
+      ACTIONS,
+      { return_deadlines: ALL },
+      '2026-03-10',
+    )!;
+    expect(row.href).toBe('/shopping/orders/o1');
+    expect(row.verbs?.map((v) => [v.label, v.tone])).toEqual([
+      ['Done', 'primary'],
+      ['Returns', 'secondary'],
+    ]);
+  });
+
   it('puts Done first on something that can be finished, through its source', () => {
     const row = agendaInboxRow(
       entry(item({ source: 'job_reminders', key: 'job_reminders:r1', completable: true })),

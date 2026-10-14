@@ -89,13 +89,12 @@ function itemRow(
   if (item.completable && can.complete) {
     verbs.push({ label: 'Done', tone: 'primary', write: { action: actions.done, fields } });
   }
-  // The row's link is its one main press when there is nothing to finish here.
-  const leads = verbs.length === 0;
-  if (item.link) {
-    verbs.push({ label: item.link.label, tone: leads ? 'primary' : 'secondary', href: item.link.href });
-  }
+  // The title opens the row's link. It is also a press only when it is the
+  // one thing to do, so a row's presses stay on one line at 390.
   if (item.action) {
-    verbs.push({ label: item.action.label, tone: 'secondary', href: item.action.href });
+    verbs.push({ label: item.action.label, tone: verbs.length === 0 ? 'primary' : 'secondary', href: item.action.href });
+  } else if (item.link && verbs.length === 0) {
+    verbs.push({ label: item.link.label, tone: 'primary', href: item.link.href });
   }
 
   return {

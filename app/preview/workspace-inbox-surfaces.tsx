@@ -29,7 +29,7 @@ const SHOPPING: InboxRow[] = [
     href: '/shopping/orders/o1',
     move: onYou,
     putOff,
-    verbs: [{ label: 'Open the order', tone: 'primary', href: '/shopping/orders/o1' }, { label: 'Returns', tone: 'secondary', href: '/shopping/returns' }],
+    verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/returns' }],
     decline,
   },
   {
@@ -40,7 +40,7 @@ const SHOPPING: InboxRow[] = [
     href: '/shopping/orders/o2',
     move: onYou,
     putOff,
-    verbs: [done, { label: 'Open the order', tone: 'secondary', href: '/shopping/orders/o2' }, { label: 'Send in Gmail', tone: 'secondary', href: '#' }],
+    verbs: [done, { label: 'Send in Gmail', tone: 'secondary', href: '#' }],
     decline,
   },
   {
@@ -62,11 +62,11 @@ const JOBS: InboxRow[] = [
     ref: 'job_search.reminders:r1',
     section: 'actions',
     title: 'Follow up with Monzo about the Senior Product Designer role',
-    line: 'Applied three weeks ago with no reply · was due Fri 10 Oct',
+    line: 'No reply in three weeks · was due Fri 10 Oct',
     href: '/jobs/roles/r1',
     move: onYou,
     putOff,
-    verbs: [done, { label: 'Monzo', tone: 'secondary', href: '/jobs/roles/r1' }, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }],
+    verbs: [done, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }],
   },
   {
     ref: 'job_search.applications:a2',
