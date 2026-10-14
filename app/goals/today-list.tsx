@@ -53,7 +53,7 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
  * - "Did you go?": yes, with a quiet No beside it
  * - a rhythm behind for the period: one more logged against it
  * - a step of yours: done
- * - a suggestion: going, which puts it on Todo, with a quiet Not for me
+ * - a suggestion: going, which puts it on Todo, with a quiet Decline
  * - proposed steps or goals: a link to where they are approved
  * - a goal whose done-when is met: close it, with a quiet Keep it open
  * - a goal nothing has moved on for three weeks: park it, with the same
@@ -86,7 +86,8 @@ const PRIMARY_VALUE: Partial<Record<TodayKind, [string, string]>> = {
 /** The quiet second answer, where the old home offered one. */
 const SECOND: Partial<Record<TodayKind, [string, string, string]>> = {
   went: ['went', 'no', 'No'],
-  suggestion: ['reaction', 'not_for_me', 'Not for me'],
+  // Decline: the Inbox's word for turning down what was proposed (plan #1937.4).
+  suggestion: ['reaction', 'not_for_me', 'Decline'],
   close: ['move', 'keep', 'Keep it open'],
   park: ['move', 'keep', 'Keep it open'],
 };
@@ -178,7 +179,7 @@ export function TodayRow({
         {item.backFromSnooze && (
           <p className="inline-flex items-center gap-1 text-small font-semibold text-accent">
             <BellRing className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Back from snooze
+            Back from Later
           </p>
         )}
         {item.url ? (
@@ -258,7 +259,9 @@ export function TodayRow({
               {onSnoozed && snoozeRefOf(item.kind, item.id) && (
                 <SnoozeRow item={item} onSnoozed={onSnoozed} />
               )}
-              {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
+              {/* In the Inbox, Later is the one way to put a row off
+                  (plan #1937.4); Not now stays on the Home's Do next. */}
+              {!onSnoozed && canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
             </span>
             {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
           </form>
@@ -384,7 +387,7 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
 }
 
 /**
- * Snooze: the row leaves the Inbox and its count until the day chosen, or
+ * Later: the row leaves the Inbox and its count until the day chosen, or
  * sooner if the step, goal or flag changes (lib/core/inbox-snoozes.ts). The
  * toast's Undo brings it back. A refusal brings the row back and says why.
  */
@@ -406,7 +409,7 @@ function SnoozeRow({ item, onSnoozed }: { item: TodayItem; onSnoozed: (hidden: b
       return;
     }
     toast({
-      text: result.message ?? 'Snoozed.',
+      text: result.message ?? 'Moved to Later.',
       undone: 'Brought back.',
       undo: async () => {
         const back = await unsnoozeInboxRowAction(fields());

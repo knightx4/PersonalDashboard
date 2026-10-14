@@ -9,9 +9,10 @@ import { cn } from '@/lib/cn';
 import { SNOOZE_CHOICES, SNOOZE_LABELS } from '@/lib/core/snooze-days';
 
 /**
- * The snooze control for an inbox row (plan #1844): Tomorrow, Next week, or a
+ * Later, on an inbox row (plans #1844, #1937.4): Tomorrow, Next week, or a
  * day picked. It only asks; `onChoose` gets 'tomorrow', 'next_week' or a
- * YYYY-MM-DD day and does the write, so every inbox can use it.
+ * YYYY-MM-DD day and does the write, so every inbox can use it. Every Inbox
+ * says Later for putting a row off (docs/ONE-INTERFACE-SPEC.md Part 4).
  */
 export function SnoozeMenu({
   label,
@@ -31,7 +32,7 @@ export function SnoozeMenu({
           type="date"
           value={day}
           onChange={(event) => setDay(event.target.value)}
-          aria-label={`Snooze until: ${label}`}
+          aria-label={`Back on this day: ${label}`}
           className="w-auto max-sm:min-h-11"
         />
         <Button
@@ -44,7 +45,7 @@ export function SnoozeMenu({
             setDay('');
           }}
         >
-          Snooze
+          Set
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setPicking(false)}>
           Cancel
@@ -55,13 +56,13 @@ export function SnoozeMenu({
 
   return (
     <ActionMenu
-      label={`Snooze: ${label}`}
+      label={`Later: ${label}`}
       align="end"
       triggerClassName={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-auto')}
       trigger={
         <span className="inline-flex items-center gap-1">
           <BellOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="max-sm:sr-only">Snooze</span>
+          <span className="max-sm:sr-only">Later</span>
           <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
         </span>
       }

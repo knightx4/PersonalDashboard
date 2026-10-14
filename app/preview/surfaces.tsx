@@ -304,6 +304,7 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import { InboxPageSurface } from './inbox-page-surface';
 import {
   AuthCodeErrorSurface,
   ConsentSurface,
@@ -3984,6 +3985,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsInboxSurface />,
+  },
+  {
+    /* The one Inbox component (plan #1937.4) from its row shape alone, as
+     * every workspace's Inbox draws it: the three sections, the verbs, Later
+     * and Decline, and the Later fold open. */
+    id: 'inbox-page',
+    label: 'Inbox · the one component',
+    module: 'dev',
+    width: 'page',
+    render: () => <InboxPageSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
