@@ -45,6 +45,12 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The mockup the person looked at for decision #1899.1: chats grouped by day on the left with the workspaces each used, the open chat at reading width beside them, and on a phone the list as the page with a chat opening over it.',
     from: '1899.2',
   },
+  'ask-page-used': {
+    pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
+    link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
+    why: 'The same mockup, for its right-hand column: under "Used in this chat", the rows Dash read with their workspace, the changes, the lookups, the files and what the chat cost, each part headed with its count.',
+    from: '1899.4',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */

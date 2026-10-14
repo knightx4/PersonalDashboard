@@ -7,11 +7,10 @@ import type { ChangePresses } from '@/components/talk/dash-changes';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { usePathname, useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import Link from '@/components/ui/link';
-import { Conversation } from '@/components/patterns/conversation';
+import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import type { AskChat } from '@/lib/talk/ask-chats';
 import { AskChats, openChatRef } from './chats';
+import { ChatUsed, type ChatUsedData } from './used';
 import { confirmDashChange, declineDashChange, undoDashChange } from './actions';
 
 const PRESSES: ChangePresses = {
@@ -60,53 +59,60 @@ export function DashChatsFrame({
   );
 }
 
-/** A reopened question: its turns, the changes Dash proposed in it, and the box to carry it on. */
+/** What the column beside a chat is called, and its button. */
+export const USED_LABEL = 'Used in this chat';
+export const USED_SHORT = 'Used';
+
+/**
+ * A reopened question: its title, its turns, the changes Dash proposed in
+ * it, and the box to carry it on, with what Dash used in it in the column
+ * beside (plan #1899.4). Each answer that comes back re-reads the page, so
+ * the column takes in what the new answer used.
+ */
 export function AskConversation({
+  title,
   conversationRef,
   turns,
   changes,
   openHandoffs,
+  used,
 }: {
+  title: string;
   conversationRef: string;
   turns: TalkTurn[];
   changes: DashChange[];
   openHandoffs?: number;
+  used: ChatUsedData;
 }) {
+  const router = useRouter();
   return (
+    <ConversationChat
+      title={title}
+      back={CHATS_BACK}
+      glance={{
+        label: USED_LABEL,
+        short: USED_SHORT,
+        content: <ChatUsed used={used} presses={PRESSES} />,
+      }}
+    >
     <AskThread
       id={`ask-${conversationRef}`}
       conversationRef={conversationRef}
       turns={turns}
       changes={changes}
       openHandoffs={openHandoffs}
+      onAnswered={() => router.refresh()}
       label="Ask a follow-up"
       placeholder="Ask more about this"
       startWriting
       hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
     />
+    </ConversationChat>
   );
 }
 
-/**
- * The open chat's heading: its title, and on a phone the way back to the
- * list it was opened over.
- */
-export function ChatHeader({ title }: { title: string }) {
-  return (
-    <div className="mb-4">
-      <Link
-        href="/ask"
-        className="press-area mb-1 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink min-[720px]:hidden"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Chats
-      </Link>
-      <h1 className="font-display line-clamp-2 break-words text-title font-semibold tracking-tight text-ink">
-        {title}
-      </h1>
-    </div>
-  );
-}
+/** On a phone, the way from an open chat back to the list it is drawn over. */
+export const CHATS_BACK = { href: '/ask', label: 'Chats' };
 
 /**
  * A new chat on the page (plan #1899.2): Dash's opening line and the box,
@@ -116,8 +122,7 @@ export function ChatHeader({ title }: { title: string }) {
 export function NewDashChat() {
   const router = useRouter();
   return (
-    <>
-      <ChatHeader title="New chat" />
+    <ConversationChat title="New chat" back={CHATS_BACK}>
       <div className="mb-4 flex gap-2">
         <div className="flex w-4 shrink-0 justify-center pt-1">
           <DashMark size="2xs" decorative className="text-ink-ghost" />
@@ -144,6 +149,6 @@ export function NewDashChat() {
         startWriting
         hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
       />
-    </>
+    </ConversationChat>
   );
 }

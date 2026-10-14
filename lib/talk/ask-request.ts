@@ -45,6 +45,8 @@ import {
 } from './changes';
 import { appendTurns, listAskChats, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { AskChat } from './ask-chats';
+import { chatCostMicros, chatSpan } from './chat-trail';
+import { RECALL_OPERATION } from '@/lib/memory/search';
 import type { TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
@@ -250,6 +252,42 @@ export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   const core = await createCoreClient();
   return withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref }));
 }
+
+/**
+ * What asking Dash cost while one chat's answers were written (plan
+ * #1899.4), in micro-dollars, or null when the ledger holds nothing for it.
+ * The ledger does not name the chat, so this reads the asking rows in the
+ * chat's span and keeps those between each question and its answer
+ * (chatCostMicros). Never throws: a failed read says nothing was recorded.
+ */
+export async function loadAskChatCost(turns: readonly TalkTurn[]): Promise<number | null> {
+  const span = chatSpan(turns);
+  if (!span) return null;
+  try {
+    await requireUser();
+    const core = await createCoreClient();
+    const { data, error } = await core
+      .from('model_spend')
+      .select('created_at, cost_micros')
+      .eq('module', 'core')
+      .in('operation', ASK_SPEND_OPERATIONS)
+      .gte('created_at', span.from)
+      .lte('created_at', span.to)
+      .limit(500);
+    if (error) throw new Error(error.message);
+    const marks = ((data ?? []) as { created_at: string; cost_micros: number | null }[]).map((row) => ({
+      createdAt: row.created_at,
+      costMicros: row.cost_micros,
+    }));
+    return chatCostMicros(turns, marks);
+  } catch (error) {
+    console.error('ask chat cost was not read', error);
+    return null;
+  }
+}
+
+/** The ledger's operations for answering a question: the answer, and recalling notes for it. */
+const ASK_SPEND_OPERATIONS = ['ask-dash', RECALL_OPERATION];
 
 /**
  * How many requests in one past question are still with the backup routine

@@ -162,6 +162,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-page-new': ['/ask'],
   'ask-page-hidden': ['/ask', '/ask/[ref]'],
   'ask-answer-actions': ['/ask', '/ask/[ref]'],
+  'ask-page-used': ['/ask/[ref]'],
+  'ask-page-used-sheet': ['/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
