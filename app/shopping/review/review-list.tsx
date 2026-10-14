@@ -43,7 +43,7 @@ import { AddFromEmailButton } from './add-from-email';
 import { AimButton } from '@/components/shell/aim-button';
 import { canReadAsOrder } from '@/lib/review/read-order';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');

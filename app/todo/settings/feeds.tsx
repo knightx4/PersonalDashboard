@@ -10,7 +10,7 @@ import { Field, FieldError, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import type { Feed } from '@/lib/todo/feeds/load';
 import { addFeed, refreshFeedNow, removeFeed, type AgendaSettingsState } from './actions';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /**
  * The calendars you keep somewhere else.

@@ -1,5 +1,5 @@
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import type { ReviewItem } from './choose';

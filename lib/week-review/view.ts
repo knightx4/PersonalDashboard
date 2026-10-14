@@ -5,7 +5,7 @@ import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { localDay, WEEK_REVIEW_ZONE, type WeekFact, type WeekFacts } from './facts';
 import { REVIEW_HOUR, type ReviewObservation } from './review';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /**
  * The Week page's rules (plan #1233): a stored core.week_reviews row turned

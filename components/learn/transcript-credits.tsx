@@ -5,7 +5,7 @@ import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
 import { projectedMonthEnd } from '@/lib/learn/youtube/budget';
 import type { Usage } from '@/lib/learn/youtube/load';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /**
  * TranscriptAPI credits this month, against the plan.

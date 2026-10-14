@@ -1,5 +1,5 @@
 import { safeTimeZone } from '@/lib/core/timezone';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /**
  * Dates as the Goals pages print them: "3 Oct", "3 Oct 2026", "Thu 1 Oct,

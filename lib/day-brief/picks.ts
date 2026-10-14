@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { formatMoney } from '@/lib/money';
 import type { Candidate, CandidateKind } from './facts';
 

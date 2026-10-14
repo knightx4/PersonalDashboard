@@ -1,5 +1,5 @@
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 /**
  * What an event is, and which days of the calendar it covers.

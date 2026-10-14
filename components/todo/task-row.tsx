@@ -50,7 +50,7 @@ import { putAway } from '@/components/motion/place';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';

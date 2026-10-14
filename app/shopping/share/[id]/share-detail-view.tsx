@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { formatMoneyOrBlank } from '@/lib/money';
 import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { PageColumn } from '@/components/shell/page-width';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 
