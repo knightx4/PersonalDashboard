@@ -205,11 +205,20 @@ async function captureAccount(userId: string): Promise<CaptureAccount> {
       if (!result.ok) return { ok: false as const, error: result.error };
       return { ok: true as const, noteId: result.noteId, title: result.title, blobSha: result.blobSha };
     },
+    // The kinds only an Add button makes (plan #1950.5). The sort never
+    // files into them, so a shortcut never reaches these.
+    goal: async () => NOT_FROM_A_SHORTCUT,
+    goalArea: async () => NOT_FROM_A_SHORTCUT,
+    planItem: async () => NOT_FROM_A_SHORTCUT,
+    idea: async () => NOT_FROM_A_SHORTCUT,
+    devNote: async () => NOT_FROM_A_SHORTCUT,
     record: (entry) => recordDashAction(dash, entry),
   };
 
   return { places, sort, writers };
 }
+
+const NOT_FROM_A_SHORTCUT = { ok: false as const, error: 'That is added from its page in the app, not from a shortcut.' };
 
 /** The address's dependencies, for app/api/capture/route.ts. */
 export function captureAddressDeps(): CaptureAddressDeps {

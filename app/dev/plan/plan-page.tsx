@@ -2,10 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { featureTable } from '@/lib/plan/feature-table';
 import { updateOverdueDays } from '@/lib/plan/updates';
 import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
-import Link from '@/components/ui/link';
-import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { buttonVariants } from '@/components/ui/button';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
@@ -27,7 +24,7 @@ import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
-import { NEW_FEATURE_PARAM, NEW_FEATURE_VALUE, newFeatureHref } from '@/lib/plan/feature-page';
+import { NewFeatureButton } from './feature-compose';
 import {
   applyView,
   buildPlanTree,
@@ -133,8 +130,6 @@ export async function renderPlanPage({
   // What to put in the plan's own search box on arrival. The app-wide search
   // sends a step here as `q=#612`, which unfolds the feature it sits under.
   const query = (Array.isArray(params.q) ? params.q[0] : params.q) ?? '';
-  // The "New feature" surface, open from the header's link (plan #1670).
-  const newFeatureOpen = params[NEW_FEATURE_PARAM] === NEW_FEATURE_VALUE;
 
   // Before the load, so anything new appears on this render rather than the
   // next one. It carries its failure back instead of throwing: a plan that
@@ -275,16 +270,7 @@ export async function renderPlanPage({
             : sectionSubject('/dev/plan', 'Plan')
         }
         title={project ? project.label : 'Plan'}
-        actions={
-          <Link
-            href={newFeatureHref(basePath, requested)}
-            scroll={false}
-            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-          >
-            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-            New feature
-          </Link>
-        }
+        actions={<NewFeatureButton module={project?.id ?? null} />}
         description={
           project
             ? // One line naming where it is built (plan #1688): the paragraph
@@ -317,10 +303,6 @@ export async function renderPlanPage({
       )}
       <PlanViewComponent
         basePath={basePath}
-        newFeature={{
-          open: newFeatureOpen,
-          ...(project ? { module: project.id, scopes: [project.id] } : {}),
-        }}
         sections={sections}
         finished={finished}
         summary={summary}

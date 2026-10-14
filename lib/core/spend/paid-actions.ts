@@ -85,9 +85,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
-  // Only a goal added to the Learn area costs: it is placed and given a plan
-  // (plan #1490). The hint shows in that area alone.
-  'app/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [
     'generate-track-from-theme',
@@ -191,6 +188,13 @@ export const PAID_ACTIONS = {
   // An Add button aimed at an order (plan #1950.3.1): the sentence is read as
   // an order before it is made.
   'app/capture-actions.ts#makeAimedCapture': ['read-order-sentence'],
+  // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
+  // placed and given a plan after the response (plan #1490), as one added
+  // from the old New goal form was.
+  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'write-curriculum'],
+  // The header's notes button (plan #1950.5): the note is triaged once it
+  // has saved (plan #1179), as it was from the old popover.
+  'app/capture-actions.ts#makeAimedCapture:dev-note': ['triage-note'],
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],
@@ -230,11 +234,9 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':
-    'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
+    'Triage of a note or idea already saved, showing its type, workspace, priority and any open item it repeats (plan #1179), and scoring an idea against the vision of its workspace (plan #1327). The header panel that called it is gone (plan #1950.5): a note filed through capture is triaged after it saves, priced under app/capture-actions.ts#makeAimedCapture:dev-note. There is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
-  'app/capture-actions.ts#makeAimedCapture':
-    "An Add button aimed at a kind (plan #1950.1). Its paid path is a goal update, filed by Goals' own model call, and Log what happened opens Goals' own panel rather than this one, which prices it there; every other kind makes its row with no model call.",
   'app/capture-actions.ts#sortCaptureBox':
     'Called by the one capture box when typing pauses, to say where the sentence will go (plan #1581). There is no button, only the field; the File it hint prices it under app/capture-actions.ts#fileCaptureBox.',
   'app/goals/actions.ts#editGoal':

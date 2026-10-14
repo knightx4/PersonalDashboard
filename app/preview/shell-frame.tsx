@@ -156,7 +156,6 @@ export function ShellFrame({
         sections={frame.sections}
         settingsHref={frame.settingsHref}
         settingsLabel={frame.settingsLabel}
-        feedbackHref="/dev/bugs"
         // The name the shopping fixtures already use, and nobody's real one:
         // these pictures go on X.
         displayName="Alex"

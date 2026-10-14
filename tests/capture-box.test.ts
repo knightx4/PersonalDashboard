@@ -34,6 +34,17 @@ function setup() {
     'job_search.roles': [{ id: ROLE.id, user_id: ME, title: ROLE.title }],
     'core.dash_actions': [],
     'obsidian.notes': [],
+    'goals.items': [],
+    'goals.areas': [],
+    'public.plan_items': [],
+    'public.ideas': [],
+    'public.feedback_items': [],
+  };
+  /** A writer that puts one row in a fake table and hands back its id. */
+  const into = (table: string, row: Record<string, unknown>) => {
+    const id = fakeId();
+    tables[table].push({ id, user_id: ME, ...row });
+    return { ok: true as const, id };
   };
   /** The notes repository: path to blob SHA, and each commit made. */
   const repo = new Map<string, string>();
@@ -94,6 +105,11 @@ function setup() {
       );
       return result.ok ? result : { ok: false, error: result.error };
     },
+    goal: async (areaId, title) => into('goals.items', { area_id: areaId, title }),
+    goalArea: async (name) => into('goals.areas', { name }),
+    planItem: async (title, at) => into('public.plan_items', { title, module: at.scope, parent_id: at.parentId }),
+    idea: async (body) => into('public.ideas', { body, module: null }),
+    devNote: async (body, pagePath) => into('public.feedback_items', { body, page_path: pagePath, kind: 'feature' }),
     record: (entry) => recordDashAction(dash, entry),
   };
   return { tables, dash, writers, goals, repo, commits, removePorts };
@@ -470,6 +486,61 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(await makeCaptureKind('job-note', { text: 'Recruiter is Sam' }, world.writers)).toMatchObject({ ok: false });
     expect(world.tables['todo.tasks']).toEqual([]);
     expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('makes an aimed goal in the area it was handed, opens it, and Undo takes it back (plan #1950.5)', async () => {
+    const world = setup();
+    const area = { id: '00000000-0000-4000-8000-0000000000d1', title: 'Health' };
+    const made = await makeCaptureKind('goal', { text: 'Run a half marathon', under: area }, world.writers);
+    if (!made.ok) throw new Error(made.error);
+    const [goal] = world.tables['goals.items'];
+    expect(goal).toMatchObject({ area_id: area.id, title: 'Run a half marathon' });
+    expect(made.filed).toMatchObject({
+      place: null,
+      module: 'goals',
+      where: 'Goals · Health',
+      ref: `goals.items:${goal.id}`,
+    });
+    expect(made.filed.page).toBeTruthy();
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_goal', undo: { aimed: true } });
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe('You added the goal "Run a half marathon".');
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['goals.items']).toEqual([]);
+  });
+
+  it('puts an aimed step under its feature, and a feature in the module it was aimed at', async () => {
+    const world = setup();
+    const feature = { id: '00000000-0000-4000-8000-0000000000e1', title: 'Capture is the one way to add anything' };
+    const step = await makeCaptureKind('plan-step', { text: 'Goals add through capture', under: feature }, world.writers);
+    const top = await makeCaptureKind('plan-feature', { text: 'A calmer plan page', under: { id: 'dev', title: 'Dev' } }, world.writers);
+    if (!step.ok || !top.ok) throw new Error('not made');
+    expect(world.tables['public.plan_items']).toMatchObject([
+      { title: 'Goals add through capture', parent_id: feature.id, module: null },
+      { title: 'A calmer plan page', parent_id: null, module: 'dev' },
+    ]);
+    expect(step.filed.where).toBe('Plan · Capture is the one way to add anything');
+  });
+
+  it('files a note for Dev with the page it came from and its files, and stays on the page', async () => {
+    const world = setup();
+    const attached: string[] = [];
+    const writers: CaptureWriters = { ...world.writers, attach: async (ref) => (attached.push(ref), 1) };
+    const made = await makeCaptureKind('dev-note', { text: 'The plan scrolls sideways', page: '/dev/plan' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const [note] = world.tables['public.feedback_items'];
+    expect(note).toMatchObject({ body: 'The plan scrolls sideways', page_path: '/dev/plan', kind: 'feature' });
+    expect(attached).toEqual([`public.feedback_items:${note.id}`]);
+    expect(made.filed).toMatchObject({ page: null, files: 1, where: 'Dev · Notes' });
+  });
+
+  it('refuses a goal or a step aimed at nothing to go under', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('goal', { text: 'Run' }, world.writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('plan-step', { text: 'Do it' }, world.writers)).toMatchObject({ ok: false });
+    expect(world.tables['goals.items']).toEqual([]);
+    expect(world.tables['public.plan_items']).toEqual([]);
   });
 
   it('names each Goals row a capture touched once', () => {

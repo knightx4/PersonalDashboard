@@ -46,8 +46,7 @@ import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { PlanRow } from './plan-row';
 import { OrderedSiblings } from './sibling-order';
-import { AddFeature, NewFeature } from './feature-compose';
-import type { PlanScope } from '@/lib/plan/projects';
+import { AddFeature } from './feature-compose';
 import { ColumnHeader } from '@/components/plan-tree/grid';
 import { moduleAnchor } from '@/lib/plan/feature-page';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
@@ -451,7 +450,6 @@ export function PlanView({
   opened = false,
   initialQuery = '',
   basePath = '/dev/plan',
-  newFeature,
 }: {
   sections: PlanSection[];
   /** The page this plan is drawn on, which the view links stay on. */
@@ -510,16 +508,6 @@ export function PlanView({
   opened?: boolean;
   /** What the search box holds on arrival: `?q=` on the page's address. */
   initialQuery?: string;
-  /**
-   * The "New feature" surface at the top (plan #1670): the module it starts
-   * on and the modules it offers. `open` forces it open, for the gallery; the
-   * page opens it from `?new=feature`.
-   */
-  newFeature?: {
-    open?: boolean;
-    module?: PlanScope | null;
-    scopes?: readonly (PlanScope | null)[];
-  };
 }) {
   const [query, setQuery] = useState(initialQuery);
   const searching = searchTerms(query).length > 0;
@@ -578,8 +566,6 @@ export function PlanView({
 
   return (
     <div className="space-y-6">
-      <NewFeature {...newFeature} />
-
       {/* Above the summary, because it is the reason the summary's claims are
           read off the clock. A banner rather than a status line: the key is a
           setting only the person can change, the sentence GitHub's refusal was

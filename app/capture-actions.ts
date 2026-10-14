@@ -2,9 +2,11 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { recordAttachments } from '@/lib/attachments/store';
 import { aimProblem, CAPTURE_KINDS, type CaptureKindId } from '@/lib/capture/actions';
@@ -37,6 +39,12 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { CAPTURE_BODY_MAX } from '@/lib/goals/capture';
 import { CAPTURE_SORT_MIN_CHARS } from '@/lib/goals/capture-sort';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { insertArea, insertGoal } from '@/lib/goals/store';
+import { GOAL_TITLE_MAX, parseAreaName } from '@/lib/goals/tree';
+import { steerLearnAfterGoalSaved } from '@/lib/learn/goal-saved';
+import { isOwner } from '@/lib/dev/owner';
+import { writeDevNote, writeIdea } from '@/lib/feedback/file-note';
+import { writePlanItem } from '@/lib/plan/capture-write';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
@@ -223,6 +231,22 @@ export async function fileCaptureBox(
   return result;
 }
 
+type SessionUser = Awaited<ReturnType<typeof requireUser>>;
+
+/** The writers for the kinds only an Add button makes (plan #1950.5). */
+type AimedOnlyWriters = Pick<CaptureWriters, 'goal' | 'goalArea' | 'planItem' | 'idea' | 'devNote'>;
+
+const NOT_SORTED = { ok: false as const, error: 'That is added from its own Add button, not from the one box.' };
+
+/** The one box's: Dash's sort never files into these kinds. */
+const NOT_FROM_THE_BOX: AimedOnlyWriters = {
+  goal: async () => NOT_SORTED,
+  goalArea: async () => NOT_SORTED,
+  planItem: async () => NOT_SORTED,
+  idea: async () => NOT_SORTED,
+  devNote: async () => NOT_SORTED,
+};
+
 /**
  * The writers capture makes rows with, bound to the signed-in person: the
  * same ones for the one box and for an Add button aimed at a kind, apart
@@ -243,6 +267,7 @@ async function rowWriters(
         : { ok: false as const, error: written.error };
     },
     vault: (text) => fileVaultNote(userId, text),
+    ...NOT_FROM_THE_BOX,
     record: (entry) => recordDashAction(deps, entry),
     role: async (input) => {
       const written = await writeJobLead({ userId, enabledModules: modules, db: requestAskDb() }, input);
@@ -265,6 +290,43 @@ async function rowWriters(
   };
 }
 
+/** The writers for a goal, an area, a plan row, an idea and a note for Dev. */
+function aimedOnlyWriters(user: SessionUser): AimedOnlyWriters {
+  const userId = user.id;
+  // The plan and the ideas page are the owner's alone (#417); asked once,
+  // and only when one of those is being written.
+  let owner: Promise<boolean> | null = null;
+  const owned = async () => {
+    owner ??= createClient().then((supabase) => isOwner({ user, supabase }));
+    return owner;
+  };
+  const notOwner = { ok: false as const, error: 'Only the owner of this app can add to the plan and its ideas.' };
+  return {
+    goal: async (areaId, title) => {
+      const name = title.trim();
+      if (name.length > GOAL_TITLE_MAX) return { ok: false, error: `Keep the goal under ${GOAL_TITLE_MAX} characters.` };
+      const id = await insertGoal(await createGoalsClient(), userId, areaId, { title: name });
+      if (!id) return { ok: false, error: 'That area is no longer there.' };
+      // A goal in the Learn area is placed and given a plan (plan #1490),
+      // after the response, as one added on /goals always was.
+      after(async () => {
+        await steerLearnAfterGoalSaved(await createLearnClient(), userId, id);
+      });
+      return { ok: true, id };
+    },
+    goalArea: async (text) => {
+      const name = parseAreaName(text);
+      if (!name.ok) return { ok: false, error: name.error };
+      return { ok: true, id: await insertArea(await createGoalsClient(), userId, name.value) };
+    },
+    planItem: async (title, at) =>
+      (await owned()) ? writePlanItem(await createClient(), userId, title, at) : notOwner,
+    idea: async (body) => ((await owned()) ? writeIdea(await createClient(), userId, body) : notOwner),
+    devNote: async (body, pagePath) =>
+      writeDevNote(await createClient(), user, body, pagePath, (await headers()).get('user-agent')),
+  };
+}
+
 /** The one box's writers: every place the sort files into, a goal update among them. */
 async function writersFor(
   userId: string,
@@ -276,13 +338,19 @@ async function writersFor(
 
 /**
  * An aimed add's writers: every kind that makes one row, Shopping's among
- * them (plan #1950.3.1). A goal update is never made here, since aiming it
+ * them (plan #1950.3.1), and the goal, area, plan, idea and Dev note kinds
+ * the box never reaches (plan #1950.5). A goal update is never made here, since aiming it
  * opens Goals' own panel, so its writer only says so; keeping it out is also
  * what keeps this press's $ hint to the order read alone.
  */
-async function aimedWriters(userId: string, modules: ModuleId[]): Promise<CaptureWriters> {
+async function aimedWriters(
+  user: SessionUser,
+  modules: ModuleId[],
+  files: readonly UploadedAttachment[],
+): Promise<CaptureWriters> {
   return {
-    ...(await rowWriters(userId, modules, [])),
+    ...(await rowWriters(user.id, modules, files)),
+    ...aimedOnlyWriters(user),
     goals: async () => ({ error: 'Log what happened from its own panel.' }),
     shopping: {
       order: (text, emailId) => (emailId ? makeShoppingOrderFromEmail(emailId) : makeShoppingOrder(text)),
@@ -301,6 +369,10 @@ const Aimed = z.object({
   role: z.object({ id: z.string().uuid(), title: z.string().max(300), company: z.string().max(300).nullable() }).optional(),
   /** An order's source: a waiting email on the review list, read instead of the text (plan #1950.3.3). */
   emailId: z.string().uuid().optional(),
+  /** The area a goal goes in, the row a step goes under, or a feature's module. */
+  under: z.object({ id: z.string().min(1).max(64), title: z.string().max(300) }).optional(),
+  /** The page a note for Dev was filed from. */
+  page: z.string().max(300).optional(),
 });
 export type CaptureAimedInput = z.infer<typeof Aimed>;
 
@@ -313,25 +385,37 @@ export type CaptureMade = { ok: true; filed: FiledCapture; errors: string[] } | 
  * back by the same rule as the box and Home does not list it as Dash's.
  */
 // latency: pending
-export async function makeAimedCapture(input: CaptureAimedInput): Promise<CaptureMade> {
+export async function makeAimedCapture(input: CaptureAimedInput, uploaded: unknown = []): Promise<CaptureMade> {
   const user = await requireUser();
   const parsed = Aimed.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
-  const { kind: kindId, text, day, role, emailId } = parsed.data;
+  const { kind: kindId, text, day, role, under, page, emailId } = parsed.data;
   const kind = CAPTURE_KINDS[kindId];
-  const problem = aimProblem({ kind: kindId, role });
+  const problem = aimProblem({ kind: kindId, role, under });
   if (problem) return { ok: false, error: problem };
 
   const settings = await loadAccountSettings(user.id);
   const modules = settings.enabledModules as ModuleId[];
-  if (!modules.includes(kind.module)) {
+  if (!kind.everyone && !modules.includes(kind.module)) {
     return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
   }
+  // Files only for a kind that takes them (plan #1713): a note for Dev.
+  const files = kind.files ? parseUploadedAttachments(uploaded, user.id) : [];
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role, emailId }, await aimedWriters(user.id, modules));
+    const made = await makeCaptureKind(
+      kindId,
+      { text, day, role, under, page, emailId },
+      await aimedWriters(user, modules, files),
+    );
     if (!made.ok) return { ok: false, error: made.error };
-    revalidatePath(kind.section, 'layout');
-    revalidatePath('/home');
+    // A note for Dev refreshes nothing: any revalidation renders the page
+    // you are on again before answering, and a note is filed from every page,
+    // heavy ones included (notes a78502b0, 3abf5f41). The queue is read
+    // fresh when it is next opened.
+    if (kindId !== 'dev-note') {
+      revalidatePath(kind.section, 'layout');
+      revalidatePath('/home');
+    }
     return { ok: true, filed: made.filed, errors: made.errors };
   } catch (error) {
     console.error('capture: making an aimed row failed', kindId, error);
@@ -387,6 +471,8 @@ export async function captureBoxCosts(): Promise<PaidCosts> {
     return await estimatePaidActions(core, user.id, [
       'app/capture-actions.ts#fileCaptureBox',
       'app/capture-actions.ts#makeAimedCapture',
+      'app/capture-actions.ts#makeAimedCapture:goal',
+      'app/capture-actions.ts#makeAimedCapture:dev-note',
     ]);
   } catch {
     return {};
