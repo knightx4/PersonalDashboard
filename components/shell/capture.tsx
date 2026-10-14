@@ -1093,7 +1093,7 @@ function describeFiledWithin(entry: FiledEntry): string {
 const CARRY_MS = 6000;
 let carried: { toast: ToastInput; at: number } | null = null;
 
-function carryToast(toast: ToastInput) {
+export function carryToast(toast: ToastInput) {
   carried = { toast, at: Date.now() };
 }
 

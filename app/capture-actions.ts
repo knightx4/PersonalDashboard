@@ -40,7 +40,12 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import type { ModuleId } from '@/lib/modules';
 import { addTask } from '@/app/todo/actions';
 import { fileGoalCapture } from '@/app/goals/capture-actions';
-import { makeShoppingItem, makeShoppingOrder, makeShoppingSaved } from '@/app/shopping/capture-writers';
+import {
+  makeShoppingItem,
+  makeShoppingOrder,
+  makeShoppingOrderFromEmail,
+  makeShoppingSaved,
+} from '@/app/shopping/capture-writers';
 
 /**
  * The one capture box's server side (plan #1581, feature #1579): where a
@@ -280,7 +285,7 @@ async function aimedWriters(userId: string, modules: ModuleId[]): Promise<Captur
     ...(await rowWriters(userId, modules, [])),
     goals: async () => ({ error: 'Log what happened from its own panel.' }),
     shopping: {
-      order: (text) => makeShoppingOrder(text),
+      order: (text, emailId) => (emailId ? makeShoppingOrderFromEmail(emailId) : makeShoppingOrder(text)),
       item: (text) => makeShoppingItem(text),
       saved: (text) => makeShoppingSaved(text),
     },
@@ -294,6 +299,8 @@ const Aimed = z.object({
   /** A todo's day: a word the chips send, or a date the field holds. */
   day: z.string().max(10).optional(),
   role: z.object({ id: z.string().uuid(), title: z.string().max(300), company: z.string().max(300).nullable() }).optional(),
+  /** An order's source: a waiting email on the review list, read instead of the text (plan #1950.3.3). */
+  emailId: z.string().uuid().optional(),
 });
 export type CaptureAimedInput = z.infer<typeof Aimed>;
 
@@ -310,7 +317,7 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
   const user = await requireUser();
   const parsed = Aimed.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That could not be read. Try again.' };
-  const { kind: kindId, text, day, role } = parsed.data;
+  const { kind: kindId, text, day, role, emailId } = parsed.data;
   const kind = CAPTURE_KINDS[kindId];
   const problem = aimProblem({ kind: kindId, role });
   if (problem) return { ok: false, error: problem };
@@ -321,7 +328,7 @@ export async function makeAimedCapture(input: CaptureAimedInput): Promise<Captur
     return { ok: false, error: 'That workspace is switched off, so nothing can be added there.' };
   }
   try {
-    const made = await makeCaptureKind(kindId, { text, day, role }, await aimedWriters(user.id, modules));
+    const made = await makeCaptureKind(kindId, { text, day, role, emailId }, await aimedWriters(user.id, modules));
     if (!made.ok) return { ok: false, error: made.error };
     revalidatePath(kind.section, 'layout');
     revalidatePath('/home');

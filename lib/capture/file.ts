@@ -74,7 +74,7 @@ export type ShoppingMade = { ok: true; id: string; title: string } | { ok: false
 
 export type ShoppingWriters = {
   /** An order from a sentence, read by the model when there is one. */
-  order: (text: string) => Promise<ShoppingMade>;
+  order: (text: string, emailId?: string) => Promise<ShoppingMade>;
   /** Something owned: a book from an ISBN, anything else by its name. */
   item: (text: string) => Promise<ShoppingMade>;
   /** A saved thing from the link in what was typed. */
@@ -160,6 +160,8 @@ export type MakeInput = {
   day?: CaptureDay;
   /** The role a note on a job goes on. */
   role?: CaptureSortRole | null;
+  /** The waiting email an order is made from, when it is (plan #1950.3.3). */
+  emailId?: string;
 };
 
 export type MakeResult = { ok: true; filed: FiledCapture } | { ok: false; error: string };
@@ -187,9 +189,10 @@ function shoppingMaker(spec: {
   section: string;
   said: (title: string) => string;
 }): Maker {
-  return async ({ text }, writers, by, errors) => {
+  return async ({ text, emailId }, writers, by, errors) => {
     if (!writers.shopping) return { ok: false, error: CANNOT_HERE };
-    const result = await writers.shopping[spec.writer](text);
+    const write: (text: string, emailId?: string) => Promise<ShoppingMade> = writers.shopping[spec.writer];
+    const result = await write(text, emailId);
     if (!result.ok) return { ok: false, error: result.error };
     const subjectRef = `public.${spec.table}:${result.id}`;
     const files = await attachTo(writers, [subjectRef], errors);
