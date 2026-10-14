@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evidenceFromRows, type EvidenceRow } from './model';
+import { backedByText, basisSentence, evidenceFromRows, type EvidenceRow } from './model';
 
 const row = (over: Partial<EvidenceRow>): EvidenceRow => ({
   id: 'a',
@@ -43,5 +43,20 @@ describe("an idea's evidence", () => {
       sourceId: 'c9',
       basis: 'from MGT 541 Corporate Finance, A, 2025',
     });
+  });
+});
+
+describe('evidence as a card says it', () => {
+  it('starts the basis with a capital', () => {
+    expect(basisSentence('you wrote about this in Notes')).toBe('You wrote about this in Notes');
+    expect(basisSentence('From your résumé: "Led audits"')).toBe('From your résumé: "Led audits"');
+  });
+
+  it('counts what backs an idea by kind, in order of the strongest', () => {
+    expect(backedByText([])).toBeNull();
+    expect(backedByText([{ sourceKind: 'course' }])).toBe('a course');
+    expect(
+      backedByText([{ sourceKind: 'note' }, { sourceKind: 'course' }, { sourceKind: 'note' }, { sourceKind: 'work' }]),
+    ).toBe('2 notes, a course and your work');
   });
 });
