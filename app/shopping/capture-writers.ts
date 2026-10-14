@@ -32,9 +32,9 @@ import { linkIn, linkTitle, typedIsbn } from '@/lib/capture/shopping-text';
 import type { ShoppingMade } from '@/lib/capture/file';
 import type { ScannedThing } from '@/lib/capture/actions';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
-import { saveOwnedBook, searchOwnedBook } from './inventory/add/actions';
-import { saveGame, searchGame } from './inventory/add/games/actions';
-import { saveManualItem } from './inventory/add/item-actions';
+import { saveOwnedBook, searchOwnedBook } from './inventory/book-actions';
+import { saveGame, searchGame } from './inventory/game-actions';
+import { saveManualItem } from './inventory/item-actions';
 import { readReceiptPhoto, saveReceiptOrder } from './orders/receipt-order';
 
 type Client = Awaited<ReturnType<typeof createClient>>;

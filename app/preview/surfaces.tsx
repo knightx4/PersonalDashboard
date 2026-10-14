@@ -61,6 +61,7 @@ import { GotThroughDemo } from '@/app/dev/ui/got-through-demo';
 import { GotThrough } from '@/app/news/quick/got-through';
 import { HomeArrivalDemo } from '@/app/dev/ui/home-arrival-demo';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
+import { ShoppingItemCatalogueSurface } from './shopping-catalogue-surfaces';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
 import {
@@ -357,11 +358,8 @@ import {
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
 import {
-  ShoppingAddBooksSurface,
-  ShoppingAddGamesSurface,
+  ShoppingDashboardEmptySurface,
   ShoppingDashboardSurface,
-  ShoppingOrderNewSurface,
-  ShoppingOrderReceiptSurface,
   ShoppingOrderSurface,
   ShoppingReturnsSurface,
   ShoppingSavedItemSurface,
@@ -3644,6 +3642,15 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The catalogue part of the same Details box, for a book with its
+     * printing to confirm and a game from BoardGameGeek (plan #1950.3.4). */
+    id: 'shopping-item-details-catalogue',
+    label: 'Inventory · Item details, a book and a game',
+    module: 'shopping',
+    width: 'wide',
+    render: () => <ShoppingItemCatalogueSurface />,
+  },
+  {
     /* The thread on a dev row, in the middle of an exchange. The waiting line
      * is up as well: it is only on screen while a tagged comment is being
      * answered, which is a few seconds nobody can hold still for a shot.
@@ -6909,18 +6916,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ShoppingDashboardSurface />,
   },
   {
-    id: 'shopping-add-books',
-    label: 'Shopping · Add owned books',
+    id: 'shopping-dashboard-empty',
+    label: 'Shopping · Dashboard, no orders yet',
     module: 'shopping',
     width: 'page',
-    render: () => <ShoppingAddBooksSurface />,
-  },
-  {
-    id: 'shopping-add-games',
-    label: 'Shopping · Add board games',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingAddGamesSurface />,
+    render: () => <ShoppingDashboardEmptySurface />,
   },
   {
     id: 'shopping-order',
@@ -6928,20 +6928,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'page',
     render: () => <ShoppingOrderSurface />,
-  },
-  {
-    id: 'shopping-order-new',
-    label: 'Shopping · Add an order, filled in from an email',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingOrderNewSurface />,
-  },
-  {
-    id: 'shopping-order-receipt',
-    label: 'Shopping · Receipt photo',
-    module: 'shopping',
-    width: 'page',
-    render: () => <ShoppingOrderReceiptSurface />,
   },
   {
     id: 'shopping-returns',

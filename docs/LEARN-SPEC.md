@@ -259,9 +259,8 @@ and for now says so. Paste with no question works fine and is the common case.
 
 ### 2. Parse
 
-Free text to candidate references. Same shape as `lib/books/paste-list.ts`,
-which already does exactly this job for a pasted list of owned books and is
-the pattern to copy rather than reinvent: Haiku
+Free text to candidate references, in the shape the pasted list of owned
+books had before Shopping's add pages went (plan #1950.3.4): Haiku
 (`claude-haiku-5-5`), a tool call, a `zod` schema, and a
 line-heuristic fallback when `ANTHROPIC_API_KEY` is unset so the module is
 developable without one.

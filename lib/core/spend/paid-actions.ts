@@ -146,10 +146,6 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
   // Shopping
-  'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],
-  'app/shopping/inventory/add/games/actions.ts#extractGamesFromPhoto': ['read-shelf-photo'],
-  'app/shopping/inventory/add/photo-actions.ts#extractBooksFromPhoto': ['read-book-photo'],
-  'app/shopping/orders/receipt/actions.ts#previewReceiptPhoto': ['read-receipt-photo'],
   'app/shopping/sell/actions.ts#priceSellItems': ['estimate-resale-price'],
   'app/shopping/sell/actions.ts#priceOneItem': ['estimate-resale-price'],
   'app/shopping/sell/actions.ts#searchItemPrice': ['estimate-resale-price'],
@@ -244,8 +240,6 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Called by the one capture box when typing pauses, to say where the sentence will go (plan #1581). There is no button, only the field; the File it hint prices it under app/capture-actions.ts#fileCaptureBox.',
   'app/goals/actions.ts#editGoal':
     'Saved when a goal\'s title or done-when loses focus after a change, or when it is moved to another area. Only a goal in the Learn area costs: it is placed again and, if it has no plan yet, given one (plan #1490). There is no button, only the field.',
-  'app/shopping/review/actions.ts#readOrderFromEmail':
-    'Nothing calls it. "Add from this email" on the review list makes the order in one press through app/capture-actions.ts#makeAimedCapture, whose hint for that button is the key ending :email.',
   'app/api/inbox/sync/continue/route.ts#POST':
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':

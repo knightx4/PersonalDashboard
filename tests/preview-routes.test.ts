@@ -94,11 +94,11 @@ describe('routeOfFile', () => {
   });
 
   it('serves a static folder before a dynamic one, as Next does', () => {
-    const found = surfacesForFiles(['app/shopping/orders/new/order-form.tsx']);
-    expect(found).toContain('shopping-order-new');
-    expect(found).not.toContain('shopping-order');
-    expect(surfacesForFiles(['app/shopping/orders/[id]/order-detail-view.tsx'])).toContain(
-      'shopping-order',
+    const found = surfacesForFiles(['app/shopping/share/families/families-view.tsx']);
+    expect(found).toContain('shopping-share-families');
+    expect(found).not.toContain('shopping-share');
+    expect(surfacesForFiles(['app/shopping/share/[id]/share-detail-view.tsx'])).toContain(
+      'shopping-share',
     );
   });
 });

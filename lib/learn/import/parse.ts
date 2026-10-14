@@ -20,10 +20,8 @@ import { forceTool } from '@/lib/learn/graph/tool-call';
  *
  * Haiku, because this is transcription rather than judgment: the text already
  * names the works, and the job is to split them apart and say which part is
- * the citation and which is the recommender's commentary. Same division
- * lib/books/paste-list.ts already makes for a pasted list of owned books, and
- * the same fallback: with no API key the heuristic runs instead, so the module
- * is developable without one.
+ * the citation and which is the recommender's commentary. With no API key
+ * the heuristic runs instead, so the module is developable without one.
  */
 
 const MODEL = MODELS.learnImportParse;
