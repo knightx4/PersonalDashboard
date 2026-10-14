@@ -23,7 +23,7 @@ export const goalsActions: ModuleActions = {
     setStepOnTodoAction: tool('schedule_goal_step'),
     countRhythmAction: tool('file_count'),
     moveStepAction: GAP,
-    archiveStepAction: GAP,
+    archiveStepAction: tool('archive_goal_step'),
     linkStepAction: GAP,
     unlinkStepAction: GAP,
   },

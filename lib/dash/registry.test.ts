@@ -62,6 +62,9 @@ describe('DASH_TOOLS', () => {
       'build_step',
       'file_goal_record',
       'schedule_goal_step',
+      'move_goal_step',
+      'archive_goal_step',
+      'promote_step_to_errand',
       'write_cover_letter',
       'file_close',
       'file_count',
@@ -98,7 +101,15 @@ describe('DASH_TOOLS', () => {
     expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.raise)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.change)).toEqual(['file_idea', 'file_note', 'reword', 'pass_to_session']);
-    expect(own(GOAL_THREAD_TABLE)).toEqual(['file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']);
+    expect(own(GOAL_THREAD_TABLE)).toEqual([
+      'file_goal_record',
+      'schedule_goal_step',
+      'move_goal_step',
+      'archive_goal_step',
+      'promote_step_to_errand',
+      'take_step',
+      'pass_to_routine',
+    ]);
     expect(own(ROLE_THREAD_TABLE)).toEqual(['write_cover_letter']);
   });
 
