@@ -564,7 +564,7 @@ export function OvernightControl({
                       : 'Approve every proposed feature and step now, and each new one as it is written.'
                   }
                 >
-                  <CheckCheck strokeWidth={1.75} className="size-3.5" aria-hidden />
+                  <CheckCheck strokeWidth={1.75} className="size-3.5 max-sm:hidden" aria-hidden />
                   {autoApprove ? 'Auto approve on' : 'Auto approve'}
                 </Button>
               </form>
@@ -640,13 +640,13 @@ export function OvernightControl({
                     <span className="text-small text-ink-muted">features, over</span>
                   </>
                 )}
-                {keepGoing && <span className="text-small text-ink-muted">Run</span>}
+                {keepGoing && <span className="text-small text-ink-muted max-sm:sr-only">Run</span>}
                 <Select
                   name="hours"
                   value={hours}
                   onChange={(event) => setHours(Number(event.target.value))}
                   aria-label="How long it may run for"
-                  className="min-h-11 w-auto sm:min-h-0"
+                  className="min-h-11 w-auto max-sm:pl-2 sm:min-h-0"
                 >
                   {/* First, because it is the default and the ordinary press. */}
                   <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
