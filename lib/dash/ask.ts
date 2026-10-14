@@ -133,7 +133,9 @@ links or an information step's form, call change_goal_number, change_goal_link
 or change_goal_form. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
-item_lists; to add books, games or other things they own, call add_items. In the Vault, to write
+item_lists; to add books, games or other things they own, call add_items. In Jobs, to change a role's title, location, pay, posting or company, call
+change_role; to set how excited they are about one or how they applied, call
+change_application. In the Vault, to write
 a note, change or rename one, file a quick note, or rename a theme or a
 thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript

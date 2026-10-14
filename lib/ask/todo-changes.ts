@@ -3,6 +3,7 @@ import { isNewsChangeKind, type NewsChangeKind } from './news-changes';
 import { isGoalsChangeKind, type GoalsChangeKind } from './goals-changes';
 import { isShoppingChangeKind, type ShoppingChangeKind } from './shopping-changes';
 import { isVaultChangeKind, type VaultChangeKind } from './vault-changes';
+import { isJobsChangeKind, type JobsChangeKind } from './jobs-changes';
 import { isYouChangeKind, type YouChangeKind } from './you-changes';
 
 /**
@@ -28,11 +29,11 @@ export function isTodoChangeKind(kind: string): kind is TodoChangeKind {
 }
 
 /** The kinds whose card reads back the sentence its tool wrote: Learn's, Todo's and You's. */
-export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind;
+export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind | JobsChangeKind;
 
 /** Whether a kept change is one whose card reads back what its tool wrote. */
 export function isWrittenCard<C extends { kind: string; input: unknown }>(
   change: C,
 ): change is Extract<C, { kind: WrittenCardKind }> {
-  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind);
+  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind) || isJobsChangeKind(change.kind);
 }
