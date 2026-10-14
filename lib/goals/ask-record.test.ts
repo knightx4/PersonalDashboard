@@ -17,6 +17,8 @@ const STEP = '00000000-0000-4000-8000-000000000301';
 const STEP_DUE = vi.hoisted(() => ({ value: null as string | null }));
 /** The goal's status, which a test can set to proposed before asking. */
 const GOAL_STATUS = vi.hoisted(() => ({ value: 'open' as string }));
+/** Whether the goal is an errand, and the run the shaping store reports. */
+const ERRAND = vi.hoisted(() => ({ on: false, lastRun: null as unknown }));
 const COLLECTION = vi.hoisted(() => ({ id: 'col-1', name: 'Loans', shape: 'many', fields: [], records: [] as unknown[] }));
 
 vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: vi.fn() }));
@@ -70,8 +72,9 @@ vi.mock('@/lib/goals/store', () => ({
   }),
 }));
 vi.mock('@/lib/goals/shaping-store', () => ({
-  loadShaping: vi.fn(async () => ({ lastRun: null })),
+  loadShaping: vi.fn(async () => ({ lastRun: ERRAND.lastRun })),
   recordAndFire: vi.fn(),
+  startGoalRun: vi.fn(async () => ({ ok: true, detail: 'fired', runId: 'run-1' })),
   approveGoal: vi.fn(async (_c: unknown, id: string) => {
     const goal = tables['goals.items'].find((r) => r.id === id);
     if (!goal) return null;
@@ -81,7 +84,7 @@ vi.mock('@/lib/goals/shaping-store', () => ({
 }));
 vi.mock('@/lib/goals/steps-store', () => ({
   loadGoalMap: vi.fn(async () => ({
-    goal: { id: 'g', title: 'Clear the loans', status: GOAL_STATUS.value, areaId: 'area-money' },
+    goal: { id: 'g', title: 'Clear the loans', status: GOAL_STATUS.value, areaId: 'area-money', ...(ERRAND.on ? { errand: true, dueOn: '2026-10-20' } : {}) },
     steps: [
       {
         id: '00000000-0000-4000-8000-000000000301',
@@ -119,7 +122,7 @@ vi.mock('@/lib/goals/steps-store', () => ({
 import { answerCall, scriptedModel, stubThreadDash, toolCall, toolResults } from '../../tests/stubs/dash-model';
 import { askDashOnGoal } from './ask';
 import { writeComment } from './comments-store';
-import { approveGoal } from './shaping-store';
+import { approveGoal, startGoalRun } from './shaping-store';
 import { moveStepToGoal, setStepArchived } from './steps-store';
 import type { GoalsSupabaseClient } from './db/schema-name';
 
@@ -354,6 +357,48 @@ describe('approving a proposed goal', () => {
     expect(vi.mocked(approveGoal)).not.toHaveBeenCalled();
     expect(tables['core.dash_actions'] ?? []).toHaveLength(0);
     expect(toolResults(model.sent).join(' ')).toContain('not a goal Dash proposed');
+  });
+});
+
+describe('starting Dash on an errand', () => {
+  beforeEach(() => {
+    ERRAND.on = true;
+    ERRAND.lastRun = null;
+    vi.mocked(startGoalRun).mockClear();
+  });
+
+  it('starts the run briefed as an errand with its date, and records it as not undoable', async () => {
+    const dash = fakeDashDeps(tables, ME);
+    await ask(dash, toolCall('p', 'start_errand_run', {}), answerCall('Started.'));
+
+    expect(vi.mocked(startGoalRun)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startGoalRun).mock.calls[0][0]).toMatchObject({
+      goal: { id: 'g', title: 'Clear the loans', errandDueOn: '2026-10-20' },
+      surface: 'thread',
+    });
+    const [action] = tables['core.dash_actions'];
+    expect(action).toMatchObject({ kind: 'start_errand_run', subject_ref: 'goals.items:g' });
+    expect(action.summary).toBe('Started Dash on the errand "Clear the loans", due 20 Oct 2026.');
+    expect((action.undo as { none?: string }).none).toContain('cannot be taken back');
+  });
+
+  it('starts nothing while a run is going', async () => {
+    ERRAND.lastRun = { status: 'awaiting_input' };
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([toolCall('p', 'start_errand_run', {}), answerCall('It is already on it.')]);
+    await askWith(dash, model);
+    expect(vi.mocked(startGoalRun)).not.toHaveBeenCalled();
+    expect(tables['core.dash_actions'] ?? []).toHaveLength(0);
+    expect(toolResults(model.sent).join(' ')).toContain('already working');
+  });
+
+  it('starts nothing on a goal that is not an errand', async () => {
+    ERRAND.on = false;
+    const dash = fakeDashDeps(tables, ME);
+    const model = scriptedModel([toolCall('p', 'start_errand_run', {}), answerCall('That is not an errand.')]);
+    await askWith(dash, model);
+    expect(vi.mocked(startGoalRun)).not.toHaveBeenCalled();
+    expect(toolResults(model.sent).join(' ')).toContain('is not an errand');
   });
 });
 

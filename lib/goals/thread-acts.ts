@@ -10,7 +10,9 @@ import { formatDue } from '@/lib/goals/due-precision';
 import { saveErrand } from '@/lib/goals/errand-store';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
-import { approveGoal } from '@/lib/goals/shaping-store';
+import { resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
+import { runInFlight } from '@/lib/goals/shaping';
+import { approveGoal, loadShaping, startGoalRun } from '@/lib/goals/shaping-store';
 import { moveStepToGoal, setStepArchived } from '@/lib/goals/steps-store';
 import { loadAreas } from '@/lib/goals/store';
 
@@ -50,6 +52,13 @@ export type GoalActContext = {
   /** The step the comment is on, or null when it is on the goal itself. */
   step: StepNode | null;
   refs: ReplyRefs;
+  /** Whether the person owns the app, the only account that can start a run. */
+  canRun: boolean;
+  /** The goals routine a run is fired at. */
+  routine: RoutineTarget;
+  /** Whether the goal is an errand, and the date it is due by (plan #2035.4). */
+  goalErrand: boolean;
+  goalDueOn: string | null;
 };
 
 /** One of the thread's own acts, by the tool's arguments. */
@@ -281,6 +290,70 @@ async function approveProposedGoal(ctx: GoalActContext): ReturnType<DashThreadAc
   return { ok: true, recorded: true, kind: 'approve_goal', said: `${sentence} Undo on Home takes it back.` };
 }
 
+const NOT_AN_ERRAND =
+  '"%" is not an errand, so no run was started. Only an errand is started from a comment this way; a goal or a step of one goes to the goals routine with the comment.';
+
+/**
+ * Start Dash on the errand the thread is on (plan #2035.4): the run the
+ * errand page's Ask Dash button starts, with the errand and its date in the
+ * brief, so it costs the same as pressing that button. Refused when the goal
+ * is not an errand, when a run is already going, and when no routine can be
+ * started from here.
+ *
+ * A run that has begun cannot be taken back, so the change is recorded as
+ * not undoable: Home lists it with the reason in place of an Undo.
+ */
+async function startErrandRun(ctx: GoalActContext): ReturnType<DashThreadActs> {
+  if (!ctx.goalErrand || !ctx.goalDueOn) {
+    return { ok: false, error: NOT_AN_ERRAND.replace('%', ctx.goalTitle) };
+  }
+  if (!ctx.canRun) {
+    return { ok: false, error: 'No run was started: only the account that owns this app can start Dash on an errand.' };
+  }
+  if (!resolveRoutineId(ctx.routine.id)) {
+    return {
+      ok: false,
+      error:
+        'No run was started: no goals routine is set on this deployment (CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN). Say so, and that Ask Dash on the errand will work once it is.',
+    };
+  }
+  try {
+    const { lastRun } = await loadShaping(ctx.client, ctx.goalId);
+    if (runInFlight(lastRun, Date.now())) {
+      return {
+        ok: false,
+        error: `No run was started: Dash is already working on "${ctx.goalTitle}". Its changes will show on the errand when it is done.`,
+      };
+    }
+    const started = await startGoalRun({
+      client: ctx.client,
+      userId: ctx.userId,
+      goal: { id: ctx.goalId, title: ctx.goalTitle, errandDueOn: ctx.goalDueOn },
+      routine: ctx.routine,
+      surface: 'thread',
+    });
+    if (!started.ok) return { ok: false, error: `No run was started: ${started.error}` };
+  } catch (error) {
+    return { ok: false, error: `No run was started: ${reason(error)}.` };
+  }
+
+  const sentence = `Started Dash on the errand "${ctx.goalTitle}", due ${formatDue(ctx.goalDueOn, 'day')}.`;
+  await recordDashAction(ctx.dash, {
+    surface: 'thread',
+    kind: 'start_errand_run',
+    subjectRef: toRef('goals.items', ctx.goalId),
+    op: 'update',
+    summary: sentence,
+    noUndo: 'A run that has started cannot be taken back. It can be stopped on the errand.',
+  });
+  return {
+    ok: true,
+    recorded: true,
+    kind: 'start_errand_run',
+    said: `${sentence} What it does will show on the errand when it is done.`,
+  };
+}
+
 /** The step acts, by tool name. */
 export function stepActs(ctx: GoalActContext): Record<string, GoalAct> {
   return {
@@ -288,5 +361,6 @@ export function stepActs(ctx: GoalActContext): Record<string, GoalAct> {
     archive_goal_step: () => archiveGoalStep(ctx),
     promote_step_to_errand: (args) => promoteStepToErrand(ctx, args),
     approve_goal: () => approveProposedGoal(ctx),
+    start_errand_run: () => startErrandRun(ctx),
   };
 }

@@ -173,6 +173,7 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
     ...(context.today ? [`Today is ${context.today}.`, ''] : []),
     `Status: ${goal.status === 'parked' ? 'parked' : STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
   ];
+  if (goal.errand) out.push(`This goal is an errand${goal.dueOn ? `, due ${goal.dueOn}` : ''}.`);
   if (goal.acceptance) out.push(`Done when: ${goal.acceptance}`);
   if (goal.unit) {
     out.push(
