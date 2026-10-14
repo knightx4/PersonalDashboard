@@ -228,7 +228,8 @@ function without(sections: readonly PlanSection[], featureId: string): PlanSecti
  * handful of common files (globals.css, components/ui, the test helpers), and
  * the merge gate is what catches a collision there.
  *
- * A feature with no module is its own group: two of them are not run at once.
+ * A feature with no module is its own group here, and a second one runs only
+ * through `besideRunning`, when the two name no path in common.
  * A running feature the tree no longer shows, closed or dropped since it was
  * fired, names no module and holds back only itself.
  */

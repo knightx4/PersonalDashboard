@@ -115,7 +115,12 @@ export function footprintsMeet(a: Footprint, b: Footprint): boolean {
  * A feature stays when its module has no session going, or when it has fewer
  * than `MODULE_SESSIONS_AT_ONCE` and the feature's footprint meets none of the
  * running ones there. Features with no module are one group, as in
- * `outsideRunning`, and never share: nothing says where they land.
+ * `outsideRunning`, and share by the same footprint test. They are the
+ * app-wide work, often in places no module owns (the shell, Dash, capture),
+ * and on 14 October seven of them waited behind one while three slots stood
+ * empty. Their footprints are file paths only, since no module's pages are
+ * theirs to name, so one that names no path still never shares, and one that
+ * reaches into every workspace meets nearly anything.
  */
 export function besideRunning(
   sections: readonly PlanSection[],
@@ -142,7 +147,7 @@ export function besideRunning(
     if (running.has(node.id)) return false;
     const there = busy.get(node.module ?? '');
     if (!there) return true;
-    if (!node.module || there.length >= MODULE_SESSIONS_AT_ONCE) return false;
+    if (there.length >= MODULE_SESSIONS_AT_ONCE) return false;
     const mine = printOf(node);
     return there.every((other) => !footprintsMeet(mine, printOf(other)));
   };
