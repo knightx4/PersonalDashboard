@@ -11,6 +11,7 @@ import {
 } from '@/lib/learn/embed/idea-sweep';
 import { refreshNoteEvidence, type RefreshNoteEvidenceResult } from '@/lib/learn/evidence/notes-store';
 import { linkCourses, type LinkCoursesResult } from '@/lib/learn/evidence/course-store';
+import { refreshWorkEvidence, type WorkEvidenceResult } from '@/lib/learn/evidence/work';
 import { refreshVaultDust, type RefreshDustResult } from '@/lib/learn/map/dust-store';
 import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/lib/learn/places/store';
 
@@ -33,7 +34,10 @@ import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/l
  * `noteEvidence` in the result. Then each person's courses
  * are embedded where their text changed and linked to the ideas they cover
  * (plan #2006.4): `courses` in the result. Without the key the links are
- * still refreshed from the course vectors already stored.
+ * still refreshed from the course vectors already stored. Then each person's
+ * ideas are linked to the passages of their résumé and Career notes that match
+ * them (plan #2006.5): `work` in the result. Résumé passages are embedded only
+ * with the key; without it the passages already embedded are still matched.
  */
 const BUDGET_MS = 90_000;
 /** Ideas per person per run; a first run fills the ~150 missing today. */
@@ -49,6 +53,7 @@ export type LearnEmbeddingsDaily = {
   places: { userId: string; result: RecomputePlacesResult | { error: string } }[];
   dust: { userId: string; result: RefreshDustResult | { error: string } }[];
   noteEvidence: { userId: string; result: RefreshNoteEvidenceResult | { error: string } }[];
+  work: { userId: string; result: WorkEvidenceResult | { error: string } }[];
   courses: { userId: string; result: LinkCoursesResult | { error: string } }[];
 };
 
@@ -78,12 +83,13 @@ export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
 async function runMaps(
   learn: ReturnType<typeof createLearnServiceSupabase>,
   courseOptions: { embed: boolean },
-): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust' | 'noteEvidence' | 'courses'>> {
+): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust' | 'noteEvidence' | 'courses' | 'work'>> {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || undefined;
   const places: LearnEmbeddingsDaily['places'] = [];
   const dust: LearnEmbeddingsDaily['dust'] = [];
   const noteEvidence: LearnEmbeddingsDaily['noteEvidence'] = [];
   const courses: LearnEmbeddingsDaily['courses'] = [];
+  const work: LearnEmbeddingsDaily['work'] = [];
   const failed = (error: unknown) => ({ error: error instanceof Error ? error.message : 'failed' });
   for (const userId of await usersWithIdeas(learn)) {
     try {
@@ -112,6 +118,11 @@ async function runMaps(
     } catch (error) {
       courses.push({ userId, result: failed(error) });
     }
+    try {
+      work.push({ userId, result: await refreshWorkEvidence(learn, userId, { embed: courseOptions.embed }) });
+    } catch (error) {
+      work.push({ userId, result: failed(error) });
+    }
   }
-  return { places, dust, noteEvidence, courses };
+  return { places, dust, noteEvidence, courses, work };
 }
