@@ -9,7 +9,7 @@ import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
-import { undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
@@ -795,6 +795,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_contact' || change.kind === 'change_touch' || change.kind === 'mark_suggestion_sent') {
     return undoMany(deps, change, surface, undoContactRows);
   }
+  // And a paste of application questions (plan #1894.6.8).
+  if (change.kind === 'add_application_questions') return undoMany(deps, change, surface, undoApplicationQuestions);
   if (change.kind === 'add_interview_round') {
     // The round's row is the record's; its interview is checked here.
     const moved = await roundConversationMoved(deps.db, change.undo);
