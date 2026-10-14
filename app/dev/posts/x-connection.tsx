@@ -121,6 +121,12 @@ export function XConnection({
               made before posting was added, so it can read but not post.
             </p>
           )}
+          {view.canPost && !view.canPostImages && (
+            <p className="text-small text-ink-muted">
+              To post a draft&rsquo;s images with it, press Disconnect, then Connect X once more. The sign-in you
+              have was made before images were added, so it can post text only.
+            </p>
+          )}
         </>
       );
       // What Check X now just said replaces the stored line it answers.

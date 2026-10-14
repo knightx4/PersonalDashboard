@@ -8,7 +8,7 @@ import { createHash, randomBytes } from 'crypto';
  * the client id and secret as Basic auth, and the code verifier proves the
  * same browser started the round trip. The scopes are `tweet.read` and
  * `users.read` for the posts and who wrote them, `tweet.write` for posting a
- * draft, and `offline.access` for a refresh token, without which the
+ * draft, `media.write` for uploading the draft's images, and `offline.access` for a refresh token, without which the
  * connection would lapse after two hours. A sign-in made before `tweet.write`
  * was asked for cannot post; X keeps a grant's scopes through refreshes, so
  * only a fresh Connect adds it (`hasXWriteScope` in ./account.ts reads the stored
@@ -26,7 +26,7 @@ export const X_AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
 export const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
 export const X_REVOKE_URL = 'https://api.x.com/2/oauth2/revoke';
 export const X_ME_URL = 'https://api.x.com/2/users/me';
-export const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'] as const;
+export const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'media.write', 'offline.access'] as const;
 
 export type XClient = { clientId: string; clientSecret: string };
 

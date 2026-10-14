@@ -289,8 +289,10 @@ function ConfirmPost({
           post for instead of {formatXPrice(X_POST_PRICE_USD)}, about 13 times more.
         </p>
       )}
-      {card.images.length > 0 && (
-        <p className="max-w-prose text-small text-ink-muted">The images stay here: the post goes out as text only.</p>
+      {card.images.length > 0 && partial === 0 && (
+        <p className="max-w-prose text-small text-ink-muted">
+          {card.images.length === 1 ? 'The image goes' : 'The images go'} on the {total > 1 ? 'first post' : 'post'}.
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button

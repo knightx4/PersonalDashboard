@@ -152,6 +152,10 @@ shows as a ! beside the button and again on the confirm step, and the person
 decides. X refuses what it will not take, such as a post past 280
 characters, and the tab shows its reason.
 
+A draft's images, up to four, go on its first post. Each is uploaded with
+POST /2/media/upload before the post is sent, which needs the sign-in to
+carry `media.write`; X lists no price for the upload.
+
 ## Examples
 
 Each example is written from a shipped step, cited by number, with its
