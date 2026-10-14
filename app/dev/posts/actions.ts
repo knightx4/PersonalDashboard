@@ -20,9 +20,10 @@ import {
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { loadXAccount } from '@/lib/x/account';
+import { freshXAccessToken, hasXWriteScope, loadXAccount, XDisconnectedError } from '@/lib/x/account';
 import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
 import { revokeXToken } from '@/lib/x/oauth';
+import { sendXThread, XPostError, xPostUrl, xSendCheck } from '@/lib/x/post';
 import { runXRead, xRunMessage } from '@/lib/x/read';
 
 /**
@@ -36,8 +37,9 @@ import { runXRead, xRunMessage } from '@/lib/x/read';
  * dropped row without its time, so each status goes in with its own fields
  * in the same update.
  *
- * Nothing here posts anywhere. The person posts on X themselves and pastes
- * the link back.
+ * Only postToX posts anywhere, and only when the person presses Post on one
+ * draft and confirms it (plan #2072). Otherwise the person posts on X
+ * themselves and pastes the link back.
  */
 
 export type PostsActionState = { error?: string; message?: string };
@@ -589,4 +591,127 @@ export async function checkX(): Promise<{ ok: boolean; error?: string; message?:
     revalidatePath(POSTS_PATH);
     return { ok: false, error: 'Something went wrong reading X. Try again in a minute.' };
   }
+}
+
+/** How long a send holds its claim on a draft before another press may take it. */
+const X_SEND_CLAIM_MS = 2 * 60 * 1000;
+
+/**
+ * Post (plan #2072): send one waiting draft to X as the connected account,
+ * a thread as a chain of replies, and mark it posted with the first post's
+ * link: the same fields "Is this it?" fills in (confirmXMatch).
+ *
+ * Never automatic and never more than one draft: the tab sends one id after
+ * the person confirms. The draft is checked again here (xSendCheck), since an
+ * action can be posted without the page.
+ *
+ * A double press sends nothing twice. The send first claims the draft by
+ * setting x_sending_at where it is unset (or older than two minutes, so a
+ * send that died does not hold it forever); a second press finds it claimed
+ * and stops. Each post X accepts is stored in x_thread_ids before the next is
+ * sent, so a thread that stops part-way carries on from there next time.
+ */
+// latency: pending -- one request to X per post, a second or two each
+export async function postToX(formData: FormData): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { ok: false, error: 'Missing post.' };
+  if (!isXOAuthConfigured()) return { ok: false, error: 'The X keys are not set yet.' };
+
+  const account = await loadXAccount(supabase, user.id);
+  if (!account || account.status !== 'active') return { ok: false, error: 'Connect X on this tab first.' };
+  if (!hasXWriteScope(account.scope)) {
+    return { ok: false, error: 'The X sign-in cannot post yet. Press Disconnect, then Connect X, and try again.' };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('id, body, x_thread_ids')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .maybeSingle();
+  if (readError) return { ok: false, error: readError.message };
+  if (!row) return { ok: false, error: 'This draft is no longer waiting to be posted.' };
+
+  const body = Array.isArray(row.body) ? (row.body as unknown[]).map(String) : [];
+  const already = Array.isArray(row.x_thread_ids) ? (row.x_thread_ids as string[]) : [];
+  const check = xSendCheck({ body, sent: already.length });
+  if (!check.ok) {
+    return {
+      ok: false,
+      error: check.problems.length ? `Not sent: ${check.problems.join('; ')}.` : 'Nothing left to send.',
+    };
+  }
+
+  const claimedAt = new Date();
+  const staleBefore = new Date(claimedAt.getTime() - X_SEND_CLAIM_MS).toISOString();
+  const { data: claimed, error: claimError } = await supabase
+    .from('social_posts')
+    .update({ x_sending_at: claimedAt.toISOString() })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .or(`x_sending_at.is.null,x_sending_at.lt.${staleBefore}`)
+    .select('id');
+  if (claimError) return { ok: false, error: claimError.message };
+  if (!claimed?.length) return { ok: false, error: 'This draft is already being posted.' };
+
+  let ids: string[];
+  try {
+    const env = xOAuthEnv();
+    const token = await freshXAccessToken(supabase, account, {
+      client: xClient(env),
+      encryptionKey: env.TOKEN_ENCRYPTION_KEY,
+    });
+    ids = await sendXThread({
+      token,
+      posts: body,
+      sent: already,
+      onSent: async (sent) => {
+        const { error } = await supabase
+          .from('social_posts')
+          .update({ x_thread_ids: sent })
+          .eq('user_id', user.id)
+          .eq('id', id.data);
+        // The post is on X whatever this write did; log it rather than stop the thread.
+        if (error) console.error('x post progress', error);
+      },
+    });
+  } catch (err) {
+    await supabase.from('social_posts').update({ x_sending_at: null }).eq('user_id', user.id).eq('id', id.data);
+    revalidatePath(POSTS_PATH);
+    if (err instanceof XDisconnectedError) return { ok: false, error: err.message };
+    if (err instanceof XPostError) {
+      const up = err.sent.length;
+      const partial =
+        up > 0 && up < body.length ? ` Posts 1 to ${up} of ${body.length} are on X; Post sends the rest.` : '';
+      return { ok: false, error: `${err.message}${partial}` };
+    }
+    console.error('x post', err);
+    return { ok: false, error: 'Something went wrong posting to X. Check the account on X before trying again.' };
+  }
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({
+      status: 'posted',
+      posted_url: xPostUrl(account.handle, ids[0]!),
+      posted_at: new Date().toISOString(),
+      dropped_at: null,
+      x_post_id: ids[0],
+      x_candidate_id: null,
+      x_thread_ids: ids,
+      x_sending_at: null,
+    })
+    .eq('user_id', user.id)
+    .eq('id', id.data);
+  revalidatePath(POSTS_PATH);
+  if (error) {
+    console.error('x post mark posted', error);
+    return { ok: false, error: `Posted on X, but the draft could not be marked posted: ${error.message}` };
+  }
+  return { ok: true, message: ids.length > 1 ? `Posted the thread of ${ids.length} to X.` : 'Posted to X.' };
 }
