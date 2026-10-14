@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
 import { removeAttachmentsFor } from '@/lib/attachments/store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadErrandAreas, saveErrandAndStart } from '@/lib/goals/errand-store';
@@ -320,9 +321,13 @@ export async function pinTask(id: string, pinned: boolean): Promise<{ error: str
 }
 
 // latency: optimistic -- the row offers "bring back" before the write returns
-export async function laterTask(id: string): Promise<{ error: string | null }> {
+export async function laterTask(id: string, choice: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  const { error } = await snoozeTask(user.id, id);
+  // One of the Later menu's days, or a day picked, in the account's timezone.
+  const { timezone } = await loadAccountSettings(user.id);
+  const day = snoozeDay(choice, todayIn(timezone));
+  if (!day) return { error: 'Pick a day after today.' };
+  const { error } = await snoozeTask(user.id, id, dayStartIn(day, timezone));
   if (error) return { error };
 
   revalidateTodo();

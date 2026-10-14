@@ -180,7 +180,7 @@ describe('the Goals home', () => {
       'Avalanche or snowball?',
       'Nothing with Dash',
       'Since your last visit',
-      'Set aside',
+      'font-medium text-ink">Later<',
       'Other goals',
     ];
     const positions = order.map((text) => html.indexOf(text));
@@ -191,11 +191,11 @@ describe('the Goals home', () => {
     }
   });
 
-  it('gives each thing in Do next one button and Not now', () => {
+  it('gives each thing in Do next one button and Later', () => {
     const html = render();
     expect(html).toContain('>Answer<');
     expect(html).toContain('>Done<');
-    expect(html).toContain('Not now');
+    expect(html).toContain('aria-label="Later: ');
     // Ask Dash on a step of yours shows only to the owner, who alone can start a run.
     expect(asks(render({ preparable: ['a'], canRun: true }))).toBe(asks(html) + 1);
     expect(asks(render({ preparable: ['a'] }))).toBe(asks(html));
@@ -271,16 +271,16 @@ describe('the Goals home', () => {
     expect(html).toContain('Needs you: Which cards do you have?');
   });
 
-  it('lists set-aside steps under Set aside with Bring back now', () => {
+  it('lists set-aside steps under Later with Bring back now', () => {
     const html = render({
       laterOn: [
         { id: 'l1', title: 'Turn on autopay', goalId: 'g1', goalTitle: 'Pay off the debts', startsOn: '2026-11-01', dueOn: null },
       ],
     });
-    expect(html).toContain('Set aside');
+    expect(html).toContain('font-medium text-ink">Later<');
     expect(html).toContain('back 1 Nov');
     expect(html).toContain('Bring back now');
-    expect(render()).not.toContain('Set aside');
+    expect(render()).not.toContain('font-medium text-ink">Later<');
   });
 
   it('lists each other goal on one line: its status and its next move', () => {

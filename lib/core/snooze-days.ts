@@ -1,17 +1,24 @@
 /**
- * The days an inbox snooze can be set to (plan #1844): tomorrow, next week, or
- * a day picked. Shared by every inbox that snoozes, so each offers the same
- * choices and means the same by them. Pure, so the dates are tested without a
- * clock; the write is in lib/core/inbox-snooze-store.ts.
+ * The days Later can be set to (plan #1844, #1957.2): Tomorrow, This weekend,
+ * Next week, Next month, or a day picked. Shared by everything that puts a
+ * thing off (a todo, a goal step, a raise, an Inbox row), so each offers the
+ * same choices and means the same by them. components/inbox/snooze-menu.tsx
+ * draws them. Pure, so the dates are tested without a clock; each write is
+ * the caller's.
  */
 
-export const SNOOZE_CHOICES = ['tomorrow', 'next_week'] as const;
+export const SNOOZE_CHOICES = ['tomorrow', 'weekend', 'next_week', 'next_month'] as const;
 export type SnoozeChoice = (typeof SNOOZE_CHOICES)[number];
 
 export const SNOOZE_LABELS: Record<SnoozeChoice, string> = {
   tomorrow: 'Tomorrow',
+  weekend: 'This weekend',
   next_week: 'Next week',
+  next_month: 'Next month',
 };
+
+/** The fifth choice, which opens a date field rather than naming a day. */
+export const PICK_A_DAY = 'Pick a day';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -19,18 +26,26 @@ function addDays(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** The next given weekday (0 Sunday to 6 Saturday) after today, a week on if today is one. */
+function coming(today: string, weekday: number): string {
+  const until = (weekday - new Date(`${today}T00:00:00Z`).getUTCDay() + 7) % 7;
+  return addDays(today, until === 0 ? 7 : until);
+}
+
 /**
  * The day a choice means, from `today` (YYYY-MM-DD in the account's zone):
- * tomorrow is the next day, next week is the coming Monday (a week on if today
- * is Monday), and a picked day is itself. A picked day that is not a real date
- * or is not after today gives null, since a snooze must end in the future.
+ * tomorrow is the next day, this weekend the coming Saturday, next week the
+ * coming Monday (each a week on when today is that day), next month the first
+ * of next month, and a picked day is itself. A picked day that is not a real
+ * date or is not after today gives null, since Later must end in the future.
  */
 export function snoozeDay(choice: string, today: string): string | null {
   if (choice === 'tomorrow') return addDays(today, 1);
-  if (choice === 'next_week') {
-    const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
-    const until = (1 - weekday + 7) % 7;
-    return addDays(today, until === 0 ? 7 : until);
+  if (choice === 'weekend') return coming(today, 6);
+  if (choice === 'next_week') return coming(today, 1);
+  if (choice === 'next_month') {
+    const [year, month] = today.split('-').map(Number);
+    return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
   }
   if (!DAY.test(choice)) return null;
   if (Number.isNaN(Date.parse(`${choice}T00:00:00Z`))) return null;

@@ -2,7 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { parseSnoozeRef } from './inbox-snoozes';
+import { dayStartIn, snoozeDay } from './snooze-days';
 import { currentRowStamps } from './inbox-snoozes-server';
 
 export type SnoozeActionState = { error?: string };
@@ -44,6 +47,19 @@ export async function snoozeInboxRow(ref: string, until: string): Promise<Snooze
   if (error) return { error: 'Dash could not snooze that. Try again.' };
   refresh();
   return {};
+}
+
+/**
+ * Later on an inbox row (plan #1957.2): one of Later's choices or a picked day
+ * (lib/core/snooze-days.ts), read in the account's timezone, so the row comes
+ * back at the start of that day where the person is.
+ */
+export async function laterInboxRow(ref: string, choice: string): Promise<SnoozeActionState> {
+  const user = await requireUser();
+  const { timezone } = await loadAccountSettings(user.id);
+  const day = snoozeDay(choice, todayIn(timezone));
+  if (!day) return { error: 'Pick a day after today.' };
+  return snoozeInboxRow(ref, dayStartIn(day, timezone).toISOString());
 }
 
 /** Take a snooze off, so the row is back in the inbox. */
