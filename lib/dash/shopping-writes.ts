@@ -10,8 +10,15 @@ import { normalizeIsbn } from '@/lib/books/isbn';
 import { resolveBook } from '@/lib/books/resolve';
 import type { CanonicalBook } from '@/lib/books/types';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { toRef } from '@/lib/core/refs';
 import { fingerprintLoose } from '@/lib/fingerprint';
+import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
+import { DISMISSED_REVIEW_ERROR } from '@/lib/inbox/merchant-exclusion-match';
+import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
+import { buildManualOrder } from '@/lib/orders/create-manual-order';
+import { extractionForAttach, isAttachableClassification, lifecycleKindForAttach } from '@/lib/review/attach-email';
+import { canReadAsOrder } from '@/lib/review/read-order';
 import { findMerchantByUrl } from '@/lib/saved/resolve-merchant';
 import { buildOwnedGameRows, type OwnedGameBundle } from '@/lib/games/create-owned-game';
 import type { CanonicalGame } from '@/lib/games/types';
@@ -21,6 +28,8 @@ import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
 import { pickListGradient } from '@/lib/lists/gradients';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
+import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
+import { normalizeTagLabel, slugifyTagName } from '@/lib/tags/guess';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -45,6 +54,15 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   add_items     books, board games and anything else they own added to the
  *                 inventory, as the add pages save them (plan #1894.5.2).
  *                 Undo takes each one away while nothing hangs off it.
+ *   add_order     an order they describe or show on a receipt, entered as
+ *                 the order form saves it, or read from a waiting email
+ *                 (plan #1894.5.4). Undo takes the whole order away while
+ *                 nothing hangs off it or its units.
+ *   order_item_tags
+ *                 a tag put on an order line or taken off it.
+ *   review_orders the review queue: confirm, unconfirm, discard and restore
+ *                 orders, dismiss and undismiss waiting emails, and attach one
+ *                 to the order it is about. Deleting an order stays on the page.
  *
  * Both Ask and the connector run them, as News's (lib/dash/news-writes.ts):
  * Ask on the person's own clients, the connector on service-role ones for the
@@ -73,6 +91,8 @@ export type ShoppingWriteEnv = {
   userId: string;
   /** The public schema, where every Shopping table is. */
   shop: SchemaClient;
+  /** Every schema, for the one change that reads an email again from Gmail (core). Without it, the subject is read alone. */
+  db?: AskDb;
 };
 
 /** The tables a Shopping change may name in its undo, and whether each keeps a user_id. */
@@ -84,6 +104,12 @@ const TABLES = {
   game_details: { owned: false },
   inventory_item_lists: { owned: false },
   saved_items: { owned: true },
+  orders: { owned: true },
+  item_tags: { owned: true },
+  order_item_tags: { owned: false },
+  ingested_messages: { owned: false },
+  shipments: { owned: false },
+  returns: { owned: true },
 } as const;
 
 export type ShoppingTable = keyof typeof TABLES;
@@ -892,6 +918,640 @@ async function addItems(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade
 }
 
 // ---------------------------------------------------------------------------
+// Orders (plan #1894.5.4): add_order, order_item_tags, review_orders
+// ---------------------------------------------------------------------------
+
+const ORDERS = 'public.orders';
+const orderHref = (id: string) => `/shopping/orders/${id}`;
+const REVIEW_HREF = '/shopping/review';
+/** The pages an order change shows on, as the order and review actions revalidate them. */
+const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/shopping/dashboard', '/shopping/review', '/shopping/settings'];
+/** One selection's worth of review rows, as the queue's bulk bar takes. */
+export const REVIEW_MAX = 100;
+const DISCARDED_ERROR = 'Discarded from review queue';
+const MESSAGE_KEYS = ['parse_status', 'resulting_order_id', 'error'] as const;
+
+/** Dollars as cents, refusing anything that is not a plain amount. */
+function centsArg(args: Args, key: string, fallback: number | null): number | null {
+  if (!given(args, key)) return fallback;
+  const value = args[key];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new ShoppingRefused(`${key} is a dollar amount such as 12.99.`);
+  return Math.round(value * 100);
+}
+
+function slugPart(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+/**
+ * The merchant an order is from, by name: a shared one or one of theirs
+ * called that, or a new one of theirs, as the order form's "Other merchant"
+ * makes. A merchant made here stays when the order is undone; it is a name in
+ * their merchant list, with nothing under it.
+ */
+async function merchantNamed(env: ShoppingWriteEnv, name: string): Promise<{ id: string; slug: string; name: string }> {
+  const { data, error } = await env.shop.from('merchants').select('id, slug, name, is_global, created_by_user_id').ilike('name', name);
+  if (error) throw new Error(`Reading the merchants failed: ${error.message}`);
+  const seen = ((data ?? []) as Row[]).filter((m) => m.is_global === true || m.created_by_user_id === env.userId);
+  const found = seen.sort((a, b) => Number(a.created_by_user_id !== env.userId) - Number(b.created_by_user_id !== env.userId))[0];
+  if (found) return { id: found.id as string, slug: found.slug as string, name: found.name as string };
+  const slug = `${slugPart(name) || 'merchant'}-${env.userId.slice(0, 8)}`;
+  const { data: mine } = await env.shop.from('merchants').select('id, slug, name').eq('slug', slug).maybeSingle();
+  if (mine) return mine as { id: string; slug: string; name: string };
+  const { data: made, error: madeError } = await env.shop
+    .from('merchants')
+    .insert({ name, slug, created_by_user_id: env.userId, is_global: false })
+    .select('id, slug, name')
+    .single();
+  if (madeError || !made) throw new Error(`Adding the merchant failed: ${madeError?.message ?? 'no row'}`);
+  return made as { id: string; slug: string; name: string };
+}
+
+type OrderLine = { name: string; variant: string | null; quantity: number; unitPriceCents: number; category: string | null };
+
+function orderLine(raw: unknown, i: number): OrderLine {
+  if (!raw || typeof raw !== 'object') throw new ShoppingRefused(`lines[${i}] must be an object.`);
+  const line = raw as Args;
+  const name = textArg(line, 'name', 300);
+  if (!name) throw new ShoppingRefused(`lines[${i}] needs a name.`);
+  const quantity = given(line, 'quantity') ? line.quantity : 1;
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+    throw new ShoppingRefused(`lines[${i}].quantity must be a whole number from 1 to 100.`);
+  }
+  const price = centsArg(line, 'unit_price', null);
+  if (price === null) throw new ShoppingRefused(`lines[${i}] needs its unit_price in dollars.`);
+  return { name, variant: textArg(line, 'variant', 300) || null, quantity, unitPriceCents: price, category: textArg(line, 'category', 80) || null };
+}
+
+/** The order's merchant names, by order id, for the sentences. */
+async function merchantNames(env: ShoppingWriteEnv, orders: readonly Row[]): Promise<Map<string, string>> {
+  const ids = [...new Set(orders.map((o) => o.merchant_id).filter((id): id is string => typeof id === 'string'))];
+  const names = new Map<string, string>();
+  if (ids.length === 0) return names;
+  const { data, error } = await env.shop.from('merchants').select('id, name').in('id', ids);
+  if (error) throw new Error(`Reading the merchants failed: ${error.message}`);
+  for (const m of (data ?? []) as Row[]) names.set(m.id as string, m.name as string);
+  return names;
+}
+
+const orderTitle = (order: Row, merchants: Map<string, string>) =>
+  `the ${named(merchants.get(order.merchant_id as string), 'unknown merchant')} order of ${order.order_date as string}`;
+
+/**
+ * Enter an order they describe, as the order form saves one: the order, a
+ * line per thing bought and an inventory item per unit, with the line's
+ * guessed tags. From a receipt they photographed it is saved as a receipt
+ * order, which is what the receipt page's save does once it has read the
+ * photo. From a waiting email it takes the email out of the review queue, as
+ * the form opened from that email does. Undo takes the order away, and every
+ * unit with it, while nothing hangs off any of them.
+ */
+async function addOrder(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const rawLines = args.lines;
+  if (!Array.isArray(rawLines) || rawLines.length === 0) throw new ShoppingRefused('lines must list at least one thing bought.');
+  if (rawLines.length > ADD_MAX) throw new ShoppingRefused(`At most ${ADD_MAX} lines in one order.`);
+  const lines = rawLines.map(orderLine);
+  const merchantName = textArg(args, 'merchant', 120);
+  const orderNumber = textArg(args, 'order_number', 120) || null;
+  const currency = textArg(args, 'currency', 3)?.toUpperCase();
+  if (currency !== undefined && !/^[A-Z]{3}$/.test(currency)) throw new ShoppingRefused('currency is a 3-letter code such as USD.');
+  const tax = centsArg(args, 'tax', 0)!;
+  const shipping = centsArg(args, 'shipping', 0)!;
+  const discount = centsArg(args, 'discount', 0)!;
+  const fromReceipt = args.from_receipt === true;
+  const messageId = given(args, 'message_ref') ? idOf(args.message_ref, 'message_ref', 'email') : null;
+  if (fromReceipt && messageId) throw new ShoppingRefused('An order comes from a receipt or from an email, not both.');
+
+  const { data: profile } = await env.shop.from('profiles').select('timezone').eq('id', env.userId).maybeSingle();
+  const today = todayInTimezone(((profile as Row | null)?.timezone as string | undefined) ?? 'UTC');
+  const orderDate = textArg(args, 'order_date', 10) || today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) throw new ShoppingRefused('order_date is a day, YYYY-MM-DD.');
+
+  let message: Row | null = null;
+  if (messageId) {
+    message = await ownRow(env.shop, 'inbox_messages', messageId, env.userId, 'email');
+    if (!canReadAsOrder(message.classification as string | null)) {
+      throw new ShoppingRefused('That email is not an order confirmation, shipping or delivery email.');
+    }
+    if (message.parse_status !== 'needs_review') throw new ShoppingRefused('That email has already left the review queue.');
+  }
+
+  // Every lookup before anything is written, so one that fails leaves nothing behind.
+  const categories = new Map<string, { id: string; slug: string; name: string }>();
+  for (const line of lines) {
+    if (line.category && !categories.has(line.category)) categories.set(line.category, await namedCategory(env, line.category));
+  }
+  const merchant = merchantName ? await merchantNamed(env, merchantName) : null;
+
+  const source = messageId ? 'email' : fromReceipt ? 'receipt_photo' : 'manual';
+  let built: ReturnType<typeof buildManualOrder>;
+  try {
+    built = buildManualOrder({
+      userId: env.userId,
+      merchantId: merchant?.id ?? null,
+      merchantSlug: merchant?.slug ?? null,
+      externalOrderNumber: orderNumber,
+      orderDate,
+      source,
+      currency,
+      taxCents: tax,
+      shippingCents: shipping,
+      discountCents: discount,
+      lines: lines.map((line) => {
+        const cat = line.category ? categories.get(line.category) : undefined;
+        return {
+          name: line.name,
+          variant: line.variant,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+          categoryId: cat?.id,
+          categorySlug: cat?.slug ?? null,
+          categoryName: cat?.name ?? null,
+        };
+      }),
+    });
+  } catch (error) {
+    // A discount larger than the order, which the form refuses the same way.
+    throw new ShoppingRefused(error instanceof Error ? error.message : 'Those amounts do not make an order.');
+  }
+
+  const orderRow: Row = {
+    id: built.order.id,
+    user_id: env.userId,
+    merchant_id: built.order.merchantId,
+    source: built.order.source,
+    external_order_number: built.order.externalOrderNumber,
+    order_date: built.order.orderDate,
+    subtotal_cents: built.order.subtotalCents,
+    tax_cents: built.order.taxCents,
+    shipping_cents: built.order.shippingCents,
+    discount_cents: built.order.discountCents,
+    total_cents: built.order.totalCents,
+    currency: built.order.currency,
+  };
+  const { data: order, error: orderError } = await env.shop.from('orders').insert(orderRow).select('*').single();
+  if (orderError || !order) throw new Error(`Adding the order failed: ${orderError?.message ?? 'no row'}`);
+  const orderId = built.order.id;
+  const takeBack = async (why: string): Promise<never> => {
+    await env.shop.from('orders').delete().eq('id', orderId).eq('user_id', env.userId);
+    throw new Error(why);
+  };
+
+  const { error: itemsError } = await env.shop.from('order_items').insert(
+    built.orderItems.map((item) => ({
+      id: item.id,
+      order_id: item.orderId,
+      category_id: item.categoryId,
+      name: item.name,
+      short_name: item.shortName,
+      variant: item.variant,
+      quantity: item.quantity,
+      unit_price_cents: item.unitPriceCents,
+      fingerprint_strict: item.fingerprintStrict,
+      fingerprint_loose: item.fingerprintLoose,
+    })),
+  );
+  if (itemsError) await takeBack(`Adding the order's lines failed: ${itemsError.message}`);
+
+  for (const item of built.orderItems) {
+    if (item.tags.length === 0) continue;
+    try {
+      const resolved = await ensureItemTags(env.shop as SupabaseClient, env.userId, item.tags);
+      await linkOrderItemTags(env.shop as SupabaseClient, item.id, resolved.map((tag) => tag.id));
+    } catch {
+      // Tags are best-effort, as on the order form; the order itself saved.
+    }
+  }
+
+  const { error: inventoryError } = await env.shop.from('inventory_items').insert(
+    built.inventoryItems.map((item) => ({
+      id: item.id,
+      user_id: env.userId,
+      order_item_id: item.orderItemId,
+      category_id: item.categoryId,
+      name: item.name,
+      short_name: item.shortName,
+      variant: item.variant,
+      fingerprint_loose: item.fingerprintLoose,
+      acquired_at: item.acquiredAt,
+      cost_cents: item.costCents,
+      search_tags: item.searchTags,
+      source: item.source,
+      status: 'owned',
+    })),
+  );
+  if (inventoryError) await takeBack(`Adding the order's items failed: ${inventoryError.message}`);
+
+  const undo: ShoppingUndo = { added: [{ table: 'orders', id: orderId }] };
+  if (message && messageId) {
+    // Conditional on the email still waiting, so a second call that got this far finds it taken.
+    const { data: linked, error: linkError } = await env.shop
+      .from('ingested_messages')
+      .update({ parse_status: 'parsed', resulting_order_id: orderId, error: null })
+      .eq('id', messageId)
+      .eq('parse_status', 'needs_review')
+      .select('*');
+    if (linkError || !linked || linked.length === 0) await takeBack(linkError?.message ?? 'That email has already left the review queue.');
+    undo.rows = [{ table: 'ingested_messages', id: messageId, before: pick(message, MESSAGE_KEYS), after: pick((linked as Row[])[0], MESSAGE_KEYS) }];
+  }
+
+  const units = built.inventoryItems.length;
+  const from = merchant ? ` from ${named(merchant.name, 'the shop')}` : '';
+  const shown = `${merchant ? named(merchant.name, 'An') : 'An'} order of ${orderDate}`;
+  const total = formatMoney(built.order.totalCents, built.order.currency);
+  const how = fromReceipt ? ' from their receipt' : messageId ? ' from the waiting email' : '';
+  return {
+    kind: 'add_order',
+    input: {
+      verb: 'Added',
+      what: shown,
+      rest: `, ${total}, with ${units} ${noun(units)}${how}`,
+      href: orderHref(orderId),
+      where: 'Open the order',
+      paths: [...ORDER_PATHS, orderHref(orderId)],
+    },
+    subjectRef: toRef(ORDERS, orderId),
+    op: 'insert',
+    before: null,
+    after: order as Row,
+    undo,
+    summary: `Dash added an order${from} of ${orderDate} for ${total}${how}, with ${units} ${noun(units)} in the inventory.`,
+    row: { table: ORDERS, ref: orderId, title: shown, href: orderHref(orderId) },
+  };
+}
+
+const TAG_CHANGES = ['add', 'remove'] as const;
+type TagChange = (typeof TAG_CHANGES)[number];
+
+/** An order line of theirs: the line and the order it is on, checked against the person. */
+async function ownOrderItem(env: ShoppingWriteEnv, id: string): Promise<{ item: Row; order: Row }> {
+  const { data, error } = await env.shop.from('order_items').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Reading the order line failed: ${error.message}`);
+  const item = data as Row | null;
+  if (!item) throw new ShoppingRefused('There is no order line of theirs with that ref. Look the order up first.');
+  const { data: order, error: orderError } = await env.shop
+    .from('orders')
+    .select('id, merchant_id, order_date')
+    .eq('id', item.order_id as string)
+    .eq('user_id', env.userId)
+    .maybeSingle();
+  if (orderError) throw new Error(`Reading the order failed: ${orderError.message}`);
+  if (!order) throw new ShoppingRefused('There is no order line of theirs with that ref. Look the order up first.');
+  return { item, order: order as Row };
+}
+
+/**
+ * Put a tag on a line of one of their orders, or take one off, as the order
+ * page's tag chips do. A tag they have none of by that name is made, and Undo
+ * takes it away again while nothing else carries it.
+ */
+async function orderItemTags(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const change = (typeof args.change === 'string' ? args.change.trim() : '') as TagChange;
+  if (!TAG_CHANGES.includes(change)) throw new ShoppingRefused(`change must be one of ${TAG_CHANGES.join(', ')}.`);
+  const lineId = idOf(args.order_item_ref, 'order_item_ref', 'order line');
+  const raw = textArg(args, 'tag', 40);
+  if (!raw) throw new ShoppingRefused('Give the tag by its name.');
+  const label = normalizeTagLabel(raw);
+  const slug = label ? slugifyTagName(label) : '';
+  if (!label || !slug || label.length < 2) throw new ShoppingRefused('A tag is 2 to 40 characters with a letter or number in it.');
+  const { item, order } = await ownOrderItem(env, lineId);
+  const line = named(item.name, 'the line');
+  const orderId = order.id as string;
+  const paths = ['/shopping/orders', '/shopping/settings', orderHref(orderId)];
+
+  const { data: existing, error: tagError } = await env.shop.from('item_tags').select('*').eq('user_id', env.userId).eq('slug', slug).maybeSingle();
+  if (tagError) throw new Error(`Reading their tags failed: ${tagError.message}`);
+  let tag = existing as Row | null;
+
+  if (change === 'remove') {
+    if (!tag) throw new ShoppingRefused(`They have no tag called "${label}".`);
+    const { data: link, error } = await env.shop.from('order_item_tags').select('*').eq('order_item_id', lineId).eq('tag_id', tag.id as string).maybeSingle();
+    if (error) throw new Error(`Reading the line's tags failed: ${error.message}`);
+    if (!link) throw new ShoppingRefused(`"${line}" is not tagged "${tag.name as string}".`);
+    const { error: removeError } = await env.shop.from('order_item_tags').delete().eq('id', (link as Row).id as string);
+    if (removeError) throw new Error(`Taking the tag off failed: ${removeError.message}`);
+    const name = tag.name as string;
+    return {
+      kind: 'order_item_tags',
+      input: { verb: 'Took', what: `the tag "${name}"`, rest: ` off ${line}`, href: orderHref(orderId), where: 'Open the order', paths },
+      subjectRef: toRef(ORDERS, orderId),
+      op: 'update',
+      before: link as Row,
+      after: null,
+      undo: { removed: [{ table: 'order_item_tags', values: link as Row }] },
+      summary: `Dash took the tag "${name}" off "${line}" on an order.`,
+      row: { table: ORDERS, ref: orderId, title: line, href: orderHref(orderId) },
+    };
+  }
+
+  const added: { table: ShoppingTable; id: string }[] = [];
+  if (!tag) {
+    const { data: made, error } = await env.shop.from('item_tags').insert({ user_id: env.userId, name: label, slug }).select('*').single();
+    if (error || !made) throw new Error(`Making the tag failed: ${error?.message ?? 'no row'}`);
+    tag = made as Row;
+    added.push({ table: 'item_tags', id: tag.id as string });
+  }
+  const { data: had } = await env.shop.from('order_item_tags').select('id').eq('order_item_id', lineId).eq('tag_id', tag.id as string).maybeSingle();
+  if (had) throw new ShoppingRefused(`"${line}" is tagged "${tag.name as string}" already.`);
+  const { data: link, error: linkError } = await env.shop.from('order_item_tags').insert({ order_item_id: lineId, tag_id: tag.id }).select('*').single();
+  if (linkError || !link) throw new Error(`Tagging the line failed: ${linkError?.message ?? 'no row'}`);
+  // The link before the tag, so a tag Dash made is free of it when Undo reaches it.
+  added.unshift({ table: 'order_item_tags', id: (link as Row).id as string });
+  const name = tag.name as string;
+  return {
+    kind: 'order_item_tags',
+    input: { verb: 'Tagged', what: line, rest: ` "${name}"`, href: orderHref(orderId), where: 'Open the order', paths },
+    subjectRef: toRef(ORDERS, orderId),
+    op: 'update',
+    before: null,
+    after: link as Row,
+    undo: { added },
+    summary: `Dash tagged "${line}" on an order with "${name}".`,
+    row: { table: ORDERS, ref: orderId, title: line, href: orderHref(orderId) },
+  };
+}
+
+const REVIEW_MOVES = ['confirm', 'unconfirm', 'discard', 'restore', 'dismiss', 'undismiss', 'attach'] as const;
+type ReviewMove = (typeof REVIEW_MOVES)[number];
+
+function refList(args: Args, key: string, what: string): string[] {
+  const raw = args[key];
+  if (!Array.isArray(raw) || raw.length === 0) throw new ShoppingRefused(`${key} must list at least one ${what}.`);
+  if (raw.length > REVIEW_MAX) throw new ShoppingRefused(`At most ${REVIEW_MAX} at once.`);
+  return [...new Set(raw.map((value, i) => idOf(value, `${key}[${i}]`, what)))];
+}
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+/** The orders of theirs among the refs, with their merchants' names. */
+async function ownOrders(env: ShoppingWriteEnv, ids: readonly string[]): Promise<{ orders: Row[]; merchants: Map<string, string> }> {
+  const { data, error } = await env.shop.from('orders').select('*').in('id', [...ids]).eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the orders failed: ${error.message}`);
+  const orders = (data ?? []) as Row[];
+  if (orders.length < ids.length) throw new ShoppingRefused('Some of those are not orders of theirs. Look them up first.');
+  return { orders, merchants: await merchantNames(env, orders) };
+}
+
+/** The waiting emails of theirs among the refs: the inbox_messages view carries the owner the verdict rows do not. */
+async function ownMessages(env: ShoppingWriteEnv, ids: readonly string[]): Promise<Row[]> {
+  const { data, error } = await env.shop.from('inbox_messages').select('*').in('id', [...ids]).eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the emails failed: ${error.message}`);
+  const messages = (data ?? []) as Row[];
+  if (messages.length < ids.length) throw new ShoppingRefused('Some of those are not emails of theirs. Look them up first.');
+  return messages;
+}
+
+/** One update per row, keeping each row's columns before and after. */
+async function updateKept(
+  env: ShoppingWriteEnv,
+  table: 'orders' | 'ingested_messages',
+  rows: readonly Row[],
+  values: Row,
+  keys: readonly string[],
+): Promise<NonNullable<ShoppingUndo['rows']>> {
+  const kept: NonNullable<ShoppingUndo['rows']> = [];
+  for (const row of rows) {
+    let query = env.shop.from(table).update(values).eq('id', row.id as string);
+    if (table === 'orders') query = query.eq('user_id', env.userId);
+    const { data, error } = await query.select('*');
+    if (error) throw new Error(`${table}: ${error.message}`);
+    const after = ((data ?? []) as Row[])[0];
+    if (after) kept.push({ table, id: row.id as string, before: pick(row, keys), after: pick(after, keys) });
+  }
+  return kept;
+}
+
+/**
+ * Work the review queue, as its buttons and bulk bar do: confirm an imported
+ * order that looks right, put a confirmed one back, discard a bad import (the
+ * order goes to Deleted orders and its email stops coming back), bring back a
+ * deleted or discarded order, dismiss a waiting email or bring one back, and
+ * attach a waiting shipping, delivery or return email to the order it is
+ * about. Every row moved is kept for Undo.
+ */
+async function reviewOrders(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const move = (typeof args.move === 'string' ? args.move.trim() : '') as ReviewMove;
+  if (!REVIEW_MOVES.includes(move)) throw new ShoppingRefused(`move must be one of ${REVIEW_MOVES.join(', ')}.`);
+  if (move === 'attach') return attachEmail(env, args);
+  const paths = ORDER_PATHS;
+
+  if (move === 'dismiss' || move === 'undismiss') {
+    const ids = refList(args, 'message_refs', 'email');
+    const messages = await ownMessages(env, ids);
+    const waiting =
+      move === 'dismiss'
+        ? messages.filter((m) => m.parse_status === 'needs_review')
+        : messages.filter((m) => m.parse_status === 'skipped' && m.error === DISMISSED_REVIEW_ERROR);
+    if (waiting.length === 0) throw new ShoppingRefused(move === 'dismiss' ? 'Those have left the queue already.' : 'None of those was dismissed from the queue.');
+    const values = move === 'dismiss' ? { parse_status: 'skipped', error: DISMISSED_REVIEW_ERROR } : { parse_status: 'needs_review', error: null };
+    const rows = await updateKept(env, 'ingested_messages', waiting, values, ['parse_status', 'error']);
+    const subjects = waiting.map((m) => named(m.subject, 'an email'));
+    const what = namedItems(subjects, subjects.length);
+    const verb = move === 'dismiss' ? 'Dismissed' : 'Put back';
+    const rest = move === 'dismiss' ? ' from the review queue' : ' in the review queue';
+    return {
+      kind: 'review_orders',
+      input: { verb, what, rest, href: REVIEW_HREF, where: 'Open the review queue', paths },
+      subjectRef: toRef('public.inbox_messages', waiting[0].id as string),
+      op: 'update',
+      before: waiting[0],
+      after: null,
+      undo: { rows },
+      summary: `Dash ${move === 'dismiss' ? 'dismissed' : 'put back'} ${plural(waiting.length, 'email')}${rest}: ${what}.`,
+      row: { table: 'public.inbox_messages', ref: waiting[0].id as string, title: subjects[0], href: REVIEW_HREF },
+    };
+  }
+
+  const ids = refList(args, 'order_refs', 'order');
+  const { orders, merchants } = await ownOrders(env, ids);
+  const live = orders.filter((o) => o.deleted_at == null);
+  let moving: Row[];
+  let values: Row;
+  let keys: string[];
+  let verb: string;
+  let rest: string;
+  let said: string;
+  let messageRows: NonNullable<ShoppingUndo['rows']> = [];
+
+  if (move === 'confirm') {
+    moving = live.filter((o) => o.needs_review === true);
+    if (moving.length === 0) throw new ShoppingRefused('Those are confirmed already.');
+    values = { needs_review: false };
+    keys = ['needs_review'];
+    [verb, rest, said] = ['Confirmed', ' from the review queue', 'confirmed'];
+  } else if (move === 'unconfirm') {
+    moving = live.filter((o) => o.needs_review !== true);
+    if (moving.length === 0) throw new ShoppingRefused('Those are waiting in the review queue already.');
+    values = { needs_review: true };
+    keys = ['needs_review'];
+    [verb, rest, said] = ['Put back', ' in the review queue', 'put back in the review queue'];
+  } else if (move === 'discard') {
+    moving = live;
+    if (moving.length === 0) throw new ShoppingRefused('Those are gone already.');
+    // The emails first, as the queue does, so a re-scan does not bring the order back.
+    const { data: sources, error } = await env.shop
+      .from('inbox_messages')
+      .select('*')
+      .in('resulting_order_id', moving.map((o) => o.id as string))
+      .eq('user_id', env.userId);
+    if (error) throw new Error(`Reading the orders' emails failed: ${error.message}`);
+    messageRows = await updateKept(
+      env,
+      'ingested_messages',
+      (sources ?? []) as Row[],
+      { parse_status: 'skipped', resulting_order_id: null, error: DISCARDED_ERROR },
+      [...MESSAGE_KEYS],
+    );
+    values = { deleted_at: new Date().toISOString(), needs_review: false };
+    keys = ['deleted_at', 'needs_review'];
+    [verb, rest, said] = ['Discarded', ' to Deleted orders', 'discarded'];
+  } else {
+    moving = orders.filter((o) => o.deleted_at != null);
+    if (moving.length === 0) throw new ShoppingRefused('None of those is deleted.');
+    values = args.review_again === true ? { deleted_at: null, needs_review: true } : { deleted_at: null };
+    keys = Object.keys(values);
+    [verb, rest, said] = ['Brought back', args.review_again === true ? ' to the review queue' : ' from Deleted orders', 'brought back'];
+  }
+
+  const rows = [...(await updateKept(env, 'orders', moving, values, keys)), ...messageRows];
+  const titles = moving.map((o) => orderTitle(o, merchants));
+  const what = namedItems(titles, titles.length);
+  const first = moving[0].id as string;
+  const href = moving.length === 1 && move !== 'discard' ? orderHref(first) : REVIEW_HREF;
+  return {
+    kind: 'review_orders',
+    input: { verb, what, rest, href, where: href === REVIEW_HREF ? 'Open the review queue' : 'Open the order', paths: [...paths, ...moving.map((o) => orderHref(o.id as string))] },
+    subjectRef: toRef(ORDERS, first),
+    op: 'update',
+    before: moving[0],
+    after: null,
+    undo: { rows },
+    summary: `Dash ${said} ${plural(moving.length, 'order')}: ${what}.`,
+    row: { table: ORDERS, ref: first, title: titles[0], href },
+  };
+}
+
+/**
+ * Attach a waiting shipping, delivery, return or confirmation email to the
+ * order it is about, as the review queue's attach does: the email is read
+ * again from Gmail where it can be (the subject alone still moves the
+ * order's status where it cannot), the shipment or return it describes is
+ * written onto the order, and the email leaves the queue. Undo puts the email
+ * back in the queue and takes away the shipment or return it wrote.
+ */
+async function attachEmail(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
+  const messageId = idOf(args.message_ref, 'message_ref', 'email');
+  const orderId = idOf(args.order_ref, 'order_ref', 'order');
+  const message = await ownRow(env.shop, 'inbox_messages', messageId, env.userId, 'email');
+  const order = await ownRow(env.shop, 'orders', orderId, env.userId, 'order');
+  if (order.deleted_at != null) throw new ShoppingRefused('That order is deleted. Bring it back first.');
+  const classification = message.classification as string | null;
+  if (!isAttachableClassification(classification)) {
+    throw new ShoppingRefused('Only confirmation, shipping, delivery and return emails attach to an order.');
+  }
+  if (message.parse_status !== 'needs_review') throw new ShoppingRefused('That email has already left the queue.');
+  const kind = lifecycleKindForAttach(classification, message.subject as string | null);
+  const merchants = await merchantNames(env, [order]);
+  const title = orderTitle(order, merchants);
+  const subject = named(message.subject, 'the email');
+
+  // Claimed first, so a sync running at the same time does not write the shipment twice.
+  const { data: claimed, error: claimError } = await env.shop
+    .from('ingested_messages')
+    .update({ parse_status: 'pending', resulting_order_id: orderId, error: null })
+    .eq('id', messageId)
+    .eq('parse_status', 'needs_review')
+    .select('id');
+  if (claimError) throw new Error(`Claiming the email failed: ${claimError.message}`);
+  if (!claimed || claimed.length === 0) throw new ShoppingRefused('That email has already left the queue.');
+
+  const undo: ShoppingUndo = {};
+  const messageKeys = [...MESSAGE_KEYS, 'classification', 'parse_confidence'];
+  let done: Row = { parse_status: 'parsed', error: null };
+
+  if (kind !== null) {
+    const receivedAt = message.received_at ? new Date(message.received_at as string) : null;
+    const fetched = env.db
+      ? await fetchMessageBody((await env.db('core')) as unknown as CoreSupabaseClient, {
+          userId: env.userId,
+          accountId: message.email_account_id as string,
+          providerMessageId: message.provider_message_id as string,
+        })
+      : null;
+    const body = fetched?.ok ? fetched.message : null;
+    const extraction = extractionForAttach({
+      classification: kind,
+      subject: body ? body.subject : (message.subject as string | null),
+      body: body ? { text: body.text, html: body.html } : null,
+      receivedAt: body ? (body.internalDate ?? receivedAt) : receivedAt,
+    });
+    const { data: profile } = await env.shop.from('profiles').select('timezone').eq('id', env.userId).maybeSingle();
+    const applied = await applyLifecycleToOrder(env.shop as SupabaseClient, {
+      userId: env.userId,
+      order: {
+        id: orderId,
+        merchantId: (order.merchant_id as string | null) ?? null,
+        externalOrderNumber: (order.external_order_number as string | null) ?? null,
+        cancelledAt: (order.cancelled_at as string | null) ?? null,
+      },
+      classification: kind,
+      extraction,
+      sourceMessageId: messageId,
+      receivedAt,
+      timezone: ((profile as Row | null)?.timezone as string | undefined) ?? 'UTC',
+    });
+    if (!applied.ok) {
+      // Back in the queue, unlinked, with the reason, as the queue leaves it.
+      await env.shop.from('ingested_messages').update({ parse_status: 'needs_review', resulting_order_id: null, error: applied.error }).eq('id', messageId);
+      throw new ShoppingRefused(`It could not be attached: ${applied.error}.`);
+    }
+    const change = applied.change;
+    if (change?.what === 'shipment' && change.op === 'insert') undo.added = [{ table: 'shipments', id: change.shipmentId }];
+    if (change?.what === 'return') undo.added = change.returnIds.map((id) => ({ table: 'returns' as const, id }));
+    if (change?.what === 'shipment' && change.op === 'update') {
+      const { data: now } = await env.shop.from('shipments').select('*').eq('id', change.shipmentId).maybeSingle();
+      if (now) {
+        const keys = Object.keys(change.before).filter((key) => !['created_at', 'updated_at'].includes(key) && !same(change.before[key], (now as Row)[key]));
+        if (keys.length > 0) undo.rows = [{ table: 'shipments', id: change.shipmentId, before: pick(change.before, keys), after: pick(now as Row, keys) }];
+      }
+    }
+    // A confirmation that was really a shipping notice is recorded as one.
+    done = { ...done, parse_confidence: extraction.confidence, classification: kind };
+  }
+
+  const { data: after, error: doneError } = await env.shop.from('ingested_messages').update(done).eq('id', messageId).select('*');
+  if (doneError) throw new Error(`Finishing the email failed: ${doneError.message}`);
+  const afterRow = ((after ?? []) as Row[])[0] ?? { ...message, ...done, resulting_order_id: orderId };
+  undo.rows = [{ table: 'ingested_messages', id: messageId, before: pick(message, messageKeys), after: pick(afterRow, messageKeys) }, ...(undo.rows ?? [])];
+
+  const what = kind === null ? 'the email' : `the ${kind} email`;
+  return {
+    kind: 'review_orders',
+    input: {
+      verb: 'Attached',
+      what: subject,
+      rest: ` to ${title}`,
+      href: orderHref(orderId),
+      where: 'Open the order',
+      paths: [...ORDER_PATHS, '/shopping/returns', orderHref(orderId)],
+    },
+    subjectRef: toRef(ORDERS, orderId),
+    op: 'update',
+    before: order,
+    after: null,
+    undo,
+    summary: `Dash attached ${what} "${subject}" to ${title}.`,
+    row: { table: ORDERS, ref: orderId, title, href: orderHref(orderId) },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Undo
 // ---------------------------------------------------------------------------
 
@@ -1077,6 +1737,34 @@ async function itemHasDependents(deps: { userId: string; db: AskDb }, shop: Sche
   return false;
 }
 
+/**
+ * Whether an order Dash added is theirs now: deleted or changed by them, a
+ * shipment, return or todo on it, or a unit with anything hanging off it.
+ * Taking the order away would take all of that with it.
+ */
+async function orderHasDependents(deps: { userId: string; db: AskDb }, shop: SchemaClient, id: string): Promise<boolean> {
+  const { data: order, error } = await shop.from('orders').select('id, deleted_at').eq('id', id).eq('user_id', deps.userId).maybeSingle();
+  if (error) throw new Error(`orders: ${error.message}`);
+  if (!order) return false;
+  if ((order as Row).deleted_at != null) return true;
+  for (const [schema, table] of [['public', 'shipments'], ['public', 'returns'], ['todo', 'task_links']] as const) {
+    const client = schema === 'public' ? shop : await deps.db(schema);
+    const { data, error: readError } = await client.from(table).select('id').eq('order_id', id).limit(1);
+    if (readError) throw new Error(`${table}: ${readError.message}`);
+    if ((data ?? []).length > 0) return true;
+  }
+  const { data: lines, error: linesError } = await shop.from('order_items').select('id').eq('order_id', id);
+  if (linesError) throw new Error(`order_items: ${linesError.message}`);
+  const lineIds = ((lines ?? []) as Row[]).map((line) => line.id as string);
+  if (lineIds.length === 0) return false;
+  const { data: units, error: unitsError } = await shop.from('inventory_items').select('id').eq('user_id', deps.userId).in('order_item_id', lineIds);
+  if (unitsError) throw new Error(`inventory_items: ${unitsError.message}`);
+  for (const unit of (units ?? []) as Row[]) {
+    if (await itemHasDependents(deps, shop, unit.id as string)) return true;
+  }
+  return false;
+}
+
 function isTable(value: unknown): value is ShoppingTable {
   return typeof value === 'string' && value in TABLES;
 }
@@ -1113,6 +1801,17 @@ export async function undoShoppingChange(
   const shop = await deps.db('public');
   let restored = 0;
 
+  // An order Dash added goes back whole or not at all: taking it away takes its units, its shipments and its returns.
+  for (const row of undo.added ?? []) {
+    if (row.table === 'orders' && (await orderHasDependents(deps, shop, row.id))) {
+      return {
+        ok: false,
+        error:
+          'The order Dash added has had something done to it since, such as an item listed, returned or linked, or a shipment added, so Dash kept it. Delete it from the order page instead.',
+      };
+    }
+  }
+
   for (const row of undo.rows ?? []) {
     let query = shop.from(row.table).update(row.before).eq('id', row.id);
     if (TABLES[row.table].owned) query = query.eq('user_id', deps.userId);
@@ -1125,8 +1824,9 @@ export async function undoShoppingChange(
     restored += (data ?? []).length;
   }
 
-  // Memberships before the list they are on, so a list Dash made is empty when it is reached.
-  const added = [...(undo.added ?? [])].sort((a, b) => Number(a.table === 'item_lists') - Number(b.table === 'item_lists'));
+  // Memberships before the list or tag they are on, so a list or tag Dash made is free of them when it is reached.
+  const last = (table: ShoppingTable) => Number(table === 'item_lists' || table === 'item_tags');
+  const added = [...(undo.added ?? [])].sort((a, b) => last(a.table) - last(b.table));
   let kept = 0;
   for (const row of added) {
     if (row.table === 'inventory_items' && (await itemHasDependents(deps, shop, row.id))) {
@@ -1137,6 +1837,15 @@ export async function undoShoppingChange(
       const { data: still, error } = await shop.from('inventory_item_lists').select('id').eq('list_id', row.id).limit(1);
       if (error) throw new Error(`inventory_item_lists: ${error.message}`);
       if ((still ?? []).length > 0) continue;
+    }
+    if (row.table === 'item_tags') {
+      let carried = false;
+      for (const links of ['order_item_tags', 'inventory_item_tags']) {
+        const { data: still, error } = await shop.from(links).select('id').eq('tag_id', row.id).limit(1);
+        if (error) throw new Error(`${links}: ${error.message}`);
+        carried ||= (still ?? []).length > 0;
+      }
+      if (carried) continue;
     }
     let query = shop.from(row.table).delete().eq('id', row.id);
     if (TABLES[row.table].owned) query = query.eq('user_id', deps.userId);
@@ -1282,6 +1991,88 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
     },
     run: changeSavedItem,
   },
+  {
+    name: 'add_order',
+    description: `Enter an order they describe in Shopping, as the order form does ("I bought two mugs at Target for $8 each yesterday"), or one read from a receipt they show you: the merchant by name, the day, and a line per thing bought with its quantity and unit price in dollars; tax, shipping and discount are optional. Each unit lands in the inventory. Set from_receipt when it comes from a receipt photo; give message_ref when it is read from an email waiting in the review queue, which takes the email out of the queue. At most ${ADD_MAX} lines. Look the orders up first when it may have come in from email already.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        merchant: { type: 'string', description: 'The shop by name. A name they have no merchant for adds one.' },
+        order_date: { type: 'string', description: 'The day of the order, YYYY-MM-DD. Today when left out.' },
+        order_number: { type: 'string', description: "The shop's order number, when known." },
+        currency: { type: 'string', description: 'A 3-letter currency code; USD when left out.' },
+        tax: { type: 'number', description: 'Tax in dollars.' },
+        shipping: { type: 'number', description: 'Shipping in dollars.' },
+        discount: { type: 'number', description: 'Discount in dollars, as a positive amount.' },
+        lines: {
+          type: 'array',
+          maxItems: ADD_MAX,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'What was bought.' },
+              variant: { type: 'string', description: 'A colour, size or model.' },
+              quantity: { type: 'integer', description: 'How many, 1 when left out.' },
+              unit_price: { type: 'number', description: 'The price of one, in dollars.' },
+              category: { type: 'string', description: 'The name of one of their Shopping categories.' },
+            },
+            required: ['name', 'unit_price'],
+            additionalProperties: false,
+          },
+          description: 'One line per thing bought.',
+        },
+        from_receipt: { type: 'boolean', description: 'True when the order is read from a receipt photo.' },
+        message_ref: { type: 'string', description: 'The public.inbox_messages ref of the waiting email the order is read from.' },
+      },
+      required: ['lines'],
+      additionalProperties: false,
+    },
+    run: addOrder,
+  },
+  {
+    name: 'order_item_tags',
+    description:
+      'Put a tag on a line of one of their Shopping orders, or take one off, when they ask ("tag the lamp as a gift"). change add tags the line, making the tag when they have none by that name; remove takes it off. Name the line by order_item_ref, from an order lookup, and the tag by its name.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...TAG_CHANGES], description: 'add or remove.' },
+        order_item_ref: { type: 'string', description: 'The public.order_items ref of the line, from an order lookup.' },
+        tag: { type: 'string', description: 'The tag by its name, 2 to 40 characters.' },
+      },
+      required: ['change', 'order_item_ref', 'tag'],
+      additionalProperties: false,
+    },
+    run: orderItemTags,
+  },
+  {
+    name: 'review_orders',
+    description: `Work the Shopping review queue and deleted orders, when they ask. On orders (order_refs, at most ${REVIEW_MAX}): confirm keeps an imported order that looks right and takes it out of the queue; unconfirm puts a confirmed one back in the queue; discard sends a bad import to Deleted orders and stops its email bringing it back; restore brings back a deleted or discarded order (review_again true puts it back in the queue too). On waiting emails (message_refs): dismiss takes an email that is not an order out of the queue; undismiss puts a dismissed one back. attach links one waiting shipping, delivery, return or confirmation email (message_ref) to the order it is about (order_ref) and writes the shipment or return it describes. Deleting an order for good stays on the page.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        move: { type: 'string', enum: [...REVIEW_MOVES], description: 'confirm, unconfirm, discard, restore, dismiss, undismiss or attach.' },
+        order_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: REVIEW_MAX,
+          description: 'For confirm, unconfirm, discard and restore: the public.orders refs.',
+        },
+        message_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: REVIEW_MAX,
+          description: 'For dismiss and undismiss: the public.inbox_messages refs of the emails.',
+        },
+        message_ref: { type: 'string', description: 'For attach: the public.inbox_messages ref of the waiting email.' },
+        order_ref: { type: 'string', description: 'For attach: the public.orders ref of the order it belongs to.' },
+        review_again: { type: 'boolean', description: 'For restore: true to put the order back in the review queue.' },
+      },
+      required: ['move'],
+      additionalProperties: false,
+    },
+    run: reviewOrders,
+  },
 ];
 
 /** Runs one Shopping write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -1318,7 +2109,7 @@ export const SHOPPING_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = S
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!shoppingOn(ctx.enabledModules)) return { ok: false, error: SHOPPING_OFF };
-    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public') }, input);
+    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public'), db: ctx.db }, input);
     if ('ok' in made) return made;
     return {
       ok: true,

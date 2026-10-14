@@ -541,7 +541,7 @@ const SHOPPING_TOOLS: readonly ConnectorWriteTool[] = SHOPPING_WRITES.map((write
   async run(ctx, input) {
     if (!ctx.db || !ctx.account) refuse();
     if (!shoppingOn(ctx.account.enabledModules)) throw new AskInputError(SHOPPING_OFF);
-    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public') }, input);
+    const made = await runShoppingWrite(write, { userId: ctx.userId, shop: await ctx.db('public'), db: ctx.db }, input);
     if ('ok' in made) throw new AskInputError(made.error);
     await recordDashAction(
       { userId: ctx.userId, core: ctx.core, db: ctx.db },
