@@ -12,7 +12,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { openFor, paramsFor } from '@/lib/learn/map/place-graph';
-import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { ValueList } from '@/components/ui/value-row';
+import { EvidenceList } from '@/components/learn/evidence-list';
+import { isUntested } from '@/lib/learn/strength';
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 
@@ -70,9 +72,16 @@ export function ChosenIdea({
         </Tooltip>
       </div>
       <p className="mt-1 line-clamp-4 text-ui text-ink-muted">{idea.claim}</p>
+      {/* Label and value on one line, the label whole and the value wrapping
+          at the right edge: a place's name runs long in a rail this narrow. */}
       <ValueList className="mt-3">
         {facts.map(([label, value]) =>
-          value ? <ValueRow key={label} label={label} value={value} align="end" /> : null,
+          value ? (
+            <div key={label} className="flex items-baseline justify-between gap-4">
+              <dt className="shrink-0 text-small text-ink-muted">{label}</dt>
+              <dd className="tabular min-w-0 text-right text-ui text-ink">{value}</dd>
+            </div>
+          ) : null,
         )}
       </ValueList>
       {!openNow && (
@@ -85,6 +94,8 @@ export function ChosenIdea({
           {placeName ? 'Open its place' : 'Open its neighbourhood'}
         </Link>
       )}
+
+      <EvidenceList links={idea.evidence} untested={isUntested(idea.stateRow)} className="mt-4" />
 
       {idea.neighbours.length > 0 && (
         <>

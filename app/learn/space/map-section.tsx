@@ -19,6 +19,7 @@ import { usePick, viewOnClick } from './pick';
 import { StarSky, type SkyName, type Star } from './star-sky';
 import { StarSwatch } from './swatch';
 import { MapTimeline } from './timeline';
+import { backedByText } from '@/lib/learn/evidence/model';
 
 /**
  * Idea Space's map with its layout switch, legend and caption (plan #1857),
@@ -69,6 +70,7 @@ export function MapSection({
         slot: idea.domain ? (slots.get(idea.domain.id) ?? 'other') : 'none',
         domainId: idea.domain?.id ?? null,
         neighbours: idea.neighbours.map((n) => n.id),
+        backedBy: backedByText(idea.evidence),
       })),
     [view.ideas, layout, slots],
   );

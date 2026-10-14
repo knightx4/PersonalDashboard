@@ -15,7 +15,7 @@ import { lightOn, type Light, type LightInput } from './sky';
  * Only the state row as it stands today is kept, so the past is that row with
  * its dates honoured: an idea declared and then tested shows as declared
  * between the two. Its level is today's throughout, since no history of
- * levels is stored.
+ * levels is stored. Evidence counts from the day it was found (plan #2006.6).
  */
 
 export const DAY_MS = 86_400_000;
@@ -94,7 +94,12 @@ export function mapOn(ideas: readonly TimelineIdea[], on: Date): Map<string, Lig
   });
   const rows = new Map(present.map((idea) => [idea.id, stateRowOn(idea.stateRow, idea.createdAt, on)]));
   const light = lightOn(
-    present.map((idea) => ({ id: idea.id, stateRow: rows.get(idea.id) ?? null, neighbours: idea.neighbours })),
+    present.map((idea) => ({
+      id: idea.id,
+      stateRow: rows.get(idea.id) ?? null,
+      neighbours: idea.neighbours,
+      evidence: idea.evidence,
+    })),
     on,
   );
   const out = new Map<string, LightThen>();

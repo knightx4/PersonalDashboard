@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AskDb } from '@/lib/ask/db';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -50,3 +51,25 @@ export const sessionClients: AgendaClients = {
   vault: () => createVaultClient(),
   news: () => createNewsClient(),
 };
+
+/**
+ * The agenda's clients over an agent's: Ask Dash's on the person's session,
+ * the connector's service-role ones for the person its token names. Each
+ * schema the agenda reads is the one its client was made for.
+ *
+ * A service-role client passes no row level security, so a caller acting on
+ * the agenda this way must name the person in every query it adds, as the
+ * sources do.
+ */
+export function clientsOver(db: AskDb): AgendaClients {
+  return {
+    shopping: () => db('public'),
+    jobs: () => db('job_search') as unknown as Promise<AppSupabaseClient>,
+    todo: () => db('todo') as unknown as Promise<TodoSupabaseClient>,
+    goals: () => db('goals') as unknown as Promise<GoalsSupabaseClient>,
+    core: () => db('core') as unknown as Promise<CoreSupabaseClient>,
+    learn: () => db('learn') as unknown as Promise<LearnSupabaseClient>,
+    vault: () => db('obsidian') as unknown as Promise<VaultSupabaseClient>,
+    news: () => db('news') as unknown as Promise<NewsSupabaseClient>,
+  };
+}

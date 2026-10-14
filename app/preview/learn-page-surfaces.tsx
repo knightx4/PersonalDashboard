@@ -18,6 +18,7 @@ import { PlaylistView } from '@/app/learn/youtube/p/[id]/playlist-view';
 import { LibraryVideoView } from '@/app/learn/youtube/v/[videoId]/library-video-view';
 import type { ClaimMaterialView } from '@/lib/learn/catalogue/material';
 import type { Concept } from '@/lib/learn/graph/model';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import type { ProbeRow } from '@/lib/learn/graph/session';
 import type { OpeningSweep } from '@/lib/learn/graph/opening';
 import type { CardNote } from '@/lib/learn/notes/notes';
@@ -229,6 +230,77 @@ export function LearnConceptSurface() {
       }}
       material={conceptMaterial}
       notes={conceptNotes}
+      timezone={ZONE}
+      now={NOW}
+    />
+  );
+}
+
+/**
+ * An idea no question has been asked about, backed by a course, a note of
+ * your own and your résumé (plan #2006.6): "Where it stands" lists the three
+ * and says how far they light it.
+ */
+const dcf = concept({
+  id: 'c0000000-0000-4000-8000-000000000006',
+  name: 'Terminal value dominates a DCF',
+  claim:
+    'In a discounted cash flow valuation most of the value usually sits in the terminal year, so the growth rate and discount rate assumed for it move the answer more than the forecast years do.',
+  basis: 'Named in the chain laid out for "How is a business valued?", as the step after discounting the forecast years.',
+});
+
+const dcfEvidence: EvidenceLink[] = [
+  {
+    id: 'ev1',
+    targetKind: 'idea',
+    targetId: dcf.id,
+    sourceKind: 'course',
+    sourceId: 'course-1',
+    similarity: 0.71,
+    weight: 0.95,
+    basis: 'from MGT 541 Corporate Finance, HH, 2026',
+    foundAt: '2026-10-14T06:00:00Z',
+  },
+  {
+    id: 'ev2',
+    targetKind: 'idea',
+    targetId: dcf.id,
+    sourceKind: 'note',
+    sourceId: 'note-1',
+    similarity: 0.68,
+    weight: 0.9,
+    basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
+    foundAt: '2026-10-14T06:00:00Z',
+  },
+  {
+    id: 'ev3',
+    targetKind: 'idea',
+    targetId: dcf.id,
+    sourceKind: 'work',
+    sourceId: 'work-1',
+    similarity: 0.63,
+    weight: 0.85,
+    basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
+    foundAt: '2026-10-14T06:00:00Z',
+  },
+];
+
+export function LearnConceptEvidenceSurface() {
+  return (
+    <ConceptPageView
+      view={{
+        subject: SUBJECT,
+        concept: dcf,
+        prerequisites: [],
+        dependents: [],
+        refersTo: [],
+        referredToBy: [],
+      }}
+      probes={[]}
+      opening={null}
+      material={{ material: [], absence: null }}
+      notes={[]}
+      evidence={dcfEvidence}
       timezone={ZONE}
       now={NOW}
     />

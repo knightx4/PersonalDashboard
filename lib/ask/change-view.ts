@@ -84,8 +84,28 @@ function itemWords(input: Extract<DashChange, { kind: 'change_items' }>['input']
       return { verb: done ? 'Took' : 'Take', what: items, rest: ` off the to-return list${list}` };
     case 'group':
       return { verb: done ? 'Grouped' : 'Group', what: `${count} copies`, rest: ` as one item${list}` };
+    case 'dispose':
+      return { verb: done ? 'Marked' : 'Mark', what: items, rest: ` as ${DISPOSAL_WORDS[input.method ?? 'trashed']}${list}` };
+    case 'ungroup':
+      return { verb: done ? 'Ungrouped' : 'Ungroup', what: `${count} ${count === 1 ? 'copy' : 'copies'}`, rest: list };
+    case 'separate':
+      return {
+        verb: done ? 'Separated' : 'Separate',
+        what: `${count} ${count === 1 ? 'copy' : 'copies'}`,
+        rest: ` from ${count === 1 ? 'its stack' : 'their stacks'}${list}`,
+      };
   }
 }
+
+/** How a disposal reads after "as", on the card and in change_items' summary. */
+export const DISPOSAL_WORDS: Record<string, string> = {
+  sold: 'sold',
+  gifted: 'given away',
+  donated: 'donated',
+  trashed: 'thrown out',
+  recycled: 'recycled',
+  consumed: 'used up',
+};
 
 /** A note as the card quotes it: its first line, cut at a word. */
 function quoted(body: string, max = 80): string {

@@ -1,4 +1,4 @@
-import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What Todo's pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const todoActions: ModuleActions = {
@@ -35,9 +35,9 @@ export const todoActions: ModuleActions = {
     removeFeed: none('account'),
   },
   'app/todo/source-actions.ts': {
-    completeItem: GAP,
-    deferItem: GAP,
-    dismissItem: GAP,
+    completeItem: tool('change_agenda_row'),
+    deferItem: tool('change_agenda_row'),
+    dismissItem: tool('change_agenda_row'),
     answerItem: none('theirs'),
   },
   'app/todo/link-actions.ts': {

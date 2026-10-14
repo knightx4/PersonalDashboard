@@ -9,6 +9,11 @@ import { WRITE_TOOL_NAMES } from './writes';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
+import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
+import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
@@ -51,6 +56,11 @@ describe('DASH_TOOLS', () => {
       ...LEARN_CHANGE_KINDS,
       ...TODO_CHANGE_KINDS,
       ...YOU_CHANGE_KINDS,
+      ...NEWS_CHANGE_KINDS,
+      ...GOALS_CHANGE_KINDS,
+      ...SHOPPING_CHANGE_KINDS,
+      ...VAULT_CHANGE_KINDS,
+      ...JOBS_CHANGE_KINDS,
       ...INTERVIEW_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
