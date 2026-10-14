@@ -243,7 +243,7 @@ export function RunnerCrew({
     <div className="flex flex-col gap-3">
       <ul
         aria-label="What each of the runner's four sessions is doing"
-        className="flex flex-col divide-y divide-border border-y border-border"
+        className="flex flex-col divide-y divide-border border-t border-border"
       >
         {slots.map((slot) => (
           <li key={slot.slot} className="min-w-0">
