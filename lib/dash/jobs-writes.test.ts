@@ -597,3 +597,71 @@ describe('contacts, touches and suggestions (plan #1894.6.6)', () => {
     expect(await refused('mark_suggestion_sent', people(), { person: 'Nobody' })).toMatch(/No open suggestion/);
   });
 });
+
+describe('review_emails (plan #1894.6.4.2)', () => {
+  const MAIL_1 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+  const MAIL_2 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+  const GONE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3';
+  const THEIRS = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4';
+  const MAILBOX = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function withMail(): FakeTables {
+    const t = tables();
+    const verdicts = [
+      { id: MAIL_1, classification: 'interview_invite', parse_status: 'needs_review', resulting_application_id: APP_1, link_method: 'thread', link_confidence: 0.6, error: null },
+      { id: MAIL_2, classification: 'recruiter_reply', parse_status: 'needs_review', resulting_application_id: null, link_method: null, link_confidence: null, error: 'no role found' },
+      { id: GONE, classification: 'not_relevant', parse_status: 'skipped', resulting_application_id: null, link_method: null, link_confidence: null, error: null },
+      { id: THEIRS, classification: 'offer', parse_status: 'needs_review', resulting_application_id: null, link_method: null, link_confidence: null, error: null },
+    ];
+    t['job_search.ingested_messages'] = verdicts.map((row) => ({ ...row }));
+    t['job_search.inbox_messages'] = verdicts.map((row, i) => ({
+      ...row,
+      user_id: row.id === THEIRS ? SOMEONE : ME,
+      email_account_id: MAILBOX,
+      provider_message_id: `m${i + 1}`,
+      subject: ['Interview next week', 'Re: your application', 'Newsletter', 'Not mine'][i],
+    }));
+    return t;
+  }
+  const undoOn = (t: FakeTables) => ({ userId: ME, db: async (schema: Parameters<ReturnType<typeof fakeSchemaDb>>[0]) => fakeSchemaDb(t)(schema) });
+  const verdict = (t: FakeTables, id: string) => t['job_search.ingested_messages'].find((row) => row.id === id)!;
+
+  it("dismisses waiting emails as the page does, and its Undo puts back each one's own classification and link", async () => {
+    const t = withMail();
+    const change = await made('review_emails', t, { email_refs: [MAIL_1, `${MAILBOX}:m2`], verb: 'dismiss' });
+    expect(change.kind).toBe('review_emails');
+    expect(change.summary).toBe('Dash dismissed 2 emails from Jobs review.');
+    for (const id of [MAIL_1, MAIL_2]) {
+      expect(verdict(t, id)).toMatchObject({ classification: 'not_relevant', parse_status: 'skipped', resulting_application_id: null, link_method: null, error: null });
+    }
+
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: true, restored: 2 });
+    expect(verdict(t, MAIL_1)).toMatchObject({ classification: 'interview_invite', parse_status: 'needs_review', resulting_application_id: APP_1, link_method: 'thread', link_confidence: 0.6 });
+    expect(verdict(t, MAIL_2)).toMatchObject({ classification: 'recruiter_reply', parse_status: 'needs_review', error: 'no role found' });
+  });
+
+  it('brings a dismissed email back, as the kind they say, and its Undo dismisses it again', async () => {
+    const t = withMail();
+    const change = await made('review_emails', t, { email_refs: [`job_search.inbox_messages:${GONE}`], verb: 'restore', classification: 'job_alert' });
+    expect(verdict(t, GONE)).toMatchObject({ classification: 'job_alert', parse_status: 'needs_review' });
+    expect(change.summary).toBe('Dash brought back "Newsletter" to Jobs review as job alert.');
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: true, restored: 1 });
+    expect(verdict(t, GONE)).toMatchObject({ classification: 'not_relevant', parse_status: 'skipped' });
+  });
+
+  it('leaves an email that has moved on since alone on Undo', async () => {
+    const t = withMail();
+    const change = await made('review_emails', t, { email_refs: [MAIL_1], verb: 'dismiss' });
+    Object.assign(verdict(t, MAIL_1), { classification: 'offer', parse_status: 'parsed' });
+    expect(await undoJobsRows(undoOn(t), change.undo)).toMatchObject({ ok: false });
+    expect(verdict(t, MAIL_1)).toMatchObject({ classification: 'offer' });
+  });
+
+  it("refuses another person's email, one with nothing to do, and a classification on a dismissal", async () => {
+    expect(await refused('review_emails', withMail(), { email_refs: [MAIL_1, THEIRS], verb: 'dismiss' })).toMatch(/not an email the job search has read/);
+    expect(await refused('review_emails', withMail(), { email_refs: [GONE], verb: 'dismiss' })).toMatch(/None of those is waiting/);
+    expect(await refused('review_emails', withMail(), { email_refs: [MAIL_1], verb: 'restore' })).toMatch(/None of those has been dismissed/);
+    expect(await refused('review_emails', withMail(), { email_refs: [MAIL_1], verb: 'dismiss', classification: 'offer' })).toMatch(/goes with restore/);
+    expect(await refused('review_emails', withMail(), { email_refs: [], verb: 'dismiss' })).toMatch(/Name the emails/);
+  });
+});

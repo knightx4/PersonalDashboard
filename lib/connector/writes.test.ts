@@ -86,6 +86,7 @@ describe('runConnectorWrite', () => {
       'change_role_email',
       'review_application',
       'review_events',
+      'review_emails',
       'change_contact',
       'change_touch',
       'mark_suggestion_sent',
