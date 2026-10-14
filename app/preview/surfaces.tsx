@@ -262,6 +262,8 @@ import {
   AskChangesSurface,
   AskDashSurface,
   AskMadeChangesSurface,
+  DashPageSurface,
+  AskAnswerActionsSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -5141,6 +5143,45 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadFilesSurface />,
+  },
+  {
+    /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
+     * left, grouped by day with the workspaces each used and chips to narrow
+     * them, and the open chat beside them. On a phone the chat is drawn over
+     * the list, with the way back above its title. */
+    id: 'ask-page',
+    label: 'Dash · A chat open beside the list',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface />,
+  },
+  {
+    /* The same page at /ask, a new chat beside the list; on a phone the
+     * list is the whole page. */
+    id: 'ask-page-new',
+    label: 'Dash · The list and a new chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* The list hidden to its strip (New chat and the button to show it),
+     * with the chat centred at its reading width. */
+    id: 'ask-page-hidden',
+    label: 'Dash · The list hidden',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* The presses under each answer (plan #1899.7): the first answer made a
+     * todo and saved to the vault, each card with Undo, and Edit pressed on
+     * the second, so its question is back in the box. */
+    id: 'ask-answer-actions',
+    label: 'Dash · An answer kept as a todo and a note',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface />,
   },
 
   {

@@ -1,7 +1,15 @@
 import 'server-only';
 
 import { createClient, requireUser } from '@/lib/auth/server';
-import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
+import {
+  confirmChange,
+  declineChange,
+  undoChange,
+  writeChange,
+  type ChangeDeps,
+  type ChangeOutcome,
+} from '@/lib/ask/changes';
+import { readSubject } from '@/lib/core/dash-actions';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
@@ -35,9 +43,11 @@ import {
   type DashChange,
   type MadeChange,
 } from './changes';
-import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
+import { appendTurns, listAskChats, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
+import type { AskChat } from './ask-chats';
 import type { TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
+import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -228,6 +238,12 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
   return listConversations(await createCoreClient(), 'ask', limit);
 }
 
+/** The person's chats with Dash for the list on /ask (plan #1899.2), with the workspaces each touched. */
+export async function listAskChatsInRequest(timezone: string, limit = 200): Promise<AskChat[]> {
+  await requireUser();
+  return listAskChats(await createCoreClient(), timezone, limit);
+}
+
 /** One past question's turns, oldest first, with each answer's lookups and citations; empty when it is not theirs or not there. */
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
@@ -297,4 +313,36 @@ export async function declineAskChange(id: string): Promise<ChangeOutcome> {
 /** Take a confirmed change back and mark it undone, or say why not. */
 export async function undoAskChange(id: string): Promise<ChangeOutcome> {
   return undoChange(await changeDeps(), id);
+}
+
+/**
+ * Make one of Dash's answers a todo or a quick note in the vault (plan
+ * #1899.7), as the signed-in person, kept as a change under that answer so
+ * its card offers Undo. The conversation is read through their own client,
+ * so an answer that is not theirs is not found.
+ */
+export async function saveAskAnswer(ref: string, turnId: string, to: SaveAnswerTo): Promise<SaveAnswerOutcome> {
+  const deps = await changeDeps();
+  const db = requestAskDb();
+  return saveAnswer(
+    {
+      enabledModules: deps.enabledModules,
+      turns: (conversationId) => loadConversation(deps.core, { kind: 'ask', ref: conversationId }),
+      writeTodo: (input) => writeChange(deps, { kind: 'add_todo', input }),
+      fileNote: (text, title) => fileVaultNote(deps.userId, text, title),
+      readRow: async (subjectRef) => {
+        try {
+          return await readSubject(db, subjectRef);
+        } catch (error) {
+          console.error(`saving an answer: reading ${subjectRef} for the record failed`, error);
+          return null;
+        }
+      },
+      keep: (conversationId, made) => insertMadeChange(deps.core, deps.userId, conversationId, made),
+      attach: (changeId, answerId) => attachProposals(deps.core, [changeId], answerId),
+    },
+    ref,
+    turnId,
+    to,
+  );
 }

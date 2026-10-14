@@ -13,10 +13,12 @@ import {
   listAskConversations,
   loadAskChanges,
   loadAskConversation,
+  saveAskAnswer,
   undoAskChange,
 } from '@/lib/talk/ask-request';
 import { AskPagePath, AskRef } from '@/lib/talk/ask-input';
 import type { DashChange } from '@/lib/talk/changes';
+import type { SaveAnswerOutcome, SaveAnswerTo } from '@/lib/talk/save-answer';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -178,4 +180,29 @@ export async function declineDashChange(id: string): Promise<ChangeOutcome> {
 // latency: pending
 export async function undoDashChange(id: string): Promise<ChangeOutcome> {
   return pressChange(id, undoAskChange, 'The change could not be undone. Check your connection and try again.');
+}
+
+/**
+ * Make one of Dash's answers a todo or a note in the vault (plan #1899.7).
+ * Never throws: the result is the change it made, drawn under the answer
+ * with Undo, or a sentence saying why not.
+ */
+// latency: pending
+export async function saveDashAnswer(ref: string, turnId: string, to: SaveAnswerTo): Promise<SaveAnswerOutcome> {
+  const conversation = Ref.safeParse(ref);
+  const turn = Ref.safeParse(turnId);
+  if (!conversation.success || !turn.success || (to !== 'todo' && to !== 'vault')) {
+    return { ok: false, error: 'That answer is not there any more.' };
+  }
+  try {
+    const outcome = await saveAskAnswer(conversation.data, turn.data, to);
+    if (outcome.ok) {
+      for (const path of changePaths(outcome.change)) revalidatePath(path);
+      revalidatePath('/ask');
+    }
+    return outcome;
+  } catch (error) {
+    console.error('saving an answer failed', error);
+    return { ok: false, error: 'That was not saved. Check your connection and try again.' };
+  }
 }

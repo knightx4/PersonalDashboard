@@ -30,11 +30,13 @@ import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import { MAIN_BOX } from '@/components/shell/main-box';
 import {
+  DashPlate,
   WorkspaceSheet,
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { isAskPath } from '@/lib/ask/page-name';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
 import { openingOffset, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
@@ -332,7 +334,9 @@ export function AppShell({
   // heading's exact words a few inches lower: "Quick read" twice. Below that
   // first page the section follows as a link back up to it, so a company or an
   // order still says where it sits.
-  const title = moduleById(module)?.label ?? 'Home';
+  // Dash's page is outside every workspace and is not Home (plan #1899.2).
+  const onDash = module === null && isAskPath(pathname ?? '');
+  const title = moduleById(module)?.label ?? (onDash ? 'Dash' : 'Home');
   const crumb = active && pathname !== active.href ? active : undefined;
 
   useEffect(() => {
@@ -468,6 +472,7 @@ export function AppShell({
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
+          dash={onDash}
           enabled={workspaces}
           counts={counts}
           onShell
@@ -597,7 +602,11 @@ export function AppShell({
         {/* The mark is 24px against the tabs' 20px icons, so it is pulled back
             in by 2px a side -- otherwise the centre label sits lower than the
             four beside it. */}
-        <ModuleMark module={module} size="sm" className="-my-0.5" />
+        {onDash ? (
+          <DashPlate className="-my-0.5" />
+        ) : (
+          <ModuleMark module={module} size="sm" className="-my-0.5" />
+        )}
         <span className="truncate">Switch</span>
       </button>
     </li>
@@ -751,6 +760,7 @@ export function AppShell({
                 <span className="lg:hidden">
                   <WorkspaceSwitcher
                     current={module}
+                    dash={onDash}
                     enabled={workspaces}
                     counts={counts}
                     onShell
@@ -942,6 +952,7 @@ export function AppShell({
 
           <WorkspaceSheet
             current={module}
+            dash={onDash}
             enabled={workspaces}
             counts={counts}
             open={switcher}

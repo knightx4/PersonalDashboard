@@ -11,15 +11,16 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import Link, { linkVariants } from '@/components/ui/link';
-import { IconButton } from '@/components/ui/icon-button';
+import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { SquarePen, X } from 'lucide-react';
+import { Maximize2, SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { AnswerActions } from '@/components/talk/answer-actions';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
@@ -44,6 +45,7 @@ import {
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
+  saveDashAnswer,
   undoDashChange,
 } from '@/app/ask/actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -93,6 +95,8 @@ export type AskSource = ChangePresses & {
   poll: typeof pollAskQuestion;
   costs: typeof askDashCosts;
   label: typeof askDashPageLabel;
+  /** Make an answer a todo or a vault note, kept as a change under it (plan #1899.7). */
+  save: typeof saveDashAnswer;
 };
 
 /**
@@ -142,6 +146,7 @@ const ACTIONS: AskSource = {
   poll: pollAskQuestion,
   costs: askDashCosts,
   label: askDashPageLabel,
+  save: saveDashAnswer,
   confirm: confirmDashChange,
   decline: declineDashChange,
   undo: undoDashChange,
@@ -346,6 +351,8 @@ export function AskThread({
   above?: React.ReactNode;
   startWriting?: boolean;
   ask?: string;
+  /** For the preview gallery: the box opens with these words in it. */
+  initialDraft?: string;
 }) {
   const source = useAskDash()?.source ?? ACTIONS;
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
@@ -410,13 +417,26 @@ export function AskThread({
       written={written}
       activity="searching"
       incoming={incoming}
-      below={(turn) => {
+      below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
             <LookupFold calls={turn.toolCalls} />
+            {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
+                A todo or a note comes back as a change, drawn above with Undo. */}
+            <AnswerActions
+              body={turn.body}
+              question={thread.question}
+              busy={thread.busy}
+              onRetry={thread.resend}
+              onEdit={thread.edit}
+              save={ref ? (to) => source.save(ref, turn.id, to) : undefined}
+              onSaved={(change) =>
+                setChanges((current) => [...current.filter((c) => c.id !== change.id), change])
+              }
+            />
           </>
         );
       }}
@@ -520,6 +540,9 @@ export function AskDashPanel({
   // Whether the question on screen has become a conversation, which is when
   // "New question" has something to leave.
   const [started, setStarted] = useState(false);
+  // The chat on screen once it has an address, for the button that opens it
+  // on the full page (plan #1899.2).
+  const [chatRef, setChatRef] = useState<string | null>(null);
   const [costs, setCosts] = useState<PaidCosts>({});
 
   useEffect(() => {
@@ -569,6 +592,7 @@ export function AskDashPanel({
   function show(next: View) {
     setView(next);
     setStarted(next.kind === 'earlier');
+    setChatRef(next.kind === 'earlier' ? next.ref : null);
     setThreadKey((key) => key + 1);
   }
 
@@ -612,6 +636,15 @@ export function AskDashPanel({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
+              <Tooltip label="Open on Dash's page" align="end">
+                <Link
+                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  aria-label="Open on Dash's page"
+                  className={iconButtonVariants()}
+                >
+                  <Maximize2 strokeWidth={1.75} aria-hidden />
+                </Link>
+              </Tooltip>
               {started && (
                 <Tooltip label="New question" align="end">
                   <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
@@ -637,7 +670,10 @@ export function AskDashPanel({
                 source={source}
                 hint={hint}
                 lookingAt={lookingAt}
-                onStarted={() => setStarted(true)}
+                onStarted={(ref) => {
+                  setStarted(true);
+                  setChatRef(ref);
+                }}
                 onReopen={(conversation) =>
                   show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
                 }
@@ -675,7 +711,7 @@ function NewQuestion({
   source: AskSource;
   hint: React.ReactNode;
   lookingAt: React.ReactNode;
-  onStarted: () => void;
+  onStarted: (ref: string) => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));
