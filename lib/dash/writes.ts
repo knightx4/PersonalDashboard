@@ -24,6 +24,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
+import { NEWS_WRITE_TOOLS } from './news-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -58,6 +59,9 @@ import { YOU_WRITE_TOOLS } from './you-writes';
  *   Todo's five      a todo's notes, pin, snooze or state, an item on its
  *                    list, what it is about, and a calendar event added or
  *                    changed (lib/dash/todo-writes.ts, plan #1894.9.1).
+ *   News's four and stop_watch  an issue marked unread, a story saved or
+ *                    unsaved, sent to Learn or made a todo, and a price
+ *                    watch stopped (lib/dash/news-writes.ts, plan #1894.9.4).
  *   You's two        a place they have lived added or changed
  *                    (lib/dash/you-writes.ts, plan #1991.5).
  *
@@ -1081,6 +1085,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...TODO_WRITE_TOOLS,
   // You's places, which the connector offers too (plan #1991.5).
   ...YOU_WRITE_TOOLS,
+  // News's, and stopping a watch, which the connector offers too (plan #1894.9.4).
+  ...NEWS_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

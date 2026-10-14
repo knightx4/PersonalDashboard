@@ -9,6 +9,7 @@ import { WRITE_TOOL_NAMES } from './writes';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
@@ -50,6 +51,7 @@ describe('DASH_TOOLS', () => {
       ...LEARN_CHANGE_KINDS,
       ...TODO_CHANGE_KINDS,
       ...YOU_CHANGE_KINDS,
+      ...NEWS_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,

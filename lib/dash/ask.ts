@@ -119,7 +119,10 @@ reword_concept, add_concept_note or change_video. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
-change_event. When they tell you about a place they have lived, or ask to
+change_event. In News, when they ask to mark a newsletter unread, save or
+unsave a story, send one to Learn or make a todo from one, call
+mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
+when they ask to stop a price watch, call stop_watch. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
 or ask to correct one, call save_job. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to

@@ -21,6 +21,7 @@ import {
 import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subjects';
 import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
+import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
 import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 
 /**
@@ -138,7 +139,7 @@ function subjectNames(input: Record<string, unknown>): string[] {
 async function record(
   ctx: ConnectorWriteContext,
   ref: string,
-  op: 'insert' | 'update',
+  op: 'insert' | 'update' | 'delete',
   kind: string,
   summary: string,
   before?: Record<string, unknown>,
@@ -445,6 +446,35 @@ const YOU_TOOLS: readonly ConnectorWriteTool[] = YOU_WRITES.map((write) => ({
   },
 }));
 
+/**
+ * News's changes and stopping a watch (plan #1894.9.4, lib/dash/news-writes.ts),
+ * the same tools Ask has, run here on the service-role clients for the
+ * verified person and recorded as Dash's.
+ */
+const NEWS_TOOLS: readonly ConnectorWriteTool[] = NEWS_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account) refuse();
+    const off = switchedOff(write, ctx.account.enabledModules);
+    if (off) throw new AskInputError(`The ${off} workspace is switched off, so nothing can be changed there.`);
+    const env = {
+      userId: ctx.userId,
+      news: await ctx.db('news'),
+      learn: await ctx.db('learn'),
+      todo: await ctx.db('todo'),
+      core: await ctx.db('core'),
+    };
+    const made = await runNewsWrite(write, env, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Ask Dash's write tools the connector also offers, with what a client is told each does. */
 type SharedWrite = 'add_quick_note' | 'add_idea' | 'add_job_lead';
 
@@ -531,6 +561,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,
+  ...NEWS_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */

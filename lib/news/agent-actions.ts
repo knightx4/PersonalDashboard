@@ -1,4 +1,4 @@
-import { GAP, none, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the News pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const newsActions: ModuleActions = {
@@ -9,10 +9,10 @@ export const newsActions: ModuleActions = {
     remakeRecommendations: none('spends'),
   },
   'app/news/i/[id]/actions.ts': {
-    markIssueUnread: GAP,
-    setStorySaved: GAP,
-    sendStoryToLearn: GAP,
-    makeTodoFromStory: GAP,
+    markIssueUnread: tool('mark_issue_unread'),
+    setStorySaved: tool('save_story'),
+    sendStoryToLearn: tool('send_story_to_learn'),
+    makeTodoFromStory: tool('make_todo_from_story'),
     confirmIssue: none('theirs', 'Says the person confirmed a signup in their mail.'),
   },
   'app/news/quick/actions.ts': {
@@ -25,7 +25,7 @@ export const newsActions: ModuleActions = {
     discussQuickStory: none('spends'),
   },
   'app/news/saved/actions.ts': {
-    removeSaved: GAP,
+    removeSaved: tool('save_story'),
   },
   'app/news/settings/actions.ts': {
     replaceAddress: none('account'),

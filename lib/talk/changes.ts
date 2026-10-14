@@ -7,6 +7,7 @@ import type { RoleStage } from '@/lib/dash/bulk-roles';
 import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS, type TodoChangeInput, type TodoChangeKind } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS, type YouChangeInput, type YouChangeKind } from '@/lib/ask/you-changes';
+import { NEWS_CHANGE_KINDS, type NewsChangeInput, type NewsChangeKind } from '@/lib/ask/news-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -51,6 +52,8 @@ export const DASH_CHANGE_KINDS = [
   ...TODO_CHANGE_KINDS,
   // You's places, in the same shape (lib/ask/you-changes.ts, plan #1991.5).
   ...YOU_CHANGE_KINDS,
+  // News's, and stopping a watch, in the same shape (lib/ask/news-changes.ts, plan #1894.9.4).
+  ...NEWS_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -160,7 +163,8 @@ export type DashChangeInput = {
   add_quick_note: { noteId: string; title: string; path: string; body: string };
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
-  Record<YouChangeKind, YouChangeInput>;
+  Record<YouChangeKind, YouChangeInput> &
+  Record<NewsChangeKind, NewsChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];

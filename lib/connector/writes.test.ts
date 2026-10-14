@@ -46,6 +46,11 @@ describe('runConnectorWrite', () => {
       'add_place',
       'change_place',
       'save_job',
+      'mark_issue_unread',
+      'save_story',
+      'send_story_to_learn',
+      'make_todo_from_story',
+      'stop_watch',
     ]);
   });
 
