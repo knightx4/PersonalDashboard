@@ -1,27 +1,21 @@
-import { CalendarClock } from 'lucide-react';
-import { cn } from '@/lib/cn';
 import { createClient, requireUser } from '@/lib/auth/server';
 import type { DevComment } from '@/lib/comments/load';
 import { loadRowThreads } from '@/lib/thread/store';
-import { THREAD_TABLES, threadRef } from '@/lib/thread/subjects';
+import { THREAD_TABLES } from '@/lib/thread/subjects';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { dayClosed, doneToday } from '@/lib/todo/agenda/day-close';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
 import { loadTaskFiles } from '@/lib/todo/tasks/files';
-import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
-import { Card } from '@/components/ui/card';
-import Link, { linkVariants } from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
 import { DayClosed } from '@/components/todo/day-closed';
 import { AddTask } from '@/components/todo/task-form';
-import { TaskRow } from '@/components/todo/task-row';
-import { AgendaItemRow } from '@/components/todo/agenda-item-row';
-import { formatClock } from '@/lib/clock';
 import { PageColumn } from '@/components/shell/page-width';
+import { AgendaPiles } from './agenda-piles';
 
 export const metadata = { title: 'Agenda' };
 
@@ -119,95 +113,13 @@ export default async function TodoPage() {
             />
           )
         ) : (
-          <div className="mt-6 space-y-6">
-            {agenda.piles.map(({ bucket, entries, context }) => {
-              // The pile in the order it is about to be drawn in, so a row can
-              // send it back with a move. Tasks only: an interview or a return
-              // deadline is not a row this account owns, so there is nowhere to
-              // write an order for it.
-              const pile = entries
-                .filter((entry) => entry.kind === 'task' && entry.task)
-                .map((entry) => entry.task!.id);
-
-              return (
-                <section key={bucket}>
-                  <h2
-                    className={cn(
-                      'text-ui font-semibold',
-                      bucket === 'overdue' ? 'text-status-rejected' : 'text-ink',
-                    )}
-                  >
-                    {BUCKET_LABELS[bucket]}
-                    {entries.length > 0 && (
-                      <span className="tabular ml-2 text-small font-normal text-ink-muted">
-                        {entries.length}
-                      </span>
-                    )}
-                  </h2>
-                  {/* What is already in these days. No checkbox: you do not tick
-                  off a meeting, and offering to would be inviting someone to
-                  lie to their own list. */}
-                  {context.length > 0 && (
-                    <ul className="mt-1 space-y-1">
-                      {context.map((entry) => (
-                        <li
-                          key={entry.key}
-                          className="flex flex-wrap items-baseline gap-x-2 rounded-control bg-accent-tint px-3 py-1.5 text-small text-ink"
-                        >
-                          <CalendarClock
-                            className="size-3.5 shrink-0 text-accent"
-                            strokeWidth={1.75}
-                            aria-hidden
-                          />
-                          {entry.at && (
-                            <span className="tabular font-medium">
-                              {formatClock(entry.at, {
-                                timeZone: agenda.timezone,
-                                weekday: 'short',
-                              })}
-                            </span>
-                          )}
-                          <span className="font-medium">{entry.label}</span>
-                          {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
-                          {entry.link && (
-                            <Link href={entry.link.href} className={linkVariants()}>
-                              {entry.link.label}
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {entries.length > 0 && (
-                    <Card padding="none" className="mt-1 divide-y divide-border px-3">
-                      {entries.map((entry) =>
-                        entry.kind === 'task' && entry.task ? (
-                          <TaskRow
-                            key={entry.key}
-                            task={entry.task}
-                            timezone={agenda.timezone}
-                            anchor={entry.anchor}
-                            pile={pile}
-                            items={entry.children}
-                            working={working}
-                            thread={threads.get(threadRef('task', entry.task.id))}
-                            files={files.get(entry.task.id)}
-                          />
-                        ) : entry.item ? (
-                          <AgendaItemRow
-                            key={entry.key}
-                            item={entry.item}
-                            timezone={agenda.timezone}
-                          />
-                        ) : null,
-                      )}
-                    </Card>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+          <AgendaPiles
+            piles={agenda.piles}
+            timezone={agenda.timezone}
+            working={working}
+            threads={threads}
+            files={files}
+          />
         )}
       </QueueCleared>
     </PageColumn>

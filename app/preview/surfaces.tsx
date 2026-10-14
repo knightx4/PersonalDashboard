@@ -358,6 +358,7 @@ import {
   TodoAllSurface,
   TodoSettingsSurface,
   TodoWaitingSurface,
+  TodoAgendaSurface,
 } from './news-todo-page-surfaces';
 import {
   ShoppingAddBooksSurface,
@@ -6900,6 +6901,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <NewsSettingsSurface />,
+  },
+  {
+    id: 'todo-agenda',
+    label: 'Todo · Agenda',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoAgendaSurface />,
   },
   {
     id: 'todo-all',

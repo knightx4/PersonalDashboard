@@ -1,15 +1,21 @@
 import { NewsListView } from '@/app/news/all/list-view';
 import { StoryView } from '@/app/news/i/[id]/s/[index]/story-view';
 import { NewsSettingsView } from '@/app/news/settings/settings-view';
+import { AgendaPiles } from '@/app/todo/agenda-piles';
 import { AllTasksView } from '@/app/todo/all/all-view';
 import { agendaSourceGroups, TodoSettingsView } from '@/app/todo/settings/settings-view';
 import { WaitingView } from '@/app/todo/waiting/waiting-view';
 import type { NewsIssue, NewsSender, UnreadStories } from '@/lib/news/issues/list';
 import type { NewsStory } from '@/lib/news/issues/stories';
 import type { Anchor } from '@/lib/todo/agenda/anchors';
+import { mergeAgenda } from '@/lib/todo/agenda/merge';
+import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 import type { Feed } from '@/lib/todo/feeds/load';
 import type { Task } from '@/lib/todo/tasks/model';
 import type { Waiting } from '@/lib/todo/waiting/load';
+import { PageHeader } from '@/components/shell/page-header';
+import { PageColumn } from '@/components/shell/page-width';
+import { AddTask } from '@/components/todo/task-form';
 
 /**
  * The News and Todo pages that had no picture (plan #1603), each drawn by the
@@ -277,4 +283,100 @@ const waiting: Waiting = {
 
 export function TodoWaitingSurface() {
   return <WaitingView waiting={waiting} />;
+}
+
+// ---- Todo: the agenda ------------------------------------------------------
+
+/** The agenda's own clock: Wednesday 14 October, just after lunch. */
+const AGENDA_NOW = new Date('2026-10-14T12:39:00Z');
+
+const agendaTasks: Task[] = [
+  task({ id: 'a1', title: 'Take the recycling out', dueOn: '2026-10-13' }),
+  task({ id: 'a2', title: 'Book a boiler service', dueOn: '2026-10-13' }),
+  task({ id: 'a3', title: 'Water the balcony plants', dueOn: '2026-10-14' }),
+  task({
+    id: 'a4',
+    title: 'Write up the notes from the Fernhill Analytics call before the follow-up on Friday',
+    dueOn: '2026-10-16',
+  }),
+  task({ id: 'a5', title: 'Pick up the dry cleaning', dueOn: '2026-10-17' }),
+];
+
+const agendaItem = (
+  over: Partial<AgendaItem> & Pick<AgendaItem, 'key' | 'source' | 'title'>,
+): AgendaItem => ({
+  ref: `preview.items:${over.key}`,
+  day: null,
+  at: null,
+  link: null,
+  action: null,
+  detail: null,
+  completable: true,
+  ...over,
+});
+
+const agendaItems: AgendaItem[] = [
+  agendaItem({
+    key: 'g1',
+    source: 'goal_steps',
+    title: 'Run 5k without stopping',
+    day: '2026-10-12',
+    link: { href: '/goals', label: 'Get fit for spring' },
+  }),
+  agendaItem({
+    key: 'j1',
+    source: 'job_reminders',
+    title: 'Interview at Fernhill Analytics for Senior Data Analyst tomorrow, and the prep doc is still empty.',
+    day: '2026-10-14',
+    at: '2026-10-14T07:30:00Z',
+    link: { href: '/jobs/roles/r1', label: 'Fernhill Analytics · Senior Data Analyst' },
+  }),
+];
+
+const agendaContext: DayContext[] = [
+  {
+    key: 'c1',
+    ref: 'preview.bills:c1',
+    day: '2026-10-15',
+    at: null,
+    label: 'Council tax due',
+    detail: null,
+    link: { href: '/shopping/recurring', label: 'Open' },
+  },
+  {
+    key: 'c2',
+    ref: 'preview.interviews:c2',
+    day: '2026-10-15',
+    at: '2026-10-15T09:00:00Z',
+    label: 'Fernhill Analytics · Senior Data Analyst',
+    detail: '2 · Technical interview · SQL and dashboards',
+    link: { href: '/jobs/roles/r1', label: 'Prep' },
+  },
+];
+
+const agendaPiles = mergeAgenda({
+  tasks: agendaTasks,
+  items: agendaItems,
+  context: agendaContext,
+  dismissals: new Map(),
+  anchors: new Map([['a4', { label: 'Fernhill Analytics · Senior Data Analyst', href: '/jobs/roles/r1' }]]),
+  timezone: ZONE,
+  now: AGENDA_NOW,
+  horizonDays: 14,
+});
+
+export function TodoAgendaSurface() {
+  return (
+    <PageColumn>
+      <PageHeader title="Agenda" description="What needs you, in the order it runs out." />
+      <AddTask today="2026-10-14" />
+      <AgendaPiles
+        piles={agendaPiles}
+        timezone={ZONE}
+        working={[]}
+        threads={new Map()}
+        files={new Map()}
+      />
+    </PageColumn>
+  );
 }
