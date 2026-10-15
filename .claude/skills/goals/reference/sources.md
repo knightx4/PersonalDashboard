@@ -270,7 +270,7 @@ Cover letters they sent.
 
 ### `job_search.application_answers` (Job search)
 
-Their answers to application questions.
+Their answers to application questions. The answers on one application, each with its question, are in application_answers.
 
 - Search: `answer`
 - Name a row by `answer`; link it by `id`
