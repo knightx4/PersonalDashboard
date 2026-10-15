@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useCallback, useMemo, useState } from 'react';
-import { CircleUser, Pencil, Play } from 'lucide-react';
+import { CircleUser, Pencil } from 'lucide-react';
 import {
   addPlanDependency,
   addPlanItem,
@@ -26,6 +26,8 @@ import { useToast } from '@/components/ui/toast';
 import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
+import { DashMark } from '@/components/ui/dash-mark';
 import { FieldError, FieldHint } from '@/components/ui/field';
 import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
@@ -265,8 +267,8 @@ function SetupJob({
 function sendLabel(node: PlanNode): string {
   const beneath = flatten([node]).length - 1;
   return beneath === 0
-    ? `Send ${stepRef(node)} to Dash`
-    : `Send ${stepRef(node)} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
+    ? `Build ${stepRef(node)}`
+    : `Build ${stepRef(node)} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} beneath`;
 }
 
 /** What a size means, for its Tooltip. */
@@ -278,7 +280,7 @@ const SIZE_TIP: Record<NonNullable<PlanNode['size']>, string> = {
 
 /** What pressing Send does, for its Tooltip. */
 function sendTip(node: PlanNode): string {
-  return `${sendLabel(node)}: Dash starts building now, without waiting for the runner.`;
+  return `${sendLabel(node)}: Dash starts now, without waiting for the runner.`;
 }
 
 /**
@@ -359,7 +361,7 @@ function SendToClaude({
         // Nothing is submitted from here while the run is quiet. The press
         // raises the question on the row, and answering it is what sends --
         // one question in one place, however Send was reached.
-        <Button
+        <DashAction
           type="button"
           size="sm"
           variant="secondary"
@@ -367,13 +369,12 @@ function SendToClaude({
           title={held ?? quietAsk}
           onClick={onAskQuiet}
         >
-          <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
           {sendLabel(node)}
-        </Button>
+        </DashAction>
       ) : (
         <form action={action}>
           <input type="hidden" name="id" value={node.id} />
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="secondary"
@@ -381,9 +382,8 @@ function SendToClaude({
             disabled={resolving}
             title={held}
           >
-            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {pending ? 'Sending…' : sendLabel(node)}
-          </Button>
+          </DashAction>
         </form>
       )}
       {/* An overhaul is worked by its own routine in its own order, so it
@@ -392,7 +392,7 @@ function SendToClaude({
       {overhaul && (
         <form action={overhaulAction}>
           <input type="hidden" name="id" value={node.id} />
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="secondary"
@@ -405,15 +405,14 @@ function SendToClaude({
                 : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
             }
           >
-            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {overhaulPending ? 'Starting…' : 'Work this overhaul'}
-          </Button>
+          </DashAction>
         </form>
       )}
       {beneath > 0 && !overhaul && (
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="ghost"
@@ -421,8 +420,8 @@ function SendToClaude({
             disabled={resolving}
             title={held ?? 'Start one session on every open step beneath this one, worked in order'}
           >
-            {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
-          </Button>
+            {batchPending ? 'Sending…' : `Build all ${beneath}`}
+          </DashAction>
         </form>
       )}
       {/* The return trip, and the only button here that starts no build: it
@@ -433,7 +432,7 @@ function SendToClaude({
       {node.children.length > 0 && node.status !== 'proposed' && (
         <form action={reshapeAction}>
           <input type="hidden" name="id" value={node.id} />
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="ghost"
@@ -445,7 +444,7 @@ function SendToClaude({
             }
           >
             {reshapePending ? 'Re-shaping…' : 'Re-shape'}
-          </Button>
+          </DashAction>
         </form>
       )}
       {/* Said in the row as well as on the tooltip: three buttons that have
@@ -1232,13 +1231,13 @@ export function usePlanRow({
               // own, and a confirmation that appeared under the pointer and
               // vanished with it would be no confirmation at all.
               <RowIconButton label={sendLabel(node)} tip={sendTip(node)} onClick={() => setConfirmingSend(true)}>
-                <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <DashMark size="2xs" tone="brand" decorative />
               </RowIconButton>
             ) : (
               <form action={sendAction}>
                 <input type="hidden" name="id" value={node.id} />
                 <RowIconButton type="submit" label={sendLabel(node)} tip={sendTip(node)} pending={sendPending}>
-                  <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  <DashMark size="2xs" tone="brand" state={sendPending ? 'working' : 'idle'} decorative />
                 </RowIconButton>
               </form>
             ))}
@@ -1398,17 +1397,16 @@ export function usePlanRow({
 
   // The one press a feature's own page keeps in its header: the same Send the
   // row's opened panel leads with, asking first when the run has gone quiet.
-  // It reads "Send to Dash" on the title's line (plan #1688): on the
+  // It reads "Start building" on the title's line (plan #1688): on the
   // feature's own page it plainly sends that feature, and the count of rows
   // beneath, which is every row at any depth rather than the steps Progress
-  // counts, is in its title instead. On a phone it is the play mark alone,
-  // the words kept as its name, so the title keeps the width of the line.
-  const sendWords = 'max-sm:sr-only';
-  const sendShape = 'press-area max-sm:size-9 max-sm:px-0';
+  // counts, is in its title instead. The verb shows on a phone too: Dash's
+  // mark alone does not say what the press does.
+  const sendShape = 'press-area';
   const sendButton =
     closed || node.track === 'overhaul' ? null : quietAsk ? (
       <Tooltip label={quietAsk} align="end">
-        <Button
+        <DashAction
           type="button"
           size="sm"
           variant="secondary"
@@ -1416,15 +1414,14 @@ export function usePlanRow({
           onClick={() => setConfirmingSend(true)}
           className={sendShape}
         >
-          <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className={sendWords}>Send to Dash</span>
-        </Button>
+          Start building
+        </DashAction>
       </Tooltip>
     ) : (
       <form action={sendAction}>
         <input type="hidden" name="id" value={node.id} />
         <Tooltip label={sendTip(node)} align="end">
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="secondary"
@@ -1432,9 +1429,8 @@ export function usePlanRow({
             disabled={beingResolved}
             className={sendShape}
           >
-            <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
-          </Button>
+            {sendPending ? 'Sending…' : 'Start building'}
+          </DashAction>
         </Tooltip>
       </form>
     );

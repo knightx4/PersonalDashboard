@@ -28,7 +28,7 @@ import {
   type EnrichmentProposal,
 } from '../actions';
 import { updateCompany } from '../actions';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import type { Tab } from '@/lib/tabs';
 import { companyTabFrom, type CompanyTab } from './tabs';
@@ -549,13 +549,17 @@ function AiEnrichment({ companyId }: { companyId: string }) {
   return (
     <div className="mt-3 border-t border-border pt-3">
       <div className="flex items-center gap-3">
-        <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
-          {pending ? 'Searching…' : 'Search with AI'}
-        </Button>
-        <PaidHint
-          action="app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment"
+        <DashAction
+          type="button"
+          size="sm"
+          variant="secondary"
+          pending={pending}
+          onClick={lookUp}
+          paid="app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment"
           what="Cost of the search"
-        />
+        >
+          {pending ? 'Looking it up…' : 'Look up this company'}
+        </DashAction>
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
