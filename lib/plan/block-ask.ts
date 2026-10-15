@@ -79,8 +79,8 @@ export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
     return (
       'That ask puts a design check to the person, and those are not theirs to answer. ' +
       'Settle the surfaces yourself: npm run ui-guard -- <n> --settle "<why>", then merge ' +
-      'and close the step with any open fixes in the close note. building.md, "Building a ' +
-      'screen", has the rule.'
+      'and close the step with any open fixes in the close note. screen.md, beside ' +
+      'building.md in the plan skill, has the rule.'
     );
   }
   if (onSteps) return null;

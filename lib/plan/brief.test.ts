@@ -470,6 +470,7 @@ describe('the gallery surfaces in a brief', () => {
     expect(brief).toContain('## Gallery surfaces');
     expect(brief).toContain('- news-saved: /preview?s=news-saved, for /news/saved');
     expect(brief).toContain('- news-saved-empty: /preview?s=news-saved-empty');
+    expect(brief).toContain('read .claude/skills/plan/reference/screen.md');
   });
 
   it('adds the surfaces its changed files serve', () => {

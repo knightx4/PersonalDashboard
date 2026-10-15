@@ -72,8 +72,10 @@ feature and every feature is theirs to approve.
    written**).
 5. **Write Dash's update on the feature** (plan #1666): `update <n> --health
    on_track|at_risk|blocked --body "…"`, two or three sentences on what the
-   re-shape changed: what it added, dropped and asked, by outline. The health
-   rules are in step 7 of the Building section in `SKILL.md`.
+   re-shape changed: what it added, dropped and asked, by outline. `on_track`
+   when the feature can move and nothing open threatens it, `at_risk` when
+   something might stop it landing as written, `blocked` when it cannot move
+   until the person answers or sets something up.
 6. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not add again what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added,
@@ -125,6 +127,6 @@ run writes is ready to build and nothing is dropped by it.
    dismissed. The run changes rows, not code, so it does not commit. Report,
    by outline and title, what you proposed, which drops you asked about, and
    which features you read and left alone.
-5. **Mark the run finished**, as the last write, under job `vision_reshape`
-   (not `reshape`): the SQL is at the end of SKILL.md. The run is about no
-   step, so nothing else ends it.
+5. **Mark the run finished**, as the last write, with the update in the
+   `## Ending this run` note at the foot of the turn, which names this run by
+   its id. The run is about no step, so nothing else ends it.
