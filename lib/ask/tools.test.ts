@@ -993,3 +993,39 @@ describe('list_rows', () => {
     expect(off).toEqual({ ok: false, error: expect.stringContaining('Learn workspace is switched off') });
   });
 });
+
+describe('the parent of each row (plan #2109.2)', () => {
+  const ROLE = '00000000-0000-4000-8000-0000000000c1';
+  const APP = '00000000-0000-4000-8000-0000000000a1';
+  const THEIR_APP = '00000000-0000-4000-8000-0000000000a2';
+  const PAYMENT = '00000000-0000-4000-8000-0000000000b1';
+  const tables: Tables = {
+    'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Designer at Acme', company_id: null }],
+    'job_search.applications': [
+      { id: APP, user_id: ME, role_id: ROLE, next_action: 'Send the follow-up' },
+      { id: THEIR_APP, user_id: THEM, role_id: null, next_action: 'Not theirs' },
+    ],
+    'job_search.cover_letters': [
+      { id: '00000000-0000-4000-8000-0000000000d1', user_id: ME, application_id: APP, body: 'Dear Acme', created_at: '2026-10-01' },
+      { id: '00000000-0000-4000-8000-0000000000d2', user_id: ME, application_id: null, body: 'Loose draft', created_at: '2026-09-01' },
+      { id: '00000000-0000-4000-8000-0000000000d3', user_id: THEM, application_id: THEIR_APP, body: 'Theirs', created_at: '2026-10-02' },
+    ],
+    'public.recurring_payments': [{ id: PAYMENT, user_id: ME, payee: 'Netflix' }],
+    'public.recurring_charges': [
+      { id: '00000000-0000-4000-8000-0000000000e1', user_id: ME, payment_id: PAYMENT, event: 'Charged 15.49', created_at: '2026-10-03' },
+    ],
+  };
+
+  it('names a cover letter by its application, which is known by its role', async () => {
+    const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'job_search.cover_letters' }, context(tables)));
+    expect(rows.map((r) => [r.title, r.parent])).toEqual([
+      ['Dear Acme', { table: 'job_search.applications', ref: APP, title: 'Designer at Acme', href: `/jobs/roles/${ROLE}` }],
+      ['Loose draft', undefined],
+    ]);
+  });
+
+  it('names a parent with no page by its title column', async () => {
+    const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'public.recurring_charges' }, context(tables)));
+    expect(rows[0].parent).toEqual({ table: 'public.recurring_payments', ref: PAYMENT, title: 'Netflix', href: null });
+  });
+});

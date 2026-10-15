@@ -32,10 +32,10 @@ const LIST_ROWS_DEFAULT = 20;
 const COLUMN_CHARS = 400;
 
 /** The schemas a lookup has a client for (AskSchema). */
-const SCHEMAS = new Set<string>(['public', 'core', 'job_search', 'obsidian', 'todo', 'learn', 'news', 'goals', 'you']);
+export const SCHEMAS: ReadonlySet<string> = new Set<string>(['public', 'core', 'job_search', 'obsidian', 'todo', 'learn', 'news', 'goals', 'you']);
 
 /** The owner column, when a table is tied to its owner by one; null when through a join. */
-function ownerColumn(source: Source): string | null {
+export function ownerColumn(source: Source): string | null {
   if (!source.owner) return 'user_id';
   return /^\w+$/.test(source.owner) ? source.owner : null;
 }

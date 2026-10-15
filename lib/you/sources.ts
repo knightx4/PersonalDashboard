@@ -1,5 +1,5 @@
 import { courseHref, transcriptHref } from '@/lib/you/education';
-import type { ModuleSources, Section } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
@@ -24,6 +24,7 @@ export const youSources: ModuleSources = {
       title: 'title',
       href: courseHref,
       section: WORK,
+      parent: parentBy('transcript_id', 'you.transcripts'),
       note:
         'transcript_id points at you.transcripts. year is the year of the term where the transcript gives one. ' +
         'grade is null for a course with no grade, such as transfer credit.',
@@ -75,6 +76,7 @@ export const youSources: ModuleSources = {
       newest: 'started',
       href: jobHref,
       section: WORK,
+      parent: parentBy('resume_id', 'job_search.resume_versions'),
       note:
         'started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. ' +
         'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',
