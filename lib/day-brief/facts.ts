@@ -1,7 +1,7 @@
 import type { AgendaPile } from '@/lib/todo/agenda/merge';
 import type { DailyView } from '@/lib/goals/daily';
 import { addDays } from '@/lib/todo/tasks/model';
-import { formatClock } from '@/lib/clock';
+import { zoneDay, zoneParts, whenTime, whenWeekday } from '@/lib/core/when';
 import { isInterviewContext } from '@/lib/todo/agenda/sources';
 import { stepHref } from '@/lib/goals/all-goals';
 
@@ -48,16 +48,7 @@ export const BRIEF_LAST_HOUR = 11;
 export const PER_KIND = 5;
 
 function partsIn(timezone: string, now: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return { day: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) };
+  return { day: zoneDay(now, timezone), hour: zoneParts(now, timezone).hour };
 }
 
 /**
@@ -71,13 +62,11 @@ export function briefDay(timezone: string, now: Date): string | null {
 }
 
 function clock(at: string, timezone: string): string {
-  return formatClock(at, { timeZone: timezone });
+  return whenTime(at, { timeZone: timezone });
 }
 
 function weekday(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(
-    new Date(`${day}T12:00:00Z`),
-  );
+  return whenWeekday(day, { timeZone: 'UTC' });
 }
 
 /** At most PER_KIND lines, and one more saying how many were left out. */

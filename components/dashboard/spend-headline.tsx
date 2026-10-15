@@ -11,19 +11,11 @@ import {
 } from '@/lib/money';
 import { Figure, FigureDelta } from '@/components/ui/figure';
 import { CountUpMoney } from '@/components/dashboard/count-up-money';
+import { whenRange } from '@/lib/core/when';
 
 /** "1 – 7 Sep", or "1 Aug – 7 Sep" when the period crosses a month. */
 function formatPeriod(period: Period): string {
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' });
-  const dayMonth = new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
-  const start = new Date(`${period.start}T12:00:00Z`);
-  const end = new Date(`${period.end}T12:00:00Z`);
-  const sameMonth = period.start.slice(0, 7) === period.end.slice(0, 7);
-  return `${sameMonth ? day.format(start) : dayMonth.format(start)} – ${dayMonth.format(end)}`;
+  return whenRange(period.start, period.end, { timeZone: 'UTC', year: 'never' });
 }
 
 /**

@@ -37,6 +37,7 @@ import { cn } from '@/lib/cn';
 import { LEVEL4_FROM, nameTopics, topicTier, type TopicOnMap } from '@/lib/learn/map/topics';
 import { usePick } from './pick';
 import { PlaceGraph } from './place-graph';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Idea Space as a night sky (plan #1997.6): every idea a star on a canvas.
@@ -167,7 +168,6 @@ function coreSprite(rgb: readonly [number, number, number]): HTMLCanvasElement {
   return canvas;
 }
 
-const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1302,8 +1302,8 @@ function StarCard({
   if (row && star.state !== 'unknown') facts.push(['Evidence', EVIDENCE_TEXT[row.established]]);
   if (star.backedBy) facts.push(['Backed by', star.backedBy]);
   if (star.strength > 0) facts.push(['Strength', `${Math.round(star.strength * 100)}%`]);
-  if (setAt) facts.push(['Last shown', DATE.format(setAt)]);
-  if (halves) facts.push(['Next halves', DATE.format(halves)]);
+  if (setAt) facts.push(['Last shown', whenDate(setAt, { timeZone: 'UTC' })]);
+  if (halves) facts.push(['Next halves', whenDate(halves, { timeZone: 'UTC' })]);
   if (star.strength <= 0 && star.haze > 0.05) facts.push(['Near', 'Ideas you know']);
 
   return (

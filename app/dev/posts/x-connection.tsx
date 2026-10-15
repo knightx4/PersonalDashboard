@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { whenDate } from '@/lib/core/when';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -59,7 +60,7 @@ function CheckX({ onResult }: { onResult: (r: { ok: boolean; text: string }) => 
 
 function lastRead(at: string | null): string {
   if (!at) return 'No posts read yet';
-  const day = new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const day = whenDate(at, { timeZone: 'UTC', year: 'auto' });
   return `Posts last read ${day}`;
 }
 

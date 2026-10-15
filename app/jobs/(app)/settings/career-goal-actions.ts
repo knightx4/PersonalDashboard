@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { THOUGHT_MAX } from '@/lib/jobs/thoughts';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The career goals entries (job_search.thoughts, 0026), written on Settings.
@@ -20,7 +21,7 @@ export interface ThoughtState {
 
 function check(body: string): string | null {
   if (!body.trim()) return 'Write something first.';
-  if (body.length > THOUGHT_MAX) return `Keep an entry under ${THOUGHT_MAX.toLocaleString('en-GB')} characters.`;
+  if (body.length > THOUGHT_MAX) return `Keep an entry under ${formatNumber(THOUGHT_MAX)} characters.`;
   return null;
 }
 

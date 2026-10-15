@@ -86,6 +86,21 @@ export async function reactToSuggestion(
 }
 
 /**
+ * Take a "not for me" back (plan #1957.3, the toast's Undo on Decline): the
+ * suggestion is unanswered again, as long as nothing else answered it since.
+ */
+export async function clearDecline(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('suggestions')
+    .update({ reaction: null, reacted_at: null })
+    .eq('id', id)
+    .eq('reaction', 'not_for_me')
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
  * The suggestions made for a goal or one of its steps, for the goal's
  * Suggestions section (plan #1739). goalSuggestions in lib/goals/suggestions.ts
  * picks what shows; this narrows the read to the rows that could.

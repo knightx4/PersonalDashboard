@@ -1,4 +1,5 @@
 import { countChangedLines, MAX_CHANGED_LINES } from './changes';
+import { whenDate } from '@/lib/core/when';
 import { parseRules } from './rules';
 import { APP_VISION, visionAnchor, type VisionScope } from './vision';
 
@@ -232,9 +233,7 @@ export function draftFits(diff: string): { ok: true } | { ok: false; lines: numb
 /** "7 October 2026", from a YYYY-MM-DD day. */
 export function spelledDate(day: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${day}T00:00:00Z`),
-  );
+  return whenDate(day, { timeZone: 'UTC', month: 'long', year: 'always' });
 }
 
 /** The sentence both proposals carry, naming the interview they came from. */

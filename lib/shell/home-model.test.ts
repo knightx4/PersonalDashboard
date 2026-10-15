@@ -39,13 +39,14 @@ describe('whenLabel', () => {
   const now = new Date('2026-09-26T15:00:00Z');
 
   it('counts minutes and hours on the same day', () => {
-    expect(whenLabel('2026-09-26T14:50:00Z', now, 'UTC')).toBe('10m ago');
-    expect(whenLabel('2026-09-26T12:00:00Z', now, 'UTC')).toBe('3h ago');
+    expect(whenLabel('2026-09-26T14:59:40Z', now, 'UTC')).toBe('Just now');
+    expect(whenLabel('2026-09-26T14:50:00Z', now, 'UTC')).toBe('10 min ago');
+    expect(whenLabel('2026-09-26T12:00:00Z', now, 'UTC')).toBe('3 h ago');
   });
 
   it('says yesterday, then the weekday', () => {
     expect(whenLabel('2026-09-25T20:00:00Z', now, 'UTC')).toBe('Yesterday');
-    expect(whenLabel('2026-09-24T20:00:00Z', now, 'UTC')).toBe('Thu');
+    expect(whenLabel('2026-09-24T20:00:00Z', now, 'UTC')).toBe('Thursday');
   });
 
   it('reads the day in the reader zone, not UTC', () => {

@@ -93,9 +93,9 @@ describe('parseWeek', () => {
 
 describe('weekRangeLabel', () => {
   it('names Sunday to Saturday, with the month once when it does not change', () => {
-    expect(weekRangeLabel('2026-09-13')).toBe('13 to 19 September 2026');
-    expect(weekRangeLabel('2026-09-27')).toBe('27 September to 3 October 2026');
-    expect(weekRangeLabel('2026-12-27')).toBe('27 December 2026 to 2 January 2027');
+    expect(weekRangeLabel('2026-09-13')).toBe('13 – 19 September 2026');
+    expect(weekRangeLabel('2026-09-27')).toBe('27 September – 3 October 2026');
+    expect(weekRangeLabel('2026-12-27')).toBe('27 December 2026 – 2 January 2027');
   });
 });
 

@@ -176,6 +176,24 @@ export async function dismissSuggestion(id: string): Promise<{ error: string | n
   return closeSuggestion(id, 'dismissed');
 }
 
+/** The toast's Undo on Decline (plan #1957.3): the suggestion is open again. */
+// latency: pending
+export async function reopenSuggestion(id: string): Promise<{ error: string | null }> {
+  const parsed = SuggestionId.safeParse(id);
+  if (!parsed.success) return { error: 'Could not tell which suggestion that was.' };
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('suggestions')
+    .update({ status: 'open', acted_at: null, dismiss_reason: null })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('status', 'dismissed');
+  if (error) return { error: error.message };
+  revalidatePaths();
+  return { error: null };
+}
+
 /** Turn a recommended role down, saying why. */
 // latency: pending -- should be optimistic: a dismiss that waits for the round trip
 export async function dismissOpening(id: string, reason: string): Promise<{ error: string | null }> {

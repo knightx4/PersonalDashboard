@@ -13,6 +13,7 @@ import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { RunLinesView } from '@/components/runs/run-lines';
 import type { RunActivity } from '@/lib/core/run-activities';
 import { PageColumn } from '@/components/shell/page-width';
+import { whenAt } from '@/lib/core/when';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -146,11 +147,6 @@ const MESSAGES: GmailMessageContent[] = [
 
 /** The markup of app/mail/[id]/page.tsx inside the shell, after its reads. */
 export function MailMessageSurface() {
-  const when = new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'America/New_York',
-  });
   const latest = MESSAGES.at(-1)!;
   const reply = replyMailto(latest);
   const subject = MESSAGES.find((m) => m.subject)?.subject ?? '(no subject)';
@@ -190,7 +186,7 @@ export function MailMessageSurface() {
             <li key={entry.id} className="card-pad">
               <MessageHead
                 from={entry.fromAddress}
-                sent={entry.internalDate ? when.format(entry.internalDate) : null}
+                sent={entry.internalDate ? whenAt(entry.internalDate, { timeZone: 'America/New_York' }) : null}
               />
               {entry.html ? (
                 <EmailFrame html={entry.html} title={entry.subject ?? 'Email'} />

@@ -38,6 +38,7 @@ export const todoActions: ModuleActions = {
     completeItem: tool('change_agenda_row'),
     deferItem: tool('change_agenda_row'),
     dismissItem: tool('change_agenda_row'),
+    restoreItem: none('theirs', 'Undo: takes back their own Later or Drop.'),
     answerItem: none('theirs'),
   },
   'app/todo/link-actions.ts': {

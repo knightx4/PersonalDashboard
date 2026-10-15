@@ -7,13 +7,10 @@ import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { InboxControls, type InboxSyncProgress } from './inbox-sync-button';
 import { InboxPerson } from './inbox-person';
 import type { Person } from '@/lib/people/load';
+import { whenDate } from '@/lib/core/when';
 
 /** The day an inbox last synced, as the rest of the page writes dates: "7 Oct 2026". */
-const SYNCED_DAY = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
+const SYNCED_DAY = { timeZone: 'UTC' } as const;
 
 type Account = {
   id: string;
@@ -148,7 +145,7 @@ export function InboxSection({
                       <p className="text-small text-ink-muted">
                         {STATUS_LABEL[account.status] ?? account.status}
                         {account.last_synced_at
-                          ? ` · Synced ${SYNCED_DAY.format(new Date(account.last_synced_at))}`
+                          ? ` · Synced ${whenDate(account.last_synced_at, SYNCED_DAY)}`
                           : ' · Not synced yet'}
                       </p>
                     </>

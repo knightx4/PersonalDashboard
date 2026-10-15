@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/clock';
+import { formatClock, whenDate, whenWeekday, zoneDay } from '@/lib/core/when';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { senderLabel, type NewsSender } from '@/lib/news/issues/list';
 import { readStories } from '@/lib/news/issues/stories';
@@ -27,12 +27,7 @@ import type { QuickIssue } from './next';
 
 /** The calendar day of an instant in a zone, as 2026-10-03. */
 function dayIn(zone: string, at: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
+  return zoneDay(at, zone);
 }
 
 /** A pass as the card needs it: when, and whether the article was opened. */
@@ -189,9 +184,9 @@ export function dueWhen(at: Date, timezone: string, now: Date = new Date()): str
   if (day === dayIn(zone, now)) return `later today around ${time}`;
   if (day === dayIn(zone, new Date(now.getTime() + 86_400_000))) return `tomorrow around ${time}`;
   // Within the week the weekday is enough; further out it needs the date.
-  const options: Intl.DateTimeFormatOptions =
+  const date =
     rounded.getTime() - now.getTime() < 6 * 86_400_000
-      ? { weekday: 'long', timeZone: zone }
-      : { day: 'numeric', month: 'short', timeZone: zone };
-  return `on ${new Intl.DateTimeFormat('en-GB', options).format(rounded)} around ${time}`;
+      ? whenWeekday(rounded, { timeZone: zone })
+      : whenDate(rounded, { timeZone: zone, year: 'never' });
+  return `on ${date} around ${time}`;
 }

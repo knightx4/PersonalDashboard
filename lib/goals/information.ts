@@ -29,6 +29,7 @@ import {
 } from '@/lib/goals/collections';
 import { formatMoney } from '@/lib/money';
 import type { StepAnswer, StepQuestion } from '@/lib/goals/answers';
+import { whenDate } from '@/lib/core/when';
 
 /** The fields the step needs filled: those it names, or every shown field. */
 export function askedFields(
@@ -191,12 +192,6 @@ export function sourceHref(source: RecordSource, ref: string | null): string | n
 
 const ORDINAL = new Intl.PluralRules('en-US', { type: 'ordinal' });
 const ORDINAL_SUFFIX: Record<string, string> = { one: 'st', two: 'nd', few: 'rd', other: 'th' };
-const DAY_FORMAT = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
 
 /** A stored value as the table shows it. Empty is an empty string. */
@@ -211,7 +206,7 @@ export function displayValue(field: CollectionField, value: FieldValue | undefin
       return typeof value === 'number' ? NUMBER_FORMAT.format(value) : String(value);
     case 'date':
       return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
-        ? DAY_FORMAT.format(new Date(`${value}T00:00:00Z`))
+        ? whenDate(value, { timeZone: 'UTC' })
         : String(value);
     case 'day_of_month':
       return typeof value === 'number'

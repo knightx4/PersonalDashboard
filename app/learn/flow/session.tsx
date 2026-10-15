@@ -15,9 +15,12 @@ import {
   answerTrackOffer,
   fillFlowQueue,
   flowStep,
+  takeBackOfferAnswer,
   type FlowState,
 } from './actions';
 import type { TrackOffer } from './state';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 
 /**
  * A question, the reason, and Next, for as long as you keep going.
@@ -130,22 +133,22 @@ function DontKnowButton() {
 }
 
 /**
- * Not now (note 7ccc6f99): the question goes back to the end of the queue with
- * nothing recorded against it, and the next one comes up. On the answer form
- * so it sits beside I don't know, and told apart by its own field.
+ * Later (note 7ccc6f99, plan #1957.3): the question goes back to the end of
+ * the queue with nothing recorded against it, and the next one comes up, so
+ * there is nothing for an Undo to take back. On the answer form so it sits
+ * beside I don't know, and told apart by its own field.
  */
 function NotNowButton() {
   const { pending } = useFormStatus();
   return (
-    <Button
+    <CloseButton
+      lifecycle="later"
       variant="link"
       type="submit"
       name="notNow"
       value="1"
       pending={pending}
-    >
-      Not now
-    </Button>
+    />
   );
 }
 
@@ -181,11 +184,20 @@ function TrackOfferCard({
   only: FlowOnly;
 }) {
   const [hidden, setHidden] = useState(false);
+  const toast = useToast();
   if (hidden) return null;
 
+  // Later or Decline, with Undo in the toast (plan #1957.3).
   const setAside = async (formData: FormData) => {
     setHidden(true);
     await answerTrackOffer(formData);
+    toast({
+      text: formData.get('outcome') === 'never' ? 'Declined' : 'Later',
+      undo: async () => {
+        await takeBackOfferAnswer({ themeId: offer.themeId });
+        setHidden(false);
+      },
+    });
   };
 
   return (
@@ -218,9 +230,7 @@ function TrackOfferCard({
             <form key={outcome} action={setAside}>
               <input type="hidden" name="themeId" value={offer.themeId} />
               <input type="hidden" name="outcome" value={outcome} />
-              <Button variant="link" type="submit">
-                {outcome === 'never' ? 'Never' : 'Not now'}
-              </Button>
+              <CloseButton lifecycle={outcome === 'never' ? 'declined' : 'later'} type="submit" />
             </form>
           ))}
         </div>

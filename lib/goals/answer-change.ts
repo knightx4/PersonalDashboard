@@ -25,6 +25,8 @@
 import type { AnswerValue, MeaningVerdict, StepAnswer } from '@/lib/goals/answers';
 import type { RecordSource } from '@/lib/goals/collections';
 import { sourceHref, sourceLabel } from '@/lib/goals/information';
+import { whenDate } from '@/lib/core/when';
+import { formatMoney } from '@/lib/money';
 
 /** An amount has to move by more than this percentage to count (#1033). */
 export const AMOUNT_MARGIN_PERCENT = 5;
@@ -47,25 +49,12 @@ export type AnswerChange = {
   reason: string;
 };
 
-const DATE = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 function formatDate(day: string): string {
-  return DATE.format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC' });
 }
 
 function formatAmount(amount: number): string {
-  const whole = Number.isInteger(amount);
-  return amount.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
+  return formatMoney(Math.round(amount * 100), 'USD', { showCents: !Number.isInteger(amount) });
 }
 
 const cents = (n: number) => Math.round(Math.abs(n) * 100);

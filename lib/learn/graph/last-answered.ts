@@ -6,15 +6,8 @@
  * something you can lose, and the point of the session is that missing a day
  * costs nothing.
  */
-function dayIn(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
 
+import { whenDate, zoneDay } from '@/lib/core/when';
 /**
  * Today, or the date, or nothing at all.
  *
@@ -31,19 +24,12 @@ function dayOrToday(
   const when = new Date(at);
   if (Number.isNaN(when.getTime())) return null;
 
-  const day = dayIn(when, timezone);
-  const today = dayIn(now, timezone);
-  if (day === today) return { today: true };
+  if (zoneDay(when, timezone) === zoneDay(now, timezone)) return { today: true };
 
-  const date = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    day: 'numeric',
-    month: 'long',
-    // The year only when it is not this one. "14 March" is what somebody
-    // means by a date three weeks ago; "14 March 2025" is what they mean by
-    // one eighteen months ago.
-    ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }),
-  }).format(when);
+  // The year only when it is not this one. "14 March" is what somebody
+  // means by a date three weeks ago; "14 March 2025" is what they mean by
+  // one eighteen months ago.
+  const date = whenDate(when, { timeZone: timezone, month: 'long', year: 'auto', now });
 
   return { today: false, date };
 }

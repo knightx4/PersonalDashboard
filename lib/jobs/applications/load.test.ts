@@ -8,14 +8,20 @@ import { formatInterviewWhen, toFunnelApplications, type PipelineRow } from './l
  * printed the same way, so a day-only round claimed to start at midnight.
  */
 describe('formatInterviewWhen', () => {
+  const now = '2026-10-14T12:00:00Z';
+
   it('gives the hour when the hour is known', () => {
-    expect(formatInterviewWhen('2026-09-15T14:30:00.000Z', true, 'UTC')).toBe(
-      '15 Sept, 2:30\u00a0PM UTC',
+    expect(formatInterviewWhen('2026-09-15T14:30:00.000Z', true, 'UTC', now)).toBe(
+      '15 Sep, 2:30\u00a0PM UTC',
+    );
+    expect(formatInterviewWhen('2026-10-15T18:30:00.000Z', true, 'America/New_York', now)).toBe(
+      'Tomorrow, 2:30\u00a0PM EDT',
     );
   });
 
   it('gives the day alone when only the day is settled', () => {
-    expect(formatInterviewWhen('2026-09-15T00:00:00.000Z', false, 'UTC')).toBe('15 Sept 2026');
+    expect(formatInterviewWhen('2026-09-15T00:00:00.000Z', false, 'UTC', now)).toBe('15 Sep');
+    expect(formatInterviewWhen('2025-09-15T00:00:00.000Z', false, 'UTC', now)).toBe('15 Sep 2025');
   });
 
   it('says the date is still to come rather than showing a dash', () => {

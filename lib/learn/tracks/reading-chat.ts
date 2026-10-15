@@ -1,5 +1,6 @@
 import { MAX_READING_TEXT } from '@/lib/learn/tracks/reading-text';
 import { UNREADABLE_ACTION } from '@/lib/learn/tracks/reading-summary';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The chat with Dash on a reading's page (plan #1876.5): the parts with no
@@ -8,7 +9,7 @@ import { UNREADABLE_ACTION } from '@/lib/learn/tracks/reading-summary';
  */
 
 /** Said once, at the top of Dash's first answer, when the reading was cut. */
-export const CHAT_CUT_LINE = `I read only the first ${MAX_READING_TEXT.toLocaleString('en-GB')} characters of this reading, so I cannot speak to anything after that.`;
+export const CHAT_CUT_LINE = `I read only the first ${formatNumber(MAX_READING_TEXT)} characters of this reading, so I cannot speak to anything after that.`;
 
 /**
  * Dash's turn when the reading's text cannot be had: what went wrong and what
@@ -43,7 +44,7 @@ export function readingMaterial(input: {
   if (input.truncated) {
     lines.push(
       '',
-      `The text below is only the first ${MAX_READING_TEXT.toLocaleString('en-GB')} characters of the reading; the rest was cut.`,
+      `The text below is only the first ${formatNumber(MAX_READING_TEXT)} characters of the reading; the rest was cut.`,
     );
   }
   lines.push('', '<reading>', input.text, '</reading>');

@@ -298,15 +298,15 @@ export async function setTaskPinned(
   return { error: error?.message ?? null };
 }
 
-/** "Later": out of sight for a week, still open, still due when it was due. */
+/**
+ * "Later": out of sight until a moment (the start of the day chosen from the
+ * Later menu), still open, still due when it was due. A week with no moment.
+ */
 export async function snoozeTask(
   userId: string,
   id: string,
-  days = SNOOZE_DAYS,
+  until: Date = new Date(Date.now() + SNOOZE_DAYS * 86_400_000),
 ): Promise<{ error: string | null }> {
-  const until = new Date();
-  until.setUTCDate(until.getUTCDate() + days);
-
   const supabase = await createTodoClient();
   const { error } = await supabase
     .from('tasks')

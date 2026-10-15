@@ -1,3 +1,5 @@
+import { zoneDay } from '@/lib/core/when';
+
 /**
  * Where an interview opens in the calendar (note 7b1975cb).
  *
@@ -24,13 +26,7 @@ export function interviewCalendarHref(input: {
   if (!scheduledAt) return null;
   const at = new Date(scheduledAt);
   if (!Number.isFinite(at.getTime())) return null;
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-  }).formatToParts(at);
-  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const day = `https://calendar.google.com/calendar/r/day/${part('year')}/${part('month')}/${part('day')}`;
+  const [year, month, date] = zoneDay(at, timezone).split('-').map(Number);
+  const day = `https://calendar.google.com/calendar/r/day/${year}/${month}/${date}`;
   return calendarEmail ? `${day}?authuser=${encodeURIComponent(calendarEmail)}` : day;
 }

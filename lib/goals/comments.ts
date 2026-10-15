@@ -34,6 +34,7 @@ import { displayValue } from '@/lib/goals/information';
 import { STEP_KIND_LABELS, STEP_STATUS_LABELS, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 import { threadReplySql } from '@/lib/thread/store';
+import { whenDate } from '@/lib/core/when';
 
 /** The column takes 4000 characters. */
 export const COMMENT_MAX = 4000;
@@ -441,15 +442,9 @@ export function replyBody(answer: string, outcomes: FilingOutcome[], scheduled?:
   return fit(lines.join('\n\n'));
 }
 
-/** "Mon 5 Oct" for 2026-10-05, with the weekday so a wrong year shows. */
+/** "Mon 5 Oct 2026" for 2026-10-05, with the weekday so a wrong year shows. */
 function dateWords(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC', weekday: 'short' });
 }
 
 /**
