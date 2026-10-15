@@ -151,6 +151,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-writing': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],
+  'ask-dash-at-work': ['/ask', '/ask/[ref]'],
+  'ask-page-at-work': ['/ask', '/ask/[ref]'],
   'ask-dash-page': ['/goals', '/ask'],
   'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],

@@ -571,7 +571,7 @@ async function recordOne(
   await send('Page.navigate', { url: `http://localhost:${PORT}/preview?s=${surfaceId}` });
   await wait(2200);
   await send('Runtime.evaluate', {
-    expression: applyExpression(theme) + HIDE_DEV_BADGE + HOLD_FORMS + ADD_FINGER,
+    expression: applyExpression(theme) + HIDE_DEV_BADGE + (interaction.submits ? '' : HOLD_FORMS) + ADD_FINGER,
   });
   await wait(400);
 

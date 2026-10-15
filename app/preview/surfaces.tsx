@@ -260,6 +260,7 @@ import { DashSeenDemo } from './dash-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
+  AT_WORK_QUESTION,
   AskDashSurface,
   AskMadeChangesSurface,
   DashPageSurface,
@@ -5051,6 +5052,27 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Dash at work in the sheet (plan #1899.8): Send pressed on a question,
+     * each lookup appearing under Dash's name as it is made, the answer's
+     * words after them, and the mark coming to rest when it lands. */
+    id: 'ask-dash-at-work',
+    label: 'Ask Dash · Dash at work',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => (
+      <AskDashSurface open draft={AT_WORK_QUESTION}>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
     /* An answer that failed (plan #1337): the question was kept, the answer
      * was not, and Dash's mark shows failed with the error beside it where
      * the working line was. */
@@ -5155,6 +5177,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <DashPageSurface />,
+  },
+  {
+    /* Dash at work on the full page (plan #1899.8): Send pressed in an open
+     * chat, each lookup appearing under Dash's name, the answer written out
+     * after them and the mark coming to rest. */
+    id: 'ask-page-at-work',
+    label: 'Dash · Dash at work in a chat',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
   },
   {
     /* The same page at /ask, a new chat beside the list; on a phone the

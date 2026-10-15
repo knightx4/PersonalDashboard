@@ -45,6 +45,12 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The mockup the person looked at for decision #1899.1: chats grouped by day on the left with the workspaces each used, the open chat at reading width beside them, and on a phone the list as the page with a chat opening over it.',
     from: '1899.2',
   },
+  'ask-page-at-work': {
+    pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
+    link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
+    why: 'The same mockup, for the open chat while Dash answers: the chat at reading width with the box at its foot, the answer appearing in the chat as it is written.',
+    from: '1899.8',
+  },
   'ask-page-used': {
     pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
     link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',

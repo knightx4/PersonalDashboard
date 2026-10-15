@@ -233,6 +233,8 @@ type AskDashHandle = {
   workspaces?: readonly ModuleId[];
   /** For the gallery: the rows @ searches in place of the account's. */
   searchHits?: readonly SearchHit[];
+  /** For the gallery: the words the sheet's box opens with, unsent (plan #1899.8). */
+  draft?: string;
 };
 
 const AskDashContext = createContext<AskDashHandle | null>(null);
@@ -255,7 +257,7 @@ type Session = { key: number; ask?: string; rows?: AskRows };
  * can wrap the whole shell in one fed with fixtures and the shell's own
  * provider leaves the job to it.
  */
-type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits'>;
+type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft'>;
 
 export function AskDashProvider({
   source,
@@ -284,6 +286,7 @@ function AskDashRoot({
   account,
   workspaces,
   searchHits,
+  draft,
 }: AskDashBox & {
   source: AskSource;
   page?: string;
@@ -298,8 +301,8 @@ function AskDashRoot({
   }, []);
   const close = useCallback(() => setSession(null), []);
   const handle = useMemo<AskDashHandle>(
-    () => ({ open, source, account, workspaces, searchHits }),
-    [open, source, account, workspaces, searchHits],
+    () => ({ open, source, account, workspaces, searchHits, draft }),
+    [open, source, account, workspaces, searchHits, draft],
   );
 
   // A link in an answer goes somewhere else in the app, and the sheet should
@@ -509,8 +512,11 @@ export function AskThread({
           align="end"
         />
       )}
+      // Heard as the question is sent, outside the transition that waits for
+      // the answer, so what it changes (the sheet's opening message going)
+      // happens with the press rather than when the answer lands (plan #1899.8).
+      onSubmit={onSend}
       send={async (body, files) => {
-        onSend?.();
         setLive([]);
         setWritten('');
         const controller = new AbortController();
@@ -826,6 +832,7 @@ function NewQuestion({
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));
+  const draft = useAskDash()?.draft;
   const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
     null,
   );
@@ -874,6 +881,7 @@ function NewQuestion({
         placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'What did I spend on eBay this month?'}
         startWriting
         ask={ask}
+        initialDraft={draft}
         hint={hint}
         above={lookingAt}
         onSend={() => setAsked(true)}
