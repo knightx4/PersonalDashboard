@@ -498,6 +498,13 @@ function agendaSubject(source: SourceId, verb: AgendaVerb, key: string): AgendaS
   if (source === 'job_reminders') {
     return { schema: 'job_search', table: 'reminders', match: { id: key.slice('job_reminders:'.length) } };
   }
+  if (source === 'job_waiting') {
+    return {
+      schema: 'job_search',
+      table: 'waiting_dismissals',
+      match: { application_event_id: key.slice('job_waiting:'.length) },
+    };
+  }
   if (source === 'drafts') {
     return { schema: 'core', table: 'drafted_messages', match: { id: key.slice('drafts:'.length) } };
   }
@@ -543,7 +550,7 @@ async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade>
 
   const subject = agendaSubject(sourceId, verbName, key);
   const before = await subjectRow(env, subject);
-  if (!before && subject.table !== 'dismissals') throw new TodoRefused('That row is not theirs to change.');
+  if (!before && subject.table !== 'dismissals' && subject.table !== 'waiting_dismissals') throw new TodoRefused('That row is not theirs to change.');
 
   const now = new Date();
   const today = todayIn(env.timezone, now);

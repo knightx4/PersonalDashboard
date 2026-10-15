@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { goalRunOn } from '@/lib/goals/settings-store';
 import { goalsRoutine, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { liveRhythms } from '@/lib/goals/rhythms';
@@ -64,6 +65,12 @@ export async function runGoalsWeekly(deps?: Partial<GoalsWeeklyDeps>): Promise<G
   const userId = parsed.data.userId;
 
   const ignored = await ignoreUnanswered(client, userId, ignoredBefore(now));
+
+  // Switched off on /goals/settings (plan #1937.10). Last week's unanswered
+  // suggestions are still marked ignored above, since that is bookkeeping.
+  if (!(await goalRunOn(client, userId, 'weeklyRun'))) {
+    return { skipped: 'the weekly run is switched off in Goals settings', ignored };
+  }
 
   const last = await client
     .from('runs')

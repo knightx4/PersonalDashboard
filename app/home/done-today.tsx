@@ -28,13 +28,48 @@ export function DoneTodayCard({
   /** Drawn open, for the gallery. */
   initialOpen?: boolean;
 }) {
-  const count = done.lines.length + done.more;
+  const count = doneTodayCount(done);
   return (
     <Card padding="standard" className="mt-4">
       <h2 className="text-ui font-semibold text-ink">
         Done today
         {count > 0 && <span className="tabular ml-2 text-small font-normal text-ink-muted">{count}</span>}
       </h2>
+      <DoneTodayBody
+        done={done}
+        logging={logging}
+        initial={initial}
+        initialMessage={initialMessage}
+        initialOpen={initialOpen}
+      />
+    </Card>
+  );
+}
+
+/** How many things were done today, for a heading or a fold's closed line. */
+export function doneTodayCount(done: DoneTodayList): number {
+  return done.lines.length + done.more;
+}
+
+/**
+ * The box and the list without the card round them: Home draws them inside
+ * its rail's fold (plan #1937.8), which carries the heading and the count.
+ */
+export function DoneTodayBody({
+  done,
+  logging,
+  initial,
+  initialMessage,
+  initialOpen,
+}: {
+  done: DoneTodayList;
+  logging: boolean;
+  initial?: React.ComponentProps<typeof LogDone>['initial'];
+  initialMessage?: string;
+  initialOpen?: boolean;
+}) {
+  return (
+    <>
       {logging && (
         <LogDone
           placeholder="What did you do today?"
@@ -61,6 +96,6 @@ export function DoneTodayCard({
         </ul>
       )}
       {done.more > 0 && <p className="mt-2 text-small text-ink-muted">{done.more} more today</p>}
-    </Card>
+    </>
   );
 }

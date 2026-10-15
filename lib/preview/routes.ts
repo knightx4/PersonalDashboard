@@ -31,6 +31,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answers-marked': ['/jobs/roles/[id]'],
+  'jobs-role-answers-closed': ['/jobs/roles/[id]'],
   'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
@@ -54,6 +56,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-screen-change': ['/dev/plan'],
   'dev-plan-send-back': ['/dev/plan'],
   'scope-burn-up': ['/goals/[goalId]', '/dev/plan/[number]'],
+  'goals-metrics': ['/goals/[goalId]'],
+  'goals-metrics-tooltip': ['/goals/[goalId]'],
+  'goals-metrics-empty': ['/goals/[goalId]'],
+  'goals-metrics-error': ['/goals/[goalId]'],
   'dev-plan-feature': ['/dev/plan/[number]'],
   'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
@@ -69,6 +75,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-step-arrival': ['/goals/[goalId]/s/[stepId]'],
   'goals-home': ['/goals'],
   'goals-inbox': ['/goals/inbox'],
+  'inbox-page': ['/goals/inbox', '/dev/inbox'],
+  'shopping-inbox': ['/shopping/inbox'],
+  'jobs-inbox': ['/jobs/inbox'],
+  'todo-inbox': ['/todo/inbox'],
+  'vault-inbox': ['/vault/inbox'],
+  'learn-inbox': ['/learn/inbox'],
+  'news-inbox': ['/news/inbox'],
   'goals-all': ['/goals/all'],
   'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
@@ -102,6 +115,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
   'jobs-pipeline-filtered': ['/jobs/pipeline'],
+  'jobs-pipeline-marks': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
   'jobs-today-clear': ['/jobs'],
   'jobs-insights': ['/jobs/analytics'],
@@ -205,10 +219,17 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-matched': ['/dev/posts'],
   'dev-posts-send': ['/dev/posts'],
   'home-page': ['/home'],
+  'home-inbox': ['/home/inbox'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
   'goals-suggestions': ['/goals/[goalId]'],
+  'goals-metrics-props': ['/goals/[goalId]'],
+  'goals-metrics-props-form': ['/goals/[goalId]'],
+  'goals-metrics-props-menu': ['/goals/[goalId]'],
+  'goals-metrics-props-empty': ['/goals/[goalId]'],
+  'goals-metrics-props-pending': ['/goals/[goalId]'],
+  'goals-metrics-props-error': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
@@ -310,8 +331,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-project-plan': ['/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
   'dev-inbox': ['/dev/inbox'],
-  'dev-raised-status': ['/dev/raised'],
-  'dev-runner-crew': ['/dev/plan', '/dev/raised'],
+  'dev-settings': ['/dev/settings'],
+  'goals-settings': ['/goals/settings'],
+  'learn-settings': ['/learn/settings'],
+  'dev-runner-crew': ['/dev/plan', '/dev/settings'],
   'dev-specs': ['/dev/specs'],
   'dev-specs-interview-empty': ['/dev/specs'],
   'dev-specs-interview-half': ['/dev/specs'],
@@ -442,6 +465,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The one Inbox component (plan #1937.4), drawn from its row shape.
+  'inbox-page': ['components/inbox/inbox-page.tsx'],
   // The capture panels, which every shell mounts: the one box, and capture
   // aimed at a kind by an Add button (plan #1950.1) or the header's notes
   // button (plan #1950.5).
@@ -457,6 +482,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'goals-log-done': ['components/goals/log-done.tsx'],
   // A goal's Suggestions section (plan #1739), drawn full and empty.
   'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
+  // A goal's metrics in its properties column (plan #2084.3), drawn with
+  // each part open on a surface of its own.
+  'goals-metrics-props': ['app/goals/[goalId]/metrics-property.tsx'],
+  // A goal's metrics as bar charts (plan #2084.2), drawn with each hidden part.
+  'goals-metrics': ['app/goals/[goalId]/goal-metrics.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).

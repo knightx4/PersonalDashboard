@@ -29,7 +29,8 @@ export const todoActions: ModuleActions = {
     toggleCalendar: none('setting'),
   },
   'app/todo/settings/actions.ts': {
-    saveAgendaSettingsNow: none('setting'),
+    saveAgendaSources: none('setting'),
+    saveAgendaHorizon: none('setting'),
     addFeed: none('account', 'Connects a calendar feed from another service.'),
     refreshFeedNow: none('page'),
     removeFeed: none('account'),

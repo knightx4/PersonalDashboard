@@ -11,7 +11,9 @@ import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
-import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { loadCollection, loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { namedLists, type MetricList } from '@/lib/goals/metric-chart';
+import { loadMetricCounts } from '@/lib/goals/metrics-store';
 import { shownContext, type ContextItem } from '@/lib/goals/context';
 import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
@@ -79,6 +81,11 @@ import { GoalHelp } from './goal-help';
 import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
+import { MetricsProperty } from './metrics-property';
+import { metricLists } from '@/lib/goals/metric-form';
+import type { Metric } from '@/lib/goals/metrics';
+import { loadMetrics } from '@/lib/goals/metrics-store';
+import { GoalMetrics, type MetricView } from './goal-metrics';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
@@ -342,6 +349,27 @@ export default async function GoalMapPage({
   // The saved step counts behind the burn-up chart (plan #1837). A failed
   // read leaves the chart out rather than the page.
   const scopeDays = loadScopeDays(core, goalScopeRef(map.goal.id)).catch((): ScopeDay[] => []);
+  // The goal's metrics for the properties column (plan #2084.3). A failed
+  // read leaves them out rather than the page.
+  const metricRowsRead = loadMetrics(client, map.goal.id).catch((): Metric[] | null => null);
+  // Each metric's counts by week or month (plan #2084.2), named by the list
+  // it reads. A failed read is the section's own message, not a broken page.
+  const metricsRead = loadMetricCounts(
+    client,
+    { id: map.goal.id, createdAt: map.goal.createdAt ?? null },
+    account.timezone,
+  )
+    .then(async (counted): Promise<MetricView[]> => {
+      const known = new Set(sources.map((list) => list.id));
+      const others = await Promise.all(
+        [...new Set(counted.map((m) => m.collectionId))]
+          .filter((id) => !known.has(id))
+          .map((id) => loadCollection(client, id)),
+      );
+      const lists: MetricList[] = [...sources, ...others.filter((list) => list !== null)];
+      return namedLists(counted, lists);
+    })
+    .catch((): MetricView[] | null => null);
   const related = relatedNotes(
     vault,
     user.id,
@@ -467,6 +495,16 @@ export default async function GoalMapPage({
   const runs = shapingView?.runs ?? runRowsOf(history, account.timezone);
 
   const burnUpDays = await scopeDays;
+  const metrics = await metricsRead;
+  const metricRows = await metricRowsRead;
+  const lists = metricLists(sources);
+  const metricsPart =
+    metricRows && (metricRows.length > 0 || lists.length > 0)
+      ? {
+          node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
+          count: Math.max(1, metricRows.length),
+        }
+      : null;
   const overview = (
     <div className="space-y-6">
       <GoalDoneWhen goal={map.goal} />
@@ -488,6 +526,7 @@ export default async function GoalMapPage({
         {!numberEmpty && <GoalNumber {...number} />}
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>
+      <GoalMetrics metrics={metrics} />
       <BurnUpChart days={burnUpDays} />
       <GoalContext items={shownItems} />
       {map.goal.status === 'open' && (
@@ -535,6 +574,7 @@ export default async function GoalMapPage({
       progress={progress}
       timeZone={account.timezone}
       pace={pace}
+      metrics={metricsPart}
     >
       {tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>

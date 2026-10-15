@@ -3,19 +3,21 @@ import { formatDate } from '@/lib/jobs/applications/load';
 import { readPreferences } from '@/lib/jobs/suggest/preferences';
 import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/shell/page-header';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { publicEnv } from '@/lib/env';
-import { SettingsView } from './view';
-import { PageColumn } from '@/components/shell/page-width';
-import { sectionSubject } from '@/lib/core/section-path';
+import { JobsSettingsView } from './settings-view';
 
-export const metadata = { title: 'Settings' };
+export const metadata = { title: 'Job search settings' };
 
-function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
+function inboxBanner(
+  code: string | undefined,
+): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
   switch (code) {
     case 'connected':
-      return { tone: 'ok', text: 'Gmail connected. Start the first scan below whenever you are ready.' };
+      return {
+        tone: 'ok',
+        text: 'Gmail connected. Start the first scan below whenever you are ready.',
+      };
     case 'denied':
       return { tone: 'warn', text: 'Google access was not granted.' };
     case 'scope_denied':
@@ -36,30 +38,28 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
         text: 'Google did not return a refresh token. Remove the app under your Google account permissions, then connect again.',
       };
     default:
-      return code ? { tone: 'err', text: 'Something went wrong connecting Gmail. Try again.' } : null;
+      return code
+        ? { tone: 'err', text: 'Something went wrong connecting Gmail. Try again.' }
+        : null;
   }
 }
 
-export default async function SettingsPage({
+export default async function JobsSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ inbox?: string }>;
+  searchParams: Promise<{ inbox?: string; tab?: string | string[] }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [
-    { data: profile },
-    { data: accounts },
-    { data: excludedSenders },
-    { data: thoughts },
-  ] = await Promise.all([
+  const [{ data: profile }, { data: accounts }, { data: excludedSenders }, { data: thoughts }] =
+    await Promise.all([
       supabase
         .from('profiles')
         .select(
-          'search_started_on, timezone, ghost_threshold_days, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
+          'search_started_on, timezone, ghost_threshold_days, show_nudges, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
         )
         .eq('id', user.id)
         .single(),
@@ -113,58 +113,54 @@ export default async function SettingsPage({
   }
 
   return (
-    <PageColumn>
-      <PageHeader
-        subject={sectionSubject('/jobs/settings', 'Settings')}
-        title="Settings"
-        description="What the job search needs, and what you want from the next job. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."
-      />
-      <SettingsView
-        email={user.email ?? ''}
-        banner={inboxBanner(params.inbox)}
-        gmailConfigured={isGmailOAuthConfigured()}
-        appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
-        profile={{
-          searchStartedOn: (profile?.search_started_on as string) ?? '',
-          ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
-          preferences: readPreferences(profile as Record<string, unknown> | null),
-          minFitScore: readMinFitScore(profile?.min_fit_score),
-        }}
-        accounts={(accounts ?? []).map((account) => {
-          const job = latestBackfill.get(account.id as string);
-          return {
-            id: account.id as string,
-            emailAddress: account.email_address as string,
-            status: account.status as string,
-            lastSyncedAt: (account.last_synced_at as string) ?? null,
-            backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
-            backfillWindowDays: account.backfill_window_days as number,
-            latestBackfill: job
-              ? {
-                  status: job.status,
-                  messagesSeen: job.messages_seen,
-                  error: job.error,
-                  finishedAt: job.finished_at,
-                }
-              : null,
-          };
-        })}
-        excludedSenders={(excludedSenders ?? []).map((entry) => ({
-          id: entry.id as string,
-          domain: entry.domain as string,
-        }))}
-        careerGoals={(thoughts ?? []).map((row) => ({
-          id: row.id as string,
-          body: row.body as string,
-          written: formatDate(row.created_at as string, timezone),
-          // A minute's grace, because the insert and its trigger stamp both
-          // columns a few microseconds apart.
-          edited:
-            new Date(row.updated_at as string).getTime() - new Date(row.created_at as string).getTime() > 60_000
-              ? formatDate(row.updated_at as string, timezone)
-              : null,
-        }))}
-      />
-    </PageColumn>
+    <JobsSettingsView
+      tab={params.tab}
+      banner={inboxBanner(params.inbox)}
+      gmailConfigured={isGmailOAuthConfigured()}
+      appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
+      profile={{
+        searchStartedOn: (profile?.search_started_on as string) ?? '',
+        ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
+        showNudges: profile?.show_nudges === true,
+        preferences: readPreferences(profile as Record<string, unknown> | null),
+        minFitScore: readMinFitScore(profile?.min_fit_score),
+      }}
+      accounts={(accounts ?? []).map((account) => {
+        const job = latestBackfill.get(account.id as string);
+        return {
+          id: account.id as string,
+          emailAddress: account.email_address as string,
+          status: account.status as string,
+          lastSyncedAt: (account.last_synced_at as string) ?? null,
+          backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
+          backfillWindowDays: account.backfill_window_days as number,
+          latestBackfill: job
+            ? {
+                status: job.status,
+                messagesSeen: job.messages_seen,
+                error: job.error,
+                finishedAt: job.finished_at,
+              }
+            : null,
+        };
+      })}
+      excludedSenders={(excludedSenders ?? []).map((entry) => ({
+        id: entry.id as string,
+        domain: entry.domain as string,
+      }))}
+      careerGoals={(thoughts ?? []).map((row) => ({
+        id: row.id as string,
+        body: row.body as string,
+        written: formatDate(row.created_at as string, timezone),
+        // A minute's grace, because the insert and its trigger stamp both
+        // columns a few microseconds apart.
+        edited:
+          new Date(row.updated_at as string).getTime() -
+            new Date(row.created_at as string).getTime() >
+          60_000
+            ? formatDate(row.updated_at as string, timezone)
+            : null,
+      }))}
+    />
   );
 }

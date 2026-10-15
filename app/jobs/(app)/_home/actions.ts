@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
+import { setWaitingDismissal } from '@/lib/jobs/today/waiting';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -92,13 +93,9 @@ export async function snoozeReminder(
 }
 
 /**
- * Dismiss a "Waiting on you" row on This week.
- *
- * It has no row of its own to mark done -- it is recomputed from the event log
- * on every load -- so the dismissal lives in its own small table instead,
- * upserted so re-dismissing an already-dismissed row just updates it rather
- * than erroring. `until: null` is "Done", for good; a date is "Later", the
- * same distinction reminders draw with completed_at vs due_at.
+ * Answer a request waiting on you: `until: null` is dealt with, for good; a
+ * date is Later, the same distinction reminders draw with completed_at vs
+ * due_at (lib/jobs/today/waiting.ts writes it).
  */
 async function dismissWaiting(
   eventId: string,
@@ -107,15 +104,10 @@ async function dismissWaiting(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('waiting_dismissals')
-    .upsert(
-      { user_id: user.id, application_event_id: eventId, dismissed_until: until },
-      { onConflict: 'user_id,application_event_id' },
-    );
-
-  if (error) return { error: error.message };
+  const { error } = await setWaitingDismissal(supabase, user.id, eventId, until);
+  if (error) return { error };
   revalidatePath('/jobs');
+  revalidatePath('/jobs/inbox');
   return { error: null };
 }
 

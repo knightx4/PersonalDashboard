@@ -3,23 +3,22 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { whenDate } from '@/lib/core/when';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Banner } from '@/components/ui/banner';
 import { chipVariants, ToggleChip } from '@/components/ui/chip';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { InlineInput, Input, Label } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDateInline } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
-import { disconnectInbox, savePreference, updateProfile, type SettingsState } from './actions';
+import { disconnectInbox, savePreference, saveProfileField, saveShowNudges, type SettingsState } from './actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
-import { cardVariants } from '@/components/ui/card';
 import { useCloseOnSuccess } from '@/lib/jobs/use-close-on-success';
+import { SettingSwitch, SettingText } from '@/components/patterns/settings-fields';
 import {
   COMPANY_STAGE_LABELS,
   COMPANY_STAGES,
@@ -29,156 +28,82 @@ import {
   type JobPreferences,
 } from '@/lib/jobs/suggest/preferences';
 import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
-import { ThoughtList, type ThoughtView } from './career-goals';
 
-/** The page's own three tones, in the four the Banner primitive names. */
-const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
-
-export function SettingsView(props: {
-  email: string;
-  banner: { tone: 'ok' | 'warn' | 'err'; text: string } | null;
-  gmailConfigured: boolean;
-  appOrigin: string;
-  profile: {
-    searchStartedOn: string;
-    ghostThresholdDays: number;
-    preferences: JobPreferences;
-    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
-    minFitScore?: number;
-  };
-  accounts: InboxAccount[];
-  excludedSenders: Array<{ id: string; domain: string }>;
-  /** The career goals entries, newest first, which the searches read. */
-  careerGoals: ThoughtView[];
-}) {
-  return (
-    <div className="space-y-6">
-      {/* The shared Banner, which this was a fourth hand-rolled copy of.
-       *
-       * `ok` maps to `info` rather than to `good`: the good tone means money
-       * came back and nothing else, and "Gmail connected" was wearing it
-       * because green is what a success message reaches for. It is also the
-       * offer hue, which law 4 reserves for one stage of the pipeline and
-       * nowhere else -- so the same class was breaking the same law twice. */}
-      {props.banner && <Banner tone={BANNER_TONE[props.banner.tone]}>{props.banner.text}</Banner>}
-
-      <ProfileSection profile={props.profile} email={props.email} />
-      <div id="career-goals" className="scroll-mt-4">
-        <ThoughtList thoughts={props.careerGoals} />
-      </div>
-      <InboxSection accounts={props.accounts} gmailConfigured={props.gmailConfigured} />
-      <BookmarkletSection appOrigin={props.appOrigin} />
-      <ExcludedSendersSection excludedSenders={props.excludedSenders} />
-    </div>
-  );
-}
-
-function ProfileSection({
-  profile,
-  email,
+/**
+ * When the search started and how long silence lasts before a pursuit is
+ * ghosted. Each saves itself on leaving the field (the settings page
+ * pattern, plan #1937.11), where an Edit button once opened a form with a
+ * Save.
+ */
+export function SearchFields({
+  searchStartedOn,
+  ghostThresholdDays,
+  showNudges,
 }: {
-  profile: {
-    searchStartedOn: string;
-    ghostThresholdDays: number;
-    preferences: JobPreferences;
-    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
-    minFitScore?: number;
-  };
-  email: string;
+  searchStartedOn: string;
+  ghostThresholdDays: number;
+  showNudges: boolean;
 }) {
-  const [state, action] = useActionState<SettingsState, FormData>(updateProfile, {});
-  const [editing, setEditing] = useCloseOnSuccess(state);
-  const prefs = profile.preferences;
-
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <SectionHeading title="Job search" />
-      <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
-      <p className="mt-2 text-small text-ink-muted">
-        Your name and timezone are account settings now — they hold across every workspace, so they
-        live under{' '}
-        <Link href="/account" className={cn(linkVariants(), 'font-medium')}>
+    <div>
+      <SettingText
+        title="Search started"
+        hint="Anchors every funnel time series."
+        type="date"
+        format={formatDay}
+        placeholder="Not set"
+        defaultValue={searchStartedOn}
+        save={saveProfileField.bind(null, 'searchStartedOn')}
+      />
+      <SettingText
+        title="Ghost after"
+        hint="Days of silence before a live pursuit is treated as ghosted, from 7 to 180."
+        type="number"
+        inputMode="numeric"
+        format={(days) => `${days} days of silence`}
+        defaultValue={String(ghostThresholdDays)}
+        save={saveProfileField.bind(null, 'ghostThresholdDays')}
+      />
+      <SettingSwitch
+        title="Nudges"
+        hint="List a round to write up and a round with no prep in your Inbox."
+        defaultChecked={showNudges}
+        save={saveShowNudges}
+      />
+      <p className="pt-2 text-small text-ink-muted">
+        Your name and timezone are under{' '}
+        <Link href="/account" className={linkVariants()}>
           Account
         </Link>
-        , and so does deleting the account, which was never the job search&rsquo;s to offer.
-      </p>
-      <p className="mt-2 text-small text-ink-muted">
-        The titles you are aiming for and the industries never to suggest are on{' '}
-        <Link href="/jobs/find" className={cn(linkVariants(), 'font-medium')}>
+        , for every workspace. The titles you are aiming for and the industries never to suggest
+        are on{' '}
+        <Link href="/jobs/find" className={linkVariants()}>
           Find
         </Link>
         , beside the roles and people they shape.
       </p>
+    </div>
+  );
+}
 
-      {/* Read first. This was five labelled fields, three of them with a
-          caption underneath, standing open every time the page loaded -- so a
-          section whose values change perhaps twice in a job search greeted you
-          as a form to fill in, and the settings themselves were never once
-          simply shown (law 14). Editing is somewhere you go.
+/** A day as the jobs pages write one, "6 Jul 2026", from its ISO form. */
+function formatDay(iso: string): string {
+  if (Number.isNaN(new Date(`${iso}T00:00:00Z`).getTime())) return iso;
+  return whenDate(iso, { timeZone: 'UTC' });
+}
 
-          The captions go with the form, which is the only place they are
-          teaching anything; the read-out is the answers. */}
-      {!editing ? (
-        <div className="mt-4 space-y-2">
-          <ValueList>
-            <ValueRow label="Search started" value={profile.searchStartedOn} />
-            <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
-            <PreferenceRows prefs={prefs} minFitScore={profile.minFitScore ?? DEFAULT_MIN_FIT_SCORE} />
-          </ValueList>
-          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
-          <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        </div>
-      ) : (
-        <form action={action} className="mt-4 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="searchStartedOn">Search started</Label>
-              <Input
-                id="searchStartedOn"
-                name="searchStartedOn"
-                type="date"
-                defaultValue={profile.searchStartedOn}
-              />
-              <p className="mt-1 text-small text-ink-muted">Anchors every funnel time series.</p>
-            </div>
-            <div>
-              <Label htmlFor="ghostThresholdDays">Ghost after</Label>
-              <Input
-                id="ghostThresholdDays"
-                name="ghostThresholdDays"
-                type="number"
-                min={7}
-                max={180}
-                defaultValue={profile.ghostThresholdDays}
-              />
-              <p className="mt-1 text-micro leading-relaxed text-ink-muted">
-                Days of silence before a live pursuit is treated as ghosted. Derived, never set by
-                hand — the moment it becomes manual, nobody maintains it and the funnel counts
-                abandoned pursuits as live ones.
-              </p>
-            </div>
-          </div>
-
-          {state.error && (
-            <p role="alert" className="text-ui text-danger">
-              {state.error}
-            </p>
-          )}
-          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
-
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm">
-              Save
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-    </section>
+/** What you want from the next job, each edited where it is read. */
+export function PreferenceFields({
+  preferences,
+  minFitScore,
+}: {
+  preferences: JobPreferences;
+  minFitScore?: number;
+}) {
+  return (
+    <ValueList>
+      <PreferenceRows prefs={preferences} minFitScore={minFitScore ?? DEFAULT_MIN_FIT_SCORE} />
+    </ValueList>
   );
 }
 
@@ -361,7 +286,7 @@ function backfillStateOf(account: InboxAccount) {
   };
 }
 
-function InboxSection({
+export function InboxSection({
   accounts,
   gmailConfigured,
 }: {
@@ -372,9 +297,8 @@ function InboxSection({
   const [, startTransition] = useTransition();
 
   return (
-    <section id="inboxes" className={cardVariants({ padding: 'standard' })}>
-      <SectionHeading title="Connected inboxes" />
-      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
+    <div>
+      <p className="text-ui leading-relaxed text-ink-muted">
         Read-only, scoped to a search query about recruiting mail. Message bodies are never stored.
         Subjects and senders are kept only for the messages that turn out to be relevant —
         everything else keeps nothing but an id and a date so the next scan can skip it.
@@ -522,11 +446,11 @@ function InboxSection({
         the companies you track. Add domains on a company page when its mail is not linking, and
         forward anything the scan misses.
       </p>
-    </section>
+    </div>
   );
 }
 
-function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
+export function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
   const [href, setHref] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -542,9 +466,8 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
   }, [appOrigin]);
 
   return (
-    <section id="bookmarklet" className={cardVariants({ padding: 'standard' })}>
-      <SectionHeading title="Capture application questions" />
-      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
+    <div>
+      <p className="text-ui leading-relaxed text-ink-muted">
         Drag this to your bookmarks bar. On an application form, click it: it reads the question
         labels and sends them here. It runs in your browser inside your session, which is why it
         works on Workday and iCIMS where nothing server-side can. It never reads what you have typed
@@ -594,11 +517,11 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
         Only Greenhouse publishes its application questions to an API, so for every other vendor
         this is the way in. The paste box on any role always works too.
       </p>
-    </section>
+    </div>
   );
 }
 
-function ExcludedSendersSection({
+export function ExcludedSendersSection({
   excludedSenders,
 }: {
   excludedSenders: Array<{ id: string; domain: string }>;
@@ -607,9 +530,8 @@ function ExcludedSendersSection({
   const [adding, setAdding] = useCloseOnSuccess(state);
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <SectionHeading title="Excluded senders" />
-      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
+    <div>
+      <p className="text-ui leading-relaxed text-ink-muted">
         Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
         anything you applied to. Add a domain here for anything else that keeps showing up as a lead
         it should not be, like a job board or a newsletter.
@@ -658,6 +580,6 @@ function ExcludedSendersSection({
       )}
       {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
-    </section>
+    </div>
   );
 }

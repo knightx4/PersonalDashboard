@@ -25,6 +25,11 @@ export const goalsActions: ModuleActions = {
     linkStepAction: tool('change_goal_step'),
     unlinkStepAction: tool('change_goal_step'),
   },
+  'app/goals/[goalId]/metric-actions.ts': {
+    addMetricAction: none('setting', 'Which list a goal counts, and how often, is chosen on the goal page.'),
+    changeMetricAction: none('setting'),
+    removeMetricAction: none('setting'),
+  },
   'app/goals/runs/[runId]/actions.ts': {
     undoRunChangeAction: none('theirs'),
     acknowledgeGoalRunAction: none('theirs'),
@@ -118,5 +123,8 @@ export const goalsActions: ModuleActions = {
     undoGoalCapture: none('theirs'),
     estimateGoalCapture: none('page'),
     goalCaptureCosts: none('page'),
+  },
+  'app/goals/settings/actions.ts': {
+    setGoalRun: none('setting'),
   },
 };

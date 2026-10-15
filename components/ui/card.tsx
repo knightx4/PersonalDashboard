@@ -98,8 +98,11 @@ export function CardSection({
   id?: string;
   /** Folds the section by its heading, kept in this browser under this key. */
   fold?: string;
-  /** With `fold`: how the section opens when nothing has been kept. */
-  defaultOpen?: boolean;
+  /**
+   * With `fold`: how the section opens when nothing has been kept. `'wide'`
+   * opens it from laptop width and shuts it on a phone (FoldDetails).
+   */
+  defaultOpen?: boolean | 'wide';
   /** Beside the heading: the count or the fact that makes opening it a choice. */
   meta?: React.ReactNode;
 }) {

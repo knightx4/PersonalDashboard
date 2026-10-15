@@ -90,7 +90,7 @@ const CAPSULE_HUES: Record<ModuleId, string> = {
 function ModuleCapsule({ name }: { name: string }) {
   const workspace = MODULES.find((m) => m.label === name || m.id === name.toLowerCase());
   const hue = workspace ? CAPSULE_HUES[workspace.id] : 'bg-canvas text-ink-muted';
-  return <span className={`mr-1.5 inline-block rounded-full px-2 text-small font-medium ${hue}`}>{name}</span>;
+  return <span className={`inline-block shrink-0 rounded-full px-2 text-small font-medium ${hue}`}>{name}</span>;
 }
 
 /** The pill's first line: the workspace and the feature's number, or the seat's name. */
@@ -100,16 +100,17 @@ function PillName({ slot }: { slot: RunnerSlot }) {
   const name = slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App');
   const title = work.title ?? 'A run with no step recorded';
   return (
-    <>
+    <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="sr-only">Working on </span>
       <ModuleCapsule name={name} />
-      {/* The title is long and the pill is a quarter of the card, so it
-          waits in a tip on the number, and in the panel the pill opens. */}
-      <Tooltip label={title}>
-        <span className="tabular font-medium">{work.ref ?? title}</span>
+      {/* The title is long and the row is narrow, so it fills what is left and
+          is cut where it meets the time; the whole of it waits in a tip, and
+          in the panel the row opens. */}
+      <Tooltip label={title} className="min-w-0">
+        <span className="tabular min-w-0 truncate font-medium">{work.ref ?? title}</span>
       </Tooltip>
       <span className="sr-only">, {title}</span>
-    </>
+    </span>
   );
 }
 
@@ -154,20 +155,21 @@ function Pill({
         still={!working}
       />
       {/* Every pill has the same three rows, a meter track included, so the
-          four stand the same height whatever their slots are doing. */}
+          four stand the same height side by side whatever their slots are
+          doing. */}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`block truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
+        <span className={`block min-w-0 truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
           <span className="sr-only">{slot.label}: </span>
           <PillName slot={slot} />
         </span>
         <span className="block truncate text-small text-ink-muted tabular">
           {pillStatus(slot, held, progress)}
         </span>
-        {progress ? (
+        {working && progress ? (
           <Meter
             value={progress.done}
             max={progress.total}
-            label={`${working ? (slot.work.ref ?? 'The feature') : slot.label}: ${progress.done} of ${progress.total} steps done`}
+            label={`${slot.work.ref ?? 'The feature'}: ${progress.done} of ${progress.total} steps done`}
             minFraction={0.04}
             moves
           />
@@ -272,6 +274,10 @@ export function RunnerCrew({
     <div className="flex flex-col gap-3">
       <ul
         aria-label="What each of the runner's four sessions is doing"
+        // The four slots sit side by side, as the person asked: four across
+        // from laptop width, two by two on a tablet, one column only where a
+        // phone has no room. Do not redraw them as stacked rows; a design
+        // check did that once (#2074) and it undid the person's layout.
         className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
       >
         {slots.map((slot) => (

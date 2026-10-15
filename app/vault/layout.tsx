@@ -22,9 +22,13 @@ export default async function VaultLayout({ children }: { children: React.ReactN
      * because this shell was written on its own.
      */
     sections: [
-      { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-      // The quick notes waiting in the Inbox folder, on a tab of their own (note aee95195).
-      { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
+      // Now and Inbox first, as in every workspace (plan #1937.6). Now is the
+      // notes, where the vault opens.
+      { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
+      { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
+      // The quick notes waiting in the Inbox folder, on a tab of their own (note
+      // aee95195). The Inbox also lists them as one row that opens this page.
+      { href: '/vault/triage', label: 'Triage', icon: 'triage' },
       { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
       // Maya's threads on your notes (plan #1286).
       { href: '/vault/maya', label: 'Maya', icon: 'maya' },

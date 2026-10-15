@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cardVariants } from '@/components/ui/card';
 import { Switch as SwitchInput } from '@/components/ui/field';
 import {
   canBuzz,
@@ -39,8 +38,8 @@ export function FeelSection() {
   }, []);
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Buzz and click</h2>
+    <section>
+      <h3 className="text-ui font-semibold text-ink">Buzz and click</h3>
       <div className="mt-4 divide-y divide-border border-y border-border">
         {buzz === 'unsupported' ? (
           <p className="row-pad text-small text-ink-muted">

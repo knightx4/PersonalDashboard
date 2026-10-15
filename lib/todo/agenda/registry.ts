@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { moduleEnabled, type AccountSettings } from '@/lib/core/account/settings';
+import type { ModuleId } from '@/lib/modules';
 import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
 import { applicationsSource } from '@/lib/todo/agenda/sources/applications';
 import { appointmentsSource } from '@/lib/todo/agenda/sources/appointments';
@@ -10,6 +11,8 @@ import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
+import { jobNudgesSource } from '@/lib/todo/agenda/sources/job-nudges';
+import { jobWaitingSource } from '@/lib/todo/agenda/sources/job-waiting';
 import { planStepsSource } from '@/lib/todo/agenda/sources/plan-steps';
 import { raisedSource } from '@/lib/todo/agenda/sources/raised';
 import { returnDeadlinesSource } from '@/lib/todo/agenda/sources/return-deadlines';
@@ -32,6 +35,8 @@ const SOURCES: AgendaSource[] = [
   billsSource,
   draftsSource,
   applicationsSource,
+  jobWaitingSource,
+  jobNudgesSource,
   planStepsSource,
   raisedSource,
   threadsSource,
@@ -43,6 +48,11 @@ export function allSources(): AgendaSource[] {
 
 export function sourceById(id: SourceId): AgendaSource | undefined {
   return SOURCES.find((source) => source.id === id);
+}
+
+/** The workspace a source reads, for placing its items in an Inbox. */
+export function sourceModule(id: SourceId): ModuleId {
+  return sourceById(id)?.module ?? 'todo';
 }
 
 /**

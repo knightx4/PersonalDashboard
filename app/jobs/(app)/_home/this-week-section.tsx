@@ -1,4 +1,5 @@
 import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
+import { Card } from '@/components/ui/card';
 import { HomeSection } from './home-section';
 import { TodayLists } from './this-week-lists';
 
@@ -6,18 +7,19 @@ import { TodayLists } from './this-week-lists';
 export const INTERVIEWS_HREF = '/jobs/interviews';
 
 /**
- * What has to happen this week, and nothing else: interviews coming up,
- * rounds owing a debrief, mail waiting on a reply, and the nightly sweep's
- * nudges. First on Today.
+ * What is happening this week: the interviews coming up. First on Now.
+ *
+ * Mail waiting on a reply and the reminders are in the Jobs Inbox since plan
+ * #1937.9, which is where what asks something of you lives; the nightly
+ * sweep's nudges join them there while the setting asks for them.
  *
  * This was the whole of the This week page until Home took its place (plan
  * #1150). A clear week used to fill that page with the finished state; here it
  * is one quiet line, because the sections below it may still have something
- * to say. Lists with nothing in them are left out rather than shown as zero.
+ * to say.
  *
- * The page loads the board (loadToday) and hands it down, because "Since you
- * last looked" leaves out the mail this one lists as waiting on you, and the
- * live list counts that mail as putting the move on you.
+ * The page loads the board (loadToday) and hands it down, because the live
+ * list counts the mail waiting on you as putting the move on you.
  */
 export function ThisWeekSection({ board, timezone }: { board: TodayBoard; timezone: string }) {
   return (
@@ -26,11 +28,10 @@ export function ThisWeekSection({ board, timezone }: { board: TodayBoard; timezo
       title="This week"
       more={{ href: INTERVIEWS_HREF, label: 'All interviews' }}
     >
-      {board.clear ? (
-        <p className="px-1 text-small text-ink-muted">
-          Nothing needs you this week: no interviews in the next {INTERVIEW_HORIZON_DAYS} days,
-          no debriefs owed, no mail waiting on a reply, and no nudges.
-        </p>
+      {board.interviews.length === 0 ? (
+        <Card padding="dense">
+          <p className="text-small text-ink-muted">No interviews in the next {INTERVIEW_HORIZON_DAYS} days.</p>
+        </Card>
       ) : (
         <TodayLists board={board} timezone={timezone} />
       )}

@@ -1,5 +1,11 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
+import {
+  GoalMetricsEmptySurface,
+  GoalMetricsErrorSurface,
+  GoalMetricsSurface,
+  GoalMetricsTooltipSurface,
+} from './goal-metrics-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -76,7 +82,9 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
-import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
+import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
+import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -92,13 +100,6 @@ import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { summariseSearch } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
-import {
-  closestToOffer,
-  withoutClosestDebriefs,
-  type ClosestApplication,
-  type ClosestInterview,
-} from '@/lib/jobs/today/closest';
-import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
@@ -280,6 +281,14 @@ import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
+import {
+  GoalMetricPropsEmptySurface,
+  GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormSurface,
+  GoalMetricPropsMenuSurface,
+  GoalMetricPropsPendingSurface,
+  GoalMetricPropsSurface,
+} from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -310,6 +319,16 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import { InboxPageSurface } from './inbox-page-surface';
+import { HomeInboxSurface } from './home-inbox-surfaces';
+import {
+  JobsInboxSurface,
+  LearnInboxSurface,
+  NewsInboxSurface,
+  ShoppingInboxSurface,
+  TodoInboxSurface,
+  VaultInboxSurface,
+} from './workspace-inbox-surfaces';
 import {
   AuthCodeErrorSurface,
   ConsentSurface,
@@ -332,7 +351,6 @@ import {
   JobsAnswersSurface,
   JobsCasePageSurface,
   JobsOnboardingSurface,
-  JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
@@ -345,7 +363,7 @@ import {
   DevIdeasEmptySurface,
   DevRaisedSurface,
   DevInboxSurface,
-  DevRaisedStatusSurface,
+  DevSettingsSurface,
   DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
@@ -500,6 +518,8 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  readyToApply: false,
+  hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
@@ -634,6 +654,8 @@ const pipelineRow = (
   attempt: 1,
   excitement: 3,
   needsReview: false,
+  readyToApply: false,
+  hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -659,6 +681,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     excitement: 5,
+    readyToApply: true,
+    hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
     daysSinceActivity: 1,
@@ -672,6 +696,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Software Developer',
     status: 'in_process',
     excitement: 4,
+    readyToApply: true,
+    hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -1006,6 +1032,7 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
+    showNudges: false,
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -1319,31 +1346,6 @@ const todayBoard: TodayBoard = {
       occurredAt: '2026-08-28T14:20:00.000Z',
     },
   ],
-  reminders: [
-    {
-      id: 'tr1',
-      kind: 'follow_up',
-      body: 'No reply to the take-home submission in nine days.',
-      dueAt: '2026-09-09T00:00:00.000Z',
-      applicationId: 'p4',
-      roleId: 'role-p4',
-      companyName: 'Kestrel Bank',
-      roleTitle: 'Platform Engineer',
-      followUpHref: 'https://mail.google.com/mail/?view=cm&to=&su=Following%20up',
-    },
-    {
-      id: 'tr2',
-      kind: 'manual',
-      body: 'Record a video interview',
-      dueAt: '2026-09-12T00:00:00.000Z',
-      applicationId: 'p1',
-      roleId: 'role-p1',
-      companyName: 'Larkspur Vane',
-      roleTitle: 'Quantitative Developer, Systematic Strategies',
-      followUpHref: null,
-    },
-  ],
-  debriefs: [],
 };
 
 /**
@@ -1364,93 +1366,9 @@ const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
       ? { ...row, status: 'final_round', lastTurnEvent: 'interview_scheduled' }
       : row,
 );
-const closestInterview = (
-  id: string,
-  applicationId: string,
-  scheduledAt: string,
-  extra: Partial<ClosestInterview> = {},
-): ClosestInterview => ({
-  id,
-  applicationId,
-  scheduledAt,
-  timeKnown: true,
-  status: 'scheduled',
-  groupId: null,
-  prepNotes: null,
-  hasPrepNote: false,
-  notes: null,
-  questionsAsked: null,
-  group: null,
-  ...extra,
-});
-const todayPageClosest: ClosestApplication[] = closestToOffer(
-  todayPageRows,
-  [
-    closestInterview('ti-screen', 'p1', '2026-09-02T15:00:00.000Z', {
-      groupId: 'tg-screen',
-      group: { id: 'tg-screen', label: 'Recruiter screen', roundNumber: 1, notes: null },
-      notes: 'Team of six under the head of systematic. They want someone who has shipped a backtester.',
-      questionsAsked: [
-        'Walk me through the last model you put into production',
-        'How do you test a signal for lookahead bias?',
-        'Why leave your current team now?',
-      ],
-    }),
-    closestInterview('ti1', 'p1', '2026-09-11T13:30:00.000Z', {
-      groupId: 'tg1',
-      group: { id: 'tg1', label: 'Technical', roundNumber: 2, notes: null },
-      prepNotes: 'Revise the event-driven backtester and the slippage model.',
-    }),
-    closestInterview('ti-hm', 'p2', '2026-08-28T10:00:00.000Z', {
-      groupId: 'tg-hm',
-      group: { id: 'tg-hm', label: 'Hiring manager', roundNumber: 1, notes: 'Talked through the ledger migration.' },
-    }),
-    closestInterview('ti0', 'p2', '2026-09-08T15:00:00.000Z', {
-      groupId: 'tg0',
-      group: { id: 'tg0', label: 'Technical', roundNumber: 2, notes: null },
-    }),
-    closestInterview('ti2', 'p2', '2026-09-16T08:00:00.000Z', {
-      timeKnown: false,
-      groupId: 'tg2',
-      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
-    }),
-    closestInterview('ti3', 'p2', '2026-09-16T10:00:00.000Z', {
-      timeKnown: false,
-      groupId: 'tg2',
-      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
-    }),
-  ],
-  todayPageNow,
-);
-const todayPageBoard: TodayBoard = {
-  ...todayBoard,
-  debriefs: [
-    {
-      key: 'tg0',
-      leadId: 'ti0',
-      roleId: 'role-p2',
-      companyName: 'The Halloran-Achterberg group',
-      roleTitle: 'Software Developer',
-      scheduledAt: '2026-09-08T15:00:00.000Z',
-      timeKnown: true,
-    },
-  ],
-};
-const todayPageReview: ReviewPeek = {
-  count: 5,
-  items: [
-    {
-      id: 'rv1',
-      title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
-      kind: 'Confirmation email',
-    },
-    { id: 'rv2', title: 'Brightwell · Software Engineer, Treasury', kind: 'New application from mail' },
-    { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
-  ],
-};
 const todayPageSince: SinceView = {
   state: 'loaded',
-  hint: 'Since 8 Sept, 18:40',
+  hint: 'Since 8 Sept, 6:40 PM BST',
   stopped: [],
   entries: [
     {
@@ -2701,8 +2619,10 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -3393,16 +3313,14 @@ const findView = {
   people: recommendedPeople,
 };
 
-/** Jobs Today drawn from the sample rows, with the review queue given. */
-function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+/** Jobs' Now drawn from the sample rows. */
+function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   return (
     <TodayPage
-      review={review}
-      closest={todayPageClosest}
-      board={withoutClosestDebriefs(todayPageBoard, todayPageClosest)}
+      board={board}
       summary={summariseSearch(
         todayPageRows,
-        todayPageBoard.interviews.map((interview) => ({
+        board.interviews.map((interview) => ({
           id: interview.id,
           scheduledAt: interview.scheduledAt,
           timeKnown: interview.timeKnown,
@@ -3471,6 +3389,38 @@ export const SURFACES: readonly Surface[] = [
         {...rolePanels}
         status="drafting"
         defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-marked',
+    label: 'Role · Answers, marked ready',
+    module: 'jobs',
+    width: 'wide',
+    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        readyToApply
+        hasCoverLetter
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-closed',
+    label: 'Role · Answers, closed',
+    module: 'jobs',
+    width: 'wide',
+    // A closed application shows the marks without controls.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="rejected"
+        readyToApply
+        hasCoverLetter={false}
+        defaultTab="answers"
       />
     ),
   },
@@ -3563,6 +3513,19 @@ export const SURFACES: readonly Surface[] = [
           <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
         </PreviewShell>
       </AskDashSurface>
+    ),
+  },
+  {
+    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
+     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    id: 'jobs-pipeline-marks',
+    label: 'Pipeline · Ready and cover letter filters',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PreviewShell>
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+      </PreviewShell>
     ),
   },
   {
@@ -3872,6 +3835,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <BurnUpSurface />,
   },
   {
+    /* A goal's metrics on its Overview (plan #2084.2): twelve weeks with a
+     * target, five months with none and a target above every count. Its
+     * hidden parts follow: a bar's tooltip, a metric with nothing counted
+     * yet, and the section's message when the read fails. */
+    id: 'goals-metrics',
+    label: 'Goals · Metrics as bar charts',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsSurface />,
+  },
+  {
+    id: 'goals-metrics-tooltip',
+    label: 'Goals · Metrics, a bar hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsTooltipSurface />,
+  },
+  {
+    id: 'goals-metrics-empty',
+    label: 'Goals · Metrics, nothing counted yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsEmptySurface />,
+  },
+  {
+    id: 'goals-metrics-error',
+    label: 'Goals · Metrics, the read failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsErrorSurface />,
+  },
+  {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
      * Dash's latest update (plan #1666), the detail, a question, what it
      * waits on and the thread, and the properties column. */
@@ -4047,6 +4042,61 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsInboxSurface />,
+  },
+  {
+    /* The one Inbox component (plan #1937.4) from its row shape alone, as
+     * every workspace's Inbox draws it: the three sections, the verbs, Later
+     * and Decline, and the Later fold open. */
+    id: 'inbox-page',
+    label: 'Inbox · the one component',
+    module: 'dev',
+    width: 'page',
+    render: () => <InboxPageSurface />,
+  },
+  /* Each workspace's Inbox (plan #1937.5): the agenda's on-you rows cut to
+   * the workspace, with a queue row where it keeps one. News is drawn empty.
+   * Fixtures in workspace-inbox-surfaces.tsx. */
+  {
+    id: 'shopping-inbox',
+    label: 'Shopping · Inbox',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingInboxSurface />,
+  },
+  {
+    id: 'jobs-inbox',
+    label: 'Job search · Inbox',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface />,
+  },
+  {
+    id: 'todo-inbox',
+    label: 'Todo · Inbox',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoInboxSurface />,
+  },
+  {
+    id: 'vault-inbox',
+    label: 'Vault · Inbox',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultInboxSurface />,
+  },
+  {
+    id: 'learn-inbox',
+    label: 'Learn · Inbox',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnInboxSurface />,
+  },
+  {
+    id: 'news-inbox',
+    label: 'News · Inbox, empty',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
@@ -4350,10 +4400,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-settings',
-    label: 'Settings',
+    label: 'Jobs · Settings, the Search tab',
     module: 'jobs',
-    width: 'wide',
-    render: () => <SettingsView {...settings} />,
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} />,
   },
   {
     id: 'jobs-material',
@@ -4455,22 +4505,22 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Today, where Jobs opens (plan #1591): the review strip, the
-     * applications closest to an offer, This week, the live applications by whose move it is, and what came in since. */
+    /* Now, where Jobs opens (plan #1591, #1937.9): This week's interviews
+     * and the live applications by whose move it is, with what came in
+     * since in the rail. What asks for an action is on jobs-inbox. */
     id: 'jobs-today',
-    label: 'Today',
+    label: 'Now',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={todayPageReview} />,
+    render: () => <JobsTodaySurface />,
   },
   {
-    /* The same page with nothing waiting to be checked, so the review strip
-     * does not draw: the picture for a post about Today. */
+    /* The same page in a week with no interviews, so This week is one line. */
     id: 'jobs-today-clear',
-    label: 'Today · nothing to check',
+    label: 'Now · a quiet week',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={{ count: 0, items: [] }} />,
+    render: () => <JobsTodaySurface board={{ ...todayBoard, interviews: [] }} />,
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */
@@ -5567,6 +5617,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsSendSurface />,
   },
   {
+    /* Home's Inbox (plan #1937.7), which took the bell's place: every
+     * workspace's on-you rows, grouped under each workspace's mark. Fixtures
+     * in home-inbox-surfaces.tsx. */
+    id: 'home-inbox',
+    label: 'Home · Inbox',
+    module: 'goals',
+    width: 'page',
+    render: () => <HomeInboxSurface />,
+  },
+  {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
      * header, briefs, Today and Updates in the main column, and Watching,
      * what Dash did, the week and the workspaces in the rail. Inside the
@@ -5619,6 +5679,57 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSuggestionsSurface />,
+  },
+  {
+    /* A goal's metrics in its properties column (plan #2084.3): two metrics,
+     * one with the longest name, and the line that adds another. The column
+     * is drawn as a phone's opened fold and the laptop's rail. Fixtures in
+     * goal-metric-props-surfaces.tsx, as are the parts below. */
+    id: 'goals-metrics-props',
+    label: 'Goal · Metrics in the properties',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsSurface />,
+  },
+  {
+    /* The add line pressed: the form open in place. */
+    id: 'goals-metrics-props-form',
+    label: 'Goal · Metrics, adding one',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormSurface />,
+  },
+  {
+    /* A metric's row pointed at, its Change and Remove menu showing. */
+    id: 'goals-metrics-props-menu',
+    label: 'Goal · Metrics, a row’s menu',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsMenuSurface />,
+  },
+  {
+    /* No list on the goal has a date to count by. */
+    id: 'goals-metrics-props-empty',
+    label: 'Goal · Metrics, nothing to count',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsEmptySurface />,
+  },
+  {
+    /* A new metric mid-save: the button's pending state. */
+    id: 'goals-metrics-props-pending',
+    label: 'Goal · Metrics, saving',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsPendingSurface />,
+  },
+  {
+    /* A change refused, its message beside the field. */
+    id: 'goals-metrics-props-error',
+    label: 'Goal · Metrics, a change refused',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsErrorSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
@@ -5853,7 +5964,8 @@ export const SURFACES: readonly Surface[] = [
           account="preview"
           module="news"
           sections={[
-            { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
+            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
             { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
@@ -6276,45 +6388,33 @@ export const SURFACES: readonly Surface[] = [
     id: 'home-arrival',
     label: 'Home · The first visit of the day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="home-arrival"]',
       shows:
-        'The greeting, the date, the brief line, each rise in a beat after the one before, the Today card and the Watching rail together on the last, all settled by about three quarters of a second.',
+        'The greeting, the date, the panel with the brief line, each rise in a beat after the one before, the brief rows, the Inbox count and the rail together on the last, all settled by about three quarters of a second.',
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day',
     label: 'Home · A finished day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'completion',
       target: '[data-motion-demo="home-finished"]',
-      shows: "The Today card goes, and the day's sigil draws in cell by cell beside the date.",
+      shows: "Today leaves the rail, and the day's sigil draws in cell by cell beside the date.",
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day-rest',
     label: 'Home · A day already finished',
     module: 'dev',
-    width: 'narrow',
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo finished />
-      </div>
-    ),
+    width: 'page',
+    render: () => <HomeArrivalDemo finished />,
   },
 
   /* The pages outside the shell, and /open's not-found (plan #1599).
@@ -6549,13 +6649,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevInboxSurface />,
   },
   {
-    /* The Status panel at the top of Home in Dev, with Dash's mark under
-     * Plan (note 076e7744). */
-    id: 'dev-raised-status',
-    label: 'Dev · Home, the Status panel',
+    /* Dev settings (plan #1937.10): the routines that were the Status panel
+     * on Home, with Dash's mark under Plan (note 076e7744). */
+    id: 'dev-settings',
+    label: 'Dev · Settings',
     module: 'dev',
     width: 'page',
-    render: () => <DevRaisedStatusSurface />,
+    render: () => <DevSettingsSurface />,
+  },
+  {
+    /* Goals settings (plan #1937.10): the morning run on, the weekly run off. */
+    id: 'goals-settings',
+    label: 'Goals · Settings',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
+  },
+  {
+    /* Learn settings (plan #1937.10): subject offers on, an explain-back card
+     * in every ten. */
+    id: 'learn-settings',
+    label: 'Learn · Settings',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSettingsView settings={{ offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a
@@ -6695,10 +6812,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-thoughts',
-    label: 'Jobs · Career goals',
+    label: 'Jobs · Settings, the Career goals tab',
     module: 'jobs',
     width: 'page',
-    render: () => <JobsThoughtsSurface />,
+    render: () => <JobsSettingsView {...settings} tab="career-goals" opensOn="career-goals" />,
   },
   {
     id: 'jobs-onboarding',

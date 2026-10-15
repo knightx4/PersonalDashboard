@@ -26,8 +26,9 @@ import { JobsRefused } from './jobs-refused';
  *   change_role         a role's title, location, work mode, seniority,
  *                       posting link and status, description or pay band,
  *                       or the company it is filed under.
- *   change_application  how excited they are about it, and how they applied
- *                       (the channel, and who referred them).
+ *   change_application  how excited they are about it, how they applied
+ *                       (the channel, and who referred them), whether it is
+ *                       ready to apply and whether it has a cover letter.
  *
  * and, from a role's application questions and the answer bank (plan
  * #1894.6.8):
@@ -418,7 +419,30 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     throw new JobsRefused('referral_contact_ref goes with channel "referral".');
   }
 
-  if (Object.keys(update).length === 0) throw new JobsRefused('Nothing to change: give excitement or channel.');
+  if (given(args, 'ready_to_apply')) {
+    if (typeof args.ready_to_apply !== 'boolean') throw new JobsRefused('ready_to_apply is true or false.');
+    update.ready_to_apply = args.ready_to_apply;
+    changed.push(args.ready_to_apply ? 'marked it ready to apply' : 'marked it not ready to apply');
+  }
+
+  if (given(args, 'has_cover_letter')) {
+    const value = args.has_cover_letter;
+    if (value !== null && typeof value !== 'boolean') {
+      throw new JobsRefused('has_cover_letter is true, false, or null to clear it.');
+    }
+    update.has_cover_letter = value;
+    changed.push(
+      value === null
+        ? 'cleared whether it has a cover letter'
+        : value
+          ? 'marked that it has a cover letter'
+          : 'marked that it has no cover letter',
+    );
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new JobsRefused('Nothing to change: give excitement, channel, ready_to_apply or has_cover_letter.');
+  }
 
   const { data, error } = await env.jobs
     .from('applications')
@@ -2823,7 +2847,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_application',
     description:
-      'Set how excited they are about a role (1 to 5, or 0 to clear it) or how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
+      'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
     input_schema: {
       type: 'object',
       properties: {
@@ -2832,6 +2856,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         excitement: { type: 'integer', description: 'How excited they are, 1 to 5; 0 clears it.' },
         channel: { type: 'string', enum: [...APPLICATION_SOURCES], description: 'How they applied.' },
         referral_contact_ref: { type: 'string', description: 'With channel referral: the job_search.contacts ref of who referred them.' },
+        ready_to_apply: { type: 'boolean', description: 'True when the application is ready to send, false when it is not.' },
+        has_cover_letter: {
+          type: ['boolean', 'null'],
+          description: 'Whether the application has a cover letter: true yes, false no, null clears the answer.',
+        },
       },
       additionalProperties: false,
     },

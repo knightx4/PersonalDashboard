@@ -267,7 +267,8 @@ five positions in every room, so the thumb learns one layout.
 
 Section addresses stay what they are (`/shopping/dashboard`, `/jobs`,
 `/goals`); only the names in the column and the dock change. `/jobs/review`
-and `/shopping/review` gain the Inbox name and keep their paths.
+and `/shopping/review` keep their paths, lose their own entries and light
+the Inbox, which lists each queue as a row.
 
 ## Part 2: Every thing has a page, a path and a way back
 
@@ -454,10 +455,10 @@ baseline it measures and takes the pending mark off.
 
 **R1.** Every workspace's first two sections are named Now and Inbox, in
 that order, and its settings link is set.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R2.** Only an Inbox carries a badge.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R3.** A page for one row draws its path from `refPath`.
 Checked by: count `row-pages-without-path`, baseline 33, target 0.

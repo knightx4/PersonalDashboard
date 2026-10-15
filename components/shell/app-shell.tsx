@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
+import { PendingPage } from '@/components/shell/pending-page';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
@@ -13,7 +14,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { NoteButton } from '@/components/shell/feedback-button';
-import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
 import { ThemeRepair } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
@@ -105,7 +105,6 @@ export function AppShell({
   brief,
   activity = [],
   mainCheck = null,
-  notifications = [],
   pathname: pathnameOverride,
   children,
 }: {
@@ -142,8 +141,6 @@ export function AppShell({
    * own rather than a reason to draw nothing.
    */
   mainCheck?: MainCheck | null;
-  /** What is waiting on you, wherever you are standing. Today: open raises. */
-  notifications?: Notification[];
   /**
    * The path to light in the column, in place of the browser's. Only the
    * preview gallery passes it: a page photographed there is served from
@@ -767,8 +764,8 @@ export function AppShell({
                 </span>
 
                 {/* Allowed to shrink, and truncate, as the last thing in the row
-                that can: on a phone the account controls (seven with Dash and
-                notifications, #1090) are wider than what is left, and a cut
+                that can: on a phone the account controls (six with Dash and
+                Capture, #1090) are wider than what is left, and a cut
                 title reads better than an account icon pushed off the edge. */}
                 <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
@@ -839,8 +836,7 @@ export function AppShell({
                 <span className={cn('min-w-0 flex-1', brief && 'sm:hidden', 'lg:hidden')} />
 
                 {/* What is left here belongs to the person, not to the workspace:
-                their theme, their notifications, their feedback, their
-                account. The workspace's own settings moved into its column --
+                their theme, their feedback, their account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center sm:gap-0.5">
                   {/* Search, below lg, where there is no field in the bar. It
@@ -863,7 +859,8 @@ export function AppShell({
                   anything in the app, answered with links to what it used. */}
                   <AskDashButton />
                   <CaptureButton />
-                  <NotificationsButton notifications={notifications} />
+                  {/* No bell (plan #1937.7): what is on you is Home's Inbox,
+                  counted on Home's first screen, and each workspace's own. */}
                   <NoteButton />
 
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
@@ -913,7 +910,7 @@ export function AppShell({
                 'pb-[calc(var(--dock-h)+2.125rem+env(safe-area-inset-bottom))] lg:pb-6',
               )}
             >
-              {children}
+              <PendingPage>{children}</PendingPage>
             </main>
             {/* The brief goes down here from lg up, which is exactly the width
             this line is drawn at, so the two copies above and this one never

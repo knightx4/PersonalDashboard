@@ -55,9 +55,10 @@ export const jobsActions: ModuleActions = {
     markTouchAnswered: tool('change_touch'),
   },
   'app/jobs/(app)/settings/actions.ts': {
-    updateProfile: none('setting'),
+    saveProfileField: none('setting'),
     disconnectInbox: none('account'),
     savePreference: none('setting'),
+    saveShowNudges: none('setting'),
   },
   'app/jobs/(app)/settings/sender-actions.ts': {
     addExcludedSender: none('setting'),
@@ -107,6 +108,7 @@ export const jobsActions: ModuleActions = {
     saveCoverLetter: tool('write_cover_letter'),
     renameRole: tool('change_role'),
     moveRoleToCompany: tool('change_role'),
+    saveApplicationMarks: tool('change_application'),
   },
   'app/jobs/(app)/roles/[id]/interview-actions.ts': {
     saveInterview: tool('change_interview'),

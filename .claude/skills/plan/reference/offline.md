@@ -1,7 +1,9 @@
 # When the CLI cannot run
 
-`DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
-exits immediately there. Fall back to the **`Supabase`** connector against
+A cloud session runs `scripts/plan.ts` over HTTPS when
+`SUPABASE_SERVICE_ROLE_KEY` is set, and that is the way to work. This file is
+for when it cannot: neither key nor `DATABASE_URL` is set, or `plan.ts` fails
+to reach the database. Then fall back to the **`Supabase`** connector against
 `plan_items` and `plan_dependencies` (both in `public`; project ref
 `asjztutnqxbecruvyrbj`), and do not spend the session diagnosing it. The
 brief a routine was fired with is the plan as it stood; trust it, and re-read

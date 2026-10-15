@@ -41,7 +41,7 @@ export default function Link({
   return (
     <NextLink {...props}>
       {children}
-      <LinkPending />
+      <LinkPending href={props.href} />
     </NextLink>
   );
 }
