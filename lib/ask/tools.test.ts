@@ -22,14 +22,17 @@ type Tables = Partial<Record<string, Row[]>>;
 type Filter = (row: Row) => boolean;
 
 /** The part of the supabase-js query builder the lookups use. */
-class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
+class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number | null }> {
   private filters: Filter[] = [];
   private sorts: { column: string; ascending: boolean }[] = [];
   private cap: number | null = null;
+  private window: [number, number] | null = null;
+  private counted = false;
 
   constructor(private readonly rows: Row[]) {}
 
-  select() {
+  select(_columns?: string, options?: { count?: string }) {
+    this.counted = options?.count === 'exact';
     return this;
   }
   eq(column: string, value: unknown) {
@@ -73,8 +76,12 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     this.cap = n;
     return this;
   }
-  then<A = { data: Row[]; error: null }, B = never>(
-    onFulfilled?: ((value: { data: Row[]; error: null }) => A | PromiseLike<A>) | null,
+  range(from: number, to: number) {
+    this.window = [from, to];
+    return this;
+  }
+  then<A = { data: Row[]; error: null; count: number | null }, B = never>(
+    onFulfilled?: ((value: { data: Row[]; error: null; count: number | null }) => A | PromiseLike<A>) | null,
     onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
   ): PromiseLike<A | B> {
     let out = this.rows.filter((row) => this.filters.every((f) => f(row)));
@@ -85,8 +92,11 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
         return ascending ? x.localeCompare(y) : y.localeCompare(x);
       });
     }
+    // A count is of every row the filters keep, before the window cuts them.
+    const count = this.counted ? out.length : null;
+    if (this.window) out = out.slice(this.window[0], this.window[1] + 1);
     if (this.cap !== null) out = out.slice(0, this.cap);
-    return Promise.resolve({ data: out, error: null }).then(onFulfilled, onRejected);
+    return Promise.resolve({ data: out, error: null, count }).then(onFulfilled, onRejected);
   }
 }
 
@@ -949,6 +959,31 @@ describe('list_rows', () => {
   it('keeps only rows holding every word given', async () => {
     const result = await executeAskTool('list_rows', { table: 'learn.watch_list', contains: 'land tax' }, context(tables));
     expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['def']);
+  });
+
+  it('says how many matched and how many it shows, exactly, beyond the 300 it reads without words', async () => {
+    const many: Row[] = Array.from({ length: 350 }, (_, i) =>
+      video(ME, `v${String(i).padStart(3, '0')}`, i % 7 === 0 ? `Tax talk ${i}` : `Other ${i}`, `2026-01-01T00:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}`),
+    );
+    const big: Tables = { 'learn.watch_list': [...many, video(THEM, 'zzz', 'Not theirs', '2026-12-01')] };
+
+    const plain = await executeAskTool('list_rows', { table: 'learn.watch_list', limit: 40 }, context(big));
+    expect(plain.ok && plain.rows).toHaveLength(40);
+    expect(plain.ok && plain.note).toContain('350 matched, showing 40');
+    expect(plain.ok && plain.totals).toEqual({ matched: 350, shown: 40 });
+
+    // 50 of the 350 hold "tax", some of them older than the newest 300 rows.
+    const tax = await executeAskTool('list_rows', { table: 'learn.watch_list', contains: 'tax', limit: 40 }, context(big));
+    expect(tax.ok && tax.rows).toHaveLength(40);
+    expect(tax.ok && tax.note).toContain('50 matched, showing 40');
+
+    const few = await executeAskTool('list_rows', { table: 'learn.watch_list', contains: 'tax talk 343' }, context(big));
+    expect(few.ok && few.note).toContain('1 matched, showing all');
+  });
+
+  it('ends a small table with "showing all"', async () => {
+    const result = await executeAskTool('list_rows', { table: 'learn.watch_list' }, context(tables));
+    expect(result.ok && result.note).toContain('2 matched, showing all');
   });
 
   it('refuses a table outside the catalogue, and one whose workspace is off', async () => {

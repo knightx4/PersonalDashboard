@@ -1,4 +1,4 @@
-import { optionalString, AskInputError, type AskContext, type AskRow, type AskToolResult, type SchemaClient } from './db';
+import { matchedNote, optionalString, AskInputError, type AskContext, type AskRow, type AskToolResult, type SchemaClient } from './db';
 
 /**
  * reading_list and learning_covered (plan #1813, under #1805): what is on the
@@ -18,6 +18,8 @@ import { optionalString, AskInputError, type AskContext, type AskRow, type AskTo
 
 /** The most rows either lookup lists. */
 export const LEARN_ROWS = 60;
+/** The most readings read before filtering. */
+const READINGS_READ = 5000;
 
 const STATUSES = ['queued', 'reading', 'read', 'abandoned'] as const;
 type Status = (typeof STATUSES)[number];
@@ -83,7 +85,7 @@ export async function readingListLookup(ctx: AskContext, input: Record<string, u
     )
     .eq('user_id', ctx.userId)
     .order('created_at', { ascending: false })
-    .limit(5000);
+    .limit(READINGS_READ);
   if (error) throw new Error(`readings: ${error.message}`);
   let rows = (data ?? []) as unknown as ReadingRow[];
   const saved = rows.length;
@@ -114,16 +116,15 @@ export async function readingListLookup(ctx: AskContext, input: Record<string, u
   if (status === 'open') rows = rows.filter((row) => row.status === 'queued' || row.status === 'reading');
   else if (status) rows = rows.filter((row) => row.status === status);
 
-  const note =
+  const why =
     saved === 0
       ? 'The reading list is empty.'
       : subject && subjects.length === 0 && rows.length === 0
         ? `No subject is named like "${subject}", and no list title holds those words. Call learning_covered or leave subject out.`
         : rows.length === 0
           ? 'Nothing on the reading list matched.'
-          : rows.length > LEARN_ROWS
-            ? `${rows.length} matched; the newest ${LEARN_ROWS} are listed.`
-            : undefined;
+          : '';
+  const note = `${why ? `${why} ` : ''}${matchedNote(rows.length, Math.min(rows.length, LEARN_ROWS), saved >= READINGS_READ)}.`;
 
   return {
     ok: true,
@@ -147,7 +148,7 @@ export async function readingListLookup(ctx: AskContext, input: Record<string, u
       };
     }),
     totals: { matched: rows.length, saved, subjects_matched: subjects.length },
-    ...(note ? { note } : {}),
+    note,
   };
 }
 
