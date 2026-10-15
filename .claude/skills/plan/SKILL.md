@@ -18,7 +18,9 @@ busy, and not marked `done` because the session is ending.
 
 ## The tool
 
-`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment.
+`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment, or in
+a cloud session `SUPABASE_SERVICE_ROLE_KEY`, which it uses to send each
+statement over HTTPS because the cloud proxy carries nothing else.
 
 ```
 npx tsx scripts/plan.ts next [--claude]        # what could be picked up, most urgent first
@@ -88,7 +90,8 @@ shows it with the outline, and you leave it as it is. Querying the database
 directly, join `plan_item_outlines` on `id` to get the outline
 (`reference/offline.md`).
 
-If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
+If both are missing, or `plan.ts` fails to reach the database, read
+`reference/offline.md` rather than guessing.
 
 **Writing by hand, record each write** to `plan_items` or `ideas` with
 `core.record_dash_action`, so Home lists it under what Dash did today with an
@@ -353,7 +356,7 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
 | `reference/raising.md` | The four places something a session has to say can go. |
 | `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
-| `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
+| `reference/offline.md` | The SQL to use when `plan.ts` cannot reach the database. |
 
 A shaping run, a re-shape and a re-shape after a vision edit each have a row
 in `plan_runs` (job `shape`, `reshape` or `vision_reshape`) that nothing else
