@@ -1138,6 +1138,39 @@ describe('list_rows', () => {
   });
 });
 
+describe('list_rows on your details (plan #2124.5)', () => {
+  const tables: Tables = {
+    'you.details': [
+      {
+        user_id: ME,
+        title: 'Personal details',
+        phone: '555 0100',
+        linkedin_url: 'linkedin.com/in/me',
+        citizenship: 'Canadian',
+        race: 'Asian',
+        gender: 'Woman',
+        sexuality: 'Bisexual',
+        updated_at: '2026-10-10',
+      },
+      { user_id: THEM, title: 'Personal details', phone: '555 0199', linkedin_url: null, citizenship: null, race: null, gender: null, sexuality: null, updated_at: '2026-10-11' },
+    ],
+  };
+
+  it('returns the asker’s one row with all six values, named and linked, and never the other person’s', async () => {
+    const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'you.details' }, context(tables)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ ref: ME, title: 'Personal details', href: '/you/details' });
+    expect(rows[0].detail).toMatchObject({
+      phone: '555 0100',
+      linkedin_url: 'linkedin.com/in/me',
+      citizenship: 'Canadian',
+      race: 'Asian',
+      gender: 'Woman',
+      sexuality: 'Bisexual',
+    });
+  });
+});
+
 describe('the parent of each row (plan #2109.2)', () => {
   const ROLE = '00000000-0000-4000-8000-0000000000c1';
   const APP = '00000000-0000-4000-8000-0000000000a1';

@@ -692,6 +692,31 @@ export function LearnReadingUnreadableSurface() {
   );
 }
 
+/** A reading queued for a gap, just marked read: Check it now and Not now under the status buttons (plan #2152.1). */
+export function LearnReadingCheckSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: elasticity.id }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+      checkOffered={{ href: `/learn/s/${SUBJECT.id}/probe?concept=${elasticity.id}` }}
+    />
+  );
+}
+
+/** A reading you added yourself, marked read: no concept, so nothing is offered (plan #2152.1). */
+export function LearnReadingCheckOwnSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: null, why: null }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+    />
+  );
+}
+
 // ---- One piece of a learning goal's plan ------------------------------------------
 
 const piecePage: PiecePage = {

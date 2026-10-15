@@ -12,6 +12,7 @@
  */
 import {
   featureProgress,
+  featureSteps,
   lastNightFrom,
   onNow,
   type DigestNight,
@@ -169,6 +170,7 @@ export function runnerCard(input: {
         // Dash's line pairs it with progress through the whole feature.
         step: { number: item.number, title: oneLine(item.title), ref: `#${item.number}` },
         progress: isGoing ? featureProgress(items, `#${item.number}`) : null,
+        steps: isGoing ? featureSteps(items, item.number) : undefined,
         module: moduleName(item.module),
         doing: null,
       });

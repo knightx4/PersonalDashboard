@@ -161,6 +161,44 @@ export async function saveAnswer(
 }
 
 /**
+ * Take a question off this application (note 08c638c3). The question stays in
+ * the bank with its default answer, since other applications may ask it; only
+ * this application's answer row goes, and the count of times it was asked
+ * drops by the one this application added.
+ */
+// latency: pending
+export async function removeAnswer(answerId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data: removed, error } = await supabase
+    .from('application_answers')
+    .delete()
+    .eq('id', answerId)
+    .eq('user_id', user.id)
+    .select('question_id')
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (removed?.question_id) {
+    const { data: question } = await supabase
+      .from('questions')
+      .select('times_seen')
+      .eq('id', removed.question_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (question && (question.times_seen as number) > 1) {
+      await supabase
+        .from('questions')
+        .update({ times_seen: (question.times_seen as number) - 1 })
+        .eq('id', removed.question_id)
+        .eq('user_id', user.id);
+    }
+  }
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/material');
+  return { error: null };
+}
+
+/**
  * Promote an approved answer to the question's canonical version.
  *
  * This is the loop that compounds: after twenty applications the common

@@ -31,9 +31,15 @@ export const youActions: ModuleActions = {
     removePlace: none('deletes'),
     placeOnMap: none(
       'own',
-      "A press on the map is the person pointing at where a place is; Dash places a place from its city when it saves it.",
+      'A press on the map is the person pointing at where a place is; Dash places a place from its city when it saves it.',
     ),
     worldMap: none('page'),
+  },
+  'app/you/details/actions.ts': {
+    saveDetailsForm: none(
+      'own',
+      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them.',
+    ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).
   'app/you/work/job-actions.ts': {

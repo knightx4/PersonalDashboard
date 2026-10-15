@@ -459,7 +459,7 @@ export function ArticleLink({
           void recordArticleOpened(issueId, storyIndex);
         });
       }}
-      className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}
+      className={`press-area inline-flex items-center gap-1 text-ui ${linkVariants()}`}
     >
       Read the article
       <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />

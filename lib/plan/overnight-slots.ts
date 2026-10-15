@@ -18,7 +18,7 @@
  * fired and holds it until it ends. The same input always gives the same
  * answer, and nothing has to be remembered between renders.
  */
-import type { FeatureProgress } from '@/lib/digest/night';
+import type { FeatureProgress, FeatureStep } from '@/lib/digest/night';
 import { elapsedSince } from './elapsed';
 import { OVERNIGHT_AT_ONCE_GOALS_IDLE, overnightStanding, type OvernightRun } from './overnight';
 
@@ -40,6 +40,8 @@ export type SlotSession = {
   doing: string | null;
   /** How far through the feature the plan is, or null when it is not known. */
   progress?: FeatureProgress | null;
+  /** The feature's steps with where each stands, or left out when not known. */
+  steps?: readonly FeatureStep[];
 };
 
 /** The goals run, when one is going. */
@@ -66,6 +68,8 @@ export type SlotWork = {
   elapsed: string | null;
   /** Steps done under the feature, out of all of them. Null for goals or when unknown. */
   progress: FeatureProgress | null;
+  /** The feature's steps with where each stands; empty for goals or when unknown. */
+  steps: readonly FeatureStep[];
 };
 
 export type RunnerSlot =
@@ -187,6 +191,7 @@ function workOf(
     module: string | null;
     doing: string | null;
     progress?: FeatureProgress | null;
+    steps?: readonly FeatureStep[];
   },
   now: number,
 ): SlotWork {
@@ -201,6 +206,7 @@ function workOf(
     // 0 is the clock's pre-mount value: say nothing rather than "just now".
     elapsed: now === 0 ? null : elapsedSince(src.firedAt, now),
     progress: src.progress ?? null,
+    steps: src.steps ?? [],
   };
 }
 

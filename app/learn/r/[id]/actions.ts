@@ -57,6 +57,14 @@ import { formatNumber } from '@/lib/money';
 export type ReadingActionState = { error?: string };
 
 /**
+ * What marking a reading's status answers with. `check` is set only when a
+ * reading queued for a gap in a subject graph has just been marked read: the
+ * probe page for that idea, which the reading page offers as "Check it now"
+ * (plan #2152.1).
+ */
+export type StatusActionState = ReadingActionState & { check?: { href: string } };
+
+/**
  * What the search was told about you, said out loud beside the results.
  *
  * Absent for a reading you typed, which has no graph behind it and nothing to
@@ -225,9 +233,9 @@ const StatusInput = z.object({
 
 // latency: pending
 export async function updateStatus(
-  _prev: ReadingActionState,
+  _prev: StatusActionState,
   formData: FormData,
-): Promise<ReadingActionState> {
+): Promise<StatusActionState> {
   const user = await requireUser();
 
   const parsed = StatusInput.safeParse({
@@ -237,6 +245,7 @@ export async function updateStatus(
   if (!parsed.success) return { error: 'That is not a status.' };
 
   const supabase = await createLearnClient();
+  let check: StatusActionState['check'];
   try {
     await setReadingStatus(supabase, parsed.data.readingId, parsed.data.status);
 
@@ -251,6 +260,17 @@ export async function updateStatus(
         readingId: parsed.data.readingId,
         outcome: 'read',
       });
+
+      // A reading queued for a gap was read to close it, so offer one question
+      // on that idea while it is fresh. One you added yourself has no concept
+      // and offers nothing. The answer is recorded by the probe like any other.
+      const reading = await loadReading(supabase, parsed.data.readingId);
+      if (reading?.conceptId) {
+        const subjectId = await subjectIdOfConcept(supabase, reading.conceptId);
+        if (subjectId) {
+          check = { href: `/learn/s/${subjectId}/probe?concept=${reading.conceptId}` };
+        }
+      }
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not update that.' };
@@ -260,7 +280,7 @@ export async function updateStatus(
   revalidatePath('/learn/lists');
   // Finishing or giving up takes it off the shelf, so the shelf has changed.
   revalidatePath('/learn/now');
-  return {};
+  return check ? { check } : {};
 }
 
 const ReadNowInput = z.object({
