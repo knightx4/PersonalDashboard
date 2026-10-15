@@ -112,6 +112,7 @@ export const jobsActions: ModuleActions = {
     saveCoverLetter: tool('write_cover_letter'),
     draftCoverLetter: none('spends'),
     saveCoverLetterReplies: none('theirs'),
+    dropCoverLetterDraft: none('theirs'),
     renameRole: tool('change_role'),
     moveRoleToCompany: tool('change_role'),
     saveApplicationMarks: tool('change_application'),
