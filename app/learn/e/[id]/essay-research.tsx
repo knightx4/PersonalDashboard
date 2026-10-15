@@ -2,6 +2,7 @@
 
 import { useCallback, useId, useState, type RefObject } from 'react';
 import { Disclosure } from '@/components/ui/disclosure';
+import { LinkedText } from '@/components/ui/linked-text';
 import { InlineTextarea } from '@/components/ui/field';
 import { takeKey } from '@/lib/learn/essays/research-map';
 import { withPoint, withTake } from '@/lib/learn/essays/plan';
@@ -171,13 +172,19 @@ function FirstPass({
 }) {
   return (
     <>
-      {run.summary && <p className="mb-3 text-small text-ink">{run.summary}</p>}
+      {run.summary && (
+        <p className="mb-3 text-small text-ink">
+          <LinkedText text={run.summary} refs={false} />
+        </p>
+      )}
       <ol className="flex flex-col divide-y divide-border">
         {run.positions.map((position, i) => (
           <li key={i} className="py-3 first:pt-0 last:pb-0">
             <p className="text-ui font-medium text-ink">{position.title}</p>
             {position.summary && (
-              <p className="mt-1 text-small text-ink-muted">{position.summary}</p>
+              <p className="mt-1 text-small text-ink-muted">
+                <LinkedText text={position.summary} refs={false} />
+              </p>
             )}
             <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
           </li>
@@ -404,7 +411,9 @@ export function ResearchStage({
           {run && run.summary && (
             <div className="mt-1">
               <p className="text-small font-medium text-ink-muted">The short answer</p>
-              <p className="mt-1 text-body text-ink">{run.summary}</p>
+              <p className="mt-1 text-body text-ink">
+                <LinkedText text={run.summary} refs={false} />
+              </p>
             </div>
           )}
         </CardSection>
@@ -416,7 +425,9 @@ export function ResearchStage({
             const key = takeKey(run.id, { part: i });
             return (
               <CardSection key={key} title={`${i + 1}. ${part.title}`}>
-                <p className="text-body text-ink">{part.summary}</p>
+                <p className="text-body text-ink">
+                  <LinkedText text={part.summary} refs={false} />
+                </p>
                 {part.citations.length > 0 && (
                   <Disclosure
                     title={`What the pages say (${part.citations.length})`}
