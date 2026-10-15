@@ -1,5 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
+import { DashMark } from '@/components/ui/dash-mark';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
@@ -163,15 +164,22 @@ function MonthObservations({ observations, timezone }: { observations: ShownObse
   return (
     <div className="mb-3 space-y-3">
       {weeks.map((week) => (
-        <section key={week} aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}>
-          <h3 className="mb-1.5 text-small font-medium text-ink-muted">
+        // Dash's words on a panel of their own, apart from the rows under
+        // them and the page's ground (taste:no-bare-text).
+        <Card
+          key={week}
+          padding="standard"
+          aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}
+        >
+          <h3 className="mb-1.5 flex items-center gap-1.5 text-small font-medium text-ink-muted">
+            <DashMark size="icon" tone="brand" decorative />
             {`Dash noticed · ${weekLabel(week).toLowerCase()}`}
           </h3>
           <ObservationList
             observations={observations.filter((observation) => observation.week === week)}
             timezone={timezone}
           />
-        </section>
+        </Card>
       ))}
     </div>
   );
@@ -195,7 +203,7 @@ function MonthChart({ months, bounds }: { months: TimelineMonth[]; bounds: { fir
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-ui font-semibold text-ink">By month</h2>
         <p className="tabular text-small text-ink-muted">
-          {`${formatNumber(total)} from ${monthLabel(bounds.first)} to ${monthLabel(bounds.last)}`}
+          {`${formatNumber(total)} ${total === 1 ? 'thing' : 'things'} from ${monthLabel(bounds.first)} to ${monthLabel(bounds.last)}`}
         </p>
       </div>
       <figure role="img" aria-label={`Things that happened by month. ${label}.`} className="space-y-1">
