@@ -10,7 +10,6 @@ import {
   loadClosestInterviews,
   withoutClosestDebriefs,
 } from '@/lib/jobs/today/closest';
-import { liveByMove } from '@/lib/jobs/today/live';
 import { loadToday } from '@/lib/jobs/today/load';
 import { reviewPeek } from '@/lib/jobs/today/review-peek';
 import { TodayPage } from './_home/today-page';
@@ -21,10 +20,9 @@ export const metadata = { title: 'Today' };
  * Today, and where `/jobs` lands (plan #1150, #1591).
  *
  * Reads everything once and hands it to TodayPage, which draws it. The
- * pipeline is read once for the live list, the numbers and This week's
- * follow-up drafts. This week's board is read before "Since you last looked",
- * which leaves out the mail This week lists as waiting on you; the same mail
- * puts the live list's move on you.
+ * pipeline is read once for the numbers and This week's follow-up drafts.
+ * This week's board is read before "Since you last looked", which leaves out
+ * the mail This week lists as waiting on you.
  *
  * The applications at final round or in process are read once more, for
  * their interviews' prep and notes, which open the page; the debriefs they
@@ -89,7 +87,6 @@ export default async function JobsToday() {
       closest={closest}
       board={withoutClosestDebriefs(board, closest)}
       summary={summariseSearch(pipeline, interviews, now)}
-      live={liveByMove(pipeline, new Set(board.waiting.map((item) => item.applicationId)))}
       since={since}
       timezone={timezone}
     />

@@ -98,7 +98,6 @@ import {
   type ClosestApplication,
   type ClosestInterview,
 } from '@/lib/jobs/today/closest';
-import { liveByMove } from '@/lib/jobs/today/live';
 import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
@@ -3398,7 +3397,6 @@ function JobsTodaySurface({ review }: { review: ReviewPeek }) {
         })),
         todayPageNow,
       )}
-      live={liveByMove(todayPageRows, new Set(['p3']))}
       since={todayPageSince}
       timezone="Europe/London"
     />

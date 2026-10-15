@@ -3,7 +3,6 @@ import type { SearchSummary } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { ClosestApplication } from '@/lib/jobs/today/closest';
 import type { TodayBoard } from '@/lib/jobs/today/load';
-import type { LiveByMove } from '@/lib/jobs/today/live';
 import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import { ClosestSection } from './closest-section';
 import { LiveSection } from './live-section';
@@ -15,11 +14,10 @@ import { PageColumn } from '@/components/shell/page-width';
 /**
  * Today, where Jobs opens (plan #1591), drawn from what the page has read.
  *
- * One column, in the order things need you: imports waiting to be checked
- * (when there are any), then the applications closest to an offer (when there
- * are any), then This week, then every live application grouped
- * by whose move it is, under the numbers that say where the search stands,
- * then what came in since your last visit. It took in three tabs: Review is
+ * One column: the numbers that say where the search stands first (note
+ * 9aab04c4), then in the order things need you: imports waiting to be checked
+ * (when there are any), the applications closest to an offer (when there are
+ * any), This week, then what came in since your last visit. It took in three tabs: Review is
  * the strip, Interviews' debrief nudge is in This week (or on the
  * application in Closest to an offer, when it is one), and Activity is behind "Since you last looked". Their pages keep their addresses.
  *
@@ -30,7 +28,6 @@ export function TodayPage({
   closest,
   board,
   summary,
-  live,
   since,
   timezone,
 }: {
@@ -39,7 +36,6 @@ export function TodayPage({
   /** With the debriefs Closest to an offer asks for already taken out. */
   board: TodayBoard;
   summary: SearchSummary;
-  live: LiveByMove;
   since: SinceView;
   timezone: string;
 }) {
@@ -47,10 +43,10 @@ export function TodayPage({
     <PageColumn>
       <PageHeader title="Today" />
       <div className="space-y-8">
+        <LiveSection summary={summary} />
         <ReviewStrip review={review} />
         <ClosestSection closest={closest} timezone={timezone} />
         <ThisWeekSection board={board} timezone={timezone} />
-        <LiveSection summary={summary} live={live} />
         <SinceList since={since} timezone={timezone} />
       </div>
     </PageColumn>
