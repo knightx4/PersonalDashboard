@@ -37,15 +37,18 @@ export function CaptureHeader({
   onSwitch: (action: CaptureAction) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
       {/* Whose workspace the result belongs to, said the way every other
           row in the shell says it. The one box belongs to none, so its
           mark is the home key. */}
       <ModuleMark module={action.module} size="sm" />
       <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{action.label}</span>
       {/* The other things this box can take, one press away, so the header
-          button and ⌥C reach every action and not only the default one. */}
-      <span className="flex shrink-0 items-center gap-1">
+          button and ⌥C reach every action and not only the default one.
+          With their names showing they take a row of their own under the
+          panel's name: in the one row the panel's width left the name
+          nothing, and it read as a dot (note d81fb329). */}
+      <span className="flex shrink-0 flex-wrap items-center gap-1 sm:order-last sm:w-full">
         {actions
           .filter((other) => other.id !== action.id)
           .map((other) => (
