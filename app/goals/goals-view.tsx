@@ -28,12 +28,7 @@ import { VIEW_LABEL } from '@/lib/core/move';
 import { goalViewHref } from '@/lib/goals/plan-rows';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
-import {
-  AREA_NAME_MAX,
-  AREA_NOTE_MAX,
-  type AreaWithGoals,
-  type Goal,
-} from '@/lib/goals/tree';
+import { AREA_NAME_MAX, AREA_NOTE_MAX, type AreaWithGoals, type Goal } from '@/lib/goals/tree';
 import { cn } from '@/lib/cn';
 import { reopenedGoal } from '@/lib/goals/optimistic';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
@@ -55,6 +50,7 @@ import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
 import { usePutAwayItems } from './put-away';
+import { GoalSelectBar, GoalSelectProvider, GoalTick, SelectGoalsToggle } from './select-goals';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
 import { areaCrumbs } from '@/lib/goals/crumbs';
@@ -176,6 +172,7 @@ export function GoalsView({
   canRun,
   areaId,
   planCost = null,
+  select,
 }: {
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
@@ -193,6 +190,8 @@ export function GoalsView({
   areaId?: string;
   /** The usual cost of one Plan this area run, for the hint beside its button; none draws no hint. */
   planCost?: CostEstimate | null;
+  /** The gallery's way in: Select already on, with these goals ticked. */
+  select?: { selecting?: boolean; ticked?: string[] };
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
   // Where a goal can be moved to: every live area, shown in this view or not.
@@ -203,75 +202,90 @@ export function GoalsView({
   const chips = counted.length > 0 && (
     <div className="flex items-center gap-2">
       <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-      <ViewChips
-        view={view}
-        chips={ALL_GOALS_VIEWS}
-        labels={VIEW_LABEL}
-        hrefOf={(candidate) =>
-          goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
-        }
-        counts={{
-          open: countAllGoalsView(counted, 'open', onYou),
-          you: countAllGoalsView(counted, 'you', onYou),
-        }}
-        scroll={false}
-      />
+      <div className="min-w-0 flex-1">
+        <ViewChips
+          view={view}
+          chips={ALL_GOALS_VIEWS}
+          labels={VIEW_LABEL}
+          hrefOf={(candidate) =>
+            goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
+          }
+          counts={{
+            open: countAllGoalsView(counted, 'open', onYou),
+            you: countAllGoalsView(counted, 'you', onYou),
+          }}
+          scroll={false}
+        />
+      </div>
+      {/* Several goals parked or archived at once (plan #2097.2). */}
+      <SelectGoalsToggle />
     </div>
   );
 
   if (pageArea) {
     const area = areaInView(pageArea, view, onYou);
     return (
-      <AreaSection
-        area={area}
-        index={pageIndex}
-        count={allAreas.length}
-        progress={progress}
-        run={areaRuns[area.id] ?? null}
-        rhythms={rhythms[area.id] ?? []}
-        canRun={canRun}
-        planCost={planCost}
-        places={places}
-        page={{
-          chips,
-          empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
-        }}
-      />
+      <GoalSelectProvider goals={selectable([area])} initial={select}>
+        <AreaSection
+          area={area}
+          index={pageIndex}
+          count={allAreas.length}
+          progress={progress}
+          run={areaRuns[area.id] ?? null}
+          rhythms={rhythms[area.id] ?? []}
+          canRun={canRun}
+          planCost={planCost}
+          places={places}
+          page={{
+            chips,
+            empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
+          }}
+        />
+        <GoalSelectBar />
+      </GoalSelectProvider>
     );
   }
 
   const areas = areasInView(allAreas, view, onYou);
   return (
-    <div className="space-y-6">
-      {chips}
-      {allAreas.length === 0 ? (
-        <EmptyState
-          icon={Flag}
-          title="No areas yet"
-          description="Start with the directions you care about, such as money, career or the city, then put goals under each."
-        />
-      ) : areas.length === 0 ? (
-        <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
-      ) : (
-        areas.map((area, index) => (
-          <AreaSection
-            key={area.id}
-            area={area}
-            index={index}
-            count={areas.length}
-            progress={progress}
-            run={areaRuns[area.id] ?? null}
-            rhythms={rhythms[area.id] ?? []}
-            canRun={canRun}
-            planCost={planCost}
-            places={places}
-            view={view}
+    <GoalSelectProvider goals={selectable(areas)} initial={select}>
+      <div className="space-y-6">
+        {chips}
+        {allAreas.length === 0 ? (
+          <EmptyState
+            icon={Flag}
+            title="No areas yet"
+            description="Start with the directions you care about, such as money, career or the city, then put goals under each."
           />
-        ))
-      )}
-      <AreaComposer />
-    </div>
+        ) : areas.length === 0 ? (
+          <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
+        ) : (
+          areas.map((area, index) => (
+            <AreaSection
+              key={area.id}
+              area={area}
+              index={index}
+              count={areas.length}
+              progress={progress}
+              run={areaRuns[area.id] ?? null}
+              rhythms={rhythms[area.id] ?? []}
+              canRun={canRun}
+              planCost={planCost}
+              places={places}
+              view={view}
+            />
+          ))
+        )}
+        <AreaComposer />
+        <GoalSelectBar />
+      </div>
+    </GoalSelectProvider>
   );
+}
+
+/** The goals Select can tick: every one shown that is not archived already. */
+function selectable(areas: readonly AreaInView[]): Goal[] {
+  return areas.flatMap((area) => area.goals.filter((goal) => !goal.archivedAt));
 }
 
 function AreaSection({
@@ -573,6 +587,7 @@ function GoalRow({
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
+      {!archived && <GoalTick id={goal.id} title={goal.title} />}
       <div className="min-w-0 flex-1">
         {/* The name opens the tree, where it is renamed; editing it here
             took the click meant for opening the goal. */}
@@ -601,7 +616,10 @@ function GoalRow({
           {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}
-            className={cn('press-area inline-flex items-center gap-1 text-small', linkVariants({ tone: 'quiet' }))}
+            className={cn(
+              'press-area inline-flex items-center gap-1 text-small',
+              linkVariants({ tone: 'quiet' }),
+            )}
           >
             <ListTree className="size-3.5" strokeWidth={1.75} aria-hidden />
             {goal.status === 'proposed'
@@ -747,7 +765,9 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
  * is made.
  */
 function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }) {
-  return <AddTrigger label="New goal" aim={{ kind: 'goal', under: { id: areaId, title: areaName } }} />;
+  return (
+    <AddTrigger label="New goal" aim={{ kind: 'goal', under: { id: areaId, title: areaName } }} />
+  );
 }
 
 /** A new area, by its name alone, through capture (plan #1950.5). */

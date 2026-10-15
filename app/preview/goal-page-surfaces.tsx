@@ -490,16 +490,38 @@ const AREA_NOTES: Record<string, string> = {
     'Fit enough to run a half marathon without thinking about it, and asleep before midnight most nights.',
 };
 
-export function GoalsAllSurface({ notes = false }: { notes?: boolean }) {
+/** A goal Dash proposed, added to Career when the surface needs more than five goals to tick. */
+const paper = goal('g-paper', 'a-career', 'Publish the volatility paper', {
+  status: 'proposed',
+  position: 20,
+});
+
+export function GoalsAllSurface({
+  notes = false,
+  more = false,
+  select,
+}: {
+  notes?: boolean;
+  /** Six goals rather than five, for archiving more than five at once (plan #2097.2). */
+  more?: boolean;
+  /** Select already on, with these goals ticked (plan #2097.2). */
+  select?: { selecting?: boolean; ticked?: string[] };
+}) {
+  const shown = more
+    ? areas.map((area) =>
+        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+      )
+    : areas;
   return (
     <PageColumn>
       <PageHeader title="All goals" subject={{ ref: null, path: allGoalsCrumbs() }} />
       <GoalsView
         areas={
           notes
-            ? areas.map((area) => ({ ...area, note: area.note ?? AREA_NOTES[area.id] ?? null }))
-            : areas
+            ? shown.map((area) => ({ ...area, note: area.note ?? AREA_NOTES[area.id] ?? null }))
+            : shown
         }
+        select={select}
         view="open"
         onYou={{ [cards.id]: 1 }}
         progress={{

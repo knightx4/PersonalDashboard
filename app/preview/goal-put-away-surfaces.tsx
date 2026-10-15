@@ -91,3 +91,55 @@ export function GoalsAllPutAwayToastSurface() {
     </ToastProvider>
   );
 }
+
+/* ------------------------------------------- several at once (plan #2097.2) */
+
+const THREE_TICKED = { selecting: true, ticked: ['g-cards', 'g-fund', 'g-run'] };
+
+/** Select pressed on All goals and three goals ticked: the bar at the foot with Park and Archive. */
+export function GoalsAllSelectSurface() {
+  return <GoalsAllSurface notes select={THREE_TICKED} />;
+}
+
+/** Six goals ticked and Archive pressed: the bar asks before archiving more than five. */
+export function GoalsAllSelectConfirmSurface() {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = box.current?.querySelector('[role="toolbar"]');
+    [...(bar?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+      .find((button) => button.textContent?.trim() === 'Archive')
+      ?.click();
+  }, []);
+  return (
+    <div ref={box}>
+      <GoalsAllSurface
+        notes
+        more
+        select={{
+          selecting: true,
+          ticked: ['g-cards', 'g-fund', 'g-job', 'g-paper', 'g-run', 'g-sleep'],
+        }}
+      />
+    </div>
+  );
+}
+
+function GroupToast() {
+  const toast = useToast();
+  useEffect(() => {
+    toast({ text: putAwayText(3, 'park'), undo: nothing, duration: 600_000 });
+  }, [toast]);
+  return null;
+}
+
+/** Three goals parked together: one toast, one Undo for the three. */
+export function GoalsAllSelectToastSurface() {
+  return (
+    <ToastProvider>
+      <div className="pb-24">
+        <GoalsAllSurface notes />
+      </div>
+      <GroupToast />
+    </ToastProvider>
+  );
+}
