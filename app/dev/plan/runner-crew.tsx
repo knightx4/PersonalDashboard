@@ -15,6 +15,7 @@ import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
 import { useRunPose } from '@/components/runs/use-run-pose';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { type RunActivity } from '@/lib/core/run-activities';
+import { MODULES, type ModuleId } from '@/lib/modules';
 import { answerPlanRunAction } from './run-actions';
 
 /**
@@ -64,6 +65,34 @@ function pillStatus(slot: RunnerSlot, held: boolean, progress: FeatureProgress |
   return held ? 'Held' : 'Not running';
 }
 
+/**
+ * Literal class names, because Tailwind finds classes by reading source. A
+ * template built from the module id would compile to nothing.
+ */
+const CAPSULE_HUES: Record<ModuleId, string> = {
+  shopping: 'bg-w-shopping-tint text-w-shopping',
+  jobs: 'bg-w-jobs-tint text-w-jobs',
+  todo: 'bg-w-todo-tint text-w-todo',
+  vault: 'bg-w-vault-tint text-w-vault',
+  learn: 'bg-w-learn-tint text-w-learn',
+  news: 'bg-w-news-tint text-w-news',
+  goals: 'bg-w-goals-tint text-w-goals',
+  you: 'bg-w-you-tint text-w-you',
+  dev: 'bg-w-dev-tint text-w-dev',
+};
+
+/**
+ * The workspace a slot works in, as a capsule in that workspace's colour, so
+ * it reads apart from the step number beside it (note 7c8b9707). The slot
+ * carries the workspace's label; a project or the app as a whole has no hue
+ * and takes a plain one.
+ */
+function ModuleCapsule({ name }: { name: string }) {
+  const workspace = MODULES.find((m) => m.label === name || m.id === name.toLowerCase());
+  const hue = workspace ? CAPSULE_HUES[workspace.id] : 'bg-canvas text-ink-muted';
+  return <span className={`mr-1.5 inline-block rounded-full px-2 text-small font-medium ${hue}`}>{name}</span>;
+}
+
 /** The pill's first line: the workspace and the feature's number, or the seat's name. */
 function PillName({ slot }: { slot: RunnerSlot }) {
   if (slot.state !== 'working') return <>{slot.slot === 'goals' ? 'Goals' : slot.label}</>;
@@ -73,7 +102,7 @@ function PillName({ slot }: { slot: RunnerSlot }) {
   return (
     <>
       <span className="sr-only">Working on </span>
-      {name}{' '}
+      <ModuleCapsule name={name} />
       {/* The title is long and the pill is a quarter of the card, so it
           waits in a tip on the number, and in the panel the pill opens. */}
       <Tooltip label={title}>
@@ -181,7 +210,6 @@ function Focus({
   }
   const { work } = slot;
   const meta = [
-    slot.slot === 'goals' ? null : work.module,
     work.doing,
     progress ? `${progress.done} of ${progress.total} steps done` : null,
     work.elapsed,
@@ -192,6 +220,7 @@ function Focus({
     <div id={id} className="flex min-w-0 flex-col gap-2">
       <div className="min-w-0">
         <span className="block text-ui text-ink">
+          <ModuleCapsule name={slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App')} />
           {work.ref && <span className="tabular font-medium">{work.ref} </span>}
           {work.title ?? 'A run with no step recorded'}
         </span>

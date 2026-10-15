@@ -3,6 +3,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { chipVariants } from '@/components/ui/chip';
 import { chanceText, type ScoreFigure, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
+import type { ChanceBand } from '@/lib/jobs/suggest/chance-check';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
@@ -120,6 +121,60 @@ export function ScoreLine({ note }: { note: ScoreNote | null | undefined }) {
   return (
     <Tooltip label={reasons.join(' ')} className="flex">
       {figures}
+    </Tooltip>
+  );
+}
+
+type Tone = 'good' | 'middling' | 'poor';
+
+const TONE_CLASS: Record<Tone, string> = {
+  good: 'bg-positive-tint text-positive',
+  middling: 'bg-caution-tint text-caution',
+  poor: 'bg-danger-tint text-danger',
+};
+
+/** Fit's tone: 70 and over is good, 50 to 69 middling, under 50 poor. */
+function fitTone(value: number): Tone {
+  return value >= 70 ? 'good' : value >= 50 ? 'middling' : 'poor';
+}
+
+/** Chance's tone is its band, so the colour agrees with the chance filter. */
+const CHANCE_TONE: Record<ChanceBand, Tone> = { high: 'good', medium: 'middling', low: 'poor' };
+
+/**
+ * Both figures as numbers in small circles, each tinted by how good it is,
+ * fit first (note 302a206e). Each says what it is and why in its tip; an
+ * unsure one carries its question mark in the tip rather than the circle,
+ * which has room for two digits.
+ */
+export function ScoreCircles({ note, className }: { note: ScoreNote | null | undefined; className?: string }) {
+  if (!note || (!note.fit && !note.chance)) return null;
+  return (
+    // Smaller below `sm`, so a phone row keeps its company beside them.
+    <span className={cn('inline-flex shrink-0 gap-0.5 sm:gap-1', className)}>
+      {note.fit && <ScoreCircle label={FIT_SCORE_LABEL} figure={note.fit} tone={fitTone(note.fit.value)} />}
+      {note.chance && (
+        <ScoreCircle label={CHANCE_LABEL} figure={note.chance} tone={CHANCE_TONE[note.chance.band]} />
+      )}
+    </span>
+  );
+}
+
+function ScoreCircle({ label, figure, tone }: { label: string; figure: ScoreFigure; tone: Tone }) {
+  const said = `${label} ${figure.value}${figure.unsure ? ', and Dash is not sure of it' : ''}`;
+  const tip = figure.reason ? `${said}. ${sentence(figure.reason)}` : `${said}.`;
+  return (
+    <Tooltip label={tip} align="end">
+      <span
+        role="img"
+        aria-label={said}
+        className={cn(
+          'tabular inline-flex size-5 items-center justify-center rounded-full text-micro font-semibold sm:size-6',
+          TONE_CLASS[tone],
+        )}
+      >
+        {figure.value}
+      </span>
     </Tooltip>
   );
 }
