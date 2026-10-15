@@ -20,10 +20,14 @@ export type Place = {
   /** 'YYYY' or 'YYYY-MM'; null while they live there. */
   movedOut: string | null;
   note: string | null;
+  /** Degrees north, -90 to 90; null until the place is on the map. Set together with longitude. */
+  latitude: number | null;
+  /** Degrees east, -180 to 180; null until the place is on the map. Set together with latitude. */
+  longitude: number | null;
 };
 
 /** The columns a place is read with, in the order the row type lists them. */
-export const PLACE_COLUMNS = 'id, name, city, region, country, moved_in, moved_out, note';
+export const PLACE_COLUMNS = 'id, name, city, region, country, moved_in, moved_out, note, latitude, longitude';
 
 export type PlaceRow = {
   id: string;
@@ -34,7 +38,15 @@ export type PlaceRow = {
   moved_in: string;
   moved_out: string | null;
   note: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
+
+/**
+ * The columns the form and Dash's tools write. The map position is left out
+ * on purpose: a save sends only these, so it never clears or changes one.
+ */
+export type PlaceWrite = Omit<PlaceRow, 'id' | 'latitude' | 'longitude'>;
 
 export function placeFromRow(row: PlaceRow): Place {
   return {
@@ -46,6 +58,8 @@ export function placeFromRow(row: PlaceRow): Place {
     movedIn: row.moved_in,
     movedOut: row.moved_out,
     note: row.note,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
   };
 }
 
@@ -192,7 +206,7 @@ export type PlaceDraft = {
 export type PlaceChecked =
   | {
       ok: true;
-      row: Omit<PlaceRow, 'id'>;
+      row: PlaceWrite;
     }
   | { ok: false; errors: Partial<Record<keyof PlaceDraft, string>> };
 

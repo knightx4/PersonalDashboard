@@ -1,5 +1,5 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { PLACE_COLUMNS, placeFromRow, sortPlaces, type Place, type PlaceRow } from './places';
+import { PLACE_COLUMNS, placeFromRow, sortPlaces, type Place, type PlaceRow, type PlaceWrite } from './places';
 
 /**
  * Reading and writing you.places (plan #1991.5). Every call names the person
@@ -28,7 +28,7 @@ export async function getPlace(client: YouSupabaseClient, userId: string, id: st
 export async function insertPlace(
   client: YouSupabaseClient,
   userId: string,
-  row: Omit<PlaceRow, 'id'>,
+  row: PlaceWrite,
 ): Promise<Record<string, unknown>> {
   const { data, error } = await client
     .from('places')
@@ -43,7 +43,7 @@ export async function updatePlace(
   client: YouSupabaseClient,
   userId: string,
   id: string,
-  patch: Partial<Omit<PlaceRow, 'id'>>,
+  patch: Partial<PlaceWrite>,
 ): Promise<Record<string, unknown> | null> {
   const { data, error } = await client
     .from('places')
