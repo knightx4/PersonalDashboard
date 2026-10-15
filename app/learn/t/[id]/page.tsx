@@ -16,6 +16,8 @@ import { removeTrack } from './actions';
 import { PageColumn } from '@/components/shell/page-width';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
+import { requireUser } from '@/lib/auth/server';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,11 +45,14 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
 
   // Which newsletter each story sent from News was in (plan #1368),
   // and the research brief that made this list, when one did (plan #2023.4).
-  const [origins, brief] = await Promise.all([
+  // And which readings a run or an Ask Dash hand-off is about (plan #1964.2.2).
+  const user = await requireUser();
+  const [origins, brief, working] = await Promise.all([
     loadReadingOrigins(
       track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
     ),
     loadBriefForTrack(supabase, track.id),
+    workingRefsForPage(user.id),
   ]);
 
   return (
@@ -134,6 +139,7 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
                 key={reading.id}
                 reading={reading}
                 from={reading.newsStoryId ? origins.get(reading.newsStoryId)?.senderName : null}
+                working={working}
               />
             ))}
           </ul>

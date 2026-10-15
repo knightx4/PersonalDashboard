@@ -4,6 +4,8 @@ import type { ReadingRow, SourceAccess } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Chip } from '@/components/ui/chip';
+import { MoveLabel } from '@/components/ui/move-label';
+import { rowRef, workingMove } from '@/lib/core/move';
 
 /**
  * One reading, in a list.
@@ -135,8 +137,18 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
  * whole card is one link to the reading, so the line is text here; the
  * reading's own page links it to the story.
  */
-export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: string | null }) {
+export function ReadingCard({
+  reading,
+  from,
+  working: running,
+}: {
+  reading: ReadingRow;
+  from?: string | null;
+  /** The refs a run or an Ask Dash hand-off is about (plan #1964.2.2); left out, none. */
+  working?: readonly string[];
+}) {
   const done = reading.status === 'read' || reading.status === 'abandoned';
+  const working = done ? null : workingMove(running, [rowRef('learn.readings', reading.id)]);
 
   return (
     <li>
@@ -167,13 +179,21 @@ export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: str
                 access={reading.source.access}
                 priceCents={reading.source.priceCents}
               />
-            ) : (
+            ) : working ? null : (
               // Written down, nothing found for it yet. Said plainly rather
               // than left blank, because a row with no source and no note
               // about it reads as a row that failed.
               <Chip className="text-ink-ghost">
                 No source yet
               </Chip>
+            )}
+            {/* Dash's mark sits with the reading's facts, under the title
+                when it wraps, and in place of "No source yet" while Dash
+                is looking for one, so the row does not grow when a run
+                starts (plan #1964.2.2). */}
+            {working && (
+              // The chip's height, so taking its place moves nothing.
+              <MoveLabel move={working.move} title={working.title} className="h-5.5" />
             )}
           </span>
 

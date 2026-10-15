@@ -261,6 +261,9 @@ import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
 import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
+import { DashWorkingReadingDemo } from './dash-working-rows';
+import { NoteListRow } from '@/components/vault/note-list-row';
+import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
@@ -1823,6 +1826,47 @@ const subjectConcepts: Concept[] = [
     mastery: [],
     testedAt: null,
     declaredAt: null,
+  },
+];
+
+/** Vault notes for the working rows surface; the second has a run on it, named by path as a goal's context names it. */
+const workingNotes = [
+  {
+    id: 'wn1',
+    path: 'Work/Interview notes, Halloran-Achterberg.md',
+    title: 'Interview notes, Halloran-Achterberg',
+    excerpt: 'Second round with the platform team. They asked about the replication lag incident twice.',
+  },
+  {
+    id: 'wn2',
+    path: 'Work/What I want from the next role.md',
+    title: 'What I want from the next role',
+    excerpt: 'A team that owns its own on-call, a manager who writes things down, and no more than two days in the office.',
+  },
+  { id: 'wn3', path: 'Work/Salary bands.md', title: 'Salary bands', excerpt: null },
+];
+
+/** Newsletter issues for the working rows surface; the first has a run on it. */
+const workingSenders = new Map([
+  ['ws1', { id: 'ws1', email: 'hello@moneystuff.example', name: 'Money Stuff', muted: false }],
+  ['ws2', { id: 'ws2', email: 'editor@thedispatch.example', name: 'The Morning Dispatch from the Engineering Desk', muted: false }],
+]);
+const workingIssues = [
+  {
+    id: 'wi1',
+    senderId: 'ws1',
+    subject: 'The bond market is pricing in two more cuts, and why the curve disagrees',
+    receivedAt: '2026-10-15T06:40:00.000Z',
+    readAt: null,
+    summaryLine: 'Rate cuts, a fund that gated withdrawals, and a lawsuit over a rounding error.',
+  },
+  {
+    id: 'wi2',
+    senderId: 'ws2',
+    subject: 'Postgres 18 ships asynchronous I/O',
+    receivedAt: '2026-10-14T17:05:00.000Z',
+    readAt: '2026-10-14T19:00:00.000Z',
+    summaryLine: null,
   },
 ];
 
@@ -4865,6 +4909,54 @@ export const SURFACES: readonly Surface[] = [
           <ReadingCard key={reading.id} reading={reading} />
         ))}
       </ul>
+    ),
+  },
+  {
+    /* "Dash is on it" on a row while a run or an Ask Dash hand-off is about
+     * it (plan #1964.2.2), in the three workspaces whose rows had no move of
+     * their own: a reading, a vault note and a newsletter issue. The press
+     * starts a run about the reading with no source; the note and the issue
+     * are drawn with a run already going. */
+    id: 'dash-working-rows',
+    label: 'Rows · Dash is on it',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-row"]',
+      shows:
+        'Pressing “Find a source” turns the button’s mark to working beside its words, which become “Finding a source”, and on the reading with no source “No source yet” gives way to Dash’s pulsing mark and “Dash is on it” in the same place, with nothing below moving.',
+    },
+    render: () => (
+      <div className="space-y-6">
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Learn · Distributed systems</h2>
+          <DashWorkingReadingDemo readings={trackReadings.slice(1, 4)} target="rd4" />
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Vault · Work</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingNotes.map((note) => (
+              <NoteListRow key={note.id} note={note} working={['obsidian.notes:Work/What I want from the next role.md']} />
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">News · Latest</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingIssues.map((issue) => (
+              <IssueListRow
+                key={issue.id}
+                issue={issue}
+                sender={workingSenders.get(issue.senderId)}
+                from={null}
+                timezone="Europe/London"
+                working={['news.issues:wi1']}
+              />
+            ))}
+          </ul>
+        </section>
+      </div>
     ),
   },
   {
