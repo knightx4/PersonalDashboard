@@ -20,6 +20,8 @@ vi.mock('@/lib/learn/graph/load', () => ({
   loadReadyAndSettled: vi.fn(),
 }));
 
+vi.mock('@/lib/learn/predicted', () => ({ predictedStrength: vi.fn(async () => 0.4) }));
+
 const TRACK_A = '00000000-0000-4000-8000-00000000000a';
 const TRACK_B = '00000000-0000-4000-8000-00000000000b';
 /** A hidden survey subject (plan #840), which `loadSubjects` leaves out. */
@@ -313,6 +315,7 @@ describe('putBack', () => {
 
     expect(calls.eq).toEqual(['id', 'p1']);
     expect(calls.update?.shown_at).toBeNull();
+    expect(calls.update?.predicted_strength).toBeNull();
     expect(new Date(String(calls.update?.created_at)).getTime()).toBeGreaterThanOrEqual(before);
     expect(calls.is).toContain('answered_at');
   });
