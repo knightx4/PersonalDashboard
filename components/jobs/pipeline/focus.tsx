@@ -182,8 +182,9 @@ function FocusSection({
 
 /**
  * One pursuit, one line: the role and company, what is next for it, its fit
- * and chance of an interview in circles, and how long since anything happened. The detail column drops below `sm`, where the
- * title needs the width more.
+ * and chance of an interview in circles, and how long since anything happened.
+ * The detail column drops below `sm`, where the title needs the width more,
+ * and the circles draw smaller there.
  */
 function FocusLine({
   row,
@@ -219,14 +220,28 @@ function FocusLine({
           className="size-5 shrink-0 text-micro"
         />
 
-        {/* The title keeps a few words on a phone; whose move it is gives way first. */}
-        <span className="min-w-28 flex-1 truncate text-ui text-ink">
-          {row.roleTitle}
-          <span className="ml-2 text-ink-muted">
-            {row.companyName}
-            {row.attempt > 1 && ` · attempt ${row.attempt}`}
+        {/* The title keeps a few words on a phone; whose move it is gives way
+            first. A row with circles splits the title from the company, so
+            the title gives way to the company there, which shows once the
+            title has room for it, at up to two fifths of the space; a row
+            without them reads as one line, the title first. */}
+        {row.scoreNote ? (
+          <span className="@container flex min-w-28 flex-1 items-baseline gap-2 text-ui">
+            <span className="min-w-0 truncate text-ink">{row.roleTitle}</span>
+            <span className="hidden max-w-2/5 shrink-0 truncate text-ink-muted @min-[12rem]:inline">
+              {row.companyName}
+              {row.attempt > 1 && ` · attempt ${row.attempt}`}
+            </span>
           </span>
-        </span>
+        ) : (
+          <span className="min-w-28 flex-1 truncate text-ui text-ink">
+            {row.roleTitle}
+            <span className="ml-2 text-ink-muted">
+              {row.companyName}
+              {row.attempt > 1 && ` · attempt ${row.attempt}`}
+            </span>
+          </span>
+        )}
 
         {/* Inside the row's link, so the tip is for the mouse and the
           * label reaches a screen reader through the link's name. */}

@@ -150,7 +150,8 @@ const CHANCE_TONE: Record<ChanceBand, Tone> = { high: 'good', medium: 'middling'
 export function ScoreCircles({ note, className }: { note: ScoreNote | null | undefined; className?: string }) {
   if (!note || (!note.fit && !note.chance)) return null;
   return (
-    <span className={cn('inline-flex shrink-0 gap-1', className)}>
+    // Smaller below `sm`, so a phone row keeps its company beside them.
+    <span className={cn('inline-flex shrink-0 gap-0.5 sm:gap-1', className)}>
       {note.fit && <ScoreCircle label={FIT_SCORE_LABEL} figure={note.fit} tone={fitTone(note.fit.value)} />}
       {note.chance && (
         <ScoreCircle label={CHANCE_LABEL} figure={note.chance} tone={CHANCE_TONE[note.chance.band]} />
@@ -168,7 +169,7 @@ function ScoreCircle({ label, figure, tone }: { label: string; figure: ScoreFigu
         role="img"
         aria-label={said}
         className={cn(
-          'tabular inline-flex size-6 items-center justify-center rounded-full text-micro font-semibold',
+          'tabular inline-flex size-5 items-center justify-center rounded-full text-micro font-semibold sm:size-6',
           TONE_CLASS[tone],
         )}
       >
