@@ -6,9 +6,12 @@ import {
   displayName,
   gmailComposeUrl,
 } from '@/lib/jobs/followup/compose';
-import { DEBRIEF_NUDGE_WINDOW_DAYS, TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
+import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 import { debriefsDue, type DebriefDue } from './debrief';
 import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
+import { loadWaitingOnYou, type WaitingOnYou } from './waiting';
+
+export type { WaitingOnYou };
 
 /**
  * The week, as three questions.
@@ -81,17 +84,6 @@ export interface DueReminder {
   followUpHref: string | null;
 }
 
-export interface WaitingOnYou {
-  eventId: string;
-  applicationId: string;
-  roleId: string;
-  companyName: string;
-  roleTitle: string;
-  kind: string;
-  summary: string | null;
-  occurredAt: string;
-}
-
 export interface TodayBoard {
   interviews: UpcomingInterview[];
   reminders: DueReminder[];
@@ -133,9 +125,8 @@ export async function loadToday(
   const [
     interviewRows,
     reminderRows,
-    eventRows,
+    waiting,
     pipelineRows,
-    waitingDismissedRows,
     pastRows,
   ] = await Promise.all([
     supabase
@@ -164,33 +155,15 @@ export async function loadToday(
       .order('due_at', { ascending: true })
       .limit(50),
 
-    // Mail that asked you something. `action_required` is set by the extractor
-    // when the body contains a request rather than a notification, and it is
-    // the only signal here that comes from the words rather than from a clock.
-    supabase
-      .from('application_events')
-      .select(
-        'id, application_id, kind, summary, occurred_at, applications!inner ( status, roles!inner ( id, title, companies!inner ( name ) ) )',
-      )
-      .eq('user_id', userId)
-      .eq('payload->>action_required', 'true')
-      .gte('occurred_at', new Date(now.getTime() - 21 * DAY_MS).toISOString())
-      .order('occurred_at', { ascending: false })
-      .limit(30),
+    // Mail that asked you something, less what you have dealt with or put
+    // off. A failed read leaves it out rather than taking the page down, as
+    // the page always has.
+    loadWaitingOnYou(supabase, userId, now).catch((): WaitingOnYou[] => []),
 
     // Through the pipeline loader rather than a query of its own: it is where
     // the date a pursuit was submitted comes from, which is what a follow-up
     // draft opens with.
     opts.pipeline ?? loadPipeline(supabase, userId),
-
-    // Dismissed "waiting" items. A row with no dismissed_until is dismissed
-    // for good; one with a future dismissed_until is snoozed and filtered the
-    // same way until it passes.
-    supabase
-      .from('waiting_dismissals')
-      .select('application_event_id, dismissed_until')
-      .eq('user_id', userId)
-      .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
 
     // The rounds just over, for the debrief nudge the Interviews tab used to
     // carry. A day further back than the window, because a day-only round is
@@ -285,33 +258,6 @@ export async function loadToday(
       followUpHref: null,
     }),
   );
-
-  type EventRaw = {
-    id: string;
-    application_id: string;
-    kind: string;
-    summary: string | null;
-    occurred_at: string;
-    applications: { status: string; roles: RoleJoin };
-  };
-
-  const dismissedWaiting = new Set(
-    (waitingDismissedRows.data ?? []).map((row) => row.application_event_id as string),
-  );
-  const waiting: WaitingOnYou[] = ((eventRows.data ?? []) as unknown as EventRaw[])
-    // A request on a pursuit that has since closed is not waiting on anybody.
-    .filter((row) => !TERMINAL_STATUSES.includes(row.applications.status as never))
-    .filter((row) => !dismissedWaiting.has(row.id))
-    .map((row) => ({
-      eventId: row.id,
-      applicationId: row.application_id,
-      roleId: row.applications.roles.id,
-      companyName: row.applications.roles.companies.name,
-      roleTitle: row.applications.roles.title,
-      kind: row.kind,
-      summary: row.summary,
-      occurredAt: row.occurred_at,
-    }));
 
   type PastRaw = {
     id: string;

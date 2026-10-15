@@ -32,6 +32,7 @@ export const SOURCE_IDS = [
   'bills',
   'drafts',
   'applications',
+  'job_waiting',
   'plan_steps',
   'raised',
   'threads',
