@@ -49,6 +49,11 @@ describe('featureLines', () => {
     expect(buckets.map((b) => b.title)).toEqual(['Store the details', 'Details tab on You', 'Edit in place']);
   });
 
+  it('reads a step written without its hash', () => {
+    const { buckets } = featureLines([line('Sent a helper to build plan step 2124.2')], '#2124', STEPS);
+    expect(buckets.find((b) => b.key === '#2124.2')?.count).toBe(1);
+  });
+
   it('files a sub-step under the step above it', () => {
     const { buckets } = featureLines([line('Claimed #2124.2.1', 'action')], '#2124', STEPS);
     expect(buckets.find((b) => b.key === '#2124.2')?.count).toBe(1);

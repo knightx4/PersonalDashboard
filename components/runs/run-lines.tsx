@@ -1,5 +1,8 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -200,9 +203,13 @@ const STEP_STATE: Record<FeatureStep['status'], string> = {
 };
 
 /**
- * A feature session's lines, one fold for each step of the feature. The fold
+ * A feature session's lines, in a box of fixed height that keeps the newest
+ * line in view, with that line pinned above it under "Now" so what Dash is
+ * doing reads first. Inside the box there is one fold for each step: the one
  * holding the newest line, a question waiting on you or a step being built
- * opens by itself; the rest fold to their state and how many lines they hold.
+ * opens by itself, and the rest fold to their state and how many lines they
+ * hold. Scrolling up through older lines stops the box following the newest
+ * one until it is scrolled back down.
  */
 function StepLines({
   lines,
@@ -218,32 +225,91 @@ function StepLines({
   open: { id: string; action: AnswerRunAction } | null;
 }) {
   const { buckets, hidden } = featureLines(lines, feature.ref, feature.steps);
-  const newest = lines[lines.length - 1]?.id ?? null;
+  let newest: { group: LineGroup; bucket: StepBucket } | null = null;
+  for (const bucket of buckets) {
+    for (const group of bucket.groups) {
+      if (!newest || group.at >= newest.group.at) newest = { group, bucket };
+    }
+  }
+  const newestId = newest?.group.lastId ?? null;
+
+  const box = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+  const moving = useRef(false);
+  const [toggled, setToggled] = useState<Readonly<Record<string, boolean>>>({});
+
+  // Keep the newest line at the foot of the box while following.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !follow.current || !newestId) return;
+    const target = el.querySelector<HTMLElement>(`[data-line="${CSS.escape(newestId)}"]`);
+    if (!target) return;
+    moving.current = true;
+    el.scrollTop = Math.max(0, target.offsetTop + target.offsetHeight - el.clientHeight + 12);
+    requestAnimationFrame(() => {
+      moving.current = false;
+    });
+  }, [newestId, toggled]);
+
+  const onScroll = () => {
+    const el = box.current;
+    if (!el || moving.current || !newestId) return;
+    const target = el.querySelector<HTMLElement>(`[data-line="${CSS.escape(newestId)}"]`);
+    // Following again once the newest line is back in view.
+    follow.current = !target || target.offsetTop + target.offsetHeight <= el.scrollTop + el.clientHeight + 24;
+  };
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
+      {newest && (
+        <div className="rounded-control border border-accent/40 bg-accent-tint px-3 py-2">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-small">
+            <span className="font-medium text-accent">Now</span>
+            {newest.bucket.ref && <span className="tabular text-ink-ghost">{newest.bucket.ref}</span>}
+            <span className="min-w-0 truncate text-ink-muted">{newest.bucket.title}</span>
+            <time dateTime={newest.group.at} className="tabular ml-auto text-ink-ghost">
+              {shortWhen(newest.group.at, now)}
+            </time>
+          </p>
+          <p className="text-ui break-words text-ink">
+            {newest.group.summary ?? <LinkedText text={newest.group.line.body} />}
+          </p>
+        </div>
+      )}
+      <div
+        ref={box}
+        onScroll={onScroll}
+        className="max-h-80 overflow-y-auto overscroll-contain rounded-control border border-border bg-sunken p-1.5"
+      >
+        <ol className="space-y-1">
+          {buckets.map((bucket) => {
+            const auto =
+              bucket.status === 'in_progress' ||
+              bucket.status === 'blocked' ||
+              bucket.groups.some((group) => group.line.id === open?.id || group.lastId === newestId);
+            const isOpen = toggled[bucket.key] ?? auto;
+            return (
+              <li key={bucket.key}>
+                <StepFold
+                  bucket={bucket}
+                  lines={lines}
+                  now={now}
+                  arrived={arrived}
+                  open={open}
+                  isOpen={isOpen}
+                  live={bucket === newest?.bucket}
+                  onToggle={() => setToggled((was) => ({ ...was, [bucket.key]: !isOpen }))}
+                />
+              </li>
+            );
+          })}
+        </ol>
+      </div>
       {hidden > 0 && (
         <p className="text-small text-ink-ghost">
           {hidden} {hidden === 1 ? 'line' : 'lines'} about other features left out
         </p>
       )}
-      <ol className="space-y-0.5">
-        {buckets.map((bucket) => (
-          <li key={bucket.key}>
-            <StepFold
-              bucket={bucket}
-              lines={lines}
-              now={now}
-              arrived={arrived}
-              open={open}
-              opens={
-                bucket.status === 'in_progress' ||
-                bucket.status === 'blocked' ||
-                bucket.groups.some((group) => group.line.id === open?.id || group.lastId === newest)
-              }
-            />
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -254,47 +320,124 @@ function StepFold({
   now,
   arrived,
   open,
-  opens,
+  isOpen,
+  live,
+  onToggle,
 }: {
   bucket: StepBucket;
   lines: readonly RunActivity[];
   now: number;
   arrived?: ReadonlySet<string>;
   open: { id: string; action: AnswerRunAction } | null;
-  opens: boolean;
+  isOpen: boolean;
+  /** Holds the newest line. */
+  live: boolean;
+  onToggle: () => void;
 }) {
   const said = bucket.count === 0 ? null : bucket.count === 1 ? '1 line' : `${bucket.count} lines`;
   const meta = [bucket.status ? STEP_STATE[bucket.status] : null, said].filter(Boolean).join(' · ');
+  const body = `step-lines-${bucket.key.replace(/\W/g, '-')}`;
   return (
-    <Disclosure
-      defaultOpen={opens}
-      summaryClassName="py-1.5"
-      title={
-        <span className="flex min-w-0 items-baseline gap-2">
-          {bucket.ref && <span className="tabular shrink-0 font-normal text-ink-ghost">{bucket.ref}</span>}
-          <span className="min-w-0 truncate">{bucket.title}</span>
+    <div className={cn('rounded-control border bg-surface', live ? 'border-accent/50' : 'border-border')}>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={body}
+        onClick={onToggle}
+        className="press flex w-full min-w-0 items-center gap-2 px-2.5 py-2 text-left text-ui"
+      >
+        <ChevronRight
+          aria-hidden
+          strokeWidth={1.75}
+          className={cn('size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick', isOpen && 'rotate-90')}
+        />
+        {bucket.ref && <span className="tabular shrink-0 text-ink-ghost">{bucket.ref}</span>}
+        <span className="min-w-0 flex-1 truncate font-medium text-ink">{bucket.title}</span>
+        <span className="flex shrink-0 items-center gap-1.5 text-small text-ink-muted">
+          {bucket.status && <StatusGlyph glyph={STEP_GLYPH[bucket.status]} size={12} />}
+          <span className="max-sm:sr-only">{meta}</span>
         </span>
-      }
-      meta={meta}
-    >
-      {bucket.groups.length === 0 ? (
-        <p className="pb-1 text-small text-ink-muted">Nothing written about this step yet.</p>
-      ) : (
-        <ol className="space-y-1 pb-1">
-          {bucket.groups.map((group) => (
-            <RunLine
-              key={group.line.id}
-              line={group.line}
-              group={group}
-              now={now}
-              arrived={arrived?.has(group.line.id) ?? false}
-              answer={group.line.kind === 'question' ? answerAfter(lines, lines.indexOf(group.line)) : null}
-              answerWith={open?.id === group.line.id ? open.action : undefined}
-            />
-          ))}
-        </ol>
+      </button>
+      {isOpen && (
+        <div id={body} className="px-2.5 pb-2">
+          {bucket.groups.length === 0 ? (
+            <p className="pl-5.5 text-small text-ink-muted">Nothing written about this step yet.</p>
+          ) : (
+            <ol>
+              {bucket.groups.map((group) =>
+                group.line.kind === 'question' || group.line.kind === 'response' ? (
+                  <RunLine
+                    key={group.line.id}
+                    line={group.line}
+                    group={group}
+                    now={now}
+                    arrived={arrived?.has(group.line.id) ?? false}
+                    answer={group.line.kind === 'question' ? answerAfter(lines, lines.indexOf(group.line)) : null}
+                    answerWith={open?.id === group.line.id ? open.action : undefined}
+                  />
+                ) : (
+                  <CompactLine key={group.line.id} group={group} now={now} arrived={arrived?.has(group.line.id) ?? false} />
+                ),
+              )}
+            </ol>
+          )}
+        </div>
       )}
-    </Disclosure>
+    </div>
+  );
+}
+
+/** The shape each step's state takes beside it, from the plan's own set. */
+const STEP_GLYPH: Record<FeatureStep['status'], GlyphName> = {
+  in_progress: 'three-quarters',
+  blocked: 'cross',
+  done: 'check',
+  not_started: 'empty',
+  proposed: 'empty',
+  dropped: 'empty',
+};
+
+/** One line under a step, on one row: what kind, what it said, and when. */
+function CompactLine({ group, now, arrived }: { group: LineGroup; now: number; arrived: boolean }) {
+  const { line } = group;
+  return (
+    <li
+      data-line={group.lastId}
+      className={cn(
+        'grid grid-cols-[4.5rem_minmax(0,1fr)_auto] gap-x-3 border-t border-border/60 py-1.5 first:border-t-0',
+        'max-sm:grid-cols-[minmax(0,1fr)_auto]',
+        arrived && 'run-line-in',
+      )}
+    >
+      <span
+        className={cn(
+          'pt-px text-small max-sm:col-span-2',
+          line.kind === 'error' ? 'text-danger' : 'text-ink-ghost',
+        )}
+      >
+        {RUN_ACTIVITY_LABEL[line.kind]}
+        {group.repeats > 1 && <span className="tabular"> &times;{group.repeats}</span>}
+      </span>
+      <span className="min-w-0 text-ui break-words text-ink">
+        {group.summary ?? <LinkedText text={line.body} />}
+        {group.files.length > 0 && (
+          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+            {group.files.map((file) => (
+              <span key={file} className="min-w-0 font-mono text-small break-all text-ink-muted">
+                {file}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+      <time
+        dateTime={group.at}
+        title={exactTime(group.at)}
+        className="tabular pt-px text-small text-ink-ghost"
+      >
+        {shortWhen(group.at, now)}
+      </time>
+    </li>
   );
 }
 
@@ -327,7 +470,7 @@ function RunLine({
   const yours = line.kind === 'response';
 
   return (
-    <li className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
+    <li data-line={group?.lastId ?? line.id} className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
       <p className="flex flex-wrap items-baseline gap-x-2 text-small">
         <span className={cn('font-medium', line.kind === 'error' ? 'text-danger' : 'text-ink-muted')}>
           {RUN_ACTIVITY_LABEL[line.kind]}
