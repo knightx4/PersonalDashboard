@@ -3,7 +3,7 @@
  *
  * Outlook and Exchange write `TZID="Eastern Standard Time"` — a Windows zone
  * name, not an IANA one — and a large share of recruiting invites come from
- * Outlook. `Intl.DateTimeFormat` throws `RangeError` on those, which sent the
+ * Outlook. `Intl` throws `RangeError` on those, which sent the
  * ICS parser down its unknown-zone fallback and stamped the wall clock as UTC.
  * A superday at 10:30am Eastern was stored as 10:30 UTC and read back as
  * 6:30am: four hours wrong, in the one place a wrong hour costs an interview.
@@ -19,6 +19,8 @@
  * conduct interviews from. Anything not here still parses; it just falls back
  * as it did before.
  */
+
+import { isValidTimeZone } from '@/lib/core/timezone';
 
 const WINDOWS_TO_IANA: Readonly<Record<string, string>> = {
   // North America
@@ -118,10 +120,5 @@ export function toIanaZone(tzid: string | null | undefined): string | null {
 
 /** Whether this runtime's zone database carries the name. */
 export function isKnownZone(zone: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
+  return isValidTimeZone(zone);
 }

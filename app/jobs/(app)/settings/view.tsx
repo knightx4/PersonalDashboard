@@ -13,7 +13,7 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { InlineInput, Input, Label } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDateInline } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
 import { disconnectInbox, savePreference, updateProfile, type SettingsState } from './actions';
@@ -426,7 +426,7 @@ function InboxSection({
                     and then held it against the far edge, so the date read as
                     an orphan rather than as a note about the address above. */}
                 <span className="tabular text-small text-ink-muted sm:ml-auto">
-                  last checked {formatDate(account.lastSyncedAt)}
+                  last checked {formatDateInline(account.lastSyncedAt)}
                 </span>
               </div>
 
@@ -447,7 +447,7 @@ function InboxSection({
                 <Note className="mt-2 text-small text-ink-muted">
                   First scan stopped partway — {account.latestBackfill.messagesSeen} messages read
                   {account.latestBackfill.finishedAt
-                    ? `, ${formatDate(account.latestBackfill.finishedAt)}`
+                    ? `, ${formatDateInline(account.latestBackfill.finishedAt)}`
                     : ''}
                   . It picks up where it left off, and keeps going on its own while a page of the
                   app is open.

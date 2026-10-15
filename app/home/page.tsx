@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { whenDate, zoneDay, zoneParts } from '@/lib/core/when';
 import { cookies } from 'next/headers';
 import Link, { linkVariants } from '@/components/ui/link';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -84,11 +85,7 @@ async function safe<T>(work: PromiseLike<T>, fallback: T): Promise<T> {
  * What time of day it is where the reader is, not where the server is.
  */
 function greeting(timezone: string, now: Date): string {
-  const hour = Number(
-    new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: timezone }).format(
-      now,
-    ),
-  );
+  const hour = zoneParts(now, timezone).hour;
   if (hour < 5) return 'Still up';
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
@@ -152,12 +149,7 @@ async function homeContent(
     cookies(),
   ]);
   const now = new Date();
-  const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: settings.timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  const today = zoneDay(now, settings.timezone);
 
   // The rail's list is the third list of workspaces, after the switcher and
   // the account page, and it goes through the same rule: a workspace this account
@@ -277,12 +269,7 @@ async function homeContent(
     ),
   );
 
-  const date = new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: settings.timezone,
-  }).format(now);
+  const date = whenDate(now, { timeZone: settings.timezone, weekday: 'long', month: 'long', year: 'auto', now });
   const workspaces = enabled.map((module) => ({
     id: module.id,
     label: module.label,

@@ -4,7 +4,7 @@ import { CalendarClock } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { formatClock } from '@/lib/core/when';
+import { whenDay, whenTime } from '@/lib/core/when';
 import { ARRIVE_LAST_STEP, arriveAt } from '@/lib/home/first-visit';
 import type { ModuleId } from '@/lib/modules';
 import type { Brief } from '@/lib/shell/brief';
@@ -197,7 +197,7 @@ export function TodayCard({
               className="flex flex-wrap items-baseline gap-x-2 rounded-control bg-accent-tint px-3 py-1.5 text-small text-ink"
             >
               <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              {entry.at && <span className="tabular font-medium">{formatClock(entry.at, { timeZone: timezone })}</span>}
+              {entry.at && <span className="tabular font-medium">{whenTime(entry.at, { timeZone: timezone })}</span>}
               {entry.href ? (
                 <Link href={entry.href} className="press-area font-medium hover:text-accent">
                   {entry.label}
@@ -248,13 +248,6 @@ export interface WeekRow {
   booked: boolean;
 }
 
-/** "Tue 29", for a day in the coming week. The day is already the reader's. */
-function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${day}T00:00:00Z`),
-  );
-}
-
 /**
  * The next seven days after today, in the rail: what is booked and what falls
  * due, so a Tuesday interview is seen on Saturday. A title wraps rather than
@@ -274,8 +267,8 @@ export function WeekCard({ rows, timezone }: { rows: readonly WeekRow[]; timezon
         {rows.map((row) => (
           <li key={row.key} className="flex items-baseline gap-2 py-1.5">
             <span className="tabular w-20 shrink-0 text-small text-ink-muted">
-              {row.day ? dayLabel(row.day) : ''}
-              {row.booked && row.at ? ` ${formatClock(row.at, { timeZone: timezone })}` : ''}
+              {row.day ? whenDay(row.day, { timeZone: timezone }) : ''}
+              {row.booked && row.at ? ` ${whenTime(row.at, { timeZone: timezone })}` : ''}
             </span>
             {/* Every row keeps the icon's slot, so the titles share one left
                 edge; the slot sits on the first line's baseline. */}

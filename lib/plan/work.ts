@@ -19,6 +19,7 @@
  * different facts and this file keeps them apart.
  */
 import { elapsedSince } from './elapsed';
+import { whenDate, whenTime } from '@/lib/core/when';
 import { refusalStanding } from './liveness';
 import { numberFromRef, stepRef, type OutlineIndex } from './ref';
 import { RUN_JOB_LABEL, type LastRun, type RunJob, type RunStatus, type StoredRunReading } from './run-end';
@@ -193,17 +194,13 @@ export function workIsEmpty(work: RunWork): boolean {
   return !work.push && work.closed.length === 0 && work.raises.length === 0;
 }
 
-/** `2026-09-17T14:02:11Z` as `2026-09-17 14:02`, the stamp the badge uses. */
+/** `2026-09-17T14:02:11Z` as "17 Sep 2026, 2:02 PM", the stamp the badge uses. */
 function stamp(iso: string): string {
-  // Twelve-hour, in UTC as the stored stamp is, so the server and the browser
-  // draw the same words.
-  const at = new Date(iso);
-  if (!Number.isFinite(at.getTime())) return iso;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const hours = at.getUTCHours();
-  const minutes = String(at.getUTCMinutes()).padStart(2, '0');
-  const half = hours < 12 ? 'AM' : 'PM';
-  return `${at.getUTCDate()} ${months[at.getUTCMonth()]} ${at.getUTCFullYear()}, ${hours % 12 || 12}:${minutes} ${half}`;
+  // In UTC as the stored stamp is, so the server and the browser draw the
+  // same words.
+  if (!Number.isFinite(new Date(iso).getTime())) return iso;
+  const zone = { timeZone: 'UTC' };
+  return `${whenDate(iso, { ...zone, year: 'always' })}, ${whenTime(iso, zone)}`;
 }
 
 /**

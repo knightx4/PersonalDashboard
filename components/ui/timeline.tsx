@@ -89,6 +89,7 @@ export function gapLabel(newer: Date | string, older: Date | string): string | n
   return `${months} months earlier`;
 }
 
+/** The row's date as when.ts writes it ("Wed 14 Oct") and its time. */
 function parts(time: Date | string, timeZone: string) {
   const day = whenDate(time, { timeZone, weekday: 'short', year: 'never' });
   const clock = whenTime(time, { timeZone });

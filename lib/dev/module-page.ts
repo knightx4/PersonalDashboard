@@ -1,4 +1,5 @@
 import type { Crumb } from '@/components/shell/breadcrumb';
+import { whenDate } from '@/lib/core/when';
 import { isOutstanding, type FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
 import { MODULES, moduleForPath, type AppModule, type ModuleId } from '@/lib/modules';
@@ -169,8 +170,6 @@ export function counted(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /**
  * The UI review's standing short enough for a third of a phone's row (plan
  * #1688): what is left to decide when something is, otherwise the day it was
@@ -180,8 +179,7 @@ export function uiShort(ui: ScopeReview | null): string {
   if (!ui?.lastReview) return 'Never';
   const open = ui.openFindings.length;
   if (open > 0) return `${open} to decide`;
-  const [, month, day] = ui.lastReview.createdAt.slice(0, 10).split('-').map(Number);
-  return `${day} ${MONTHS[month - 1]}`;
+  return whenDate(ui.lastReview.createdAt.slice(0, 10), { timeZone: 'UTC', year: 'never' });
 }
 
 /** The UI review's standing in a few words, which says never when nobody has looked. */

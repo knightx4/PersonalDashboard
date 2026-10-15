@@ -175,13 +175,14 @@ export function whenAgo(at: WhenInput, options: WhenOptions): string {
   return whenDay(at, options);
 }
 
-// -- plan #1957.6: zones, fixed dates and months ------------------------------
+// -- zones, fixed dates, months and ranges (plan #1957.5, #1957.6) -----------
 //
 // What the other workspaces needed and the functions above do not give. The
 // zone helpers are arithmetic rather than words: they read an instant's parts
-// on the 24-hour clock, for a time input's value, a day's key or a zone's
-// offset. `whenDate`, `whenMonth` and `whenWeekday` write a date that does not
-// move with today: a byline, a heading over a calendar, a month in a list.
+// on the 24-hour clock, for a time input's value, a day's key, a greeting's
+// hour or a zone's offset. `whenDate`, `whenMonth`, `whenRange` and
+// `whenWeekday` write a date that does not move with today: a byline, a
+// heading over a calendar, a week, a month in a list.
 
 /** The zone the browser runs in, or null where the platform will not say. */
 export function deviceTimeZone(): string | null {
@@ -248,10 +249,13 @@ export function zoneParts(at: WhenInput, timeZone: string): ZoneParts {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** The day an instant falls on in a zone, as `YYYY-MM-DD`: a date input's value and a day's key. */
+/**
+ * The day an instant falls on in a zone, as `YYYY-MM-DD`: a date input's
+ * value and a day's key. A bare date names its own day and comes back as it is.
+ */
 export function zoneDay(at: WhenInput, timeZone: string): string {
-  const p = zoneParts(at, timeZone);
-  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+  const c = civilDay(at, timeZone);
+  return `${c.year}-${pad2(c.month)}-${pad2(c.day)}`;
 }
 
 /** The clock an instant reads in a zone, as `HH:MM` on the 24-hour clock: a time input's value. */
@@ -276,6 +280,15 @@ export function zoneOffsetLabel(timeZone: string, at: WhenInput = Date.now()): s
   const abs = Math.abs(minutes);
   const rest = abs % 60;
   return `GMT${sign}${Math.floor(abs / 60)}${rest ? `:${pad2(rest)}` : ''}`;
+}
+
+/** The zone's short name at that moment: "EDT", "BST", or "GMT+2" where it has none. */
+export function whenZoneName(at: WhenInput, options: Pick<WhenOptions, 'timeZone'>): string {
+  return (
+    new Intl.DateTimeFormat('en-US', { timeZone: options.timeZone, timeZoneName: 'short' })
+      .formatToParts(at instanceof Date ? at : new Date(at))
+      .find((p) => p.type === 'timeZoneName')?.value ?? options.timeZone
+  );
 }
 
 const MONTHS_LONG = [
@@ -306,19 +319,22 @@ export interface WhenDateOptions {
   now?: WhenInput;
 }
 
+function dateText(c: Civil, month: 'short' | 'long', withYear: boolean): string {
+  const name = (month === 'long' ? MONTHS_LONG : MONTHS)[c.month - 1];
+  return withYear ? `${c.day} ${name} ${c.year}` : `${c.day} ${name}`;
+}
+
 /**
- * A date that does not move with today: "14 Oct 2026", "14 October 2026",
- * "Wednesday 14 October". For a byline, a heading over a day, or a date read
- * as a record rather than as how near it is; `whenDay` is for the rest.
+ * A date that does not move with today, never Today or a weekday in its
+ * place: "14 Oct 2026", "14 October 2026", "Wednesday 14 October". For a
+ * byline, a heading over a day, or a date read as a record rather than as how
+ * near it is; `whenDay` is for the rest.
  */
 export function whenDate(at: WhenInput, options: WhenDateOptions): string {
   const { timeZone, month = 'short', weekday, year = 'always', now = Date.now() } = options;
   const day = civilDay(at, timeZone);
-  const name = month === 'long' ? MONTHS_LONG[day.month - 1] : MONTHS[day.month - 1];
-  let text = `${day.day} ${name}`;
-  if (year === 'always' || (year === 'auto' && day.year !== civilDay(now, timeZone).year)) {
-    text = `${text} ${day.year}`;
-  }
+  const withYear = year === 'always' || (year === 'auto' && day.year !== civilDay(now, timeZone).year);
+  const text = dateText(day, month, withYear);
   if (!weekday) return text;
   const dayName = weekdayOf(day);
   return `${weekday === 'short' ? dayName.slice(0, 3) : dayName} ${text}`;
@@ -340,28 +356,25 @@ export function whenMonth(
 
 /**
  * Two days as one span, each part said once: "1 – 7 Sep 2026", "31 Aug – 6
- * Sep 2026", "31 Dec 2025 – 6 Jan 2026". With `year: 'never'` the years are
- * left off even across one: "31 Dec – 6 Jan".
+ * Sep 2026", "31 Dec 2025 – 6 Jan 2026", and a single day as that day. The
+ * year follows `whenDate`'s rule, except that `auto` writes both years when
+ * the span crosses one; `never` leaves them off even then: "31 Dec – 6 Jan".
  */
-export function whenRange(
-  from: WhenInput,
-  to: WhenInput,
-  options: { timeZone: string; month?: 'short' | 'long'; year?: 'always' | 'never' },
-): string {
-  const { timeZone, month = 'short', year = 'always' } = options;
+export function whenRange(from: WhenInput, to: WhenInput, options: Omit<WhenDateOptions, 'weekday'>): string {
+  const { timeZone, month = 'short', year = 'always', now = Date.now() } = options;
   const a = civilDay(from, timeZone);
   const b = civilDay(to, timeZone);
-  const names = month === 'long' ? MONTHS_LONG : MONTHS;
-  const withYear = year === 'always';
   const sameYear = a.year === b.year;
-  const end = `${b.day} ${names[b.month - 1]}${withYear ? ` ${b.year}` : ''}`;
-  let start = String(a.day);
-  if (!sameYear || a.month !== b.month) start = `${start} ${names[a.month - 1]}`;
-  if (withYear && !sameYear) start = `${start} ${a.year}`;
-  return `${start} – ${end}`;
+  const withYear =
+    year === 'always' || (year === 'auto' && (!sameYear || b.year !== civilDay(now, timeZone).year));
+  const end = dateText(b, month, withYear);
+  if (!sameYear) return `${dateText(a, month, withYear)} – ${end}`;
+  if (a.month !== b.month) return `${dateText(a, month, false)} – ${end}`;
+  if (a.day === b.day) return end;
+  return `${a.day} – ${end}`;
 }
 
-/** A weekday's name: "Wednesday", or "Wed" short. */
+/** A weekday's name: "Wednesday", or "Wed" with `style: 'short'`. */
 export function whenWeekday(at: WhenInput, options: { timeZone: string; style?: 'short' | 'long' }): string {
   const name = weekdayOf(civilDay(at, options.timeZone));
   return options.style === 'short' ? name.slice(0, 3) : name;

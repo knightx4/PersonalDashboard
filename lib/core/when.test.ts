@@ -14,6 +14,7 @@ import {
   whenSpan,
   whenTime,
   whenWeekday,
+  whenZoneName,
   zoneClock,
   zoneDay,
   zoneOffset,
@@ -160,7 +161,7 @@ describe('whenAgo', () => {
   });
 });
 
-// -- plan #1957.6 -------------------------------------------------------------
+// -- zones, fixed dates, months and ranges (plan #1957.5, #1957.6) -----------
 
 describe('zone helpers', () => {
   it('reads an instant on the 24-hour clock in the zone', () => {
@@ -173,6 +174,7 @@ describe('zone helpers', () => {
       second: 0,
       weekday: 3,
     });
+    expect(zoneParts(NOW, 'UTC').hour).toBe(19);
   });
 
   it('reads midnight as hour 0, never 24', () => {
@@ -180,20 +182,28 @@ describe('zone helpers', () => {
     expect(zoneClock('2026-10-14T04:00:00Z', 'America/New_York')).toBe('00:00');
   });
 
-  it('gives the day an instant falls on in the zone', () => {
+  it('gives the day an instant falls on in the zone, and a bare date back as it is', () => {
     expect(zoneDay('2026-10-14T23:30:00Z', 'Asia/Tokyo')).toBe('2026-10-15');
     expect(zoneDay('2026-10-14T23:30:00Z', 'UTC')).toBe('2026-10-14');
+    expect(zoneDay('2026-10-15T02:00:00Z', 'America/New_York')).toBe('2026-10-14');
+    expect(zoneDay('2026-03-05', 'America/New_York')).toBe('2026-03-05');
   });
 
   it('measures the offset across a clock change', () => {
     expect(zoneOffset('2026-07-01T12:00:00Z', 'Europe/London')).toBe(3_600_000);
     expect(zoneOffset('2026-12-01T12:00:00Z', 'Europe/London')).toBe(0);
+    expect(zoneOffset(NOW, 'America/New_York')).toBe(-4 * 3_600_000);
+    expect(zoneOffset('2026-12-14T19:05:00Z', 'America/New_York')).toBe(-5 * 3_600_000);
   });
 
   it('labels an offset as a picker hints it', () => {
     expect(zoneOffsetLabel('UTC', NOW)).toBe('GMT');
     expect(zoneOffsetLabel('America/New_York', NOW)).toBe('GMT-4');
     expect(zoneOffsetLabel('Asia/Kolkata', NOW)).toBe('GMT+5:30');
+  });
+
+  it('names the zone at that moment', () => {
+    expect(whenZoneName(NOW, ny)).toBe('EDT');
   });
 
   it('knows a zone, spells it the platform way, and refuses one that is not', () => {
@@ -215,15 +225,19 @@ describe('whenDate', () => {
     expect(whenDate('2026-10-14', { timeZone: 'UTC', weekday: 'long', month: 'long' })).toBe(
       'Wednesday 14 October 2026',
     );
+    expect(whenDate('2026-10-04', { ...ny, weekday: 'long', month: 'long', year: 'auto' })).toBe('Sunday 4 October');
+    expect(whenDate('2025-10-14', { ...ny, year: 'never' })).toBe('14 Oct');
   });
 
-  it('writes the year only when it is not this one, on auto', () => {
+  it('writes the year only when it is not this one, on auto, and never says Today', () => {
     expect(whenDate('2026-03-01', { timeZone: 'UTC', year: 'auto', now: NOW })).toBe('1 Mar');
     expect(whenDate('2025-03-01', { timeZone: 'UTC', year: 'auto', now: NOW })).toBe('1 Mar 2025');
+    expect(whenDate('2026-10-14', { ...ny, year: 'auto' })).toBe('14 Oct');
   });
 
   it('reads an instant in the zone it is given', () => {
     expect(whenDate('2026-10-14T23:30:00Z', { timeZone: 'Asia/Tokyo' })).toBe('15 Oct 2026');
+    expect(whenDate('2026-10-15T02:00:00Z', { ...ny, year: 'auto' })).toBe('14 Oct');
   });
 });
 
@@ -234,15 +248,17 @@ describe('whenMonth and whenWeekday', () => {
     expect(whenMonth('2026-09', { timeZone: 'UTC', year: false })).toBe('September');
   });
 
-  it('names the weekday', () => {
+  it('names the weekday, in the zone', () => {
     expect(whenWeekday('2026-10-14', { timeZone: 'UTC' })).toBe('Wednesday');
     expect(whenWeekday('2026-10-14', { timeZone: 'UTC', style: 'short' })).toBe('Wed');
+    expect(whenWeekday('2026-10-15T02:00:00Z', { ...ny, style: 'short' })).toBe('Wed');
   });
 });
 
 describe('whenRange', () => {
   it('says the month and year once when both ends share them', () => {
     expect(whenRange('2026-09-01', '2026-09-07', { timeZone: 'UTC' })).toBe('1 – 7 Sep 2026');
+    expect(whenRange('2026-09-20', '2026-09-26', { ...ny, month: 'long' })).toBe('20 – 26 September 2026');
   });
 
   it('names both months across one, and both years across one', () => {
@@ -254,5 +270,14 @@ describe('whenRange', () => {
 
   it('leaves the years off when told to', () => {
     expect(whenRange('2026-08-01', '2026-09-07', { timeZone: 'UTC', year: 'never' })).toBe('1 Aug – 7 Sep');
+  });
+
+  it('on auto, writes the year only when it is not this one or the span crosses one', () => {
+    expect(whenRange('2026-09-27', '2026-10-03', { ...ny, year: 'auto' })).toBe('27 Sep – 3 Oct');
+    expect(whenRange('2025-12-28', '2026-01-03', { ...ny, year: 'auto' })).toBe('28 Dec 2025 – 3 Jan 2026');
+  });
+
+  it('writes a single day as that day', () => {
+    expect(whenRange('2026-10-04', '2026-10-04', { ...ny, year: 'auto' })).toBe('4 Oct');
   });
 });

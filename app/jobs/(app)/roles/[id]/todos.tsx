@@ -12,6 +12,8 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { Tooltip } from '@/components/ui/tooltip';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { formatDate } from '@/lib/jobs/applications/load';
+import { safeTimeZone } from '@/lib/core/timezone';
+import { whenDay, zoneDay } from '@/lib/core/when';
 import type { Task } from '@/lib/todo/tasks/model';
 import { linkReminderMessage, updateReminder } from './timeline-actions';
 import { GmailLink } from './shared';
@@ -73,15 +75,14 @@ export function RoleTodos({
   );
 }
 
-/** The day a to-do is due, as the task rows write theirs: "16 Sept". */
-function shortDay(iso: string): string {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  }).format(date);
+/**
+ * The day a to-do is due: "Tomorrow", "Friday", "16 Sep". The stored instant
+ * is midnight UTC on the picked day (see dueDateInput), so the day is read in
+ * UTC and then named against today in the account's zone.
+ */
+function shortDay(iso: string, timezone: string): string {
+  const day = dueDateInput(iso);
+  return day ? whenDay(day, { timeZone: safeTimeZone(timezone) }) : '';
 }
 
 /**
@@ -92,14 +93,8 @@ function shortDay(iso: string): string {
  * out of the picker as the day that went in.
  */
 function dueDateInput(iso: string): string {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'UTC',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+  if (!Number.isFinite(new Date(iso).getTime())) return '';
+  return zoneDay(iso, 'UTC');
 }
 
 /**
@@ -159,7 +154,7 @@ function TodoLine({
             </IconButton>
           </Tooltip>
           <span className="min-w-0 flex-1 truncate text-ui text-ink">{todo.body}</span>
-          <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt)}</span>
+          <span className="tabular shrink-0 text-small text-ink-muted">{shortDay(todo.dueAt, timezone)}</span>
           <Tooltip label={answering ? 'Close' : 'Edit, push back or finish it'} align="end" className="shrink-0">
             <IconButton
               label={answering ? 'Close' : 'Edit, push back or finish it'}
