@@ -6181,45 +6181,33 @@ export const SURFACES: readonly Surface[] = [
     id: 'home-arrival',
     label: 'Home · The first visit of the day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="home-arrival"]',
       shows:
-        'The greeting, the date, the brief line, each rise in a beat after the one before, the Today card and the Watching rail together on the last, all settled by about three quarters of a second.',
+        'The greeting, the date, the panel with the brief line, each rise in a beat after the one before, the brief rows, the Inbox count and the rail together on the last, all settled by about three quarters of a second.',
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day',
     label: 'Home · A finished day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'completion',
       target: '[data-motion-demo="home-finished"]',
-      shows: "The Today card goes, and the day's sigil draws in cell by cell beside the date.",
+      shows: "Today leaves the rail, and the day's sigil draws in cell by cell beside the date.",
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day-rest',
     label: 'Home · A day already finished',
     module: 'dev',
-    width: 'narrow',
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo finished />
-      </div>
-    ),
+    width: 'page',
+    render: () => <HomeArrivalDemo finished />,
   },
 
   /* The pages outside the shell, and /open's not-found (plan #1599).

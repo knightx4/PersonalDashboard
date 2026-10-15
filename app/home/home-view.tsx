@@ -116,16 +116,17 @@ export function BriefLine({ module, brief }: { module: ModuleId; brief: Brief })
   // The sentence wraps rather than being cut (plan #1937.8): a brief cut at
   // 390 loses the fact it is there to give, such as which day a window
   // closes. Two lines at most, so a long one cannot push the Inbox count off
-  // a phone's first screen.
+  // a phone's first screen. From laptop width the rail has taken its room and
+  // the line wraps in full (plan #1937.12: the cut lost "due Monday" there).
   return (
     <li className="flex items-start gap-3 py-2.5">
       <ModuleMark module={module} size="sm" />
       {brief.href ? (
         <Link href={brief.href} className="press-area min-w-0 flex-1 text-body text-ink hover:text-accent">
-          <span className="line-clamp-2">{brief.text}</span>
+          <span className="line-clamp-2 lg:line-clamp-none">{brief.text}</span>
         </Link>
       ) : (
-        <span className="line-clamp-2 min-w-0 flex-1 text-body text-ink">{brief.text}</span>
+        <span className="line-clamp-2 min-w-0 flex-1 text-body text-ink lg:line-clamp-none">{brief.text}</span>
       )}
       {brief.tone === 'caution' && <span className="mt-2 size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />}
     </li>
