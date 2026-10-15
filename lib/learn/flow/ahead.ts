@@ -7,6 +7,7 @@ import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { pickAhead, pickOneToAsk, type NothingToAsk, type PickedToAsk } from '@/lib/learn/graph/pick';
 import { READY_LIMIT } from '@/lib/learn/graph/ready';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
+import { predictedStrength } from '@/lib/learn/predicted';
 import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -514,11 +515,16 @@ export async function takeWaiting(
   }
 
   for (const { row, claim } of valid.filter(({ claim }) => fits(claim, options))) {
-    // Conditional on it still being unshown, so two presses at once cannot
-    // both take the same question.
+    // Keep what Learn believes of the idea at this moment with the question
+    // (plan #2179.1). Conditional on it still being unshown, so two presses at
+    // once cannot both take the same question.
+    const now = new Date();
     const { data, error } = await supabase
       .from('probes')
-      .update({ shown_at: new Date().toISOString() })
+      .update({
+        shown_at: now.toISOString(),
+        predicted_strength: await predictedStrength(supabase, row.concept_id, now),
+      })
       .eq('id', row.id)
       .is('shown_at', null)
       .select('id');
@@ -545,7 +551,7 @@ export async function takeWaiting(
 export async function putBack(supabase: LearnSupabaseClient, probeId: string): Promise<void> {
   const { error } = await supabase
     .from('probes')
-    .update({ shown_at: null, created_at: new Date().toISOString() })
+    .update({ shown_at: null, predicted_strength: null, created_at: new Date().toISOString() })
     .eq('id', probeId)
     .not('picked_state', 'is', null)
     .is('answered_at', null);
