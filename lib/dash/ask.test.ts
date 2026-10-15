@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
@@ -942,10 +942,13 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(result.error).toBeUndefined();
     expect(result.stop).toBe('unfinished');
     const kept = written[1].turns[0];
-    expect(kept.body).toContain('I could not finish writing the answer');
-    for (const company of COMPANIES) expect(kept.body).toContain(`- ${company}: Product designer`);
+    expect(kept.body).toContain('I could not finish this answer');
+    // The first line names the cause, and only the last lookup's rows follow.
+    expect(kept.body.split('\n')[0]).toContain('the model stopped without writing an answer');
+    expect(kept.body).toContain('- Ember: Product designer');
+    for (const company of COMPANIES.slice(0, -1)) expect(kept.body).not.toContain(company);
     expect(kept.body).not.toContain('could not answer');
-    expect(kept.citations).toEqual(COMPANIES.map((_, i) => app(i)));
+    expect(kept.citations).toEqual([app(COMPANIES.length - 1)]);
     // The refused lookup is still on the turn, as refused.
     expect(kept.toolCalls).toHaveLength(6);
   });
@@ -962,7 +965,7 @@ describe('questions that need several lookups (plan #1437)', () => {
       now,
     });
     expect(answer).toMatchObject({ ok: true, stop: 'unfinished' });
-    expect(answer.ok && answer.citations).toHaveLength(5);
+    expect(answer.ok && answer.citations).toHaveLength(1);
   });
 
   it('still says it could not answer when the lookups found nothing', async () => {
@@ -984,18 +987,48 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(!answer.ok && answer.detail).toContain('reported nothing');
   });
 
-  it('names each row once and stops listing past the cap', () => {
+  it('leads with the reason and lists only the last lookup, up to the cap, with no "more" line', () => {
     const rows = Array.from({ length: FALLBACK_ROWS + 3 }, (_, i) => ({
       table: 'public.orders',
       ref: `o-${i}`,
       title: `Order\n ${i}`,
       href: `/shopping/orders/o-${i}`,
     }));
-    const built = answerFromLookups([rows[0], ...rows]);
+    const built = answerFromLookups('the model stopped without writing an answer.', [rows[0], ...rows]);
     expect(built?.citations).toHaveLength(FALLBACK_ROWS);
+    expect(built?.body.split('\n')[0]).toContain('the model stopped without writing an answer.');
     expect(built?.body).toContain('- Order 0\n- Order 1\n');
-    expect(built?.body).toContain('- and 3 more');
-    expect(answerFromLookups([])).toBeNull();
+    expect(built?.body).not.toContain('more');
+    expect(answerFromLookups('why', [])).toBeNull();
+  });
+
+  it('names the cause and lists only the last lookup when the model stops, and logs the reason', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const execute = async (_name: string, input: unknown): Promise<AskToolResult> => {
+      const title = (input as { query: string }).query === 'first' ? 'Mercury' : 'Birch Labs';
+      return { ok: true, rows: [{ table: 'public.x', ref: title, title, href: `/x/${title}` }] };
+    };
+    const { client } = stubClient([
+      reply([use('u1', 'search', { query: 'first' })]),
+      reply([use('u2', 'search', { query: 'second' })]),
+      reply([], 'end_turn'),
+      reply([], 'end_turn'),
+    ]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'q' }],
+      today: '2026-10-02',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    expect(answer).toMatchObject({ ok: true, stop: 'unfinished' });
+    const body = answer.ok ? answer.body : '';
+    expect(body.split('\n')[0]).toContain('the model stopped without writing an answer');
+    expect(body).toContain('- Birch Labs');
+    expect(body).not.toContain('Mercury');
+    expect(body).not.toMatch(/Claude/);
+    expect(log).toHaveBeenCalledWith('ask answer did not finish', expect.stringContaining('reported nothing'), '');
+    log.mockRestore();
   });
 
   it('tells a listener each lookup as it starts and as it finishes', async () => {

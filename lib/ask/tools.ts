@@ -18,6 +18,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
+import { applicationAnswersLookup } from './answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
@@ -48,6 +49,7 @@ export const ASK_TOOL_NAMES = [
   'list_rows',
   'spend_by_merchant',
   'job_applications',
+  'application_answers',
   'todos',
   'agenda',
   'goal_status',
@@ -199,6 +201,19 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
           type: 'boolean',
           description: 'Only sent applications the company never replied to, an automatic confirmation aside, whatever their status now.',
         },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'application_answers',
+    description:
+      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the first words of the answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        role_ref: { type: 'string', description: "The job_search.roles ref, as job_applications or search returned it. Reads the role's latest application." },
+        application_ref: { type: 'string', description: 'The job_search.applications ref, as job_applications returned it.' },
       },
       additionalProperties: false,
     },
@@ -426,6 +441,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   list_rows: { run: listRowsLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
+  application_answers: { run: applicationAnswersLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
   agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },

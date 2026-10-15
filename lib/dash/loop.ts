@@ -411,15 +411,19 @@ function withRollingBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.Me
 }
 
 /**
- * The answer given when the model wrote nothing usable after its lookups
- * (plan #1437): the rows they returned, each named once, in the order found,
- * and cited so the person can open them. Null when no lookup returned a row,
- * since a list of nothing is not an answer.
+ * The answer given when the model could not finish (plan #1437, #2080.3): the
+ * first line says what went wrong, then come the rows of the last lookup, each named once and cited so the person can open them, up to
+ * FALLBACK_ROWS. Rows from earlier lookups are left out, since they answered
+ * other questions. Null when that lookup returned no row, since a reason with
+ * nothing under it is an error, not an answer.
  */
-export function answerFromLookups(found: readonly TalkCitation[]): { body: string; citations: TalkCitation[] } | null {
+export function answerFromLookups(
+  reason: string,
+  lastRows: readonly TalkCitation[],
+): { body: string; citations: TalkCitation[] } | null {
   const seen = new Set<string>();
   const rows: TalkCitation[] = [];
-  for (const row of found) {
+  for (const row of lastRows) {
     const key = citationKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -428,13 +432,25 @@ export function answerFromLookups(found: readonly TalkCitation[]): { body: strin
   if (rows.length === 0) return null;
   const listed = rows.slice(0, FALLBACK_ROWS);
   const lines = listed.map((row) => `- ${row.title.replace(/\s+/g, ' ').trim()}`);
-  const more = rows.length - listed.length;
-  if (more > 0) lines.push(`- and ${more} more`);
   const body = [
-    'I could not finish writing the answer, so here is what my lookups found. Ask again for more about any of them.',
+    `I could not finish this answer: ${reason} My last lookup found these, which may not be what you asked about.`,
     lines.join('\n'),
   ].join('\n\n');
   return { body: body.slice(0, MAX_TURN), citations: listed };
+}
+
+/** A stopped reply, in words for the person. */
+function stoppedInWords(reply: { stop_reason?: string | null }): string {
+  switch (reply.stop_reason) {
+    case 'max_tokens':
+      return 'the reply grew too long and was cut off.';
+    case 'refusal':
+      return 'the model declined to answer.';
+    case 'pause_turn':
+      return 'the model paused and did not come back.';
+    default:
+      return 'the model stopped without writing an answer.';
+  }
 }
 
 function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[]; couldNot: string | null } {
@@ -675,9 +691,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     ...(choose ? { webCited } : {}),
   });
   const toolCalls: TalkToolCall[] = [];
-  // Every row a lookup in this answer returned, in the order found: what an
-  // answer is built from when the model writes none.
-  const found: TalkCitation[] = [];
+  // The rows the last lookup returned: all an answer is built
+  // from when the model writes none.
+  let lastRows: TalkCitation[] = [];
+  // What the last lookup that failed said, to name when the answer stops.
+  let lastError: string | null = null;
   const hear = (event: DashLookupEvent) => {
     try {
       input.onLookup?.(event);
@@ -694,10 +712,18 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       }
     : undefined;
-  const fail = (detail: string): DashAnswer => {
-    const built = answerFromLookups(found);
+  const fail = (detail: string, plain: string = detail): DashAnswer => {
+    const cause = lastError ? `${plain} A lookup also failed: ${lastError}` : plain;
+    console.error('ask answer did not finish', detail, lastError ? `(last lookup error: ${lastError})` : '');
+    const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
+  };
+  const noteLookup = (result: AskToolResult) => {
+    lastError = result.ok ? null : result.error.replace(/\s+/g, ' ').trim().slice(0, 200);
+    const rows = citationsOf(result);
+    for (const c of rows) known.set(citationKey(c), c);
+    lastRows = rows;
   };
   const history = withNewestFiles(historyMessages(input.turns), input.files);
   if (history.length === 0 || history[history.length - 1].role !== 'user') {
@@ -795,7 +821,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         finishName,
       );
     } catch (error) {
-      return fail(error instanceof Error ? error.message : 'The answer failed.');
+      return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
     }
 
     const usage = usageFrom(response.usage);
@@ -840,14 +866,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         const kept = keptResult(result);
         toolCalls.push({ name: use.name, input: use.input, result: kept });
         hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
-        for (const c of citationsOf(result)) {
-          known.set(citationKey(c), c);
-          found.push(c);
-        }
+        noteLookup(result);
       });
       lookups += writes.length;
       const { answer, cited, couldNot } = answerInput(answered.input);
-      if (!answer && !voice.finish) return fail('The answer came back empty.');
+      if (!answer && !voice.finish) return fail('The answer came back empty.', 'the model finished without writing any words.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
       for (const c of cited) {
@@ -918,7 +941,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     if (voice.finish && (uses.length === 0 || mustAnswer)) {
       // Its answer has a shape prose cannot give.
-      return fail(stopped === 'refusal' ? 'The model declined to answer.' : whyNoReport(response));
+      return fail(stopped === 'refusal' ? 'The model declined to answer.' : whyNoReport(response), stoppedInWords(response));
     }
 
     if (uses.length === 0 || mustAnswer) {
@@ -961,7 +984,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             finishName,
           );
         } catch (error) {
-          return fail(error instanceof Error ? error.message : 'The answer failed.');
+          return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
         }
         input.onSpend?.({ model, usage: usageFrom(prose.usage) });
         const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
@@ -970,9 +993,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           const note = `\n\n${limitNote(stop)}`;
           return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
         }
-        return fail(whyNoReport(prose));
+        return fail(whyNoReport(prose), stoppedInWords(prose));
       }
-      return fail(whyNoReport(response));
+      return fail(whyNoReport(response), stoppedInWords(response));
     }
 
     // Run this round's calls together, as many as the cap still allows.
@@ -991,10 +1014,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       const kept = keptResult(result);
       toolCalls.push({ name: use.name, input: use.input, result: kept });
       hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
-      for (const c of citationsOf(result)) {
-        known.set(citationKey(c), c);
-        found.push(c);
-      }
+      noteLookup(result);
       return {
         type: 'tool_result',
         tool_use_id: use.id,
@@ -1006,5 +1026,5 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     messages.push({ role: 'assistant', content: response.content }, { role: 'user', content: blocks });
   }
 
-  return fail('The answer did not finish.');
+  return fail('The answer did not finish.', 'it ran out of steps before the model wrote an answer.');
 }
