@@ -22,6 +22,7 @@ import { sql } from './helpers/db';
 const NO_PARENT: Record<string, string> = {
   'learn.subjects': 'Its page sits in Subjects on its own; aim_id and theme_id say what it serves, not what it is part of.',
   'learn.essays': 'An essay is also a vault note (note_id), the same piece of writing rather than a part of it.',
+  'learn.cell_evidence': 'Belongs to a level of a topic (cell_id); concept_id only marks evidence carried over from the claims graph.',
   'obsidian.tensions': 'Joins two positions as equals; neither side is its parent.',
 };
 

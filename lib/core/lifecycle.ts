@@ -352,6 +352,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   sync_run_status: 'state of a background sync',
   vault_connection_status: 'connection state of a vault',
   parse_status: 'whether an email was read',
+  topics_status_ck: 'whether a topic is still a draft or approved to ask about',
+  graph_moves_status_ck: 'whether a claims-graph subject has been moved onto topics',
   recurring_messages_status_ck: 'whether an email was read',
   appointment_messages_status_ck: 'whether an email was read',
   order_status: 'where an order is in the post',

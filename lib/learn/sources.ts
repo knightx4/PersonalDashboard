@@ -293,6 +293,7 @@ export const learnSources: ModuleSources = {
       title: 'name',
       facts: ['origin'],
       href: (id) => `/learn/lens/${id}`,
+      parent: parentByFirst(['aim_id', 'learn.aims'], ['subject_id', 'learn.subjects']),
       section: SUBJECTS,
       note: 'Every subject and every learning goal has one (subject_id or aim_id; learn 0137). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
     },
