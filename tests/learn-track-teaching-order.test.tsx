@@ -65,6 +65,11 @@ function from(table: string) {
 
 vi.mock('@/lib/learn/auth/server', () => ({ createLearnClient: async () => ({ from }) }));
 vi.mock('@/lib/learn/tracks/news-origin', () => ({ loadReadingOrigins: async () => new Map() }));
+vi.mock('@/lib/talk/handoffs', () => ({ workingRefsForPage: async () => [] }));
+vi.mock('@/lib/auth/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth/server')>()),
+  requireUser: async () => ({ id: 'user-1' }),
+}));
 vi.mock('@/app/learn/t/[id]/actions', () => ({
   addToTrack: async () => ({}),
   removeTrack: async () => {},

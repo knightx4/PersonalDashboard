@@ -494,7 +494,7 @@ control.
 Checked by: count `ai-on-controls`, baseline 1, target 0.
 
 **R13.** There is one thread component.
-Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
+Checked by: count `thread-components`, baseline 1, target 1.
 
 **R14.** A radius class is one of the four tokens (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`), `rounded-full` or `rounded-none`.
 Checked by: count `off-token-radius`, baseline 199, target 0.
