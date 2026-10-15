@@ -54,6 +54,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-screen-change': ['/dev/plan'],
   'dev-plan-send-back': ['/dev/plan'],
   'scope-burn-up': ['/goals/[goalId]', '/dev/plan/[number]'],
+  'goals-metrics': ['/goals/[goalId]'],
+  'goals-metrics-tooltip': ['/goals/[goalId]'],
+  'goals-metrics-empty': ['/goals/[goalId]'],
+  'goals-metrics-error': ['/goals/[goalId]'],
   'dev-plan-feature': ['/dev/plan/[number]'],
   'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
@@ -466,6 +470,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // A goal's metrics in its properties column (plan #2084.3), drawn with
   // each part open on a surface of its own.
   'goals-metrics-props': ['app/goals/[goalId]/metrics-property.tsx'],
+  // A goal's metrics as bar charts (plan #2084.2), drawn with each hidden part.
+  'goals-metrics': ['app/goals/[goalId]/goal-metrics.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).
