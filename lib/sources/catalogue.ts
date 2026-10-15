@@ -10,7 +10,7 @@ import { todoSources } from '@/lib/todo/sources';
 import { vaultSources } from '@/lib/vault/sources';
 import { youSources } from '@/lib/you/sources';
 import type { ModuleId } from '@/lib/modules';
-import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Source } from './types';
+import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Parent, type Source } from './types';
 
 /**
  * Every module's sources, gathered (lib/sources/types.ts). Goals reads this
@@ -93,6 +93,15 @@ export function sourceFor(table: string): Source | null {
 export function sourceHref(table: string, ref: string): string | null {
   const source = byTable.get(table);
   return source?.href ? source.href(ref) : null;
+}
+
+/**
+ * How a source's row names the row it belongs to: its own `parent`, or the
+ * one its `page` declares. Null for a table that sits under nothing.
+ */
+export function sourceParent(table: string): Parent | null {
+  const source = byTable.get(table);
+  return source?.parent ?? source?.page?.parent ?? null;
 }
 
 /** The module a source belongs to, as the page names it; the schema for one not listed. */
