@@ -221,6 +221,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
+  'shell-status-run': ['/home'],
+  'shell-status-run-new': ['/home'],
   'news-issue-digest': ['/news/i/[id]'],
   'news-issue-digest-no-pictures': ['/news/i/[id]'],
   'news-issue-essay': ['/news/i/[id]'],
@@ -456,6 +458,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The status line while a run is going (plan #1964.2.3).
+  'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
+  'shell-status-run-new': ['components/shell/status-line.tsx'],
   // The one Inbox component (plan #1937.4), drawn from its row shape.
   'inbox-page': ['components/inbox/inbox-page.tsx'],
   // The capture panels, which every shell mounts: the one box, and capture
