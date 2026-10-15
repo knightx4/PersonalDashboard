@@ -246,6 +246,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // to eight searches. Dynamic filtering keeps only the relevant parts of
   // each result, but the server's loop reads them again each round.
   'research-essay-question': searching(run(SONNET, 110_000, 5_000), 6),
+  // Kept for the spend rows recorded before research became one call.
+  'write-essay-research': run(SONNET, 30_000, 2_000),
   // The guided essay's calls: the rules and the brief (and the plan, where
   // it reads one) in; a few short lines out.
   'read-essay-brief': run(SONNET, 1_500, 300),
