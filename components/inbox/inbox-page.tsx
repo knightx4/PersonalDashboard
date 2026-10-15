@@ -102,6 +102,21 @@ export type InboxRow = {
   back?: boolean;
   /** The workspace's own drawing of the row, in place of the shape's. */
   card?: ReactNode;
+  /** On a page drawn in `groups`, the key of the group the row is listed under. */
+  group?: string;
+};
+
+/**
+ * A group on a page that lists its rows by where they come from rather than
+ * by section: Home's Inbox, one group per workspace (plan #1937.7).
+ */
+export type InboxGroup = {
+  key: string;
+  title: string;
+  /** Drawn before the title: the workspace's mark. */
+  mark?: ReactNode;
+  /** Where the group's own page is, opposite its heading. */
+  href?: string;
 };
 
 /** A row put off, in the Later fold at the foot. */
@@ -337,6 +352,7 @@ export function InboxPage({
   sectionActions,
   alsoWaiting = 0,
   laterOpen = false,
+  groups,
   children,
 }: {
   /** Everything on you, in the order each section lists it. */
@@ -351,14 +367,40 @@ export function InboxPage({
   alsoWaiting?: number;
   /** Whether Later starts open; shut on the app's pages. */
   laterOpen?: boolean;
+  /**
+   * List the rows under these groups, in this order, in place of the three
+   * sections; each group's rows keep the sections' order inside it. A row
+   * whose `group` names none of them is not drawn.
+   */
+  groups?: readonly InboxGroup[];
   /** Anything the workspace keeps under the sections, before Later. */
   children?: ReactNode;
 }) {
-  const sections = INBOX_SECTION_KEYS.map((key) => ({
-    key,
-    ...INBOX_SECTIONS[key],
-    rows: rows.filter((row) => row.section === key),
-  })).filter((section) => section.rows.length > 0);
+  const bySection = (list: readonly InboxRow[]) =>
+    INBOX_SECTION_KEYS.flatMap((key) => list.filter((row) => row.section === key));
+
+  const sections = groups
+    ? groups
+        .map((group) => ({
+          key: group.key,
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              {group.mark}
+              {group.title}
+            </span>
+          ),
+          href: group.href,
+          label: group.title,
+          rows: bySection(rows.filter((row) => row.group === group.key)),
+        }))
+        .filter((section) => section.rows.length > 0)
+    : INBOX_SECTION_KEYS.map((key) => ({
+        key,
+        title: INBOX_SECTIONS[key].title as ReactNode,
+        href: undefined as string | undefined,
+        label: INBOX_SECTIONS[key].title,
+        rows: rows.filter((row) => row.section === key),
+      })).filter((section) => section.rows.length > 0);
 
   const total = sections.reduce((sum, section) => sum + section.rows.length, 0);
 
@@ -378,7 +420,15 @@ export function InboxPage({
                 <span className="tabular ml-2 font-normal text-ink-muted">{section.rows.length}</span>
               </>
             }
-            action={sectionActions?.[section.key]}
+            action={
+              section.href ? (
+                <Link href={section.href} className="press-area text-small" aria-label={`Open the ${section.label} Inbox`}>
+                  Open
+                </Link>
+              ) : (
+                sectionActions?.[section.key as InboxSectionKey]
+              )
+            }
           >
             <ul className={cn(cardVariants(), 'divide-y divide-border')}>
               {section.rows.map((row) =>

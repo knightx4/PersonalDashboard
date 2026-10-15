@@ -72,6 +72,8 @@ import { OwlIcon } from '@/components/shell/owl-icon';
  * happen to sit beside.
  */
 export const NAV_ICONS = {
+  // Home's front page (plan #1937.7): the house, as the other front pages.
+  home: House,
   // Shopping
   dashboard: LayoutDashboard,
   orders: Receipt,

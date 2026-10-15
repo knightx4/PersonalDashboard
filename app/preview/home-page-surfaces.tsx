@@ -4,6 +4,7 @@ import {
   BriefLine,
   HomeColumns,
   HomeHeader,
+  InboxLine,
   TodayCard,
   UpdatesCard,
   WeekCard,
@@ -12,6 +13,7 @@ import {
   type WorkspaceEntry,
 } from '@/app/home/home-view';
 import type { Update } from '@/lib/shell/home-model';
+import { HOME_SECTIONS } from '@/lib/home/sections';
 import type { Brief } from '@/lib/shell/brief';
 import type { ModuleId } from '@/lib/modules';
 import { WatchingSurface } from './watching-surfaces';
@@ -86,7 +88,8 @@ export function HomePageSurface() {
     <AppShell
       account="preview"
       module={null}
-      sections={[]}
+      sections={HOME_SECTIONS}
+      pathname="/home"
       displayName="Chris"
       email="chris@example.com"
       isOwner
@@ -136,6 +139,7 @@ export function HomePageSurface() {
                 <BriefLine key={module} module={module} brief={brief} />
               ))}
             </ul>
+            <InboxLine count={7} />
             <TodayCard
               timezone={TZ}
               more={3}

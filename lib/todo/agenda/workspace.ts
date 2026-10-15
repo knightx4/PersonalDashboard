@@ -73,6 +73,37 @@ export function inboxEntries(
   return out;
 }
 
+/** An entry in Home's Inbox, with the workspace it is grouped under. */
+export type HomeInboxEntry = { workspace: ModuleId; entry: AgendaEntry };
+
+/**
+ * Home's Inbox (plan #1937.7): every workspace's Inbox at once, so the bell's
+ * question, what is on me anywhere, has one answer. The same cut as
+ * `inboxEntries` for every workspace together, Goals' and Dev's rows on the
+ * agenda included (their steps, flags and raises): Todo's rows only from the
+ * undated pile, every other workspace's dated or not, and nothing without a
+ * workspace, which is the day's context rather than something on you.
+ */
+export function homeInboxEntries(
+  piles: readonly AgendaPile[],
+  sourceModule: (id: SourceId) => ModuleId,
+): HomeInboxEntry[] {
+  const seen = new Set<string>();
+  const out: HomeInboxEntry[] = [];
+  for (const pile of piles) {
+    for (const entry of pile.entries) {
+      const workspace = entryWorkspace(entry, sourceModule);
+      if (!workspace) continue;
+      if (workspace === 'todo' && pile.bucket !== 'undated') continue;
+      const key = entryRef(entry);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ workspace, entry });
+    }
+  }
+  return out;
+}
+
 /** The row an entry is about, as `schema.table:id`. */
 export function entryRef(entry: AgendaEntry): string {
   if (entry.kind === 'task' && entry.task) return `todo.tasks:${entry.task.id}`;

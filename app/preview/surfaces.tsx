@@ -302,6 +302,7 @@ import {
   InformationOneSurface,
 } from './goal-page-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
+import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
   JobsInboxSurface,
   LearnInboxSurface,
@@ -5502,6 +5503,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsSendSurface />,
+  },
+  {
+    /* Home's Inbox (plan #1937.7), which took the bell's place: every
+     * workspace's on-you rows, grouped under each workspace's mark. Fixtures
+     * in home-inbox-surfaces.tsx. */
+    id: 'home-inbox',
+    label: 'Home · Inbox',
+    module: 'goals',
+    width: 'page',
+    render: () => <HomeInboxSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the

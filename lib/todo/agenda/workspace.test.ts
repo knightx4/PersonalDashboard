@@ -5,6 +5,7 @@ import type { AgendaItem, SourceId } from '@/lib/todo/agenda/sources';
 import {
   AGENDA_INBOXES,
   entryRef,
+  homeInboxEntries,
   inboxEntries,
   itemWorkspace,
 } from '@/lib/todo/agenda/workspace';
@@ -131,5 +132,39 @@ describe('inboxEntries', () => {
       horizonDays: 7,
     });
     expect(inboxEntries(hidden, 'shopping', moduleOf).map((e) => e.item?.title)).toEqual(['Ask for a refund']);
+  });
+});
+
+describe('homeInboxEntries', () => {
+  const home = homeInboxEntries(piles, moduleOf);
+
+  it('is every workspace’s Inbox at once, each row once', () => {
+    const union = AGENDA_INBOXES.flatMap((ws) => inboxEntries(piles, ws, moduleOf).map(entryRef));
+    expect(home.map((row) => entryRef(row.entry)).sort()).toEqual([...union].sort());
+  });
+
+  it('groups each row under its own workspace', () => {
+    const where = Object.fromEntries(
+      home.map((row) => [row.entry.task?.title ?? row.entry.item?.title, row.workspace]),
+    );
+    expect(where['Return the drill']).toBe('shopping');
+    expect(where['Follow up']).toBe('jobs');
+    expect(where['Undated']).toBe('todo');
+    expect(where['Dated']).toBeUndefined();
+  });
+
+  it('keeps a Dev or Goals row, which no agenda Inbox lists', () => {
+    const raised = mergeAgenda({
+      tasks: [],
+      items: [
+        item({ key: 'raised:r1', source: 'raised', ref: 'public.raised_items:r1', title: 'Which key?', day: null, workspace: 'dev' }),
+        item({ key: 'raised:r2', source: 'raised', ref: 'public.raised_items:r2', title: 'Off track?', day: null, workspace: 'goals' }),
+      ],
+      dismissals: new Map(),
+      timezone: 'UTC',
+      now: NOW,
+      horizonDays: 7,
+    });
+    expect(homeInboxEntries(raised, moduleOf).map((row) => row.workspace).sort()).toEqual(['dev', 'goals']);
   });
 });
