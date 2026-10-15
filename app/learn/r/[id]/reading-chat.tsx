@@ -32,7 +32,6 @@ export function ReadingChat({
         placeholder="A question about this reading. Dash answers from its text."
         awaitingReply={awaitingReply}
         composerOpen={composerOpen}
-        onCard
       />
     </ThreadPanel>
   );

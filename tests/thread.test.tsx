@@ -11,6 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CommentActionState } from '@/app/dev/comment-actions';
+import type { ThreadProps } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 
 // The comment actions reach for the session client, which has no business in a
@@ -38,7 +39,7 @@ const ROW = '00000000-0000-4000-8000-000000000001';
 
 const respond = async (): Promise<CommentActionState> => ({});
 
-function open(props: Partial<React.ComponentProps<typeof Thread>> = {}): string {
+function open(props: Partial<Extract<ThreadProps, { subject: string }>> = {}): string {
   return renderToStaticMarkup(
     <Thread subject={threadRef('step', ROW)} turns={[]} composerOpen {...props} />,
   );
@@ -166,5 +167,53 @@ describe('one thread for any row', () => {
 
   it('will not draw a thread under a table that has none', () => {
     expect(() => open({ subject: `public.shipments:${ROW}` })).toThrow(/not a row that has a thread/);
+  });
+});
+
+/**
+ * One thread with a subject or none (plan #1964.3): the person's words and
+ * Dash's are drawn in their two voices wherever the thread is, and the
+ * opening Dash's conversations start with is a turn of his like any other.
+ */
+describe('the three voices', () => {
+  const at = '2026-10-01T09:00:00.000Z';
+
+  it('draws a row thread in both voices', () => {
+    const html = renderToStaticMarkup(
+      <Thread
+        subject={threadRef('step', ROW)}
+        turns={[
+          { id: 'a', author: 'me', body: '@dash which one?', createdAt: at },
+          { id: 'b', author: 'claude', body: '> the quoted line\n\nThis one.', createdAt: at },
+        ]}
+      />,
+    );
+    expect(html).toContain('voice-you');
+    expect(html).toContain('voice-dash');
+    // A quote inside a turn takes the quote voice.
+    expect(html).toContain('comment-prose');
+    expect(html).toContain('the quoted line');
+    expect(html).toMatch(/<blockquote/);
+  });
+
+  it('draws a conversation without a subject the same way, opening included', () => {
+    const html = renderToStaticMarkup(
+      <Thread
+        id="t"
+        label="Reply"
+        send={async () => ({})}
+        opening="What do you make of this story?"
+        turns={[
+          { id: 'q', role: 'user', body: 'It is overblown.', createdAt: at },
+          { id: 'r', role: 'assistant', body: 'Why?', createdAt: at },
+        ]}
+      />,
+    );
+    const opening = html.indexOf('What do you make of this story?');
+    const yours = html.indexOf('It is overblown.');
+    expect(opening).toBeGreaterThan(-1);
+    expect(opening).toBeLessThan(yours);
+    expect(html.match(/voice-dash/g)?.length).toBe(2);
+    expect(html.match(/voice-you/g)?.length).toBe(1);
   });
 });

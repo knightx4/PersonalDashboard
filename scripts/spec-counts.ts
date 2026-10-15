@@ -429,8 +429,9 @@ const HINT_HOMES = new Set([
   'components/ui/paid-hint.tsx',
   'components/ui/cost-hint.tsx',
   'components/ui/dash-action.tsx',
-  // The comment composer prices Dash's reply beside its send arrow. The
-  // thread is #1964.3's to rework, so it is passed here rather than marked.
+  // The one thread (plan #1964.3) prices a reply beside the arrow that sends
+  // it and the button that opens its box, the way DashAction prices a press,
+  // so every conversation takes its hint from here.
   'components/thread/thread.tsx',
 ]);
 
@@ -445,6 +446,26 @@ function paidHintsOutsideDashAction(root: string): string[] {
         .map((m) => lineAt(text, m.index ?? 0))
         .filter((line) => !/dash-action-ok:\s*\S/.test(`${lines[line - 2] ?? ''}\n${lines[line - 1]}`))
         .map((line) => `${file}:${line}`);
+    })
+    .sort();
+}
+
+/**
+ * docs/ONE-INTERFACE-SPEC.md, "One thread" (plan #1964.3): one component
+ * draws every conversation. A file draws turns of its own when it names the
+ * person's turns "You" and draws both the person's glyph (CircleUser) and
+ * Dash's mark beside them. The gallery is left out; the target is the one
+ * thread, components/thread/thread.tsx.
+ */
+const PERSON_GLYPH = /\bCircleUser\b/;
+const YOU_NAME = /['"`]You['"`]/;
+
+function threadComponents(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .filter((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return PERSON_GLYPH.test(text) && /\bDashMark\b/.test(text) && YOU_NAME.test(text);
     })
     .sort();
 }
@@ -591,6 +612,12 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'buttons and links under app/ and components/ whose label says AI',
     target: 0,
     measure: aiOnControls,
+  },
+  {
+    name: 'thread-components',
+    counts: 'components under app/ and components/ that draw the turns of a conversation',
+    target: 1,
+    measure: threadComponents,
   },
   {
     name: 'paid-hints-outside-dash-action',
