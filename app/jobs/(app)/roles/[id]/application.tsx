@@ -292,17 +292,21 @@ export function Answers({
       )}
 
       {/* Keyed on the text so a letter Dash writes from the Comments tab
-          replaces what this box holds rather than sitting behind it. */}
-      <CoverLetter
-        key={coverLetter}
-        applicationId={applicationId}
-        roleId={roleId}
-        initial={coverLetter}
-        closed={closed}
-        initialDraft={coverLetterDraft}
-        initialRun={coverLetterRun}
-        onMarkedYes={() => setLetterMark(true)}
-      />
+          replaces what this box holds rather than sitting behind it. Marked
+          No, the application takes no letter, so there is none to write
+          (note 67df30d0); pressing No again brings it back. */}
+      {letterMark !== false && (
+        <CoverLetter
+          key={coverLetter}
+          applicationId={applicationId}
+          roleId={roleId}
+          initial={coverLetter}
+          closed={closed}
+          initialDraft={coverLetterDraft}
+          initialRun={coverLetterRun}
+          onMarkedYes={() => setLetterMark(true)}
+        />
+      )}
     </div>
   );
 }
