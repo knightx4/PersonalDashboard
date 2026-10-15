@@ -33,6 +33,8 @@ export interface PanelProps {
   coverLetter: string;
   /** Marked ready to apply. */
   readyToApply: boolean;
+  /** Every question the application form asks has been added. */
+  allQuestionsAdded: boolean;
   /** Your yes/no answer to "has a cover letter"; null until answered. */
   hasCoverLetter: boolean | null;
   timezone: string;

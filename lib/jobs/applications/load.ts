@@ -44,6 +44,7 @@ export interface PipelineRow {
   needsReview: boolean;
   /** Marked ready to apply on the role's Application tab. */
   readyToApply: boolean;
+  allQuestionsAdded: boolean;
   /** true has a cover letter, false has none, null not answered. */
   hasCoverLetter: boolean | null;
   createdBy: string;
@@ -90,7 +91,7 @@ export interface PipelineRow {
 }
 
 const SELECT = `
-  id, status, source, attempt, excitement, needs_review, ready_to_apply, has_cover_letter, created_by,
+  id, status, source, attempt, excitement, needs_review, ready_to_apply, all_questions_added, has_cover_letter, created_by,
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
@@ -108,6 +109,7 @@ type RawRow = {
   excitement: number | null;
   needs_review: boolean;
   ready_to_apply: boolean | null;
+  all_questions_added: boolean | null;
   has_cover_letter: boolean | null;
   created_by: string;
   submitted_at: string | null;
@@ -189,6 +191,7 @@ export async function loadPipeline(
     excitement: row.excitement,
     needsReview: row.needs_review,
     readyToApply: row.ready_to_apply === true,
+    allQuestionsAdded: row.all_questions_added === true,
     hasCoverLetter: row.has_cover_letter ?? null,
     createdBy: row.created_by,
     submittedAt: row.submitted_at,
