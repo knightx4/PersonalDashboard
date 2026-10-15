@@ -63,6 +63,8 @@ export type ReadingViewProps = {
   tab?: ReadingTab;
   /** A failed Summarize press, drawn by the gallery; the page passes none. */
   summaryFailure?: SummaryFailure | null;
+  /** Gallery only: draws the Check it now prompt as if the reading had just been marked read. */
+  checkOffered?: { href: string };
   /** The chat with Dash under the reading, oldest turn first (plan #1876.5). */
   thread?: readonly DevComment[];
   /** Gallery only: the chat's waiting line and open box. */
@@ -83,6 +85,7 @@ export function ReadingView({
   origin,
   tab = 'reading',
   summaryFailure = null,
+  checkOffered,
   thread = [],
   chatState,
   path,
@@ -125,7 +128,7 @@ export function ReadingView({
           chat={<ReadingChat readingId={reading.id} turns={thread} {...chatState} />}
         />
       ) : (
-        <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} />
+        <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} checkOffered={checkOffered} />
       )}
     </TabbedDetail>
   );
@@ -195,10 +198,12 @@ function ReadingTabBody({
   reading,
   subjects,
   alreadyRead,
+  checkOffered,
 }: {
   reading: ReadingDetail;
   subjects: Subject[];
   alreadyRead: { trackTitle: string } | null;
+  checkOffered?: { href: string };
 }) {
   const verified = reading.locatorConfidence === 'verified';
   const pages =
@@ -309,7 +314,7 @@ function ReadingTabBody({
           this" opens it as a reading list of its own. */}
       <section className="mb-5">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where you are</h2>
-        <StatusButtons readingId={reading.id} status={reading.status} />
+        <StatusButtons readingId={reading.id} status={reading.status} offered={checkOffered} />
         <div className="mt-2 flex flex-wrap items-start gap-2">
           <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
           <form action={goDeeper}>
