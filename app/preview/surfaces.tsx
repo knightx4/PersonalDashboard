@@ -518,6 +518,8 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  readyToApply: false,
+  hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
