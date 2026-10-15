@@ -4,12 +4,26 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { isTeachBackRate } from '@/lib/learn/feed/teach-back';
 import { saveTeachBackEvery } from '@/lib/learn/feed/teach-back-store';
+import { saveGoalsOnly } from '@/lib/learn/goals-only-setting';
 import { saveOfferSubjects } from '@/lib/learn/offer-setting';
 
 /**
  * Learn settings' writes (plan #1937.10). Each answers `{ error }` when it
  * refuses, which the field shows in the toast.
  */
+
+/** Whether Now and Practice Flow draw from your goals alone (plan #2164.1). */
+// latency: optimistic
+export async function setGoalsOnly(on: boolean): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (typeof on !== 'boolean') return { error: 'That is not a setting here.' };
+  try {
+    await saveGoalsOnly(await createLearnClient(), user.id, on);
+    return {};
+  } catch (caught) {
+    return { error: caught instanceof Error ? caught.message : 'Could not keep that.' };
+  }
+}
 
 /** Whether Subjects and Practice offer a subject built from a theme in your notes. */
 // latency: optimistic

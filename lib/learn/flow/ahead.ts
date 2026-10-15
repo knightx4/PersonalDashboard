@@ -21,7 +21,7 @@ import {
   FLOW_LOOKBACK,
   flowSlots,
   GOAL_SHARE,
-  surveyShare,
+  surveyShareFor,
   type FlowTurn,
 } from '@/lib/learn/survey/rate';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
@@ -83,6 +83,12 @@ export type FlowScope = {
   tracksOnly?: boolean;
   goalsOnly?: boolean;
   aim?: string | null;
+  /**
+   * The goals-only setting (plan #2164.1, `learn.settings.goals_only`): no
+   * survey question is written or taken, whatever the filter. The mixed flow
+   * still asks about tracks and goals.
+   */
+  noSurvey?: boolean;
 };
 
 /** Whether the flow asks about goals and nothing else: all of them, or one. */
@@ -488,6 +494,7 @@ async function pickRows(
  * a goal's link, and anything at all with no filter.
  */
 function fits(claim: ClaimNow, scope: FlowScope): boolean {
+  if (scope.noSurvey && claim.survey !== null) return false;
   if (scope.track !== null) return inTrack(claim) && claim.subjectId === scope.track;
   if (scope.aim) return claim.goal?.aimId === scope.aim;
   if (scope.goalsOnly) return claim.goal !== null;
@@ -862,7 +869,7 @@ export async function nextQuestion(
       });
       if (goal) return { kind: 'question', question: goal };
     }
-    if (options.vault && surveys(options)) {
+    if (options.vault && surveys(options) && !options.noSurvey) {
       const [survey] = await writeSurveys({
         supabase,
         vault: options.vault,
@@ -932,7 +939,7 @@ export async function fillQueue(
       waitingByTrack.set(claim.subjectId, (waitingByTrack.get(claim.subjectId) ?? 0) + 1);
     }
 
-    const mixing = vault !== undefined && surveys(scope);
+    const mixing = vault !== undefined && surveys(scope) && !scope.noSurvey;
     const [subjects, { rows, shares }, answered, pool, recent, goals] = await Promise.all([
       loadSubjects(supabase),
       pickRows(supabase, READY_LIMIT, scope.track, waitingByTrack),
@@ -968,7 +975,7 @@ export async function fillQueue(
       recent,
       {
         goal: goals.length > 0 ? GOAL_SHARE : 0,
-        survey: pool ? surveyShare(fieldsWrittenAbout(pool)) : 0,
+        survey: pool ? surveyShareFor(fieldsWrittenAbout(pool), scope.noSurvey === true) : 0,
       },
       wanted,
     );

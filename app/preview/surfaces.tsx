@@ -7574,13 +7574,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
   },
   {
-    /* Learn settings (plan #1937.10): subject offers on, an explain-back card
-     * in every ten. */
+    /* Learn settings (plan #1937.10): goals only on (plan #2164.1), subject
+     * offers on, an explain-back card in every ten. */
     id: 'learn-settings',
     label: 'Learn · Settings',
     module: 'learn',
     width: 'page',
-    render: () => <LearnSettingsView settings={{ offerSubjects: true, teachBackEvery: 10 }} />,
+    render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a

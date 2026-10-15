@@ -49,6 +49,19 @@ export type FeedScope = {
   cardId?: string | null;
 };
 
+/**
+ * Goals only (plan #2164.1): while `learn.settings.goals_only` is on, the
+ * cards already picked for a vault theme or a gap field are left in the table
+ * and out of the deal, so turning it off brings them back. Read through RLS,
+ * so no user id; with no row, or a failed read, it is on, the default.
+ */
+async function goalsOnlyFilter(supabase: LearnSupabaseClient): Promise<string | null> {
+  const { data, error } = await supabase.from('settings').select('goals_only').maybeSingle();
+  if (error) console.error('[learn now] goals-only setting', error.message);
+  const on = (data as { goals_only: boolean } | null)?.goals_only ?? true;
+  return on ? 'reason.not.in.(interest,gap)' : null;
+}
+
 /** The most card ids a request excludes. Past this, the oldest shown come back. */
 const MAX_EXCLUDED = 300;
 
@@ -90,7 +103,12 @@ export async function loadFeedPage(
   const skip = [...exclude.slice(-MAX_EXCLUDED), ...(pinned ? [pinned.id] : [])];
   // A goal's lessons are on its plan (plan #1143). A failed read deals them
   // rather than failing the deck.
-  const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
+  const [planLessons, goalsOnly] = await Promise.all([
+    goalTrackIds(supabase)
+      .catch(() => [])
+      .then(notPlanLessons),
+    goalsOnlyFilter(supabase),
+  ]);
   const read = async (
     status: 'ready' | 'review' | 'skipped',
     count: number,
@@ -115,6 +133,8 @@ export async function loadFeedPage(
         .order('acted_at', { ascending: true });
     }
     if (planLessons) query = query.or(planLessons);
+    // As an `or` of one, for the same reason as the context filter above.
+    if (goalsOnly) query = query.or(goalsOnly);
     if (subjectId) query = query.eq('subject_id', subjectId);
     const leaveOut = [...skip, ...taken];
     if (leaveOut.length > 0) query = query.not('id', 'in', `(${leaveOut.join(',')})`);
@@ -385,7 +405,12 @@ export async function countReadyCards(
   supabase: LearnSupabaseClient,
   subjectId: string | null = null,
 ): Promise<number> {
-  const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
+  const [planLessons, goalsOnly] = await Promise.all([
+    goalTrackIds(supabase)
+      .catch(() => [])
+      .then(notPlanLessons),
+    goalsOnlyFilter(supabase),
+  ]);
   let query = supabase
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
@@ -394,6 +419,7 @@ export async function countReadyCards(
     .not('context', 'is', null);
   // A goal's lessons are on its plan, not in the deck (plan #1143).
   if (planLessons) query = query.or(planLessons);
+  if (goalsOnly) query = query.or(goalsOnly);
   if (subjectId) query = query.eq('subject_id', subjectId);
   const { count, error } = await query;
   assertSchemaExposed(error, LEARN_SCHEMA);

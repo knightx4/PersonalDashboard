@@ -13,6 +13,7 @@ import {
   themeStrength,
 } from '@/lib/learn/flow/offer';
 import { trackMove } from '@/lib/learn/flow/track';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { loadGraph } from '@/lib/learn/graph/load';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { answerQuestion } from '../s/[id]/probe/actions';
@@ -78,7 +79,8 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
 
-  const scope = scopeFrom(formData);
+  // Goals only on Learn settings (plan #2164.1) takes the survey out of every filter.
+  const scope = { ...scopeFrom(formData), noSurvey: await goalsOnlyOrDefault(supabase, user.id) };
   const intent = formData.get('intent');
 
   // Not now is a button on the answer form, so it arrives carrying that
@@ -169,7 +171,10 @@ export async function fillFlowQueue(focus: {
 }): Promise<void> {
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
-  const scope = scopeOf(focus?.track, focus?.only, focus?.goal);
+  const scope = {
+    ...scopeOf(focus?.track, focus?.only, focus?.goal),
+    noSurvey: await goalsOnlyOrDefault(supabase, user.id),
+  };
   after(() => fillQueue(supabase, user.id, scope, vault));
 }
 
