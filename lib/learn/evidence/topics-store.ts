@@ -47,6 +47,7 @@ export type RefreshTopicUnlocksResult = {
   sources: number;
   /** Topics with at least one link: the ones unlocked. */
   topics: number;
+  /** Links written, those held for want of confirmation included. */
   links: number;
   removed: number;
 };
@@ -171,7 +172,7 @@ export async function refreshTopicUnlocks(
 
   return {
     sources: sources.size,
-    topics: new Set(rows.map((row) => row.target_id)).size,
+    topics: new Set(rows.filter((row) => !row.held_reason).map((row) => row.target_id)).size,
     links: rows.length,
     removed: stale.length,
   };

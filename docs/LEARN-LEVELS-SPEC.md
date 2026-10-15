@@ -289,6 +289,21 @@ Practice Flow already uses. Re-checks are one in five. The track weights in
 `lib/learn/flow/interest.ts` decide which topic each ordinary question comes
 from.
 
+As built (plan #2138.6, `lib/learn/levels/pick.ts`), each question is the
+first of these that has one:
+
+1. On every fifth answer, a re-check that is due.
+2. Placement on a topic not yet placed, the topic already under way first, so
+   one topic is placed before the next starts.
+3. The top of the fringe.
+4. The most-settling cell on a topic, when the fringe is empty.
+
+A cell answered in the last twelve hours rests and is not asked, so a level
+just missed does not come straight back. Level 10 is not asked until the
+defence question exists. The track weights are not read yet: a flow focused on
+a subject keeps to the topics of that subject's lens, and otherwise the lens
+targets and the unlock count order the fringe.
+
 ## What to learn next: the fringe
 
 The **fringe** is every open or missed cell whose level below is held and
@@ -305,11 +320,15 @@ The fringe has two directions, and the screen names which a row is:
 
 Ranking within the fringe, in order:
 
-1. Cells inside a lens you are working towards, below its target (see
+1. **Misses first.** A cell with a not-met answer comes before one nothing
+   has touched (idea eacdd0c9). Counting a miss as settled would let the part
+   you got wrong drift behind new material. Held cells are not on the fringe,
+   so they come last by construction.
+2. Cells inside a lens you are working towards, below its target (see
    "Lenses").
-2. The interest weights the flow already keeps per track, and the vault
+3. The interest weights the flow already keeps per track, and the vault
    theme strengths from KNOWLEDGE-SPEC.
-3. **Unlock count:** how many other cells would join the fringe if this one
+4. **Unlock count:** how many other cells would join the fringe if this one
    were held. A cell that opens eight others outranks one that opens none.
 
 Every fringe row says in one line why it is there, as every row on Learn's
@@ -390,6 +409,11 @@ enough to migrate in one pass, with the person reviewing the result.
 5. **Probes stay.** `probes` gains a `cell_id`, and every graded answer from
    now on also writes its `cell_evidence` rows.
 
+   A question written about a cell rather than a concept is not a probe. It
+   has no concept, and the claims graph's readers take every probe row as
+   one of theirs, so it goes in `cell_questions`, and its evidence names the
+   question instead of a probe.
+
 The old tables are kept read-only until the new screens have replaced every
 read of them. Then a later migration drops them. That drop is destructive,
 so it waits for the person's go-ahead.
@@ -405,7 +429,8 @@ In `learn`, with RLS on every table and composite foreign keys carrying
 | `topic_cells` | one row per topic and level: the descriptor, when it was rewritten by hand | no: part of the topic |
 | `cell_links` | requiring cell → required cell, the sentence why, acyclic | no: structure |
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |
-| `cell_evidence` | met, not met or declared, the probe it came from, the verified quote, the date | yes: what the person did |
+| `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date | yes: what the person did |
+| `cell_questions` | a question asked about one cell, its format, the answer and every verdict the grader returned | no: read through `cell_evidence` |
 | `lenses` | a named set of targets, and whether it was a subject or a goal | yes: what the person wants |
 | `lens_targets` | lens, topic, target level | no: part of the lens |
 | `link_reviews` | a link in question, the two answers that put it there, and what the person decided | no: bookkeeping |
@@ -422,7 +447,10 @@ Statuses, levels, the fringe and lens progress are computed and never stored.
 | `/learn/now?practice=1` | Practice Flow, now asking placement, fringe and re-check questions, with the answer screen listing every cell an answer reached |
 
 At the end of a practice run, the flow lists what moved: cells newly shown,
-cells newly implied, misses found, and any link put in doubt.
+cells newly implied, misses found, and any link put in doubt. A run is the
+questions answered since it began; the flow carries the start time in its
+links, and End run, or running out of questions, shows the list. Nothing
+about a run is stored.
 
 ## Rules
 

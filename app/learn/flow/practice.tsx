@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { Target } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -9,14 +10,26 @@ import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
 import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
-import { practiceHref } from '@/lib/learn/flow/href';
+import { firstParam, practiceHref } from '@/lib/learn/flow/href';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
 import { loadOfferSubjects } from '@/lib/learn/offer-setting';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
+import { askCell } from '@/lib/learn/levels/answer-store';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { CellAnswer } from '@/components/learn/cell-answer';
+import { CellQuestionSkeleton } from '@/components/learn/cell-answer-view';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { LevelsFlow } from './levels';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
+
+/** Whether you have any topic, draft or approved: the flow asks about levels from then on. */
+async function hasTopics(learn: LearnSupabaseClient): Promise<boolean> {
+  const { count, error } = await learn.from('topics').select('id', { count: 'exact', head: true });
+  return !error && (count ?? 0) > 0;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -64,11 +77,53 @@ export async function PracticeFlow({
   track: trackParam,
   only,
   goal: goalParam,
+  cell: cellParam,
+  run,
+  end,
+  after,
 }: {
   track?: string | string[];
   only?: string | string[];
   goal?: string | string[];
+  cell?: string | string[];
+  /** When the practice run began (plan #2138.6). */
+  run?: string | string[];
+  /** The run to sum up. */
+  end?: string | string[];
+  /** The question just answered; only part of the key. */
+  after?: string | string[];
 }) {
+  // `?cell=<id>` asks an explain question about one level of a topic (plan
+  // #2138.5), graded against that level and the ones around it. Without it,
+  // placement and the fringe choose the level (#2138.6, ./levels.tsx).
+  if (cellParam !== undefined) {
+    const cellId = typeof cellParam === 'string' && UUID.test(cellParam) ? cellParam : null;
+    if (!cellId) redirect(practiceHref());
+    const user = await requireUser();
+    const spend = collectSpend();
+    const asked = await askCell(
+      await createLearnClient(),
+      user.id,
+      cellId,
+      process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+    );
+    await recordLearnSpend(user.id, 'write-cell-case', spend.reports);
+    return (
+      <div className="mt-6">
+        {asked.ok ? (
+          <CellAnswer key={asked.asked.questionId} asked={asked.asked} nextHref={practiceHref()} />
+        ) : (
+          <EmptyState
+            icon={Target}
+            title="That level cannot be asked"
+            description={asked.error}
+            action={{ label: 'Practice', href: practiceHref() }}
+          />
+        )}
+      </div>
+    );
+  }
+
   const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
   if (trackParam !== undefined && trackId === null) redirect(practiceHref());
   const goalId =
@@ -81,6 +136,26 @@ export async function PracticeFlow({
 
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+
+  // Once you have topics, the flow asks about their levels (plan #2138.6),
+  // and the claims graph is no longer asked about or written from here. A
+  // goal, or Goals only, still asks the goal questions.
+  if (goalId === null && filter !== 'goals' && (await hasTopics(supabase))) {
+    const subjects = trackId ? await loadSubjects(supabase) : [];
+    const focused = trackId ? subjects.find((subject) => subject.id === trackId) : undefined;
+    if (trackId && !focused) redirect(practiceHref());
+    const subject = focused ? { id: focused.id, name: focused.name } : null;
+    return (
+      <div>
+        {subject ? <FlowFocus name={subject.name} back="All subjects" /> : <ScopeFilter filter={filter} />}
+        <div className="mt-6">
+          <Suspense key={`${subject?.id ?? 'all'}:${firstParam(run) ?? ''}:${firstParam(end) ?? ''}:${firstParam(after) ?? ''}`} fallback={<CellQuestionSkeleton />}>
+            <LevelsFlow userId={user.id} subject={subject} only={filter} run={run} end={end} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
 
   const named = goalId ? await loadFlowGoal(supabase, goalId) : null;
   if (goalId && !named) redirect(practiceHref());

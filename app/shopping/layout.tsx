@@ -4,6 +4,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import type { NavSection } from '@/components/shell/app-shell';
 import { loadShoppingBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { onboardingNeeded } from '@/lib/onboarding';
 import { countReviewItems } from '@/lib/review/load';
 
@@ -34,29 +35,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return shellFor({
     module: 'shopping',
     user,
-    /**
-     * Now and Inbox first, as in every workspace (plan #1937.6). The Inbox
-     * carries the review count because an unattended review queue is how the
-     * dashboard quietly becomes wrong; the queue is a row on it, and its page
-     * keeps its address and lights the Inbox. Nothing else here has earned one.
-     */
-    sections: async (): Promise<NavSection[]> => [
-      { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
-      {
-        href: '/shopping/inbox',
-        label: 'Inbox',
-        icon: 'inbox',
-        alsoMatches: ['/shopping/review'],
-        badge: await reviewCount,
-      },
-      { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
-      { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-      { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-      { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-      { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
-      { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-      { href: '/shopping/share', label: 'Share', icon: 'share' },
-    ],
+    // The tabs and their order are in lib/shell/tabs.ts (plan #2208.2). The
+    // Inbox carries the review count because an unattended review queue is how
+    // the dashboard quietly becomes wrong; nothing else here has earned one.
+    sections: async ({ owner }): Promise<NavSection[]> =>
+      withBadges(tabsFor('shopping', owner), { '/shopping/inbox': await reviewCount }),
     settingsHref: '/shopping/settings',
     settingsLabel: 'Shopping settings',
     brief: async ({ settings }) => loadShoppingBrief(user.id, settings.timezone, await reviewCount),

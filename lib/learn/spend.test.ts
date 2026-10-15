@@ -67,6 +67,8 @@ describe('the operation names', () => {
       'grade-quiz-answer',
       'write-applied-case',
       'grade-applied-answer',
+      'grade-cell-answer',
+      'write-cell-case',
       'embed-catalogue',
       'embed-claim',
       'judge-segment',
@@ -146,6 +148,10 @@ describe('the operation names', () => {
       'find-point-evidence',
       'map-essay-notes',
       'draft-essay-model',
+      'write-essay-research',
+      'draft-topic',
+      'embed-topic-scope',
+      'assign-topics',
     ]);
   });
 });
