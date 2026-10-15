@@ -64,10 +64,12 @@ describe('visionReshapeText', () => {
     expect(text).toContain('do not commit or push');
   });
 
-  it('ends its own run under its own job name', () => {
-    // Nothing else closes a run about no step; one closed as `reshape` stays
-    // started and is written back as failed.
-    expect(text).toContain("where job = 'vision_reshape' and status = 'started'");
+  it('ends its run by the note under its own id, not the newest of its job', () => {
+    // Nothing else closes a run about no step. The note startRoutineRun
+    // appends (runEndNote) names this run's id, so a second re-shape started
+    // in the meantime cannot be the one marked.
+    expect(text).toContain('End the run as the note at the foot of this turn says.');
+    expect(text).not.toContain('order by created_at desc limit 1');
   });
 
   it('says when there was no vision before', () => {

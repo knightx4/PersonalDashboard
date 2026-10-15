@@ -47,7 +47,7 @@ describe('referenceProblems', () => {
 describe('the instructions that carry a reference', () => {
   const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8').replace(/\s+/g, ' ');
   const critic = read('.claude/agents/ui-critic.md');
-  const building = read('.claude/skills/plan/reference/building.md');
+  const screen = read('.claude/skills/plan/reference/screen.md');
   const shaping = read('.claude/skills/plan/reference/shaping.md');
 
   it('give the critic the rule from Part 2 and a breaks value for it', () => {
@@ -57,9 +57,9 @@ describe('the instructions that carry a reference', () => {
   });
 
   it('have the builder register a reference and send it on every round', () => {
-    expect(building).toContain('lib/preview/references.ts');
-    expect(building).toContain('Send a registered reference to the critic on every round');
-    expect(building).toContain(`${REFERENCE_DIR}/<surface>/`);
+    expect(screen).toContain('lib/preview/references.ts');
+    expect(screen).toContain('Send a registered reference to the critic on every round');
+    expect(screen).toContain(`${REFERENCE_DIR}/<surface>/`);
   });
 
   it('teach shaping the Reference line', () => {

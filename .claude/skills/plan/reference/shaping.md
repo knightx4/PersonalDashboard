@@ -293,8 +293,9 @@ something the person decided.
    same commit, with a one-sentence blurb.
 3. **Put it on main.** Commit the spec on its own, subject `Write "<change
    title>" into the <spec title> spec`, with the change's id in the body.
-   Then `git fetch origin`, merge `origin/main`, `npm run gate`, and merge to
-   main and push as in step 4 of the Building section in `SKILL.md`. If the
+   Then `git fetch origin` (naming no refs), merge `origin/main`, run `npm
+   run gate`, and once it ends with `gate: all clear` merge to main with
+   `--no-ff` and push. If the
    gate fails because of the change itself, such as a spec rule check, put
    the change back to proposed as in step 2 with the gate's reason in the
    comment, and stop.

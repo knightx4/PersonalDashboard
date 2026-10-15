@@ -118,6 +118,28 @@ describe('startRoutineRun', () => {
     );
   });
 
+  it('tells the session how to end the run it was fired as', async () => {
+    const { insert, supabase } = db();
+    const fetchFn = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ run_id: 'run_9' }), { status: 200 }),
+    );
+
+    await startRoutineRun({
+      supabase: supabase as never,
+      userId: 'user-1',
+      job: 'comment',
+      routine: { id: 'trig_plan', token: 'oat_plan' },
+      text: 'answer the comment',
+      fetch: fetchFn as never,
+    });
+
+    const row = (insert.mock.calls[0] as unknown as [{ id: string }])[0];
+    const sent = String(fetchFn.mock.calls[0][1].body);
+    expect(sent).toContain('answer the comment');
+    expect(sent).toContain(`where id = '${row.id}' and status in ('started', 'stale')`);
+    expect(sent).toContain(`Dash run id: ${row.id}`);
+  });
+
   it('writes a row for a press that failed, and says so to the caller', async () => {
     const { insert, supabase } = db();
 

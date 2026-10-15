@@ -12,7 +12,7 @@ import { FRAME_MS, INPUT_AT_MS, inputEvents, phaseAt, stripName } from '@/lib/pr
 
 const root = join(__dirname, '..');
 const critic = readFileSync(join(root, '.claude/agents/ui-critic.md'), 'utf8');
-const building = readFileSync(join(root, '.claude/skills/plan/reference/building.md'), 'utf8');
+const screen = readFileSync(join(root, '.claude/skills/plan/reference/screen.md'), 'utf8');
 
 const box = { x: 0, y: 100, width: 390, height: 300 };
 
@@ -43,8 +43,8 @@ describe('the critic craft checklist', () => {
   });
 
   it('is handed the strip and the moment by the builder', () => {
-    expect(building).toContain('npm run record -- <id>');
-    expect(building).toMatch(/the strip and its JSON or "none"/);
-    expect(building).toContain('app/dev/ui/moments.ts');
+    expect(screen).toContain('npm run record -- <id>');
+    expect(screen).toMatch(/the strip and its JSON or "none"/);
+    expect(screen).toContain('app/dev/ui/moments.ts');
   });
 });
