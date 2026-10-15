@@ -13,6 +13,7 @@
  * sentences before drifting back. A regex over the output does not drift.
  */
 import { z } from 'zod';
+import type { LimitOverrun } from '@/lib/jobs/drafting/limits';
 
 export interface AnswerDraft {
   text: string;
@@ -22,6 +23,8 @@ export interface AnswerDraft {
   unsupportedClaims: string[];
   /** Banned constructions found in the text, as written. */
   bannedFound: string[];
+  /** Set when the text is still over its limit after the corrective retry (plan #2130.3). */
+  overLimit?: LimitOverrun;
 }
 
 export type DraftResult = { ok: true; draft: AnswerDraft } | { ok: false; error: string };

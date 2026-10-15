@@ -550,6 +550,7 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  coverLetterDraft: null,
   readyToApply: false,
   hasCoverLetter: null,
   timezone: 'Europe/London',
@@ -629,8 +630,11 @@ const rolePanels: PanelProps = {
       timesSeen: 3,
       evidenceItemIds: [],
       unsupportedClaims: [],
+      wordLimit: null,
     },
   ],
+  answerDrafts: {},
+  dashAsks: [],
   thread: [],
   interviewGroups: [
     { id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] },
@@ -3444,6 +3448,130 @@ function StatusRunSurface({ going }: { going: GoingRunLine }) {
   );
 }
 
+/**
+ * An application with four questions after Draft all answers (plan #2130.4):
+ * three drafts waiting, one over its character limit, one answer already
+ * approved, and three questions Dash asked back, one of them replied to.
+ */
+const draftedAnswers: PanelProps['answers'] = [
+  { ...rolePanels.answers[0], wordLimit: 150 },
+  {
+    id: 'a2',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q2',
+    questionText: 'Tell us about a time you shipped something under a hard deadline. (400 characters)',
+    questionKind: 'behavioural',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+  {
+    id: 'a3',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q3',
+    questionText:
+      'What would you want to change about how research tooling is built here in your first ninety days, and how would you know it had worked?',
+    questionKind: 'motivation',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: 200,
+  },
+  {
+    id: 'a4',
+    answer: 'Yes. I hold settled status and need no sponsorship.',
+    status: 'approved',
+    questionId: 'q4',
+    questionText: 'Are you authorised to work in the UK?',
+    questionKind: 'logistics',
+    canonicalAnswer: null,
+    timesSeen: 5,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+];
+
+const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
+  a1: {
+    text: 'The research tooling team owns the pipeline every strategy desk reads from, and that is the work I have been doing at Kestrel: making market data people can trust. I would rather fix a bad day of ticks at the source than work around it downstream, and this team is where the source is.',
+    evidenceItemIds: ['ev-1', 'ev-2'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a2: {
+    text: 'In March the exchange moved its feed to a new binary format with three weeks of notice. I rewrote our decoder, ran it beside the old one on a week of recorded traffic until the two agreed to the tick, and cut over on the Sunday before the switch. The desks lost no trading time. What made it work was the side-by-side check: every difference was a bug in one or the other, and I fixed eleven of them before anyone downstream saw one.',
+    evidenceItemIds: ['ev-3'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a3: {
+    text: 'First I would sit with two desks and time how long an idea takes to become a backtest. I expect most of it is waiting on data to be cleaned by hand. I would move that cleaning into the pipeline, once, and measure the same journey again at the end of the quarter.',
+    evidenceItemIds: [],
+    unsupportedClaims: ['most of it is waiting on data'],
+    bannedFound: [],
+  },
+};
+
+/**
+ * Dash's cover letter after Draft a cover letter (plan #2135.2): five
+ * paragraphs citing three items, one claim to check, and two questions back,
+ * the first already replied to.
+ */
+const draftedLetter: NonNullable<PanelProps['coverLetterDraft']> = {
+  letter: [
+    'Dear hiring team,',
+    'I am applying for the quantitative developer role on your systematic trading teams. For the last three years at Kestrel I have built the research tooling our desk runs on: the backtester, the tick store behind it, and the checks that stop a bad day of market data reaching a live strategy.',
+    'The part of your posting I keep coming back to is turning an idea into a backtest and a backtest into a live strategy. At Kestrel that path took two weeks when I joined. After I moved the backtester onto the same data path as production it took two days, and the strategies that went live behaved the way their backtests said they would.',
+    'I write Python every day and C++ where the hot path needs it, and I have run market data at the scale of every US equity tick. I would like to bring that to the team that owns the pipeline every desk reads from.',
+    'Thank you for reading. I would be glad to talk it through.',
+  ].join('\n\n'),
+  words: 178,
+  evidenceItemIds: ['ev-1', 'ev-2', 'ev-3'],
+  unsupportedClaims: ['the strategies that went live behaved the way their backtests said they would'],
+  bannedFound: [],
+  asks: [
+    {
+      id: 'letter-ask-1',
+      answer_id: null,
+      question: 'Who should the letter be addressed to? The posting names no hiring manager.',
+      reply: 'Dana Okafor, who ran the phone screen',
+    },
+    {
+      id: 'letter-ask-2',
+      answer_id: null,
+      question: 'Is the move from two weeks to two days something you can say publicly, or should it stay vaguer?',
+      reply: null,
+    },
+  ],
+};
+
+const draftedAsks: PanelProps['dashAsks'] = [
+  {
+    id: 'ask-1',
+    answer_id: 'a2',
+    question: 'Which deadline should this be: the feed migration in March, or the regulatory report in 2024?',
+    reply: null,
+  },
+  {
+    id: 'ask-2',
+    answer_id: 'a3',
+    question: 'Have you used their open-source backtester, or only read about it?',
+    reply: 'Ran the examples and read the docs, never in production.',
+  },
+  {
+    id: 'ask-3',
+    answer_id: null,
+    question: 'Would you move to London for this, or is it remote only for you?',
+    reply: null,
+  },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -3535,15 +3663,116 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-questions',
+    label: 'Role · Answers drafted, with Dash\'s questions',
+    module: 'jobs',
+    width: 'wide',
+    // After Draft all answers (plan #2130.4): a draft beside every unanswered
+    // question, one over its character limit, and Dash's questions above the
+    // cards with one already replied to.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        answerDrafts={draftedAnswerDrafts}
+        dashAsks={draftedAsks}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-drafting',
+    label: 'Role · Answers, drafting all',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers mid-run: the button reads Drafting and the cards stay open.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-error',
+    label: 'Role · Answers, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: false, error: 'Dash ran out of time before the answers were written. Nothing was saved; try again.' }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-draft',
+    label: "Role · Cover letter drafted, with Dash's questions",
+    module: 'jobs',
+    width: 'wide',
+    // After Draft a cover letter (plan #2135.2): the draft beside the empty
+    // letter, one claim to check, and Dash's two questions with Redraft.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterDraft={draftedLetter}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-drafting',
+    label: 'Role · Cover letter, drafting',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter mid-run: the button reads Drafting with a note under it.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-error',
+    label: 'Role · Cover letter, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{
+          pending: false,
+          error: 'Dash ran out of time before the letter was written. Nothing was saved; try again.',
+        }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
     width: 'wide',
     // The draft beside a question after Draft is pressed (note ad554975): one
-    // drawn from the posting alone, citing nothing from the bank.
+    // drawn from the posting alone, citing nothing from the bank, counted
+    // against the question's 150-word limit (plan #2130.4).
     render: () => (
       <AnswerCard
-        answer={rolePanels.answers[0]}
+        answer={{ ...rolePanels.answers[0], wordLimit: 150 }}
         closed={false}
         initialDraft={{
           text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
