@@ -70,6 +70,11 @@ not write any of their essay.
 Write for someone reading quickly: short sentences, plain words, every term
 explained the first time it appears.
 
+Where a sentence names a document, report, rule or study that one of the
+pages is, or links to, make the words that name it a markdown link to that
+address exactly as the page gives it: "it released [guidance](https://...)".
+Link only addresses that appear in the pages; never make one up.
+
 First a heading line "## Short answer" and under it about ${SHORT_VERSION_WORDS} words: the
 state of the question as the pages show it, including where they disagree.
 Each sentence cites the passage it rests on.
@@ -128,10 +133,24 @@ export function readMap(
     citations: section.citations.map((c) => ({ source: c.page, quote: c.quote })),
   }));
   return {
-    parts: parts.filter((p) => p.title),
-    summary: written.shortAnswer,
+    parts: parts.filter((p) => p.title).map((p) => ({ ...p, summary: keepPageLinks(p.summary, pages) })),
+    summary: keepPageLinks(written.shortAnswer, pages),
     asks: readAsks(content),
   };
+}
+
+const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+/**
+ * The write-up's links, kept only where the address is one of the pages read
+ * or appears in one of them (note 179b2256). Any other is a guessed address,
+ * and its words stay as plain text.
+ */
+export function keepPageLinks(text: string, pages: readonly ResearchSource[]): string {
+  const bare = (url: string) => url.replace(/\/$/, '');
+  const known = (url: string) =>
+    pages.some((page) => bare(page.url) === bare(url) || (page.text ?? '').includes(url));
+  return text.replace(MARKDOWN_LINK, (whole, words: string, url: string) => (known(url) ? whole : words));
 }
 
 /** The key a take on one part of a run is kept under: the run, and the part or the question. */

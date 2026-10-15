@@ -112,7 +112,15 @@ export async function mailLookup(ctx: AskContext, input: Record<string, unknown>
 
   const showMailbox = found.searched.length + found.problems.length > 1;
   const rows = found.messages.map((hit) => row(hit, ctx.timezone, showMailbox));
+  // With a mailbox that could not be searched, say plainly which were, so
+  // one expired mailbox is not read as email that could not be checked at
+  // all (note 7d927727).
+  const partly =
+    found.problems.length > 0 && found.searched.length > 0
+      ? `Searched ${found.searched.join(', ')}${rows.length ? '' : ', and nothing there matched'}. Not searched: ${found.problems.map((problem) => problem.mailbox).join(', ')}.`
+      : null;
   const notes = [
+    partly,
     found.more ? `More messages matched than the ${rows.length} listed; narrow by sender, words or dates to see older ones.` : null,
     ...found.problems.map((problem) => problem.reason),
   ].filter(Boolean);
