@@ -12,16 +12,20 @@ import type { TalkToolCall } from './talk';
  * (core.conversation_turns), so a reopened conversation draws it again from
  * the turn alone. It is never written to a workspace page.
  *
- * Only two kinds. A bar compares amounts that are parts of one question
+ * Four kinds. A bar compares amounts that are parts of one question
  * (spend by shop); a table lists figures a length would mislead about, such
- * as days in each stage beside a count. More kinds can follow when a
- * question needs one.
+ * as days in each stage beside a count; columns show one amount over time,
+ * oldest first, the last column the period asked about; a figure is the one
+ * number a question asked for, set large. Columns and a figure can carry a
+ * reference: the usual amount (an average of the months before) or a target
+ * the person set, drawn as a line across the columns or as the change beside
+ * the figure.
  *
  * Nothing here reads a database or the network, so the thread imports it.
  */
 
 export const CHART_TOOL = 'show_chart';
-export const CHART_KINDS = ['bar', 'table'] as const;
+export const CHART_KINDS = ['bar', 'table', 'columns', 'figure'] as const;
 export type ChartKind = (typeof CHART_KINDS)[number];
 
 /** The most rows a chart draws: a phone shows twelve bars without scrolling past the answer. */
@@ -34,6 +38,9 @@ export const MAX_CHART_UNIT = 20;
 
 export type DashChartRow = { label: string; value: number };
 
+/** What a figure or columns are measured against: the usual amount, or a target. */
+export type DashChartReference = { label: string; value: number };
+
 export type DashChart = {
   kind: ChartKind;
   title: string;
@@ -44,6 +51,8 @@ export type DashChart = {
   unit: string | null;
   /** A table's two column headings; null for a bar, or to let the table name them. */
   columns: [string, string] | null;
+  /** For columns or a figure: the usual amount or a target; null when none was given. */
+  reference: DashChartReference | null;
 };
 
 function line(value: unknown): string {
@@ -67,7 +76,10 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
   const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
 
   const kind = raw.kind;
-  if (kind !== 'bar' && kind !== 'table') return { ok: false, error: 'kind must be "bar" or "table".' };
+  if (!(CHART_KINDS as readonly unknown[]).includes(kind)) {
+    return { ok: false, error: 'kind must be "bar", "table", "columns" or "figure".' };
+  }
+  const chartKind = kind as ChartKind;
 
   const title = line(raw.title);
   if (!title) return { ok: false, error: 'Give the chart a title that says what it shows.' };
@@ -93,10 +105,31 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       return { ok: false, error: `Row ${i + 1} ("${cut(label, 30)}") needs a number for its value.` };
     }
-    if (kind === 'bar' && value < 0) {
+    if ((kind === 'bar' || kind === 'columns') && value < 0) {
       return { ok: false, error: `Row ${i + 1} ("${cut(label, 30)}") is below zero, which a bar cannot draw. Use a table.` };
     }
     rows.push({ label: cut(label, MAX_CHART_LABEL), value });
+  }
+
+  if (kind === 'figure' && rows.length !== 1) {
+    return { ok: false, error: 'A figure is one row: the number the question asked for. Put the usual amount in reference.' };
+  }
+  if (kind === 'columns' && rows.length < 2) {
+    return { ok: false, error: 'Columns need two or more periods, oldest first. A single number is a figure.' };
+  }
+
+  let reference: DashChartReference | null = null;
+  if (raw.reference !== undefined && raw.reference !== null) {
+    if (kind !== 'columns' && kind !== 'figure') {
+      return { ok: false, error: 'Only columns or a figure take a reference.' };
+    }
+    const ref = typeof raw.reference === 'object' ? (raw.reference as Record<string, unknown>) : {};
+    const refLabel = line(ref.label);
+    if (!refLabel) return { ok: false, error: 'The reference needs a label that says what it is, such as "Jun to Aug average".' };
+    if (typeof ref.value !== 'number' || !Number.isFinite(ref.value) || ref.value < 0) {
+      return { ok: false, error: 'The reference needs a value of zero or more.' };
+    }
+    reference = { label: cut(refLabel, MAX_CHART_LABEL), value: ref.value };
   }
 
   const code = line(raw.currency).toUpperCase();
@@ -111,7 +144,7 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
     if (first && second) columns = [first, second];
   }
 
-  return { ok: true, chart: { kind, title, rows, currency: code || null, unit, columns } };
+  return { ok: true, chart: { kind: chartKind, title, rows, currency: code || null, unit, columns, reference } };
 }
 
 /**
@@ -146,6 +179,18 @@ export function chartValue(chart: Pick<DashChart, 'currency' | 'rows'>, value: n
   return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
+/**
+ * How far a figure sits from its reference, as a whole percentage: 38 for
+ * 38% more, -12 for 12% less. Null with no reference, or a reference of zero,
+ * which no change can be a share of.
+ */
+export function chartChange(chart: Pick<DashChart, 'rows' | 'reference'>): number | null {
+  const base = chart.reference?.value;
+  const value = chart.rows[0]?.value;
+  if (base === undefined || value === undefined || base === 0) return null;
+  return Math.round(((value - base) / base) * 100);
+}
+
 /** A table's headings: its own, or the label and what the values are. */
 export function chartColumns(chart: DashChart): [string, string] {
   if (chart.columns) return chart.columns;
@@ -160,11 +205,16 @@ export const CHART_DRAWN =
 /** The tool's definition, sent to the model with the lookups (lib/ask/tools.ts). */
 export const CHART_TOOL_DEFINITION = {
   name: CHART_TOOL,
-  description: `Draw a bar chart or a small table under your answer, for a question about how something splits or changes: spending by shop, category or month; applications by status, by week or by rejection stage; days spent in each stage. Fill it with the figures a lookup returned, exactly as it gave them, never estimated. A bar compares amounts that answer one question; a table suits figures a bar would mislead about, or values below zero. At most ${MAX_CHART_ROWS} rows, largest first unless the rows are in time order: keep the largest and add the rest together as "Everything else". Money goes in whole units with its currency (12.5 for 12.50); give one chart per currency. Call it at most once or twice for an answer, and only when there are three or more figures to compare; a single figure belongs in the answer's words.`,
+  description: `Draw a chart under your answer. Fill it with the figures a lookup returned, exactly as it gave them, never estimated. Four kinds:
+- figure: the one number a question asks for ("what did I spend in September", "how many applications this month"), set large, with reference set to the usual amount (the average of the periods before, which you work out from the same lookup) or to a target the person wrote down, so the change shows beside it. One row.
+- columns: one amount over time, oldest first, the period asked about last: spending by month, applications by week. Two to ${MAX_CHART_ROWS} periods. reference draws a line across them: the target, or the usual amount.
+- bar: amounts that are parts of one question, largest first: spending by shop, applications by status. Keep the largest and add the rest together as "Everything else".
+- table: figures a length would mislead about, or values below zero, such as days in each stage beside a count.
+Money goes in whole units with its currency (12.5 for 12.50); give one chart per currency. Draw at most two charts for an answer: a figure and the columns or bar behind it is the usual pair.`,
   input_schema: {
     type: 'object' as const,
     properties: {
-      kind: { type: 'string', enum: [...CHART_KINDS], description: 'bar or table.' },
+      kind: { type: 'string', enum: [...CHART_KINDS], description: 'figure, columns, bar or table.' },
       title: { type: 'string', description: 'What the chart shows, with its period: "Spending by shop, 2026".' },
       rows: {
         type: 'array',
@@ -188,6 +238,16 @@ export const CHART_TOOL_DEFINITION = {
         maxItems: 2,
         items: { type: 'string' },
         description: 'For a table, its two column headings, such as ["Stage", "Median days"].',
+      },
+      reference: {
+        type: 'object',
+        description: 'For a figure or columns: what to measure against, the usual amount or a target.',
+        properties: {
+          label: { type: 'string', description: 'What it is, with its period: "Jun to Aug average", "Monthly target".' },
+          value: { type: 'number', description: 'Its amount, in the same units as the rows.' },
+        },
+        required: ['label', 'value'],
+        additionalProperties: false,
       },
     },
     required: ['kind', 'title', 'rows'],

@@ -1,6 +1,7 @@
 'use client';
 
 import { Thread, type TalkSend } from '@/components/thread/thread';
+import type { DashChart } from '@/lib/talk/chart';
 import { Card } from '@/components/ui/card';
 import { CostHint } from '@/components/ui/cost-hint';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
@@ -33,15 +34,9 @@ const at = (hour: number, minute = 0) =>
   `2026-09-28T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
 
 /** A `show_chart` call as a kept turn holds it: the tool's result is the chart. */
-function chartCall(chart: {
-  kind: 'bar' | 'table';
-  title: string;
-  rows: { label: string; value: number }[];
-  currency: string | null;
-  unit: string | null;
-  columns: [string, string] | null;
-}): TalkToolCall {
-  return { name: 'show_chart', input: chart, result: { ok: true, chart } };
+function chartCall(chart: Omit<DashChart, 'reference'> & { reference?: DashChart['reference'] }): TalkToolCall {
+  const kept = { reference: null, ...chart };
+  return { name: 'show_chart', input: kept, result: { ok: true, chart: kept } };
 }
 
 /** Twelve shops, the most a chart draws, with the longest name a shop is given. */
@@ -163,6 +158,41 @@ const TURNS: TalkTurn[] = [
         currency: null,
         unit: 'days',
         columns: ['Stage', 'Median days'],
+      }),
+    ],
+  },
+  { id: 'q5', role: 'user', body: 'What did I spend on food delivery in September?', createdAt: at(11) },
+  {
+    id: 'a5',
+    role: 'assistant',
+    body:
+      'You spent $412.80 on food delivery in September across 19 orders. That is 38% more than your June to August average of $299 a month, and the first month this year over your $300 budget.',
+    createdAt: at(11),
+    toolCalls: [
+      chartCall({
+        kind: 'figure',
+        title: 'Food delivery, September',
+        rows: [{ label: 'September, 19 orders', value: 412.8 }],
+        currency: 'USD',
+        unit: null,
+        columns: null,
+        reference: { label: 'Jun to Aug average', value: 299 },
+      }),
+      chartCall({
+        kind: 'columns',
+        title: 'Food delivery by month, 2026',
+        rows: [
+          { label: 'Apr', value: 262.4 },
+          { label: 'May', value: 281 },
+          { label: 'Jun', value: 305 },
+          { label: 'Jul', value: 276 },
+          { label: 'Aug', value: 316 },
+          { label: 'Sep', value: 412.8 },
+        ],
+        currency: 'USD',
+        unit: null,
+        columns: null,
+        reference: { label: 'Budget', value: 300 },
       }),
     ],
   },
