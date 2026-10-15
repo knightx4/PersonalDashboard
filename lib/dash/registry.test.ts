@@ -26,11 +26,13 @@ describe('DASH_TOOLS', () => {
       ...THREAD_TOOL_NAMES,
       ...CAPTURE_TOOL_NAMES,
       'propose_watch',
+      'propose_build',
       HAND_OFF_TOOL_NAME,
     ]);
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
-    // The other three proposals became writes (plan #1440); a watch acts outside the app.
-    expect(dashToolsOf('proposal').map((t) => t.name)).toEqual(['propose_watch']);
+    // The other three proposals became writes (plan #1440); a watch acts outside
+    // the app, and a build starts a session that cannot be undone (plan #2106.1).
+    expect(dashToolsOf('proposal').map((t) => t.name)).toEqual(['propose_watch', 'propose_build']);
     expect(dashToolsOf('handoff').map((t) => t.name)).toEqual([
       'send_step',
       'pass_to_session',
@@ -93,6 +95,7 @@ describe('DASH_TOOLS', () => {
       ...ASK_TOOL_NAMES,
       ...WRITE_TOOL_NAMES,
       'propose_watch',
+      'propose_build',
       HAND_OFF_TOOL_NAME,
     ]);
   });
@@ -108,6 +111,7 @@ describe('DASH_TOOLS', () => {
       expect(names.slice(0, lookups.length + WRITE_TOOL_NAMES.length)).toEqual([...lookups, ...WRITE_TOOL_NAMES]);
       expect(names).not.toContain('show_chart');
       expect(names).not.toContain('propose_watch');
+      expect(names).not.toContain('propose_build');
       expect(names).not.toContain(HAND_OFF_TOOL_NAME);
     }
     expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
@@ -158,6 +162,7 @@ describe('DASH_TOOLS', () => {
   it('finds a tool by name, and nothing for a made-up one', () => {
     expect(dashTool('todos')?.kind).toBe('lookup');
     expect(dashTool('propose_watch')?.kind).toBe('proposal');
+    expect(dashTool('propose_build')?.kind).toBe('proposal');
     expect(dashTool('close_todo')?.kind).toBe('write');
     expect(dashTool('propose_todo')).toBeUndefined();
     expect(dashTool('hand_off')?.kind).toBe('handoff');

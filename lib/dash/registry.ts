@@ -30,10 +30,11 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
  *             moved or ticked off, a goal or a step added, a step closed,
  *             an item marked returned, a note on a role.
  *
- * Only a watch on a price is still a proposal (propose_watch): it reads a
+ * Two things are still proposals. A watch on a price (propose_watch) reads a
  * page outside the app every hour, and what acts outside the app waits for
- * the person. The other three proposals became the writes add_todo,
- * add_goal_step and mark_returned.
+ * the person. A build on a plan step (propose_build, plan #2106.1) starts a
+ * session that cannot be undone. The other three proposals became the writes
+ * add_todo, add_goal_step and mark_returned.
  *
  * The lookup and proposal code stays where it is: this file lists the tools
  * and does not run them. A write tool is different, since what it does is
@@ -182,7 +183,7 @@ export type DashTool = DashLookupTool | DashProposalTool | DashHandoffTool | Das
 const IN_APP = new Set<string>(IN_APP_ONLY_TOOLS);
 
 /** The proposals still offered: the rest became writes (plan #1440). */
-const REGISTERED_PROPOSALS = new Set<string>(['propose_watch']);
+const REGISTERED_PROPOSALS = new Set<string>(['propose_watch', 'propose_build']);
 
 /** The tools in the order the model is sent them, which keeps the cached prefix stable. */
 export const DASH_TOOLS: readonly DashTool[] = [

@@ -6,6 +6,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { learnChangeWords } from './learn-changes';
 import { isWrittenCard } from './todo-changes';
 import { whenDate } from '@/lib/core/when';
+import { planRefHref } from '@/lib/comments/refs';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -48,6 +49,8 @@ export function changeHref(change: DashChange): string {
       return '/jobs/pipeline';
     case 'add_quick_note':
       return noteHref(change.input.path);
+    case 'start_build':
+      return planRefHref(change.input.number);
   }
 }
 
@@ -234,6 +237,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: quoted(change.input.body),
         rest: " in your vault's Inbox",
       };
+    case 'start_build':
+      return {
+        verb: done ? 'Started the build of' : 'Start the build of',
+        what: `#${change.input.outline} ${change.input.title}`,
+        rest: '',
+      };
   }
 }
 
@@ -283,5 +292,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the pipeline';
     case 'add_quick_note':
       return 'Open the note';
+    case 'start_build':
+      return 'Open the step';
   }
 }
