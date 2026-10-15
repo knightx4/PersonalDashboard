@@ -66,6 +66,31 @@ export function takeawayContext(takeaway: {
   return out.join('\n') + '\n';
 }
 
+/**
+ * An X post draft on the Posts tab (plan #2202.2): its angle and status, the
+ * text as it stands, numbered when it is a thread, and Dash's first draft
+ * when the person has changed it since, so a request to change it is read
+ * against what they already changed.
+ */
+export function postContext(post: {
+  angle: string;
+  status: string;
+  body: readonly string[];
+  draft: readonly string[];
+  images: number;
+  onX: number;
+}): string {
+  const numbered = (posts: readonly string[]) =>
+    posts.length === 1 ? [posts[0]] : posts.map((text, i) => `${i + 1}/${posts.length}: ${text}`);
+  const out = [`# An X post draft — ${post.angle}`, '', `Status: ${post.status}`];
+  if (post.images > 0) out.push(`Pictures: ${post.images}`);
+  if (post.onX > 0) out.push(`Already on X: the first ${post.onX} of the thread`);
+  out.push('', '## The text now', '', ...numbered(post.body));
+  const edited = post.draft.length > 0 && post.draft.join('\n') !== post.body.join('\n');
+  if (edited) out.push('', '## As Dash first drafted it', '', ...numbered(post.draft));
+  return out.join('\n') + '\n';
+}
+
 const NOTE_HEADING: Record<FeedbackRow['kind'], string> = {
   bug: '# A bug report',
   feature: '# A feature request',

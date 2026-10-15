@@ -266,6 +266,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
   'dev-posts-send': ['/dev/posts'],
+  'dev-posts-thread': ['/dev/posts'],
+  'dev-posts-comment': ['/dev/posts'],
   'home-page': ['/home'],
   'home-inbox': ['/home/inbox'],
   'home-watching': ['/home'],

@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { dayLabel } from '@/lib/dev/inspiration/view';
 import { planHref } from '@/lib/search/sources/dev-map';
 import { stepRef } from '@/lib/plan/ref';
+import type { DevComment } from '@/lib/comments/load';
+import { loadRowThreads, rowRef } from '@/lib/thread/store';
 import {
   loadLastPostsRun,
   loadSocialPosts,
@@ -68,7 +70,15 @@ export type PostCard = {
    * that costs (plan #2072). Null for a posted or dropped one.
    */
   send: XSendCheck | null;
+  /**
+   * The comments under it and Dash's replies (plan #2202.2), oldest first.
+   * Only a waiting or posted draft has a thread drawn; a dropped one is empty.
+   */
+  thread: DevComment[];
 };
+
+/** The table a draft's thread is keyed by, as `public.social_posts:<id>`. */
+export const POSTS_TABLE = 'public.social_posts';
 
 export type PostsPage = {
   suggested: PostCard[];
@@ -99,6 +109,8 @@ export function buildPostsPage(input: {
   now: number;
   /** What was read from X: the posts drafts ask about, and the page of the rest. */
   x?: { candidates: readonly XStoredPost[]; listed: readonly XStoredPost[]; total: number };
+  /** Each draft's thread, keyed by its ref (rowRef(POSTS_TABLE, id)). */
+  threads?: ReadonlyMap<string, DevComment[]>;
 }): PostsPage {
   const steps = new Map(input.steps.map((step) => [step.id, step]));
   const notes = new Map(input.notes.map((note) => [note.id, note]));
@@ -142,7 +154,8 @@ export function buildPostsPage(input: {
     const candidate =
       post.status !== 'posted' && post.xCandidateId ? (candidates.get(post.xCandidateId) ?? null) : null;
     const send = post.status === 'suggested' ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
-    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send };
+    const thread = post.status === 'dropped' ? [] : (input.threads?.get(rowRef(POSTS_TABLE, post.id)) ?? []);
+    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send, thread };
   };
 
   return {
@@ -252,7 +265,10 @@ export async function loadPostsPage(
   const stepIds = [...new Set(posts.flatMap((post) => post.sourcePlanItemIds))];
   const noteIds = [...new Set(posts.flatMap((post) => post.sourceFeedbackIds))];
 
-  const [steps, outlines, notes, x] = await Promise.all([
+  // Threads only on the drafts that draw one: a dropped draft has none.
+  const threaded = posts.filter((post) => post.status !== 'dropped').map((post) => post.id);
+
+  const [steps, outlines, notes, x, threads] = await Promise.all([
     stepIds.length
       ? supabase.from('plan_items').select('id, number, title').eq('user_id', userId).in('id', stepIds)
       : Promise.resolve({ data: [], error: null }),
@@ -264,6 +280,7 @@ export async function loadPostsPage(
       ? supabase.from('feedback_items').select('id, body').eq('user_id', userId).in('id', noteIds)
       : Promise.resolve({ data: [], error: null }),
     loadXPosts(supabase, userId, posts, shown),
+    loadRowThreads(supabase, POSTS_TABLE, threaded, { userId }),
   ]);
   if (steps.error) throw new Error(`Could not read the steps the posts cite: ${steps.error.message}`);
   if (notes.error) throw new Error(`Could not read the notes the posts cite: ${notes.error.message}`);
@@ -279,5 +296,6 @@ export async function loadPostsPage(
     run,
     now,
     x,
+    threads,
   });
 }

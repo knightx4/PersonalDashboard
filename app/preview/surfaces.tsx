@@ -334,11 +334,13 @@ import {
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
 import {
+  PostsCommentSurface,
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
   PostsSendSurface,
   PostsSurface,
+  PostsThreadSurface,
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
@@ -6330,6 +6332,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsSendSurface />,
+  },
+  {
+    /* Comments on a draft (plan #2202.2): a waiting draft Dash shortened
+     * when tagged, with an untagged note under it, and a posted one whose
+     * tagged comment Dash marked seen. */
+    id: 'dev-posts-thread',
+    label: 'Dev · Posts, comments on a draft',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsThreadSurface />,
+  },
+  {
+    /* Add a comment pressed on a draft with no thread: the box open. */
+    id: 'dev-posts-comment',
+    label: 'Dev · Posts, writing a comment',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsCommentSurface />,
   },
   {
     /* Home's Inbox (plan #1937.7), which took the bell's place: every

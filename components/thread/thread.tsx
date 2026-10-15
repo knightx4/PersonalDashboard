@@ -405,6 +405,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   spec: DEV_STORE,
   takeaway: DEV_STORE,
   change: DEV_STORE,
+  post: DEV_STORE,
   goal: GOALS_STORE,
   role: ROLE_STORE,
   file: ROW_STORE,
