@@ -48,7 +48,12 @@ registered; working offline, read the line and `REFERENCES` yourself.
   surface it is for, with `pictures`, `link`, `why` (what the person likes
   about it, in a sentence, from the step or their note) and `from` (this
   step's outline). Save its pictures under `docs/references/<surface>/` and
-  list them. A link with no pictures is photographed the first time: open it
+  list them. A mockup made in a chat (a `claude.ai/artifact` link) also
+  saves its HTML there, read with the Artifact tool, as the entry's
+  `source`, so you and the critic take its sizes, colours and spacing from
+  the page rather than from pixels. Build from the app's own components and
+  tokens all the same: the source is what to match, never code to paste. The
+  gate fails a chat mockup registered without its source. A link with no pictures is photographed the first time: open it
   at 390 and 1280 wide, as the gallery shots are, save the shots there, and
   list them, so every later round sees the same design whatever the page
   shows by then. A step that names a reference without saying which surface
