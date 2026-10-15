@@ -90,3 +90,52 @@ computing variance of `z.ZodType<T>` in its `each` helper.
 4. Type the repeated Supabase reads through a few shared loaders with an
    explicit row type, so the chain is instantiated once and not per page.
 5. Import the world-atlas JSON through a `.d.ts` that types it as `Topology`.
+
+## After #2205.2
+
+Measured 15 October 2026 on the same machine with the same command
+(`tsc --noEmit --incremental false` under the python snippet above, no
+`tsconfig.tsbuildinfo`). The before column was re-measured on this machine at
+the same time; the 5.10 GiB above came from a different run, and peak RSS
+varies by a few hundred MiB between runs of the same tree.
+
+| | Before | After |
+|---|---|---|
+| Peak memory (max RSS) | 4.60 GiB (4,820,436 KiB) | 2.97 GiB (3,109,788 KiB) |
+| `Memory used` (tsc's own count) | 4.48 GiB | 2.82 GiB |
+| Wall time, no errors | 154 s | 106 s |
+| Types | 1,764,406 | 1,047,324 |
+| Instantiations | 9,377,851 | 2,047,138 |
+
+Four further runs of the after tree peaked between 2.94 and 3.02 GiB.
+
+`npm run typecheck`, which the gate, CI and the building guide use, is still
+one `tsc` process over the whole project, tests included. Next's type check
+during `next build` reads the same `tsconfig.json`, so it gets the same saving.
+
+### What changed
+
+The cost was the select-string parser in `@supabase/postgrest-js`. Every
+client here is created without a `Database` type, and for that case the
+library still parses each `.select('...')` string at the type level to infer a
+row of `any` fields. About 2,300 select calls did that.
+
+`lib/db/postgrest-select.d.ts` adds a `select()` overload, ahead of the
+library's own, that applies only when the schema is `any`: it takes the column
+list as a plain `string` and types each row as `any`. A client given a real
+`Database` type falls through to the library's own `select()`.
+
+Rows were `{ col: any }` objects before and are `any` now, so a misspelt
+property on an untyped row is no longer caught. One page relied on the
+inferred shape for callback parameters, `app/shopping/orders/[id]/page.tsx`,
+and now states its row type with `.maybeSingle<OrderRow>()`. Nothing changes
+at runtime.
+
+### Tried and not kept
+
+| Change | Result |
+|---|---|
+| Drop `{ schema }` from `drizzle()` in `lib/db/admin.ts` | 13k fewer types and 158k fewer instantiations, peak memory unchanged (2.96 GiB). Not kept. |
+| `@types/node` 22 | `compatibility/indexable.d.ts` is identical in 22.20.5, so `RelativeIndexable` stays. Not installed. |
+| Type the `world-atlas` and `us-atlas` JSON as `Topology` | Peak 3.00 GiB, no change. Not kept. |
+| Check tests in a separate `tsc` run | The project without tests peaks at 2.39 GiB in 74 s. The whole project in one run is already under 3 GiB, so the split is left as the next lever if the count grows again. |
