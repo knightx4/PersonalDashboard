@@ -35,6 +35,7 @@ export function PipelineFilters({
   counts,
   sources,
   scored,
+  marks,
 }: {
   params: PipelineParams;
   state: PipelineState;
@@ -43,6 +44,8 @@ export function PipelineFilters({
   sources: readonly (readonly [ApplicationSource, number])[];
   /** Whether any application has a fit or a chance to filter by. */
   scored: boolean;
+  /** How many applications in scope each ready and cover letter choice would show. */
+  marks: { ready: number; notReady: number; letter: number; noLetter: number };
 }) {
   const router = useRouter();
   // On a phone the line holds status, source and More; the other three come
@@ -50,7 +53,7 @@ export function PipelineFilters({
   const [more, setMore] = useState(false);
   const tucked = (set: boolean) => (more || set ? undefined : 'max-sm:hidden');
   const anyTucked =
-    !more && (!state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
+    !more && (state.ready === null || state.letter === null || !state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
   const go = (changes: Partial<Record<keyof PipelineParams, string | undefined>>) =>
     router.push(pipelineHref(params, changes), { scroll: false });
 
@@ -144,6 +147,30 @@ export function PipelineFilters({
           <option value="high">{CHANCE_BAND_LABELS.high} chance</option>
         </PressChip>
       )}
+      <PressChip
+        className={tucked(state.ready !== null)}
+        name="ready"
+        aria-label="Filter by ready to apply"
+        placeholderValue=""
+        value={state.ready === null ? '' : state.ready ? 'yes' : 'no'}
+        onChange={(event) => go({ ready: event.currentTarget.value || undefined })}
+      >
+        <option value="">Any readiness</option>
+        <option value="yes">Ready to apply · {marks.ready}</option>
+        <option value="no">Not ready · {marks.notReady}</option>
+      </PressChip>
+      <PressChip
+        className={tucked(state.letter !== null)}
+        name="letter"
+        aria-label="Filter by cover letter"
+        placeholderValue=""
+        value={state.letter === null ? '' : state.letter ? 'yes' : 'no'}
+        onChange={(event) => go({ letter: event.currentTarget.value || undefined })}
+      >
+        <option value="">Any cover letter</option>
+        <option value="yes">With a cover letter · {marks.letter}</option>
+        <option value="no">Without a cover letter · {marks.noLetter}</option>
+      </PressChip>
       {anyTucked && (
         <Button type="button" variant="ghost" size="xs" onClick={() => setMore(true)} className="sm:hidden">
           More
