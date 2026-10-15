@@ -87,6 +87,17 @@ export async function dismissItem(sourceId: string, key: string): Promise<{ erro
   return { error: null };
 }
 
+/** The toast's Undo on Later or Drop (plan #1957.3): the item is back on the list. */
+// latency: pending
+export async function restoreItem(sourceId: string, key: string): Promise<{ error: string | null }> {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source?.restore) return refuse(sourceId, 'bring back');
+
+  await source.restore(await context(), key);
+  done();
+  return { error: null };
+}
+
 /**
  * Answer a question on the agenda with one of its options (plan #1267). The
  * source records it where the question lives; the row marks itself answered

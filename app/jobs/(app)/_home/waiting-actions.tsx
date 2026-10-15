@@ -9,46 +9,53 @@ import { FieldError, Input } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { SNOOZE_DAYS, type WaitingOnYou } from '@/lib/jobs/today/load';
 import { addLinkedTask, type LinkedTaskState } from '@/app/todo/link-actions';
-import { completeWaiting, snoozeWaiting } from './actions';
+import { completeWaiting, restoreWaiting, snoozeWaiting } from './actions';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { prepareWithDash, type PrepareState } from './prepare-actions';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Same two answers as a reminder -- dealt with, or not now -- for the one
  * section that is not backed by a reminder row: a request already answered.
+ * Either can be taken back from the toast.
  */
-function DismissActions({
+function CloseActions({
   onComplete,
   onSnooze,
+  onRestore,
 }: {
   onComplete: () => Promise<{ error: string | null }>;
   onSnooze: () => Promise<{ error: string | null }>;
+  onRestore: () => Promise<{ error: string | null }>;
 }) {
   const [busy, startTransition] = useTransition();
+  const toast = useToast();
+
+  function close(write: () => Promise<{ error: string | null }>, text: string) {
+    startTransition(async () => {
+      const result = await write();
+      if (result.error) return toast({ text: result.error });
+      toast({ text, undo: async () => void (await onRestore()) });
+    });
+  }
 
   return (
     <span className="ml-auto flex shrink-0 items-center gap-2">
       <Tooltip label={`Brings it back in ${SNOOZE_DAYS} days`} align="end">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        <CloseButton
+          lifecycle="later"
           pending={busy}
-          onClick={() => startTransition(() => void onSnooze())}
-        >
-          Later
-        </Button>
+          onClick={() => close(onSnooze, `Later: back in ${SNOOZE_DAYS} days`)}
+        />
       </Tooltip>
       <Tooltip label="Takes it off this list for good" align="end">
-        <Button
-          type="button"
+        <CloseButton
+          lifecycle="done"
           variant="secondary"
-          size="sm"
           pending={busy}
-          onClick={() => startTransition(() => void onComplete())}
-        >
-          Dismiss
-        </Button>
+          onClick={() => close(onComplete, 'Done')}
+        />
       </Tooltip>
     </span>
   );
@@ -108,9 +115,10 @@ export function WaitingActions({ row }: { row: WaitingOnYou }) {
             <PaidHint action="app/jobs/(app)/_home/prepare-actions.ts#prepareWithDash" what="Cost of Dash’s help" />
           </span>
         )}
-        <DismissActions
+        <CloseActions
           onComplete={() => completeWaiting(row.eventId)}
           onSnooze={() => snoozeWaiting(row.eventId)}
+          onRestore={() => restoreWaiting(row.eventId)}
         />
       </div>
 

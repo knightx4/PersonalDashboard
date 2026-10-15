@@ -1262,25 +1262,30 @@ describe('a step a session added under an approved feature', () => {
     const rest = [{ id: 'assign', label: 'Mine', onSelect: () => {} }];
 
     it('puts Drop first, one press that drops this step', () => {
-      const menu = withSessionDrop({ id: 'a', status: 'not_started', comment: stamp }, rest);
+      let dropped = 0;
+      const menu = withSessionDrop({ id: 'a', status: 'not_started', comment: stamp }, rest, () => {
+        dropped += 1;
+      });
       expect(menu.map((entry) => entry.label)).toEqual(['Drop', 'Mine']);
       const [drop] = menu;
-      // No confirm and no note to type: the step can be put back from the
-      // status menu, so a second press would only be in the way.
+      // No confirm and no note to type: the toast's Undo puts it back, so a
+      // second press would only be in the way (plan #1957.3).
       expect(drop.confirm).toBeUndefined();
-      expect(drop.formFields).toEqual({ id: 'a', status: 'dropped' });
+      expect(drop.lifecycle).toBe('dropped');
+      drop.onSelect?.();
+      expect(dropped).toBe(1);
     });
 
     it('offers it on a blocked or underway step as well', () => {
       for (const status of ['in_progress', 'blocked'] as const) {
-        expect(withSessionDrop({ id: 'a', status, comment: stamp }, rest)[0].label).toBe('Drop');
+        expect(withSessionDrop({ id: 'a', status, comment: stamp }, rest, () => {})[0].label).toBe('Drop');
       }
     });
 
     it('leaves the menu alone on a closed step or one without the stamp', () => {
-      expect(withSessionDrop({ id: 'a', status: 'done', comment: stamp }, rest)).toBe(rest);
-      expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest)).toBe(rest);
-      expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest)).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'done', comment: stamp }, rest, () => {})).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest, () => {})).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest, () => {})).toBe(rest);
     });
   });
 });

@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { createClient, requireUser } from '@/lib/auth/server';
-import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
+import { confirmChange, declineChange, reopenChange,
+  undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
@@ -292,6 +293,11 @@ export async function confirmAskChange(id: string): Promise<ChangeOutcome> {
 /** Mark a proposed change declined, or say why not. */
 export async function declineAskChange(id: string): Promise<ChangeOutcome> {
   return declineChange(await changeDeps(), id);
+}
+
+/** Take a Decline back: the change is proposed again, or say why not. */
+export async function reopenAskChange(id: string): Promise<ChangeOutcome> {
+  return reopenChange(await changeDeps(), id);
 }
 
 /** Take a confirmed change back and mark it undone, or say why not. */

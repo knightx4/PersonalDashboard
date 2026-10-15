@@ -7,7 +7,9 @@ import { Input, Select } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
-import { completeReminder } from '@/app/jobs/(app)/_home/actions';
+import { completeReminder, restoreReminder } from '@/app/jobs/(app)/_home/actions';
+import { useToast } from '@/components/ui/toast';
+import { LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { Tooltip } from '@/components/ui/tooltip';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
@@ -127,6 +129,7 @@ function TodoLine({
   const [dueAt, setDueAt] = useState(() => dueDateInput(todo.dueAt));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   function open() {
     // From the row as it stands, not from whatever was typed and abandoned
@@ -147,12 +150,25 @@ function TodoLine({
        * line under the words. */
       <div>
         <div className="flex items-center gap-2">
-          <Tooltip label="Mark this to-do done" className="-m-1 shrink-0">
+          <Tooltip label={LIFECYCLE_VERB.done} className="-m-1 shrink-0">
             <IconButton
               size="sm"
-              label="Mark done"
+              label={`${LIFECYCLE_VERB.done}: ${todo.body}`}
               disabled={finishing}
-              onClick={() => finish(() => void completeReminder(todo.id))}
+              onClick={() =>
+                finish(async () => {
+                  const result = await completeReminder(todo.id);
+                  if (result.error) return setError(result.error);
+                  // Done, with the way back (plan #1957.3).
+                  toast({
+                    text: LIFECYCLE_WORD.done,
+                    undo: async () => {
+                      const back = await restoreReminder(todo.id, null);
+                      if (back.error) throw new Error(back.error);
+                    },
+                  });
+                })
+              }
               className="hover:text-accent"
             >
               <StatusGlyph glyph={TASK_STATUS_GLYPHS.open} size={14} />

@@ -35,6 +35,7 @@ import { writingGuideFindings } from '@/lib/learn/essays/checks-local';
 import { runCheckCall } from '@/lib/learn/essays/checks-model';
 import {
   closeNote,
+  reopenNote,
   insertNotes,
   loadNote,
   loadNoteStates,
@@ -706,6 +707,20 @@ export async function closeEssayNote(
     return { ok: true, ...(await closeNote(supabase, parsed.data.id, parsed.data.noteId, outcome)) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Could not close the note.' };
+  }
+}
+
+/** The toast's Undo on a note's Done or Decline (plan #1957.3). */
+// latency: pending
+export async function reopenEssayNote(id: string, noteId: string): Promise<NotesResult> {
+  await requireUser();
+  const parsed = NoteInput.safeParse({ id, noteId });
+  if (!parsed.success) return { ok: false, error: 'Could not find that note.' };
+  const supabase = await createLearnClient();
+  try {
+    return { ok: true, ...(await reopenNote(supabase, parsed.data.id, parsed.data.noteId)) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not bring the note back.' };
   }
 }
 

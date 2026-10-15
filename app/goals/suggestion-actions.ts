@@ -8,6 +8,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { parseYourReaction } from '@/lib/goals/suggestions';
 import {
   acceptStepSuggestion,
+  clearDecline,
   reactToSuggestion,
   recordAttended,
 } from '@/lib/goals/suggestions-store';
@@ -46,6 +47,22 @@ export async function reactToSuggestionAction(
   }
   revalidatePath('/goals', 'layout');
   revalidatePath('/todo', 'layout');
+  revalidatePath('/home');
+  return { done: Date.now() };
+}
+
+/** The toast's Undo on Decline: the suggestion is unanswered again (plan #1957.3). */
+// latency: pending
+export async function undoDeclineAction(id: string): Promise<SuggestionActionState> {
+  await requireUser();
+  const parsed = Id.safeParse(id);
+  if (!parsed.success) return { error: 'Could not tell which suggestion that was.' };
+  try {
+    await clearDecline(await createGoalsClient(), parsed.data);
+  } catch {
+    return { error: 'Could not take that back. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
   revalidatePath('/home');
   return { done: Date.now() };
 }

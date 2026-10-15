@@ -85,6 +85,10 @@ export const returnDeadlinesSource: AgendaSource = {
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'return_deadline', key, null, ctx.clients);
   },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'return_deadline', key, ctx.clients);
+  },
 };
 
 /** Exported for the undo path, and so the enum value has exactly one owner. */

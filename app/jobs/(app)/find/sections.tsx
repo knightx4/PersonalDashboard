@@ -15,6 +15,8 @@ import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useToast } from '@/components/ui/toast';
+import { CloseButton } from '@/components/inbox/close-button';
 import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
 import { OPENING_SOURCE_LABELS, OPENING_SOURCES, sourceText } from '@/lib/jobs/suggest/source';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
@@ -38,6 +40,7 @@ import type { RunLine } from '@/lib/jobs/suggest/search-runs';
 import {
   dismissOpening,
   dismissSuggestion,
+  reopenSuggestion,
   markSuggestionSent,
   saveOpening,
   suggestOpenings,
@@ -566,6 +569,7 @@ function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
 
 function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const message = suggestion.message ?? '';
@@ -584,6 +588,16 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
     start(async () => {
       const result = await action();
       setError(result.error);
+    });
+  const decline = (action: () => Promise<{ error: string | null }>) =>
+    start(async () => {
+      const result = await action();
+      setError(result.error);
+      if (!result.error)
+        toast({
+          text: 'Declined',
+          undo: async () => void (await reopenSuggestion(suggestion.id)),
+        });
     });
 
   return (
@@ -686,15 +700,11 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
           </a>
         )}
         <span className="ml-auto flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
+          <CloseButton
+            lifecycle="declined"
             pending={busy}
-            onClick={() => act(() => dismissSuggestion(suggestion.id))}
-          >
-            Not now
-          </Button>
+            onClick={() => decline(() => dismissSuggestion(suggestion.id))}
+          />
           <Button
             type="button"
             size="sm"
@@ -831,6 +841,7 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
  */
 function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const steps = moveSteps(suggestion.move);
@@ -839,6 +850,16 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
     start(async () => {
       const result = await action();
       setError(result.error);
+    });
+  const decline = (action: () => Promise<{ error: string | null }>) =>
+    start(async () => {
+      const result = await action();
+      setError(result.error);
+      if (!result.error)
+        toast({
+          text: 'Declined',
+          undo: async () => void (await reopenSuggestion(suggestion.id)),
+        });
     });
 
   const title = (
@@ -908,15 +929,11 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
             )}
         </Disclosure>
         <span className="ml-auto flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
+          <CloseButton
+            lifecycle="declined"
             aria-expanded={choosing}
             onClick={() => setChoosing(!choosing)}
-          >
-            Not for me
-          </Button>
+          />
           <Button
             type="button"
             size="sm"
@@ -941,7 +958,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
               type="button"
               variant="link"
               disabled={busy}
-              onClick={() => act(() => dismissOpening(suggestion.id, reason))}
+              onClick={() => decline(() => dismissOpening(suggestion.id, reason))}
               className="text-ink"
             >
               {DISMISS_REASON_LABELS[reason]}

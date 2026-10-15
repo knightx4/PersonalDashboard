@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { Card, CardSection } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -22,6 +24,7 @@ import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
   closeEssayNote,
   helpEssayNote,
+  reopenEssayNote,
   moveEssayNotes,
   rephraseEssaySelection,
   runEssayCheck,
@@ -66,6 +69,7 @@ export function useEssayNotes(
   const [stopped, setStopped] = useState(initial.stopped);
   const [active, setActive] = useState<string | null>(initialOpen);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [running, setRunning] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<string | null>(null);
   const [ran, setRan] = useState<{ check: string; raised: number } | null>(null);
@@ -194,8 +198,16 @@ export function useEssayNotes(
         return;
       }
       apply(result);
+      toast({
+        text: outcome === 'done' ? 'Done' : 'Declined',
+        undo: async () => {
+          const back = await reopenEssayNote(essayId, note.id);
+          if (!back.ok) throw new Error(back.error);
+          apply(back);
+        },
+      });
     },
-    [active, apply, editor, essayId, notes, open, place],
+    [active, apply, editor, essayId, notes, open, place, toast],
   );
 
   /** Rung 4: Rephrase on the note's text, with its hint, shown as a change to accept or reject. */
@@ -343,7 +355,7 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
           <LinkedText text={note.why} />
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center gap-0.5">
         {!detached && note.rung < 3 && (
           <Button type="button" variant="secondary" size="sm" onClick={() => void api.help(note)}>
             Help
@@ -371,30 +383,19 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-expanded={explained}
             onClick={() => setExplained((on) => !on)}
           >
             Explain
           </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void api.close(note, 'done')}
-        >
-          {detached ? 'Clear' : 'Done'}
-        </Button>
+        {/* Done and Decline with their glyphs, at the small size so a
+            note's actions stay on one line in the rail (plan #1957.3). A
+            detached note's text has gone from the draft, so it is Done. */}
+        <CloseButton size="xs" lifecycle="done" onClick={() => void api.close(note, 'done')} />
         {!detached && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void api.close(note, 'dismissed')}
-          >
-            Dismiss
-          </Button>
+          <CloseButton size="xs" lifecycle="declined" onClick={() => void api.close(note, 'dismissed')} />
         )}
       </div>
     </li>

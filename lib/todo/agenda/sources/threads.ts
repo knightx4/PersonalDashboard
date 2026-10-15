@@ -5,7 +5,7 @@ import { pageFor } from '@/lib/sources/catalogue';
 import type { PageRow } from '@/lib/sources/types';
 import type { AnyClient } from '@/lib/thread/store';
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -191,5 +191,9 @@ export const threadsSource: AgendaSource = {
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'thread', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'thread', key, ctx.clients);
   },
 };

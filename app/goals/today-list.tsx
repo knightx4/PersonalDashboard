@@ -1,7 +1,7 @@
 'use client';
 
 import Link, { linkVariants } from '@/components/ui/link';
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { BellRing, Copy, ExternalLink } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -26,7 +26,8 @@ import { addGoalComment } from './[goalId]/comment-actions';
 import { settleGoalAction } from './actions';
 import { answerFlagAction } from './[goalId]/flag-actions';
 import { answerGoalQuestion } from './[goalId]/tree-actions';
-import { reactToSuggestionAction, recordAttendedAction } from './suggestion-actions';
+import { reactToSuggestionAction, recordAttendedAction, undoDeclineAction } from './suggestion-actions';
+import { CloseButton } from '@/components/inbox/close-button';
 
 /**
  * A row of what is on you on the Goals home (plan #1077): everything worth doing,
@@ -82,10 +83,12 @@ const PRIMARY_VALUE: Partial<Record<TodayKind, [string, string]>> = {
   park: ['move', 'park'],
 };
 
-/** The quiet second answer, where the old home offered one. */
+/**
+ * The quiet second answer, where the old home offered one. A suggestion's is
+ * Decline, drawn as its own button with the toast's Undo (DeclineSuggestion).
+ */
 const SECOND: Partial<Record<TodayKind, [string, string, string]>> = {
   went: ['went', 'no', 'No'],
-  suggestion: ['reaction', 'not_for_me', 'Not for me'],
   close: ['move', 'keep', 'Keep it open'],
   park: ['move', 'keep', 'Keep it open'],
 };
@@ -250,6 +253,7 @@ export function TodayRow({
                 {item.action}
               </Button>
             )}
+            {item.kind === 'suggestion' && <DeclineSuggestion id={item.id} onAside={onAside} />}
             {second && (
               <Button
                 type="submit"
@@ -277,6 +281,39 @@ export function TodayRow({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Decline on a suggestion from the weekly run (plan #1957.3): the row goes,
+ * and the toast's Undo brings it back unanswered.
+ */
+function DeclineSuggestion({ id, onAside }: { id: string; onAside: (hidden: boolean) => void }) {
+  const [pending, start] = useTransition();
+  const toast = useToast();
+  return (
+    <CloseButton
+      lifecycle="declined"
+      pending={pending}
+      onClick={() =>
+        start(async () => {
+          const form = new FormData();
+          form.set('id', id);
+          form.set('reaction', 'not_for_me');
+          const result = await reactToSuggestionAction({}, form);
+          if (result.error) return toast({ text: result.error });
+          onAside(true);
+          toast({
+            text: 'Declined',
+            undo: async () => {
+              const back = await undoDeclineAction(id);
+              if (back.error) throw new Error(back.error);
+              onAside(false);
+            },
+          });
+        })
+      }
+    />
   );
 }
 
