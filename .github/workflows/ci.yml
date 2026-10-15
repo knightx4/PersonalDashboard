@@ -71,8 +71,14 @@ jobs:
       - name: Test
         run: scripts/ci-step.sh Test npm test
 
+      # next build checks types in the same process as the bundle, which needs
+      # more than Node's default 4 GB heap on this codebase: the check alone
+      # uses about 5 GB, and main's build ran out of memory from e0bdd62 on.
+      # The runner has 16 GB.
       - name: Build
         run: scripts/ci-step.sh Build npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   # The design checks read source files and need neither a database nor a
   # build, so they run beside the check job rather than inside it. A design
