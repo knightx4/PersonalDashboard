@@ -164,6 +164,10 @@ import {
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
+  LearnExternalSurface,
+  LearnExternalItemSurface,
+  LearnExternalNewSurface,
+  LearnExternalScoreSurface,
   LearnReadingSurface,
   LearnReadingTextSurface,
   LearnReadingSummarySurface,
@@ -7800,6 +7804,38 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnQuizTakeSurface />,
+  },
+  {
+    /* External check (plan #2179.4): one set scored, one half sat. */
+    id: 'learn-external',
+    label: 'Learn · External check',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalSurface />,
+  },
+  {
+    /* No set sat yet: the paste form stands open. */
+    id: 'learn-external-new',
+    label: 'Learn · External check, no set yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalNewSurface />,
+  },
+  {
+    /* The item form, one question at a time, with nothing said of earlier ones. */
+    id: 'learn-external-item',
+    label: 'Learn · External check, one item',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalItemSurface />,
+  },
+  {
+    /* The score, drawn after the last item. */
+    id: 'learn-external-score',
+    label: 'Learn · External check, the score',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalScoreSurface />,
   },
   {
     id: 'learn-reading',
