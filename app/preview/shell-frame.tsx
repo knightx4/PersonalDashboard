@@ -60,6 +60,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   you: {
     sections: [
       { href: '/you/personality', label: 'Personality', icon: 'personality' },
+      { href: '/you/details', label: 'Details', icon: 'details' },
       { href: '/you/places', label: 'Places', icon: 'places' },
       { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
       { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
