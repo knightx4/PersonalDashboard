@@ -40,6 +40,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/goals/runs/[runId]',
   '/goals/settings',
   '/home',
+  '/home/inbox',
   '/home/week',
   '/home/week/[week]',
   '/jobs',

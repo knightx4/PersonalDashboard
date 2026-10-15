@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Inbox } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -145,6 +145,34 @@ export function BriefLine({ module, brief }: { module: ModuleId; brief: Brief })
       )}
       {brief.tone === 'caution' && <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />}
     </li>
+  );
+}
+
+/**
+ * How many things are on you across every workspace, as a line that opens
+ * Home's Inbox (plan #1937.7). It took the bell's place: the bell counted the
+ * open raises from every page, and this counts everything, from the page the
+ * day starts on. A null count is an Inbox that could not be read, which says
+ * so rather than claiming nothing is waiting.
+ */
+export function InboxLine({ count }: { count: number | null }) {
+  const words =
+    count === null
+      ? 'Your Inbox could not be counted just now'
+      : count === 0
+        ? 'Nothing is waiting on you'
+        : count === 1
+          ? '1 thing is waiting on you'
+          : `${count} things are waiting on you`;
+  return (
+    <Link
+      href="/home/inbox"
+      className="press-area mt-3 flex items-center gap-3 py-2 text-body text-ink hover:text-accent"
+    >
+      <Inbox className="size-5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <span className="tabular min-w-0 flex-1 truncate">{words}</span>
+      <span className="shrink-0 text-small text-ink-muted">Inbox</span>
+    </Link>
   );
 }
 

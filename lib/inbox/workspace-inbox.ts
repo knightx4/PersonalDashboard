@@ -10,6 +10,7 @@ import { loadAgenda } from '@/lib/todo/agenda/load';
 import { allSources, sourceModule } from '@/lib/todo/agenda/registry';
 import { inboxEntries, type AgendaInbox } from '@/lib/todo/agenda/workspace';
 import { todayIn } from '@/lib/todo/tasks/model';
+import type { AgendaEntry } from '@/lib/todo/agenda/merge';
 import { agendaInboxRow, type SourceAbilities } from '@/lib/inbox/agenda-rows';
 import { queueRow, type InboxQueue } from '@/lib/inbox/queue-rows';
 import {
@@ -88,32 +89,41 @@ const QUEUE_COUNTS: Partial<Record<AgendaInbox, { queue: InboxQueue; label: stri
   ],
 };
 
-export async function loadWorkspaceInbox(userId: string, workspace: AgendaInbox): Promise<WorkspaceInbox> {
-  const now = new Date();
+/** A workspace's queues as rows, with any queue that could not be counted named. */
+export async function queueRowsFor(
+  userId: string,
+  workspace: AgendaInbox,
+): Promise<{ rows: InboxRow[]; failed: string[] }> {
   const queues = QUEUE_COUNTS[workspace] ?? [];
-
-  const [agenda, counted] = await Promise.all([
-    loadAgenda(userId, now, sessionClients, { workspace }),
-    Promise.allSettled(queues.map((q) => q.count(userId))),
-  ]);
-
-  const today = todayIn(agenda.timezone, now);
-  const can = abilities();
-  const failed = [...agenda.failed];
-
-  const queueRows: InboxRow[] = [];
+  const counted = await Promise.allSettled(queues.map((q) => q.count(userId)));
+  const rows: InboxRow[] = [];
+  const failed: string[] = [];
   counted.forEach((result, index) => {
     if (result.status === 'rejected') {
       failed.push(queues[index].label);
       return;
     }
     const row = queueRow(queues[index].queue, result.value);
-    if (row) queueRows.push(row);
+    if (row) rows.push(row);
   });
+  return { rows, failed };
+}
 
-  const rows = inboxEntries(agenda.piles, workspace, sourceModule)
+/** Agenda entries as Inbox rows, each press going back through the agenda's verbs. */
+export function agendaRowsOf(entries: readonly AgendaEntry[], today: string): InboxRow[] {
+  const can = abilities();
+  return entries
     .map((entry) => agendaInboxRow(entry, ACTIONS, can, today))
     .filter((row): row is InboxRow => row !== null);
+}
 
-  return { rows: [...queueRows, ...rows], failed };
+export async function loadWorkspaceInbox(userId: string, workspace: AgendaInbox): Promise<WorkspaceInbox> {
+  const now = new Date();
+  const [agenda, queues] = await Promise.all([
+    loadAgenda(userId, now, sessionClients, { workspace }),
+    queueRowsFor(userId, workspace),
+  ]);
+  const today = todayIn(agenda.timezone, now);
+  const rows = agendaRowsOf(inboxEntries(agenda.piles, workspace, sourceModule), today);
+  return { rows: [...queues.rows, ...rows], failed: [...agenda.failed, ...queues.failed] };
 }

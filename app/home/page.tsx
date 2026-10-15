@@ -14,7 +14,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { describeCount } from '@/lib/modules/counts';
 import { moduleEnabled } from '@/lib/core/account/settings';
-import { loadAgenda, type Agenda } from '@/lib/todo/agenda/load';
+import type { Agenda } from '@/lib/todo/agenda/load';
+import { loadHomeAgenda, loadHomeInbox } from '@/lib/inbox/home-inbox';
+import { HOME_SECTIONS } from '@/lib/home/sections';
 import { todaySlice } from '@/lib/todo/agenda/today';
 import { dayClosed, doneToday, type DoneTodayTask } from '@/lib/todo/agenda/day-close';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
@@ -57,6 +59,7 @@ import { WatchingSection } from './watching';
 import {
   BriefLine,
   HomeColumns,
+  InboxLine,
   HomeHeader,
   TodayCard,
   UpdatesCard,
@@ -136,6 +139,8 @@ export default async function HomePage({
   return shellFor({
     module: null,
     narrow: false,
+    // Now and Inbox around the switcher in the dock (plan #1937.7).
+    sections: HOME_SECTIONS,
     children: (frame) => homeContent(frame, searchParams),
   });
 }
@@ -171,7 +176,12 @@ async function homeContent(
   // The agenda reads three schemas; a failure in any of them must cost this
   // page a section, not the whole front door. Today, This week and the banner
   // all read this one promise.
-  const agenda = loadAgenda(user.id).catch(() => null);
+  const agenda = loadHomeAgenda(user.id).catch(() => null);
+  // How many things are on you, everywhere (plan #1937.7): Home's Inbox
+  // counted, from the same agenda. Null when it could not be read.
+  const inboxCount = loadHomeInbox(user.id, { owner, enabled: on })
+    .then((inbox) => inbox.total)
+    .catch(() => null);
   // What was finished today, for the day's sigil beside the date (plan
   // #1558): the same rule the agenda closes the day by.
   const tasksDone: Promise<Task[]> = on('todo')
@@ -351,6 +361,12 @@ async function homeContent(
                 </Suspense>
               ))}
             </ul>
+            {/* The bell's place (plan #1937.7): what is on you, as a line that
+                opens Home's Inbox. */}
+            <Suspense fallback={<Skeleton className="mt-5 h-5 w-64 max-w-full" />}>
+              <InboxCount count={inboxCount} />
+            </Suspense>
+
             <Suspense fallback={null}>
               <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
             </Suspense>
@@ -450,6 +466,10 @@ async function AgendaBanner({ agenda }: { agenda: Promise<Agenda | null> }) {
       The agenda could not be read just now, so anything due today is missing from this page.
     </Banner>
   );
+}
+
+async function InboxCount({ count }: { count: Promise<number | null> }) {
+  return <InboxLine count={await count} />;
 }
 
 /** The placeholder for one workspace's line: its mark is known already. */

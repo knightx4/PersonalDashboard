@@ -19,7 +19,7 @@ const onYou = { state: 'on_you' as const };
 
 const queue = (row: InboxRow | null): InboxRow[] => (row ? [row] : []);
 
-const SHOPPING: InboxRow[] = [
+export const SHOPPING: InboxRow[] = [
   ...queue(queueRow('shopping-review', 4)),
   {
     ref: 'public.orders:o1',
@@ -56,7 +56,7 @@ const SHOPPING: InboxRow[] = [
   },
 ];
 
-const JOBS: InboxRow[] = [
+export const JOBS: InboxRow[] = [
   ...queue(queueRow('jobs-review', 2)),
   {
     ref: 'job_search.reminders:r1',
@@ -92,7 +92,7 @@ const JOBS: InboxRow[] = [
   },
 ];
 
-const TODO: InboxRow[] = [
+export const TODO: InboxRow[] = [
   {
     ref: 'todo.tasks:t1',
     section: 'actions',
