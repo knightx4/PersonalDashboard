@@ -2,9 +2,9 @@
 
 import { useActionState, useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { useToast } from '@/components/ui/toast';
 import { createClient } from '@/lib/auth/client';
 import {
@@ -165,15 +165,16 @@ function ReadForm({
         />
       </Field>
       <div className="flex flex-wrap items-center gap-2">
-        <Button
+        <DashAction
           type="submit"
           size="sm"
           pending={reading}
           disabled={!file && text.trim() === ''}
+          paid={READ_ACTION}
+          what="Cost of reading it into the form"
         >
           {reading ? 'Reading…' : 'Read it'}
-        </Button>
-        <PaidHint action={READ_ACTION} what="Cost of reading it into the form" />
+        </DashAction>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>
           Cancel
         </Button>

@@ -3,10 +3,9 @@
 import { useActionState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { LiveDot } from '@/components/ui/live-dot';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { cn } from '@/lib/cn';
-import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import { planAreaAction, type GoalsActionState } from './actions';
@@ -76,16 +75,18 @@ export function AreaPlanner({
         {canRun && (
           <form action={plan} className={cn('flex items-center gap-1', hasGoals && '-ml-2.5')}>
             <input type="hidden" name="id" value={areaId} />
-            <Button
+            <DashAction
               type="submit"
               size="sm"
               variant={hasGoals ? 'ghost' : 'secondary'}
               pending={starting}
               disabled={running !== null}
+              estimate={cost}
+              what="Cost of planning this area"
+              align="end"
             >
               {hasGoals ? 'Plan what is missing' : 'Plan this area'}
-            </Button>
-            {cost && <CostHint estimate={cost} what="Cost of planning this area" align="end" />}
+            </DashAction>
           </form>
         )}
       </div>

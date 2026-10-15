@@ -4,9 +4,10 @@ import { useRef, useState, useTransition } from 'react';
 import { Undo2 } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { toggleChipClass } from '@/components/ui/chip';
 import { FieldError, Input } from '@/components/ui/field';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
@@ -168,11 +169,18 @@ export function LogDone({
             aria-invalid={error ? true : undefined}
             className="min-w-0 flex-1 max-sm:min-h-11"
           />
-          <Button type="submit" variant="secondary" pending={pending} className="max-sm:min-h-11">
-            {pending ? 'Logging…' : 'Log it'}
-          </Button>
           <PaidCostsProvider costs={costs ?? {}}>
-            <PaidHint action={PAID} what="Cost of logging it" align="end" />
+            <DashAction
+              type="submit"
+              variant="secondary"
+              pending={pending}
+              className="max-sm:min-h-11"
+              paid={PAID}
+              what="Cost of logging it"
+              align="end"
+            >
+              {pending ? 'Logging…' : 'Log it'}
+            </DashAction>
           </PaidCostsProvider>
         </form>
       )}
