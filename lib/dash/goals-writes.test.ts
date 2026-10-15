@@ -575,10 +575,12 @@ describe('the Goals writes', () => {
     }
 
     it('snoozes a step until the start of the day in their zone, and brings it back', async () => {
-      // The fixtures' today; the write reads the clock, which moves on (both failed on 15 October).
+      // The expected days are written for 14 October; pin the clock so the test passes on any day.
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
-      onTestFinished(() => vi.useRealTimers());
+      onTestFinished(() => {
+      vi.useRealTimers();
+    });
       const data = inboxTables();
       const snoozed = await made('change_goals_inbox', data, { change: 'snooze', row_ref: STEP, until: 'tomorrow' });
       const kept = data['core.inbox_snoozes']![0];

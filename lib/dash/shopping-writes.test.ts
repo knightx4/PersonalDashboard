@@ -332,10 +332,12 @@ describe('add_items', () => {
   const added = () => tables['public.inventory_items'].filter((r) => ![CATAN, CATAN_TWO, DUNE, THEIRS].includes(r.id as string));
 
   it('adds a book by its ISBN, a game and a plain item, as the add pages save them, and Undo takes them away', async () => {
-    // The fixtures' today; the write reads the clock, which moves on (both failed on 15 October).
+    // The expected days are written for 14 October; pin the clock so the test passes on any day.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const kept = await viaAsk('add_items', {
       items: [
         { kind: 'book', isbn: '0-441-17271-7' },
