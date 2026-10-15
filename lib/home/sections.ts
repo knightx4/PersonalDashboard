@@ -1,4 +1,5 @@
 import type { NavSection } from '@/components/shell/app-shell';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Home's two rooms (plan #1937.7): Now, the front page, and Inbox, everything
@@ -10,8 +11,9 @@ import type { NavSection } from '@/components/shell/app-shell';
  * for its sections before it draws, so a badge would hold Home's greeting
  * back for the slowest source. The count is on Home's first screen instead,
  * as a line that opens this tab, where it streams in with the rest.
+ *
+ * The rooms themselves are in lib/shell/tabs.ts with every workspace's tabs
+ * (plan #2208.3). Home has no owner-only room, so the list is the same for
+ * every account.
  */
-export const HOME_SECTIONS: readonly NavSection[] = [
-  { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },
-  { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
-];
+export const HOME_SECTIONS: readonly NavSection[] = tabsFor('home', true);

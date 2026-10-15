@@ -1,4 +1,5 @@
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { loadHomeForRequest } from '@/lib/goals/home-request';
 import { goalInboxCount } from '@/lib/goals/inbox';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -20,20 +21,15 @@ import { todayIn } from '@/lib/todo/tasks/model';
 export default async function GoalsLayout({ children }: { children: React.ReactNode }) {
   return shellFor({
     module: 'goals',
-    sections: async ({ user, settings }) => {
+    // The tabs are in lib/shell/tabs.ts (plan #2208.3); the Inbox's count is
+    // put on here, because it is read for the request.
+    sections: async ({ user, settings, owner }) => {
       // The Inbox badge, from the same read the Home and Inbox pages draw from
       // (cached for the request). A failed read leaves the badge off, not the page.
       const inbox = await loadHomeForRequest(user.id, todayIn(settings.timezone))
         .then((home) => goalInboxCount(home.onYou, home.dash, home.waitingRuns))
         .catch(() => undefined);
-      return [
-        // Now and Inbox first, as in every workspace (plan #1937.6).
-        { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },
-        // Everything on you across the goals, as the Inbox in Dev holds what is
-        // waiting on you there.
-        { href: '/goals/inbox', label: 'Inbox', icon: 'inbox', badge: inbox },
-        { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
-      ];
+      return withBadges(tabsFor('goals', owner), { '/goals/inbox': inbox });
     },
     // Whether the morning and weekly runs start (plan #1937.10).
     settingsHref: '/goals/settings',
