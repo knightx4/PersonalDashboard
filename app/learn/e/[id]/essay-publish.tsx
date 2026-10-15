@@ -42,7 +42,9 @@ export function publishLine(state: {
   if (state.publishedAt) {
     const first = state.firstPublishedAt ?? state.publishedAt;
     const since = `Published since ${when(first)}.`;
-    return when(first) === when(state.publishedAt) ? since : `${since} Last published ${when(state.publishedAt)}.`;
+    return when(first) === when(state.publishedAt)
+      ? since
+      : `${since} Last published ${when(state.publishedAt)}.`;
   }
   if (!state.finished) return `Finish the essay first. Only a finished essay goes on ${SITE}.`;
   return `Puts this version on ${SITE}. Edits after that stay here until you publish again.`;
@@ -80,10 +82,18 @@ export function EssayPublishCard({
     const result = await onPublish();
     if (!result.ok) {
       // A failed vault save is explained under the editor.
-      setView('reason' in result && result.reason ? { kind: 'idle' } : { kind: 'failed', error: result.error });
+      setView(
+        'reason' in result && result.reason
+          ? { kind: 'idle' }
+          : { kind: 'failed', error: result.error },
+      );
       return;
     }
-    setState({ publishedAt: result.publishedAt, firstPublishedAt: result.firstPublishedAt, slug: result.slug });
+    setState({
+      publishedAt: result.publishedAt,
+      firstPublishedAt: result.firstPublishedAt,
+      slug: result.slug,
+    });
     setView({ kind: 'idle' });
   }, [onPublish]);
 
@@ -110,7 +120,11 @@ export function EssayPublishCard({
     <Card padding="none" className={className}>
       <CardSection title="Publish">
         <p className="text-small text-ink-muted">
-          {publishLine({ finished, publishedAt: state.publishedAt, firstPublishedAt: state.firstPublishedAt })}
+          {publishLine({
+            finished,
+            publishedAt: state.publishedAt,
+            firstPublishedAt: state.firstPublishedAt,
+          })}
         </p>
         {live && state.slug && (
           <p className="mt-1 text-ui [overflow-wrap:anywhere]">

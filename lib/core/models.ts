@@ -140,6 +140,8 @@ export const MODELS = {
   learnSurveyGoalIdea: HAIKU,
   /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
   learnEssayInterview: SONNET,
+  /** lib/learn/essays/guide-model.ts, the guided essay: reading the brief, finding points, shapes, plan notes, questions on a point, and writing up the research */
+  learnEssayGuide: SONNET,
   /** lib/learn/essays/rephrase-model.ts, Rephrase on a selected sentence of an essay */
   learnEssayRephrase: SONNET,
   /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */
