@@ -12,6 +12,8 @@ import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
 import { practiceHref } from '@/lib/learn/flow/href';
+import { AskButton, DontKnowButton, NotNowButton } from './buttons';
+import { ExplainCard } from './explain-card';
 import {
   answerTrackOffer,
   fillFlowQueue,
@@ -56,22 +58,6 @@ const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
   'all-settled': 'Every idea in every subject is known. Nothing left to ask.',
 };
 
-function AskButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  // Usually the next question was written ahead and comes straight back. The
-  // wait is only long when the queue ran dry and it is being written now.
-  return (
-    <DashAction
-      type="submit"
-      pending={pending}
-      paid="app/learn/flow/actions.ts#flowStep:ask"
-      what="Cost of the next question"
-    >
-      {pending ? 'Getting the next question…' : label}
-    </DashAction>
-  );
-}
-
 /**
  * The track the answer belonged to, and its bar moving from where it stood to
  * where the answer left it. Drawn at the old width first and moved on the next
@@ -112,48 +98,6 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
       </div>
       <p className="mt-1 text-small text-ink-muted">{trackChange(move)}</p>
     </div>
-  );
-}
-
-/**
- * "I don't know" (note a62b132f): a submit on the answer form carrying no
- * index. It counts as a miss, and the right answer and its reason come back
- * the same as after a wrong pick.
- */
-function DontKnowButton() {
-  const { pending } = useFormStatus();
-  return (
-    <DashAction
-      variant="link"
-      type="submit"
-      name="dontKnow"
-      value="1"
-      pending={pending}
-      paid="app/learn/flow/actions.ts#flowStep:answer"
-      what="Cost of answering"
-    >
-      I don&rsquo;t know
-    </DashAction>
-  );
-}
-
-/**
- * Later (note 7ccc6f99, plan #1957.3): the question goes back to the end of
- * the queue with nothing recorded against it, and the next one comes up, so
- * there is nothing for an Undo to take back. On the answer form so it sits
- * beside I don't know, and told apart by its own field.
- */
-function NotNowButton() {
-  const { pending } = useFormStatus();
-  return (
-    <CloseButton
-      lifecycle="later"
-      variant="link"
-      type="submit"
-      name="notNow"
-      value="1"
-      pending={pending}
-    />
   );
 }
 
@@ -330,6 +274,18 @@ export function FlowSession({
           {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
         </EmptyState>
       </form>
+    );
+  }
+
+  // A goal question (plan #2164.2): explained in your own words and marked.
+  if (live.explain) {
+    return (
+      <ExplainCard
+        key={live.probeId}
+        live={live}
+        step={step}
+        fields={<TrackField track={track} only={only} goal={goal} />}
+      />
     );
   }
 

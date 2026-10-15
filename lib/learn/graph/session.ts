@@ -515,6 +515,52 @@ export async function recordProbe(
 }
 
 /**
+ * Write an explain question as asked (plan #2164.2): a prompt to explain the
+ * idea in your own words, with no options, at the defence rung the teach-back
+ * marks at. `expected` is the idea's claim, which the grader marks against
+ * and the screen shows only once the exchange is over. `flow` is as for
+ * `recordProbe`.
+ */
+export async function recordExplainProbe(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: {
+    conceptId: string;
+    question: string;
+    expected: string;
+    /** The check the prompt led with, as `recordProbe` keeps it. */
+    masteryCheck: string | null;
+    flow?: {
+      pickedState: KnowledgeState;
+      pickedRecheck: 'tested' | 'declared' | null;
+      shownAt: string | null;
+    };
+  },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('probes')
+    .insert({
+      ...(input.flow && {
+        picked_state: input.flow.pickedState,
+        picked_recheck: input.flow.pickedRecheck,
+        shown_at: input.flow.shownAt,
+      }),
+      user_id: userId,
+      concept_id: input.conceptId,
+      rung: 'defend',
+      question: input.question,
+      expected: input.expected,
+      mastery_check: input.masteryCheck,
+    })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw fail('Saving the question', error ?? { message: 'no row' });
+  return (data as { id: string }).id;
+}
+
+/**
  * Write an applied case as asked, before it is shown.
  *
  * The situation and what to say about it are stored in the question column as
