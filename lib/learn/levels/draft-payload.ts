@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import { MAX_LEVEL } from '@/lib/learn/levels/model';
+import {
+  CITED_CANONICALITIES,
+  NO_SOURCES,
+  citeIds,
+  type CitedCanonicality,
+  type DraftSources,
+  validCites,
+} from '@/lib/learn/levels/draft-sources';
 
 /**
  * What the drafting call reports, and the draft that is kept from it
@@ -33,16 +41,24 @@ export function isVagueCheck(check: string): boolean {
 
 const levelNumber = z.number().int().min(1).max(MAX_LEVEL);
 
+/** The ids a row cites (S1, S1.3, P2) and how settled the call judged it; both optional, an uncited row is flagged. */
+const cites = z.array(z.string()).optional();
+const canonicality = z.string().optional();
+
 export const draftPayloadSchema = z.object({
   too_vague: z.boolean().optional(),
   name: z.string(),
   scope: z.string(),
   ceiling: levelNumber,
   fields: z.array(z.string()).default([]),
+  cites,
+  canonicality,
   levels: z.array(
     z.object({
       level: levelNumber,
       checks: z.array(z.string()),
+      cites,
+      canonicality,
     }),
   ),
   links: z
@@ -52,6 +68,8 @@ export const draftPayloadSchema = z.object({
         topic: z.string(),
         level: levelNumber,
         why: z.string().optional(),
+        cites,
+        canonicality,
       }),
     )
     .default([]),
@@ -63,9 +81,18 @@ export const draftPayloadSchema = z.object({
         from_level: levelNumber,
         level: levelNumber,
         why: z.string().optional(),
+        cites,
       }),
     )
     .default([]),
+  /** For each performance by number (1 for P1), the level of this topic it needs; level null when it needs none. */
+  performances: z
+    .array(z.object({ performance: z.number().int().min(1), level: levelNumber.nullable().optional() }))
+    .default([]),
+  /** Source lines that belong to neighbouring topics rather than this one. */
+  out_of_scope: z.array(z.string()).default([]),
+  /** Three to five questions a practitioner would put to the top levels. */
+  checklist: z.array(z.string()).default([]),
 });
 
 export type DraftPayload = z.infer<typeof draftPayloadSchema>;
@@ -82,7 +109,10 @@ export type MapTopic = {
 /** A field from LEARN-AREAS-SPEC, by the slug the call names it with. */
 export type FieldOption = { id: string; slug: string; name: string };
 
-export type DraftCell = { level: number; checks: string[] };
+/** Where a row came from, as kept: the cited ids and how settled it is; both empty for an uncited row. */
+export type Citation = { cites: string[]; canonicality: CitedCanonicality | null };
+
+export type DraftCell = { level: number; checks: string[] } & Citation;
 
 /** A link to a topic on the map: `fromLevel` of the draft needs `level` of `topicId`. */
 export type DraftLink = {
@@ -91,7 +121,7 @@ export type DraftLink = {
   topicName: string;
   level: number;
   why: string | null;
-};
+} & Citation;
 
 /** A topic a link needs that the map does not have, kept in `topics.wanted`. */
 export type WantedTopic = {
@@ -100,6 +130,8 @@ export type WantedTopic = {
   from_level: number;
   level: number;
   why: string | null;
+  /** The source ids it was named from; absent on a topic drafted before sources. */
+  cites?: string[];
 };
 
 export type TopicDraft = {
@@ -112,6 +144,12 @@ export type TopicDraft = {
   wanted: WantedTopic[];
   /** What the call proposed and the rules dropped, said rather than swallowed. */
   dropped: string[];
+  topicCites: string[];
+  canonicality: CitedCanonicality | null;
+  /** The level each performance needs, by its index; null when this topic serves it at no level. */
+  performanceLevels: (number | null)[];
+  outOfScope: string[];
+  checklist: string[];
 };
 
 export type NormaliseResult =
@@ -154,7 +192,17 @@ export function normaliseDraft(
   payload: DraftPayload,
   map: readonly MapTopic[],
   fields: readonly FieldOption[],
+  given: DraftSources = NO_SOURCES,
 ): NormaliseResult {
+  const ids = citeIds(given);
+  const cite = (row: { cites?: string[]; canonicality?: string }): Citation => {
+    const kept = validCites(row.cites, ids);
+    if (kept.length === 0) return { cites: [], canonicality: null };
+    const said = (row.canonicality ?? '').trim().toLowerCase();
+    const known = (CITED_CANONICALITIES as readonly string[]).includes(said);
+    return { cites: kept, canonicality: known ? (said as CitedCanonicality) : 'practitioner' };
+  };
+
   if (payload.too_vague) {
     return {
       ok: false,
@@ -173,9 +221,15 @@ export function normaliseDraft(
   const dropped: string[] = [];
 
   const byLevel = new Map<number, string[]>();
+  const levelCites = new Map<number, { cites: string[]; canonicality?: string }>();
   for (const entry of payload.levels) {
     if (entry.level > ceiling) continue;
     byLevel.set(entry.level, [...(byLevel.get(entry.level) ?? []), ...entry.checks]);
+    const was = levelCites.get(entry.level);
+    levelCites.set(entry.level, {
+      cites: [...(was?.cites ?? []), ...(entry.cites ?? [])],
+      canonicality: was?.canonicality ?? entry.canonicality,
+    });
   }
 
   const cells: DraftCell[] = [];
@@ -189,7 +243,7 @@ export function normaliseDraft(
         detail: `Level ${level} came back with ${kept.length === 0 ? 'no checks' : 'one check'} an answer could meet. Try drafting it again.`,
       };
     }
-    cells.push({ level, checks: kept });
+    cells.push({ level, checks: kept, ...cite(levelCites.get(level) ?? {}) });
   }
 
   const fieldBySlug = new Map(fields.map((f) => [f.slug.toLowerCase(), f.id]));
@@ -234,6 +288,7 @@ export function normaliseDraft(
           from_level: link.from_level,
           level: link.level,
           why: link.why ? tidy(link.why) || null : null,
+          cites: validCites(missing.cites, ids),
         });
       } else {
         dropped.push(`a link to ${topicName}, which is not on your map`);
@@ -250,6 +305,7 @@ export function normaliseDraft(
       topicName: target.name,
       level: link.level,
       why: link.why ? tidy(link.why) || null : null,
+      ...cite(link),
     };
     const was = best.get(target.id);
     if (!was || candidate.fromLevel < was.fromLevel || (candidate.fromLevel === was.fromLevel && candidate.level < was.level)) {
@@ -268,6 +324,7 @@ export function normaliseDraft(
       from_level: missing.from_level,
       level: missing.level,
       why: missing.why ? tidy(missing.why) || null : null,
+      cites: validCites(missing.cites, ids),
     });
   }
 
@@ -282,8 +339,19 @@ export function normaliseDraft(
       links: [...best.values()].sort((a, b) => a.fromLevel - b.fromLevel || a.topicName.localeCompare(b.topicName)),
       wanted: [...wanted.values()].filter((w) => w.scope !== ''),
       dropped,
+      ...topicCitation(cite(payload)),
+      performanceLevels: given.performances.map((_, i) => {
+        const said = payload.performances.find((p) => p.performance === i + 1)?.level ?? null;
+        return said !== null && said <= ceiling ? said : null;
+      }),
+      outOfScope: payload.out_of_scope.map((id) => id.trim().toUpperCase()).filter((id) => ids.has(id)),
+      checklist: payload.checklist.map(tidy).filter((c) => c !== '').slice(0, 5),
     },
   };
+}
+
+function topicCitation(c: Citation): { topicCites: string[]; canonicality: CitedCanonicality | null } {
+  return { topicCites: c.cites, canonicality: c.canonicality };
 }
 
 /**
@@ -323,6 +391,7 @@ export function readWanted(value: unknown): WantedTopic[] {
         from_level: e.from_level,
         level: e.level,
         why: typeof e.why === 'string' ? e.why : null,
+        ...(Array.isArray(e.cites) ? { cites: e.cites.filter((c): c is string => typeof c === 'string') } : {}),
       },
     ];
   });

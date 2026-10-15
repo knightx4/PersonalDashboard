@@ -163,6 +163,8 @@ import {
   LearnTopicQuotesPreview,
   LearnTopicEditPreview,
   LearnTopicLoadingPreview,
+  LearnTopicDraftChecksPreview,
+  LearnTopicsSourcesPreview,
 } from './learn-topic-surfaces';
 import {
   LearnKnowLensesEmptyPreview,
@@ -7951,6 +7953,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnTopicsErrorPreview />,
   },
   {
+    /* What a topic is drafted from, open on Edit sources (plan #2138.11). */
+    id: 'learn-topics-sources',
+    label: 'Topics · The sources a draft is compiled from',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsSourcesPreview />,
+  },
+  {
     /* A draft topic to read, reword and approve (plan #2138.2). */
     id: 'learn-topic-draft',
     label: 'Topic · A draft to approve',
@@ -7964,6 +7974,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    /* The five checks with every row cited or marked personal (plan #2138.11). */
+    id: 'learn-topic-draft-checks',
+    label: 'Topic · A draft whose checks let it be approved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftChecksPreview />,
   },
   {
     id: 'learn-topic-draft-comment',

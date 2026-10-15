@@ -228,3 +228,35 @@ describe('the shared territory (plan #2138.10)', () => {
     expect(row).toEqual({ source: 'CFA level I outcomes', canonicality: 'canonical', refines_article_id: null });
   });
 });
+
+describe('approving a draft (plan #2138.11)', () => {
+  it('refuses a draft with an uncited row until it is cited or marked personal', async () => {
+    const topic = await seedTopic(userA, 'Free cash flow');
+    const one = await seedCell(userA, topic, 1);
+    await admin`update topics set ceiling = 1, source = 'A syllabus', canonicality = 'canonical' where id = ${topic}`;
+    await link(userA, one, ret[1]);
+    await admin`update cell_links set source = 'A syllabus', canonicality = 'canonical' where requiring_cell_id = ${one}`;
+
+    const approve = () =>
+      asUser(userA, (tx) => tx`update topics set status = 'approved', approved_at = now() where id = ${topic}`);
+    await expect(approve()).rejects.toThrow(/uncited/);
+
+    // The person marks the one uncited level personal; the draft then goes through.
+    const marked = await asUser(
+      userA,
+      (tx) => tx`update topic_cells set canonicality = 'personal' where id = ${one} and source is null returning id`,
+    );
+    expect(marked).toHaveLength(1);
+    await approve();
+    const [row] = await admin<{ status: string }[]>`select status from topics where id = ${topic}`;
+    expect(row.status).toBe('approved');
+  });
+
+  it('keeps what the drafting checks were as an object', async () => {
+    const topic = await seedTopic(userA, 'Terminal value');
+    await expect(admin`update topics set drafting = '[]'::jsonb where id = ${topic}`).rejects.toThrow(
+      /topics_drafting_ck/,
+    );
+    await admin`update topics set drafting = '{"sources": [], "performances": []}'::jsonb where id = ${topic}`;
+  });
+});
