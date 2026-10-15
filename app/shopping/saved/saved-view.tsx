@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/money';
 import { AimButton } from '@/components/shell/aim-button';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { whenDay } from '@/lib/core/when';
 
 export const STATUSES = [
   { id: 'saved', label: 'Saved' },
@@ -32,13 +33,11 @@ export type SavedQueueItem = {
   merchant: { name: string } | null;
 };
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
-/** "2 Oct", from the row's timestamp. */
+/** "Today", "Friday" or "2 Oct", from the row's timestamp. */
 function savedOn(iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : DAY.format(date);
+  return Number.isNaN(date.getTime()) ? null : whenDay(date, { timeZone: 'UTC' });
 }
 
 const EMPTY: Record<SavedStatus, { title: string; description: string }> = {

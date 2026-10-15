@@ -54,5 +54,5 @@ export async function doneInboxTask(form: FormData): Promise<Said> {
 
 // latency: optimistic -- the row says it is put off at once
 export async function laterInboxTask(form: FormData): Promise<Said> {
-  return after(await laterTask(text(form, 'id')), 'Put off for now.');
+  return after(await laterTask(text(form, 'id'), text(form, 'choice')), 'Later.');
 }

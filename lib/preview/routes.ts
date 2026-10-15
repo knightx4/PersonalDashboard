@@ -47,6 +47,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-comment-thread-empty': ['/dev/plan'],
   'dev-comment-thread-composer': ['/dev/plan'],
   'dev-plan-tree': ['/dev/plan'],
+  'dev-plan-tree-assignee-tip': ['/dev/plan'],
   'dev-plan-table': ['/dev/plan'],
   'dev-plan-opened': ['/dev/plan'],
   'dev-plan-critic-stop': ['/dev/plan'],
@@ -59,6 +60,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
   'dev-plan-feature-edit': ['/dev/plan/[number]'],
   'goals-steps-tree': ['/goals/[goalId]'],
+  'goals-steps-tree-assignee-tip': ['/goals/[goalId]'],
+  'goals-steps-tree-empty': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
   'goals-substep': ['/goals/[goalId]/s/[stepId]'],
@@ -245,6 +248,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'account-spend-overview': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
+  // A component surface (COMPONENT_SURFACES); the pages it opens on have their own.
+  'core-later-menu': ['/dev/ui'],
+  'core-close-buttons': ['/dev/ui'],
   'dev-status-tips': ['/dev/plan', '/dev/ideas', '/dev/inbox', '/dev/bugs'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
@@ -437,6 +443,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
   // The shared tooltip (plan #1985.1).
   'core-tooltip': ['components/ui/tooltip.tsx'],
+  // Later's one menu (plan #1957.2), which Todo, Goals and the Dev Inbox open.
+  'core-later-menu': ['components/inbox/snooze-menu.tsx'],
+  // The four words that close a row (plan #1957.3), which every workspace's
+  // closing buttons draw.
+  'core-close-buttons': ['components/inbox/close-button.tsx'],
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],

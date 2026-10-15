@@ -4,6 +4,7 @@ import { Note } from '@/components/ui/note';
 import type { SweepOutcome } from '@/lib/vault/map/sweep';
 import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { startSweep, stopSweep } from './actions';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * The sweep's state on the map page (plan #757): the one button that applies,
@@ -29,7 +30,8 @@ const OUTCOME_LINES: { outcome: SweepOutcome; label: string }[] = [
   { outcome: 'failed', label: 'failed' },
 ];
 
-const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
+/** "14 October", the day a merge or a sweep happened. */
+const dayOf = (iso: string) => whenDate(iso, { timeZone: 'UTC', month: 'long', year: 'never' });
 
 export function SweepAction({ sweep }: { sweep: SweepView | null }) {
   const running = sweep?.status === 'running';
@@ -62,7 +64,7 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
 
   const heading =
     sweep.status === 'done'
-      ? `Swept ${sweep.reached} notes, ${dateFormat.format(new Date(sweep.finishedAt ?? sweep.startedAt))}`
+      ? `Swept ${sweep.reached} notes, ${dayOf(sweep.finishedAt ?? sweep.startedAt)}`
       : sweep.status === 'stopped'
         ? `Sweep stopped: ${reachedLine}`
         : `Sweeping: ${reachedLine}`;

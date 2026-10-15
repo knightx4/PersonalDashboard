@@ -13,6 +13,7 @@ import {
   revokeCaptureTokenAction,
   type MakeTokenState,
 } from './capture-token-actions';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * Personal capture tokens (plan #1705): what lets a Siri Shortcut or another
@@ -46,8 +47,7 @@ export function CaptureTokensSection({
   );
   // The day alone: a token's history is read by the day, and the time would
   // wrap each row's line to two at 390.
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: timezone });
-  const when = (at: string) => day.format(new Date(at));
+  const when = (at: string) => whenDay(at, { timeZone: timezone });
 
   return (
     <section>

@@ -3,7 +3,7 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Disclosure } from '@/components/ui/disclosure';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import type { ConnectedApp, ConnectedAppCall } from '@/lib/connector/apps';
 import { removeConnectedApp } from './connected-apps-actions';
 

@@ -1,16 +1,12 @@
 import Link, { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import type { VisionReviewStatus } from '@/lib/specs/vision-review-run';
 import { cn } from '@/lib/cn';
 
 /** A date as the line says it: "Sunday 4 October". UTC, as the schedule is. */
 function day(at: string): string {
-  return new Date(at).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  return whenDate(at, { timeZone: 'UTC', weekday: 'long', month: 'long', year: 'auto' });
 }
 
 /** "3d 2h ago", or "just now". */

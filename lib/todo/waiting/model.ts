@@ -4,6 +4,7 @@ import type { ModuleId } from '@/lib/modules';
 import { returnMove } from '@/lib/returns/move';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
 import type { AgendaItemLink } from '@/lib/todo/agenda/sources';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Todo's Waiting view (plan #1475; docs/CORE-AND-DASH-SPEC.md, Part 4):
@@ -143,15 +144,5 @@ export function sinceLabel(since: string | null, timezone: string, now: Date = n
   const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(since);
   const date = new Date(dayOnly ? `${since}T00:00:00Z` : since);
   if (Number.isNaN(date.getTime())) return null;
-  const zone = dayOnly ? 'UTC' : timezone;
-  const sameYear =
-    new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric' }).format(date) ===
-    new Intl.DateTimeFormat('en-GB', { timeZone: timezone, year: 'numeric' }).format(now);
-  const day = new Intl.DateTimeFormat('en-GB', {
-    timeZone: zone,
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(date);
-  return `Since ${day}`;
+  return `Since ${whenDate(dayOnly ? since : date, { timeZone: timezone, year: 'auto', now })}`;
 }

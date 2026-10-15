@@ -3,7 +3,6 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPipeline } from '@/lib/jobs/applications/load';
 import { summariseSearch, type SummaryInterview } from '@/lib/jobs/home/summary';
 import { loadSinceView } from '@/lib/jobs/home/since-load';
-import { liveByMove } from '@/lib/jobs/today/live';
 import { loadToday } from '@/lib/jobs/today/load';
 import { TodayPage } from './_home/today-page';
 
@@ -13,10 +12,10 @@ export const metadata = { title: 'Now' };
  * Now, and where `/jobs` lands (plan #1150, #1591, #1937.9).
  *
  * Reads everything once and hands it to TodayPage, which draws it. The
- * pipeline is read once for the live list and the numbers. The board is read
- * for This week's interviews and for the mail waiting on you, which puts the
- * live list's move on you and is left out of "Since you last looked"; the
- * mail itself is listed in the Jobs Inbox.
+ * pipeline is read once for the numbers and This week's follow-up drafts.
+ * The board is read for This week's interviews and for the mail waiting on
+ * you, which is left out of "Since you last looked"; the mail itself is
+ * listed in the Jobs Inbox.
  *
  * /jobs/today, the page Home replaced, redirects here.
  */
@@ -65,7 +64,6 @@ export default async function JobsToday() {
     <TodayPage
       board={board}
       summary={summariseSearch(pipeline, interviews, now)}
-      live={liveByMove(pipeline, new Set(board.waiting.map((item) => item.applicationId)))}
       since={since}
       timezone={timezone}
     />

@@ -12,9 +12,13 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
-import { applyView, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
+import { applyView, assigneeTitle, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
 import { placeCheckBacks } from '@/lib/plan/check-backs';
 import { PageColumn } from '@/components/shell/page-width';
+import { AssigneeCell, type AssigneeWho } from '@/components/plan-tree/assignee-cell';
+import { ColumnHeader, ROW_GRID } from '@/components/plan-tree/grid';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -957,4 +961,51 @@ export function PlanFeatureStepsYoursSurface() {
 /** The feature page's Edit: the compose surface it was written in, filled in (plan #1670). */
 export function PlanFeatureEditSurface() {
   return <FeatureFixture editing />;
+}
+
+/**
+ * The Assignee column's tooltip held open (plan #2069.1), on the plan's own
+ * header and rows: a step you kept, a step of Dash's being worked now, and a
+ * feature split between you, whose tip says how many steps each holds.
+ */
+export function PlanAssigneeTipSurface() {
+  const cells: { title: string; who: AssigneeWho; working?: boolean; tip: string; open?: boolean }[] = [
+    {
+      title: 'Make the goal page use the dev plan’s tree',
+      who: 'both',
+      tip: assigneeTitle({ who: 'both', yours: 2, dashs: 3, working: false, reason: null }),
+      open: true,
+    },
+    {
+      title: 'Render the goal page through the plan tree',
+      who: 'you',
+      tip: assigneeTitle({ who: 'you', yours: 0, dashs: 0, working: false, reason: 'kept' }),
+    },
+    {
+      title: 'Build the shared header beside the old one',
+      who: 'dash',
+      working: true,
+      tip: assigneeTitle({ who: 'dash', yours: 0, dashs: 0, working: true, reason: null }),
+    },
+  ];
+  return (
+    <PageColumn className="pb-24">
+      <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
+        <ColumnHeader />
+        {cells.map((cell) => (
+          <li key={cell.title} className={cn(ROW_GRID, 'px-3 py-2 text-ui')}>
+            <span className="min-w-0 truncate">{cell.title}</span>
+            <span className="hidden text-small text-ink-muted sm:block">Ready</span>
+            <span className="sm:hidden" />
+            <span className="flex items-center">
+              <AssigneeCell who={cell.who} working={cell.working} title={cell.tip} defaultOpen={cell.open} />
+            </span>
+            <span className="hidden sm:block" />
+            <span className="hidden sm:block" />
+            <span />
+          </li>
+        ))}
+      </ul>
+    </PageColumn>
+  );
 }

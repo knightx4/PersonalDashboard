@@ -138,7 +138,7 @@ describe('agendaInboxRow', () => {
     expect(row.ref).toBe('todo.tasks:t1');
     expect(row.line).toBe('1 of 3 left');
     expect(row.verbs?.map((v) => [v.label, v.write?.fields])).toEqual([['Done', { id: 't1' }]]);
-    expect(row.putOff?.fields).toEqual({ id: 't1' });
+    expect(row.later?.fields).toEqual({ id: 't1' });
   });
 });
 

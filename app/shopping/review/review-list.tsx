@@ -1,5 +1,7 @@
 'use client';
 
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import Link from '@/components/ui/link';
 import { useCallback, useMemo } from 'react';
 import { ClipboardCheck } from 'lucide-react';
@@ -43,7 +45,7 @@ import { AddFromEmailButton } from './add-from-email';
 import { AimButton } from '@/components/shell/aim-button';
 import { canReadAsOrder } from '@/lib/review/read-order';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -200,7 +202,7 @@ function ReviewBulkBar({ rows }: { rows: ReviewRow[] }) {
     let restore: DismissedEmail[] = [];
     run({
       ids: emailIds,
-      verb: 'Dismissed',
+      verb: 'Declined',
       one: 'email',
       write: async (ids) => {
         const result = await dismissEmailsReview([...ids]);
@@ -237,7 +239,8 @@ function ReviewBulkBar({ rows }: { rows: ReviewRow[] }) {
           pending={pending}
           onClick={dismissSelected}
         >
-          Dismiss {countNoun(emailIds.length, 'email')}
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
+          {LIFECYCLE_VERB.declined} {countNoun(emailIds.length, 'email')}
         </Button>
       )}
     </SelectionActionBar>

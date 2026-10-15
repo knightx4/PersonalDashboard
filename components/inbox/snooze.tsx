@@ -3,24 +3,14 @@
 import { useState, useTransition } from 'react';
 import { FieldError } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
-import { SnoozeMenu as LaterMenu } from '@/components/inbox/snooze-menu';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 import type { InboxLaterRow } from '@/components/inbox/inbox-page';
-import { bringBackInboxRow, snoozeInboxRow } from '@/lib/core/inbox-snooze-actions';
-import { pickedDayStart } from '@/lib/core/inbox-snoozes';
-import { snoozeDay } from '@/lib/core/snooze-days';
-
-/** Today in the reader's own zone, as YYYY-MM-DD. */
-function localToday(now: Date): string {
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-');
-}
+import { bringBackInboxRow, laterInboxRow } from '@/lib/core/inbox-snooze-actions';
+import { deviceTimeZone, whenDate } from '@/lib/core/when';
 
 /**
- * Later on one Dev inbox row (plans #1843, #1937.4), with the menu every
- * Inbox has: Tomorrow, Next week or a day picked (lib/core/snooze-days.ts).
+ * Later on one inbox row in Dev (plans #1843, #1937.4, #1957.2): the one
+ * Later menu, whose days are read in the account's timezone on the server.
  * `snoozeRef` is the row's `schema.table:id` (lib/core/inbox-snoozes.ts).
  * The row leaves the list when the page refreshes after the press.
  */
@@ -28,23 +18,18 @@ export function SnoozeMenu({ snoozeRef, label = 'this row' }: { snoozeRef: strin
   const [error, setError] = useState<string | undefined>();
   const [, start] = useTransition();
 
-  function choose(choice: string) {
-    const day = snoozeDay(choice, localToday(new Date()));
-    const until = day ? pickedDayStart(day) : null;
-    if (!until) {
-      setError('Pick a day after today.');
-      return;
-    }
-    setError(undefined);
-    start(async () => {
-      const result = await snoozeInboxRow(snoozeRef, until.toISOString());
-      if (result.error) setError(result.error);
-    });
-  }
-
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <LaterMenu label={label} onChoose={choose} />
+      <LaterMenu
+        label={label}
+        onChoose={(choice) => {
+          setError(undefined);
+          start(async () => {
+            const result = await laterInboxRow(snoozeRef, choice);
+            if (result.error) setError(result.error);
+          });
+        }}
+      />
       <FieldError>{error}</FieldError>
     </span>
   );
@@ -72,11 +57,7 @@ export type SnoozedItem = {
 
 /** "Fri 16 Oct", in the reader's own time zone. */
 function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  return whenDate(iso, { timeZone: deviceTimeZone() ?? 'UTC', weekday: 'short', year: 'never' });
 }
 
 /** What is snoozed, as rows for the Inbox page's Later fold, each with Bring back. */

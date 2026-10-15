@@ -13,6 +13,7 @@ import {
   listAskConversations,
   loadAskChanges,
   loadAskConversation,
+  reopenAskChange,
   undoAskChange,
 } from '@/lib/talk/ask-request';
 import { AskPagePath, AskRef } from '@/lib/talk/ask-input';
@@ -173,6 +174,11 @@ export async function confirmDashChange(id: string): Promise<ChangeOutcome> {
 // latency: pending
 export async function declineDashChange(id: string): Promise<ChangeOutcome> {
   return pressChange(id, declineAskChange, 'The change could not be declined. Try again.');
+}
+
+// latency: pending
+export async function reopenDashChange(id: string): Promise<ChangeOutcome> {
+  return pressChange(id, reopenAskChange, 'The change could not be put back. Try again.');
 }
 
 // latency: pending

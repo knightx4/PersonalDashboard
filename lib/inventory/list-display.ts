@@ -3,6 +3,7 @@ import {
   type GroupBucket,
   type ListDisplaySpec,
 } from '@/lib/list-display';
+import { whenMonth } from '@/lib/core/when';
 
 /**
  * What the inventory list offers: six sorts, four groupings, and the columns a
@@ -42,12 +43,7 @@ function byDate<T extends SortableInventoryItem>(a: T, b: T): number {
 function monthBucket(acquiredAt: string | null): GroupBucket | null {
   if (!acquiredAt || acquiredAt.length < 7) return null;
   const key = acquiredAt.slice(0, 7);
-  const [year, month] = key.split('-').map(Number);
-  const date = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, 1));
-  return {
-    key,
-    label: date.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-  };
+  return { key, label: whenMonth(key, { timeZone: 'UTC' }) };
 }
 
 function named(value: string | null | undefined): GroupBucket | null {

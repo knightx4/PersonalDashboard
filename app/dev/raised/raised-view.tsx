@@ -1,6 +1,8 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import {
   closeRaise,
   decideRaise,
@@ -30,7 +32,7 @@ import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { inboxAnchor } from '@/components/inbox/overview';
-import { INBOX_WORDS, InboxPage, type InboxRow, type InboxSectionKey } from '@/components/inbox/inbox-page';
+import { InboxPage, type InboxRow, type InboxSectionKey } from '@/components/inbox/inbox-page';
 import { isRunnerSource } from '@/lib/plan/stall';
 import {
   BackFromSnoozeMark,
@@ -243,10 +245,26 @@ function RaiseCard({
   /** Present when an open raise can be snoozed (plan #1843). */
   snooze?: { back: boolean };
 }) {
-  const [dismissState, dismissAction, dismissPending] = useActionState(
-    dismissRaise,
-    {} as RaisedActionState,
-  );
+  const [dismissState, setDismissState] = useState<RaisedActionState>({});
+  const [dismissPending, startDismiss] = useTransition();
+  const toast = useToast();
+  // Decline, with Undo in the toast (plan #1957.3).
+  function decline() {
+    const form = new FormData();
+    form.set('id', row.id);
+    startDismiss(async () => {
+      const result = await dismissRaise({}, form);
+      setDismissState(result);
+      if (result.error) return;
+      toast({
+        text: 'Declined',
+        undo: async () => {
+          const back = await reopenRaise({}, form);
+          if (back.error) throw new Error(back.error);
+        },
+      });
+    });
+  }
   const [closeState, closeAction, closePending] = useActionState(
     closeRaise,
     {} as RaisedActionState,
@@ -328,12 +346,7 @@ function RaiseCard({
       <div className="flex flex-wrap items-center gap-2">
         {row.status === 'open' ? (
           <>
-            <form action={dismissAction}>
-              <input type="hidden" name="id" value={row.id} />
-              <Button type="submit" size="sm" variant="ghost" pending={dismissPending}>
-                {INBOX_WORDS.decline}
-              </Button>
-            </form>
+            <CloseButton lifecycle="declined" pending={dismissPending} onClick={decline} />
             {snooze && <SnoozeMenu snoozeRef={raiseRef(row.id)} label={row.title} />}
           </>
         ) : (

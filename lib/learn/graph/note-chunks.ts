@@ -23,6 +23,8 @@
  * else.
  */
 
+import { formatNumber } from '@/lib/money';
+
 /** The most a chunk holds before it is cut. */
 export const NOTE_SECTION_CHARS = 4000;
 
@@ -251,7 +253,7 @@ export function chunkNote(
       chars,
       chunks: over.length,
       from: first.title,
-      detail: `The last ${chars.toLocaleString('en-GB')} characters, from “${first.title}” on, were not read: a note is read up to ${limit.toLocaleString('en-GB')} characters.`,
+      detail: `The last ${formatNumber(chars)} characters, from “${first.title}” on, were not read: a note is read up to ${formatNumber(limit)} characters.`,
     });
   }
 

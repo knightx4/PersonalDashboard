@@ -20,7 +20,7 @@ import { DayClosed } from '@/components/todo/day-closed';
 import { AimButton } from '@/components/shell/aim-button';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Agenda' };

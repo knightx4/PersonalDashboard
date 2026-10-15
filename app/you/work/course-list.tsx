@@ -22,6 +22,7 @@ import {
   updateCourseAction,
   type CourseEditState,
 } from './actions';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * One school's courses, term by term with the newest first, and the
@@ -202,5 +203,5 @@ function TranscriptRow({ transcript, courses }: { transcript: Transcript; course
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

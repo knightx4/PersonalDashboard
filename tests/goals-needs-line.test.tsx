@@ -114,14 +114,17 @@ describe('the Needs line on a goal step', () => {
 });
 
 describe('whose a goal step is (plan #1159)', () => {
-  it('marks Dash’s steps and leaves yours unmarked (plan #1078)', () => {
+  it('draws Dash’s mark on Dash’s steps and your initial on yours (plan #2069.2)', () => {
     const html = render([
       step('a', { title: 'Turn on autopay' }),
       step('b', { title: 'Log each loan balance', kind: 'rhythm', rhythmCount: 1, rhythmPeriod: 'month', position: 20 }),
       step('c', { title: 'List balances', kind: 'claude', position: 30 }),
     ]);
-    expect(html).not.toContain('sr-only">Yours<');
-    // Dash's is the mark itself (plan #1338), named for a screen reader.
-    expect(html.match(/role="img" aria-label="Dash&#x27;s"/g)).toHaveLength(1);
+    // The Assignee cell (plan #2069.2): your initial on your step and your
+    // rhythm, Dash's mark on Dash's. Each row draws the cell twice, once in
+    // its column and once on the phone's line under the title.
+    expect(html.match(/ml-0\.5">You</g)).toHaveLength(4);
+    expect(html.match(/ml-0\.5">Dash</g)).toHaveLength(2);
+    expect(html.match(/data-dash-tone="brand"/g)).toHaveLength(2);
   });
 });

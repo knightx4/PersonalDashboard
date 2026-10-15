@@ -109,6 +109,11 @@ export interface AgendaItem {
    */
   completable: boolean;
   /**
+   * Whether the toast can take a Later or Drop back (plan #1957.3): set by
+   * the agenda's loader from the source having a `restore`.
+   */
+  restorable?: boolean;
+  /**
    * Answers to choose between, for an item that is a question rather than a
    * task. Pressing one goes through the source's `answer`; absent on
    * everything else.
@@ -220,4 +225,6 @@ export interface AgendaSource {
    */
   defer?(ctx: SourceContext, key: string): Promise<void>;
   dismiss?(ctx: SourceContext, key: string): Promise<void>;
+  /** Takes a Later or Drop back, for the toast's Undo (plan #1957.3). */
+  restore?(ctx: SourceContext, key: string): Promise<void>;
 }

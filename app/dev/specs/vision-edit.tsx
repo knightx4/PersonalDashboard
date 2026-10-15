@@ -4,9 +4,11 @@ import { useActionState } from 'react';
 import {
   acceptVisionEdit,
   dismissVisionEdit,
+  reopenVisionEdit,
   type VisionEditActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -50,8 +52,21 @@ export function VisionEditPanel({
     },
     {} as VisionEditActionState,
   );
+  // Decline, with Undo in the toast (plan #1957.3): the panel leaves the page
+  // once decided, and the toast outlives it.
   const [dismissed, dismiss, dismissing] = useActionState(
-    dismissVisionEdit,
+    async (prev: VisionEditActionState, formData: FormData) => {
+      const next = await dismissVisionEdit(prev, formData);
+      if (!next.error)
+        toast({
+          text: 'Declined',
+          undo: async () => {
+            const back = await reopenVisionEdit(edit.id);
+            if (back.error) throw new Error(back.error);
+          },
+        });
+      return next;
+    },
     {} as VisionEditActionState,
   );
   const now = useClockNow();
@@ -111,9 +126,7 @@ export function VisionEditPanel({
         <Button type="submit" size="sm" formAction={accept} pending={pending}>
           {accepting ? 'Accepting…' : 'Accept'}
         </Button>
-        <Button type="submit" size="sm" variant="ghost" formAction={dismiss} pending={pending}>
-          {dismissing ? 'Dismissing…' : 'Dismiss'}
-        </Button>
+        <CloseButton lifecycle="declined" type="submit" formAction={dismiss} pending={pending} />
         <FieldError>{accepted.error ?? dismissed.error}</FieldError>
       </form>
       <p className="text-caption text-ink-ghost">

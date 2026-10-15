@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { formatMoney } from '@/lib/money';
+import { whenDate } from '@/lib/core/when';
 
 export type DeletedOrderRow = {
   id: string;
@@ -20,13 +21,7 @@ export type DeletedOrderRow = {
 };
 
 /** Dates on this card read as the inboxes' do: "14 Aug 2026". */
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-const DAY_UTC = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
+const UTC = { timeZone: 'UTC' } as const;
 
 export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) {
   return (
@@ -44,9 +39,9 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
         <ul className="divide-y divide-border">
           {orders.map((order) => {
             const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
-            const deletedOn = DAY.format(new Date(order.deleted_at));
+            const deletedOn = whenDate(order.deleted_at, UTC);
             // A calendar date with no time: read in UTC so it stays the day it names.
-            const orderedOn = DAY_UTC.format(new Date(`${order.order_date}T00:00:00Z`));
+            const orderedOn = whenDate(order.order_date, UTC);
             return (
               <li
                 key={order.id}

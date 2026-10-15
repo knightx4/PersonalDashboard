@@ -4,7 +4,8 @@ import { Fragment, useState, useTransition, type ReactNode } from 'react';
 import { BellRing, Inbox as InboxIcon } from 'lucide-react';
 import { inboxAnchor } from '@/components/inbox/overview';
 import { INBOX_WORDS } from '@/components/inbox/inbox-words';
-import { SnoozeMenu } from '@/components/inbox/snooze-menu';
+import { CloseButton } from '@/components/inbox/close-button';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Group, SectionFold } from '@/components/ui/disclosure';
@@ -279,29 +280,13 @@ function ShapeRow({ row }: { row: InboxRow }) {
               )}
               <span className="ml-auto flex items-center gap-1">
                 {row.decline && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    pending={pending}
-                    onClick={() => run(row.decline!)}
-                  >
-                    {INBOX_WORDS.decline}
-                  </Button>
+                  <CloseButton lifecycle="declined" pending={pending} onClick={() => run(row.decline!)} />
                 )}
                 {row.later && (
-                  <SnoozeMenu label={row.title} onChoose={(choice) => run(row.later!, { choice })} />
+                  <LaterMenu label={row.title} onChoose={(choice) => run(row.later!, { choice })} />
                 )}
                 {!row.later && row.putOff && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    pending={pending}
-                    onClick={() => run(row.putOff!)}
-                  >
-                    {INBOX_WORDS.later}
-                  </Button>
+                  <CloseButton lifecycle="later" pending={pending} onClick={() => run(row.putOff!)} />
                 )}
               </span>
             </div>

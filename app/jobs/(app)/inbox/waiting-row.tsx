@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Sparkles } from 'lucide-react';
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
-import { INBOX_WORDS } from '@/components/inbox/inbox-words';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import Link from '@/components/ui/link';
@@ -75,9 +75,7 @@ export function WaitingInboxRow({
       ) : (
         <div className="flex flex-wrap items-center gap-2 pt-0.5">
           {done && (
-            <Button type="button" size="sm" pending={pending} onClick={() => run(done)}>
-              Done
-            </Button>
+            <CloseButton lifecycle="done" variant="primary" pending={pending} onClick={() => run(done)} />
           )}
           {prep?.href && !preparing ? (
             <Link href={prep.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
@@ -105,9 +103,7 @@ export function WaitingInboxRow({
           )}
           {row.putOff && (
             <span className="ml-auto flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" pending={pending} onClick={() => run(row.putOff!)}>
-                {INBOX_WORDS.later}
-              </Button>
+              <CloseButton lifecycle="later" pending={pending} onClick={() => run(row.putOff!)} />
             </span>
           )}
         </div>

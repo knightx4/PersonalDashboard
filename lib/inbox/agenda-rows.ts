@@ -132,7 +132,8 @@ export function agendaInboxRow(
       href: entry.anchor?.href,
       move: { state: 'on_you' },
       verbs: [{ label: 'Done', tone: 'primary', write: { action: actions.doneTask, fields } }],
-      putOff: { action: actions.laterTask, fields },
+      // A task takes a day, from the one Later menu (plan #1957.2).
+      later: { action: actions.laterTask, fields },
     };
   }
   if (entry.item) return itemRow(entry.item, actions, abilities, today);

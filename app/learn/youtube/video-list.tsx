@@ -8,6 +8,7 @@ import type { TranscriptState } from '@/lib/learn/youtube/transcripts';
 import { transcribeVideoAction } from './actions';
 import { Press } from './press';
 import { Tooltip } from '@/components/ui/tooltip';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * A list of videos with each one's transcript state, as one surface.
@@ -27,12 +28,7 @@ const STATE_GLYPH: Record<TranscriptState, { glyph: 'full' | 'empty' | 'slash' |
 
 function published(date: string | null): string | null {
   if (!date) return null;
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(date, { timeZone: 'UTC' });
 }
 
 export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; numbered?: boolean }) {

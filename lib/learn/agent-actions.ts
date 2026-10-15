@@ -48,6 +48,7 @@ export const learnActions: ModuleActions = {
     reloadEssayFromVault: none('page'),
     moveEssayNotes: none('page'),
     closeEssayNote: none('theirs'),
+    reopenEssayNote: none('theirs', 'Undo: takes back their own Done or Decline.'),
     helpEssayNote: none('spends'),
     hideEssayStudyItem: none('theirs'),
     findEssayStudy: none('page'),
@@ -61,6 +62,7 @@ export const learnActions: ModuleActions = {
     flowStep: none('page'),
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
+    takeBackOfferAnswer: none('theirs', 'Undo: takes back their own answer.'),
   },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),

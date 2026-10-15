@@ -147,7 +147,9 @@ async function runSources(
 ): Promise<[AgendaItem[], DayContext[], string[]]> {
   const settled = await Promise.allSettled(
     sources.map(async (source) => ({
-      items: await source.fetch(ctx),
+      items: (await source.fetch(ctx)).map((item) =>
+        source.restore ? { ...item, restorable: true } : item,
+      ),
       context: (await source.context?.(ctx)) ?? [],
     })),
   );

@@ -5,7 +5,7 @@ import { SectionLabel } from '@/components/ui/section-heading';
 import { Pill, WorkweekOutline, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
-import { hourLabel } from '@/lib/clock';
+import { hourLabel, whenWeekday } from '@/lib/core/when';
 import { NewEventLink } from '@/components/todo/new-event-link';
 
 /**
@@ -191,10 +191,7 @@ function DayHeading({
   day: CalendarDay;
   newEventHref: (day: string) => string;
 }) {
-  const date = new Date(`${day.day}T00:00:00Z`);
-  const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(
-    date,
-  );
+  const weekday = whenWeekday(day.day, { timeZone: 'UTC', style: 'short' });
 
   return (
     <div className="group flex min-w-0 items-center gap-1 border-l border-border pr-1">

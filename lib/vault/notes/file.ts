@@ -7,6 +7,7 @@ import {
   type RemoveNotePorts,
 } from '@/lib/vault/notes/create';
 import { saveNote, type SaveNoteFailure, type SaveNotePorts } from '@/lib/vault/notes/save';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Filing a quick note out of the Inbox (plan #1728, feature #1726).
@@ -90,16 +91,9 @@ export const FILE_ERRORS: Record<FileQuickNoteFailure, string> = {
   error: 'The quick note could not be filed. Try again in a moment. It is still in your Inbox.',
 };
 
-const DAY = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 /** The line a filed quick note sits under: "*Added 10 October 2026*". */
 export function filedLine(now: Date): string {
-  return `*Added ${DAY.format(now)}*`;
+  return `*Added ${whenDate(now, { timeZone: 'UTC', month: 'long' })}*`;
 }
 
 /**

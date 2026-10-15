@@ -5,18 +5,17 @@ import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { chipVariants, ToggleChip } from '@/components/ui/chip';
-import { IconButton } from '@/components/ui/icon-button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
 import { InlineInput, Input, Label } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDateInline } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
 import { disconnectInbox, savePreference, saveProfileField, saveShowNudges, type SettingsState } from './actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
-import { Tooltip } from '@/components/ui/tooltip';
 import { useCloseOnSuccess } from '@/lib/jobs/use-close-on-success';
 import { SettingSwitch, SettingText } from '@/components/patterns/settings-fields';
 import {
@@ -355,7 +354,7 @@ export function InboxSection({
                     and then held it against the far edge, so the date read as
                     an orphan rather than as a note about the address above. */}
                 <span className="tabular text-small text-ink-muted sm:ml-auto">
-                  last checked {formatDate(account.lastSyncedAt)}
+                  last checked {formatDateInline(account.lastSyncedAt)}
                 </span>
               </div>
 
@@ -376,7 +375,7 @@ export function InboxSection({
                 <Note className="mt-2 text-small text-ink-muted">
                   First scan stopped partway — {account.latestBackfill.messagesSeen} messages read
                   {account.latestBackfill.finishedAt
-                    ? `, ${formatDate(account.latestBackfill.finishedAt)}`
+                    ? `, ${formatDateInline(account.latestBackfill.finishedAt)}`
                     : ''}
                   . It picks up where it left off, and keeps going on its own while a page of the
                   app is open.
@@ -534,7 +533,6 @@ export function ExcludedSendersSection({
 }) {
   const [state, action] = useActionState(addExcludedSender, {});
   const [adding, setAdding] = useCloseOnSuccess(state);
-  const [, startTransition] = useTransition();
 
   return (
     <div>
@@ -549,20 +547,18 @@ export function ExcludedSendersSection({
           {excludedSenders.map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 text-ui">
               <span className="tabular text-ink">{entry.domain}</span>
-              <Tooltip label="Stop excluding this sender" align="end" className="ml-auto">
-                <IconButton
-                  size="sm"
-                  label={`Stop excluding ${entry.domain}`}
-                  className="hover:text-danger"
-                  onClick={() =>
-                    startTransition(async () => {
-                      await removeExcludedSender(entry.id);
-                    })
-                  }
-                >
-                  <Trash2 strokeWidth={1.75} aria-hidden />
-                </IconButton>
-              </Tooltip>
+              <ConfirmStep
+                size="xs"
+                className="ml-auto text-danger"
+                prompt={`Mail from ${entry.domain} can show up as leads again.`}
+                confirmLabel="Stop excluding"
+                onConfirm={async () => {
+                  await removeExcludedSender(entry.id);
+                }}
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Stop excluding
+              </ConfirmStep>
             </li>
           ))}
         </ul>

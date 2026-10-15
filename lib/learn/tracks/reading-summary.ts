@@ -1,4 +1,5 @@
 import { MAX_READING_TEXT } from '@/lib/learn/tracks/reading-text';
+import { formatNumber } from '@/lib/money';
 
 /**
  * Summarize on a reading (plan #1876.4): the parts with no model in them.
@@ -61,7 +62,7 @@ export function summarySource(summary: { from: 'given' | 'link'; label: string }
 /** The line saying the reading was cut, or null when Dash read all of it. */
 export function summaryCutLine(truncated: boolean): string | null {
   if (!truncated) return null;
-  return `The reading is longer than ${MAX_READING_TEXT.toLocaleString('en-GB')} characters, so Dash read only the first ${MAX_READING_TEXT.toLocaleString('en-GB')} and this summary covers that part.`;
+  return `The reading is longer than ${formatNumber(MAX_READING_TEXT)} characters, so Dash read only the first ${formatNumber(MAX_READING_TEXT)} and this summary covers that part.`;
 }
 
 /** The host of an address without "www.", or the address itself when it is not one. */

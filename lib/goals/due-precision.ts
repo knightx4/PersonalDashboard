@@ -11,6 +11,8 @@
  * until 1 July. Pure; calendar dates are read in UTC so no zone moves a day.
  */
 
+import { whenDate, whenMonth } from '@/lib/core/when';
+
 export const DUE_PRECISIONS = ['day', 'month', 'quarter', 'half', 'year'] as const;
 export type DuePrecision = (typeof DUE_PRECISIONS)[number];
 
@@ -67,15 +69,6 @@ export function isPeriodEnd(isoDate: string, precision: DuePrecision): boolean {
   return periodEnd(isoDate, precision) === isoDate;
 }
 
-const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const DAY_YEAR = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 /**
  * A goal's date as it is shown, without the "by": "3 Oct", "Mar 2027",
  * "Q2 2027", "H1 2027", "2027". A day drops its year when it falls in
@@ -87,12 +80,11 @@ export function formatDue(
   currentYear?: number,
 ): string {
   const { year, month } = parts(isoDate);
-  const at = new Date(`${isoDate}T00:00:00Z`);
   switch (precision) {
     case 'day':
-      return (currentYear === year ? DAY : DAY_YEAR).format(at);
+      return whenDate(isoDate, { timeZone: 'UTC', year: currentYear === year ? 'never' : 'always' });
     case 'month':
-      return MONTH.format(at);
+      return whenMonth(isoDate, { timeZone: 'UTC', month: 'short' });
     case 'quarter':
       return `Q${Math.ceil(month / 3)} ${year}`;
     case 'half':

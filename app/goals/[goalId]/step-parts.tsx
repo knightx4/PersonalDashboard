@@ -9,6 +9,7 @@ import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components
 import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/components/ui/field';
@@ -75,14 +76,31 @@ const answerInitial: ShapingActionState = {};
  * The lettered options in its detail are buttons, with the one Claude
  * recommends marked; pressing one writes it into the box, where it can be
  * sent as it is or said differently. Answering closes the step and the next
- * run reads the answer. Not now puts an unanswered question out of sight
+ * run reads the answer. Later puts an unanswered question out of sight
  * until it is brought back. An answered question shows its answer and can be
  * given a new one, which is kept in the goal's history with the one it
  * replaced. The pieces are the dev plan's, from components/dev/question.tsx.
  */
 export function Question({ node }: { node: StepNode }) {
   const [state, answerAction, answering] = useActionState(answerQuestionAction, answerInitial);
-  const [asideState, asideAction, putting] = useActionState(setQuestionAsideAction, answerInitial);
+  const [asideError, setAsideError] = useState<string | null>(null);
+  const [putting, startAside] = useTransition();
+  const toast = useToast();
+  // Later on an unanswered question, with Undo in the toast (plan #1957.3).
+  function putAside(aside: boolean) {
+    const form = new FormData();
+    form.set('id', node.id);
+    form.set('aside', aside ? '1' : '0');
+    return setQuestionAsideAction(answerInitial, form);
+  }
+  function later() {
+    startAside(async () => {
+      const result = await putAside(true);
+      setAsideError(result.error ?? null);
+      if (result.error) return;
+      toast({ text: 'Later', undo: async () => void (await putAside(false)) });
+    });
+  }
   // The box is open when it was opened since the last answer was saved, so a
   // save closes it without an effect.
   const [openedAt, setOpenedAt] = useState<number | null>(null);
@@ -115,18 +133,10 @@ export function Question({ node }: { node: StepNode }) {
                   setOpenedAt(null);
                 }
           }
-          error={state.error ?? asideState.error}
+          error={state.error ?? asideError ?? undefined}
           extra={
             unanswered && !aside ? (
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                formAction={asideAction}
-                pending={putting}
-              >
-                Not now
-              </Button>
+              <CloseButton lifecycle="later" pending={putting} onClick={later} />
             ) : undefined
           }
         />
@@ -144,13 +154,20 @@ export function Question({ node }: { node: StepNode }) {
         </Button>
       )}
       {unanswered && aside && (
-        <form action={asideAction}>
-          <input type="hidden" name="id" value={node.id} />
-          <input type="hidden" name="aside" value="0" />
-          <Button type="submit" size="sm" variant="secondary" pending={putting}>
-            Bring back
-          </Button>
-        </form>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          pending={putting}
+          onClick={() =>
+            startAside(async () => {
+              const result = await putAside(false);
+              setAsideError(result.error ?? null);
+            })
+          }
+        >
+          Bring back
+        </Button>
       )}
     </div>
   );

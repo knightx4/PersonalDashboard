@@ -1,4 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
@@ -59,12 +60,7 @@ const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
  * the last summary on the page, and the date is how you tell.
  */
 function formatDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long', year: 'auto' });
 }
 
 function Label({ children }: { children: React.ReactNode }) {

@@ -212,7 +212,7 @@ describe('an @dash comment asking for a date and Todo', () => {
     const outcome = await askDashOnGoal(input({ question: 'make it Oct 4 and put it on my todos' }));
     expect(mocks.updateStep).toHaveBeenCalledWith(client, 'mine-1', { due_on: '2026-10-04' });
     expect(mocks.setStepOnTodo).toHaveBeenCalledWith(client, 'mine-1', true);
-    expect(said()).toEqual(['Done.\n\nSet the due date to Sun, Oct 4, 2026. Put it on your Todo.']);
+    expect(said()).toEqual(['Done.\n\nSet the due date to Sun 4 Oct 2026. Put it on your Todo.']);
     expect(outcome.ok).toBe(true);
   });
 
