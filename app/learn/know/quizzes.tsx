@@ -1,9 +1,10 @@
 import Link from '@/components/ui/link';
-import { buttonVariants } from '@/components/ui/button';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { QuizListItem } from '@/lib/learn/quiz/load';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * The quizzes you have taken, and the ones you have not finished, as a
@@ -19,11 +20,7 @@ import type { QuizListItem } from '@/lib/learn/quiz/load';
 export const QUIZZES_HREF = '/learn/know?open=quizzes#quizzes';
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDay(iso, { timeZone: 'UTC' });
 }
 
 /** What a row says about how it went, in one phrase. */
@@ -52,14 +49,14 @@ export function QuizzesSection({
         defaultOpen={open || unfinished}
       >
         <p className="text-ui text-ink-muted">
-          Questions written from notes you chose, answered in your own words.
+          Questions written from notes or text you chose, answered in your own words.
         </p>
 
         {failed ? (
           <p className="text-ui text-ink-muted">The quizzes could not be read.</p>
         ) : quizzes.length === 0 ? (
           <p className="text-ui text-ink-muted">
-            Nothing yet. Pick a few notes and a quiz gets written from what they say.
+            Nothing yet. Name a few notes or paste something, and a quiz gets written from what it says.
           </p>
         ) : (
           <ul className={cn(cardVariants(), 'max-w-2xl divide-y divide-border overflow-hidden')}>
@@ -87,9 +84,7 @@ export function QuizzesSection({
           </ul>
         )}
 
-        <Link href="/learn/quiz/new" className={buttonVariants({ variant: 'secondary' })}>
-          New quiz
-        </Link>
+        <AddTrigger label="Start a quiz" aim={{ kind: 'learn-quiz' }} />
       </SectionFold>
     </div>
   );

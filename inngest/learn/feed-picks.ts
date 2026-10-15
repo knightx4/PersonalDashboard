@@ -40,6 +40,9 @@ import {
 } from '@/lib/learn/feed/targets';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { fetchWikipediaArticle, type WikipediaResult } from '@/lib/learn/providers/wikipedia';
+import { loadTopicStates } from '@/lib/learn/evidence/topic-state-store';
+import type { NextTopic } from '@/lib/learn/map/next-topics';
+import { loadNextTopics } from '@/lib/learn/map/next-topics-load';
 
 /**
  * One call of the Learn now picking pass (plan #806).
@@ -107,7 +110,13 @@ export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<strin
  * oldest first: the Level 3 goal, marked by `list`, whose cards the pass takes
  * from the list rather than naming them (plan #910). An open goal has a track
  * of its own instead, and its cards are that track's lessons (plan #972,
- * lib/learn/lessons/aim-tracks.ts), so it is not drawn here.
+ * lib/learn/lessons/aim-tracks.ts), so it is not drawn here, unless topics
+ * next to what the person knows rank closest to it (plan #2016.6): then it is
+ * drawn for those topics, marked `list: 'next'`.
+ *
+ * `since` starts the one-in-three count: the oldest Level 3 goal's creation,
+ * and for the next-topic goals the first card drawn for them, or now when
+ * there is none yet, so their share starts from today rather than catching up.
  */
 async function loadGoals(
   learn: LearnSupabaseClient,
@@ -119,24 +128,64 @@ async function loadGoals(
     .select(AIM_COLUMNS)
     .eq('user_id', userId)
     .is('archived_at', null)
-    .not('list_source', 'is', null)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
-  const aims = ((data ?? []) as AimRow[]).map(toAim);
-  const names = aims.some((aim) => aim.domainId) ? await loadAimAreaNames(learn, aims) : new Map<string, string>();
+  const all = ((data ?? []) as AimRow[]).map(toAim);
+  const listed = all.filter((aim) => aim.listSource);
+  const open = all.filter((aim) => !aim.listSource);
+  const next = open.length > 0 ? await loadNextGoals(learn, userId) : null;
+  const drawn = [...listed, ...open.filter((aim) => (next?.byAim.get(aim.id)?.length ?? 0) > 0)];
+
+  const names = drawn.some((aim) => aim.domainId) ? await loadAimAreaNames(learn, drawn) : new Map<string, string>();
   const fieldById = new Map(fields.map((field) => [field.id, field]));
-  return {
-    goals: aims.map((aim) => ({
-      id: aim.id,
-      name: aim.name,
-      ...(aim.listSource ? { list: aim.listSource } : {}),
-      about: aim.about,
-      depth: cardDepthForAim(aim.depth),
-      field: aim.fieldId ? (fieldById.get(aim.fieldId) ?? null) : null,
-      domain: aim.domainId ? (names.get(aim.domainId) ?? null) : null,
-    })),
-    since: aims[0]?.createdAt ?? null,
-  };
+  const goal = (aim: (typeof drawn)[number]): FeedGoal => ({
+    id: aim.id,
+    name: aim.name,
+    ...(aim.listSource ? { list: aim.listSource } : { list: 'next' as const, next: next?.byAim.get(aim.id) ?? [] }),
+    about: aim.about,
+    depth: cardDepthForAim(aim.depth),
+    field: aim.fieldId ? (fieldById.get(aim.fieldId) ?? null) : null,
+    domain: aim.domainId ? (names.get(aim.domainId) ?? null) : null,
+  });
+  const starts = [
+    ...listed.map((aim) => aim.createdAt),
+    ...(drawn.length > listed.length && next ? [next.since] : []),
+  ].sort();
+  return { goals: drawn.map(goal), since: starts[0] ?? null };
+}
+
+/**
+ * The topics next to what this person knows, by the goal each ranks closest
+ * to, and when the first card on one was drawn. A failure to read them leaves
+ * the open goals out of the draw, as before, rather than stopping the pass.
+ */
+async function loadNextGoals(
+  learn: LearnSupabaseClient,
+  userId: string,
+): Promise<{ byAim: Map<string, NextTopic[]>; since: string } | null> {
+  try {
+    const states = await loadTopicStates(learn, { userId });
+    const lit = [...states.values()].filter((state) => state.state === 'lit').map((state) => state.topicId);
+    const topics = await loadNextTopics(learn, userId, lit);
+    const byAim = new Map<string, NextTopic[]>();
+    for (const topic of topics) {
+      if (!topic.aim) continue;
+      byAim.set(topic.aim.id, [...(byAim.get(topic.aim.id) ?? []), topic]);
+    }
+    const { data, error } = await learn
+      .from('feed_cards')
+      .select('created_at')
+      .eq('user_id', userId)
+      .not('beside_topic', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (error) throw new Error(`Reading your first card on a next topic failed: ${error.message}`);
+    const first = ((data ?? []) as { created_at: string }[])[0]?.created_at;
+    return { byAim, since: first ?? new Date().toISOString() };
+  } catch (error) {
+    console.error('[learn feed picks] next topics', error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userId: string): Promise<PersonInputs> {

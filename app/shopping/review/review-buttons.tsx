@@ -1,11 +1,16 @@
 'use client';
 
-import { useActionState } from 'react';
+import { closedToast } from '@/lib/core/lifecycle';
+import { useActionState, useState, useTransition } from 'react';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   confirmOrderReview,
   discardOrderReview,
-  dismissEmailReview,
+  dismissEmailsReview,
   excludeSenderReview,
+  restoreDismissedEmails,
   type ActionState,
 } from '@/app/shopping/review/actions';
 import { chooseExclusionDomain } from '@/lib/review/exclude-sender';
@@ -54,17 +59,38 @@ export function DiscardOrderButton({ orderId }: { orderId: string }) {
   );
 }
 
-export function DismissEmailButton({ messageId }: { messageId: string }) {
-  const [state, action, pending] = useActionState(dismissEmailReview, initial);
+/** Not an order: Decline the sync's guess, with Undo in the toast (plan #1957.3). */
+export function DismissEmailButton({ messageId, subject }: { messageId: string; subject: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const toast = useToast();
 
   return (
-    <form action={action} className="inline-flex flex-col items-stretch gap-1">
-      <input type="hidden" name="messageId" value={messageId} />
-      <Button type="submit" variant="secondary" size="sm" pending={pending}>
-        {pending ? 'Dismissing…' : 'Not an order'}
-      </Button>
-      <FieldError>{state.error}</FieldError>
-    </form>
+    <span className="inline-flex flex-col items-stretch gap-1">
+      <Tooltip label="Not an order">
+        <CloseButton
+          lifecycle="declined"
+          variant="secondary"
+          pending={pending}
+          onClick={() =>
+            start(async () => {
+              const result = await dismissEmailsReview([messageId]);
+              setError(result.error ?? null);
+              if (result.error) return;
+              const restore = result.restore;
+              toast({
+                text: closedToast('declined', subject),
+                undo: async () => {
+                  const back = await restoreDismissedEmails(restore);
+                  if (back.error) throw new Error(back.error);
+                },
+              });
+            })
+          }
+        />
+      </Tooltip>
+      <FieldError>{error}</FieldError>
+    </span>
   );
 }
 

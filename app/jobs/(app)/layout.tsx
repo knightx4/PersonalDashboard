@@ -30,16 +30,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
+  // Read once, for the Inbox badge and the brief both.
+  const reviewCount = countReviewItems(supabase, core, user.id);
+  // Awaited below; this only keeps a failure from reading as unhandled first.
+  reviewCount.catch(() => {});
+
   /**
-   * Eight sections, the most the design language allows. Today took in
-   * Interviews and Review (plan #1591): their pages keep their addresses and
-   * are reached from Today, and the review count is on Today's strip and in
-   * the brief rather than on a tab. Activity went the same way and came back
-   * as a tab at the person's ask, since "See all" at the foot of Today was
-   * too far down to find.
+   * Now and Inbox first, as in every workspace (plan #1937.6). Today took in
+   * Interviews (plan #1591) and is now the Now; its page keeps its address.
+   * Review's entry is the Inbox, which carries the review count and lists the
+   * queue as a row, so /jobs/review keeps its address and lights the Inbox.
+   * Activity left for Today once and came back as a tab at the person's ask,
+   * since "See all" at the foot of Today was too far down to find.
    */
-  const sections: NavSection[] = [
-    { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
+  const sections = async (): Promise<NavSection[]> => [
+    { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
+    {
+      href: '/jobs/inbox',
+      label: 'Inbox',
+      icon: 'inbox',
+      alsoMatches: ['/jobs/review'],
+      badge: await reviewCount,
+    },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
     { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
@@ -55,8 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     sections,
     settingsHref: '/jobs/settings',
     settingsLabel: 'Job search settings',
-    feedbackHref: '/dev/bugs',
-    brief: async () => loadJobsBrief(user.id, await countReviewItems(supabase, core, user.id)),
+    brief: async () => loadJobsBrief(user.id, await reviewCount),
     children,
   });
 }

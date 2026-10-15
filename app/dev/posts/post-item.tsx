@@ -1,9 +1,12 @@
 'use client';
 
 import Link, { linkVariants } from '@/components/ui/link';
-import { Check, Copy, Download, Plus } from 'lucide-react';
+import { Check, CircleAlert, Copy, Download, Plus } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
+import { Tooltip } from '@/components/ui/tooltip';
+import { formatXPrice, X_POST_PRICE_USD, X_POST_WITH_URL_PRICE_USD } from '@/lib/x/price';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
@@ -25,6 +28,7 @@ import {
   editPostAngle,
   editPostBody,
   markPostPosted,
+  postToX,
   removePostImage,
   restorePost,
   type PostsActionState,
@@ -225,23 +229,155 @@ function MarkPosted({ id, onCancel }: { id: string; onCancel: () => void }) {
   );
 }
 
-function SuggestedActions({ card }: { card: PostCard }) {
-  const { copied, copy } = useCopy();
-  const [marking, setMarking] = useState(false);
-  const [dropped, drop, dropping] = useActionState(dropPost, {} as PostsActionState);
-  const thread = card.post.body.length > 1;
+/** What the $ beside Post says: the exact price, since X's rates are fixed. */
+function xPriceLine(send: NonNullable<PostCard['send']>): string {
+  const posts = send.requests === 1 ? 'one post' : `${send.requests} posts`;
+  const link =
+    send.linkPosts.length > 0
+      ? ` A post with a link costs ${formatXPrice(X_POST_WITH_URL_PRICE_USD)} instead of ${formatXPrice(X_POST_PRICE_USD)}.`
+      : '';
+  return `X charges ${formatXPrice(send.priceUsd)} for ${posts}.${link}`;
+}
 
-  if (marking) return <MarkPosted id={card.post.id} onCancel={() => setMarking(false)} />;
+function postNumbers(numbers: number[], total: number): string {
+  if (total === 1) return 'This post has';
+  const named = numbers.map(String);
+  const list = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0];
+  return `${named.length > 1 ? 'Posts' : 'Post'} ${list} ${named.length > 1 ? 'have' : 'has'}`;
+}
+
+/**
+ * Post pressed once (plan #2072): what will go where and what X charges,
+ * with the link warning when a post holds a link, then Cancel and Yes, post
+ * it. It takes the row the other actions sat in, so the one decision is the
+ * only thing there. While it sends, both buttons are disabled, and the action
+ * claims the draft as well, so a double press posts once.
+ */
+function ConfirmPost({
+  card,
+  send,
+  handle,
+  onCancel,
+}: {
+  card: PostCard;
+  send: NonNullable<PostCard['send']>;
+  handle: string;
+  onCancel: () => void;
+}) {
+  const [error, setError] = useState<string | undefined>();
+  const [pending, start] = useTransition();
+  const total = card.post.body.length;
+  const partial = total - send.requests;
+  const what =
+    partial > 0
+      ? `Sends posts ${partial + 1} to ${total} of the thread to @${handle} on X now`
+      : total > 1
+        ? `Posts this thread of ${total} to @${handle} on X now`
+        : `Posts this to @${handle} on X now`;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 pt-1">
+    <div role="group" aria-label="Post to X" className="flex flex-col items-start gap-2 pt-1">
+      <p className="max-w-prose text-small text-ink-muted">
+        {what}. X charges {formatXPrice(send.priceUsd)}.
+      </p>
+      {send.warnings.length > 0 && (
+        <p className="max-w-prose text-small text-caution">Worth a look first: {send.warnings.join('; ')}.</p>
+      )}
+      {send.linkPosts.length > 0 && (
+        <p className="max-w-prose text-small text-caution">
+          {postNumbers(send.linkPosts, total)} a link, which X charges {formatXPrice(X_POST_WITH_URL_PRICE_USD)} a
+          post for instead of {formatXPrice(X_POST_PRICE_USD)}, about 13 times more.
+        </p>
+      )}
+      {card.images.length > 0 && partial === 0 && (
+        <p className="max-w-prose text-small text-ink-muted">
+          {card.images.length === 1 ? 'The image goes' : 'The images go'} on the {total > 1 ? 'first post' : 'post'}.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          autoFocus
+          pending={pending}
+          onClick={() =>
+            start(async () => {
+              const form = new FormData();
+              form.set('id', card.post.id);
+              const result = await postToX(form);
+              if (!result.ok) setError(result.error ?? 'That did not work.');
+            })
+          }
+        >
+          {pending ? 'Posting…' : 'Yes, post it'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+      <FieldError>{error}</FieldError>
+    </div>
+  );
+}
+
+/**
+ * Post (plan #2072): the button that sends this draft to X as the connected
+ * account, with the $ beside it saying what X charges. The first press opens
+ * ConfirmPost in place of the row; only Yes, post it sends. What the check
+ * finds (a mention, a post past 280) never takes the button away: it shows as
+ * a ! beside it, and again on the confirm step, and the person decides.
+ */
+function SuggestedActions({
+  card,
+  postAs,
+  postArmed = false,
+}: {
+  card: PostCard;
+  postAs: string | null;
+  postArmed?: boolean;
+}) {
+  const { copied, copy } = useCopy();
+  const [marking, setMarking] = useState(false);
+  const [posting, setPosting] = useState(postArmed);
+  const [dropped, drop, dropping] = useActionState(dropPost, {} as PostsActionState);
+  const thread = card.post.body.length > 1;
+  const send = postAs && card.send?.ok ? card.send : null;
+
+  if (marking) return <MarkPosted id={card.post.id} onCancel={() => setMarking(false)} />;
+  if (posting && postAs && send) {
+    return <ConfirmPost card={card} send={send} handle={postAs} onCancel={() => setPosting(false)} />;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+      {send && (
+        <span className="inline-flex items-center">
+          <Button type="button" size="sm" onClick={() => setPosting(true)}>
+            {send.requests < card.post.body.length ? 'Post the rest' : 'Post'}
+          </Button>
+          {/* dash-action-ok: X's price for a post the person makes; Dash never posts and no model runs. */}
+          <CostHint text={xPriceLine(send)} what="Cost of posting to X" />
+          {send.warnings.length > 0 && (
+            <Tooltip label={`Worth a look: ${send.warnings.join('; ')}.`}>
+              <span
+                tabIndex={0}
+                aria-label="Something to check before posting"
+                className="flex size-8 items-center justify-center rounded-control text-caution"
+              >
+                <CircleAlert className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </span>
+            </Tooltip>
+          )}
+        </span>
+      )}
       <Button
         type="button"
         size="sm"
         variant="secondary"
         onClick={() => copy('all', threadCopyText(card.post.body))}
       >
-        {copied === 'all' ? (
+        {/* Beside Post the row runs out of room at 390, so Copy drops its icon there. */}
+        {send ? null : copied === 'all' ? (
           <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
         ) : (
           <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
@@ -413,7 +549,17 @@ function PostImage({
   );
 }
 
-export function PostItem({ card }: { card: PostCard }) {
+export function PostItem({
+  card,
+  postAs = null,
+  postArmed,
+}: {
+  card: PostCard;
+  /** The handle a draft is posted as from the tab; null when the sign-in cannot post. */
+  postAs?: string | null;
+  /** Draw Post already pressed once, its confirm showing: the gallery's hidden part. */
+  postArmed?: boolean;
+}) {
   const { post } = card;
   const editable = post.status === 'suggested';
   const [editing, setEditing] = useState<number | null>(null);
@@ -442,6 +588,31 @@ export function PostItem({ card }: { card: PostCard }) {
       <ol className="flex flex-col gap-2" aria-label={thread ? 'The thread' : 'The post'}>
         {post.body.map((text, index) => {
           const label = thread ? `Post ${index + 1} of ${post.body.length}` : 'The post';
+          // A post already on X from a send that stopped part-way (plan
+          // #2072): marked, linked, and no longer edited, since X has it.
+          const onX = post.xThreadIds?.[index] ?? null;
+          if (onX) {
+            return (
+              <li key={index} className={cn(thread && 'border-l-2 border-border pl-3')}>
+                <div className="flex flex-col gap-0.5">
+                  <p className="whitespace-pre-wrap text-body text-ink">
+                    <LinkedText text={text} />
+                  </p>
+                  <div className="flex items-center justify-end gap-2">
+                    <StateLabel glyph="check" word="On X" tone="quiet" title="This post went up on X." />
+                    <a
+                      href={`https://x.com/i/status/${onX}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={cn('press-area text-small font-medium', linkVariants())}
+                    >
+                      Open on X
+                    </a>
+                  </div>
+                </div>
+              </li>
+            );
+          }
           return (
             <li key={index} className={cn(thread && 'border-l-2 border-border pl-3')}>
               {editing === index ? (
@@ -558,7 +729,7 @@ export function PostItem({ card }: { card: PostCard }) {
 
       {card.candidate && editing === null && <IsThisIt postId={post.id} candidate={card.candidate} />}
 
-      {editable && editing === null && <SuggestedActions card={card} />}
+      {editable && editing === null && <SuggestedActions card={card} postAs={postAs} postArmed={postArmed} />}
       {post.status === 'dropped' && <RestoreButton id={post.id} />}
     </li>
   );

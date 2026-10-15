@@ -1,10 +1,13 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
+import { CloseButton } from '@/components/inbox/close-button';
 import {
   CHANGE_STATUS_LABEL,
   changeHref,
@@ -32,6 +35,8 @@ import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
 export type ChangePresses = {
   confirm: (id: string) => Promise<ChangeOutcome>;
   decline: (id: string) => Promise<ChangeOutcome>;
+  /** The toast's Undo on Decline (plan #1957.3): proposed again. */
+  reopen?: (id: string) => Promise<ChangeOutcome>;
   undo: (id: string) => Promise<ChangeOutcome>;
 };
 
@@ -64,7 +69,7 @@ export function DashChanges({
   );
 }
 
-type Press = keyof ChangePresses;
+type Press = Exclude<keyof ChangePresses, 'reopen'>;
 
 /**
  * One change and its buttons. Keeps the change it was given until a press
@@ -89,6 +94,7 @@ export function DashChangeRow({
   const [error, setError] = useState<string | null>(null);
   const [pressing, setPressing] = useState<Press | null>(null);
   const [, startPress] = useTransition();
+  const toast = useToast();
 
   // A newer copy from the owner (a reopened thread, the other surface) wins.
   const [seen, setSeen] = useState(given);
@@ -111,6 +117,18 @@ export function DashChangeRow({
         onChanged?.(next);
       }
       if (!outcome.ok) setError(outcome.error);
+      const reopen = presses.reopen;
+      if (outcome.ok && which === 'decline' && reopen) {
+        toast({
+          text: closedToast('declined', words.what),
+          undo: async () => {
+            const back = await reopen(change.id);
+            if (!back.ok) throw new Error(back.error);
+            setChange(back.change);
+            onChanged?.(back.change);
+          },
+        });
+      }
     });
   }
 
@@ -147,6 +165,15 @@ export function DashChangeRow({
         </p>
       )}
 
+      {change.kind === 'start_build' && change.status === 'proposed' && (
+        <p className="text-small text-ink-muted">
+          {change.input.quiet
+            ? 'Confirm writes off its quiet last run and starts a new session now.'
+            : 'Confirm starts a session on this step now.'}{' '}
+          It cannot be undone.
+        </p>
+      )}
+
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -156,18 +183,15 @@ export function DashChangeRow({
             disabled={pressing !== null}
             onClick={() => press('confirm')}
           >
-            {pressing === 'confirm' ? 'Writing…' : 'Confirm'}
+            {pressing === 'confirm' ? (change.kind === 'start_build' ? 'Starting…' : 'Writing…') : 'Confirm'}
           </Button>
-          <Button
-            type="button"
-            size="sm"
+          <CloseButton
+            lifecycle="declined"
             variant="secondary"
             pending={pressing === 'decline'}
             disabled={pressing !== null}
             onClick={() => press('decline')}
-          >
-            Decline
-          </Button>
+          />
         </div>
       )}
 
@@ -180,18 +204,21 @@ export function DashChangeRow({
           >
             {changeWhere(change)}
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="-ml-1"
-            pending={pressing === 'undo'}
-            disabled={pressing !== null}
-            onClick={() => press('undo')}
-          >
-            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {pressing === 'undo' ? 'Undoing…' : 'Undo'}
-          </Button>
+          {/* A started build cannot be taken back (plan #2106.1). */}
+          {change.kind !== 'start_build' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="-ml-1"
+              pending={pressing === 'undo'}
+              disabled={pressing !== null}
+              onClick={() => press('undo')}
+            >
+              <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pressing === 'undo' ? 'Undoing…' : 'Undo'}
+            </Button>
+          )}
         </div>
       )}
 

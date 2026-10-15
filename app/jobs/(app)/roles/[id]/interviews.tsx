@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDateInline } from '@/lib/jobs/applications/load';
 import { createInterviewRound, groupInterviews } from './interview-actions';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ClosedFold, INTERVIEW_MAIL, type InterviewSeed } from './shared';
@@ -203,7 +203,7 @@ function GroupTheseRounds({
   const [error, setError] = useState<string | null>(null);
   // `day` is already the date in the reader's zone, so it is formatted as
   // written rather than converted again -- which past ±12 would move it.
-  const label = formatDate(`${day}T00:00:00.000Z`, 'UTC');
+  const label = formatDateInline(day, 'UTC');
 
   return (
     <div

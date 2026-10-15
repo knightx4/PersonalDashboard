@@ -12,10 +12,6 @@ import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
-import { loadAutoApprove } from '@/lib/plan/auto-approve';
-import { planRoutine } from '@/lib/feedback/routine';
-import { loadNotesLastRun } from '@/lib/feedback/last-worked';
-import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadRecentScreenChanges } from '@/lib/plan/screen-change-load';
@@ -30,12 +26,8 @@ import { DigestPanel } from './digest-panel';
 import { AskBox } from './ask-box';
 import { NowStrip } from './now-strip';
 import { InboxRedirect } from './inbox-redirect';
-import { StatusPanel } from './status-panel';
-import { createGoalsClient } from '@/lib/goals/auth/server';
-import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
-import { goalsStatus } from '@/lib/goals/runner-status';
-import { loadGoalsNight } from '@/inngest/goals/overnight';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const metadata = { title: 'Home' };
 
@@ -50,29 +42,14 @@ function readClock(): number {
   return Date.now();
 }
 
-/** The goal runs going and the goals night's rows, or null when they could not be read. */
-async function readGoals(userId: string) {
-  try {
-    const client = await createGoalsClient();
-    const [started, night] = await Promise.all([
-      loadStartedGoalRuns(client),
-      loadGoalsNight(client, userId, readClock()),
-    ]);
-    return { started, night };
-  } catch (error) {
-    console.error(`Dash could not read the goal runs: ${(error as Error).message}`);
-    return null;
-  }
-}
-
 /**
  * The page you open in the morning, read top to bottom: what is going right
  * now, what changed, what Dash is due to come back to, then the conversations.
  *
  * The strip of chips answers "is anything running, is main green, is anything
  * waiting on me" before anything is scrolled, each chip a link to the page
- * that holds the detail. The runner's controls are folded under it. What is
- * waiting on you is the Inbox tab, and Home carries only its count.
+ * that holds the detail. The runner's controls are on Dev settings
+ * (plan #1937.10). What is waiting on you is the Inbox tab, and Home carries only its count.
  *
  * The pictures are the after shots of the screens changed in the last two
  * days, because a changed screen is read faster from a picture than from its
@@ -86,9 +63,6 @@ async function readGoals(userId: string) {
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  // The goals half of the same runner, read alongside the rest. A goals read
-  // that fails leaves the Plan row as it was rather than taking the page down.
-  const goalsRead = readGoals(user.id);
   const now = readClock();
   const [
     queue,
@@ -100,13 +74,10 @@ export default async function DevRaisedPage() {
     lastRuns,
     started,
     openNotes,
-    notesLastRun,
     checkBacks,
-    vision,
     specChanges,
     mainCheck,
     recentScreens,
-    autoApprove,
     snoozes,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
@@ -127,9 +98,8 @@ export default async function DevRaisedPage() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .in('status', ['open', 'in_progress', 'blocked', 'planned'])
-      // Beside the routine button, so only what a notes run would work.
+      // Only what a notes run would work, as on the routine's button.
       .in('kind', [...NOTES_WORK_KINDS]),
-    loadNotesLastRun(supabase, user.id),
     // What Dash has said it will come back to, soonest first.
     supabase
       .from('check_backs')
@@ -137,7 +107,6 @@ export default async function DevRaisedPage() {
       .eq('user_id', user.id)
       .eq('status', 'waiting')
       .order('due_at'),
-    loadVisionReviewStatus(supabase, user.id),
     // Counted for the Inbox chip, the same as the tab's badge.
     countProposedSpecChanges(supabase, user.id),
     // The row the status line reads, for the Main chip.
@@ -145,8 +114,6 @@ export default async function DevRaisedPage() {
     // The screens changed in the last two days, for the pictures. Two days
     // rather than one, so a morning after a quiet day still has something.
     loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
-    // The runner's auto approve switch, drawn on its row.
-    loadAutoApprove(supabase, user.id),
     // Snoozed rows are out of the chip as they are out of the Inbox (plan #1843).
     loadSnoozeState(supabase, user.id),
   ]);
@@ -176,16 +143,6 @@ export default async function DevRaisedPage() {
     started,
     lastRuns: Object.values(lastRuns),
   });
-
-  // What the goals half is on and what it could pick up.
-  const goalsRows = await goalsRead;
-  const goals = goalsRows
-    ? goalsStatus({
-        ...goalsRows,
-        nightStartedAt: overnight?.running ? overnight.startedAt : null,
-        now,
-      })
-    : null;
 
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
@@ -222,17 +179,6 @@ export default async function DevRaisedPage() {
         />
         <AskBox />
       </div>
-      <StatusPanel
-        run={overnight}
-        canSend={Boolean(planRoutine().token)}
-        card={card}
-        goals={goals}
-        openNotes={openNotes.count ?? 0}
-        notesLastRun={notesLastRun}
-        vision={vision}
-        autoApprove={autoApprove}
-        now={now}
-      />
       {shipped.some((screen) => screen.change.after) && (
         <Group title="Shipped lately">
           <ShippedScreens screens={shipped} />
@@ -240,6 +186,7 @@ export default async function DevRaisedPage() {
       )}
       <DigestPanel digest={digest} />
       <CheckBacksPanel rows={comingBack} now={now} />
+      <NowDashToday workspace="dev" className="" />
       <ConversationsView conversations={conversations} titles={titles} now={now} />
     </PageColumn>
   );

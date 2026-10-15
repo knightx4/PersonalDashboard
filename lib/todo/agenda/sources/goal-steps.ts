@@ -6,7 +6,7 @@ import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
 import { todoSuggestions } from '@/lib/goals/suggestions';
 import { loadGoingSuggestions, recordAttended } from '@/lib/goals/suggestions-store';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
+import { todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -108,14 +108,16 @@ export const goalStepsSource: AgendaSource = {
     revalidatePath('/goals', 'layout');
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'goal_step', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'goal_step', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'goal_step', key, ctx.clients);
   },
 };
 

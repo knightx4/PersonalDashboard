@@ -235,7 +235,17 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Search results come back as input and every round of the server's loop
   // reads them again, so the prompt passes Haiku's 100,000-token line, past
   // which the long-prompt rate applies, about $0.10 in all.
-  'research-essay-question': searching(run(HAIKU, 110_000, 5_000), 4),
+  'research-essay-question': searching(run(HAIKU, 250_000, 6_000), 6),
+  // The guided essay's calls: the rules and the brief (and the plan, where
+  // it reads one) in; a few short lines out.
+  'read-essay-brief': run(SONNET, 1_500, 300),
+  'find-essay-points': run(SONNET, 2_500, 400),
+  'shape-essay-plan': run(SONNET, 1_800, 600),
+  'review-essay-plan': run(SONNET, 2_500, 300),
+  'word-point-question': run(SONNET, 1_500, 60),
+  // Framing the question, then writing the map from the five pages read
+  // (about 5,000 tokens each) with citations on.
+  'write-essay-research': run(SONNET, 30_000, 2_000),
   // The deeper pass gathering: up to eight searches and five pages of about
   // 6,000 tokens each, all read again on each round.
   'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),
@@ -320,6 +330,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'estimate-resale-price': searching(unit(HAIKU, 6_000, 300), 1),
   'read-shelf-photo': run(OPUS, 2_100, 1_500),
   'read-receipt-photo': run(HAIKU, 2_000, 600),
+  'read-order-sentence': run(HAIKU, 700, 200),
   'parse-paste-list': run(HAIKU, 1_500, 1_000),
   'read-book-photo': run(HAIKU, 2_000, 600),
 

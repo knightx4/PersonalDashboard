@@ -1,3 +1,4 @@
+import { RowLink } from '@/components/shell/back-link';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
@@ -180,12 +181,12 @@ function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: strin
   return (
     <li className="relative row-pad px-4 hover:bg-sunken">
       <p className="min-w-0 truncate text-ui">
-        <Link
+        <RowLink
           href={`/jobs/roles/${row.roleId}`}
           className="font-medium text-ink after:absolute after:inset-0 after:content-[''] hover:text-accent"
         >
           {row.roleTitle}
-        </Link>
+        </RowLink>
         {showing('company') && <span className="ml-1.5 text-ink-muted">{row.companyName}</span>}
       </p>
       <p className="mt-1 flex min-w-0 items-center gap-x-2 text-small text-ink-muted">

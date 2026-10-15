@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
-  // Read once, for the Review badge and the brief both.
+  // Read once, for the Inbox badge and the brief both.
   const reviewCount = countReviewItems(supabase, core, user.id);
   // Awaited below; this only keeps a failure from reading as unhandled first.
   reviewCount.catch(() => {});
@@ -35,11 +35,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     module: 'shopping',
     user,
     /**
-     * Review carries a count because an unattended review queue is how the
-     * dashboard quietly becomes wrong. Nothing else here has earned one.
+     * Now and Inbox first, as in every workspace (plan #1937.6). The Inbox
+     * carries the review count because an unattended review queue is how the
+     * dashboard quietly becomes wrong; the queue is a row on it, and its page
+     * keeps its address and lights the Inbox. Nothing else here has earned one.
      */
     sections: async (): Promise<NavSection[]> => [
-      { href: '/shopping/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
+      {
+        href: '/shopping/inbox',
+        label: 'Inbox',
+        icon: 'inbox',
+        alsoMatches: ['/shopping/review'],
+        badge: await reviewCount,
+      },
       { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
       { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
@@ -47,11 +56,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
       { href: '/shopping/share', label: 'Share', icon: 'share' },
-      { href: '/shopping/review', label: 'Review', icon: 'review', badge: await reviewCount },
     ],
     settingsHref: '/shopping/settings',
     settingsLabel: 'Shopping settings',
-    feedbackHref: '/dev/bugs',
     brief: async ({ settings }) => loadShoppingBrief(user.id, settings.timezone, await reviewCount),
     children,
   });

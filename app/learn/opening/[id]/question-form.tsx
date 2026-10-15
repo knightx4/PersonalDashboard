@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -25,9 +25,14 @@ import { answerOpening, skipOpening, type AnswerState } from './actions';
 function AnswerButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
-      {pending ? 'Checking…' : 'Answer'}
-    </Button>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/opening/[id]/actions.ts#answerOpening"
+      what="Cost of marking the answer"
+    >
+      {pending ? 'Checking…' : 'Check my answer'}
+    </DashAction>
   );
 }
 
@@ -80,10 +85,6 @@ export function QuestionForm({
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <AnswerButton />
-          <PaidHint
-            action="app/learn/opening/[id]/actions.ts#answerOpening"
-            what="Cost of marking the answer"
-          />
           {state.error && <span className="text-ui text-danger">{state.error}</span>}
         </div>
       </form>

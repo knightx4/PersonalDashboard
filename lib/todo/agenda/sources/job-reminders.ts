@@ -8,8 +8,8 @@ import {
   gmailComposeUrl,
 } from '@/lib/jobs/followup/compose';
 import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
+import { zoneDay } from '@/lib/core/when';
 
 /**
  * Follow-ups, prep, thank-yous and deadlines, from job_search.reminders.
@@ -146,10 +146,7 @@ export const jobRemindersSource: AgendaSource = {
    * yet" has always meant on the job side, so pushing it is the one write both
    * pages read.
    */
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-
+  async defer(ctx, key, until) {
     const supabase = await (ctx.clients ?? sessionClients).jobs();
     await supabase
       .from('reminders')
@@ -180,12 +177,7 @@ function idOf(key: string): string {
 }
 
 function dayIn(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso));
+  return zoneDay(iso, timezone);
 }
 
 /** The Gmail compose window, already written, for a follow-up reminder. */

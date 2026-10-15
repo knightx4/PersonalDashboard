@@ -29,7 +29,8 @@ export const todoActions: ModuleActions = {
     toggleCalendar: none('setting'),
   },
   'app/todo/settings/actions.ts': {
-    saveAgendaSettingsNow: none('setting'),
+    saveAgendaSources: none('setting'),
+    saveAgendaHorizon: none('setting'),
     addFeed: none('account', 'Connects a calendar feed from another service.'),
     refreshFeedNow: none('page'),
     removeFeed: none('account'),
@@ -38,6 +39,7 @@ export const todoActions: ModuleActions = {
     completeItem: tool('change_agenda_row'),
     deferItem: tool('change_agenda_row'),
     dismissItem: tool('change_agenda_row'),
+    restoreItem: none('theirs', 'Undo: takes back their own Later or Drop.'),
     answerItem: none('theirs'),
   },
   'app/todo/link-actions.ts': {

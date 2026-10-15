@@ -1,6 +1,4 @@
-import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
 import {
@@ -37,6 +35,11 @@ import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
 import { NoteEdit } from './note-edit';
 import { PageWide } from '@/components/shell/page-width';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
+import { whenDate } from '@/lib/core/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +127,7 @@ export default async function NotePage({
       (): DevComment[] => [],
     ),
   ]);
+  const notePath = (await rowSubject(toRef('obsidian.notes', note.id))).path;
 
   return (
     <PageWide>
@@ -155,13 +159,9 @@ export default async function NotePage({
               way into the same vault without leaving the note (#577). From lg up
               the same spot holds the way back to a folded column (#1380). */}
           <div className="mb-4 flex items-center justify-between gap-3">
-            <Link
-              href="/vault"
-              className="inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-            >
-              <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              All notes
-            </Link>
+            {/* The note's path, Vault › the note, and the one back link
+                (plans #1931.2, #1931.3). */}
+            <PathLine crumbs={notePath} fallback={parentCrumb(notePath)} />
 
             {hasVault && (
               <>
@@ -244,9 +244,5 @@ export default async function NotePage({
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

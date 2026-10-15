@@ -48,6 +48,7 @@ export const learnActions: ModuleActions = {
     reloadEssayFromVault: none('page'),
     moveEssayNotes: none('page'),
     closeEssayNote: none('theirs'),
+    reopenEssayNote: none('theirs', 'Undo: takes back their own Done or Decline.'),
     helpEssayNote: none('spends'),
     hideEssayStudyItem: none('theirs'),
     findEssayStudy: none('page'),
@@ -57,10 +58,20 @@ export const learnActions: ModuleActions = {
     publishEssay: none('outside', "Publishes to the person's website."),
     unpublishEssay: none('outside'),
   },
+  'app/learn/e/[id]/guide-actions.ts': {
+    changeEssayPlan: none('own'),
+    answerEssayPoint: none('own'),
+    readEssayBrief: none('spends'),
+    findEssayPoints: none('spends'),
+    shapeEssayPlan: none('spends'),
+    reviewEssayPlan: none('spends'),
+    askEssayPoint: none('spends'),
+  },
   'app/learn/flow/actions.ts': {
     flowStep: none('page'),
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
+    takeBackOfferAnswer: none('theirs', 'Undo: takes back their own answer.'),
   },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
@@ -89,14 +100,8 @@ export const learnActions: ModuleActions = {
       note: 'A ready-made goal offered as one press on Subjects; asked for in words, Dash adds the goal with add_goal.',
     },
   },
-  'app/learn/new/actions.ts': {
-    parseImport: none('page'),
-    resolveCandidate: none('page'),
+  'app/learn/lists/actions.ts': {
     startTrack: tool('add_learn_track'),
-    confirmImport: {
-      tool: ['add_learn_track', 'add_track_reading'],
-      note: 'Dash starts the list and adds each work to it, where the page reads a pasted list first.',
-    },
   },
   'app/learn/save/actions.ts': {
     saveReadingLink: {
@@ -135,9 +140,6 @@ export const learnActions: ModuleActions = {
   'app/learn/quiz/[id]/take/actions.ts': {
     answerQuiz: none('own'),
     skipQuiz: none('own'),
-  },
-  'app/learn/quiz/new/actions.ts': {
-    startQuiz: none('spends'),
   },
   'app/learn/r/[id]/actions.ts': {
     findSources: none('spends'),
@@ -215,5 +217,9 @@ export const learnActions: ModuleActions = {
     transcribeVideoAction: none('spends'),
     transcribePlaylistAction: none('spends'),
     setWatchListPlaylistAction: none('setting'),
+  },
+  'app/learn/settings/actions.ts': {
+    setOfferSubjects: none('setting'),
+    setTeachBackRate: none('setting'),
   },
 };

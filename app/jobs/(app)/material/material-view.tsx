@@ -6,16 +6,16 @@ import { MessageSquareText, Trash2 } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
 import { Group } from '@/components/ui/disclosure';
-import { IconButton } from '@/components/ui/icon-button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Checkbox, ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient as createBrowserJobsClient } from '@/lib/jobs/auth/client';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
@@ -143,7 +143,7 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
         icon={MessageSquareText}
         title="No questions captured yet"
         description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically. Questions are deduped by fingerprint, so the same question asked in different words lands on one row."
-        action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+        action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         secondaryAction={{ label: 'Get the bookmarklet', href: '/jobs/settings#bookmarklet' }}
       />
     );
@@ -471,7 +471,6 @@ function EvidenceSection({
 }) {
   const [state, action] = useActionState(addEvidence, {});
   const [adding, setAdding] = useCloseOnSuccess(state);
-  const [, startTransition] = useTransition();
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -516,20 +515,17 @@ function EvidenceSection({
                 {item.skills.map((skill) => (
                   <Chip key={skill}>{skill.replace(/_/g, ' ')}</Chip>
                 ))}
-                <Tooltip label="Delete this piece of evidence" align="end" className="ml-auto self-center">
-                  <IconButton
-                    size="sm"
-                    label={`Delete ${item.title}`}
-                    className="hover:text-danger"
-                    onClick={() =>
-                      startTransition(async () => {
-                        await deleteEvidence(item.id);
-                      })
-                    }
-                  >
-                    <Trash2 strokeWidth={1.75} aria-hidden />
-                  </IconButton>
-                </Tooltip>
+                <ConfirmStep
+                  size="xs"
+                  className="ml-auto self-center text-danger"
+                  prompt="This piece of evidence goes for good, and drafts stop drawing on it."
+                  onConfirm={async () => {
+                    await deleteEvidence(item.id);
+                  }}
+                >
+                  <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Delete
+                </ConfirmStep>
               </div>
               <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
               {item.metrics && <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>}
@@ -731,10 +727,12 @@ function SeedFromWriting({
           </span>
         )}
 
-        <Button
+        <DashAction
           type="button"
           size="sm"
           variant="secondary"
+          paid="app/jobs/(app)/material/evidence-actions.ts#proposeEvidence"
+          what="Cost of proposing evidence"
           disabled={busy || (kind === 'resume' && !resumeVersionId)}
           onClick={() => {
             setBusy(true);
@@ -761,12 +759,8 @@ function SeedFromWriting({
             });
           }}
         >
-          {busy ? 'Reading…' : 'Propose'}
-        </Button>
-        <PaidHint
-          action="app/jobs/(app)/material/evidence-actions.ts#proposeEvidence"
-          what="Cost of proposing evidence"
-        />
+          {busy ? 'Reading…' : 'Propose evidence'}
+        </DashAction>
 
         {error && <span className="text-small text-danger">{error}</span>}
         {message && <span className="text-small text-ink-muted">{message}</span>}

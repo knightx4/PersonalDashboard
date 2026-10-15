@@ -366,9 +366,9 @@ describe('whoIsOn', () => {
       step('mine', 'stage'),
       step('done-mine', 'stage', { status: 'done' }),
     ]).byGoal.get('g')!;
-    expect(whoIsOn(stage.children[0]).word).toBe('Dash');
-    expect(whoIsOn(stage.children[1]).word).toBe('You');
-    expect(whoIsOn(stage).word).toBe('You and Dash');
+    expect(whoIsOn(stage.children[0]).who).toBe('dash');
+    expect(whoIsOn(stage.children[1]).who).toBe('you');
+    expect(whoIsOn(stage)).toEqual({ who: 'both', title: 'Split: 1 step yours, 1 step Dash’s.' });
   });
 
   it('reads a stage by its open steps, and by all of them once none is open', () => {
@@ -377,13 +377,13 @@ describe('whoIsOn', () => {
       step('dash', 'stage', { kind: 'claude' }),
       step('mine', 'stage', { status: 'done' }),
     ]).byGoal.get('g')!;
-    expect(whoIsOn(open).word).toBe('Dash');
+    expect(whoIsOn(open)).toEqual({ who: 'dash', title: 'Its 1 step is Dash’s.' });
     const [closed] = buildForest(['g'], [
       step('stage', 'g'),
       step('dash', 'stage', { kind: 'claude', status: 'done' }),
       step('mine', 'stage', { status: 'done' }),
     ]).byGoal.get('g')!;
-    expect(whoIsOn(closed).word).toBe('You and Dash');
+    expect(whoIsOn(closed).who).toBe('both');
   });
 });
 

@@ -1,10 +1,11 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from 'react';
-import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
+import { AlertTriangle, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { IconButton } from '@/components/ui/icon-button';
@@ -181,7 +182,7 @@ export function PipelineBoard({
    * the toast, which moves nothing on the board, and only once the write has
    * worked, so a refused move never claims it was filed.
    */
-  const closedLines = useRef(new Map<string, string>());
+  const closedLines = useRef(new Map<string, { line: string; from: ApplicationStatus }>());
   const toast = useToast();
 
   /**
@@ -208,10 +209,17 @@ export function PipelineBoard({
     // An offer is a completion: the buzz once the write is through.
     onDone: (change) => {
       if (change.status === 'offer') completionMoment();
-      const line = closedLines.current.get(change.applicationId);
-      if (line) {
+      const closed = closedLines.current.get(change.applicationId);
+      if (closed) {
         closedLines.current.delete(change.applicationId);
-        toast({ text: line });
+        // Undo puts the role back in the column it left (plan #1957.8).
+        toast({
+          text: closed.line,
+          undo: async () => {
+            const back = await write(change.applicationId, closed.from);
+            if (back && back.error) throw new Error(back.error);
+          },
+        });
       }
     },
   });
@@ -253,10 +261,10 @@ export function PipelineBoard({
       await fadeInPlace(visibleCard(boardRef.current, row.applicationId));
       const open = openCount ?? openApplications(shown);
       const wasOpen = OPEN_STATUSES.includes(row.status);
-      closedLines.current.set(
-        row.applicationId,
-        stillOpenLine(row.companyName, Math.max(0, open - (wasOpen ? 1 : 0))),
-      );
+      closedLines.current.set(row.applicationId, {
+        line: stillOpenLine(row.companyName, Math.max(0, open - (wasOpen ? 1 : 0))),
+        from: row.status,
+      });
       moving.current = {
         applicationId: row.applicationId,
         moment,
@@ -547,12 +555,12 @@ function PipelineCard({
             {/* Padded out to a finger's height and pulled back by the same
               * margin, so the title is a 44px target on a phone without the
               * card growing. */}
-            <Link
+            <RowLink
               href={`/jobs/roles/${row.roleId}`}
               className="-my-3.5 block min-w-0 truncate py-3.5 text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {row.roleTitle}
-            </Link>
+            </RowLink>
             {row.excitement !== null && (
               <Tooltip label={`How excited you are about this role, ${row.excitement} of 5`} align="end" className="shrink-0">
                 <span
@@ -678,10 +686,9 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
   if (confirming) {
     return (
       <span className="flex shrink-0 items-center gap-1">
-        <Button
-          type="button"
+        <CloseButton
+          lifecycle="declined"
           variant="danger"
-          size="sm"
           pending={pending}
           onClick={() =>
             startTransition(async () => {
@@ -689,9 +696,7 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
               setConfirming(false);
             })
           }
-        >
-          {pending ? 'Moving…' : 'Reject'}
-        </Button>
+        />
         <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
           Keep
         </Button>
@@ -700,15 +705,13 @@ function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Prom
   }
 
   return (
-    <Tooltip label="Send straight to rejected" align="end">
-      <IconButton
-        label="Send straight to rejected"
-        onClick={() => setConfirming(true)}
-        className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-      >
-        <Ban strokeWidth={1.75} aria-hidden />
-      </IconButton>
-    </Tooltip>
+    <CloseButton
+      compact
+      lifecycle="declined"
+      label={row.companyName || 'this role'}
+      onClick={() => setConfirming(true)}
+      className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+    />
   );
 }
 

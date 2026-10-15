@@ -1,9 +1,12 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { Card } from '@/components/ui/card';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
@@ -13,6 +16,7 @@ import type { Suggestion } from '@/lib/goals/suggestions';
 import {
   addSuggestedStepAction,
   reactToSuggestionAction,
+  undoDeclineAction,
   type SuggestionActionState,
 } from '../suggestion-actions';
 import { GoalHelp } from './goal-help';
@@ -94,7 +98,28 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
   const step = s.kind === 'step';
   const [added, add, adding] = useActionState(addSuggestedStepAction, initial);
   const [went, goGoing, going] = useActionState(reactToSuggestionAction, initial);
-  const [declined, decline, declining] = useActionState(reactToSuggestionAction, initial);
+  const [declined, setDeclined] = useState<SuggestionActionState>(initial);
+  const [declining, startDecline] = useTransition();
+  const toast = useToast();
+  // Decline, with Undo in the toast (plan #1957.3).
+  function decline() {
+    startDecline(async () => {
+      const form = new FormData();
+      form.set('id', s.id);
+      form.set('reaction', 'not_for_me');
+      const result = await reactToSuggestionAction(initial, form);
+      setDeclined(result);
+      if (result.error) return;
+      toast({
+        text: closedToast('declined', s.title),
+        undo: async () => {
+          const back = await undoDeclineAction(s.id);
+          if (back.error) throw new Error(back.error);
+          setDeclined(initial);
+        },
+      });
+    });
+  }
   const busy = adding || going || declining;
   const error = added.error ?? went.error ?? declined.error;
   // A suggested step needs no label: the section says what it is.
@@ -170,13 +195,7 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
               </Button>
             </form>
           )}
-          <form action={decline}>
-            <input type="hidden" name="id" value={s.id} />
-            <input type="hidden" name="reaction" value="not_for_me" />
-            <Button type="submit" size="sm" variant="ghost" pending={declining} disabled={busy}>
-              Not for me
-            </Button>
-          </form>
+          <CloseButton lifecycle="declined" pending={declining} disabled={busy} onClick={decline} />
           {error && (
             <p role="alert" className="w-full text-small text-danger">
               {error}

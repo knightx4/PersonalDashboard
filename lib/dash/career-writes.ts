@@ -1,6 +1,7 @@
 import { isUuid, type AskDb } from '@/lib/ask/db';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { toRef } from '@/lib/core/refs';
+import { formatNumber } from '@/lib/money';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { APP_STORAGE_BUCKET, type AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { normalizeSkills } from '@/lib/jobs/evidence/propose-payload';
@@ -69,7 +70,7 @@ function text(args: Args, key: string): string {
 
 function capped(args: Args, key: string, max: number): string | null {
   const value = text(args, key);
-  if (value.length > max) throw new JobsRefused(`Keep ${key} under ${max.toLocaleString('en-GB')} characters.`);
+  if (value.length > max) throw new JobsRefused(`Keep ${key} under ${formatNumber(max)} characters.`);
   return value || null;
 }
 
@@ -111,7 +112,7 @@ async function addEvidence(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (title.length > EVIDENCE_TITLE_MAX) throw new JobsRefused(`Keep title under ${EVIDENCE_TITLE_MAX} characters.`);
   const body = text(args, 'body');
   if (!body) throw new JobsRefused('Give body: the story, in their words.');
-  if (body.length > EVIDENCE_BODY_MAX) throw new JobsRefused(`Keep body under ${EVIDENCE_BODY_MAX.toLocaleString('en-GB')} characters.`);
+  if (body.length > EVIDENCE_BODY_MAX) throw new JobsRefused(`Keep body under ${formatNumber(EVIDENCE_BODY_MAX)} characters.`);
   let strength = 3;
   if (args.strength !== undefined && args.strength !== null) {
     if (typeof args.strength !== 'number' || !Number.isInteger(args.strength) || args.strength < 1 || args.strength > 5) {
@@ -293,7 +294,7 @@ async function attachResumePdf(env: JobsWriteEnv, args: Args): Promise<JobsMade>
 async function changeCareerThought(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const body = text(args, 'body');
   if (!body) throw new JobsRefused('Give body: the entry, in their words.');
-  if (body.length > THOUGHT_MAX) throw new JobsRefused(`Keep an entry under ${THOUGHT_MAX.toLocaleString('en-GB')} characters.`);
+  if (body.length > THOUGHT_MAX) throw new JobsRefused(`Keep an entry under ${formatNumber(THOUGHT_MAX)} characters.`);
   const ref = text(args, 'thought_ref');
   const before = ref ? await ownRow(env, 'thoughts', idOf(ref, 'career goals entry'), 'career goals entry') : null;
   if (before && before.body === body) throw new JobsRefused('That entry says that already.');

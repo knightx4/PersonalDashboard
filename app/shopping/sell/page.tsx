@@ -2,6 +2,7 @@ import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
+import { AimButton } from '@/components/shell/aim-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Tag } from 'lucide-react';
@@ -70,8 +71,14 @@ export default async function SellPage() {
           title="Nothing marked for sale"
           description="Mark anything you own for sale and it lands here, whatever it is — a book, a board game, a blender. The assistant prices it and says whether listing it is worth the effort."
           action={{ label: 'Browse inventory', href: '/shopping/inventory' }}
-          secondaryAction={{ label: 'Add something you own', href: '/shopping/inventory/add' }}
-        />
+        >
+          <AimButton
+            aim={{ kind: 'inventory-item' }}
+            label="Add something you own"
+            variant="secondary"
+            size="md"
+          />
+        </EmptyState>
       ) : (
         <SellQueue
           rows={rows}

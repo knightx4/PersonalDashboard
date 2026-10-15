@@ -3,7 +3,6 @@ import 'server-only';
 import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
@@ -298,15 +297,15 @@ export async function setTaskPinned(
   return { error: error?.message ?? null };
 }
 
-/** "Later": out of sight for a week, still open, still due when it was due. */
+/**
+ * "Later": out of sight until a moment (the start of the day chosen from the
+ * Later menu), still open, still due when it was due.
+ */
 export async function snoozeTask(
   userId: string,
   id: string,
-  days = SNOOZE_DAYS,
+  until: Date,
 ): Promise<{ error: string | null }> {
-  const until = new Date();
-  until.setUTCDate(until.getUTCDate() + days);
-
   const supabase = await createTodoClient();
   const { error } = await supabase
     .from('tasks')

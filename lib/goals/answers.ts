@@ -19,6 +19,7 @@ import { liveFields, type CollectionField, type RecordValues } from '@/lib/goals
 import { displayValue } from '@/lib/goals/information';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
+import { whenDate } from '@/lib/core/when';
 
 /** One row an answer read, and the date its figures were current. */
 export type AnswerSource = { recordId: string; asOf: string };
@@ -207,16 +208,9 @@ export function recordName(fields: CollectionField[], record: SourceRecord): str
   return 'a row without a name';
 }
 
-const DATE = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-/** A stored day as the step writes a date elsewhere ("Sep 2, 2026"). */
+/** A stored day as the step writes a date elsewhere ("2 Sep 2026"). */
 function formatDay(day: string): string {
-  return DATE.format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC' });
 }
 
 function joinNames(names: string[]): string {

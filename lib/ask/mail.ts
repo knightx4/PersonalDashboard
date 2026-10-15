@@ -2,6 +2,7 @@ import type { MailSearchHit, MailSearchInput } from '@/lib/inbox/search-mail';
 import type { MailMessage } from '@/lib/inbox/read-mail';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { AskInputError, optionalDate, optionalString, type AskContext, type AskToolResult } from './db';
+import { whenDate, zoneClock, zoneDay } from '@/lib/core/when';
 
 /**
  * search_mail (plan #1316): Dash searching the person's connected Gmail at
@@ -41,30 +42,13 @@ export function senderName(header: string | null): string {
 
 /** A moment as the person's local day and clock, "2026-09-28 14:05", for the model to read. */
 function localStamp(iso: string, timezone: string | undefined): string {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone ?? 'UTC',
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-      .formatToParts(new Date(iso))
-      .map((part) => [part.type, part.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`;
+  const zone = timezone ?? 'UTC';
+  return `${zoneDay(iso, zone)} ${zoneClock(iso, zone)}`;
 }
 
 /** A moment as the person's local day in words, "28 Sep 2026", for the citation under the answer. */
 function localDay(iso: string, timezone: string | undefined): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone ?? 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return whenDate(iso, { timeZone: timezone ?? 'UTC' });
 }
 
 /** Midnight at the start of a local day, as the instant Gmail is asked about. */

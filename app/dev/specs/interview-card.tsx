@@ -1,19 +1,21 @@
 'use client';
 
 import { Tooltip } from '@/components/ui/tooltip';
+import { whenDate } from '@/lib/core/when';
 import { useActionState, useState } from 'react';
-import { ArrowUp, CircleUser, MessagesSquare } from 'lucide-react';
+import { ArrowUp, MessagesSquare } from 'lucide-react';
 import { ThreadPanel } from '@/components/patterns/thread';
+import { ThreadTurn } from '@/components/thread/thread';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { DashAction } from '@/components/ui/dash-action';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
-import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { DevComment } from '@/lib/comments/load';
 import type { InterviewCardView } from '@/lib/specs/interview-view';
 import type { VisionScope } from '@/lib/specs/vision';
@@ -51,46 +53,32 @@ import Link, { linkVariants } from '@/components/ui/link';
 const START: PaidAction = 'app/dev/specs/interview-actions.ts#startInterview';
 const ANSWER: PaidAction = 'app/dev/specs/interview-actions.ts#answerInterviewQuestion';
 
-const AUTHOR_NAME = { me: 'You', claude: 'Dash' } as const;
-
+/** A question or an answer, drawn as every thread draws a turn. */
 function Turn({ turn, now }: { turn: DevComment; now: number }) {
   const dash = turn.author === 'claude';
   return (
-    <li className={cn('flex gap-2', dash && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        {dash ? (
-          <DashMark size="2xs" decorative className="text-ink-ghost" />
-        ) : (
-          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
-        )}
+    <ThreadTurn voice={dash ? 'dash' : 'you'} name={dash ? 'Dash' : 'You'} at={turn.createdAt} now={now}>
+      <div className="text-body">
+        <CommentBody body={turn.body} refs="outlines" />
       </div>
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className="text-small font-semibold text-ink">{AUTHOR_NAME[turn.author]}</span>
-          <time dateTime={turn.createdAt} title={exactTime(turn.createdAt)} className="tabular text-small text-ink-muted">
-            {commentWhen(turn.createdAt, now)}
-          </time>
-        </div>
-        <div className="text-body text-ink">
-          <CommentBody body={turn.body} refs={false} />
-        </div>
-      </div>
-    </li>
+    </ThreadTurn>
   );
 }
 
 /** Dash's line while it writes, in the place its turn will take. */
 function Writing({ children }: { children: React.ReactNode }) {
+  const now = useClockNow();
   return (
-    <li className="-mx-2 flex gap-2 rounded-control bg-sunken px-2 py-1.5" aria-live="polite">
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        <DashMark size="2xs" state="working" activity="writing" tone="brand" decorative />
-      </div>
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <span className="text-small font-semibold text-ink-muted">Dash</span>
-        <p className="text-body text-ink-muted">{children}</p>
-      </div>
-    </li>
+    <ThreadTurn
+      voice="dash"
+      name="Dash"
+      muted
+      now={now}
+      aria-live="polite"
+      mark={<DashMark size="2xs" state="working" activity="writing" tone="brand" decorative />}
+    >
+      <p className="text-body text-ink-muted">{children}</p>
+    </ThreadTurn>
   );
 }
 
@@ -119,11 +107,7 @@ function drafted(view: InterviewCardView): string {
   if (!view.finishedAt) return `Drafted from ${answers}`;
   // The day as stored, read in UTC on both sides so the server's and the
   // browser's renderings agree.
-  const day = new Date(`${view.finishedAt.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  const day = whenDate(view.finishedAt.slice(0, 10), { timeZone: 'UTC', month: 'long', year: 'auto' });
   return `Drafted on ${day} from ${answers}`;
 }
 
@@ -180,8 +164,16 @@ export function InterviewPanel({
         ) : (
           <form action={startAction} onSubmit={() => setOpen(true)} className="flex flex-wrap items-center gap-x-2">
             <input type="hidden" name="module" value={module} />
-            <Offer type="submit" label={`Interview me about ${label}`} />
-            <PaidHint action={START} what="Cost of Dash's first question" />
+            <DashAction
+              type="submit"
+              variant="ghost"
+              size="sm"
+              className="-ml-2.5"
+              paid={START}
+              what="Cost of Dash's first question"
+            >
+              {`Interview me about ${label}`}
+            </DashAction>
           </form>
         )}
         <FieldError>{started.error}</FieldError>
@@ -259,10 +251,9 @@ export function InterviewPanel({
         <form action={startAction}>
           <input type="hidden" name="module" value={module} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" variant="secondary">
+            <DashAction type="submit" size="sm" variant="secondary" paid={START} what="Cost of Dash's next question">
               Ask the next question
-            </Button>
-            <PaidHint action={START} what="Cost of Dash's next question" />
+            </DashAction>
           </div>
         </form>
       )}
@@ -301,6 +292,7 @@ export function InterviewPanel({
                   }}
                 />
                 <div className="mt-1 flex items-center justify-end gap-1">
+                  {/* dash-action-ok: the composer's send is an arrow beside what is typed, with Dash's question above it. */}
                   <PaidHint action={ANSWER} what="Cost of answering" />
                   <Tooltip label="Send your answer to Dash." align="end">
                     <IconButton
@@ -323,16 +315,17 @@ export function InterviewPanel({
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {hasAnswer ? (
               <>
-                <Button
+                <DashAction
                   type="submit"
                   name="intent"
                   value="draft"
                   size="sm"
                   variant={move === 'draft' ? 'primary' : 'secondary'}
+                  paid={ANSWER}
+                  what="Cost of drafting"
                 >
                   {move === 'draft' ? 'Draft it' : 'Draft it now'}
-                </Button>
-                <PaidHint action={ANSWER} what="Cost of drafting" />
+                </DashAction>
                 <span className="text-small text-ink-muted">Drafting takes about a minute.</span>
               </>
             ) : (

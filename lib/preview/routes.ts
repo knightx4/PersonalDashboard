@@ -31,6 +31,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answers-marked': ['/jobs/roles/[id]'],
+  'jobs-role-answers-closed': ['/jobs/roles/[id]'],
+  'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
   'jobs-moment-forward': ['/jobs/pipeline'],
@@ -39,25 +42,32 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-pipeline-focus': ['/jobs/pipeline'],
   'jobs-pipeline-table': ['/jobs/pipeline'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
+  'shopping-item-details-catalogue': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
   'dev-comment-thread-seen': ['/dev/plan'],
   'dev-comment-thread-seen-moment': ['/dev/plan'],
   'dev-comment-thread-empty': ['/dev/plan'],
   'dev-comment-thread-composer': ['/dev/plan'],
   'dev-plan-tree': ['/dev/plan'],
+  'dev-plan-tree-assignee-tip': ['/dev/plan'],
   'dev-plan-table': ['/dev/plan'],
   'dev-plan-opened': ['/dev/plan'],
   'dev-plan-critic-stop': ['/dev/plan'],
   'dev-plan-screen-change': ['/dev/plan'],
   'dev-plan-send-back': ['/dev/plan'],
   'scope-burn-up': ['/goals/[goalId]', '/dev/plan/[number]'],
+  'goals-metrics': ['/goals/[goalId]'],
+  'goals-metrics-tooltip': ['/goals/[goalId]'],
+  'goals-metrics-empty': ['/goals/[goalId]'],
+  'goals-metrics-error': ['/goals/[goalId]'],
   'dev-plan-feature': ['/dev/plan/[number]'],
   'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
   'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
   'dev-plan-feature-edit': ['/dev/plan/[number]'],
-  'dev-plan-new-feature': ['/dev/plan', '/dev/projects/[id]'],
   'goals-steps-tree': ['/goals/[goalId]'],
+  'goals-steps-tree-assignee-tip': ['/goals/[goalId]'],
+  'goals-steps-tree-empty': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
   'goals-substep': ['/goals/[goalId]/s/[stepId]'],
@@ -65,7 +75,21 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-step-arrival': ['/goals/[goalId]/s/[stepId]'],
   'goals-home': ['/goals'],
   'goals-inbox': ['/goals/inbox'],
+  'inbox-page': ['/goals/inbox', '/dev/inbox'],
+  'shopping-inbox': ['/shopping/inbox'],
+  'jobs-inbox': ['/jobs/inbox'],
+  'todo-inbox': ['/todo/inbox'],
+  'vault-inbox': ['/vault/inbox'],
+  'learn-inbox': ['/learn/inbox'],
+  'news-inbox': ['/news/inbox'],
   'goals-all': ['/goals/all'],
+  'goals-all-menu': ['/goals/all'],
+  'goals-all-toast': ['/goals/all'],
+  'goals-all-select': ['/goals/all', '/goals/area/[areaId]'],
+  'goals-all-select-confirm': ['/goals/all'],
+  'goals-all-select-toast': ['/goals/all'],
+  'goals-page-top-menu': ['/goals/[goalId]'],
+  'goals-page-top-archive': ['/goals/[goalId]'],
   'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
   'goals-page-steps': ['/goals/[goalId]'],
@@ -94,11 +118,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-material-voice': ['/jobs/material'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
-  'jobs-role-new': ['/jobs/roles/new'],
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
   'jobs-pipeline-filtered': ['/jobs/pipeline'],
+  'jobs-pipeline-marks': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
   'jobs-today-clear': ['/jobs'],
   'jobs-insights': ['/jobs/analytics'],
@@ -109,6 +133,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-quick-note-read-only': ['/vault'],
   'vault-triage': ['/vault/triage'],
   'vault-triage-empty': ['/vault/triage'],
+  'vault-triage-previous': ['/vault/triage'],
   'vault-triage-read-only': ['/vault/triage'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
@@ -123,7 +148,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-work-check': ['/you/work'],
   'you-work-list': ['/you/work'],
   'learn-track-readings': ['/learn/t/[id]'],
+  'dash-working-rows': ['/learn/t/[id]', '/vault', '/news/all'],
+  'learn-track-header': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
+  'learn-review-list': ['/learn/now'],
+  'learn-review-list-folded': ['/learn/now'],
   'learn-now-subject-empty': ['/learn/now'],
   'learn-brief-quick': ['/learn/b/[id]/quick'],
   'learn-brief-quick-empty': ['/learn/b/[id]/quick'],
@@ -144,9 +173,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
     '/shopping/inventory',
   ],
   'shell-search-bar': ['/home'],
+  'shell-go-to': ['/home'],
   'shell-capture': ['/home'],
-  'shell-note': ['/dev/bugs'],
-  'shell-note-saved': ['/dev/bugs'],
+  'shell-capture-aimed': ['/home'],
+  'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
+  'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
+  'shell-capture-aimed-jobs-learn': ['/home'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-writing': ['/ask', '/ask/[ref]'],
@@ -157,6 +189,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
+  'ask-dash-build': ['/ask', '/ask/[ref]'],
+  'ask-dash-build-refused': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'ask-dash-thread': ['/ask/[ref]'],
   'ask-dash-files': ['/ask', '/ask/[ref]'],
@@ -180,8 +214,15 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-shell': ['/you/personality', '/you/work'],
   'you-places': ['/you/places'],
   'you-places-empty': ['/you/places'],
+  'you-places-map': ['/you/places'],
+  'you-places-map-tooltip': ['/you/places'],
+  'you-places-map-empty': ['/you/places'],
+  'you-places-add': ['/you/places'],
   'you-place': ['/you/places/[id]'],
-  'you-place-form': ['/you/places/new', '/you/places/[id]/edit'],
+  'you-place-map': ['/you/places/[id]'],
+  'you-place-map-placing': ['/you/places/[id]'],
+  'you-place-map-error': ['/you/places/[id]'],
+  'you-place-form': ['/you/places/[id]/edit'],
   'you-insights': ['/you/insights'],
   'you-personality-test': ['/you/personality/test'],
   'you-personality-scores': ['/you/personality/test'],
@@ -200,6 +241,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],
+  'learn-idea-space-topics': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
@@ -209,14 +251,25 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
+  'dev-posts-send': ['/dev/posts'],
   'home-page': ['/home'],
+  'home-inbox': ['/home/inbox'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
+  'now-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
   'goals-suggestions': ['/goals/[goalId]'],
+  'goals-metrics-props': ['/goals/[goalId]'],
+  'goals-metrics-props-form': ['/goals/[goalId]'],
+  'goals-metrics-props-menu': ['/goals/[goalId]'],
+  'goals-metrics-props-empty': ['/goals/[goalId]'],
+  'goals-metrics-props-pending': ['/goals/[goalId]'],
+  'goals-metrics-props-error': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
+  'shell-status-run': ['/home'],
+  'shell-status-run-new': ['/home'],
   'news-issue-digest': ['/news/i/[id]'],
   'news-issue-digest-no-pictures': ['/news/i/[id]'],
   'news-issue-essay': ['/news/i/[id]'],
@@ -242,16 +295,34 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
+  'account-spend-overview': ['/account/spend'],
+  'account-spend-by-module': ['/account/spend'],
+  'account-spend-by-module-open': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
+  // A component surface (COMPONENT_SURFACES); the pages it opens on have their own.
+  'core-later-menu': ['/dev/ui'],
+  'core-close-buttons': ['/dev/ui'],
   'dev-status-tips': ['/dev/plan', '/dev/ideas', '/dev/inbox', '/dev/bugs'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
+  // The button that started a run, while the run goes (plan #1964.2.1).
+  'dash-action-run': ['/dev/ui', '/goals', '/dev/plan'],
   'ui-kit': ['/dev/ui'],
+  // A ref link's preview held open (plan #1931.4): in comments, Dash's
+  // replies and plan details.
+  'ref-preview': ['/dev/plan', '/dev/inbox', '/goals'],
+  // The per-day bar chart (plan #2036.1), made for the two usage pages: drawn
+  // with data, the readout held on a day, and a period with nothing in it.
+  'usage-day-bars': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-readout': ['/dev/usage', '/account/spend'],
+  'usage-day-bars-empty': ['/dev/usage', '/account/spend'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
+  'todo-agenda-header': ['/todo'],
+  'todo-agenda-rows': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
@@ -303,8 +374,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-project-plan': ['/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
   'dev-inbox': ['/dev/inbox'],
-  'dev-raised-status': ['/dev/raised'],
-  'dev-runner-crew': ['/dev/plan', '/dev/raised'],
+  'dev-settings': ['/dev/settings'],
+  'goals-settings': ['/goals/settings'],
+  'learn-settings': ['/learn/settings'],
+  'dev-runner-crew': ['/dev/plan', '/dev/settings'],
   'dev-specs': ['/dev/specs'],
   'dev-specs-interview-empty': ['/dev/specs'],
   'dev-specs-interview-half': ['/dev/specs'],
@@ -317,6 +390,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-module': ['/dev/modules/[id]'],
   'dev-module-ideas': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
+  'dev-plan-run': ['/dev/plan/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
   'jobs-analytics': ['/jobs/analytics'],
@@ -337,11 +411,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-concept-evidence': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
-  'learn-new': ['/learn/new'],
   'learn-opening': ['/learn/opening/[id]'],
   'learn-quiz': ['/learn/quiz/[id]'],
   'learn-quiz-take': ['/learn/quiz/[id]/take'],
-  'learn-quiz-new': ['/learn/quiz/new'],
   'learn-reading': ['/learn/r/[id]'],
   'learn-reading-text': ['/learn/r/[id]'],
   'learn-reading-summary': ['/learn/r/[id]'],
@@ -368,6 +440,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-essay-brief': ['/learn/e/[id]'],
   'learn-essay-interview': ['/learn/e/[id]'],
   'learn-essay-interview-later': ['/learn/e/[id]'],
+  'learn-essay-discover': ['/learn/e/[id]'],
+  'learn-essay-research-map': ['/learn/e/[id]'],
+  'learn-essay-plan': ['/learn/e/[id]'],
+  'learn-essay-structure': ['/learn/e/[id]'],
+  'learn-essay-develop': ['/learn/e/[id]'],
+  'learn-essay-write-plan': ['/learn/e/[id]'],
   'learn-plan-finished': ['/learn/s/[id]'],
   'learn-subject-conversations': ['/learn/s/[id]'],
   'news-all': ['/news/all'],
@@ -377,13 +455,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-settings': ['/todo/settings'],
   'todo-waiting': ['/todo/waiting'],
   'shopping-dashboard': ['/shopping/dashboard'],
-  'shopping-add-books': ['/shopping/inventory/add/books'],
-  'shopping-add-games': ['/shopping/inventory/add/games'],
+  'shopping-dashboard-empty': ['/shopping/dashboard'],
   'shopping-order': ['/shopping/orders/[id]'],
-  'shopping-order-new': ['/shopping/orders/new'],
-  'shopping-order-receipt': ['/shopping/orders/receipt'],
   'shopping-returns': ['/shopping/returns'],
   'shopping-saved': ['/shopping/saved'],
+  'shopping-list-adds': ['/shopping/orders', '/shopping/inventory'],
   'shopping-saved-item': ['/shopping/saved/[id]'],
   'shopping-settings': ['/shopping/settings'],
   'shopping-shares': ['/shopping/share'],
@@ -421,9 +497,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  * shows. A piece a page imports for itself still reaches that page.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
-  'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  // The one thread (plan #1964.3), with a subject or none: a change to it is
+  // looked at here and on the dev-comment-thread surfaces, rather than on
+  // every page that draws a thread.
+  'ask-dash-thread': ['components/thread/thread.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
-  'ask-dash-files': ['components/talk/talk-thread.tsx'],
+  'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
   // Dash's box: @ rows, / commands and the scope chip (plan #1899.5).
   'ask-box-rows': ['components/talk/ask-box.tsx'],
@@ -432,21 +511,48 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
   // The shared tooltip (plan #1985.1).
   'core-tooltip': ['components/ui/tooltip.tsx'],
+  // Later's one menu (plan #1957.2), which Todo, Goals and the Dev Inbox open.
+  'core-later-menu': ['components/inbox/snooze-menu.tsx'],
+  // The four words that close a row (plan #1957.3), which every workspace's
+  // closing buttons draw.
+  'core-close-buttons': ['components/inbox/close-button.tsx'],
+  // The agenda's borrowed rows (plan #1957.9), with the one Later menu.
+  'todo-agenda-rows': ['components/todo/agenda-item-row.tsx'],
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The status line while a run is going (plan #1964.2.3).
+  'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
+  'shell-status-run-new': ['components/shell/status-line.tsx'],
+  // The one Inbox component (plan #1937.4), drawn from its row shape.
+  'inbox-page': ['components/inbox/inbox-page.tsx'],
+  // The capture panels, which every shell mounts: the one box, and capture
+  // aimed at a kind by an Add button (plan #1950.1) or the header's notes
+  // button (plan #1950.5).
+  'shell-capture': ['components/shell/capture.tsx'],
+  'shell-capture-aimed': ['components/shell/capture-aim.tsx', 'components/shell/feedback-button.tsx'],
+  // Shopping's Add buttons and the capture they aim (plan #1950.3.1).
+  'shopping-list-adds': ['app/shopping/list-adds.tsx', 'components/shell/aim-button.tsx'],
+  'shell-capture-aimed-jobs-learn': ['components/shell/capture-aim.tsx'],
+  // The receipt photo and barcode scan inside aimed capture (plan #1950.3.2).
+  'shell-capture-aimed-camera': ['components/shell/capture-camera.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],
   // A goal's Suggestions section (plan #1739), drawn full and empty.
   'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
-  // The note button's panel, open with files added (plan #1713).
-  'shell-note': ['components/shell/feedback-button.tsx'],
-  // The same panel once a note has saved, with its triage (plan #1674).
-  'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
+  // A goal's metrics in its properties column (plan #2084.3), drawn with
+  // each part open on a surface of its own.
+  'goals-metrics-props': ['app/goals/[goalId]/metrics-property.tsx'],
+  // A goal's metrics as bar charts (plan #2084.2), drawn with each hidden part.
+  'goals-metrics': ['app/goals/[goalId]/goal-metrics.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
+  // A ref link with its preview open, loading and gone (plan #1931.4).
+  'ref-preview': ['components/ui/ref-link.tsx'],
+  // The per-day bar chart in each state it has (plan #2036.1).
+  'usage-day-bars': ['components/ui/day-bar-chart.tsx'],
   // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
   // Without this a change to Button or Card reached every surface in the
   // gallery, and each had to be settled by hand. A new file in components/ui
@@ -461,6 +567,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/ui/chip.tsx',
     'components/ui/confirm-step.tsx',
     'components/ui/cost-hint.tsx',
+    'components/ui/dash-action.tsx',
     'components/ui/disclosure.tsx',
     'components/ui/editable-prose.tsx',
     'components/ui/empty-state.tsx',
@@ -555,7 +662,7 @@ export function routeMatches(surfaceRoute: string, route: string, under = false)
  *
  * A route with no pattern in it that a surface lists exactly is that page and
  * no other: Next serves a static folder before a dynamic one, so
- * `/shopping/orders/new` is never `/shopping/orders/[id]` (plan #1783).
+ * `/shopping/share/families` is never `/shopping/share/[id]` (plan #1783).
  */
 export function surfacesForRoute(route: string, under = false): string[] {
   const entries = Object.entries(SURFACE_ROUTES);

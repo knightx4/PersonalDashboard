@@ -1659,6 +1659,11 @@ body,
   --color-fill-ink: var(--c-fill-ink);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
+  /* The three voices of a conversation (see the voice-* utilities). */
+  --color-voice-you: var(--c-ink);
+  --color-voice-dash: var(--c-canvas);
+  --color-voice-quote: var(--c-ink-muted);
+  --color-voice-quote-rule: var(--c-border);
   --color-border: var(--c-border);
   --color-border-strong: var(--c-border-strong);
   --color-shell: var(--c-shell);
@@ -2173,6 +2178,29 @@ body::before {
 }
 @utility row-pad {
   padding-block: var(--row-y);
+}
+
+/* The three voices (plan #1964.3, docs/ONE-INTERFACE-SPEC.md "One thread").
+ * The preference "text never sits bare on the background, and the person's
+ * words, quotes and Dash's words each look different" (taste.ts), defined
+ * once. Your words are ink on the ground they are written on. Dash's words
+ * sit on the recessed ground, the well inside a card or a sheet, so a turn of
+ * his reads as his before a word of it is read. Quoted text hangs off a rule
+ * in the muted ink, so words lifted from elsewhere never pass for anyone's
+ * own. Every thread draws its turns with these (components/thread/thread.tsx),
+ * and so do the goals briefing and Dash's lines in capture. */
+@utility voice-you {
+  color: var(--color-voice-you);
+}
+@utility voice-dash {
+  background-color: var(--color-voice-dash);
+  color: var(--color-voice-you);
+  border-radius: var(--radius-control);
+}
+@utility voice-quote {
+  border-left: 2px solid var(--color-voice-quote-rule);
+  padding-left: 0.75rem;
+  color: var(--color-voice-quote);
 }
 
 /* A sheet: the one class every opaque card carries. Inert in three themes,
@@ -3466,6 +3494,11 @@ form[data-auto-submit] [data-fallback-submit] {
 .comment-prose ul { list-style: disc; }
 .comment-prose ol { list-style: decimal; }
 .comment-prose li + li { margin-top: 0.2em; }
+
+/* Quoted text in a comment or a reply: the quote voice (plan #1964.3). */
+.comment-prose blockquote {
+  @apply voice-quote;
+}
 
 .comment-prose code {
   background: var(--c-sunken);

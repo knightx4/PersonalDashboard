@@ -126,7 +126,6 @@ second press posts the action again.
 | `app/account/view.tsx:141` | Save | `updateEnabledModules` | |
 | `app/account/view.tsx:250` | Sign out | `signOut` | |
 | `app/jobs/(app)/contacts/view.tsx:120` | Add contact | `createContact` | |
-| `app/jobs/(app)/roles/new/role-form.tsx:63` | Fetch | `fetchJobDescription` | |
 | `app/jobs/(app)/settings/view.tsx:244` | Save | `updateProfile` | |
 | `app/jobs/(app)/settings/view.tsx:572` | Exclude | `addExcludedSender` | |
 | `app/jobs/(app)/settings/view.tsx:649` | Add | `addResumeVersion` | |

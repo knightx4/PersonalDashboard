@@ -1,4 +1,12 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
+const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
+const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
+const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
+const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+/** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
+const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
 
 /**
  * Learn's tables, as Goals reads them (lib/sources/types.ts). What someone
@@ -15,6 +23,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'about'],
       title: 'name',
       href: () => '/goals',
+      section: GOALS_HOME,
+      parent: parentBy('goal_id', 'goals.items'),
       note: 'Each aim is a goal in the Learn area on /goals (aims.goal_id, goals 0066), and the goal owns its name, line and whether it is active. Read the goal rather than counting both.',
     },
     {
@@ -25,6 +35,7 @@ export const learnSources: ModuleSources = {
       search: ['name', 'note'],
       title: 'name',
       href: (id) => `/learn/s/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.goals',
@@ -33,6 +44,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['asked'],
       title: 'asked',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects'], ['concept_id', 'learn.concepts']),
     },
     {
       table: 'learn.tracks',
@@ -42,6 +54,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'question'],
       title: 'title',
       href: (id) => `/learn/t/${id}`,
+      section: READING_LISTS,
     },
     {
       table: 'learn.readings',
@@ -51,6 +64,8 @@ export const learnSources: ModuleSources = {
       search: ['title', 'why', 'note'],
       title: 'title',
       href: (id) => `/learn/r/${id}`,
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.learning_log',
@@ -59,6 +74,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['topic', 'question', 'summary'],
       title: 'topic',
+      parent: parentByFirst(['subject_id', 'learn.subjects'], ['essay_id', 'learn.essays']),
       note: 'Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.',
     },
     {
@@ -77,6 +93,8 @@ export const learnSources: ModuleSources = {
       search: ['name', 'claim'],
       title: 'name',
       href: (id) => `/learn/c/${id}`,
+      section: SUBJECTS,
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.curriculum_units',
@@ -85,6 +103,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title', 'covers', 'outcome'],
       title: 'title',
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.plan_pieces',
@@ -93,6 +112,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title'],
       title: 'title',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects']),
     },
     {
       table: 'learn.piece_checks',
@@ -101,6 +121,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('piece_id', 'learn.plan_pieces'),
     },
     {
       table: 'learn.review_questions',
@@ -109,6 +130,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('concept_id', 'learn.concepts'),
       note: 'concept_id is the idea in learn.concepts; its next due date is review_due_on in learn.concept_state.',
     },
     {
@@ -137,6 +159,7 @@ export const learnSources: ModuleSources = {
       search: ['title', 'preparing_for'],
       title: 'title',
       href: (id) => `/learn/quiz/${id}`,
+      section: SUBJECTS,
     },
     {
       table: 'learn.imports',
@@ -145,6 +168,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['raw_text', 'source_hint'],
       title: 'source_hint',
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.card_notes',
@@ -153,6 +177,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentByFirst(['concept_id', 'learn.concepts'], ['card_id', 'learn.feed_cards']),
       note: 'concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.',
     },
     {
@@ -162,6 +187,7 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['phrase', 'explanation'],
       title: 'phrase',
+      parent: parentBy('card_id', 'learn.feed_cards'),
       note: 'card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.',
     },
     {
@@ -171,6 +197,12 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['summary', 'takeaway', 'why', 'theme_name', 'aim_name'],
       title: 'summary',
+      parent: parentByFirst(
+        ['subject_id', 'learn.subjects'],
+        ['aim_id', 'learn.aims'],
+        ['concept_id', 'learn.concepts'],
+        ['reading_id', 'learn.readings'],
+      ),
       note: 'status says what they did with a card; saved and tested cards say more than drawn ones.',
     },
     {
@@ -185,10 +217,12 @@ export const learnSources: ModuleSources = {
       ref: 'video_id',
       href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
       newest: 'added_at',
+      parent: parentBy('subject_id', 'learn.subjects'),
       // The title is on catalogue_items, which a ref's page cannot join to.
       page: {
         title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
         href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        section: VIDEOS,
         reads: ['video_id'],
       },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
@@ -201,17 +235,18 @@ export const learnSources: ModuleSources = {
       search: ['path', 'draft_body'],
       title: 'path',
       href: (id) => `/learn/e/${id}`,
+      section: ESSAYS,
       note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
     {
       table: 'learn.evidence_links',
       module: 'Learn',
-      holds: 'What backs each idea: the notes they wrote, courses they took and work they did that cover it, with how close the match is and why it counts.',
+      holds: 'What backs each idea, and which topics their notes, courses, work and ideas touch: the source, how close the match is and why it counts.',
       weight: 'record',
       search: ['basis'],
       title: 'basis',
       newest: 'found_at',
-      note: 'target_id is the idea in learn.concepts when target_kind is idea; source_kind and source_id name the note, course, work entry, reading or video. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
     },
     {
       table: 'learn.briefs',
@@ -221,6 +256,9 @@ export const learnSources: ModuleSources = {
       search: ['question', 'angle', 'short_answer'],
       title: 'question',
       href: (id) => `/learn/b/${id}`,
+      // A brief's sources are a reading list (track_id), so it sits there.
+      section: READING_LISTS,
+      parent: parentBy('track_id', 'learn.tracks'),
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
   ],
@@ -230,7 +268,7 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.area_check_articles',
       reason:
-        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases and the embedding columns are bookkeeping for matching them.",
+        "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
@@ -243,6 +281,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
+    { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
     { table: 'learn.idea_place_members', reason: 'Join rows putting an idea in a place on the Idea Space map.' },
     { table: 'learn.work_passages', reason: 'Passages of the résumé and Career notes, copied and embedded daily to link ideas to work history; the résumé and the notes are the sources.' },
     { table: 'learn.vault_dust', reason: 'Each vault note matched with its most alike idea, worked out daily for the dust on the Idea Space map.' },
@@ -263,7 +302,12 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.opening_sweeps',
       reason: 'Placement bookkeeping.',
-      page: { title: 'asked', href: (row) => `/learn/opening/${row.id}` },
+      page: {
+        title: 'asked',
+        href: (row) => `/learn/opening/${row.id}`,
+        section: SUBJECTS,
+        parent: parentBy('subject_id', 'learn.subjects'),
+      },
     },
     { table: 'learn.piece_practice', reason: 'Practice tasks Dash wrote; read through what was handed in for them.' },
     { table: 'learn.plan_projects', reason: 'Final projects Dash wrote; read through what was handed in for them.' },

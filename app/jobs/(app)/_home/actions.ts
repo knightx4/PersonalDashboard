@@ -2,9 +2,20 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { LATER_REFUSED, laterUntil, untilWords } from '@/lib/core/snooze-days';
+import { setWaitingDismissal } from '@/lib/jobs/today/waiting';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Later's day, from the one Later menu (plan #1957.9): one of
+ * lib/core/snooze-days.ts's choices or a day picked, read in the account's
+ * zone. Null when the day is not after today.
+ */
+async function laterFor(userId: string, choice: string): Promise<{ until: string; words: string } | null> {
+  const { timezone } = await loadAccountSettings(userId);
+  const later = laterUntil(choice, timezone);
+  return later ? { until: later.until.toISOString(), words: untilWords(later.day, timezone) } : null;
+}
 
 /**
  * Done with a nudge.
@@ -34,15 +45,56 @@ export async function completeReminder(id: string): Promise<{ error: string | nu
   return { error: null };
 }
 
-/** Not now. Pushes the nudge out rather than deciding anything about it. */
-// latency: pending -- should be optimistic: a snooze that waits for the round trip
-export async function snoozeReminder(id: string): Promise<{ error: string | null }> {
+/**
+ * The toast's Undo on Done or Later (plan #1957.3): puts the nudge back as it
+ * was, open and due when it was due.
+ */
+// latency: pending
+export async function restoreReminder(
+  id: string,
+  dueAt: string | null,
+): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from('reminders')
-    .update({ due_at: new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString() })
+    .update(dueAt ? { completed_at: null, due_at: dueAt } : { completed_at: null })
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  return { error: null };
+}
+
+/**
+ * Not now. Pushes the nudge out to the day chosen rather than deciding
+ * anything about it, and hands back when it was due so the toast's Undo can
+ * put it back, with when it comes back in words for the toast.
+ */
+// latency: pending -- should be optimistic: a snooze that waits for the round trip
+export async function snoozeReminder(
+  id: string,
+  choice: string,
+): Promise<{ error: string | null; dueAt?: string | null; until?: string }> {
+  const user = await requireUser();
+  const later = await laterFor(user.id, choice);
+  if (!later) return { error: LATER_REFUSED };
+  const supabase = await createClient();
+
+  const { data: before } = await supabase
+    .from('reminders')
+    .select('due_at')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('reminders')
+    .update({ due_at: later.until })
     .eq('id', id)
     .eq('user_id', user.id);
 
@@ -51,17 +103,13 @@ export async function snoozeReminder(id: string): Promise<{ error: string | null
   revalidatePath('/jobs/roles/[id]', 'page');
   // And on the company, which rolls up the to-dos of every role it has.
   revalidatePath('/jobs/companies/[slug]', 'page');
-  return { error: null };
+  return { error: null, dueAt: (before?.due_at as string | null | undefined) ?? null, until: later.words };
 }
 
 /**
- * Dismiss a "Waiting on you" row on This week.
- *
- * It has no row of its own to mark done -- it is recomputed from the event log
- * on every load -- so the dismissal lives in its own small table instead,
- * upserted so re-dismissing an already-dismissed row just updates it rather
- * than erroring. `until: null` is "Done", for good; a date is "Later", the
- * same distinction reminders draw with completed_at vs due_at.
+ * Answer a request waiting on you: `until: null` is dealt with, for good; a
+ * date is Later, the same distinction reminders draw with completed_at vs
+ * due_at (lib/jobs/today/waiting.ts writes it).
  */
 async function dismissWaiting(
   eventId: string,
@@ -70,15 +118,10 @@ async function dismissWaiting(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('waiting_dismissals')
-    .upsert(
-      { user_id: user.id, application_event_id: eventId, dismissed_until: until },
-      { onConflict: 'user_id,application_event_id' },
-    );
-
-  if (error) return { error: error.message };
+  const { error } = await setWaitingDismissal(supabase, user.id, eventId, until);
+  if (error) return { error };
   revalidatePath('/jobs');
+  revalidatePath('/jobs/inbox');
   return { error: null };
 }
 
@@ -87,7 +130,32 @@ export async function completeWaiting(eventId: string): Promise<{ error: string 
   return dismissWaiting(eventId, null);
 }
 
+/** Later on a request, to the day chosen from the one Later menu. */
 // latency: pending -- should be optimistic: a snooze that waits for the round trip
-export async function snoozeWaiting(eventId: string): Promise<{ error: string | null }> {
-  return dismissWaiting(eventId, new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString());
+export async function snoozeWaiting(eventId: string, choice: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const later = await laterFor(user.id, choice);
+  if (!later) return { error: LATER_REFUSED };
+  return dismissWaiting(eventId, later.until);
+}
+
+/**
+ * The toast's Undo on a "Waiting on you" row (plan #1957.3). The row is
+ * recomputed from the event log, so taking the dismissal away is what brings
+ * it back.
+ */
+// latency: pending
+export async function restoreWaiting(eventId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('waiting_dismissals')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('application_event_id', eventId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs');
+  return { error: null };
 }

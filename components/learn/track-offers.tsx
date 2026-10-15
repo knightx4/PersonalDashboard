@@ -1,16 +1,20 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Moon, Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import type { TrackOffer } from '@/lib/learn/flow/offer';
 import { weeksResting, type RestingOffer } from '@/lib/learn/lessons/resting';
-import { answerTrackOffer } from '@/app/learn/flow/actions';
+import { answerTrackOffer, takeBackOfferAnswer } from '@/app/learn/flow/actions';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   answerRestingTrack,
   startTrackOffer,
@@ -81,10 +85,16 @@ export function TrackOffers({
           key={shownResting.subjectId}
           track={shownResting}
           onDone={restingDone}
+          onBack={() => setResting(resting)}
           onError={setError}
         />
       ) : shownOffer ? (
-        <FeedOfferCard key={shownOffer.themeId} offer={shownOffer} onDone={offerDone} />
+        <FeedOfferCard
+          key={shownOffer.themeId}
+          offer={shownOffer}
+          onDone={offerDone}
+          onBack={() => setOffer(offer)}
+        />
       ) : null}
     </div>
   );
@@ -107,19 +117,23 @@ export function MadeTrackLine({ track, className }: { track: MadeTrack; classNam
 
 /**
  * A theme from your notes offered as a new track (LEARN-LESSONS-SPEC, "What
- * the feed deals"; plan #968). Start writes the track with its units; Not now
- * and Never go through Practice Flow's own action, so a theme set aside here
+ * the feed deals"; plan #968). Start writes the track with its units; Later
+ * and Decline go through Practice Flow's own action, so a theme set aside here
  * is set aside there too.
  */
 function FeedOfferCard({
   offer,
   onDone,
+  onBack,
 }: {
   offer: TrackOffer;
   onDone: (track: MadeTrack | null) => void;
+  /** The toast's Undo: the card comes back. */
+  onBack: () => void;
 }) {
   const [starting, startStart] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const start = () =>
     startStart(async () => {
@@ -139,6 +153,13 @@ function FeedOfferCard({
     // As in Practice Flow: the card has gone, and a press that was not kept
     // only means the theme may be offered again.
     void answerTrackOffer(form).catch(() => undefined);
+    toast({
+      text: closedToast(outcome === 'never' ? 'declined' : 'later', offer.name),
+      undo: async () => {
+        await takeBackOfferAnswer({ themeId: offer.themeId });
+        onBack();
+      },
+    });
   };
 
   return (
@@ -162,26 +183,29 @@ function FeedOfferCard({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1">
-          <Button type="button" variant="primary" onClick={start} pending={starting}>
-            {starting ? 'Writing the subject…' : 'Start'}
-          </Button>
-          <PaidHint
-            action="app/learn/now/actions.ts#startTrackOffer"
-            what="Cost of starting the subject"
-          />
-        </span>
-        <Button
+        <DashAction
           type="button"
+          variant="primary"
+          onClick={start}
+          pending={starting}
+          paid="app/learn/now/actions.ts#startTrackOffer"
+          what="Cost of starting the subject"
+        >
+          {starting ? 'Writing the subject…' : 'Start this subject'}
+        </DashAction>
+        <CloseButton
+          lifecycle="later"
           variant="secondary"
+          size="md"
           onClick={() => setAside('not_now')}
           disabled={starting}
-        >
-          Not now
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setAside('never')} disabled={starting}>
-          Never
-        </Button>
+        />
+        <CloseButton
+          lifecycle="declined"
+          size="md"
+          onClick={() => setAside('never')}
+          disabled={starting}
+        />
       </div>
 
       {starting && (
@@ -197,21 +221,25 @@ function FeedOfferCard({
 /**
  * A track you have left alone, offered back (LEARN-LESSONS-SPEC, "A resting
  * track is offered back"; plan #1045). Pick it up waits for the press to be
- * kept, since the track's lessons hang on it; Not now and Let it rest take the
+ * kept, since the track's lessons hang on it; Later and Drop take the
  * card away at once, and one that was not kept only means the track may be
  * offered again.
  */
 function RestingTrackCard({
   track,
   onDone,
+  onBack,
   onError,
 }: {
   track: RestingOffer;
   onDone: (picked: RestingOffer | null) => void;
+  /** The toast's Undo: the card comes back. */
+  onBack: () => void;
   onError: (message: string) => void;
 }) {
   const [picking, startPicking] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const weeks = weeksResting(track.lastUsed, new Date());
 
   const pickUp = () =>
@@ -231,6 +259,13 @@ function RestingTrackCard({
         if (result.error) onError(`That was not kept: ${result.error}`);
       })
       .catch(() => onError('That was not kept. Check your connection.'));
+    toast({
+      text: closedToast(outcome === 'rested' ? 'dropped' : 'later', track.name),
+      undo: async () => {
+        await takeBackOfferAnswer({ subjectId: track.subjectId });
+        onBack();
+      },
+    });
   };
 
   return (
@@ -253,17 +288,21 @@ function RestingTrackCard({
         <Button type="button" variant="primary" onClick={pickUp} pending={picking}>
           Pick it up
         </Button>
-        <Button
-          type="button"
+        <CloseButton
+          lifecycle="later"
           variant="secondary"
+          size="md"
           onClick={() => setAside('not_now')}
           disabled={picking}
-        >
-          Not now
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setAside('rested')} disabled={picking}>
-          Let it rest
-        </Button>
+        />
+        <Tooltip label="Let it rest: it is not offered back again">
+          <CloseButton
+            lifecycle="dropped"
+            size="md"
+            onClick={() => setAside('rested')}
+            disabled={picking}
+          />
+        </Tooltip>
       </div>
       {error && <p className="mt-2 text-small text-danger">{error}</p>}
     </Card>

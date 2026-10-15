@@ -3,7 +3,6 @@
 import { useActionState, useRef, useState } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
@@ -23,23 +22,20 @@ export type ThoughtView = {
 const initial: ThoughtState = { error: null };
 
 /**
- * The career goals entries as one folding section: a composer, then the
- * entries newest first as rows in one panel (law 13). Folded, its heading
- * still says when the latest entry was written. It sits on Settings; the
- * roles and people searches on Find read the entries.
+ * The career goals entries: a composer, then the entries newest first as
+ * rows in one panel (law 13). It is a tab of Job search settings, which
+ * draws the card and heading; the roles and people searches on Find read
+ * the entries.
  */
 export function ThoughtList({ thoughts }: { thoughts: ThoughtView[] }) {
   return (
-    <CardSection
-      fold="jobs.fold.Career goals"
-      title="Career goals"
-      meta={thoughts.length > 0 ? `latest ${thoughts[0].written}` : undefined}
-      hint={
-        thoughts.length === 0
-          ? 'What you want from the next job and where you are now, in your own words. Add a new entry when your thinking changes; the newest one counts.'
-          : undefined
-      }
-    >
+    <div>
+      {thoughts.length === 0 && (
+        <p className="mb-3 text-small text-ink-muted">
+          What you want from the next job and where you are now, in your own words. Add a new
+          entry when your thinking changes; the newest one counts.
+        </p>
+      )}
       {/* With nothing written yet the composer is the section, so it starts open. */}
       <Composer startOpen={thoughts.length === 0} />
       {thoughts.length > 0 && (
@@ -49,7 +45,7 @@ export function ThoughtList({ thoughts }: { thoughts: ThoughtView[] }) {
           ))}
         </ul>
       )}
-    </CardSection>
+    </div>
   );
 }
 

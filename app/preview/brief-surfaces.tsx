@@ -1,3 +1,4 @@
+import { sectionSubject } from '@/lib/core/section-path';
 import { BriefView } from '@/app/learn/b/[id]/brief-view';
 import { BriefsList } from '@/app/learn/now/briefs-list';
 import type { BriefOnPage, BriefPage, BriefSource, BriefSummary } from '@/lib/learn/briefs/view';
@@ -117,7 +118,12 @@ const ready: BriefOnPage = {
 const readyPage: BriefPage = { brief: ready, sources };
 
 export function LearnBriefSurface() {
-  return <BriefView page={readyPage} live={false} />;
+  // The path the page reads from the catalogue: Learn › Now › the brief.
+  const path = sectionSubject('/learn/now', 'Now', {
+    label: ready.question,
+    href: `/learn/b/${ready.id}`,
+  });
+  return <BriefView page={readyPage} live={false} path={path} />;
 }
 
 /**

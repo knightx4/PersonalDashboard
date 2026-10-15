@@ -143,9 +143,9 @@ describe('the feature page', () => {
     expect(html).toContain('Status of #1 Feature pages');
     expect(html).toContain('Priority of #1 Feature pages');
     expect(html).toContain('Actions for #1');
-    // "Send to Dash" on the button, the count of rows beneath in its title.
-    expect(html).toContain('Send to Dash');
-    expect(html).toContain('title="Send #1');
+    // "Start building" on the button, the count of rows beneath in its title.
+    expect(html).toContain('Start building');
+    expect(html).toContain('title="Build #1');
     expect(html).toContain('Started');
     expect(html).toContain('2026-10-07');
   });

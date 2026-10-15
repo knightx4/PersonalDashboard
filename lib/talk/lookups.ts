@@ -155,6 +155,8 @@ export function lookupLabel(name: string, input: unknown): string {
     }
     case 'note_positions':
       return 'Reading the notes and positions around a note';
+    case 'application_answers':
+      return 'Reading the answers on an application';
     case 'courses':
       return 'Checking courses';
     case 'read_spec': {

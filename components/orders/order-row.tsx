@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
 import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';
@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
+import { whenDate } from '@/lib/core/when';
 
 const STATUS_TONES: Record<string, ChipTone> = {
   ordered: 'accent',
@@ -18,14 +19,7 @@ const STATUS_TONES: Record<string, ChipTone> = {
 
 function formatOrderDate(iso: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }
 
 function statusLabel(status: string): string {
@@ -62,7 +56,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
 
   return (
     <li className="group flex items-stretch transition-colors duration-quick hover:bg-canvas">
-      <Link
+      <RowLink
         href={`/shopping/orders/${order.id}`}
         className={cn(
           'row-pad flex min-w-0 flex-1 items-center gap-3 pl-3 pr-2 transition-colors duration-quick',
@@ -102,7 +96,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
               </span>
             )}
         </p>
-      </Link>
+      </RowLink>
 
       <div className="flex shrink-0 items-center pr-2">
         <OrderRowMenu orderId={order.id} merchantName={order.merchant_name} />

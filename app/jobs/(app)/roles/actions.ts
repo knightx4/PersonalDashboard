@@ -1,196 +1,18 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
-import { fetchPostingFromUrl, fetchQuestionsFromUrl, detectPosting } from '@/lib/jobs/ats';
-import { extractCompBand, extractRequirements, guessSeniority, guessWorkMode, jdHash } from '@/lib/jobs/jd/requirements';
-import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
-import { APPLICATION_SOURCES } from '@/lib/jobs/pipeline';
 import { draftAnswer } from '@/lib/jobs/evidence/draft';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { DEFAULT_BANNED_CONSTRUCTIONS, type AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
-
-/**
- * Creating a role.
- *
- * Creating a role creates its application in the same action unless it is
- * explicitly saved as a lead. The three-level split is a modelling decision;
- * the interface should not make the user perform it.
- */
-
-export interface RoleFormState {
-  error?: string;
-  notice?: string;
-  fetched?: {
-    title: string;
-    text: string;
-    location: string | null;
-    atsJobId: string | null;
-    boardToken: string | null;
-    vendor: string;
-    questionCount: number;
-  };
-}
-
-const createSchema = z.object({
-  companyName: z.string().trim().min(1, 'Which company is this?'),
-  title: z.string().trim().min(1, 'What is the role called?'),
-  jdUrl: z.string().trim().url().optional().or(z.literal('')),
-  jdText: z.string().trim().optional(),
-  location: z.string().trim().optional(),
-  source: z.enum(APPLICATION_SOURCES).default('portal'),
-  referralContactId: z.string().uuid().optional().or(z.literal('')),
-  saveAsLead: z.boolean().default(false),
-  submittedAt: z.string().optional(),
-  excitement: z.coerce.number().min(1).max(5).optional(),
-});
-
-// latency: pending
-export async function createRole(
-  _prev: RoleFormState,
-  formData: FormData,
-): Promise<RoleFormState> {
-  const parsed = createSchema.safeParse({
-    companyName: formData.get('companyName'),
-    title: formData.get('title'),
-    jdUrl: formData.get('jdUrl') ?? '',
-    jdText: formData.get('jdText') ?? '',
-    location: formData.get('location') ?? '',
-    source: formData.get('source') ?? 'portal',
-    referralContactId: formData.get('referralContactId') ?? '',
-    saveAsLead: formData.get('saveAsLead') === 'on',
-    submittedAt: formData.get('submittedAt') ?? '',
-    excitement: formData.get('excitement') || undefined,
-  });
-
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const user = await requireUser();
-  const supabase = await createClient();
-  const input = parsed.data;
-
-  const detected = input.jdUrl ? detectPosting(input.jdUrl) : null;
-
-  const company = await ensureCompany(supabase, user.id, input.companyName, {
-    careersUrl: input.jdUrl || null,
-    website: input.jdUrl || null,
-    boardToken: detected?.boardToken ?? null,
-    ats: detected?.vendor === 'other' || detected?.vendor === 'unknown' ? null : detected?.vendor,
-  });
-  if (company.error) return { error: company.error };
-
-  const jdText = input.jdText?.trim() || null;
-  const comp = jdText ? extractCompBand(jdText) : null;
-
-  const { data: role, error: roleError } = await supabase
-    .from('roles')
-    .insert({
-      user_id: user.id,
-      company_id: company.id,
-      title: input.title,
-      jd_url: input.jdUrl || null,
-      jd_text: jdText,
-      jd_fetched_at: null,
-      jd_hash: jdText ? jdHash(jdText) : null,
-      jd_source: jdText ? 'manual' : null,
-      ats_job_id: detected?.jobId ?? null,
-      seniority: jdText ? guessSeniority(input.title, jdText) : null,
-      location: input.location || null,
-      work_mode: jdText ? guessWorkMode(jdText) : null,
-      comp_min_cents: comp?.minCents ?? null,
-      comp_max_cents: comp?.maxCents ?? null,
-      comp_source: comp ? 'posted' : null,
-      source: input.source,
-      requirements: jdText ? extractRequirements(jdText) : null,
-      requirements_extracted_at: jdText ? new Date().toISOString() : null,
-    })
-    .select('id')
-    .single();
-
-  if (roleError || !role) {
-    if (/roles_user_jd_hash_key/.test(roleError?.message ?? '')) {
-      return { error: 'You already have this exact posting saved for this company.' };
-    }
-    return { error: roleError?.message ?? 'Could not create the role.' };
-  }
-
-  const { data: application, error: applicationError } = await supabase
-    .from('applications')
-    .insert({
-      user_id: user.id,
-      role_id: role.id,
-      source: input.source,
-      referral_contact_id: input.source === 'referral' ? input.referralContactId || null : null,
-      created_by: 'manual',
-      excitement: input.excitement ?? null,
-      submitted_at: input.saveAsLead ? null : (input.submittedAt || new Date().toISOString()),
-    })
-    .select('id')
-    .single();
-
-  if (applicationError || !application) {
-    return { error: applicationError?.message ?? 'Could not create the application.' };
-  }
-
-  if (!input.saveAsLead) {
-    await supabase.from('application_events').insert({
-      user_id: user.id,
-      application_id: application.id,
-      kind: 'submitted',
-      occurred_at: input.submittedAt || new Date().toISOString(),
-      source: 'manual',
-      summary: 'Applied',
-    });
-  }
-
-  revalidatePath('/jobs/pipeline');
-  revalidatePath('/jobs/roles');
-  redirect(`/jobs/roles/${role.id}`);
-}
-
-/** Fetch a posting so the form can be filled in from a pasted link. */
-// latency: pending
-export async function fetchJobDescription(
-  _prev: RoleFormState,
-  formData: FormData,
-): Promise<RoleFormState> {
-  await requireUser();
-  const url = String(formData.get('jdUrl') ?? '').trim();
-  if (!url) return { error: 'Paste a link first.' };
-
-  const outcome = await fetchPostingFromUrl(url);
-  if (!outcome.ok) {
-    // Never a silent failure: the paste box is the documented answer and the
-    // reason it is being offered is shown.
-    return { notice: outcome.reason };
-  }
-
-  const questions = await fetchQuestionsFromUrl(url);
-
-  return {
-    fetched: {
-      title: outcome.posting.title,
-      text: outcome.posting.text,
-      location: outcome.posting.location,
-      atsJobId: outcome.posting.atsJobId,
-      boardToken: outcome.posting.boardToken,
-      vendor: outcome.posting.vendor,
-      questionCount: questions.ok ? questions.questions.length : 0,
-    },
-    notice:
-      outcome.tier === 2
-        ? 'Read from the page itself rather than the job board API — check the title and description.'
-        : undefined,
-  };
-}
 
 // latency: pending
 export async function updateRole(
@@ -473,7 +295,8 @@ export async function lookUpJobDescription(roleId: string): Promise<JdLookupResu
 }
 
 /**
- * Drafting one answer from the bank.
+ * Drafting one answer: the best answer to the question, drawing on the bank
+ * and the posting (note ad554975).
  *
  * The draft comes back to the caller and is not written anywhere. It lands
  * beside the textarea, not in it, and only an Insert followed by a Save puts
@@ -501,7 +324,7 @@ export async function draftAnswerFromEvidence(
     .select(
       `id, word_limit,
        questions!application_answers_question_id_fkey!inner ( text, canonical_answer ),
-       applications!inner ( roles!inner ( title, requirement_matches, companies!inner ( name ) ) )`,
+       applications!inner ( roles!inner ( title, jd_text, requirement_matches, companies!inner ( name ) ) )`,
     )
     .eq('id', parsed.data.answerId)
     .eq('user_id', user.id)
@@ -514,6 +337,7 @@ export async function draftAnswerFromEvidence(
   const role = (row.applications as unknown as {
     roles: {
       title: string;
+      jd_text: string | null;
       requirement_matches: RequirementMatch[] | null;
       companies: { name: string } | null;
     };
@@ -543,12 +367,6 @@ export async function draftAnswerFromEvidence(
     strength: item.strength as number,
   }));
 
-  if (items.length === 0) {
-    return {
-      draft: null,
-      error: 'Your evidence bank is empty. Fill it in Material — a draft from nothing is a blank page with extra steps.',
-    };
-  }
 
   // The shortlist is against the question rather than the description: this
   // one answer is about one thing, and sending the whole bank invites the
@@ -579,6 +397,7 @@ export async function draftAnswerFromEvidence(
       banned: banned.length > 0 ? banned : DEFAULT_BANNED_CONSTRUCTIONS,
       canonicalAnswer: question.canonical_answer,
       requirementSummary: wants || null,
+      posting: role.jd_text,
     },
   );
   await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-answer' }, spend);

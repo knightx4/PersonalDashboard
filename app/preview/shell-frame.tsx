@@ -57,6 +57,14 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
       { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
     ],
   },
+  you: {
+    sections: [
+      { href: '/you/personality', label: 'Personality', icon: 'personality' },
+      { href: '/you/places', label: 'Places', icon: 'places' },
+      { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
+      { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+    ],
+  },
   dev: {
     sections: [
       { href: '/dev/raised', label: 'Home', icon: 'devHome' },
@@ -115,7 +123,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         label: 'Reading lists',
         icon: 'tracks',
         exact: true,
-        alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
+        alsoMatches: ['/learn/t/', '/learn/r/'],
       },
       {
         href: '/learn/videos',
@@ -156,7 +164,6 @@ export function ShellFrame({
         sections={frame.sections}
         settingsHref={frame.settingsHref}
         settingsLabel={frame.settingsLabel}
-        feedbackHref="/dev/bugs"
         // The name the shopping fixtures already use, and nobody's real one:
         // these pictures go on X.
         displayName="Alex"

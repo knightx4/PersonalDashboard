@@ -35,6 +35,8 @@ import type { DevComment } from '@/lib/comments/load';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -314,6 +316,7 @@ export default async function InventoryItemPage({
     // The page width every page in the shell shares.
     <PageColumn className="space-y-8">
       <PageHeader
+        subject={await rowSubject(toRef('public.inventory_items', id))}
         title={title}
         description={[displayVariant(item.variant), category?.name, item.status]
           .filter(Boolean)

@@ -3,32 +3,20 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPipeline } from '@/lib/jobs/applications/load';
 import { summariseSearch, type SummaryInterview } from '@/lib/jobs/home/summary';
 import { loadSinceView } from '@/lib/jobs/home/since-load';
-import { loadReviewQueue } from '@/lib/jobs/review/load';
-import {
-  CLOSEST_STATUSES,
-  closestToOffer,
-  loadClosestInterviews,
-  withoutClosestDebriefs,
-} from '@/lib/jobs/today/closest';
-import { liveByMove } from '@/lib/jobs/today/live';
 import { loadToday } from '@/lib/jobs/today/load';
-import { reviewPeek } from '@/lib/jobs/today/review-peek';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { TodayPage } from './_home/today-page';
 
-export const metadata = { title: 'Today' };
+export const metadata = { title: 'Now' };
 
 /**
- * Today, and where `/jobs` lands (plan #1150, #1591).
+ * Now, and where `/jobs` lands (plan #1150, #1591, #1937.9).
  *
  * Reads everything once and hands it to TodayPage, which draws it. The
- * pipeline is read once for the live list, the numbers and This week's
- * follow-up drafts. This week's board is read before "Since you last looked",
- * which leaves out the mail This week lists as waiting on you; the same mail
- * puts the live list's move on you.
- *
- * The applications at final round or in process are read once more, for
- * their interviews' prep and notes, which open the page; the debriefs they
- * ask for are taken out of This week so a round is nudged once.
+ * pipeline is read once for the numbers and This week's follow-up drafts.
+ * The board is read for This week's interviews and for the mail waiting on
+ * you, which is left out of "Since you last looked"; the mail itself is
+ * listed in the Jobs Inbox.
  *
  * /jobs/today, the page Home replaced, redirects here.
  */
@@ -38,12 +26,11 @@ export default async function JobsToday() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, timezone')
+    .select('timezone')
     .eq('id', user.id)
     .maybeSingle();
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
-  const senderName = (profile?.display_name as string) ?? null;
 
   const [core, pipeline, interviewResult] = await Promise.all([
     createCoreClient(),
@@ -58,16 +45,7 @@ export default async function JobsToday() {
   ]);
 
   const now = new Date();
-  const [board, queue, closestInterviews] = await Promise.all([
-    loadToday(supabase, user.id, { senderName, pipeline, now }),
-    loadReviewQueue(supabase, core, user.id),
-    loadClosestInterviews(
-      supabase,
-      user.id,
-      pipeline.filter((row) => CLOSEST_STATUSES.includes(row.status)).map((row) => row.applicationId),
-    ),
-  ]);
-  const closest = closestToOffer(pipeline, closestInterviews, now);
+  const board = await loadToday(supabase, user.id, { now });
   const since = await loadSinceView(supabase, core, {
     userId: user.id,
     timezone,
@@ -85,13 +63,11 @@ export default async function JobsToday() {
 
   return (
     <TodayPage
-      review={reviewPeek(queue.rows)}
-      closest={closest}
-      board={withoutClosestDebriefs(board, closest)}
+      board={board}
       summary={summariseSearch(pipeline, interviews, now)}
-      live={liveByMove(pipeline, new Set(board.waiting.map((item) => item.applicationId)))}
       since={since}
       timezone={timezone}
+      dashToday={<NowDashToday workspace="jobs" className="" />}
     />
   );
 }

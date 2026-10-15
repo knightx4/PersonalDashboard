@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { KindBadge } from '@/components/learn/kind-badge';
@@ -60,15 +61,15 @@ function Bar({ percent }: { percent: number }) {
 function AskButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <span className="inline-flex items-center gap-1">
-      <Button type="submit" variant="secondary" pending={pending}>
-        {pending ? 'Writing a question…' : label}
-      </Button>
-      <PaidHint
-        action="app/learn/s/[id]/probe/actions.ts#askQuestion"
-        what="Cost of writing a question"
-      />
-    </span>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/s/[id]/probe/actions.ts#askQuestion"
+      what="Cost of writing a question"
+    >
+      {pending ? 'Writing a question…' : label}
+    </DashAction>
   );
 }
 
@@ -138,13 +139,14 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
         </ul>
 
         <div className="mt-3 flex items-center gap-3">
-          <Button type="submit" variant="secondary">
-            Add these underneath
-          </Button>
-          <PaidHint
-            action="app/learn/s/[id]/probe/actions.ts#approveFloor"
+          <DashAction
+            type="submit"
+            variant="secondary"
+            paid="app/learn/s/[id]/probe/actions.ts#approveFloor"
             what="Cost of adding them"
-          />
+          >
+            Add these underneath
+          </DashAction>
           {saved.error && <span className="text-ui text-danger">{saved.error}</span>}
         </div>
       </form>
@@ -160,13 +162,14 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
         usually the graph starting too high rather than anything about you.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="ghost">
-          Work out what it rests on
-        </Button>
-        <PaidHint
-          action="app/learn/s/[id]/probe/actions.ts#findFloor"
+        <DashAction
+          type="submit"
+          variant="ghost"
+          paid="app/learn/s/[id]/probe/actions.ts#findFloor"
           what="Cost of working it out"
-        />
+        >
+          Work out what it rests on
+        </DashAction>
         {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
@@ -224,6 +227,7 @@ export function ProbeSession({
                   <ProbeOptions options={live.options} answered={live.answered ?? null} />
                   {!live.answered && (
                     <div className="flex justify-end">
+                      {/* dash-action-ok: the hint sits under the answer options, which are not a button for this cost. */}
                       <PaidHint
                         action="app/learn/s/[id]/probe/actions.ts#answerQuestion"
                         what="Cost of answering"
@@ -235,15 +239,10 @@ export function ProbeSession({
               ) : (
                 <WrittenAnswer
                   response={live.answered?.response ?? null}
+                  paid="app/learn/s/[id]/probe/actions.ts#answerQuestion"
                   beside={
                     live.answered ? undefined : (
-                      <>
-                        <PaidHint
-                          action="app/learn/s/[id]/probe/actions.ts#answerQuestion"
-                          what="Cost of marking the answer"
-                        />
-                        <KnownButton declare={declare} />
-                      </>
+                      <KnownButton declare={declare} />
                     )
                   }
                 />

@@ -745,6 +745,32 @@ substep (on a step), edits, moves the row up or down among its siblings, or
 deletes it with its count of rows beneath in the confirm. The foot of each
 module adds a feature.
 
+**The columns.** Every row sits on the same five columns, headed Step,
+Status, Assignee, Priority and Steps (plan #2069.1).
+
+- **Status** is the row's health from `healthOf`, its word and shape, and
+  pressing it changes the stored status. Its tooltip names the steps a
+  waiting row waits on, and on a row with a session working it or a step
+  beneath it, which steps those are.
+- **Assignee** is who the row is on, from `assigneeOf` in
+  `lib/plan/tree.ts`: your initial, Dash's mark, or both. A question, a
+  setup job and a proposal are yours; otherwise `isClaudes` decides, so a
+  step you kept is yours and every other is Dash's. A row with steps
+  beneath it reads from its open leaf steps, and shows both when they are
+  split; the tooltip then says how many each holds. Dash's mark moves only
+  while `lib/plan/liveness.ts` says a session is working the row or a step
+  beneath it, and goes still under reduced motion. The word sits beside the
+  marks from sm up; on a phone the marks stand on the line under the title.
+  The cell is `AssigneeCell` in `components/plan-tree/assignee-cell.tsx`,
+  shared with a goal's page.
+- **Priority** and **Steps** are as before: *Next* or *Someday* with the
+  size, and the done and open count on a row with steps beneath.
+
+A row waiting on another step says so on the Needs line under its title:
+"Needs: #2016.4 to close first", or the day of the check it waits for. No
+column says whose move it is; the feature's own page keeps that as a
+property.
+
 A decision is marked where a build step's checkbox would be, with a `?`. Its
 health reads *Unanswered* rather than *Ready* — on a question, "ready" would
 read as ready to be built, which is the one thing it is not — and its health
@@ -836,19 +862,18 @@ press.
 
 ### Writing a feature
 
-*New feature* in the plan's header opens one compose surface at the top of
-the plan (plan #1670), and *Add a feature* at the foot of a module's section
-opens the same surface with the module set. It holds the title, a one-line
-summary, chips for the module, priority, size and who holds it, then the
-description and what the feature is done when. Saving writes a not-started
-feature with no session stamp, so it reads as yours, last in its module's
-section, and a line under the header links to its page for adding steps. The
-header's press is a link to `?new=feature`, so it works before the page's
-script has loaded. The summary is kept in `plan_items.summary`, one line of
-at most 200 characters, and shows under the title on the feature's page.
-*Edit* on that page opens the same surface filled in, without the module
-chip; the status, note and commit stay on the row's own Edit on the
-plan.
+*New feature* in the plan's header and *Add a feature* at the foot of a
+module's section open capture aimed at a feature (plan #1950.5), with the
+module set when the press knows it and the app as a whole otherwise. One
+press writes a not-started feature with the title alone and no session
+stamp, so it reads as yours, last in its module's section, and opens its
+page. A row's *Add a step* opens capture aimed at a step under that row the
+same way. The summary is kept in `plan_items.summary`, one line of at most
+200 characters, and shows under the title on the feature's page.
+*Edit* on that page opens one compose surface (plan #1670) holding the
+title, the summary, chips for priority, size and who holds it, then the
+description and what the feature is done when. The status, note and
+commit stay on the row's own Edit on the plan.
 
 ## The changelog
 
@@ -963,12 +988,25 @@ and a leaf step, which has nothing beneath it to re-read.
 are Claude's, how a batch is run, and where each job is written down. The jobs
 themselves are one file each under `reference/` — building a step, shaping an
 idea, re-shaping a feature, answering an `@dash` comment, plus the wording
-rules and the SQL for when the CLI cannot run. A session reads the front door
-and the one file it was sent for, rather than all seven jobs to do one of them.
+rules and the SQL for when the CLI cannot run. A session reads the one file
+its turn names, rather than all seven jobs to do one of them. Only a batch,
+which has to orchestrate, reads the front door as well. The routine's standing
+prompt says so, and every turn the app fires names its file.
 
 `reference/building.md` is the per-step procedure: read the brief, check what
 it waits on, claim it, break it down if it is large, build to the done-when,
-verify, commit with `(plan #<outline>)` in the subject, close with a note.
+verify, commit with `(plan #<outline>)` in the subject, close with a note. A
+step fired on its own also merges to main and closes from there, under **When
+nobody sent you**. The gallery, photograph and critic loop is in
+`reference/screen.md`, which a builder reads only when its step changes a
+screen: the brief says so under its `## Gallery surfaces` section.
+
+Every turn ends with a note giving the SQL that marks that run over, by its
+own id (`runEndNote` in `lib/plan/auto-line.ts`). The sweep ends a build run
+when its step closes or blocks, and a shaping or notes run by the rows its job
+leaves, but a comment reply, a raise, a spec change or a CI fix leaves neither.
+Before the note, those were written back as failed at the two-hour cutoff
+whether or not they had done their work.
 
 A batch is not built by the session that receives it. More than one step means
 each step goes to its own subagent, which reads `reference/building.md`, builds

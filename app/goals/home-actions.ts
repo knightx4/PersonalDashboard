@@ -7,7 +7,8 @@ import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatDay } from '@/lib/goals/dates';
 import { saveErrandAndStart, saveGoalAndStart } from '@/lib/goals/errand-store';
-import { SET_ASIDE_CHOICES, setAsideFields, setAsideOn } from '@/lib/goals/set-aside';
+import { SET_ASIDE_CHOICES, setAsideFields } from '@/lib/goals/set-aside';
+import { snoozeDay } from '@/lib/core/snooze-days';
 import { updateStep } from '@/lib/goals/steps-store';
 import { COMMENT_MAX } from '@/lib/goals/comments';
 import { GOAL_TITLE_MAX, parseGoalFields } from '@/lib/goals/tree';
@@ -18,7 +19,7 @@ import { todayIn } from '@/lib/todo/tasks/model';
 import { addGoalComment } from './[goalId]/comment-actions';
 
 /**
- * The Goals home's own writes: Not now on a row of Up next, its undo, and Ask
+ * The Goals home's own writes: Later on a row of Up next, its undo, and Ask
  * Dash. Preparing a step and working a goal from Put Dash to work go through
  * the goal page's own actions (shaping-actions.ts), so they refuse the same
  * things there and here.
@@ -49,7 +50,7 @@ function redraw() {
 export async function setAsideAction(form: FormData): Promise<SetAsideState> {
   const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
-  const choice = Choice.safeParse(form.get('choice'));
+  const choice = Choice.or(Day).safeParse(form.get('choice'));
   if (!id.success || !choice.success) return { error: 'Could not tell what to set aside.' };
 
   const client = await createGoalsClient();
@@ -63,7 +64,9 @@ export async function setAsideAction(form: FormData): Promise<SetAsideState> {
   if (error || !step) return { error: 'That step is no longer on the page.' };
 
   const account = await loadAccountSettings(user.id);
-  const on = setAsideOn(choice.data as Parameters<typeof setAsideOn>[0], todayIn(account.timezone));
+  // A named choice, or a day picked, which has to be after today.
+  const on = snoozeDay(choice.data, todayIn(account.timezone));
+  if (!on) return { error: 'Pick a day after today.' };
   const { dueMoved, ...fields } = setAsideFields({ dueOn: step.due_on as string | null }, on);
   try {
     if (!(await updateStep(client, id.data, fields))) {
@@ -73,10 +76,11 @@ export async function setAsideAction(form: FormData): Promise<SetAsideState> {
     return { error: 'It could not be set aside. Try again.' };
   }
   redraw();
+  // The toast puts "Later:" and the step's title in front (plan #1957.8).
   return {
     message: dueMoved
-      ? `Set aside until ${formatDay(on)}. Its due date moved with it.`
-      : `Set aside until ${formatDay(on)}.`,
+      ? `until ${formatDay(on)}. Its due date moved with it.`
+      : `until ${formatDay(on)}.`,
     before: {
       id: id.data,
       startsOn: (step.starts_on as string | null) ?? null,
@@ -85,7 +89,7 @@ export async function setAsideAction(form: FormData): Promise<SetAsideState> {
   };
 }
 
-/** Undo a Not now: the start and due dates the step held before. */
+/** Undo a Later: the start and due dates the step held before. */
 // latency: optimistic
 export async function restoreAsideAction(form: FormData): Promise<SetAsideState> {
   await requireUser();

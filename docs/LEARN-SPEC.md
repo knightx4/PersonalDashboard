@@ -239,7 +239,13 @@ Account deletion needs no route change: everything cascades from
 
 ## The flow
 
-### 1. Intake — `/learn/new`
+### 1. Intake — capture's Start a topic
+
+Start a topic on Reading lists opens capture aimed at a topic (plan
+#1950.4): the first line names it, and a list pasted under that line goes in
+as readings, one per line, each with nothing looked up yet. The page that
+held the two fields below and the confirm list is gone; what follows is how
+the import was first specified.
 
 Two fields and no ceremony.
 
@@ -253,9 +259,8 @@ and for now says so. Paste with no question works fine and is the common case.
 
 ### 2. Parse
 
-Free text to candidate references. Same shape as `lib/books/paste-list.ts`,
-which already does exactly this job for a pasted list of owned books and is
-the pattern to copy rather than reinvent: Haiku
+Free text to candidate references, in the shape the pasted list of owned
+books had before Shopping's add pages went (plan #1950.3.4): Haiku
 (`claude-haiku-5-5`), a tool call, a `zod` schema, and a
 line-heuristic fallback when `ANTHROPIC_API_KEY` is unset so the module is
 developable without one.
@@ -383,8 +388,7 @@ existing vault-provider boundary.
 | `/learn` | redirects to `/learn/now`, Now, the first tab (plan #1486). It was the tracks until plan #773, Practice Flow until #805, Learn now until #1313 and Home until #1486. A `?track=` link goes to Now's practice questions on that track and a `?q=` link to the reading lists |
 | `/learn/now` | Now: the feed, with what is waiting as a strip at the top and a Practice only switch |
 | `/learn/flow` | redirects to Now's practice questions, keeping its query (plan #1486). What practice asks about, and the Tracks only filter, are in [LEARN-NOW-SPEC](LEARN-NOW-SPEC.md) |
-| `/learn/lists` | tracks, shown as reading lists, with progress. `EmptyState` pointing at `/learn/new` when there are none |
-| `/learn/new` | question + paste, then the confirm list |
+| `/learn/lists` | tracks, shown as reading lists, with progress. Save a reading and Start a topic open capture aimed at each; the `EmptyState` offers Start a topic when there are none |
 | `/learn/t/[id]` | one track: the question at the top, then ordered readings |
 | `/learn/r/[id]` | one reading: locator, basis, open, note, status |
 

@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import {
-  ArrowLeft,
   CircleDot,
   ExternalLink,
   FileText,
@@ -28,6 +27,7 @@ import { IssueFrame } from './issue-frame';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Tooltip } from '@/components/ui/tooltip';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 export type IssueViewProps = {
   issueId: string;
@@ -101,7 +101,8 @@ export function IssueView({
   savedHeadlines = [],
   sent = {},
   elsewhere = {},
-}: IssueViewProps) {
+  path,
+}: IssueViewProps & { path?: PageSubject }) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
   const sentOf = (story: NewsStory) => sent[story.headline.trim()];
   // From md up a summarised issue's stories are a grid (plan #942). An essay,
@@ -207,17 +208,9 @@ export function IssueView({
   };
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={back.href}
-          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {back.label}
-        </Link>
-      </p>
-
       <PageHeader
+        subject={path}
+        back={back}
         title={subject ?? 'No subject'}
         description={byline}
         actions={<div className="contents max-sm:hidden">{actions(false)}</div>}

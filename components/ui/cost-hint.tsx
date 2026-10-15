@@ -17,7 +17,8 @@ import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spen
  * calls, or every model when it runs several (note 17bae0c6).
  *
  * It takes the estimate already worked out (lib/core/spend/estimate-types.ts)
- * and fetches nothing, so a page that has several paid buttons asks for all
+ * or, for a price that is fixed rather than estimated (X's per-post rate),
+ * the sentence itself as `text`. It fetches nothing, so a page that has several paid buttons asks for all
  * their estimates once rather than once per hint.
  *
  * -- Two ways open --
@@ -33,13 +34,16 @@ import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spen
  */
 export function CostHint({
   estimate,
+  text: fixed,
   count,
   what,
   align = 'start',
   defaultOpen = false,
   className,
 }: {
-  estimate: CostEstimate;
+  estimate?: CostEstimate;
+  /** A fixed price, said as it is ("Posting costs $0.015"), in place of an estimate. */
+  text?: string;
   /** How many items the press works on, for an estimate that is per unit. */
   count?: number;
   /** What the button does, for a screen reader: "Cost of drafting the letter". */
@@ -87,8 +91,8 @@ export function CostHint({
     if (shift !== 0) panel.style.translate = `${shift}px 0`;
   }, [mode]);
 
-  const text = costHintText(estimate, count);
-  const models = costHintModels(estimate);
+  const text = fixed ?? (estimate ? costHintText(estimate, count) : '');
+  const models = estimate ? costHintModels(estimate) : '';
   const spoken = models ? `${text}. ${models}` : text;
   const label = what ? `${what}: ${spoken}` : `Expected cost: ${spoken}`;
 

@@ -451,9 +451,9 @@ describe('proposals to close or park a goal (plan #1084)', () => {
     );
     expect(list.map((item) => [item.kind, item.id, item.action])).toEqual([
       ['step', 'flagged', 'Done'],
-      ['close', 'debt', 'Close goal'],
+      ['close', 'debt', 'Done'],
       ['step', 'first', 'Done'],
-      ['park', 'board', 'Park goal'],
+      ['park', 'board', 'Later'],
     ]);
     expect(list[1]).toMatchObject({
       title: 'Its done-when is met: close the goal',

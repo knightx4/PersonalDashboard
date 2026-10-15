@@ -1,7 +1,7 @@
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { SOURCES } from '@/lib/sources/catalogue';
 import type { Source } from '@/lib/sources/types';
-import { AskInputError, clip, optionalString, type AskContext, type AskSchema, type AskToolResult } from './db';
+import { AskInputError, clip, matchedNote, optionalString, type AskContext, type AskSchema, type AskToolResult } from './db';
 
 /**
  * list_rows: Dash reading any table in the sources catalogue
@@ -20,8 +20,11 @@ import { AskInputError, clip, optionalString, type AskContext, type AskSchema, t
  * can filter on it.
  */
 
-/** The most rows read before filtering by words, newest first. */
+/** The most rows read when there are no words to match, newest first. */
 const READ_ROWS = 300;
+/** With words to match, rows are read this many to a page, and no more than SCAN_ROWS in all. */
+const SCAN_PAGE = 1000;
+const SCAN_ROWS = 5000;
 /** The most rows returned. */
 export const LIST_ROWS_MAX = 40;
 const LIST_ROWS_DEFAULT = 20;
@@ -29,10 +32,10 @@ const LIST_ROWS_DEFAULT = 20;
 const COLUMN_CHARS = 400;
 
 /** The schemas a lookup has a client for (AskSchema). */
-const SCHEMAS = new Set<string>(['public', 'core', 'job_search', 'obsidian', 'todo', 'learn', 'news', 'goals', 'you']);
+export const SCHEMAS: ReadonlySet<string> = new Set<string>(['public', 'core', 'job_search', 'obsidian', 'todo', 'learn', 'news', 'goals', 'you']);
 
 /** The owner column, when a table is tied to its owner by one; null when through a join. */
-function ownerColumn(source: Source): string | null {
+export function ownerColumn(source: Source): string | null {
   if (!source.owner) return 'user_id';
   return /^\w+$/.test(source.owner) ? source.owner : null;
 }
@@ -57,7 +60,7 @@ export function sourceWorkspace(source: Source): ModuleId | null {
  * Where a row with no page of its own is linked: its workspace's front page,
  * so the answer can still cite it. Home for a table that belongs to none.
  */
-function fallbackHref(source: Source): string {
+export function fallbackHref(source: Source): string {
   return MODULE_BY_LABEL.get(source.module)?.prefix ?? '/';
 }
 
@@ -66,14 +69,14 @@ export function listableList(): string {
   return LISTABLE.map((s) => `${s.table} (${s.holds.replace(/\.$/, '')})`).join('; ');
 }
 
-function asText(value: unknown): string | null {
+export function asText(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
 }
 
 /** The embedded row's column, whether PostgREST returned the embed as an object or a one-row list. */
-function viaTitle(row: Record<string, unknown>, via: NonNullable<Source['titleVia']>): string | null {
+export function viaTitle(row: Record<string, unknown>, via: NonNullable<Source['titleVia']>): string | null {
   const alias = via.embed.split(':')[0];
   const embedded = row[alias];
   const one = Array.isArray(embedded) ? embedded[0] : embedded;
@@ -102,15 +105,32 @@ export async function listRowsLookup(ctx: AskContext, input: Record<string, unkn
   const columns = source.titleVia ? [...plain, `${source.titleVia.embed}(${source.titleVia.column})`] : plain;
 
   // Every listable table has the column it is ordered by (tests/ask-reach.test.ts).
+  // The first page asks for the exact number of the person's rows in the table.
+  // Without words the newest READ_ROWS are all that can be listed, so that is
+  // one page. With words the match is made here, over the text, so it reads
+  // on through the table (up to SCAN_ROWS) and the count of matches is exact.
   const client = await ctx.db(schema);
-  const { data, error } = await client
-    .from(name)
-    .select(columns.join(', '))
-    .eq(owner, ctx.userId)
-    .order(source.newest ?? 'created_at', { ascending: false })
-    .limit(READ_ROWS);
-  if (error) throw new Error(`${table}: ${error.message}`);
-  const all = (data ?? []) as unknown as Record<string, unknown>[];
+  const pageSize = words.length > 0 ? SCAN_PAGE : READ_ROWS;
+  const page = (from: number, count: boolean) =>
+    client
+      .from(name)
+      .select(columns.join(', '), count ? { count: 'exact' } : undefined)
+      .eq(owner, ctx.userId)
+      .order(source.newest ?? 'created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+  const first = await page(0, true);
+  if (first.error) throw new Error(`${table}: ${first.error.message}`);
+  const all = (first.data ?? []) as unknown as Record<string, unknown>[];
+  const total = Math.max(first.count ?? all.length, all.length);
+  const reach = words.length > 0 ? SCAN_ROWS : READ_ROWS;
+  while (words.length > 0 && all.length < Math.min(total, reach)) {
+    const next = await page(all.length, false);
+    if (next.error) throw new Error(`${table}: ${next.error.message}`);
+    const more = (next.data ?? []) as unknown as Record<string, unknown>[];
+    if (more.length === 0) break;
+    all.push(...more);
+  }
+  const complete = all.length >= total;
 
   const textOf = (row: Record<string, unknown>) =>
     [
@@ -140,9 +160,11 @@ export async function listRowsLookup(ctx: AskContext, input: Record<string, unkn
     };
   });
 
-  const scope = all.length === READ_ROWS ? `the newest ${READ_ROWS} of their rows` : `all ${all.length} of their rows`;
-  const found = words.length > 0 ? `${matched.length} of ${scope} hold "${words.join(' ')}"` : `Read ${scope}`;
-  const shown = matched.length > listed.length ? `; listed the first ${listed.length}` : '';
-  const notes = [`${found}${shown}.`, source.note ? `About this table: ${source.note}` : null].filter(Boolean);
-  return { ok: true, rows, note: notes.join(' ') };
+  // Without words every row matches, and the table's own count is the number.
+  const matchedCount = words.length > 0 ? matched.length : total;
+  const scope = complete ? `all ${total} of their rows` : `the newest ${all.length} of their ${total} rows`;
+  const found = words.length > 0 ? `Looked for "${words.join(' ')}" in ${scope}` : `Read ${scope}`;
+  const count = matchedNote(matchedCount, listed.length, words.length > 0 && !complete);
+  const notes = [`${found}: ${count}.`, source.note ? `About this table: ${source.note}` : null].filter(Boolean);
+  return { ok: true, rows, totals: { matched: matchedCount, shown: listed.length }, note: notes.join(' ') };
 }

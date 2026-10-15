@@ -3,14 +3,12 @@ import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 /** What the Goals pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const goalsActions: ModuleActions = {
   'app/goals/actions.ts': {
-    addArea: tool('change_goal_area'),
     renameAreaAction: tool('change_goal_area'),
     setAreaNoteAction: tool('change_goal_area'),
     planAreaAction: none('spends'),
     approveAreaAction: none('theirs'),
     moveAreaAction: tool('change_goal_area'),
     archiveAreaAction: tool('change_goal_area'),
-    addGoal: tool('add_goal'),
     editGoal: tool('set_goal_done_when', 'change_goal'),
     moveGoalAction: tool('change_goal'),
     archiveGoalAction: tool('change_goal'),
@@ -27,6 +25,11 @@ export const goalsActions: ModuleActions = {
     linkStepAction: tool('change_goal_step'),
     unlinkStepAction: tool('change_goal_step'),
   },
+  'app/goals/[goalId]/metric-actions.ts': {
+    addMetricAction: none('setting', 'Which list a goal counts, and how often, is chosen on the goal page.'),
+    changeMetricAction: none('setting'),
+    removeMetricAction: none('setting'),
+  },
   'app/goals/runs/[runId]/actions.ts': {
     undoRunChangeAction: none('theirs'),
     acknowledgeGoalRunAction: none('theirs'),
@@ -34,6 +37,7 @@ export const goalsActions: ModuleActions = {
   },
   'app/goals/suggestion-actions.ts': {
     reactToSuggestionAction: none('theirs'),
+    undoDeclineAction: none('theirs', 'Undo: takes back their own decline.'),
     recordAttendedAction: tool('change_goals_inbox'),
     addSuggestedStepAction: none('theirs'),
   },
@@ -99,10 +103,12 @@ export const goalsActions: ModuleActions = {
     answerQuestionAction: none('theirs'),
     setQuestionAsideAction: none('theirs'),
     settleProposalAction: none('theirs'),
+    undoDeclineProposalAction: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/goals/[goalId]/help-actions.ts': {
     setHelpKindsAction: none('setting'),
     turnDownHelpAction: none('theirs'),
+    restoreHelpProposalAction: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/goals/files/[fileId]/read-actions.ts': {
     markFileReadAction: none('own', 'Opening the file marks it read, which means the person read it.'),
@@ -119,5 +125,8 @@ export const goalsActions: ModuleActions = {
     undoGoalCapture: none('theirs'),
     estimateGoalCapture: none('page'),
     goalCaptureCosts: none('page'),
+  },
+  'app/goals/settings/actions.ts': {
+    setGoalRun: none('setting'),
   },
 };

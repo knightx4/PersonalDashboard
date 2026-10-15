@@ -4,6 +4,8 @@ import {
   draftOf,
   formatRoughDate,
   livedInYear,
+  placeFromLine,
+  placeFromRow,
   placeSpan,
   readRoughDate,
   sortPlaces,
@@ -22,7 +24,37 @@ const place = (fields: Partial<Place>): Place => ({
   movedIn: '2000',
   movedOut: null,
   note: null,
+  latitude: null,
+  longitude: null,
   ...fields,
+});
+
+describe('map position', () => {
+  const row = {
+    id: 'a',
+    name: 'Leeds',
+    city: null,
+    region: null,
+    country: null,
+    moved_in: '2019',
+    moved_out: null,
+    note: null,
+  };
+
+  it('is empty on a place that has none', () => {
+    expect(placeFromRow({ ...row, latitude: null, longitude: null })).toMatchObject({ latitude: null, longitude: null });
+  });
+
+  it('is carried onto the place when the row has one', () => {
+    expect(placeFromRow({ ...row, latitude: 53.8, longitude: -1.55 })).toMatchObject({ latitude: 53.8, longitude: -1.55 });
+  });
+
+  it('is left out of what a save writes, so a save never touches it', () => {
+    const checked = checkPlace(draftOf(place({ name: 'Leeds', movedIn: '2019', latitude: 53.8, longitude: -1.55 })));
+    if (!checked.ok) throw new Error('expected a valid place');
+    expect(checked.row).not.toHaveProperty('latitude');
+    expect(checked.row).not.toHaveProperty('longitude');
+  });
 });
 
 describe('rough dates', () => {
@@ -120,5 +152,54 @@ describe('the list', () => {
     expect(timeThere({ movedIn: '2019-08', movedOut: '2020-02' }, '2026-10')).toBe('6 months');
     expect(timeThere({ movedIn: '2015', movedOut: '2019-08' }, '2026-10')).toBe('About 4 years');
     expect(timeThere({ movedIn: '2019', movedOut: '2019' }, '2026-10')).toBe('Under a year');
+  });
+});
+
+describe('a place from one typed line (plan #1950.7)', () => {
+  const read = (text: string) => {
+    const draft = placeFromLine(text);
+    if ('error' in draft) throw new Error(draft.error);
+    return { name: draft.name, movedIn: draft.movedIn, movedOut: draft.movedOut };
+  };
+
+  it('takes the dates from the end and the rest as the name', () => {
+    expect(read('12 Oak Street, Leeds, 2019 to 2021')).toEqual({
+      name: '12 Oak Street, Leeds',
+      movedIn: '2019',
+      movedOut: '2021',
+    });
+    expect(read('Leeds from March 2019 until Aug 2021')).toEqual({
+      name: 'Leeds',
+      movedIn: 'March 2019',
+      movedOut: 'Aug 2021',
+    });
+    expect(read('The flat on Kerr Street 2019-2021')).toEqual({
+      name: 'The flat on Kerr Street',
+      movedIn: '2019',
+      movedOut: '2021',
+    });
+    expect(read('Oak Street 3/2019 – now')).toEqual({ name: 'Oak Street', movedIn: '3/2019', movedOut: '' });
+  });
+
+  it('reads one date as the home they live in now', () => {
+    expect(read('Leeds since March 2019')).toEqual({ name: 'Leeds', movedIn: 'March 2019', movedOut: '' });
+    expect(read('Marylebone, 2019')).toEqual({ name: 'Marylebone', movedIn: '2019', movedOut: '' });
+    expect(read('Flat 4, 2019-03')).toEqual({ name: 'Flat 4', movedIn: '2019-03', movedOut: '' });
+  });
+
+  it('asks for a date when there is none, and leaves an empty name to checkPlace', () => {
+    expect(placeFromLine('Oak Street')).toHaveProperty('error');
+    const bare = placeFromLine('2019');
+    if ('error' in bare) throw new Error(bare.error);
+    expect(checkPlace(bare)).toMatchObject({ ok: false, errors: { name: expect.any(String) } });
+  });
+
+  it('goes through checkPlace into the row', () => {
+    const draft = placeFromLine('Leeds, Mar 2019 to 2021');
+    if ('error' in draft) throw new Error(draft.error);
+    expect(checkPlace(draft)).toMatchObject({
+      ok: true,
+      row: { name: 'Leeds', moved_in: '2019-03', moved_out: '2021', city: null },
+    });
   });
 });

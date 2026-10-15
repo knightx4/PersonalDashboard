@@ -2,7 +2,6 @@ import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -76,14 +75,16 @@ export const returnDeadlinesSource: AgendaSource = {
     });
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'return_deadline', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'return_deadline', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'return_deadline', key, ctx.clients);
   },
 };
 

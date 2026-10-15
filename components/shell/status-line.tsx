@@ -20,8 +20,11 @@ import {
   type MainCheck,
   type MainDot,
 } from '@/lib/plan/main-check';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DashMark } from '@/components/ui/dash-mark';
+import { useGoingRunLine, type GoingRunLine } from '@/components/runs/use-going-run-line';
+import { runPose } from '@/lib/core/run-pose';
 
 /**
  * The status line.
@@ -55,13 +58,20 @@ export function StatusLine({
   lines,
   brief = null,
   main = null,
+  going: fixture,
 }: {
   lines: ActivityLine[];
   /** The one thing this workspace would say if it could say only one thing. */
   brief?: Brief | null;
   main?: MainCheck | null;
+  /**
+   * The run Dash is on, drawn without a database. Left out, the line follows
+   * the newest run still going itself (plan #1964.2.3).
+   */
+  going?: GoingRunLine | null;
 }) {
   const [settled, setSettled] = useState(false);
+  const going = useGoingRunLine(fixture);
 
   useEffect(() => {
     if (lines.length === 0) return;
@@ -74,7 +84,7 @@ export function StatusLine({
   // matters on a quiet day -- main goes red on the nights nothing else is
   // happening -- and the summary is the third, on a workspace where nothing has
   // happened yet at all. With none of the three there is still nothing to draw.
-  if (lines.length === 0 && !main && !brief) return null;
+  if (lines.length === 0 && !main && !brief && !going) return null;
 
   return (
     <div className="pointer-events-none sticky bottom-0 z-status hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
@@ -87,13 +97,16 @@ export function StatusLine({
         {brief && (
           <>
             <BriefMark brief={brief} />
-            {lines.length > 0 && <span className="h-3 w-px shrink-0 bg-shell-border" aria-hidden />}
+            {(lines.length > 0 || going) && (
+              <span className="h-3 w-px shrink-0 bg-shell-border" aria-hidden />
+            )}
           </>
         )}
+        {going && <GoingRunMark going={going} />}
         {/* The icon marks where the activity notes start, so it is drawn only
         when there are some. Without this it sat in front of the summary and
         read as labelling it. */}
-        {lines.length > 0 && (
+        {lines.length > 0 && !going && (
           <Activity className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
         )}
         {/* Empty when there are no notes, and still the flexible cell: it is
@@ -105,6 +118,31 @@ export function StatusLine({
         <Timestamp />
       </div>
     </div>
+  );
+}
+
+/**
+ * What Dash is doing now, while a run is going: its mark, working, and the
+ * run's newest line in the run's own words, linking to the run's page
+ * (plan #1964.2.3). Before the run has written a line it says so plainly.
+ *
+ * Capped at half the line like the summary, so a long line leaves the activity
+ * notes their room. The line is `pointer-events-none`, so the link takes its
+ * clicks back. The line goes when the run ends: the hook returns null.
+ */
+function GoingRunMark({ going }: { going: GoingRunLine }) {
+  const pose = runPose(going.line);
+  const said = going.line?.body ?? 'Dash is on it';
+  return (
+    <Link
+      href={going.href}
+      aria-label={`Dash is working: ${said}`}
+      data-going-run=""
+      className="pointer-events-auto flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 underline-offset-2 transition-colors hover:text-shell-ink hover:underline" /* ui-ok: machine voice, underlined on hover like the summary beside it */
+    >
+      <DashMark size="2xs" tone="brand" state={pose.state} activity={pose.activity} decorative />
+      <span className="min-w-0 truncate">{said}</span>
+    </Link>
   );
 }
 

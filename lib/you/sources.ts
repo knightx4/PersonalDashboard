@@ -1,6 +1,11 @@
 import { courseHref, transcriptHref } from '@/lib/you/education';
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
+
+/** The sections of You's nav its rows sit under (app/you/layout.tsx). */
+const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
+const PLACES: Section = { href: '/you/places', label: 'Places' };
+const WORK: Section = { href: '/you/work', label: 'Work & school' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -18,6 +23,8 @@ export const youSources: ModuleSources = {
       search: ['title', 'code', 'school', 'term'],
       title: 'title',
       href: courseHref,
+      section: WORK,
+      parent: parentBy('transcript_id', 'you.transcripts'),
       note:
         'transcript_id points at you.transcripts. year is the year of the term where the transcript gives one. ' +
         'grade is null for a course with no grade, such as transfer credit.',
@@ -31,6 +38,7 @@ export const youSources: ModuleSources = {
       title: 'school',
       newest: 'uploaded_at',
       href: transcriptHref,
+      section: WORK,
       note: 'The courses on each are in you.courses. The file is in the private vault-transcripts bucket at storage_path.',
     },
     {
@@ -41,6 +49,7 @@ export const youSources: ModuleSources = {
       search: ['test_name', 'typed_value', 'note', 'read_points'],
       title: 'test_name',
       href: () => '/you/personality',
+      section: PERSONALITY,
       note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
     {
@@ -53,6 +62,7 @@ export const youSources: ModuleSources = {
       facts: ['moved_in', 'moved_out'],
       newest: 'moved_in',
       href: (id) => `/you/places/${id}`,
+      section: PLACES,
       note: 'moved_in and moved_out are a year (YYYY) or a month (YYYY-MM); no moved_out means they live there now. A place counts for a year when it was moved into that year or before and left that year or after.',
     },
     {
@@ -65,6 +75,8 @@ export const youSources: ModuleSources = {
       facts: ['started', 'ended', 'edited'],
       newest: 'started',
       href: jobHref,
+      section: WORK,
+      parent: parentBy('resume_id', 'job_search.resume_versions'),
       note:
         'started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. ' +
         'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',

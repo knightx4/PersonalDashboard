@@ -6,7 +6,6 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { DoneSince } from '@/lib/goals/done-since';
 import type { HomeGoal } from '@/lib/goals/home';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { TodayItem } from '@/lib/goals/today';
@@ -101,25 +100,6 @@ function item(id: string, extra: Partial<TodayItem> = {}): TodayItem {
   };
 }
 
-const done: DoneSince = {
-  since: '2026-09-24T08:00:00Z',
-  items: [
-    {
-      kind: 'result',
-      id: 's9',
-      title: 'Drafted the payoff order',
-      goalId: 'g1',
-      goalTitle: 'Pay off the debts',
-      href: '/goals/g1/s/s9',
-      unread: true,
-      runId: 'r1',
-      undo: { runId: 'r1', key: '41', state: 'undoable', reason: null },
-      at: '2026-09-25T06:10:00Z',
-    },
-  ],
-  more: 0,
-};
-
 function render(extra: Partial<Parameters<typeof HomeView>[0]> = {}): string {
   return renderToStaticMarkup(
     <HomeView
@@ -133,7 +113,6 @@ function render(extra: Partial<Parameters<typeof HomeView>[0]> = {}): string {
         }),
         item('a'),
       ]}
-      done={done}
       brief={null}
       timeZone="UTC"
       {...extra}
@@ -151,12 +130,6 @@ function other(id: string, title: string, extra: GoalFields = {}): HomeGoal {
 /** The line given a due date, which puts its steps in Do next. */
 function dueOn(line: HomeGoal): HomeGoal {
   return { ...line, goal: { ...line.goal, dueOn: '2026-12-01' } as HomeGoal['goal'] };
-}
-
-/** Whether the fold holding Since your last visit is drawn open. */
-function sinceOpen(markup: string): boolean {
-  const tag = markup.lastIndexOf('<details', markup.indexOf('Since your last visit'));
-  return markup.slice(tag, markup.indexOf('>', tag)).includes('open');
 }
 
 const asks = (markup: string) => markup.split('Ask Dash</button>').length - 1;
@@ -179,9 +152,9 @@ describe('the Goals home', () => {
       'Do next',
       'Avalanche or snowball?',
       'Nothing with Dash',
-      'Since your last visit',
-      'Set aside',
+      'font-medium text-ink">Later<',
       'Other goals',
+      'Every run',
     ];
     const positions = order.map((text) => html.indexOf(text));
     expect(positions.every((p) => p >= 0)).toBe(true);
@@ -191,11 +164,11 @@ describe('the Goals home', () => {
     }
   });
 
-  it('gives each thing in Do next one button and Not now', () => {
+  it('gives each thing in Do next one button and Later', () => {
     const html = render();
     expect(html).toContain('>Answer<');
     expect(html).toContain('>Done<');
-    expect(html).toContain('Not now');
+    expect(html).toContain('aria-label="Later: ');
     // Ask Dash on a step of yours shows only to the owner, who alone can start a run.
     expect(asks(render({ preparable: ['a'], canRun: true }))).toBe(asks(html) + 1);
     expect(asks(render({ preparable: ['a'] }))).toBe(asks(html));
@@ -271,16 +244,16 @@ describe('the Goals home', () => {
     expect(html).toContain('Needs you: Which cards do you have?');
   });
 
-  it('lists set-aside steps under Set aside with Bring back now', () => {
+  it('lists set-aside steps under Later with Bring back now', () => {
     const html = render({
       laterOn: [
         { id: 'l1', title: 'Turn on autopay', goalId: 'g1', goalTitle: 'Pay off the debts', startsOn: '2026-11-01', dueOn: null },
       ],
     });
-    expect(html).toContain('Set aside');
+    expect(html).toContain('font-medium text-ink">Later<');
     expect(html).toContain('back 1 Nov');
     expect(html).toContain('Bring back now');
-    expect(render()).not.toContain('Set aside');
+    expect(render()).not.toContain('font-medium text-ink">Later<');
   });
 
   it('lists each other goal on one line: its status and its next move', () => {
@@ -289,7 +262,7 @@ describe('the Goals home', () => {
     const others = html.slice(html.indexOf('Other goals'));
     expect(others).toContain('Learn Spanish');
     expect(others).toContain('Waiting on you');
-    expect(others).toContain('Next: Choose avalanche or snowball, 28 Sept');
+    expect(others).toContain('Next: Choose avalanche or snowball, 28 Sep');
     expect(others).not.toContain('as of');
     const stale = render({
       goals: [dueOn(goal), { ...waiting, current: false }],
@@ -319,14 +292,12 @@ describe('the Goals home', () => {
     expect(others).not.toContain('Give Sam');
   });
 
-  it('lists what Dash did with Read and Undo behind one line', () => {
-    const html = render();
-    expect(html).toContain('1 result');
-    expect(html).toMatch(/href="\/goals\/g1\/s\/s9"[^>]*>Read</);
-    expect(html).toContain('>Undo<');
-    expect(html).toContain('Every run');
-    expect(render({ done: { ...done, items: [] } })).toContain('nothing new');
-    expect(render({ done: null })).toContain('could not be read just now');
+  it('draws the fold of what Dash did today where the page passes it, and always links every run', () => {
+    const html = render({ dashToday: <p>What Dash did today fold</p> });
+    expect(html).toContain('What Dash did today fold');
+    expect(html).toContain('href="/goals/runs"');
+    expect(render()).toContain('href="/goals/runs"');
+    expect(html).not.toContain('Since your last visit');
   });
 
   it('counts the files Dash wrote that you have not opened, and lists the newest five (plan #1861)', () => {
@@ -347,7 +318,6 @@ describe('the Goals home', () => {
     expect(html).toContain('File number 4');
     expect(html).not.toContain('File number 5');
     expect(html).toContain('All 7 on Files');
-    expect(html.indexOf('Since your last visit')).toBeLessThan(html.indexOf('Files to read'));
     expect(render({ filesToRead: files.slice(0, 2) })).toContain('All files');
     expect(render({ filesToRead: [] })).not.toContain('Files to read');
     expect(render({ filesToRead: null })).not.toContain('Files to read');
@@ -364,15 +334,16 @@ describe('the Goals home', () => {
     expect(html).toContain('Dash could take these');
     expect(html).not.toContain('A new errand');
     const withArea = render({ areas: [{ id: 'area', name: 'Money' }] });
-    expect(withArea).toContain('A new errand');
-    expect(withArea).toContain('A new goal');
+    // Ask Dash opens on a press (plan #1950.6), so its kinds are not drawn
+    // until then; what an area adds is the button that opens it.
+    expect(withArea).not.toContain('A new errand');
+    expect(withArea).toContain('Ask Dash');
   });
 
   it('welcomes you back and opens what Dash did on the day you come back', () => {
     const html = render({ awayFrom: '2026-09-18T21:30:00Z', todayOn: '2026-09-24' });
     expect(html).toContain('You were away 6 days');
-    expect(sinceOpen(html)).toBe(true);
-    expect(sinceOpen(render())).toBe(false);
+    expect(html).toContain('every run');
   });
 
   it('offers to add a goal when there are none', () => {

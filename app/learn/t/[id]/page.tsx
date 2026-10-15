@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -10,11 +9,15 @@ import { loadBriefForTrack } from '@/lib/learn/briefs/load';
 import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { AddForm } from './add-form';
+import { AimButton } from '@/components/shell/aim-button';
 import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
+import { requireUser } from '@/lib/auth/server';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,31 +45,39 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
 
   // Which newsletter each story sent from News was in (plan #1368),
   // and the research brief that made this list, when one did (plan #2023.4).
-  const [origins, brief] = await Promise.all([
+  // And which readings a run or an Ask Dash hand-off is about (plan #1964.2.2).
+  const user = await requireUser();
+  const [origins, brief, working] = await Promise.all([
     loadReadingOrigins(
       track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
     ),
     loadBriefForTrack(supabase, track.id),
+    workingRefsForPage(user.id),
   ]);
 
   return (
     <PageColumn>
-      {/* A track that came out of another one points back at it rather than at
-          the list: you got here from economics, and that is where you are
-          going next. */}
-      <p className="mb-3">
-        <Link
-          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn/lists'}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Reading lists'}
-        </Link>
-      </p>
-
       <PageHeader
+        subject={await rowSubject(toRef('learn.tracks', id))}
+        // A track that came out of another one goes back to it rather than
+        // to the list: you got here from economics, and that is where you
+        // are going next.
+        back={
+          track.branchedFrom
+            ? {
+                label: track.branchedFromTitle ?? 'The topic this came from',
+                href: `/learn/t/${track.branchedFrom}`,
+              }
+            : undefined
+        }
         actions={
-          <ConfirmStep
+          <>
+            <AimButton
+              aim={{ kind: 'track-reading', under: { id: track.id, title: track.title } }}
+              label="Add something to read"
+              variant="secondary"
+            />
+            <ConfirmStep
             action={removeTrack}
             fields={{ trackId: track.id }}
             prompt={
@@ -80,7 +91,8 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
             pendingLabel="Deleting…"
           >
             Delete reading list
-          </ConfirmStep>
+            </ConfirmStep>
+          </>
         }
         title={track.title}
         description={
@@ -127,13 +139,13 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
                 key={reading.id}
                 reading={reading}
                 from={reading.newsStoryId ? origins.get(reading.newsStoryId)?.senderName : null}
+                working={working}
               />
             ))}
           </ul>
         </>
       )}
 
-      <AddForm trackId={track.id} />
     </PageColumn>
   );
 }

@@ -6,7 +6,6 @@ import {
   featureCrumbs,
   featureStatus,
   findFeature,
-  newFeatureHref,
   stepGroups,
   waitedOnHref,
   stepRedirect,
@@ -208,15 +207,7 @@ describe("the Steps tab's status groups", () => {
   });
 });
 
-describe('newFeatureHref', () => {
-  it('opens the New feature surface on the page it was pressed from, keeping the view', () => {
-    expect(newFeatureHref('/dev/plan')).toBe('/dev/plan?new=feature');
-    expect(newFeatureHref('/dev/plan', 'all')).toBe('/dev/plan?view=all&new=feature');
-    expect(newFeatureHref('/dev/projects/website', null)).toBe(
-      '/dev/projects/website?new=feature',
-    );
-  });
-
+describe('a feature rolled up from its steps', () => {
   it('reads a feature as in progress once a step beneath it has started', () => {
     const rolled = buildPlanTree({
       items: [

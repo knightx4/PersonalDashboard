@@ -11,7 +11,7 @@ import {
   type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/core/timezone';
-import { formatClock } from '@/lib/clock';
+import { whenDate, whenDay, whenTime, whenZoneName, type WhenInput } from '@/lib/core/when';
 import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { lastTurnEvent } from '@/lib/jobs/move';
 
@@ -42,6 +42,10 @@ export interface PipelineRow {
   attempt: number;
   excitement: number | null;
   needsReview: boolean;
+  /** Marked ready to apply on the role's Application tab. */
+  readyToApply: boolean;
+  /** true has a cover letter, false has none, null not answered. */
+  hasCoverLetter: boolean | null;
   createdBy: string;
   submittedAt: string | null;
   confirmationReceivedAt: string | null;
@@ -86,7 +90,7 @@ export interface PipelineRow {
 }
 
 const SELECT = `
-  id, status, source, attempt, excitement, needs_review, created_by,
+  id, status, source, attempt, excitement, needs_review, ready_to_apply, has_cover_letter, created_by,
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
@@ -103,6 +107,8 @@ type RawRow = {
   attempt: number;
   excitement: number | null;
   needs_review: boolean;
+  ready_to_apply: boolean | null;
+  has_cover_letter: boolean | null;
   created_by: string;
   submitted_at: string | null;
   confirmation_received_at: string | null;
@@ -182,6 +188,8 @@ export async function loadPipeline(
     attempt: row.attempt,
     excitement: row.excitement,
     needsReview: row.needs_review,
+    readyToApply: row.ready_to_apply === true,
+    hasCoverLetter: row.has_cover_letter ?? null,
     createdBy: row.created_by,
     submittedAt: row.submitted_at,
     confirmationReceivedAt: row.confirmation_received_at,
@@ -283,19 +291,27 @@ export function formatCompBand(minCents: number | null, maxCents: number | null)
   return format((minCents ?? maxCents)!);
 }
 
-export function formatDate(iso: string | null, timezone = 'UTC'): string {
+/**
+ * The day, as when.ts says it: "Today", "Friday", "12 Oct", "12 Oct 2025".
+ * Through safeTimeZone, because the value comes from a free-text profile
+ * field: Intl throws on a zone it does not know, and an uncaught throw in a
+ * server component is a 500, not a wrong date. See lib/core/timezone.ts.
+ */
+export function formatDate(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    // Through safeTimeZone, because the value comes from a free-text profile
-    // field: Intl throws on a zone it does not know, and an uncaught throw in
-    // a server component is a 500, not a wrong date. See lib/core/timezone.ts.
-    timeZone: safeTimeZone(timezone),
-  }).format(date);
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  return whenDay(iso, { timeZone: safeTimeZone(timezone), now });
+}
+
+/**
+ * The date itself, never "Today" or a weekday: "12 Oct", "12 Oct 2025". For a
+ * date inside a sentence ("Rejected on 12 Oct", "last checked 12 Oct"), where
+ * a relative day would read "on Today".
+ */
+export function formatDateInline(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
+  if (!iso) return '—';
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  return whenDate(iso, { timeZone: safeTimeZone(timezone), year: 'auto', now });
 }
 
 /**
@@ -311,19 +327,16 @@ export function formatInterviewWhen(
   iso: string | null,
   timeKnown: boolean,
   timezone = 'UTC',
+  now: WhenInput = Date.now(),
 ): string {
   if (!iso) return 'Date to be set';
-  return timeKnown ? formatDateTime(iso, timezone) : formatDate(iso, timezone);
+  return timeKnown ? formatDateTime(iso, timezone, now) : formatDate(iso, timezone, now);
 }
 
-export function formatDateTime(iso: string | null, timezone = 'UTC'): string {
+/** The day and the time, with the zone it was read in: "Tomorrow, 2:30 PM EDT". */
+export function formatDateTime(iso: string | null, timezone = 'UTC', now: WhenInput = Date.now()): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return formatClock(date, {
-    day: 'numeric',
-    month: 'short',
-    timeZone: safeTimeZone(timezone),
-    timeZoneName: 'short',
-  });
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  const timeZone = safeTimeZone(timezone);
+  return `${whenDay(iso, { timeZone, now })}, ${whenTime(iso, { timeZone })} ${whenZoneName(iso, { timeZone })}`;
 }

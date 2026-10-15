@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Trash2 } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
@@ -280,13 +280,14 @@ function TypedForm({
       {error && !error.field ? <FieldError>{error.text}</FieldError> : null}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" pending={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-        <PaidHint
-          action="app/you/personality/actions.ts#saveTypedAction"
+        <DashAction
+          type="submit"
+          pending={pending}
+          paid="app/you/personality/actions.ts#saveTypedAction"
           what="Cost of Dash reading your type against your notes"
-        />
+        >
+          {pending ? 'Saving…' : 'Save and read it'}
+        </DashAction>
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>

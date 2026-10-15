@@ -4,7 +4,7 @@ import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from '@/components/ui/link';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Network } from 'lucide-react';
 import { ChipSelect, Checkbox } from '@/components/ui/field';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
@@ -46,27 +46,48 @@ type Track = { id: string; name: string };
 function ReadButton({ again }: { again: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      {pending ? 'Reading…' : again ? 'Read again' : 'Read'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      size="sm"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeFromCourse"
+      what="Cost of reading the course"
+      align="end"
+      wrapperClassName="shrink-0"
+    >
+      {pending ? 'Reading…' : again ? 'Reread' : 'Read'}
+    </DashAction>
   );
 }
 
 function RetrackButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="ghost" pending={pending}>
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="ghost"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeFromCourse"
+      what="Cost of reading the course again"
+    >
       {pending ? 'Reading…' : 'Read for this subject'}
-    </Button>
+    </DashAction>
   );
 }
 
 function ApproveButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending || count === 0}>
+    <DashAction
+      type="submit"
+      disabled={pending || count === 0}
+      paid="app/learn/know/actions.ts#approveFromCourse"
+      what="Cost of saving them"
+    >
       {pending ? 'Saving…' : `Approve and mark ${count} known`}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -108,14 +129,7 @@ function CourseRow({
               .join(' · ') || 'Not read yet'}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          <ReadButton again={Boolean(read)} />
-          <PaidHint
-            action="app/learn/know/actions.ts#proposeFromCourse"
-            what="Cost of reading the course"
-            align="end"
-          />
-        </span>
+        <ReadButton again={Boolean(read)} />
       </form>
       {said?.message && <p className="mt-1 text-small text-ink-muted">{said.message}</p>}
       {said?.error && <p className="mt-1 text-small text-danger">{said.error}</p>}
@@ -289,13 +303,7 @@ export function CourseCheck({
               </option>
             ))}
           </ChipSelect>
-          <span className="flex items-center gap-1">
-            <RetrackButton />
-            <PaidHint
-              action="app/learn/know/actions.ts#proposeFromCourse"
-              what="Cost of reading the course again"
-            />
-          </span>
+          <RetrackButton />
         </form>
       </Card>
 
@@ -340,13 +348,7 @@ export function CourseCheck({
               Open {chain.subject}
             </Link>
           ) : (
-            <>
-              <ApproveButton count={adding} />
-              <PaidHint
-                action="app/learn/know/actions.ts#approveFromCourse"
-                what="Cost of saving them"
-              />
-            </>
+            <ApproveButton count={adding} />
           )}
           <Button type="button" variant="ghost" onClick={onBack}>
             Back to courses

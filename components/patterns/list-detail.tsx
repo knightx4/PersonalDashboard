@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
@@ -71,7 +71,7 @@ export function ListRow({
 }) {
   return (
     <li>
-      <Link
+      <RowLink
         href={href}
         className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
       >
@@ -80,7 +80,7 @@ export function ListRow({
           {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
         </span>
         {end && <span className="tabular shrink-0 text-small text-ink-muted">{end}</span>}
-      </Link>
+      </RowLink>
     </li>
   );
 }

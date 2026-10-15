@@ -1,6 +1,6 @@
 'use client';
 
-import Link from '@/components/ui/link';
+import { RowLink } from '@/components/shell/back-link';
 import { RotateCcw, Tag } from 'lucide-react';
 import {
   InventoryRowActions,
@@ -84,7 +84,7 @@ export function InventoryRow({
         label={quantity > 1 ? `${title} (${quantity} copies)` : title}
         className="pl-3 pr-0.5"
       />
-      <Link
+      <RowLink
         href={`/shopping/inventory/${item.id}`}
         className={cn(
           'flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-2 transition-colors duration-quick',
@@ -173,7 +173,7 @@ export function InventoryRow({
             </p>
           )}
         </div>
-      </Link>
+      </RowLink>
 
       <div className="flex shrink-0 items-center pr-1.5 sm:pr-2">
         <InventoryRowActions

@@ -14,7 +14,8 @@ import type { PlanRefTitles } from '@/lib/comments/refs';
  */
 
 /** What a comment is allowed to draw. Everything else is unwrapped to its text. */
-const ALLOWED = ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'span'];
+// A quote is kept: the thread draws it in the quote voice (plan #1964.3).
+const ALLOWED = ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'span', 'blockquote'];
 
 export function CommentBody({
   body,
@@ -24,11 +25,12 @@ export function CommentBody({
   body: string;
   titles?: PlanRefTitles;
   /**
-   * Whether `#494` links to the plan step. Off for a reply from Dash in a
-   * conversation (note 7cf4109a), where a `#3` is a list number or a count
-   * far more often than a step.
+   * Whether `#494` links to the plan step. `outlines` for a reply from Dash
+   * in a conversation (note 7cf4109a), where a `#3` is a list number or a
+   * count far more often than a step, but `#1490.11` is only ever a step
+   * (plan #1931.4). Every one previews its step on hover or hold.
    */
-  refs?: boolean;
+  refs?: boolean | 'outlines';
 }) {
   return (
     <Markdown
@@ -36,7 +38,7 @@ export function CommentBody({
       className="comment-prose"
       allowedElements={ALLOWED}
       mentions
-      planRefs={refs ? { titles } : false}
+      planRefs={refs ? { titles, reading: refs === 'outlines' ? 'outlines' : 'all' } : false}
     />
   );
 }

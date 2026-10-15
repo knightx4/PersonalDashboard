@@ -4,6 +4,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadListVideo, loadRelatedIdeas, loadVideoCards, type RelatedIdea } from '@/lib/learn/youtube/videos';
 import { ListVideoView } from './video-view';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Video' };
@@ -38,6 +39,16 @@ export default async function ListVideoRoute({
   }
 
   return (
-    <ListVideoView video={video} start={start} cards={cards} related={related} relatedError={relatedError} />
+    <ListVideoView
+      video={video}
+      start={start}
+      cards={cards}
+      related={related}
+      relatedError={relatedError}
+      path={sectionSubject('/learn/videos', 'Videos', {
+        label: video.title,
+        href: `/learn/videos/${encodeURIComponent(video.videoId)}`,
+      })}
+    />
   );
 }

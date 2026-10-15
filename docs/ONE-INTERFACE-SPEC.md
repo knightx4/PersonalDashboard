@@ -144,7 +144,7 @@ Next week and Next month, and the inbox snooze with Tomorrow and Next week.
 
 116 files format a date or a time, through four APIs: `Intl.DateTimeFormat`
 in 106 places, `toLocaleDateString` in 33, `toLocaleString` in 36 and
-`toLocaleTimeString` in one. `lib/clock.ts` holds the one shared formatter,
+`toLocaleTimeString` in one. `lib/clock.ts` held the one shared formatter,
 for the clock face. The preference "times are 12-hour with AM and PM,
 everywhere" (`taste.ts`) is kept by 116 files agreeing, which is the same
 arrangement that let 24-hour times reach the calendar in September.
@@ -267,7 +267,8 @@ five positions in every room, so the thumb learns one layout.
 
 Section addresses stay what they are (`/shopping/dashboard`, `/jobs`,
 `/goals`); only the names in the column and the dock change. `/jobs/review`
-and `/shopping/review` gain the Inbox name and keep their paths.
+and `/shopping/review` keep their paths, lose their own entries and light
+the Inbox, which lists each queue as a row.
 
 ## Part 2: Every thing has a page, a path and a way back
 
@@ -361,7 +362,7 @@ knows the account's timezone. Four functions:
   than the date.
 
 A time never shows beside a day the person did not give a time for (law 3).
-`lib/clock.ts` folds in. The 116 files move onto it one workspace at a
+`lib/clock.ts` has folded in. The files move onto it one workspace at a
 time, and the count holds the rest from growing.
 
 ## Part 6: One shell, mounted once
@@ -454,29 +455,29 @@ baseline it measures and takes the pending mark off.
 
 **R1.** Every workspace's first two sections are named Now and Inbox, in
 that order, and its settings link is set.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R2.** Only an Inbox carries a badge.
-Checked by: test `tests/workspace-rooms.test.ts`, pending #1943.
+Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 43, target 0, pending #1932.
+Checked by: count `row-pages-without-path`, baseline 33, target 0.
 
 **R4.** There is one back-link component.
-Checked by: count `hand-rolled-back-links`, baseline 32, target 0, pending #1934.
+Checked by: count `hand-rolled-back-links`, baseline 32, target 0.
 
 **R5.** Back from a row lands on the list at the same scroll offset.
-Checked by: test `tests/flows/search-open-back.test.ts`, pending #1934.
+Checked by: test `tests/flows/search-open-back.test.ts`.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
-Checked by: count `date-formatting-files`, baseline 116, target 1, pending #1961.
+Checked by: count `date-formatting-files`, baseline 122, target 0.
 
 **R7.** A row is closed with one of Done, Dropped, Later or Declined, and
 every workspace status maps onto one.
-Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
+Checked by: test `tests/lifecycle-words.test.ts`.
 
 **R8.** No section links to a page whose only job is a form.
-Checked by: count `form-only-pages`, baseline 9, target 0, pending #1953.
+Checked by: count `form-only-pages`, baseline 9, target 0.
 
 **R9.** The shell is mounted in one place.
 Checked by: count `shell-mounts`, baseline 15, target 1.
@@ -490,10 +491,10 @@ Checked by: test `tests/proxy-launch.test.ts`.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.
-Checked by: count `ai-on-controls`, baseline 1, target 0, pending #1965.
+Checked by: count `ai-on-controls`, baseline 1, target 0.
 
 **R13.** There is one thread component.
-Checked by: count `thread-components`, baseline 2, target 1, pending #1967.
+Checked by: count `thread-components`, baseline 1, target 1.
 
 **R14.** A radius class is one of the four tokens (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`), `rounded-full` or `rounded-none`.
 Checked by: count `off-token-radius`, baseline 199, target 0.

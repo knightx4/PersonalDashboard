@@ -1,4 +1,9 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+
+/** The sections of Todo's nav its rows sit under (app/todo/layout.tsx). */
+const AGENDA: Section = { href: '/todo', label: 'Now' };
+const CALENDAR: Section = { href: '/todo/calendar', label: 'Calendar' };
+const ALL: Section = { href: '/todo/all', label: 'All' };
 
 /**
  * Todo's tables, as Goals reads them (lib/sources/types.ts). A new table in
@@ -15,7 +20,12 @@ export const todoSources: ModuleSources = {
       title: 'title',
       href: () => '/todo/all',
       // Named by a ref, a task opens on the list scrolled to it.
-      page: { title: 'title', href: (row) => `/todo/all?status=all&focus=${row.id}` },
+      page: {
+        title: 'title',
+        href: (row) => `/todo/all?status=all&focus=${row.id}`,
+        section: ALL,
+        parent: parentBy('parent_id', 'todo.tasks'),
+      },
       note: 'A task that repeats a goal step is theirs to keep; do not propose it again as a step.',
     },
     {
@@ -26,6 +36,7 @@ export const todoSources: ModuleSources = {
       search: ['title', 'body', 'location'],
       title: 'title',
       href: () => '/todo/calendar',
+      section: CALENDAR,
     },
     {
       table: 'todo.feed_events',
@@ -35,6 +46,7 @@ export const todoSources: ModuleSources = {
       search: ['title', 'body', 'location'],
       title: 'title',
       href: () => '/todo/calendar',
+      section: CALENDAR,
     },
     {
       table: 'todo.appointments',
@@ -44,6 +56,7 @@ export const todoSources: ModuleSources = {
       search: ['title', 'provider', 'location'],
       title: 'title',
       href: () => '/todo',
+      section: AGENDA,
       note: "starts_on is the day in their zone and starts_at the instant when the mail gave a time. status 'cancelled' means a cancellation email came after the booking.",
     },
   ],

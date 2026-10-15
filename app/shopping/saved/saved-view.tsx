@@ -5,8 +5,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { toggleChipClass } from '@/components/ui/chip';
 import { formatMoney } from '@/lib/money';
-import { SaveForm } from './save-form';
+import { AimButton } from '@/components/shell/aim-button';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
+import { whenDay } from '@/lib/core/when';
 
 export const STATUSES = [
   { id: 'saved', label: 'Saved' },
@@ -31,13 +33,11 @@ export type SavedQueueItem = {
   merchant: { name: string } | null;
 };
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
-/** "2 Oct", from the row's timestamp. */
+/** "Today", "Friday" or "2 Oct", from the row's timestamp. */
 function savedOn(iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : DAY.format(date);
+  return Number.isNaN(date.getTime()) ? null : whenDay(date, { timeZone: 'UTC' });
 }
 
 const EMPTY: Record<SavedStatus, { title: string; description: string }> = {
@@ -99,12 +99,11 @@ function SavedRow({ item, withPicture }: { item: SavedQueueItem; withPicture: bo
 export function SavedQueueView({ status, items }: { status: SavedStatus; items: SavedQueueItem[] }) {
   const header = (
     <>
-      <PageHeader title="Saved" />
-      {status === 'saved' && (
-        <div className="mb-4">
-          <SaveForm compact />
-        </div>
-      )}
+      <PageHeader
+        subject={sectionSubject('/shopping/saved', 'Saved')}
+        title="Saved"
+        actions={<AimButton aim={{ kind: 'saved-item' }} label="Save a link" />}
+      />
     </>
   );
 
@@ -137,11 +136,10 @@ export function SavedQueueView({ status, items }: { status: SavedStatus; items: 
             icon={Bookmark}
             title={EMPTY[status].title}
             description={EMPTY[status].description}
-            // The composer that fills the saved queue sits just above, so its
-            // action points at the URL box rather than at another page.
+            // Saving opens capture aimed at a link (plan #1950.3.1).
             action={
               status === 'saved'
-                ? { label: 'Save your first link', href: '#url' }
+                ? { label: 'Save your first link', aim: { kind: 'saved-item' } }
                 : { label: 'Back to saved', href: '/shopping/saved' }
             }
           />

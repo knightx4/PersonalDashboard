@@ -8,15 +8,12 @@ import {
 } from '@/app/(onboarding)/onboarding/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label } from '@/components/ui/field';
+import { deviceTimeZone } from '@/lib/core/when';
 
 const initial: OnboardingState = {};
 
 function browserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
+  return deviceTimeZone() ?? 'UTC';
 }
 
 export function WelcomeForm() {

@@ -4,7 +4,6 @@ import { useActionState, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { FieldError, Input, Label } from '@/components/ui/field';
 import { CAPTURE_TOKEN_LABEL_MAX } from '@/lib/capture/token-label';
@@ -14,6 +13,7 @@ import {
   revokeCaptureTokenAction,
   type MakeTokenState,
 } from './capture-token-actions';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * Personal capture tokens (plan #1705): what lets a Siri Shortcut or another
@@ -47,13 +47,12 @@ export function CaptureTokensSection({
   );
   // The day alone: a token's history is read by the day, and the time would
   // wrap each row's line to two at 390.
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: timezone });
-  const when = (at: string) => day.format(new Date(at));
+  const when = (at: string) => whenDay(at, { timeZone: timezone });
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
+    <section>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-body font-semibold text-ink">Capture tokens</h2>
+        <h3 className="text-ui font-semibold text-ink">Capture tokens</h3>
         {!making && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMaking(true)}>
             Make a token

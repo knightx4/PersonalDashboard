@@ -10,7 +10,10 @@ write the essay.
 Written to [WRITING-GUIDE.md](WRITING-GUIDE.md). The decisions below were made
 by the owner on 12 October 2026, after a survey of Lex, Copilot for Obsidian,
 Smart Connections, iA Writer, NotebookLM, Elicit, Consensus, Khanmigo and the
-research on AI writing help.
+research on AI writing help. The stages between the interview and the draft
+were added on 15 October 2026, after the owner's first essay: the interview
+ended on an empty editor with nothing said about what to do next, and the
+research was too hard to read to use.
 
 ---
 
@@ -69,6 +72,10 @@ anything like "That sounds interesting". The questions are fixed in kind:
 4. What made you think this? (Dash offers what it found in your study, below.)
 5. What would change your mind?
 
+Answering the last question also has Dash read the whole brief back (see
+"The stages", Discover), so the interview ends on what to tighten next rather
+than on an empty page.
+
 Your answers, in your own words, become the **brief**: question, claim,
 reader, what made you think it, what would change your mind, and the notes
 and readings you pinned. The brief sits above the
@@ -85,6 +92,34 @@ already half filled:
 
 These are buttons on pages that exist. Learn does not push essay prompts into
 the Now deck.
+
+## The stages
+
+An essay is worked out in six stages, shown as steps across the top of the
+page. Every step can be opened at any time and nothing is locked; a tick marks
+a step with enough in it to move on, and the foot of each step says what the
+next one is for. The page opens on the interview while it is asking, on Write
+once the draft has 150 words, and otherwise on the first step not done. The
+rail beside each step says how it works and shows the essay so far: the
+question, the thesis and the points.
+
+Everything the person writes along the way is kept in `learn.essays.plan` in
+their words. Dash contributes questions, short notes naming a problem, sharper
+versions of the question, and what each part of a shape does. Each is labelled
+as Dash's where it is shown, and none of it goes into the draft.
+
+| Step | What the person does | What Dash does, when asked |
+|---|---|---|
+| Discover | Answers the interview, then edits the brief in place and replies to Dash's notes | Reads the brief: up to three notes, each naming one problem and ending in a question, and up to three sharper versions of the question. Read it again sends the replies too. |
+| Research | Reads the research and writes what they make of each part | Researches the question (see "Research, when you ask") |
+| Plan | Writes the thesis in one sentence and lists the points | Find points lifts passages from what the person already wrote, word for word; a passage not found verbatim is dropped. Ask Dash about the plan names up to three problems, each ending in a question. |
+| Structure | Orders the points, gives each a role (opening, point, objection, closing), fills empty parts | Suggests two or three shapes built around the person's points, each part saying what it does for the reader and which points go in it. Using one reorders the plan and leaves an empty part where no point fits. No point is dropped. |
+| Develop | Answers questions about one point at a time, in rough notes | Asks one question about a point, of a kind the person can choose (why it is true, an example, what shows it, what a doubter says, why the reader cares, how it connects), then the next after each answer, until the person stops or marks the point ready |
+| Write | Writes the essay | Shows the plan beside the draft, opening the notes for the point whose heading the cursor is under. With an empty draft, Put the outline in the draft writes the title and one heading per point, in the person's words. |
+
+Each Dash press is one Sonnet call with its price beside the button, recorded
+in the Learn spend ledger. Without the Anthropic key, Develop asks the plain
+question of each kind and Structure offers three common shapes.
 
 ## The writing surface
 
@@ -245,11 +280,23 @@ note and its heading path, re-embedded only when a block's text changes.
 No search runs without you pressing a button, and every button shows its
 price before it runs. There are two levels.
 
-| | First pass | Deeper pass |
+| | Research the question | Check the draft's claims |
 |---|---|---|
-| What it does | Up to 4 web searches on the essay's question; 3 to 5 positions, each with sources | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
-| Typical cost | $0.05 to $0.20 | $0.15 to $0.60, shown as "up to $0.60" |
-| Model | Haiku, with the basic web search tool | Haiku gathers, Sonnet judges |
+| What it does | Sonnet splits the question into 3 to 5 parts a writer needs answered; Haiku runs up to 8 searches and reads 5 pages; Sonnet writes, from those pages, a short answer of about 110 words, an answer to each part, and up to three questions asking the writer where they stand | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
+| Typical cost | $0.25 to $0.45 | $0.15 to $0.60, shown as "up to $0.60" |
+| Model | Sonnet frames and writes, Haiku searches and reads | Haiku gathers, Sonnet judges |
+
+The first level has its own step, Research, laid out to be read top to bottom:
+the short answer, then each part as a heading with its answer and, folded
+under it, the quoted words; then the questions for the writer; then the
+numbered sources. Under every part and question is a line for what the person
+makes of it, and Make it a point copies that line into the plan. The rail's
+research card in the Write step shows the same run compactly, with Insert
+footnote on each quote.
+
+Until 15 October 2026 the first level was one Haiku call listing positions
+with quotes, shown only in the rail. Runs from before then still show as
+positions.
 
 **Haiku and web search** (checked 12 October 2026, plan #1863.9). Haiku
 takes the basic tools, `web_search_20250305` and `web_fetch_20250910`, but
@@ -348,6 +395,14 @@ and applied to the live project in the same sitting.
   `published_at`, `slug`), when it was finished (`finished_at`), the id of its
   evidence-bank item (`evidence_item_id`), and timestamps. A **source** in the catalogue: it
   holds what the person wrote.
+- **`learn.essays.plan`** (migration 0132): the guided stages' work, in the
+  person's words apart from Dash's questions and notes: the thesis, Dash's
+  read of the brief with the replies, the takes on the research keyed by run
+  and part, the points in order with each one's role, what its part does, and
+  the questions asked about it with the answers, the chosen shape, and Dash's
+  notes on the plan.
+- `learn.essay_research` gains
+  `summary` (the short answer) and `asks` (the questions for the writer).
 - **`learn.essay_notes`**: margin notes. The essay, the check that raised it,
   the rung, the body, what it says at rungs 1 to 3 and why it was raised
   (so Help needs no second call), the anchor (quote, prefix, suffix, offset
@@ -367,7 +422,8 @@ Each goes in its module's `sources.ts`, and `npm run sources:write` runs after.
 - **Not a drafting tool.** There is no "write it for me". The highest rung is
   a suggested sentence for text you selected.
 - **Not a chat.** Help is attached to the text it is about, as a margin note
-  or a change to a selection. A side chat that edits the document is how
+  or a change to a selection. The back and forth in the stages is Dash asking
+  and the person answering, and the answers are kept as the person's notes. A side chat that edits the document is how
   Canvas ends up rewriting text the writer did not ask it to touch.
 - **Not a research assistant that runs by itself.** Research is two buttons
   with a price on each.

@@ -1000,6 +1000,106 @@ export function moveOf(node: MoveInput, context?: MoveContext): PlanMove {
   return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
 
+/* -------------------------------------------------------------------------
+ * Who a row is on
+ * ---------------------------------------------------------------------- */
+
+/**
+ * The Assignee column (plan #2069.1): who each row is on, as you, Dash or
+ * both.
+ *
+ * It replaced the move column, which said "Dash is on it" or "Waiting on
+ * #2016.4" beside a Status word that often said the same thing. Who holds a
+ * step is the one fact the row did not otherwise show.
+ *
+ * A step reads from the same rules the runner does. A question and a setup
+ * job are yours, since no session can answer or set up for you. Otherwise
+ * `isClaudes` decides: a step you kept is yours, and so is a proposal, which
+ * is waiting on your approve; every other step is Dash's.
+ *
+ * A row with steps beneath it reads from its open leaf steps, and from all of
+ * them that were not dropped once none is open. When the open ones are split
+ * between you, it is both, and the counts say how many each holds.
+ */
+export type PlanAssignee = {
+  who: 'you' | 'dash' | 'both';
+  /** Leaf steps beneath held by you and by Dash. Both 0 on a leaf. */
+  yours: number;
+  dashs: number;
+  /** A session is working this row, or a step beneath it, right now. */
+  working: boolean;
+  /** What a leaf is yours for, which its tooltip says. */
+  reason: 'kept' | 'question' | 'setup' | 'proposed' | null;
+};
+
+type AssigneeInput = Pick<PlanNode, 'id' | 'kind' | 'status' | 'assignee'> & {
+  dismissedAt?: string | null;
+  children?: readonly AssigneeInput[];
+};
+
+function ownAssignee(node: AssigneeInput): Pick<PlanAssignee, 'who' | 'reason'> {
+  if (node.kind === 'decision') return { who: 'you', reason: 'question' };
+  if (node.kind === 'setup') return { who: 'you', reason: 'setup' };
+  if (isClaudes(node)) return { who: 'dash', reason: null };
+  return { who: 'you', reason: node.status === 'proposed' ? 'proposed' : 'kept' };
+}
+
+function leafRowsOf(node: AssigneeInput): AssigneeInput[] {
+  return (node.children ?? []).flatMap((child) =>
+    (child.children?.length ?? 0) > 0 ? leafRowsOf(child) : [child],
+  );
+}
+
+/**
+ * Who this row is on. `context.working` is the claims a session is working
+ * now (lib/plan/liveness.ts, read the way `moveOf` reads it), which is what
+ * makes Dash's mark pulse.
+ */
+export function assigneeOf(node: AssigneeInput, context?: MoveContext): PlanAssignee {
+  const shown = (row: AssigneeInput) => !isDismissed({ dismissedAt: row.dismissedAt ?? null });
+  const leaves = leafRowsOf(node).filter(shown);
+  const open = leaves.filter((leaf) => !isClosed(leaf.status));
+  const counted = open.length > 0 ? open : leaves.filter((leaf) => leaf.status !== 'dropped');
+  const working = [node, ...open].some((row) => context?.working?.has(row.id) ?? false);
+  if (counted.length === 0) return { ...ownAssignee(node), yours: 0, dashs: 0, working };
+  const dashs = counted.filter((leaf) => ownAssignee(leaf).who === 'dash').length;
+  const yours = counted.length - dashs;
+  return {
+    who: yours > 0 && dashs > 0 ? 'both' : yours > 0 ? 'you' : 'dash',
+    yours,
+    dashs,
+    working,
+    reason: null,
+  };
+}
+
+const stepsWord = (n: number) => (n === 1 ? '1 step' : `${n} steps`);
+
+/** The Assignee cell's tooltip: who, and on a split row how many each holds. */
+export function assigneeTitle(assignee: PlanAssignee): string {
+  const now = assignee.working ? ' A session is working on it now.' : '';
+  const beneath = assignee.yours + assignee.dashs;
+  if (assignee.who === 'both') {
+    return `Split: ${stepsWord(assignee.yours)} yours, ${stepsWord(assignee.dashs)} Dash's.${now}`;
+  }
+  if (beneath > 0) {
+    const all = beneath === 1 ? 'Its 1 step is' : `All ${beneath} steps are`;
+    return `${all} ${assignee.who === 'you' ? 'yours' : "Dash's"}.${now}`;
+  }
+  switch (assignee.reason) {
+    case 'question':
+      return 'Yours to answer.';
+    case 'setup':
+      return 'Yours to set up. No session can do it for you.';
+    case 'proposed':
+      return 'Yours to approve. Dash builds it once you do.';
+    case 'kept':
+      return 'Yours. You kept it, so the runner leaves it for you.';
+    default:
+      return `Dash's. The runner takes it when it is ready.${now}`;
+  }
+}
+
 /**
  * How many steps are in each state. Every health has an entry, most of them 0.
  *

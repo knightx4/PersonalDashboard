@@ -1,3 +1,4 @@
+import { marksFromRow } from '@/lib/jobs/application-marks';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -14,7 +15,7 @@ import { applicationMove, lastTurnEvent } from '@/lib/jobs/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
-import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
+import { formatCompBand, formatDate, formatDateInline } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
 import {
@@ -37,6 +38,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { loadThread } from '@/lib/thread/store';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 /** The columns of an interview row the prep key is computed from. */
 type PrepInterviewRow = {
@@ -115,7 +118,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, needs_review, created_by, cover_letter, referral_contact_id`,
+       excitement, needs_review, created_by, cover_letter, ready_to_apply, has_cover_letter, referral_contact_id`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -372,7 +375,7 @@ export default async function RoleDetailPage({
             (interviews ?? []).map((interview) => interview.kind as string),
           ),
           everSubmitted: current.submitted_at !== null,
-          closedOn: current.closed_at ? formatDate(current.closed_at as string, timezone) : null,
+          closedOn: current.closed_at ? formatDateInline(current.closed_at as string, timezone) : null,
           interviewCount: (interviews ?? []).length,
         })
       : null;
@@ -396,6 +399,7 @@ export default async function RoleDetailPage({
     <PageColumn className="space-y-4">
         <>
           <PageHeader
+            subject={await rowSubject(toRef('job_search.roles', role.id as string))}
             leading={
               <CompanyAvatar
                 company={{
@@ -573,6 +577,7 @@ export default async function RoleDetailPage({
           }
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
+          {...marksFromRow(current)}
           timezone={timezone}
           defaultTab={defaultRoleTab(status)}
           focusInterviewId={focusInterviewId ?? null}

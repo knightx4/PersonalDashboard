@@ -1,5 +1,5 @@
 import { FolderTree } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { vaultWritable } from '@/lib/capture/vault';
@@ -10,13 +10,17 @@ import { suggestedNotesForInbox } from '@/lib/vault/notes/related';
 import { noteHref } from '@/lib/vault/paths';
 import { QuickNoteTriage, type TriageNote } from './triage';
 import { PageColumn } from '@/components/shell/page-width';
+import { whenDate } from '@/lib/core/when';
 
 export const dynamic = 'force-dynamic';
 
-const TRIAGE_CRUMBS = [
-  { label: 'Vault', href: '/vault' },
-  { label: 'Quick note triage', href: '/vault/triage' },
-];
+const TRIAGE: Subject = {
+  ref: null,
+  path: [
+    { label: 'Vault', href: '/vault' },
+    { label: 'Quick note triage', href: '/vault/triage' },
+  ],
+};
 
 /**
  * Quick note triage (plan #1729, feature #1726): the quick notes waiting in
@@ -35,7 +39,7 @@ export default async function QuickNoteTriagePage() {
   if (!connection) {
     return (
       <PageColumn>
-        <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
+        <PageHeader subject={TRIAGE} title="Quick note triage" />
         <EmptyState
           icon={FolderTree}
           title="No vault connected"
@@ -72,16 +76,12 @@ export default async function QuickNoteTriagePage() {
 
   return (
     <PageColumn>
-      <PageHeader crumbs={TRIAGE_CRUMBS} title="Quick note triage" />
+      <PageHeader subject={TRIAGE} title="Quick note triage" />
       <QuickNoteTriage notes={notes} writable={writable} />
     </PageColumn>
   );
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

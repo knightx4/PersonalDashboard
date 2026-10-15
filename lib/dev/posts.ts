@@ -46,13 +46,18 @@ export type SocialPost = {
   xPostId: string | null;
   /** The X post a near match asks about ("Is this it?"). */
   xCandidateId: string | null;
+  /**
+   * The posts of this draft already on X, in thread order, from a send from
+   * the tab that stopped part-way (plan #2072). Empty, or left out, when none.
+   */
+  xThreadIds?: string[];
   createdAt: string;
   updatedAt: string;
 };
 
 export const SOCIAL_POST_COLUMNS =
   'id, platform, angle, status, draft, body, source_plan_item_ids, source_feedback_ids, ' +
-  'image_paths, posted_url, posted_at, dropped_at, run_id, x_post_id, x_candidate_id, created_at, updated_at';
+  'image_paths, posted_url, posted_at, dropped_at, run_id, x_post_id, x_candidate_id, x_thread_ids, created_at, updated_at';
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -78,6 +83,7 @@ export function socialPostFromRow(row: Record<string, unknown>): SocialPost {
     runId: (row.run_id as string | null) ?? null,
     xPostId: (row.x_post_id as string | null) ?? null,
     xCandidateId: (row.x_candidate_id as string | null) ?? null,
+    xThreadIds: strings(row.x_thread_ids),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at ?? row.created_at),
   };

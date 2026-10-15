@@ -1,9 +1,7 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { after } from 'next/server';
 import { z } from 'zod';
-import { ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
@@ -32,6 +30,7 @@ import { loadOpenBriefs } from '@/lib/learn/briefs/load';
 import type { BriefSummary } from '@/lib/learn/briefs/view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
@@ -192,6 +191,8 @@ export default async function NowPage({
 
       {strip}
 
+      <NowDashToday workspace="learn" className="mb-6" />
+
       <BriefsList briefs={briefs} />
 
       {queued.length > 0 && (
@@ -226,14 +227,15 @@ export default async function NowPage({
                     {url ? (
                       <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
-                        <Button type="submit" variant="primary" size="sm">
-                          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-                          Open
-                        </Button>
-                        <PaidHint
-                          action="app/learn/r/[id]/actions.ts#openReading"
+                        <DashAction
+                          type="submit"
+                          variant="primary"
+                          size="sm"
+                          paid="app/learn/r/[id]/actions.ts#openReading"
                           what="Cost of finding the passage"
-                        />
+                        >
+                          Open at the passage
+                        </DashAction>
                       </form>
                     ) : (
                       <Link
@@ -270,6 +272,7 @@ export default async function NowPage({
         <ReviewList
           reviews={(reviews ?? []).slice(0, REVIEWS_IN_LEARN_NOW)}
           title="Due for review"
+          remember="learn.fold.reviews"
           description="Ideas you answered questions on or said you know. A right answer brings the next question later; a miss brings it back tomorrow."
           showPlan
         />

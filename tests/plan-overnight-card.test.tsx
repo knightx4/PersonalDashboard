@@ -209,6 +209,8 @@ describe('the Overnight card while a night is running', () => {
     expect(html.indexOf('#494')).toBeLessThan(html.indexOf('#723'));
     expect(html).toContain('Newest session');
     expect((html.match(/data-dash-state="working"/g) ?? []).length).toBe(2);
+    // The workspace sits in a capsule of its own colour, apart from the number (note 7c8b9707).
+    expect(html).toMatch(/bg-w-dev-tint text-w-dev[^>]*>Dev<\/span>/);
   });
 
   it('gives each session its own progress through its feature', () => {

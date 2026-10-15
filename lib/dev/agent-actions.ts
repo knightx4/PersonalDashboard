@@ -76,6 +76,7 @@ export const devActions: ModuleActions = {
     editPostAngle: none('own', "The person's say on what their post is about; the posts skill writes the first angle."),
     addPostImage: none('own', 'Attaches a picture the person uploaded from their device.'),
     removePostImage: none('deletes'),
+    postToX: none('outside', 'Publishes under the person\'s name and spends on their X account, so it waits for their confirmed press.'),
     confirmXMatch: none('theirs'),
     dismissXMatch: none('theirs'),
     checkX: none('outside', 'Reads the account on X.'),
@@ -90,6 +91,7 @@ export const devActions: ModuleActions = {
   },
   'app/dev/raised/check-back-actions.ts': {
     dropCheckBack: none('theirs'),
+    restoreCheckBack: none('theirs', 'Undo: takes back their own drop.'),
   },
   'app/dev/specs/actions.ts': {
     saveModuleVision: none('theirs', "A vision is the person's and a session never edits one."),
@@ -97,6 +99,8 @@ export const devActions: ModuleActions = {
     dismissVisionEdit: none('theirs'),
     approveSpecChange: none('theirs'),
     declineSpecChange: none('theirs'),
+    reopenVisionEdit: none('theirs', 'Undo: takes back their own decline.'),
+    undeclineSpecChange: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/dev/specs/interview-actions.ts': {
     startInterview: none('spends'),

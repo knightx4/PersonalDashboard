@@ -1,11 +1,11 @@
-import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft } from 'lucide-react';
+import { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PlaylistPage } from '@/lib/learn/youtube/load';
 import { transcribePlaylistAction } from '../../actions';
 import { Press } from '../../press';
 import { VideoList } from '../../video-list';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One playlist, in the order the channel published it, with one button for
@@ -16,7 +16,7 @@ import { PageColumn } from '@/components/shell/page-width';
  * but the count is only known after asking, so the label gives the most it
  * can spend.
  */
-export function PlaylistView({ data }: { data: PlaylistPage }) {
+export function PlaylistView({ data, path }: { data: PlaylistPage; path?: PageSubject }) {
   const { channel, playlist, videos } = data;
 
   const missing = videos.filter((video) => video.state !== 'fetched').length;
@@ -24,17 +24,9 @@ export function PlaylistView({ data }: { data: PlaylistPage }) {
 
   return (
     <PageColumn>
-      <p className="mb-3">
-        <Link
-          href={`/learn/youtube/${channel.slug}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {channel.name}
-        </Link>
-      </p>
-
       <PageHeader
+        subject={path}
+        back={{ label: channel.name, href: `/learn/youtube/${channel.slug}` }}
         title={playlist.title}
         description={
           <>

@@ -1,12 +1,12 @@
 'use client';
 
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { useOptimistic, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
   ChevronRight,
-  Clock,
   GripVertical,
   MessageSquare,
   Pencil,
@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Trash2,
   Undo2,
-  X,
 } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { IconButton } from '@/components/ui/icon-button';
@@ -41,16 +40,19 @@ import {
   rescheduleTaskAction,
   unpointTask,
 } from '@/app/todo/actions';
-import { openCount, SNOOZE_DAYS, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { openCount, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { laterUntil } from '@/lib/core/snooze-days';
 import { InlineTextarea } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
 import { putAway } from '@/components/motion/place';
+import { LaterDayField, LaterMenu, LATER_CHOICES } from '@/components/inbox/snooze-menu';
+import { PICK_A_DAY } from '@/lib/core/snooze-days';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
-import { formatClock } from '@/lib/clock';
+import { whenAt } from '@/lib/core/when';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
@@ -106,11 +108,13 @@ type RowWrite = {
   toast?: ToastInput;
 };
 
-/** What "later" does to the row until the server says when. Only the button
- * reads it: a snoozed task shows "Bring back" where an open one shows "Later".
+/** What "later" does to the row until the server says when: the start of the
+ * day chosen. Only the button reads it: a snoozed task shows "Bring back"
+ * where an open one shows "Later". A day the server will refuse still marks
+ * the row, and the refusal puts it back.
  */
-function snoozedFrom(now: number): string {
-  return new Date(now + SNOOZE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+function snoozedFrom(choice: string, timezone: string): string {
+  return (laterUntil(choice, timezone)?.until ?? new Date()).toISOString();
 }
 
 /**
@@ -201,6 +205,10 @@ export function TaskRow({
   const [adding, setAdding] = useState(false);
   /** The anchor finder on a narrow row, which has no button of its own. */
   const [aboutOpen, setAboutOpen] = useState(false);
+  /** The phone menu showing Later's days in place of its own items. */
+  const [laterStep, setLaterStep] = useState(false);
+  /** Later's Pick a day, opened from the phone menu, under the row. */
+  const [pickingLater, setPickingLater] = useState(false);
   /** Hand to Dash (plan #1263), which opens in place of the row like the editor. */
   const [handing, setHanding] = useState(false);
   const [pending, start] = useTransition();
@@ -297,7 +305,7 @@ export function TaskRow({
         return result;
       },
       toast: {
-        text: 'done',
+        text: closedToast('done', task.title),
         undo: undoWith(() => reopenTask(task.id, ticked)),
         undone: 'reopened',
       },
@@ -315,24 +323,26 @@ export function TaskRow({
       },
       // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
       toast: {
-        text: 'dropped',
+        text: closedToast('dropped', task.title),
         undo: undoWith(() => reopenTask(task.id)),
         undone: 'back on the list',
       },
     });
   }
 
-  function later() {
+  /** Later, to one of the Later menu's days or a day picked. */
+  function later(choice: string) {
+    setPickingLater(false);
     const away = sendAway('Open');
     run({
-      patch: { snoozedUntil: snoozedFrom(Date.now()) },
+      patch: { snoozedUntil: snoozedFrom(choice, timezone) },
       write: async () => {
-        const result = await laterTask(task.id);
+        const result = await laterTask(task.id, choice);
         if (!result.error) away();
         return result;
       },
       toast: {
-        text: 'until later',
+        text: closedToast('later', task.title),
         undo: undoWith(() => bringBackTask(task.id)),
         undone: 'brought back',
       },
@@ -366,9 +376,18 @@ export function TaskRow({
           label: 'Bring back',
           onSelect: () => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) }),
         }
-      : { id: 'later', label: 'Later', onSelect: later },
+      : // Later turns the menu into Later's days, the same five as the row's own menu.
+        {
+          id: 'later',
+          label: LIFECYCLE_VERB.later,
+          lifecycle: 'later',
+          closeOnSelect: false,
+          onSelect: () => setLaterStep(true),
+        },
     // On All the phone row is the menu alone, so Drop and Edit come in too.
-    ...(archive ? [{ id: 'drop', label: 'Drop', onSelect: drop }] : []),
+    ...(archive
+      ? [{ id: 'drop', label: LIFECYCLE_VERB.dropped, lifecycle: 'dropped' as const, onSelect: drop }]
+      : []),
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
     ...(archive ? [{ id: 'edit', label: 'Edit everything', onSelect: () => setEditing(true) }] : []),
     { id: 'comment', label: 'Comment', onSelect: () => setCommenting(true) },
@@ -387,6 +406,12 @@ export function TaskRow({
         ]
       : []),
     { id: 'dash', label: 'Hand to Dash', onSelect: () => setHanding(true) },
+  ];
+
+  /** What the phone menu holds once Later is pressed in it: Later's own five. */
+  const laterMenuItems: ActionMenuItem[] = [
+    ...LATER_CHOICES.map(({ id, label, choice }) => ({ id, label, onSelect: () => later(choice) })),
+    { id: 'later-pick', label: PICK_A_DAY, onSelect: () => setPickingLater(true) },
   ];
 
   /** A row can be reordered when it is in a pile and still on the list. */
@@ -488,11 +513,11 @@ export function TaskRow({
           is the same claim twice. A dropped task gets the struck hexagon here
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
-        <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+        <Tooltip label={done ? 'Reopen' : LIFECYCLE_VERB.done} className="shrink-0">
           <button
             ref={glyph}
             type="button"
-            aria-label={done ? 'Reopen' : 'Mark done'}
+            aria-label={done ? 'Reopen' : LIFECYCLE_VERB.done}
             onClick={() =>
               done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
             }
@@ -656,12 +681,10 @@ export function TaskRow({
                   <Undo2 strokeWidth={1.75} aria-hidden />
                 </RowAction>
               ) : (
-                <RowAction label="Later" onClick={later}>
-                  <Clock strokeWidth={1.75} aria-hidden />
-                </RowAction>
+                <LaterMenu compact label={task.title} onChoose={later} />
               )}
-              <RowAction label="Drop" onClick={drop}>
-                <X strokeWidth={1.75} aria-hidden />
+              <RowAction label={LIFECYCLE_VERB.dropped} onClick={drop}>
+                <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
               </RowAction>
               {/* Breaking the task up: the box opens under the row, where the
                 list is. Hidden with the rest of the actions until the row is
@@ -704,15 +727,21 @@ export function TaskRow({
               {/* On All the menu holds these two as well (plan #1776). */}
               {!archive && (
                 <>
-                  <RowAction label="Drop" onClick={drop}>
-                    <X strokeWidth={1.75} aria-hidden />
+                  <RowAction label={LIFECYCLE_VERB.dropped} onClick={drop}>
+                    <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
                   </RowAction>
                   <RowAction label="Edit everything" onClick={() => setEditing(true)}>
                     <Pencil strokeWidth={1.75} aria-hidden />
                   </RowAction>
                 </>
               )}
-              <ActionMenu label="More actions" items={moreActions} />
+              <ActionMenu
+                label="More actions"
+                items={laterStep ? laterMenuItems : moreActions}
+                onOpenChange={(open) => {
+                  if (!open) setLaterStep(false);
+                }}
+              />
               {/* Drawn with no trigger of its own -- the menu above opens it. */}
               <TaskAbout
                 taskId={task.id}
@@ -748,6 +777,13 @@ export function TaskRow({
           )}
         </div>
       </div>
+
+      {/* Later's Pick a day, when the phone menu asked for it. */}
+      {pickingLater && (
+        <div className="pb-2 pl-9 pr-3">
+          <LaterDayField label={task.title} onChoose={later} onCancel={() => setPickingLater(false)} />
+        </div>
+      )}
 
       {/* The files, under the row, when the paperclip has opened them. */}
       {showFiles && files.length > 0 && <TaskFiles files={files} className="pb-2 pl-9 pr-3" />}
@@ -877,7 +913,7 @@ function TaskItems({
               }
               onDrop={() =>
                 write(item.id, 'dropped', () => dropTask(item.id), {
-                  text: 'removed',
+                  text: closedToast('dropped', item.title),
                   undo: undoWith(() => reopenTask(item.id)),
                   undone: 'back on the list',
                 })
@@ -898,10 +934,10 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
 
   return (
     <li className="group/item flex items-start gap-2">
-      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+      <Tooltip label={done ? 'Reopen' : LIFECYCLE_VERB.done} className="shrink-0">
         <button
           type="button"
-          aria-label={done ? 'Reopen' : 'Mark done'}
+          aria-label={done ? 'Reopen' : LIFECYCLE_VERB.done}
           onClick={onTick}
           className={cn(
             'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
@@ -921,14 +957,14 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         {item.title}
       </span>
 
-      <Tooltip label="Remove" align="end" className="shrink-0">
+      <Tooltip label={LIFECYCLE_VERB.dropped} align="end" className="shrink-0">
         <IconButton
-          label="Remove"
+          label={`${LIFECYCLE_VERB.dropped}: ${item.title}`}
           size="sm"
           onClick={onDrop}
           className="opacity-100 sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
         >
-          <X strokeWidth={1.75} aria-hidden />
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
         </IconButton>
       </Tooltip>
     </li>
@@ -1157,13 +1193,7 @@ function DueLabel({
     );
   }
 
-  const text = task.dueAt
-    ? formatClock(task.dueAt, { timeZone: timezone, day: 'numeric', month: 'short' })
-    : new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'UTC',
-        day: 'numeric',
-        month: 'short',
-      }).format(new Date(`${task.dueOn}T00:00:00Z`));
+  const text = whenAt(task.dueAt ?? `${task.dueOn}`, { timeZone: timezone });
 
   return (
     <button

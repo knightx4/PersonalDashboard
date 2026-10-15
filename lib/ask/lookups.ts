@@ -32,6 +32,7 @@ import {
   clip,
   daysBefore,
   isUuid,
+  matchedNote,
   nextDay,
   optionalDate,
   optionalString,
@@ -102,7 +103,7 @@ export async function searchLookup(ctx: AskContext, input: Input): Promise<AskTo
     ? (input.kinds.filter((k) => typeof k === 'string' && k in HIT_KINDS) as HitKind[])
     : undefined;
 
-  const { hits, failed } = await searchEverything({
+  const { hits, failed, found, capped } = await searchEverything({
     userId: ctx.userId,
     query,
     sources: [...ctx.searchSources],
@@ -123,7 +124,8 @@ export async function searchLookup(ctx: AskContext, input: Input): Promise<AskTo
     })),
     note:
       'Matches titles and names only, not the words inside a row. ' +
-      (failed.length > 0 ? `Could not read: ${failed.join(', ')}.` : ''),
+      (failed.length > 0 ? `Could not read: ${failed.join(', ')}. ` : '') +
+      `${matchedNote(found ?? hits.length, hits.length, capped === true)}.`,
   };
 }
 
@@ -182,7 +184,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   // something else (a note by path, a company by slug), so an id is taken too.
   const byId = refColumn !== 'id' && refColumn !== owner && isUuid(ref);
   const columns = [
-    ...new Set([refColumn, ...(refColumn !== owner ? ['id'] : []), source.title, ...source.search]),
+    ...new Set([refColumn, ...(refColumn !== owner ? ['id'] : []), source.title, ...source.search, ...(source.facts ?? [])]),
   ];
 
   const client = await ctx.db(schema);
@@ -199,7 +201,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   const canonical = String(row[refColumn] ?? row.id ?? ref);
   const href = (BETTER_HREFS[table] ?? source.href!)(canonical);
   const detail: Record<string, string | null> = {};
-  for (const column of source.search) detail[column] = clip(asText(row[column]), 1500);
+  for (const column of [...source.search, ...(source.facts ?? [])]) detail[column] = clip(asText(row[column]), 1500);
   const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
   if (comments) detail.comments = comments;
 
@@ -494,6 +496,9 @@ export const APPLICATION_STATUSES = [
   'role_closed',
 ] as const;
 
+/** The most applications read before filtering. */
+const APPLICATIONS_READ = 1000;
+
 export async function applicationsLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const from = optionalDate(input, 'from');
   const to = optionalDate(input, 'to');
@@ -515,9 +520,11 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     .eq('user_id', ctx.userId);
   // Not narrowed by date here: an application is dated by when it was sent,
   // which can be long after the row was added, so the period is applied below.
-  const { data, error } = await query.order('created_at', { ascending: false }).limit(1000);
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(APPLICATIONS_READ);
   if (error) throw new Error(`applications: ${error.message}`);
   let applications = (data ?? []) as ApplicationRow[];
+  // Filters below run over what was read, so a full read means the count is a floor.
+  const readCapped = applications.length >= APPLICATIONS_READ;
 
   const roles = await readIn<{ id: string; title: string; company_id: string | null }>(
     db,
@@ -621,7 +628,8 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
         : '') +
       (quietDays !== null
         ? `Open applications with nothing heard from the company in the ${quietDays} days before ${ctx.today}; last heard is the newest reply, screen, interview, offer or rejection, or the day it was sent when nothing came back. `
-        : '') + (applications.length > MAX_ROWS ? `Only the newest ${MAX_ROWS} are listed.` : ''),
+        : '') +
+      `${matchedNote(applications.length, rows.length, readCapped)}.`,
   };
 }
 
@@ -688,7 +696,9 @@ export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToo
     ok: true,
     rows,
     totals: { from, to, done: doneRows.length, overdue_today: overdueRows.length },
-    note: `Done means finished between ${from} and ${to}; overdue means still open and due before ${ctx.today}.`,
+    note:
+      `Done means finished between ${from} and ${to}; overdue means still open and due before ${ctx.today}. ` +
+      `Done: ${matchedNote(doneRows.length, Math.min(doneRows.length, MAX_ROWS))}. Overdue: ${matchedNote(overdueRows.length, Math.min(overdueRows.length, MAX_ROWS))}.`,
   };
 }
 
@@ -742,7 +752,7 @@ export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToo
     ok: true,
     rows,
     totals: { goals: goals.length, by_verdict: byVerdict },
-    note: 'The verdict is the newest from the daily goals review in the last four weeks.',
+    note: `The verdict is the newest from the daily goals review in the last four weeks. ${matchedNote(goals.length, rows.length)}.`,
   };
 }
 
@@ -785,21 +795,22 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
   const client = await ctx.db('obsidian');
   let read = client
     .from('notes')
-    .select('id, path, title, body, git_updated_at')
+    .select('id, path, title, body, git_updated_at', { count: 'exact' })
     .eq('user_id', ctx.userId)
     .is('deleted_at', null);
   if (query) read = read.textSearch('search_tsv', query, { type: 'websearch', config: 'english' });
   if (from) read = read.gte('git_updated_at', from);
   if (to) read = read.lt('git_updated_at', nextDay(to));
-  const { data, error } = await read
+  const { data, error, count } = await read
     .order('git_updated_at', { ascending: false, nullsFirst: false })
-    .limit(MAX_ROWS + 1);
+    .limit(MAX_ROWS);
   if (error) throw new Error(`notes: ${error.message}`);
   const notes = (data ?? []) as NoteRow[];
+  const matched = Math.max(count ?? notes.length, notes.length);
 
   return {
     ok: true,
-    rows: notes.slice(0, MAX_ROWS).map((note) => ({
+    rows: notes.map((note) => ({
       table: 'obsidian.notes',
       ref: note.path,
       title: note.title?.trim() || note.path.split('/').pop() || note.path,
@@ -813,7 +824,7 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
     note:
       (query ? 'Matched on the words of the whole note, not just its title. ' : '') +
       (from || to ? 'Changed means last changed in the vault within the period. ' : '') +
-      (notes.length > MAX_ROWS ? `More than ${MAX_ROWS} matched; only the newest are listed.` : ''),
+      `${matchedNote(matched, notes.length)}.`,
   };
 }
 
@@ -1130,6 +1141,6 @@ export async function recallLookup(ctx: AskContext, input: Input): Promise<AskTo
       'Ranked by closeness of meaning to the question, not by shared words, so a passage can be near without answering it: use only the ones that do, and say so if none does. ' +
       "Each passage says who wrote it: 'the person' is their own writing, 'Dash' is text Dash wrote for them (drafts, files, results, Learn cards). When they ask what they said or wrote, answer from their own passages and name anything of Dash's as Dash's. " +
       (byDash && !onlyMine ? 'Pass only_mine to leave Dash’s writing out. ' : '') +
-      (hits.length > RECALL_ROWS ? `${hits.length} rows had near passages; the closest ${RECALL_ROWS} are listed.` : ''),
+      `${matchedNote(hits.length, listed.length)}, closest first.`,
   };
 }

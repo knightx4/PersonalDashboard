@@ -16,6 +16,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const FILTERS = [
   { id: 'open', label: 'Open' },
@@ -63,7 +64,7 @@ export function AllTasksView({
   // No line under the title: the tabs below already say what the list covers.
   const header = (
     <>
-      <PageHeader title="All tasks" />
+      <PageHeader subject={sectionSubject('/todo/all', 'All')} title="All tasks" />
       {focus && <FocusTask id={focus} />}
     </>
   );

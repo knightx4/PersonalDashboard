@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayStartIn, snoozeDay } from './snooze-days';
+import { dayStartIn, laterUntil, snoozeDay, untilWords } from './snooze-days';
 
 describe('snoozeDay', () => {
   it('means the next day by tomorrow', () => {
@@ -8,6 +8,15 @@ describe('snoozeDay', () => {
   it('means the coming Monday by next week, a week on from a Monday', () => {
     expect(snoozeDay('next_week', '2026-10-14')).toBe('2026-10-19');
     expect(snoozeDay('next_week', '2026-10-12')).toBe('2026-10-19');
+  });
+  it('means the coming Saturday by this weekend, a week on from a Saturday', () => {
+    expect(snoozeDay('weekend', '2026-10-14')).toBe('2026-10-17');
+    expect(snoozeDay('weekend', '2026-10-17')).toBe('2026-10-24');
+    expect(snoozeDay('weekend', '2026-10-18')).toBe('2026-10-24');
+  });
+  it('means the first of next month by next month, across a year', () => {
+    expect(snoozeDay('next_month', '2026-10-14')).toBe('2026-11-01');
+    expect(snoozeDay('next_month', '2026-12-31')).toBe('2027-01-01');
   });
   it('takes a picked day after today and refuses the rest', () => {
     expect(snoozeDay('2026-11-02', '2026-10-12')).toBe('2026-11-02');
@@ -23,5 +32,22 @@ describe('dayStartIn', () => {
     expect(dayStartIn('2026-12-01', 'Europe/London').toISOString()).toBe('2026-12-01T00:00:00.000Z');
     expect(dayStartIn('2026-10-13', 'America/New_York').toISOString()).toBe('2026-10-13T04:00:00.000Z');
     expect(dayStartIn('2026-10-13', 'UTC').toISOString()).toBe('2026-10-13T00:00:00.000Z');
+  });
+});
+
+describe('laterUntil and untilWords (plan #1957.9)', () => {
+  it('reads today in the zone and ends at the start of the day chosen there', () => {
+    // 23:30 on the 14th in New York is already the 15th in UTC.
+    const now = new Date('2026-10-15T03:30:00Z');
+    expect(laterUntil('tomorrow', 'America/New_York', now)).toEqual({
+      day: '2026-10-15',
+      until: new Date('2026-10-15T04:00:00Z'),
+    });
+    expect(laterUntil('2026-10-14', 'America/New_York', now)).toBeNull();
+  });
+  it('says the day it comes back in words', () => {
+    const now = new Date('2026-10-15T12:00:00Z');
+    expect(untilWords('2026-10-17', 'UTC', now)).toBe('until Sat 17 Oct');
+    expect(untilWords('2027-01-04', 'UTC', now)).toBe('until Mon 4 Jan 2027');
   });
 });

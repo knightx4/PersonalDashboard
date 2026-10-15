@@ -12,6 +12,8 @@ import { readTopic } from '@/lib/news/issues/topics';
 import { NewsListView, ViewSwitch } from './list-view';
 import { RecommendedNewsletters } from './recommended';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 
 export const metadata = { title: 'Newsletters' };
 export const dynamic = 'force-dynamic';
@@ -53,12 +55,14 @@ export default async function NewsPage({
   if (readListView(viewParam) === 'recommended') return <RecommendedPage userId={user.id} />;
   const client = await createNewsClient();
 
-  const [settings, senders, issues, unread, waiting] = await Promise.all([
+  const [settings, senders, issues, unread, waiting, working] = await Promise.all([
     loadAccountSettings(user.id),
     loadSenders(client),
     loadIssues(client, { topic }),
     loadUnreadStories(client),
     loadWaitingSignups(client),
+    // Which issues a run or an Ask Dash hand-off is about (plan #1964.2.2).
+    workingRefsForPage(user.id),
   ]);
 
   return (
@@ -72,6 +76,7 @@ export default async function NewsPage({
       topic={topic}
       viewParam={viewParam}
       gap={deliveryGap()}
+      working={working}
     />
   );
 }
@@ -92,7 +97,7 @@ async function RecommendedPage({ userId }: { userId: string }) {
 
   return (
     <PageColumn className="space-y-4">
-      <PageHeader title="Newsletters" />
+      <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters
         stored={stored}

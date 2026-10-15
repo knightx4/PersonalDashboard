@@ -1,5 +1,6 @@
 import type { AskToolResult, SchemaClient } from '@/lib/ask/db';
 import type { TalkCitation } from '@/lib/talk/talk';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The log of what a connected Claude app read, and the cap on how often it may
@@ -139,7 +140,7 @@ export function rateVerdict(windows: { minute: RateWindow; day: RateWindow }, no
   const allowed =
     worst.limit === 'minute'
       ? `${CONNECTOR_RATE.perMinute} calls a minute`
-      : `${CONNECTOR_RATE.perDay.toLocaleString('en-US')} calls a day`;
+      : `${formatNumber(CONNECTOR_RATE.perDay)} calls a day`;
   return {
     ok: false,
     limit: worst.limit,

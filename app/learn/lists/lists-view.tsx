@@ -1,15 +1,15 @@
 import Link from '@/components/ui/link';
-import { BookOpen, CornerDownRight, Plus } from 'lucide-react';
+import { BookOpen, CornerDownRight } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
-import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SaveLinkForm } from '../save/save-link-form';
+import { AimButton } from '@/components/shell/aim-button';
 import type { TrackProgress } from '@/lib/learn/tracks/load';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The reading lists, which the database and the code still call tracks. They
@@ -66,23 +66,21 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
 export function ListsView({ rows, search }: { rows: NestedTrack[]; search: string }) {
   const header = (
     <PageHeader
+      subject={sectionSubject('/learn/lists', 'Reading lists')}
       title="Reading lists"
       actions={
-        <Link href="/learn/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-          New reading list
-        </Link>
+        <>
+          <AimButton aim={{ kind: 'learn-reading' }} label="Save a reading" variant="secondary" />
+          <AimButton aim={{ kind: 'learn-topic' }} label="Start a topic" />
+        </>
       }
     />
   );
-  // Saving a link comes first: it is the quick way onto the queue, and the
-  // search is for finding something already there.
+  // Saving a link and starting a topic are the header's two Adds, which open
+  // capture aimed at each (plan #1950.4); the search finds what is there.
   const tools = (
-    <div className="space-y-3">
-      <SaveLinkForm />
-      <div className="max-w-md">
-        <SearchField placeholder="Search your reading lists" />
-      </div>
+    <div className="max-w-md">
+      <SearchField placeholder="Search your reading lists" />
     </div>
   );
 
@@ -99,8 +97,8 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
           <EmptyState
             icon={BookOpen}
             title="Nothing queued"
-            description="Things worth reading, resolved to real links and pointed at the part that matters. Paste what someone told you to read, such as a reply from a chat, a syllabus or a footnote, and each item gets somewhere you can open, with a note on which part to read."
-            action={{ label: 'Paste a reading list', href: '/learn/new' }}
+            description="Things worth reading, each pointed at the part that matters. Start a topic and paste what someone told you to read under its name, such as a reply from a chat or a syllabus, and each item becomes a row you can find a source for."
+            action={{ label: 'Start a topic', aim: { kind: 'learn-topic' } }}
           />
         )}
       </PageColumn>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, onTestFinished } from 'vitest';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
@@ -297,6 +297,26 @@ describe('the Goals writes', () => {
       expect(restored.after).toMatchObject({ archived_at: null });
     });
 
+    it('makes a step its own errand in the goal\'s area and archives the step (note 16a21d3a)', async () => {
+      const data = tables();
+      expect(await refused('change_goal_step', data, { change: 'make_errand', step_ref: STEP })).toMatch(/needs a date/);
+      const change = await made('change_goal_step', data, { change: 'make_errand', step_ref: STEP, due_on: '2026-10-20' });
+      const errand = data['goals.items']!.find((r) => r.errand === true)!;
+      expect(errand).toMatchObject({ user_id: ME, level: 'goal', area_id: HEALTH, title: 'Buy shoes', due_on: '2026-10-20' });
+      expect(row(data, 'goals.items', STEP).archived_at).not.toBeNull();
+      expect(change.summary).toBe('Dash made the step "Buy shoes" its own errand in Health, due 2026-10-20, and archived the step from "Run a half marathon".');
+      expect(change.input.href).toBe(`/goals/${errand.id}`);
+      expect(change.undo).toEqual({ none: expect.stringContaining('Two rows changed') });
+      expect(await refused('change_goal_step', data, { change: 'make_errand', step_ref: STEP })).toBe('That step is archived. Restore it first.');
+    });
+
+    it('makes an errand in a named area, on the step\'s own date', async () => {
+      const data = tables();
+      row(data, 'goals.items', STEP_2).due_on = '2026-11-02';
+      await made('change_goal_step', data, { change: 'make_errand', step_ref: STEP_2, area: 'Music' });
+      expect(data['goals.items']!.find((r) => r.errand === true)).toMatchObject({ area_id: MUSIC, due_on: '2026-11-02' });
+    });
+
     it('counts a step towards another goal and stops it, each a link row', async () => {
       const data = tables();
       const linked = await made('change_goal_step', data, { change: 'count_towards', step_ref: STEP, goal_ref: GOAL_2 });
@@ -555,6 +575,12 @@ describe('the Goals writes', () => {
     }
 
     it('snoozes a step until the start of the day in their zone, and brings it back', async () => {
+      // The expected days are written for 14 October; pin the clock so the test passes on any day.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
+      onTestFinished(() => {
+      vi.useRealTimers();
+    });
       const data = inboxTables();
       const snoozed = await made('change_goals_inbox', data, { change: 'snooze', row_ref: STEP, until: 'tomorrow' });
       const kept = data['core.inbox_snoozes']![0];
@@ -576,7 +602,7 @@ describe('the Goals writes', () => {
         'There is no goal or step of theirs with that row_ref. Look it up first.',
       );
       expect(await refused('change_goals_inbox', inboxTables(), { change: 'snooze', row_ref: STEP, until: '2026-10-01' })).toBe(
-        'until must be tomorrow or next_week, or a day after today as YYYY-MM-DD.',
+        'until must be tomorrow, weekend, next_week, next_month, or a day after today as YYYY-MM-DD.',
       );
     });
 

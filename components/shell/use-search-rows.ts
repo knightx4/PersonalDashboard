@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { hitHref } from '@/lib/core/back-from';
 import { hitPoints, mergeRanked, paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
@@ -17,6 +18,7 @@ import { useAskDash } from '@/components/shell/ask-dash';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
+import { rememberedPath, visibleModules } from '@/components/shell/workspace-switcher';
 import {
   COLOURWAYS,
   colourwayOf,
@@ -331,6 +333,7 @@ export function useSearchRows({
   theme,
   query,
   active,
+  emptyShows = 'here',
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -354,6 +357,12 @@ export function useSearchRows({
   query: string;
   /** Whether the box is open. Nothing is fetched until it is true. */
   active: boolean;
+  /**
+   * What the box lists before anything is typed: where you can go from here
+   * and what you can start here, or every workspace, Home first, for the
+   * phone's dock button that switches as well as searches (note 5f3ef44f).
+   */
+  emptyShows?: 'here' | 'workspaces';
 }): {
   rows: SearchRow[];
   /** An answer is still on its way, so "nothing matches" would be premature. */
@@ -475,7 +484,40 @@ export function useSearchRows({
     );
   }, [scope, openCapture, captureActions]);
 
+  /** Every workspace you can switch to, Home first, the one you are in included. */
+  const workspaces = useMemo<SearchCommand[]>(
+    () => [
+      {
+        id: 'workspace:home',
+        label: 'Home',
+        hint: 'Workspace',
+        module: null,
+        run: () => router.push('/home'),
+      },
+      // Dash's page sits with Home above the workspaces, as in the switcher (plan #1899.2).
+      {
+        id: 'workspace:dash',
+        label: 'Dash',
+        hint: 'Your chats with Dash',
+        module: null,
+        icon: 'dash',
+        run: () => router.push('/ask'),
+      },
+      ...visibleModules(enabledModules, module).map((entry) => ({
+        id: `workspace:${entry.id}`,
+        label: entry.label,
+        hint: entry.id === module ? 'You are here' : 'Workspace',
+        module: entry.id as ModuleId,
+        run: () => router.push(rememberedPath(entry.id as ModuleId, entry.home)),
+      })),
+    ],
+    [enabledModules, module, router],
+  );
+
   const matches = useMemo(() => {
+    if (!query.trim() && emptyShows === 'workspaces') {
+      return workspaces.map((command) => ({ command, points: Number.POSITIVE_INFINITY }));
+    }
     if (!query.trim()) {
       // Opening the box is the question, so it answers: where you can go from
       // here and what you can start here. Both halves are already narrowed to
@@ -487,7 +529,7 @@ export function useSearchRows({
         .map((command) => ({ command, points: Number.POSITIVE_INFINITY }));
     }
     return rankCommands({ commands, captures, query: query.trim() });
-  }, [captures, commands, query, startable]);
+  }, [captures, commands, query, startable, emptyShows, workspaces]);
 
   const needle = query.trim();
   const { hits, looking, reset } = useSearchHits({ account, scope, query, active });
@@ -520,7 +562,9 @@ export function useSearchRows({
     (row: SearchRow | undefined) => {
       if (!row) return;
       if (row.kind === 'command') row.command.run();
-      else router.push(row.hit.href);
+      // The hit carries the page it was found from, so the row's back link
+      // returns there (plan #1931.3).
+      else router.push(hitHref(row.hit.href, window.location));
     },
     [router],
   );

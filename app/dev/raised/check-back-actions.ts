@@ -28,3 +28,23 @@ export async function dropCheckBack(formData: FormData): Promise<void> {
   // A feature's Steps tab lists its check-backs too.
   revalidatePath('/dev/plan/[number]', 'page');
 }
+
+/** The toast's Undo on Drop (plan #1957.3): the check-back is waiting again. */
+// latency: pending
+export async function restoreCheckBack(id: string): Promise<void> {
+  await requireOwner();
+  const user = await requireUser();
+  const parsed = z.string().uuid().safeParse(id);
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('check_backs')
+    .update({ status: 'waiting', outcome: null, closed_at: null })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('status', 'dropped');
+  if (error) throw new Error(error.message);
+  revalidatePath('/dev/raised');
+  revalidatePath('/dev/plan/[number]', 'page');
+}

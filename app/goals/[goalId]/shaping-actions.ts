@@ -13,7 +13,10 @@ import {
   approveGoal,
   loadShaping,
   markReviewed,
+  proposalDeclineRows,
+  restoreDeclinedProposal,
   setQuestionAside,
+  type DeclinedRow,
   settleProposal,
   startGoalRun,
 } from '@/lib/goals/shaping-store';
@@ -25,7 +28,13 @@ import {
  * show rather than throwing.
  */
 
-export type ShapingActionState = { error?: string; message?: string; done?: number };
+export type ShapingActionState = {
+  error?: string;
+  message?: string;
+  done?: number;
+  /** What a decline dropped, for the toast's Undo (plan #1957.8). */
+  declined?: DeclinedRow[];
+};
 
 const Id = z.string().uuid();
 const ANSWER_MAX = 20000;
@@ -261,15 +270,38 @@ export async function settleProposalAction(
   if (!id.success) return { error: 'Could not tell which step that was.' };
   const approve = form.get('approve') === '1';
   let settled: number | null;
+  let declined: DeclinedRow[] = [];
   try {
-    settled = await settleProposal(await createGoalsClient(), id.data, approve);
+    const client = await createGoalsClient();
+    if (!approve) declined = await proposalDeclineRows(client, id.data);
+    settled = await settleProposal(client, id.data, approve);
   } catch {
     return {
-      error: approve ? 'The approval could not be saved. Try again.' : 'Could not turn it down. Try again.',
+      error: approve ? 'The approval could not be saved. Try again.' : 'Could not decline it. Try again.',
     };
   }
   if (settled === null) return { error: 'That step is no longer a proposal. Reload to see it.' };
   const beneath = settled - 1;
   const more = beneath > 0 ? `, with ${beneath} beneath it` : '';
-  return saved(approve ? `Approved${more}.` : `Turned down${more}.`);
+  if (approve) return saved(`Approved${more}.`);
+  return { ...saved(`Declined${more}.`), declined };
+}
+
+const Declined = z
+  .array(z.object({ id: Id, status: z.enum(['proposed', 'open']) }))
+  .min(1)
+  .max(500);
+
+/** The Undo of declining a proposal: the rows it dropped come back as they were. */
+// latency: pending
+export async function undoDeclineProposalAction(rows: DeclinedRow[]): Promise<ShapingActionState> {
+  await requireUser();
+  const parsed = Declined.safeParse(rows);
+  if (!parsed.success) return { error: 'Could not tell which steps those were.' };
+  try {
+    await restoreDeclinedProposal(await createGoalsClient(), parsed.data);
+  } catch {
+    return { error: 'Could not bring it back. Try again.' };
+  }
+  return saved();
 }

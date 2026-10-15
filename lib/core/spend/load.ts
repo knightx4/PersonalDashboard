@@ -36,12 +36,12 @@ type Row = {
   created_at: string;
 };
 
-export async function loadSpend(supabase: CoreSupabaseClient): Promise<SpendRow[]> {
+export async function loadSpend(supabase: CoreSupabaseClient, limit = MAX_ROWS): Promise<SpendRow[]> {
   const { data, error } = await supabase
     .from('model_spend')
     .select(COLUMNS)
     .order('created_at', { ascending: false })
-    .limit(MAX_ROWS);
+    .limit(Math.min(limit, MAX_ROWS));
 
   assertSchemaExposed(error, CORE_SCHEMA);
   if (error) throw new Error(`Reading the spend ledger failed: ${error.message}`);

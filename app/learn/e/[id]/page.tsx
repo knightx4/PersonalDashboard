@@ -5,8 +5,13 @@ import { loadEssay } from '@/lib/learn/essays/store';
 import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
 import { loadEssayResearch } from '@/lib/learn/essays/research-store';
 import { EssayView } from './essay-view';
+import { readStage } from '@/lib/learn/essays/plan';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
+/** Research on the essay frames, searches, reads and writes up in one press, which can take a couple of minutes. */
+export const maxDuration = 300;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,12 +33,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 /** One essay in the editor; essay-view.tsx says how it is drawn (plan #1865). */
-export default async function EssayPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EssayPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ stage?: string | string[] }>;
+}) {
   const essay = await read((await params).id);
+  const asked = (await searchParams).stage;
   if (!essay) notFound();
   const [notes, research] = await Promise.all([
     readNotes(essay.id, essay.draftBody),
     createLearnClient().then((supabase) => loadEssayResearch(supabase, essay.id)),
   ]);
-  return <EssayView essay={essay} notes={notes} research={research} />;
+  return (
+    <EssayView
+      essay={essay}
+      notes={notes}
+      research={research}
+      initialStage={readStage(Array.isArray(asked) ? asked[0] : asked)}
+      path={await rowSubject(toRef('learn.essays', essay.id))}
+    />
+  );
 }

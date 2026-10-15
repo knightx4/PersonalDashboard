@@ -16,7 +16,7 @@ import { moduleById, type ModuleId } from '@/lib/modules';
 import { commandsFor, type BoxTrigger } from '@/lib/talk/box-commands';
 import { MAX_MENTIONS, type AskMention } from '@/lib/talk/ask-input';
 import type { TalkCitation } from '@/lib/talk/talk';
-import type { BoxItem, BoxMenu } from '@/components/talk/talk-thread';
+import type { BoxItem, BoxMenu } from '@/components/thread/thread';
 
 /**
  * What Dash's box adds to the thread's own (plan #1899.5): `@` to add one of

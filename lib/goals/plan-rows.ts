@@ -145,29 +145,45 @@ export type GoalRowNode = {
   need: string | null;
   health: ReturnType<typeof healthWordsOf>;
   move: ReturnType<typeof moveWordsFor>;
-  /** Who the step is on, for the row's second column: you, Dash, or both beneath it. */
-  who: { word: string; tone: 'quiet' | 'accent'; title: string };
+  /**
+   * Who the step is on, for the Assignee column the plan shares (plan
+   * #2069.2): you, Dash, or both beneath it, and the tooltip's sentence.
+   */
+  who: { who: 'you' | 'dash' | 'both'; title: string };
 };
 
+const stepsWord = (n: number) => (n === 1 ? '1 step' : `${n} steps`);
+
 /**
- * Who a step is on (note 6d242e62): Dash for a Dash step, you for every other
- * kind -- yours, a question, a rhythm. A step with steps beneath it is on
- * whoever its open steps are on, or all of them once none is open.
+ * Who a step is on (note 6d242e62), as the Assignee column draws it (plan
+ * #2069.2): Dash for a Dash step, you for every other kind -- yours, a
+ * question, a rhythm. A step with steps beneath it is on whoever its open
+ * steps are on, or all of them that were not dropped once none is open, and
+ * a split says how many each holds, as the plan's `assigneeTitle` does.
  */
 export function whoIsOn(step: StepNode): GoalRowNode['who'] {
-  const on = new Set<'you' | 'dash'>();
-  const walk = (node: StepNode, openOnly: boolean) => {
-    if (node.children.length === 0) {
-      if (!openOnly || node.status === 'open' || node.status === 'blocked') on.add(node.kind === 'claude' ? 'dash' : 'you');
-      return;
-    }
-    for (const child of node.children) walk(child, openOnly);
-  };
-  walk(step, true);
-  if (on.size === 0) walk(step, false);
-  if (on.size === 2) return { word: 'You and Dash', tone: 'accent', title: 'Some steps beneath are yours and some are Dash’s.' };
-  if (on.has('dash')) return { word: 'Dash', tone: 'accent', title: 'Dash does this step.' };
-  return { word: 'You', tone: 'quiet', title: 'This step is yours to do.' };
+  const own = (node: StepNode) => (node.kind === 'claude' ? 'dash' : 'you');
+  const leaves = (node: StepNode): StepNode[] =>
+    node.children.flatMap((child) => (child.children.length > 0 ? leaves(child) : [child]));
+  const beneath = leaves(step);
+  const open = beneath.filter((leaf) => leaf.status === 'open' || leaf.status === 'blocked');
+  const counted = open.length > 0 ? open : beneath.filter((leaf) => leaf.status !== 'dropped');
+  if (counted.length === 0) {
+    if (own(step) === 'dash') return { who: 'dash', title: 'Dash does this step.' };
+    return {
+      who: 'you',
+      title: step.kind === 'decision' ? 'Yours to answer.' : 'This step is yours to do.',
+    };
+  }
+  const dashs = counted.filter((leaf) => own(leaf) === 'dash').length;
+  const yours = counted.length - dashs;
+  if (yours > 0 && dashs > 0) {
+    return { who: 'both', title: `Split: ${stepsWord(yours)} yours, ${stepsWord(dashs)} Dash’s.` };
+  }
+  const all = counted.length === 1 ? 'Its 1 step is' : `All ${counted.length} steps are`;
+  return yours > 0
+    ? { who: 'you', title: `${all} yours.` }
+    : { who: 'dash', title: `${all} Dash’s.` };
 }
 
 /** The step as the plan's rules read it: enough of a `PlanNode` for them. */

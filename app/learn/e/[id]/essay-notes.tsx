@@ -1,11 +1,14 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { Card, CardSection } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { cn } from '@/lib/cn';
 import { locateAnchor, makeAnchor } from '@/lib/learn/essays/anchor';
@@ -22,6 +25,7 @@ import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
   closeEssayNote,
   helpEssayNote,
+  reopenEssayNote,
   moveEssayNotes,
   rephraseEssaySelection,
   runEssayCheck,
@@ -66,6 +70,7 @@ export function useEssayNotes(
   const [stopped, setStopped] = useState(initial.stopped);
   const [active, setActive] = useState<string | null>(initialOpen);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [running, setRunning] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<string | null>(null);
   const [ran, setRan] = useState<{ check: string; raised: number } | null>(null);
@@ -194,8 +199,16 @@ export function useEssayNotes(
         return;
       }
       apply(result);
+      toast({
+        text: closedToast(outcome === 'done' ? 'done' : 'declined', note.body),
+        undo: async () => {
+          const back = await reopenEssayNote(essayId, note.id);
+          if (!back.ok) throw new Error(back.error);
+          apply(back);
+        },
+      });
     },
-    [active, apply, editor, essayId, notes, open, place],
+    [active, apply, editor, essayId, notes, open, place, toast],
   );
 
   /** Rung 4: Rephrase on the note's text, with its hint, shown as a change to accept or reject. */
@@ -343,7 +356,7 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
           <LinkedText text={note.why} />
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center gap-0.5">
         {!detached && note.rung < 3 && (
           <Button type="button" variant="secondary" size="sm" onClick={() => void api.help(note)}>
             Help
@@ -351,50 +364,41 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
         )}
         {!detached && note.rung === 3 && (
           <>
-            <Button
+            <DashAction
               type="button"
               variant="secondary"
               size="sm"
               pending={api.suggesting === note.id}
               disabled={api.suggesting !== null}
               onClick={() => void api.suggest(note)}
+              paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
+              what="Cost of a suggested wording"
             >
               {api.suggesting === note.id ? 'Suggesting…' : 'Suggest wording'}
-            </Button>
-            <PaidHint
-              action="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
-              what="Cost of a suggested wording"
-            />
+            </DashAction>
           </>
         )}
         {!detached && (
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-expanded={explained}
             onClick={() => setExplained((on) => !on)}
           >
             Explain
           </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void api.close(note, 'done')}
-        >
-          {detached ? 'Clear' : 'Done'}
-        </Button>
+        {/* Done and Decline with their glyphs, at the small size so a
+            note's actions stay on one line in the rail (plan #1957.3). A
+            detached note's text has gone from the draft, so it is Done. */}
+        <CloseButton size="xs" lifecycle="done" onClick={() => void api.close(note, 'done')} />
         {!detached && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
+          <CloseButton
+            size="xs"
+            lifecycle="declined"
             onClick={() => void api.close(note, 'dismissed')}
-          >
-            Dismiss
-          </Button>
+          />
         )}
       </div>
     </li>
@@ -433,26 +437,37 @@ export function EssayNotesCard({ api, paragraphs }: { api: EssayNotesApi; paragr
               </option>
             ))}
           </Select>
-          {check.kind === 'model' && calls > 0 && (
-            <PaidHint
-              action={
-                check.id === 'already_said'
-                  ? 'app/learn/e/[id]/actions.ts#runEssayCheck:already-said'
-                  : 'app/learn/e/[id]/actions.ts#runEssayCheck:model'
+          {check.kind === 'model' ? (
+            <DashAction
+              type="button"
+              variant="secondary"
+              disabled={stopped || api.running !== null}
+              pending={api.running === check.id}
+              onClick={() => void api.run(check.id)}
+              paid={
+                calls === 0
+                  ? undefined
+                  : check.id === 'already_said'
+                    ? 'app/learn/e/[id]/actions.ts#runEssayCheck:already-said'
+                    : 'app/learn/e/[id]/actions.ts#runEssayCheck:model'
               }
               count={calls}
               what={`Cost of running ${check.name}`}
-            />
+              hintFirst
+            >
+              {api.running === check.id ? 'Running…' : 'Run'}
+            </DashAction>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={stopped || api.running !== null}
+              pending={api.running === check.id}
+              onClick={() => void api.run(check.id)}
+            >
+              {api.running === check.id ? 'Running…' : 'Run'}
+            </Button>
           )}
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={stopped || api.running !== null}
-            pending={api.running === check.id}
-            onClick={() => void api.run(check.id)}
-          >
-            {api.running === check.id ? 'Running…' : 'Run'}
-          </Button>
         </div>
         <p className="mt-2 text-small text-ink-muted">
           {stopped

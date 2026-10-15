@@ -5,6 +5,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ListPage } from '@/components/patterns/list-detail';
 import type { MayaThreadRow } from '@/lib/vault/maya/store';
 import { mayaThreadHref } from '@/lib/vault/paths';
+import { sectionSubject } from '@/lib/core/section-path';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * Every thread with Maya, drawn from what the page read (page.tsx), so the
@@ -15,7 +17,7 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
   if (threads.length === 0) {
     return (
       <>
-        <PageHeader title="Maya" />
+        <PageHeader subject={sectionSubject('/vault/maya', 'Maya')} title="Maya" />
         <EmptyState
           icon={OwlIcon}
           title="No threads with Maya yet"
@@ -31,7 +33,7 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
 
   return (
     <ListPage
-      header={<PageHeader title="Maya" />}
+      header={<PageHeader subject={sectionSubject('/vault/maya', 'Maya')} title="Maya" />}
       foot={
         <>
           {threads.length} {threads.length === 1 ? 'thread' : 'threads'}, most recent first
@@ -62,5 +64,5 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return whenDay(iso, { timeZone: 'UTC' });
 }

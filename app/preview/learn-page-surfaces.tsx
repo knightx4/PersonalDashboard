@@ -1,7 +1,5 @@
-import NewTrackPage from '@/app/learn/new/page';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
-import NewQuizPage from '@/app/learn/quiz/new/page';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
 import { ListsView } from '@/app/learn/lists/lists-view';
 import { OpeningView } from '@/app/learn/opening/[id]/opening-view';
@@ -367,16 +365,6 @@ const listRows: NestedTrack[] = [
 
 export function LearnListsSurface() {
   return <ListsView rows={listRows} search="" />;
-}
-
-// ---- New reading list, new quiz -----------------------------------------------
-
-export function LearnNewSurface() {
-  return <NewTrackPage />;
-}
-
-export function LearnQuizNewSurface() {
-  return <NewQuizPage />;
 }
 
 // ---- Before you start: the opening questions, answered ------------------------
@@ -769,14 +757,33 @@ const reviews: DueReview[] = [
   },
 ];
 
+/* Typical figures for the piece's two marked presses, so their hints draw
+ * inside the Dash buttons as the learn layout would hand them (plan #1964.1.2). */
+const PIECE_RUN = {
+  lowMicros: 2_000,
+  medianMicros: 4_000,
+  highMicros: 9_000,
+  runs: 14,
+  basis: 'measured',
+  per: 'run',
+  models: [MODELS.learnProbe],
+} as const;
+
 export function LearnPieceSurface() {
   return (
-    <PiecePageView
-      page={piecePage}
-      practice={practice}
-      standing={{ practicePassed: false, checkPassed: false }}
-      reviews={reviews}
-    />
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={piecePage}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={reviews}
+      />
+    </PaidCostsProvider>
   );
 }
 

@@ -1,5 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { ArrowLeft, Clapperboard } from 'lucide-react';
+import { Clapperboard } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { CLIPS_HREF } from '@/app/learn/videos/clips-section';
 import { cn } from '@/lib/cn';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { PageColumn } from '@/components/shell/page-width';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /**
  * One subject's Clips page (plan #1697): the player, holding only the clips
@@ -29,21 +30,20 @@ export type SubjectClipsProps = {
   clips: PlayerClip[];
   counts: SubjectClipCounts;
   fixed?: boolean;
+  /** The path to this page, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 };
 
-export function SubjectClipsView({ subject, clips, counts, fixed = false }: SubjectClipsProps) {
+export function SubjectClipsView({
+  subject,
+  clips,
+  counts,
+  fixed = false,
+  path,
+}: SubjectClipsProps) {
   const header = (
     <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
-      <PageHeader title="Clips" />
+      <PageHeader subject={path} title="Clips" />
     </>
   );
 

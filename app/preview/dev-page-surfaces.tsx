@@ -3,7 +3,8 @@ import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
 import { IdeasView } from '@/app/dev/ideas/ideas-view';
-import { UsageScreen } from '@/app/dev/usage/usage-view';
+import { UsageScreen, type UsageDays } from '@/app/dev/usage/usage-view';
+import { fillDays } from '@/lib/usage/per-day';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
 import type { InterviewCardView } from '@/lib/specs/interview-view';
@@ -16,7 +17,7 @@ import { phoneShot } from './plan-surfaces';
 import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
-import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { DevSettingsView } from '@/app/dev/settings/settings-view';
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { DigestNight } from '@/lib/digest/night';
@@ -321,13 +322,56 @@ const functions = functionSpendRows([
   },
 ]);
 
+/**
+ * `total` spread over the 30 days to 4 October by `weights`, the remainder on
+ * the last day, so the bars add up to the figures the fixtures above show:
+ * 434 views over the workspaces and $21.09 over the functions.
+ */
+function spread(total: number, weights: readonly number[]): UsageDays['views'] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const values = weights.map((weight) => Math.floor((total * weight) / sum));
+  values[values.length - 1] += total - values.reduce((a, b) => a + b, 0);
+  return fillDays(
+    values.map((value, index) => ({ day: new Date(Date.UTC(2026, 8, 5 + index)).toISOString().slice(0, 10), value })),
+    '2026-10-04',
+    30,
+  );
+}
+
+// Quiet weekends, a week away in the middle, and a busy last week.
+const VIEW_WEIGHTS = [9, 12, 14, 3, 2, 11, 13, 15, 12, 10, 1, 0, 0, 0, 0, 0, 0, 4, 12, 14, 16, 13, 5, 3, 18, 22, 25, 19, 16, 9];
+const SPEND_WEIGHTS = [6, 8, 9, 4, 3, 7, 9, 10, 8, 7, 2, 2, 2, 2, 2, 2, 2, 3, 8, 9, 11, 9, 4, 3, 13, 16, 30, 14, 11, 6];
+
+const days: UsageDays = {
+  today: '2026-10-04',
+  span: 30,
+  views: spread(434, VIEW_WEIGHTS),
+  spend: { values: spread(21_091_000, SPEND_WEIGHTS), calls: 783, unpriced: 5 },
+};
+
 export function DevUsageSurface() {
-  return <UsageScreen report={report} functions={functions} phoneShare={{ phone: 312, total: 1204 }} now={new Date('2026-10-04T12:00:00Z')} />;
+  return (
+    <UsageScreen
+      report={report}
+      functions={functions}
+      phoneShare={{ phone: 312, total: 1204 }}
+      days={days}
+      now={new Date('2026-10-04T12:00:00Z')}
+    />
+  );
 }
 
 /** The tab before any model call has been made and before any page was opened. */
 export function DevUsageEmptySurface() {
-  return <UsageScreen report={usageReport([])} functions={[]} phoneShare={{ phone: 0, total: 0 }} now={new Date('2026-10-04T12:00:00Z')} />;
+  return (
+    <UsageScreen
+      report={usageReport([])}
+      functions={[]}
+      phoneShare={{ phone: 0, total: 0 }}
+      days={{ today: '2026-10-04', span: 30, views: [], spend: { values: [], calls: 0, unpriced: 0 } }}
+      now={new Date('2026-10-04T12:00:00Z')}
+    />
+  );
 }
 
 // ---- UI review ------------------------------------------------------------
@@ -779,7 +823,18 @@ const raise: RaisedRow = {
   title: 'The share link page has no rate limit on its answer route',
   detail: 'Found while building the gallery surface for the shared form. Anyone with the link can send answers as fast as they like.',
   ask: 'Add a limit of thirty answers a minute per link?',
-  consequence: null,
+  // A yes Dash carries out, so the row shows "Yes, do it" with Dash's mark.
+  consequence: {
+    action: {
+      name: 'file_idea',
+      text: 'Limit the share link answer route to thirty answers a minute per link',
+      module: 'shopping',
+      field: null,
+      detail: null,
+      kind: null,
+    },
+    said: 'Files this on the ideas page, about Shopping: Limit the share link answer route to thirty answers a minute per link',
+  },
   outcome: null,
   module: 'shopping',
   source: 'plan #1599',
@@ -937,13 +992,14 @@ export function DevInboxSurface() {
 }
 
 /**
- * The Status panel at the top of Home in Dev: the plan runner resting with
- * three features ready, and the notes routine with twelve notes open. Dash's
- * mark sits under Plan (note 076e7744).
+ * Dev settings (plan #1937.10), once the Status panel at the top of Home: the
+ * plan runner resting with three features ready, the notes routine with
+ * twelve notes open, and the vision review. Dash's mark sits under Plan
+ * (note 076e7744).
  */
-export function DevRaisedStatusSurface() {
-  return column(
-    <StatusPanel
+export function DevSettingsSurface() {
+  return (
+    <DevSettingsView
       run={null}
       canSend
       card={{
@@ -958,11 +1014,16 @@ export function DevRaisedStatusSurface() {
       }}
       goals={null}
       openNotes={12}
-      notesLastRun={null}
-      vision={null}
+      notesLastRun={{ at: '2026-10-06T02:40:00Z', done: 7, declined: 1, blocked: 2 }}
+      vision={{
+        lastRunAt: '2026-10-03T07:00:00Z',
+        failed: null,
+        nextAt: '2026-10-10T07:00:00Z',
+        pendingEdits: 2,
+      }}
       autoApprove={false}
       now={Date.parse('2026-10-06T08:00:00Z')}
-    />,
+    />
   );
 }
 
@@ -1038,7 +1099,7 @@ export function AccountSurface({
   /** Only the newest capture token, as the list reads once the first is made. */
   onlyFirstToken?: boolean;
 }) {
-  return column(
+  return (
     <>
       <AccountView
         tab={tab}
@@ -1056,7 +1117,7 @@ export function AccountSurface({
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
         capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
-    </>,
+    </>
   );
 }
 

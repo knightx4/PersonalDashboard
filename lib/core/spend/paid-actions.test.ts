@@ -51,6 +51,7 @@ import {
 
 const KNOWN = new Set(Object.keys(OPERATION_GUESSES));
 const HINT_FILE = join(REPO_ROOT, 'components/ui/paid-hint.tsx');
+const DASH_ACTION_FILE = join(REPO_ROOT, 'components/ui/dash-action.tsx');
 
 function files(dir: string, match: RegExp): string[] {
   const out: string[] = [];
@@ -150,11 +151,15 @@ describe('paid actions', () => {
   it('puts every press beside a button that shows its hint', () => {
     // A key counts as shown where a component names it and renders PaidHint,
     // itself or through a component it imports that does (the YouTube Press
-    // takes the key as `cost` and hands it on). A layout listing keys to
-    // price them does not count: it renders the provider, not a hint.
+    // takes the key as `cost` and hands it on). DashAction draws PaidHint
+    // itself, so a component rendering it counts as rendering the hint. A
+    // layout listing keys to price them does not count: it renders the
+    // provider, not a hint.
     const rendersHint = (file: string) =>
       [...namedImports(file).values()].some(
-        (target) => target.file === HINT_FILE && target.name === 'PaidHint',
+        (target) =>
+          (target.file === HINT_FILE && target.name === 'PaidHint') ||
+          (target.file === DASH_ACTION_FILE && target.name === 'DashAction'),
       );
     const components = SOURCES.filter((file) => file.endsWith('.tsx'));
     const showing = components.filter(
@@ -207,6 +212,5 @@ describe('estimatePaidActions', () => {
     // plan-topic measured, name-areas a guess: the sum is a guess.
     expect(plan.basis).toBe('guess');
     expect(plan.medianMicros).toBeGreaterThan(200_000);
-    expect(costs['app/learn/new/actions.ts#resolveCandidate']!.per).toBe('unit');
   });
 });

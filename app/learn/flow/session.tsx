@@ -1,9 +1,10 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sprout } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -15,9 +16,12 @@ import {
   answerTrackOffer,
   fillFlowQueue,
   flowStep,
+  takeBackOfferAnswer,
   type FlowState,
 } from './actions';
 import type { TrackOffer } from './state';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 
 /**
  * A question, the reason, and Next, for as long as you keep going.
@@ -57,12 +61,14 @@ function AskButton({ label }: { label: string }) {
   // Usually the next question was written ahead and comes straight back. The
   // wait is only long when the queue ran dry and it is being written now.
   return (
-    <span className="inline-flex items-center gap-1">
-      <Button type="submit" pending={pending}>
-        {pending ? 'Getting the next question…' : label}
-      </Button>
-      <PaidHint action="app/learn/flow/actions.ts#flowStep:ask" what="Cost of the next question" />
-    </span>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:ask"
+      what="Cost of the next question"
+    >
+      {pending ? 'Getting the next question…' : label}
+    </DashAction>
   );
 }
 
@@ -117,35 +123,37 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
 function DontKnowButton() {
   const { pending } = useFormStatus();
   return (
-    <Button
+    <DashAction
       variant="link"
       type="submit"
       name="dontKnow"
       value="1"
       pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:answer"
+      what="Cost of answering"
     >
       I don&rsquo;t know
-    </Button>
+    </DashAction>
   );
 }
 
 /**
- * Not now (note 7ccc6f99): the question goes back to the end of the queue with
- * nothing recorded against it, and the next one comes up. On the answer form
- * so it sits beside I don't know, and told apart by its own field.
+ * Later (note 7ccc6f99, plan #1957.3): the question goes back to the end of
+ * the queue with nothing recorded against it, and the next one comes up, so
+ * there is nothing for an Undo to take back. On the answer form so it sits
+ * beside I don't know, and told apart by its own field.
  */
 function NotNowButton() {
   const { pending } = useFormStatus();
   return (
-    <Button
+    <CloseButton
+      lifecycle="later"
       variant="link"
       type="submit"
       name="notNow"
       value="1"
       pending={pending}
-    >
-      Not now
-    </Button>
+    />
   );
 }
 
@@ -154,9 +162,16 @@ function StartButton() {
   // One call to write the track's ideas and one to write its first question,
   // so this is the slowest press in the flow and says so.
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      {pending ? 'Writing the subject…' : 'Start'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      size="sm"
+      pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:start-track"
+      what="Cost of starting the subject"
+    >
+      {pending ? 'Writing the subject…' : 'Start this subject'}
+    </DashAction>
   );
 }
 
@@ -181,11 +196,20 @@ function TrackOfferCard({
   only: FlowOnly;
 }) {
   const [hidden, setHidden] = useState(false);
+  const toast = useToast();
   if (hidden) return null;
 
+  // Later or Decline, with Undo in the toast (plan #1957.3).
   const setAside = async (formData: FormData) => {
     setHidden(true);
     await answerTrackOffer(formData);
+    toast({
+      text: closedToast(formData.get('outcome') === 'never' ? 'declined' : 'later', offer.name),
+      undo: async () => {
+        await takeBackOfferAnswer({ themeId: offer.themeId });
+        setHidden(false);
+      },
+    });
   };
 
   return (
@@ -206,21 +230,13 @@ function TrackOfferCard({
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
             <TrackField track={track} only={only} goal={null} />
-            <span className="inline-flex items-center gap-1">
-              <StartButton />
-              <PaidHint
-                action="app/learn/flow/actions.ts#flowStep:start-track"
-                what="Cost of starting the subject"
-              />
-            </span>
+            <StartButton />
           </form>
           {(['not_now', 'never'] as const).map((outcome) => (
             <form key={outcome} action={setAside}>
               <input type="hidden" name="themeId" value={offer.themeId} />
               <input type="hidden" name="outcome" value={outcome} />
-              <Button variant="link" type="submit">
-                {outcome === 'never' ? 'Never' : 'Not now'}
-              </Button>
+              <CloseButton lifecycle={outcome === 'never' ? 'declined' : 'later'} type="submit" />
             </form>
           ))}
         </div>
@@ -366,12 +382,10 @@ export function FlowSession({
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
         {!live.answered && (
           <div className="flex flex-wrap items-center gap-4 pt-1">
-            <span className="inline-flex items-center gap-1">
-              <DontKnowButton />
-              <PaidHint action="app/learn/flow/actions.ts#flowStep:answer" what="Cost of answering" />
-            </span>
+            <DontKnowButton />
             <span className="inline-flex items-center gap-1">
               <NotNowButton />
+              {/* dash-action-ok: the hint sits beside the Later close button, which does not run the model. */}
               <PaidHint
                 action="app/learn/flow/actions.ts#flowStep:ask"
                 what="Cost of the next question"

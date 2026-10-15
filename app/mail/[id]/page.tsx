@@ -6,9 +6,11 @@ import { fetchConversation } from '@/lib/inbox/fetch-conversation';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
-import { BackButton, EmailFrame } from './reader';
+import { EmailFrame } from './reader';
 import { MessageHead } from './message-head';
 import { LinkedText } from '@/components/ui/linked-text';
+import { sectionSubject } from '@/lib/core/section-path';
+import { whenAt } from '@/lib/core/when';
 
 export const metadata = { title: 'Email' };
 
@@ -29,11 +31,6 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
     fetchConversation(core, { userId: user.id, gmailId: id }),
   ]);
 
-  const when = new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: settings.timezone,
-  });
   const messages = conversation.ok ? conversation.messages : [];
   const latest = messages.at(-1);
   const reply = latest ? replyMailto(latest) : null;
@@ -41,8 +38,14 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <BackButton />
+      {/* An email is opened from wherever it was mentioned, and its back
+          link returns there when the link said so, else Home (plan #1931.3). */}
       <PageHeader
+        back={{ label: 'Home', href: '/home' }}
+        subject={sectionSubject('/home', 'Home', {
+          label: conversation.ok ? subject : 'Email',
+          href: `/mail/${id}`,
+        })}
         title={conversation.ok ? subject : 'Email'}
         description={
           conversation.ok && messages.length > 1 ? `${messages.length} messages` : undefined
@@ -79,7 +82,7 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
               <li key={message.id} className="card-pad">
                 <MessageHead
                   from={message.fromAddress}
-                  sent={message.internalDate ? when.format(message.internalDate) : null}
+                  sent={message.internalDate ? whenAt(message.internalDate, { timeZone: settings.timezone }) : null}
                 />
                 {message.html ? (
                   <EmailFrame html={message.html} title={message.subject ?? 'Email'} />

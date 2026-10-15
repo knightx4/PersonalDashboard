@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileCaptureParts, goalRefs, type CaptureWriters } from '@/lib/capture/file';
+import { fileCaptureParts, goalRefs, makeCaptureKind, type CaptureWriters } from '@/lib/capture/file';
 import type { CapturePart } from '@/lib/capture/sort';
 import { markDashActionUndone, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
 import { writeRoleNote } from '@/lib/dash/writes';
 import type { FiledEntry } from '@/lib/goals/capture';
-import { undoDashTodayWith } from '@/lib/shell/dash-today';
+import { dashTodayEntry, undoDashTodayWith } from '@/lib/shell/dash-today';
 import { createCapturedNote, removeCapturedNote, type RemoveNotePorts } from '@/lib/vault/notes/create';
 import type { VaultSource } from '@/lib/vault/providers/types';
 import { fakeDashDeps, fakeId, type FakeTables } from './stubs/fake-schema-db';
@@ -34,6 +34,17 @@ function setup() {
     'job_search.roles': [{ id: ROLE.id, user_id: ME, title: ROLE.title }],
     'core.dash_actions': [],
     'obsidian.notes': [],
+    'goals.items': [],
+    'goals.areas': [],
+    'public.plan_items': [],
+    'public.ideas': [],
+    'public.feedback_items': [],
+  };
+  /** A writer that puts one row in a fake table and hands back its id. */
+  const into = (table: string, row: Record<string, unknown>) => {
+    const id = fakeId();
+    tables[table].push({ id, user_id: ME, ...row });
+    return { ok: true as const, id };
   };
   /** The notes repository: path to blob SHA, and each commit made. */
   const repo = new Map<string, string>();
@@ -94,6 +105,11 @@ function setup() {
       );
       return result.ok ? result : { ok: false, error: result.error };
     },
+    goal: async (areaId, title) => into('goals.items', { area_id: areaId, title }),
+    goalArea: async (name) => into('goals.areas', { name }),
+    planItem: async (title, at) => into('public.plan_items', { title, module: at.scope, parent_id: at.parentId }),
+    idea: async (body) => into('public.ideas', { body, module: null }),
+    devNote: async (body, pagePath) => into('public.feedback_items', { body, page_path: pagePath, kind: 'feature' }),
     record: (entry) => recordDashAction(dash, entry),
   };
   return { tables, dash, writers, goals, repo, commits, removePorts };
@@ -281,6 +297,340 @@ describe('files sent with a capture (plan #1714)', () => {
     expect(out.ok).toBe(true);
     expect(world.tables['core.dash_actions'][0].status).toBe('undone');
     spy.mockRestore();
+  });
+
+  it('makes an aimed todo for the day picked, opens its page, and Undo takes it back', async () => {
+    const world = setup();
+    const days: (string | undefined)[] = [];
+    const todo = world.writers.todo;
+    const writers: CaptureWriters = {
+      ...world.writers,
+      todo: (text, day) => {
+        days.push(day);
+        return todo(text, day);
+      },
+    };
+
+    const made = await makeCaptureKind('todo', { text: '  call the dentist ', day: 'tomorrow' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(days).toEqual(['tomorrow']);
+    const id = world.tables['todo.tasks'][0].id as string;
+    expect(made.filed).toMatchObject({
+      place: 'todo',
+      text: 'call the dentist',
+      where: 'Todo · Tomorrow',
+      ref: `todo.tasks:${id}`,
+      page: `/todo/all?status=all&focus=${id}`,
+    });
+    // Recorded as the person's own, so Home's list of Dash's changes leaves it out.
+    const [action] = world.tables['core.dash_actions'];
+    expect(action).toMatchObject({ surface: 'capture', kind: 'add_todo', undo: { aimed: true } });
+    expect(String(action.summary)).toBe('You added the todo "call the dentist".');
+    expect(
+      dashTodayEntry(
+        { ...(action as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+        '2026-10-14',
+      ),
+    ).toBeNull();
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['todo.tasks']).toEqual([]);
+  });
+
+  it('makes an aimed note on the role it was handed and opens the role', async () => {
+    const world = setup();
+    const made = await makeCaptureKind('job-note', { text: 'Recruiter is Sam', role: ROLE }, world.writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(made.filed).toMatchObject({ place: 'jobs', page: `/jobs/roles/${ROLE.id}` });
+    expect(world.tables['core.conversation_turns']).toMatchObject([
+      { ref: `job_search.roles:${ROLE.id}`, author: 'me', body: 'Recruiter is Sam' },
+    ]);
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe(
+      'You added a note to the role Product Analyst at Stripe.',
+    );
+  });
+
+  it('makes a Shopping row from an aimed add, opens its page, and Undo takes it back (plan #1950.3.1)', async () => {
+    const world = setup();
+    world.tables['public.saved_items'] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      shopping: {
+        order: async () => ({ ok: false, error: 'not this one' }),
+        item: async () => ({ ok: false, error: 'not this one' }),
+        saved: async (text) => {
+          const id = fakeId();
+          world.tables['public.saved_items'].push({ id, user_id: ME, url: text, title: 'Green kettle' });
+          return { ok: true, id, title: 'Green kettle' };
+        },
+      },
+    };
+
+    const made = await makeCaptureKind('saved-item', { text: 'https://example.com/kettle' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const id = world.tables['public.saved_items'][0].id as string;
+    expect(made.filed).toMatchObject({
+      place: null,
+      where: 'Shopping · Saved',
+      ref: `public.saved_items:${id}`,
+      page: `/shopping/saved/${id}`,
+    });
+    const [action] = world.tables['core.dash_actions'];
+    expect(action).toMatchObject({ surface: 'capture', kind: 'add_saved_item', undo: { aimed: true } });
+    expect(String(action.summary)).toBe('You saved "Green kettle".');
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['public.saved_items']).toEqual([]);
+  });
+
+  it('makes an order from a receipt photo and an item from a scan, with nothing typed (plan #1950.3.2)', async () => {
+    const world = setup();
+    const sent: string[] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      shopping: {
+        order: async () => ({ ok: false, error: 'the sentence path ran' }),
+        item: async () => ({ ok: false, error: 'the typed path ran' }),
+        saved: async () => ({ ok: false, error: 'not this one' }),
+        receipt: async (photo) => {
+          sent.push(photo);
+          return { ok: true, id: fakeId(), title: 'Milk and 4 more from Safeway' };
+        },
+        scanned: async (thing) => {
+          sent.push(thing.code);
+          return { ok: true, id: fakeId(), title: thing.title };
+        },
+      },
+    };
+
+    const order = await makeCaptureKind('order', { text: '', photo: 'data:image/jpeg;base64,AAAA' }, writers);
+    if (!order.ok) throw new Error(order.error);
+    expect(order.filed).toMatchObject({ where: 'Shopping · Orders', text: 'Milk and 4 more from Safeway' });
+
+    const item = await makeCaptureKind(
+      'inventory-item',
+      {
+        text: '',
+        scanned: { kind: 'book', title: 'Middlemarch', byline: 'George Eliot', image: null, code: '9780141439549', record: '{}' },
+      },
+      writers,
+    );
+    if (!item.ok) throw new Error(item.error);
+    expect(item.filed).toMatchObject({ where: 'Shopping · Inventory', text: 'Middlemarch' });
+    expect(sent).toEqual(['data:image/jpeg;base64,AAAA', '9780141439549']);
+    expect(String(world.tables['core.dash_actions'][1].summary)).toBe('You added "Middlemarch" to your inventory.');
+  });
+
+  it('still asks for words when there is no photo or scan either', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('order', { text: '  ' }, world.writers)).toMatchObject({
+      ok: false,
+      error: 'Type something first.',
+    });
+  });
+
+  it('says so when a Shopping kind is aimed where there are no Shopping writers', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('order', { text: 'a kettle for $30' }, world.writers)).toMatchObject({
+      ok: false,
+      error: 'That cannot be added from here. Open its list and press Add there.',
+    });
+    expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('makes a role from a sentence through its writer, opens it, and records it as yours (plan #1950.4)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      role: async (input) => {
+        asked.push(input);
+        return { ok: true, roleId: ROLE.id, title: 'Product Analyst at Stripe' };
+      },
+    };
+    const made = await makeCaptureKind('job-role', { text: 'Product Analyst at Stripe' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([{ url: null, title: 'Product Analyst', company: 'Stripe' }]);
+    expect(made.filed).toMatchObject({ place: 'jobs', ref: `job_search.roles:${ROLE.id}`, page: `/jobs/roles/${ROLE.id}` });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({
+      kind: 'add_job_lead',
+      summary: 'You saved Product Analyst at Stripe to your leads.',
+      undo: { aimed: true },
+    });
+    // Without a writer bound, as on the shortcuts' route, it says so.
+    expect(await makeCaptureKind('job-role', { text: 'Analyst at Ramp' }, world.writers)).toMatchObject({ ok: false });
+  });
+
+  it('starts a topic with the list pasted under it, opens it, and Undo takes it back (plan #1950.4)', async () => {
+    const world = setup();
+    world.tables['learn.tracks'] = [];
+    world.tables['learn.readings'] = [];
+    const writers: CaptureWriters = {
+      ...world.writers,
+      topic: async ({ title, readings }) => {
+        const trackId = fakeId();
+        world.tables['learn.tracks'].push({ id: trackId, user_id: ME, title });
+        for (const reading of readings) {
+          // Written before the record, as the writer does.
+          world.tables['learn.readings'].push({ id: fakeId(), user_id: ME, track_id: trackId, title: reading.title, created_at: '2026-10-01T00:00:00Z' });
+        }
+        return { ok: true, trackId, readings: readings.length };
+      },
+    };
+    const made = await makeCaptureKind('learn-topic', { text: 'Central banking\n- Lords of Finance\n- The Alchemists' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const trackId = world.tables['learn.tracks'][0].id as string;
+    expect(made.filed).toMatchObject({ place: null, page: `/learn/t/${trackId}`, where: 'Learn · Reading lists' });
+    expect(world.tables['learn.readings']).toHaveLength(2);
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe(
+      'You started the topic "Central banking" with 2 readings.',
+    );
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['learn.tracks']).toEqual([]);
+  });
+
+  it('opens a link saved before without recording it, so Undo cannot take an older reading (plan #1950.4)', async () => {
+    const world = setup();
+    const reading = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      reading: async () => ({ ok: true, readingId: reading, title: 'How rates work', created: false }),
+    };
+    const made = await makeCaptureKind('learn-reading', { text: 'https://example.com/rates' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(made.filed).toMatchObject({ actionId: null, page: `/learn/r/${reading}` });
+    expect(made.errors).toEqual(['"How rates work" was on your reading lists already.']);
+    expect(world.tables['core.dash_actions']).toEqual([]);
+    expect(await makeCaptureKind('learn-reading', { text: 'no link here' }, writers)).toMatchObject({ ok: false });
+  });
+
+  it('adds one thing to read on the track the page is open on, and stays there (plan #1950.6)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const reading = fakeId();
+    const track = { id: fakeId(), title: 'Central banking' };
+    const writers: CaptureWriters = {
+      ...world.writers,
+      trackReading: async (trackId, title) => {
+        asked.push([trackId, title]);
+        return { ok: true, id: reading };
+      },
+    };
+    const made = await makeCaptureKind('track-reading', { text: 'How rates are set', under: track }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([[track.id, 'How rates are set']]);
+    expect(made.filed).toMatchObject({ ref: `learn.readings:${reading}`, href: `/learn/t/${track.id}`, page: null });
+    expect(await makeCaptureKind('track-reading', { text: 'No track' }, writers)).toMatchObject({ ok: false });
+  });
+
+  it('adds a place from its name and dates in one line, and opens it (plan #1950.7)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const place = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      place: async (row) => {
+        asked.push(row);
+        return { ok: true, id: place };
+      },
+    };
+    const made = await makeCaptureKind('place', { text: '12 Oak Street, Leeds, March 2019 to 2021' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([
+      { name: '12 Oak Street, Leeds', city: null, region: null, country: null, moved_in: '2019-03', moved_out: '2021', note: null },
+    ]);
+    expect(made.filed).toMatchObject({ ref: `you.places:${place}`, page: `/you/places/${place}`, where: 'You · Places' });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_place', subject_ref: `you.places:${place}` });
+
+    // No date, or a date the form would refuse, writes nothing.
+    expect(await makeCaptureKind('place', { text: 'Oak Street' }, writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('place', { text: 'Leeds, 2021 to 2019' }, writers)).toMatchObject({ ok: false });
+    expect(asked).toHaveLength(1);
+  });
+
+  it('starts a quiz over named notes and pasted text, and opens it (plan #1950.4)', async () => {
+    const world = setup();
+    const asked: unknown[] = [];
+    const quiz = fakeId();
+    const writers: CaptureWriters = {
+      ...world.writers,
+      quiz: async (input) => {
+        asked.push(input);
+        return { ok: true, quizId: quiz, title: 'Monetary policy' };
+      },
+    };
+    const made = await makeCaptureKind('learn-quiz', { text: 'Rates move prices.\n[[Monetary policy]]' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    expect(asked).toEqual([{ paste: 'Rates move prices.', notes: ['Monetary policy'] }]);
+    expect(made.filed).toMatchObject({ page: `/learn/quiz/${quiz}` });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_quiz', subject_ref: `learn.quizzes:${quiz}` });
+  });
+
+  it('refuses an aimed add with nothing typed, and a note with no role', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('todo', { text: '   ' }, world.writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('job-note', { text: 'Recruiter is Sam' }, world.writers)).toMatchObject({ ok: false });
+    expect(world.tables['todo.tasks']).toEqual([]);
+    expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('makes an aimed goal in the area it was handed, opens it, and Undo takes it back (plan #1950.5)', async () => {
+    const world = setup();
+    const area = { id: '00000000-0000-4000-8000-0000000000d1', title: 'Health' };
+    const made = await makeCaptureKind('goal', { text: 'Run a half marathon', under: area }, world.writers);
+    if (!made.ok) throw new Error(made.error);
+    const [goal] = world.tables['goals.items'];
+    expect(goal).toMatchObject({ area_id: area.id, title: 'Run a half marathon' });
+    expect(made.filed).toMatchObject({
+      place: null,
+      module: 'goals',
+      where: 'Goals · Health',
+      ref: `goals.items:${goal.id}`,
+    });
+    expect(made.filed.page).toBeTruthy();
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ kind: 'add_goal', undo: { aimed: true } });
+    expect(String(world.tables['core.dash_actions'][0].summary)).toBe('You added the goal "Run a half marathon".');
+
+    const out = await undoDashAction(world.dash, made.filed.actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['goals.items']).toEqual([]);
+  });
+
+  it('puts an aimed step under its feature, and a feature in the module it was aimed at', async () => {
+    const world = setup();
+    const feature = { id: '00000000-0000-4000-8000-0000000000e1', title: 'Capture is the one way to add anything' };
+    const step = await makeCaptureKind('plan-step', { text: 'Goals add through capture', under: feature }, world.writers);
+    const top = await makeCaptureKind('plan-feature', { text: 'A calmer plan page', under: { id: 'dev', title: 'Dev' } }, world.writers);
+    if (!step.ok || !top.ok) throw new Error('not made');
+    expect(world.tables['public.plan_items']).toMatchObject([
+      { title: 'Goals add through capture', parent_id: feature.id, module: null },
+      { title: 'A calmer plan page', parent_id: null, module: 'dev' },
+    ]);
+    expect(step.filed.where).toBe('Plan · Capture is the one way to add anything');
+  });
+
+  it('files a note for Dev with the page it came from and its files, and stays on the page', async () => {
+    const world = setup();
+    const attached: string[] = [];
+    const writers: CaptureWriters = { ...world.writers, attach: async (ref) => (attached.push(ref), 1) };
+    const made = await makeCaptureKind('dev-note', { text: 'The plan scrolls sideways', page: '/dev/plan' }, writers);
+    if (!made.ok) throw new Error(made.error);
+    const [note] = world.tables['public.feedback_items'];
+    expect(note).toMatchObject({ body: 'The plan scrolls sideways', page_path: '/dev/plan', kind: 'feature' });
+    expect(attached).toEqual([`public.feedback_items:${note.id}`]);
+    expect(made.filed).toMatchObject({ page: null, files: 1, where: 'Dev · Notes' });
+  });
+
+  it('refuses a goal or a step aimed at nothing to go under', async () => {
+    const world = setup();
+    expect(await makeCaptureKind('goal', { text: 'Run' }, world.writers)).toMatchObject({ ok: false });
+    expect(await makeCaptureKind('plan-step', { text: 'Do it' }, world.writers)).toMatchObject({ ok: false });
+    expect(world.tables['goals.items']).toEqual([]);
+    expect(world.tables['public.plan_items']).toEqual([]);
   });
 
   it('names each Goals row a capture touched once', () => {

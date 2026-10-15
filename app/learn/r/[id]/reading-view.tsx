@@ -1,10 +1,11 @@
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 import Link, { linkVariants } from '@/components/ui/link';
-import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
+import { BadgeCheck, AlertTriangle, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { READING_TABS, type ReadingTab } from '@/lib/learn/tracks/reading-tabs';
@@ -66,6 +67,8 @@ export type ReadingViewProps = {
   thread?: readonly DevComment[];
   /** Gallery only: the chat's waiting line and open box. */
   chatState?: { awaitingReply?: boolean; composerOpen?: boolean };
+  /** The path from the catalogue (rowSubject); the gallery passes none and gets it from the reading. */
+  path?: PageSubject;
 };
 
 /**
@@ -82,6 +85,7 @@ export function ReadingView({
   summaryFailure = null,
   thread = [],
   chatState,
+  path,
 }: ReadingViewProps) {
   const byline =
     [reading.source?.author, reading.source?.year ? String(reading.source.year) : null]
@@ -90,12 +94,17 @@ export function ReadingView({
 
   return (
     <TabbedDetail
-      crumbs={[
-        { label: 'Learn', href: '/learn' },
-        { label: 'Lists', href: '/learn/lists' },
-        { label: reading.trackTitle, href: `/learn/t/${reading.trackId}` },
-        { label: reading.subject, href: `/learn/r/${reading.id}` },
-      ]}
+      subject={
+        path ?? {
+          ref: `learn.readings:${reading.id}`,
+          path: [
+            { label: 'Learn', href: '/learn/now' },
+            { label: 'Reading lists', href: '/learn/lists' },
+            { label: reading.trackTitle, href: `/learn/t/${reading.trackId}` },
+            { label: reading.subject, href: `/learn/r/${reading.id}` },
+          ],
+        }
+      }
       title={reading.subject}
       description={byline}
       actions={
@@ -270,11 +279,15 @@ function ReadingTabBody({
             {url ? (
               <form action={openReading} className="flex flex-wrap items-center gap-1">
                 <input type="hidden" name="readingId" value={reading.id} />
-                <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
-                  Open
-                </Button>
-                <PaidHint action="app/learn/r/[id]/actions.ts#openReading" what="Cost of finding the passage" />
+                <DashAction
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  paid="app/learn/r/[id]/actions.ts#openReading"
+                  what="Cost of finding the passage"
+                >
+                  Open at the passage
+                </DashAction>
                 {!verified && (
                   <span className="ml-2 text-small text-ink-muted">Finds the passage on the way, the first time.</span>
                 )}

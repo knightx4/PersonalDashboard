@@ -8,6 +8,8 @@
  * lib/vault/sync/plan.ts, for the same reason.
  */
 
+import { zoneDay } from '@/lib/core/when';
+
 export type TaskStatus = 'open' | 'done' | 'dropped';
 
 /**
@@ -98,15 +100,6 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 export const SOON_DAYS = 7;
 
 /**
- * How far "Later" pushes a snoozed task.
- *
- * The same seven days the job side already means by "Later"
- * (`SNOOZE_DAYS` in lib/jobs/today/load.ts). Long enough that deferring is a
- * decision rather than a way of clearing the screen.
- */
-export const SNOOZE_DAYS = 7;
-
-/**
  * Today, as a calendar day, in a given zone.
  *
  * Taking the zone as an argument rather than reading it is what makes "which
@@ -115,12 +108,7 @@ export const SNOOZE_DAYS = 7;
  * shopping module to know what day it is.
  */
 export function todayIn(timezone: string, now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  return zoneDay(now, timezone);
 }
 
 /** A calendar day `days` after `day`. Pure string arithmetic on a UTC date. */

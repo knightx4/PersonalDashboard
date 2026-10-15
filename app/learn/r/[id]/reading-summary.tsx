@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { RotateCcw, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { cardVariants } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import type { ReadingSummary as Summary } from '@/lib/learn/tracks/load';
 import {
@@ -16,6 +14,7 @@ import {
 import { summarizeReading } from './actions';
 import { READING_TEXT_ANCHOR, ReadingText } from './reading-text';
 import { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 
 export type SummaryFailure = { error: string; unreadable?: boolean };
 
@@ -99,13 +98,17 @@ export function ReadingSummary({
             </div>
             {failure && <Failure failure={failure} />}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <div className="flex items-center gap-1">
-                <Button type="button" variant="secondary" size="md" onClick={run} disabled={pending}>
-                  <RotateCcw className="size-4" strokeWidth={1.75} aria-hidden />
-                  {pending ? 'Summarizing…' : 'Redo'}
-                </Button>
-                <PaidHint action="app/learn/r/[id]/actions.ts#summarizeReading" what="Cost of a summary" />
-              </div>
+              <DashAction
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={run}
+                disabled={pending}
+                paid="app/learn/r/[id]/actions.ts#summarizeReading"
+                what="Cost of a summary"
+              >
+                {pending ? 'Summarizing…' : 'Summarize it again'}
+              </DashAction>
               <span className="text-small text-ink-muted">Written {formatWritten(summary.writtenAt)}</span>
             </div>
           </div>
@@ -115,19 +118,17 @@ export function ReadingSummary({
               A short summary of this reading, written by Dash from its text and kept here.
             </p>
             {failure && <Failure failure={failure} />}
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant={unreadable ? 'secondary' : 'primary'}
-                size="md"
-                onClick={run}
-                disabled={pending}
-              >
-                <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
-                {pending ? 'Summarizing…' : 'Summarize'}
-              </Button>
-              <PaidHint action="app/learn/r/[id]/actions.ts#summarizeReading" what="Cost of a summary" />
-            </div>
+            <DashAction
+              type="button"
+              variant={unreadable ? 'secondary' : 'primary'}
+              size="md"
+              onClick={run}
+              disabled={pending}
+              paid="app/learn/r/[id]/actions.ts#summarizeReading"
+              what="Cost of a summary"
+            >
+              {pending ? 'Summarizing…' : 'Summarize this reading'}
+            </DashAction>
           </div>
         )}
       </section>
@@ -160,10 +161,5 @@ function Failure({ failure }: { failure: SummaryFailure }) {
 }
 
 function formatWritten(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

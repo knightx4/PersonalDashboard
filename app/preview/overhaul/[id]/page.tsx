@@ -34,7 +34,13 @@ export default async function OverhaulEntryPage({ params }: { params: Promise<{ 
         <PageHeader
           title={entry.name}
           description={entry.drift}
-          crumbs={[{ label: 'Component overhaul', href: `/preview/overhaul#${entry.id}` }, { label: entry.name, href: `/preview/overhaul/${entry.id}` }]}
+          subject={{
+            ref: null,
+            path: [
+              { label: 'Component overhaul', href: `/preview/overhaul#${entry.id}` },
+              { label: entry.name, href: `/preview/overhaul/${entry.id}` },
+            ],
+          }}
         />
 
         <div className="space-y-6">

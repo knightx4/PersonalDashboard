@@ -2,9 +2,8 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
@@ -53,10 +52,15 @@ const ACCESS_NOTE: Record<string, string | null> = {
 function PlanButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/t/[id]/actions.ts#planTrack"
+      what="Cost of planning the reading list"
+    >
       {pending ? 'Working it out…' : 'Plan this topic'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -245,10 +249,6 @@ export function PlanForm({ trackId }: { trackId: string }) {
         description="Write down what you want to learn, or have the route worked out for you."
       >
         <PlanButton />
-        <PaidHint
-          action="app/learn/t/[id]/actions.ts#planTrack"
-          what="Cost of planning the reading list"
-        />
         {planState.error && <span className="text-ui text-danger">{planState.error}</span>}
         <p className="w-full text-small text-ink-muted">
           Searches for the few things this topic is made of and where to read each. Takes a moment,

@@ -43,10 +43,11 @@ describe('reportTimeLabel', () => {
 
 describe('endsLabel', () => {
   const now = new Date('2026-09-30T14:00:00Z');
-  it('says today, tomorrow or the date, in the reader zone', () => {
+  it('says today, tomorrow, the weekday or the date, in the reader zone', () => {
     expect(endsLabel('2026-09-30T22:00:00Z', now, 'UTC')).toBe('Ends today at 10:00 PM');
     expect(endsLabel('2026-10-01T09:00:00Z', now, 'UTC')).toBe('Ends tomorrow at 9:00 AM');
-    expect(endsLabel('2026-10-04T09:00:00Z', now, 'UTC')).toBe('Ends Sun 4 Oct');
+    expect(endsLabel('2026-10-04T09:00:00Z', now, 'UTC')).toBe('Ends Sunday');
+    expect(endsLabel('2026-10-14T09:00:00Z', now, 'UTC')).toBe('Ends 14 Oct');
   });
 });
 

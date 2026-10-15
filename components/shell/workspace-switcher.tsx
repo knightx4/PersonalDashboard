@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { Popover, scrim } from '@/components/ui/popover';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -105,8 +105,8 @@ function rememberPath(module: ModuleId, path: string) {
 
 /**
  * Where switching to a module should land: where you last were in it, or its
- * home. A module marked `alwaysHome` always lands on its home. Exported because the phone's dock offers the same list from a sheet of
- * its own, and two rules for "where does Jobs go" is one rule too many.
+ * home. A module marked `alwaysHome` always lands on its home. Exported because the search box offers the same list from the phone's dock
+ * (note 5f3ef44f), and two rules for "where does Jobs go" is one rule too many.
  */
 export function rememberedPath(module: ModuleId | null, fallback: string): string {
   if (!module || moduleById(module)?.alwaysHome) return fallback;
@@ -400,92 +400,5 @@ function WorkspaceRowBody({
         <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
       )}
     </>
-  );
-}
-
-/**
- * The same list, as a sheet up from the foot of the phone.
- *
- * A dropdown anchored to a control sitting on the bottom edge opens off the
- * screen, so the phone gets a sheet rather than the column's menu. It is the
- * same rows in the same order for the same reason -- switching workspace
- * should not feel like a different act depending on the width of the window.
- */
-export function WorkspaceSheet({
-  current,
-  enabled,
-  counts = {},
-  open,
-  onClose,
-  dash,
-}: {
-  current: WorkspaceId | null;
-  /** Standing on Dash's page; read from the address when left out. */
-  dash?: boolean;
-  enabled?: readonly ModuleId[];
-  counts?: SwitcherCounts;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const pathname = usePathname();
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const rows = switcherRows(visibleModules(enabled, current));
-  const onDash = dash ?? (current === null && isAskPath(pathname ?? ''));
-
-  return (
-    <div className="fixed inset-0 z-overlay lg:hidden">
-      <button
-        type="button"
-        aria-label="Close the workspace list"
-        onClick={onClose}
-        className={scrim}
-      />
-      <div
-        role="menu"
-        aria-label="Workspaces"
-        /* ui-ok: a sheet against the foot of the screen, not a card -- it is rounded and bordered only on the one edge that meets the page */
-        className="popover-panel absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
-      >
-        {rows.map((row) => {
-          const isCurrent = rowIsCurrent(row, current, onDash);
-          const count = row.id ? counts[row.id] : undefined;
-          return (
-            <Link
-              key={row.key}
-              href={row.dash ? row.href : rememberedPath(row.id, row.href)}
-              role="menuitem"
-              aria-current={isCurrent ? 'true' : undefined}
-              onClick={onClose}
-              className={cn(
-                'flex items-start gap-2.5 rounded-control px-2 py-3',
-                isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
-              )}
-            >
-              <WorkspaceRowBody
-                id={row.id}
-                dash={row.dash}
-                label={row.label}
-                detail={count ?? row.description}
-                isCurrent={isCurrent}
-              />
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }

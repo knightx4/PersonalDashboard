@@ -45,6 +45,29 @@ export async function readPageOpens(client: SupabaseClient, userId?: string): Pr
 }
 
 /**
+ * The opens of every page that has been opened, over the Usage tab's whole
+ * days (plan #2036.2): the 7- and 30-day counts start at midnight in the
+ * person's timezone, so they agree with the views-per-day chart above them.
+ * Read through core.page_opens_since as the request's own client.
+ */
+export async function readPageOpensSince(
+  client: SupabaseClient,
+  window: { since7: string; since: string },
+): Promise<PageOpens[]> {
+  const { data, error } = await client
+    .schema('core')
+    .rpc('page_opens_since', { p_since7: window.since7, p_since30: window.since });
+  if (error) throw new Error(`Could not read the page opens: ${error.message}`);
+  return ((data ?? []) as Row[]).map((row) => ({
+    route: row.route,
+    workspace: (row.workspace as ModuleId | null) ?? moduleForPath(row.route),
+    opens7: row.opens_7,
+    opens30: row.opens_30,
+    lastOpened: row.last_opened,
+  }));
+}
+
+/**
  * Every page in the app with its opens, including the ones never opened, the
  * pages not opened in the last 30 days first (longest unopened at the top),
  * then the rest by opens in 30 days. A route recorded that is no longer a
@@ -105,12 +128,12 @@ export async function readPathOpens30(
 export type PhoneShare = { phone: number; total: number };
 
 /**
- * How much of the app is opened on a phone: page views of the last 30 days
- * whose device is recorded (plan #1919.6). Rows from before the device was
- * recorded are not counted either way. Null when the read fails.
+ * How much of the app is opened on a phone: page views since `since` whose
+ * device is recorded (plan #1919.6), the Usage tab passing the start of its
+ * 30 days. Rows from before the device was recorded are not counted either
+ * way. Null when the read fails.
  */
-export async function readPhoneShare(client: SupabaseClient, now: Date = new Date()): Promise<PhoneShare | null> {
-  const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+export async function readPhoneShare(client: SupabaseClient, since: string): Promise<PhoneShare | null> {
   const count = (device: 'phone' | 'laptop') =>
     client
       .schema('core')

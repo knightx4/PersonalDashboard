@@ -16,6 +16,7 @@ import {
   loadAskConversation,
   saveAskAnswer,
   searchAskChatsInRequest,
+  reopenAskChange,
   undoAskChange,
 } from '@/lib/talk/ask-request';
 import { chatQuery, chatTitleFrom } from '@/lib/talk/ask-chats';
@@ -179,6 +180,11 @@ export async function confirmDashChange(id: string): Promise<ChangeOutcome> {
 // latency: pending
 export async function declineDashChange(id: string): Promise<ChangeOutcome> {
   return pressChange(id, declineAskChange, 'The change could not be declined. Try again.');
+}
+
+// latency: pending
+export async function reopenDashChange(id: string): Promise<ChangeOutcome> {
+  return pressChange(id, reopenAskChange, 'The change could not be put back. Try again.');
 }
 
 // latency: pending

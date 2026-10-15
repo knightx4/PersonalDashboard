@@ -5,7 +5,11 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isSourceId, type SourceId } from '@/lib/todo/agenda/sources';
-import { saveAgendaSettings } from '@/lib/todo/agenda/settings';
+import {
+  loadAgendaSettings,
+  saveAgendaSettings,
+  type AgendaSettings,
+} from '@/lib/todo/agenda/settings';
 import { createFeed, deleteFeed, feedInput } from '@/lib/todo/feeds/write';
 import { refreshFeed } from '@/lib/todo/feeds/refresh';
 
@@ -32,30 +36,37 @@ const horizonSchema = z.coerce
   .min(1, 'A horizon of less than a day is not a horizon.')
   .max(90, 'Ninety days is the most the agenda will look ahead.');
 
-// latency: pending
-export async function saveAgendaSettingsNow(input: {
-  enabledSources: string[];
-  horizonDays: number;
-}): Promise<{ error?: string }> {
-  const horizon = horizonSchema.safeParse(input.horizonDays);
-  if (!horizon.success) return { error: horizon.error.issues[0].message };
-
-  // Only names this build knows. A stale value in a form is a stale value, not
-  // an instruction, and unknown source names must not reach the column.
-  const enabledSources = input.enabledSources.filter((id): id is SourceId => isSourceId(id));
-
+/** Saves the agenda's settings with one side changed, the other as stored. */
+async function saveAgenda(change: (current: AgendaSettings) => AgendaSettings): Promise<{ error?: string }> {
   const user = await requireUser();
-  const { error } = await saveAgendaSettings(user.id, {
-    enabledSources,
-    horizonDays: horizon.data,
-  });
-
+  const current = await loadAgendaSettings(user.id);
+  const { error } = await saveAgendaSettings(user.id, change(current));
   if (error) return { error };
 
   revalidatePath('/todo');
   revalidatePath('/todo/settings');
   revalidatePath('/home');
   return {};
+}
+
+/**
+ * The sources the agenda reads. The whole current choice is sent, so two
+ * quick presses cannot undo each other.
+ */
+// latency: optimistic -- the box is ticked at once, and a refused save puts it back with a toast
+export async function saveAgendaSources(ids: string[]): Promise<{ error?: string }> {
+  // Only names this build knows. A stale value is a stale value, not an
+  // instruction, and unknown source names must not reach the column.
+  const enabledSources = ids.filter((id): id is SourceId => isSourceId(id));
+  return saveAgenda((current) => ({ ...current, enabledSources }));
+}
+
+/** How many days "this week" on the agenda covers. */
+// latency: optimistic -- the number shows at once, and a refused save puts it back with a toast
+export async function saveAgendaHorizon(days: string): Promise<{ error?: string }> {
+  const horizon = horizonSchema.safeParse(days);
+  if (!horizon.success) return { error: horizon.error.issues[0].message };
+  return saveAgenda((current) => ({ ...current, horizonDays: horizon.data }));
 }
 
 /**

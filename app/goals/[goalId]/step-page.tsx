@@ -1,6 +1,7 @@
 'use client';
 
-import { Breadcrumb } from '@/components/shell/breadcrumb';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
 import { Card } from '@/components/ui/card';
 import type { LinkedFile } from '@/lib/files/files';
 import { stepCrumbs } from '@/lib/goals/crumbs';
@@ -83,7 +84,7 @@ export function StepPage({
   return (
     <PageColumn>
       {/* The path down to the step, through every step it sits under (plan #1622). */}
-      {crumbs && <Breadcrumb crumbs={crumbs} className="mb-3" />}
+      {crumbs && <PathLine crumbs={crumbs} fallback={parentCrumb(crumbs)} className="mb-3" />}
       {/* The step's own row is the page's heading: its title, the status
           you press to change and its menu, then the panel and sub-steps. */}
       <Card padding="none">

@@ -13,6 +13,7 @@ import {
 } from '@/lib/week-review/view';
 import { EventRow } from '@/app/timeline/event-row';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The weekly review (plan #1233), apart from the reads. Whether last week's
@@ -31,6 +32,14 @@ const HOME_LINK = (
     Home
   </Link>
 );
+
+/** One week's path: Home › the week (plan #1931.2). */
+function weekSubject(week: string) {
+  return sectionSubject('/home', 'Home', {
+    label: weekRangeLabel(week),
+    href: `/home/week/${week}`,
+  });
+}
 
 export function WeekReviewView(props: WeekReviewViewProps) {
   if (props.state === 'none') {
@@ -51,7 +60,11 @@ export function WeekReviewView(props: WeekReviewViewProps) {
   if (props.state === 'missing') {
     return (
       <>
-        <PageHeader title={weekRangeLabel(props.week)} actions={HOME_LINK} />
+        <PageHeader
+          subject={weekSubject(props.week)}
+          title={weekRangeLabel(props.week)}
+          actions={HOME_LINK}
+        />
         <EmptyState
           title="No review for this week"
           description="Dash wrote no review for this week. Reviews start from the first Sunday the weekly run reached you."
@@ -72,6 +85,7 @@ export function WeekReviewView(props: WeekReviewViewProps) {
   return (
     <>
       <PageHeader
+        subject={weekSubject(review.week)}
         title={weekRangeLabel(review.week)}
         description={
           review.source === 'plain' && review.observations.length > 0 ? (

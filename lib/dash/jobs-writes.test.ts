@@ -145,6 +145,32 @@ describe('the Jobs writes', () => {
     expect(await refused('change_application', tables(), { application_ref: APP_2, excitement: 9 })).toMatch(/1 to 5/);
   });
 
+  it('marks an application ready to apply and answers whether it has a cover letter (plan #2102.1)', async () => {
+    const t = tables();
+    const ready = await made('change_application', t, { application_ref: APP_1, ready_to_apply: true, has_cover_letter: false });
+    expect(ready.after).toMatchObject({ ready_to_apply: true, has_cover_letter: false });
+    expect(ready.summary).toBe(
+      'Dash marked it ready to apply and marked that it has no cover letter for the role Role from email at Acme.',
+    );
+    const cleared = await made('change_application', t, { application_ref: APP_1, ready_to_apply: false, has_cover_letter: null });
+    expect(cleared.before).toMatchObject({ ready_to_apply: true, has_cover_letter: false });
+    expect(cleared.after).toMatchObject({ ready_to_apply: false, has_cover_letter: null });
+  });
+
+  it('refuses marks that are not true or false', async () => {
+    expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: 'yes' })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: null })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1, has_cover_letter: 1 })).toMatch(/null to clear/);
+  });
+
+  it("refuses an application mark on someone else's application", async () => {
+    const t = tables();
+    const app = t['job_search.applications'].find((row) => row.id === APP_1)!;
+    app.user_id = SOMEONE;
+    expect(await refused('change_application', t, { application_ref: APP_1, ready_to_apply: true })).toMatch(/no application of theirs/);
+    expect(app.ready_to_apply).toBeUndefined();
+  });
+
   it("refuses a referral contact that is not theirs", async () => {
     const t = tables();
     t['job_search.contacts'][0].user_id = SOMEONE;
@@ -276,10 +302,12 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
     expect(change.undo).toBeNull();
   });
 
-  it('puts one off a week, rewords and moves one, and links it to an email by its search_mail ref', async () => {
-    const off = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: true });
-    const days = (new Date(off.after.due_at as string).getTime() - Date.now()) / 86_400_000;
-    expect(Math.round(days)).toBe(7);
+  it('puts one off to a day, rewords and moves one, and links it to an email by its search_mail ref', async () => {
+    const off = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: '2099-01-15' });
+    expect(off.after.due_at).toBe('2099-01-15T00:00:00.000Z');
+    expect(off.summary).toContain('put off until Thu 15 Jan 2099');
+    const tomorrow = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: 'tomorrow' });
+    expect(new Date(tomorrow.after.due_at as string).getTime()).toBeGreaterThan(Date.now());
 
     const edited = await made('change_reminder', withReminders(), {
       reminder_ref: REMINDER,
@@ -297,7 +325,8 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
       /not one the job search has read/,
     );
     expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER })).toMatch(/Nothing to change/);
-    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true, put_off: true })).toMatch(/not both/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true, put_off: 'tomorrow' })).toMatch(/not both/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: 'someday' })).toMatch(/put_off must be tomorrow/);
   });
 
   it('marks a waiting row done with a new row, whose Undo takes it out', async () => {
@@ -312,10 +341,11 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
   it('puts off a row already set aside in place, and refuses an event that asked nothing', async () => {
     const data = withReminders();
     data['job_search.waiting_dismissals'] = [{ id: DISMISSAL, user_id: ME, application_event_id: EVENT, dismissed_until: null }];
-    const change = await made('change_waiting', data, { event_ref: EVENT, verb: 'put_off' });
+    const change = await made('change_waiting', data, { event_ref: EVENT, verb: 'put_off', until: '2099-01-15' });
     expect(change.op).toBe('update');
     expect(change.subjectRef).toBe(`job_search.waiting_dismissals:${DISMISSAL}`);
-    expect(change.after.dismissed_until).toEqual(expect.any(String));
+    expect(change.after.dismissed_until).toBe('2099-01-15T00:00:00.000Z');
+    expect(await refused('change_waiting', data, { event_ref: EVENT, verb: 'put_off' })).toMatch(/until must be tomorrow/);
     expect(await refused('change_waiting', withReminders(), { event_ref: ANSWER_1, verb: 'finish' })).toMatch(/not one waiting on them/);
   });
 });

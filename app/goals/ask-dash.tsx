@@ -3,7 +3,8 @@
 import { useActionState, useState } from 'react';
 import { Folder, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashMark } from '@/components/ui/dash-mark';
+import { DashAction } from '@/components/ui/dash-action';
 import { ChipInput, ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -41,18 +42,31 @@ export function AskDash({
     goals[0]?.id ?? (goalsOn ? GOAL : errandsOn ? ERRAND : ''),
   );
   const [body, setBody] = useState('');
+  // Closed until pressed (law 14): a button, not a box waiting for words.
+  const [open, setOpen] = useState(false);
   // The area picked for a new goal or errand, null until the chip is changed.
   const [areaPick, setAreaPick] = useState<string | null>(null);
   const [state, ask, asking] = useActionState(async (prev: AskDashState, form: FormData) => {
     const next = await askDashAction(prev, form);
     if (next.done) {
       setBody('');
+      setOpen(false);
       toast({ text: next.message ?? 'Asked.' });
     }
     return next;
   }, {} as AskDashState);
 
   if (!target) return null;
+  if (!open) {
+    return (
+      <div className={className}>
+        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          <DashMark size="2xs" tone="brand" decorative />
+          Ask Dash
+        </Button>
+      </div>
+    );
+  }
   const errand = target === ERRAND;
   const goal = target === GOAL;
   // A new errand or goal is saved and handed to Dash; an ask on a goal is a reply.
@@ -69,6 +83,7 @@ export function AskDash({
       <ComposeBox>
         <ComposeBody
           id="ask-dash"
+          autoFocus
           name="body"
           required
           rows={2}
@@ -131,28 +146,34 @@ export function AskDash({
               ))}
             </ChipSelect>
           )}
-          <span className="ml-auto flex items-center gap-2">
-            {/* An ask on a goal is a reply from Dash; a new errand or goal starts a run, which is not metered here. */}
-            {!handing && (
-              <PaidHint
-                action="app/goals/home-actions.ts#askDashAction"
-                what="Cost of Dash's reply"
-                align="end"
-                className="self-center"
-              />
-            )}
-            {learnGoal && (
-              <PaidHint
-                action="app/goals/home-actions.ts#askDashAction:new-goal"
-                what="Cost of placing the goal and writing its plan"
-                align="end"
-                className="self-center"
-              />
-            )}
-            <Button type="submit" size="sm" disabled={asking || !body.trim()}>
-              {asking ? 'Asking Dash…' : handing ? 'Hand it to Dash' : 'Ask Dash'}
-            </Button>
-          </span>
+          {/* An ask on a goal is a reply from Dash; a new errand or goal starts a
+              run, which is not metered here, unless a Learn goal is placed. */}
+          <DashAction
+            type="submit"
+            size="sm"
+            disabled={asking || !body.trim()}
+            wrapperClassName="ml-auto"
+            hintFirst
+            align="end"
+            paid={
+              !handing
+                ? 'app/goals/home-actions.ts#askDashAction'
+                : learnGoal
+                  ? 'app/goals/home-actions.ts#askDashAction:new-goal'
+                  : undefined
+            }
+            what={!handing ? "Cost of Dash's reply" : 'Cost of placing the goal and writing its plan'}
+          >
+            {asking
+              ? handing
+                ? 'Starting…'
+                : 'Asking Dash…'
+              : errand
+                ? 'Start this errand'
+                : goal
+                  ? 'Start this goal'
+                  : 'Ask Dash'}
+          </DashAction>
         </div>
       </ComposeBox>
       {state.error && <p className="text-small text-danger">{state.error}</p>}

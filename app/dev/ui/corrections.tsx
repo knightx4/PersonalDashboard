@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { whenDate } from '@/lib/core/when';
 import { RECENT_DAYS, sharePercent, type CorrectionWeek } from '@/lib/plan/correction-share';
 
 /** The most weeks drawn: eight columns and their dates fit 390 pixels without scrolling sideways. */
@@ -9,11 +10,7 @@ const PLOT_HEIGHT = 112;
 
 /** "5 Oct" from `2026-10-05`. */
 function dayMonth(week: string): string {
-  return new Date(`${week}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+  return whenDate(week, { timeZone: 'UTC', year: 'auto' });
 }
 
 /** "1/7": corrections over notes, or "none" for a week with no notes. */

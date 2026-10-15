@@ -1,4 +1,5 @@
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { toRef } from '@/lib/core/refs';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
 import type { GoalPace } from '@/lib/goals/pace';
@@ -26,6 +27,7 @@ export function GoalDetail({
   progress,
   timeZone,
   pace = null,
+  metrics = null,
   children,
 }: {
   goal: Goal;
@@ -37,6 +39,11 @@ export function GoalDetail({
   timeZone: string;
   /** The goal's usual pace, for the properties (plan #1737). */
   pace?: GoalPace | null;
+  /**
+   * The goal's metrics under its facts (plan #2084.3), with how many facts
+   * they add to the phone's fold; null where there is nothing to count.
+   */
+  metrics?: { node: React.ReactNode; count: number } | null;
   /** The open tab's content. */
   children: React.ReactNode;
 }) {
@@ -46,7 +53,10 @@ export function GoalDetail({
   const tabs = GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t));
   return (
     <TabbedDetail
-      crumbs={goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' })}
+      subject={{
+        ref: toRef('goals.items', goal.id),
+        path: goalCrumbs(goal, areaName, { open: !closed && goal.status !== 'dropped' }),
+      }}
       title={
         <span className="flex items-center gap-2.5">
           <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
@@ -66,21 +76,26 @@ export function GoalDetail({
             dueOn: goal.dueOn ?? null,
             duePrecision: goal.duePrecision,
             status: goal.status,
+            archivedAt: goal.archivedAt ?? null,
           }}
           places={places}
+          steps={progress.live}
         />
       }
       glance={<GoalGlance goal={goal} review={review} progress={progress} pace={pace} />}
-      detailCount={goalDetailCount(goal, progress, timeZone, pace, review)}
+      detailCount={goalDetailCount(goal, progress, timeZone, pace, review) + (metrics?.count ?? 0)}
       properties={
-        <GoalProperties
-          goal={goal}
-          areaName={areaName}
-          review={review}
-          progress={progress}
-          timeZone={timeZone}
-          pace={pace}
-        />
+        <>
+          <GoalProperties
+            goal={goal}
+            areaName={areaName}
+            review={review}
+            progress={progress}
+            timeZone={timeZone}
+            pace={pace}
+          />
+          {metrics?.node}
+        </>
       }
       tabs={tabs}
       label="Goal"

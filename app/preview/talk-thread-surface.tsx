@@ -1,8 +1,9 @@
 'use client';
 
-import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { Thread, type TalkSend } from '@/components/thread/thread';
 import { Card } from '@/components/ui/card';
 import { CostHint } from '@/components/ui/cost-hint';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { sumEstimates, type CostEstimate } from '@/lib/core/spend/estimate-types';
 import { filesEstimate } from '@/lib/dash/file-cost';
@@ -11,7 +12,7 @@ import type { TalkToolCall, TalkTurn } from '@/lib/talk/talk';
 import { PageColumn } from '@/components/shell/page-width';
 
 /**
- * The Ask Dash thread on its own (plan #1708): components/talk/talk-thread.tsx
+ * The Ask Dash thread on its own (plan #1708): components/thread/thread.tsx
  * with nothing of the sheet or a page around it, which is where a change to
  * the thread is looked at (COMPONENT_SURFACES in lib/preview/routes.ts)
  * instead of on every page that imports it.
@@ -23,9 +24,8 @@ import { PageColumn } from '@/components/shell/page-width';
  * the thread draws them as soon as it draws charts; until then their words
  * stand alone, and are written to.
  *
- * It is drawn on a card with `onCard`, so Dash's turns take the recessed
- * ground (taste `no-bare-text`). A host that draws the thread bare does not
- * set it yet.
+ * It is drawn on a card, and Dash's turns take the recessed ground of his
+ * voice (taste `no-bare-text`), as they do on every thread (plan #1964.3).
  */
 
 // Fixed times, so the server's render and the browser's agree.
@@ -188,20 +188,27 @@ const send: TalkSend = async (body) => {
 export function TalkThreadSurface() {
   return (
     <PageColumn className="py-4">
-      <Card padding="standard">
-        <TalkThread
-          id="talk-thread-preview"
-          turns={TURNS}
-          send={send}
-          label="Ask a follow-up"
-          placeholder="Ask more about this"
-          onCard
-          withFiles
-        />
-      </Card>
+      {/* The figure an answer costs, as the ledger would give it, so the $
+          beside "Ask a follow-up" draws as it does in the sheet. */}
+      <PaidCostsProvider costs={{ [ASK_ACTION]: ANSWER_COST }}>
+        <Card padding="standard">
+          <Thread
+            id="talk-thread-preview"
+            turns={TURNS}
+            send={send}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
+            withFiles
+            cost={{ action: ASK_ACTION, what: 'Cost of each answer from Dash' }}
+          />
+        </Card>
+      </PaidCostsProvider>
     </PageColumn>
   );
 }
+
+/** The action an Ask Dash answer is priced by (app/api/ask/route.ts). */
+const ASK_ACTION = 'app/api/ask/route.ts#POST';
 
 /** A bill photographed and its PDF, added to a question before it is sent. */
 const BILL_FILES: UploadedAttachment[] = [
@@ -241,13 +248,12 @@ export function TalkThreadFilesSurface() {
   return (
     <PageColumn className="py-4">
       <Card padding="standard">
-        <TalkThread
+        <Thread
           id="talk-thread-files-preview"
           turns={[]}
           send={send}
           label="Ask a question"
           placeholder="What did I spend on eBay this month?"
-          onCard
           withFiles
           startWriting
           initialDraft="What is the due date on this bill, and how much is it?"

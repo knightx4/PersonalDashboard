@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
+import { PendingPage } from '@/components/shell/pending-page';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
@@ -12,8 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { FeedbackButton } from '@/components/shell/feedback-button';
-import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
+import { NoteButton } from '@/components/shell/feedback-button';
 import { ThemeRepair } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
@@ -30,15 +30,12 @@ import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import { MAIN_BOX } from '@/components/shell/main-box';
 import {
-  DashPlate,
-  WorkspaceSheet,
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { isAskPath } from '@/lib/ask/page-name';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
-import { openingOffset, savePaneScroll } from '@/lib/shell/pane-scroll';
+import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
@@ -97,7 +94,6 @@ export function AppShell({
   sections,
   settingsHref,
   settingsLabel,
-  feedbackHref,
   displayName,
   email,
   enabledModules,
@@ -108,7 +104,6 @@ export function AppShell({
   brief,
   activity = [],
   mainCheck = null,
-  notifications = [],
   pathname: pathnameOverride,
   children,
 }: {
@@ -118,7 +113,6 @@ export function AppShell({
   sections: readonly NavSection[];
   settingsHref?: string;
   settingsLabel?: string;
-  feedbackHref?: string;
   displayName: string | null;
   email: string;
   enabledModules?: readonly ModuleId[];
@@ -146,8 +140,6 @@ export function AppShell({
    * own rather than a reason to draw nothing.
    */
   mainCheck?: MainCheck | null;
-  /** What is waiting on you, wherever you are standing. Today: open raises. */
-  notifications?: Notification[];
   /**
    * The path to light in the column, in place of the browser's. Only the
    * preview gallery passes it: a page photographed there is served from
@@ -161,7 +153,6 @@ export function AppShell({
   const router = useRouter();
   const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);
-  const [switcher, setSwitcher] = useState(false);
   /**
    * Whether the search box is up.
    *
@@ -177,8 +168,15 @@ export function AppShell({
    * sets it, so a narrowed opening never carries to the next one.
    */
   const [searchOn, setSearchOn] = useState<SearchScope>('everything');
+  /**
+   * What the box lists before anything is typed. The phone's dock button is
+   * the switcher and the search in one (note 5f3ef44f), so it opens the box on
+   * every workspace; every other way in opens it on what is here.
+   */
+  const [searchShows, setSearchShows] = useState<'here' | 'workspaces'>('here');
   function openSearch(scope: SearchScope = 'everything') {
     setSearchOn(scope);
+    setSearchShows('here');
     setSearching(true);
   }
   const [collapsed, setCollapsed] = useState(false);
@@ -188,13 +186,13 @@ export function AppShell({
    * The workspaces this person may switch to: the ones they switched on,
    * minus any this account is not allowed to see at all.
    *
-   * Three lists below read it -- the column's switcher, the phone's sheet and
-   * ⌘K -- and the filtering happens once here rather than in each of them,
-   * because three lists disagreeing about which workspaces exist is the bug
+   * Two lists below read it -- the column's switcher and the search box,
+   * which is also the phone's switcher -- and the filtering happens once here rather than in each of them,
+   * because two lists disagreeing about which workspaces exist is the bug
    * this shell was written to end.
    *
    * The rule itself is in lib/modules, where it can be read by a test without
-   * a DOM -- these three lists are a menu, a sheet and a palette, and none of
+   * a DOM -- these lists are a menu and a palette, and neither of
    * them puts a workspace in its markup until it is opened.
    */
   const workspaces = switchableModules(enabledModules, isOwner);
@@ -229,22 +227,30 @@ export function AppShell({
    * press fires `popstate` before the new path renders, so that sets a flag
    * the path change reads. The offset is saved as the pane scrolls and again
    * at the moment of leaving, before the old content is replaced.
+   *
+   * The back link on a row page (components/shell/back-link.tsx) is a link
+   * to the list you came from, and marks the visit as a return so the list
+   * opens where you left it too (plan #1931.3). Below lg the window is what
+   * scrolls, so there the offset is the window's.
    */
   const poppedRef = useRef(false);
   const pathRef = useRef(pathname);
   useEffect(() => {
     const pane = paneRef.current;
     if (!pane) return;
-    const save = () => savePaneScroll(pathRef.current, pane.scrollTop);
+    const save = () =>
+      savePaneScroll(pathRef.current, windowScrolls(pane) ? window.scrollY : pane.scrollTop);
     const onPop = () => {
       save();
       poppedRef.current = true;
     };
     pane.addEventListener('scroll', save, { passive: true });
+    window.addEventListener('scroll', save, { passive: true });
     document.addEventListener('click', save, true);
     window.addEventListener('popstate', onPop, true);
     return () => {
       pane.removeEventListener('scroll', save);
+      window.removeEventListener('scroll', save);
       document.removeEventListener('click', save, true);
       window.removeEventListener('popstate', onPop, true);
     };
@@ -252,19 +258,24 @@ export function AppShell({
   useEffect(() => {
     const pane = paneRef.current;
     pathRef.current = pathname;
-    const popped = poppedRef.current;
+    const { top, returned } = arrival(pathname, poppedRef.current);
     poppedRef.current = false;
     if (!pane) return;
-    const top = openingOffset(pathname, popped);
     pane.scrollTo({ top });
+    // Below lg the browser restores the window itself on a Back press; a
+    // return by the back link is a push, so that one is restored here.
+    const viaWindow = returned && windowScrolls(pane);
+    if (viaWindow) window.scrollTo({ top });
     if (!top) return;
     // The page may still be filling in; keep asking for a moment until the
     // pane is long enough to hold the offset.
     let tries = 0;
     let frame = 0;
     const settle = () => {
-      if (Math.abs(pane.scrollTop - top) < 2 || ++tries > 30) return;
-      pane.scrollTo({ top });
+      const at = viaWindow ? window.scrollY : pane.scrollTop;
+      if (Math.abs(at - top) < 2 || ++tries > 30) return;
+      if (viaWindow) window.scrollTo({ top });
+      else pane.scrollTo({ top });
       frame = requestAnimationFrame(settle);
     };
     frame = requestAnimationFrame(settle);
@@ -322,22 +333,20 @@ export function AppShell({
       if (!isSearchShortcut(event)) return;
       event.preventDefault();
       setSearchOn('everything');
+      setSearchShows('here');
       setSearching((open) => !open);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const active = sections.find(isActive);
-  // The top bar names the workspace, and the page's own heading names the
-  // page. It used to name the section, which on a section's first page is the
-  // heading's exact words a few inches lower: "Quick read" twice. Below that
-  // first page the section follows as a link back up to it, so a company or an
-  // order still says where it sits.
+  // The top bar names the workspace and nothing else (plan #1931.2). Where a
+  // page sits inside it is the page's own path, drawn once above its heading
+  // by PageHeader's `subject`; the bar used to add the section after a ›,
+  // which repeated the first part of that path a few inches lower.
   // Dash's page is outside every workspace and is not Home (plan #1899.2).
   const onDash = module === null && isAskPath(pathname ?? '');
   const title = moduleById(module)?.label ?? (onDash ? 'Dash' : 'Home');
-  const crumb = active && pathname !== active.href ? active : undefined;
 
   useEffect(() => {
     if (!drawer) return;
@@ -584,30 +593,28 @@ export function AppShell({
   }
 
   /**
-   * The centre slot. The mark rather than an icon, because it is the one
-   * control on the bar that answers "where am I" as well as "where else could
-   * I be" -- and it is already the thing a person taps at the top of the
-   * column on a desktop.
+   * The centre slot: the switcher and the search in one (note 5f3ef44f). It
+   * opens the search box, which lists every workspace before anything is
+   * typed and finds anything once something is, so the phone has one way to
+   * go anywhere where it had a switcher at the foot and a magnifier at the
+   * top. The ring with a dot inside is the search mark the box itself uses.
    */
   const dockSwitcher = (
     <li key="__switcher">
       <button
         type="button"
-        onClick={() => setSwitcher(true)}
-        aria-haspopup="menu"
+        onClick={() => {
+          setSearchOn('everything');
+          setSearchShows('workspaces');
+          setSearching(true);
+        }}
+        aria-haspopup="dialog"
         data-capture-switcher=""
-        aria-expanded={switcher}
-        className={cn(dockItem, switcher ? 'text-shell-ink' : 'text-shell-muted')}
+        aria-expanded={searching}
+        className={cn(dockItem, searching ? 'text-shell-ink' : 'text-shell-muted')}
       >
-        {/* The mark is 24px against the tabs' 20px icons, so it is pulled back
-            in by 2px a side -- otherwise the centre label sits lower than the
-            four beside it. */}
-        {onDash ? (
-          <DashPlate className="-my-0.5" />
-        ) : (
-          <ModuleMark module={module} size="sm" className="-my-0.5" />
-        )}
-        <span className="truncate">Switch</span>
+        <SearchMark className="size-5" strokeWidth={searching ? 2 : 1.75} />
+        <span className="truncate">Go to</span>
       </button>
     </li>
   );
@@ -740,7 +747,10 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
+              {/* Below lg the bar is 5rem tall and its icons were the desk's
+              16px in 32px buttons, too small to hit or read on a phone (note
+              55df4819): there they are 20px in 40px buttons, the dock's size. */}
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5 max-lg:[&_button_[data-dash-state]]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
@@ -751,42 +761,12 @@ export function AppShell({
                   </IconButton>
                 </Tooltip>
 
-                {/* The mark in the bar is the switcher, not a picture of one.
-                From lg up the column carries it -- and still does when the
-                column is collapsed, as its mark. Below lg there is no column
-                until you open the drawer, and this icon sat there looking
-                exactly like the thing that switches workspaces while doing
-                nothing, which made changing module a drawer away. */}
-                <span className="lg:hidden">
-                  <WorkspaceSwitcher
-                    current={module}
-                    dash={onDash}
-                    enabled={workspaces}
-                    counts={counts}
-                    onShell
-                    compact
-                  />
-                </span>
-
                 {/* Allowed to shrink, and truncate, as the last thing in the row
-                that can: on a phone the account controls (seven with Dash and
-                notifications, #1090) are wider than what is left, and a cut
+                that can: on a phone the account controls (six with Dash and
+                Capture, #1090) are wider than what is left, and a cut
                 title reads better than an account icon pushed off the edge. */}
                 <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
-                  {crumb && (
-                    <>
-                      <span className="px-1.5 font-normal text-shell-muted" aria-hidden>
-                        ›
-                      </span>
-                      <Link
-                        href={crumb.href}
-                        className="font-normal text-shell-muted transition-colors hover:text-shell-ink"
-                      >
-                        {crumb.label}
-                      </Link>
-                    </>
-                  )}
                 </h2>
 
                 {/* The one thing this workspace would say if it could say only
@@ -854,37 +834,24 @@ export function AppShell({
                 <span className={cn('min-w-0 flex-1', brief && 'sm:hidden', 'lg:hidden')} />
 
                 {/* What is left here belongs to the person, not to the workspace:
-                their theme, their notifications, their feedback, their
-                account. The workspace's own settings moved into its column --
+                their theme, their feedback, their account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center sm:gap-0.5">
-                  {/* Search, below lg, where there is no field in the bar. It
-                  opens the same box the shortcut opens, on everything you own,
-                  with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
-                  the left and a second way in beside it would be two controls
-                  for one thing. */}
-                  <Tooltip label="Search" className="shrink-0 lg:hidden">
-                    <IconButton
-                      label="Search"
-                      onClick={() => openSearch()}
-                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                    >
-                      <SearchMark />
-                      <span className="sr-only">Search</span>
-                    </IconButton>
-                  </Tooltip>
-
+                  {/* No search or switcher here below lg: the dock's centre
+                  button is both (note 5f3ef44f). From lg up the field is in
+                  the bar a few inches to the left. */}
                   {/* Dash, from any page (plan #1090): a question about
                   anything in the app, answered with links to what it used. */}
                   <AskDashButton />
                   <CaptureButton />
-                  <NotificationsButton notifications={notifications} />
-                  <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
+                  {/* No bell (plan #1937.7): what is on you is Home's Inbox,
+                  counted on Home's first screen, and each workspace's own. */}
+                  <NoteButton />
 
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
                     <Link
                       href="/account"
-                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
                     >
                       {initial}
                       <span className="sr-only">Account</span>
@@ -928,7 +895,7 @@ export function AppShell({
                 'pb-[calc(var(--dock-h)+2.125rem+env(safe-area-inset-bottom))] lg:pb-6',
               )}
             >
-              {children}
+              <PendingPage>{children}</PendingPage>
             </main>
             {/* The brief goes down here from lg up, which is exactly the width
             this line is drawn at, so the two copies above and this one never
@@ -950,15 +917,6 @@ export function AppShell({
             </nav>
           </div>
 
-          <WorkspaceSheet
-            current={module}
-            dash={onDash}
-            enabled={workspaces}
-            counts={counts}
-            open={switcher}
-            onClose={() => setSwitcher(false)}
-          />
-
           <ThemeRepair value={theme} />
 
           <CommandPalette
@@ -969,6 +927,7 @@ export function AppShell({
             theme={theme}
             open={searching}
             opensOn={searchOn}
+            opensWith={searchShows}
             onOpenChange={setSearching}
           />
         </div>
@@ -976,4 +935,13 @@ export function AppShell({
       </CaptureProvider>
     </ToastProvider>
   );
+}
+
+/**
+ * Whether the window rather than the pane scrolls: below lg the pane is not a
+ * scroll container, so its own offset stays at zero.
+ */
+function windowScrolls(pane: HTMLElement): boolean {
+  const overflow = window.getComputedStyle(pane).overflowY;
+  return overflow !== 'auto' && overflow !== 'scroll';
 }

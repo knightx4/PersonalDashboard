@@ -94,8 +94,20 @@ export const TASTE: readonly Taste[] = [
   {
     id: 'list-boxes-collapse',
     sentence: 'A box that holds a list can be collapsed.',
-    sources: [{ where: 'Roles', on: '2026-09-28' }],
+    sources: [
+      { where: 'Roles', on: '2026-09-28' },
+      { where: 'Pipeline', on: '2026-10-14' },
+    ],
     example: 'jobs-recommended-roles',
+  },
+  {
+    id: 'pictures-paste',
+    sentence: 'Anywhere a picture can be added, it can be pasted from the clipboard too.',
+    sources: [
+      { where: 'Pipeline', on: '2026-10-14' },
+      { where: 'Posts', on: '2026-10-14' },
+    ],
+    example: 'dev-posts-write',
   },
   {
     id: 'name-opens',

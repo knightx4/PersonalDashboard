@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react';
 import { CheckCircle2, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Textarea } from '@/components/ui/field';
+import { CheckRow, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
@@ -17,8 +18,7 @@ import {
   saveAnswer,
   saveDraftedAnswer,
 } from '../actions';
-import { saveCoverLetter } from './actions';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { saveApplicationMarks, saveCoverLetter } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
 import { roleStage } from '@/lib/jobs/role-stage';
 import type { PanelProps } from './types';
@@ -26,9 +26,10 @@ import type { PanelProps } from './types';
 export function Answers({
   answers,
   applicationId,
-  bankSize,
   roleId,
   coverLetter,
+  readyToApply,
+  hasCoverLetter,
   status,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
@@ -42,6 +43,13 @@ export function Answers({
 
   return (
     <div className="space-y-4">
+      <ApplicationMarks
+        applicationId={applicationId}
+        roleId={roleId}
+        closed={closed}
+        initialReady={readyToApply}
+        initialCoverLetter={hasCoverLetter}
+      />
       {/* The panel is the answers. Adding questions is something you do to it
           now and then, and it used to be a four-row textarea sitting above
           them on every visit -- the first thing on a page you came to read.
@@ -126,7 +134,7 @@ export function Answers({
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} closed={closed} />
+            <AnswerCard key={answer.id} answer={answer} closed={closed} />
           ))}
         </div>
       )}
@@ -148,6 +156,111 @@ export function Answers({
  * answers because it is part of the same submission. Read as prose and edited
  * in place, as an answer is.
  */
+/**
+ * Two marks you keep on the application: ready to apply, and whether it has a
+ * cover letter (plan #2102.2). The cover letter answer is yours, separate from
+ * the text below it. Pressing the pressed answer again clears it. Each press
+ * saves at once; a closed application shows them without the controls.
+ */
+function ApplicationMarks({
+  applicationId,
+  roleId,
+  closed,
+  initialReady,
+  initialCoverLetter,
+}: {
+  applicationId: string;
+  roleId: string;
+  closed: boolean;
+  initialReady: boolean;
+  initialCoverLetter: boolean | null;
+}) {
+  const [ready, setReady] = useState(initialReady);
+  const [letter, setLetter] = useState(initialCoverLetter);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function save(
+    marks: { readyToApply?: boolean; hasCoverLetter?: boolean | null },
+    revert: () => void,
+  ) {
+    setError(null);
+    startTransition(async () => {
+      const result = await saveApplicationMarks({ applicationId, roleId, ...marks });
+      if (result.error) {
+        revert();
+        setError(result.error);
+      }
+    });
+  }
+
+  function pressLetter(answer: boolean) {
+    const before = letter;
+    const next = before === answer ? null : answer;
+    setLetter(next);
+    save({ hasCoverLetter: next }, () => setLetter(before));
+  }
+
+  if (closed) {
+    return (
+      <Card padding="dense">
+      <p className="text-ui text-ink-muted">
+        {ready ? 'Marked ready to apply' : 'Not marked ready to apply'}
+        {' · '}
+        {letter === null ? 'Cover letter not answered' : letter ? 'Has a cover letter' : 'No cover letter'}
+      </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card padding="dense">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+        <CheckRow
+          title="Ready to apply"
+          className="items-center"
+          checked={ready}
+          disabled={pending}
+          onChange={(event) => {
+            const before = ready;
+            const next = event.target.checked;
+            setReady(next);
+            save({ readyToApply: next }, () => setReady(before));
+          }}
+        />
+        <div role="group" aria-label="Has a cover letter" className="flex items-center gap-2">
+          <span className="text-ui text-ink">Cover letter</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === true}
+            disabled={pending}
+            onClick={() => pressLetter(true)}
+          >
+            Yes
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === false}
+            disabled={pending}
+            onClick={() => pressLetter(false)}
+          >
+            No
+          </Button>
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {error}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function CoverLetter({
   applicationId,
   roleId,
@@ -219,15 +332,17 @@ function CoverLetter({
   );
 }
 
-function AnswerCard({
+/** One question and its answer; exported for the preview gallery. */
+export function AnswerCard({
   answer,
-  bankSize,
   closed,
+  initialDraft = null,
 }: {
   answer: PanelProps['answers'][number];
-  bankSize: number;
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** For the preview gallery: the card opens with this draft beside it. */
+  initialDraft?: AnswerDraft | null;
 }) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
@@ -239,7 +354,7 @@ function AnswerCard({
   // answer only through Insert, and the record only through Save -- the
   // compose.ts rule: the model may prepare text, but nothing goes out over
   // your name that you did not put there.
-  const [draft, setDraft] = useState<AnswerDraft | null>(null);
+  const [draft, setDraft] = useState<AnswerDraft | null>(initialDraft);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -388,17 +503,13 @@ function AnswerCard({
         )}
         {!closed && (
           <>
-            <Button
+            <DashAction
               type="button"
               size="sm"
               variant="ghost"
               pending={drafting}
-              disabled={bankSize === 0}
-              title={
-                bankSize === 0
-                  ? 'Your evidence bank is empty, so there is nothing to draft from.'
-                  : undefined
-              }
+              paid="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+              what="Cost of drafting"
               onClick={() => {
                 setDrafting(true);
                 setDraftError(null);
@@ -413,14 +524,8 @@ function AnswerCard({
                 });
               }}
             >
-              {drafting ? 'Drafting…' : 'Draft from my evidence'}
-            </Button>
-            {bankSize > 0 && (
-              <PaidHint
-                action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-                what="Cost of drafting"
-              />
-            )}
+              {drafting ? 'Drafting…' : 'Draft an answer'}
+            </DashAction>
           </>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
@@ -434,7 +539,7 @@ function AnswerCard({
         // border inside the answer card. Law 11: a shared ground groups.
         <Note className="mt-3 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
+            <h4 className="text-small font-medium text-ink">A draft</h4>
             <span className="text-small text-ink-muted">
               Nothing is saved until you insert it and save.
             </span>
@@ -445,11 +550,9 @@ function AnswerCard({
           </p>
 
           <p className="mt-2 text-small text-ink-muted">
-            Draws on{' '}
-            {draft.evidenceItemIds.length === 1
-              ? 'one item'
-              : `${draft.evidenceItemIds.length} items`}{' '}
-            from your bank.
+            {draft.evidenceItemIds.length === 0
+              ? 'Draws on nothing from your bank.'
+              : `Draws on ${draft.evidenceItemIds.length === 1 ? 'one item' : `${draft.evidenceItemIds.length} items`} from your bank.`}
           </p>
 
           {draft.unsupportedClaims.length > 0 && (

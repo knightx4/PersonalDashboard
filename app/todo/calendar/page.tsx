@@ -30,6 +30,8 @@ import { FeedEventCard } from '@/components/todo/feed-event-card';
 import { CalendarPicker } from '@/components/todo/calendar-picker';
 import { StepLink } from './step-link';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
+import { whenDate, whenMonth, whenRange } from '@/lib/core/when';
 
 export const metadata = { title: 'Calendar' };
 
@@ -133,7 +135,11 @@ export default async function TodoCalendarPage({
     // A wide page: a calendar is a grid, and seven columns want every bit of
     // the shell's 1400.
     <PageWide>
-      <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
+      <PageHeader
+        subject={sectionSubject('/todo/calendar', 'Calendar')}
+        title="Calendar"
+        description="Everything with a date on it, laid out."
+      />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* The arrows sit either side of the thing they move, the way every
@@ -281,36 +287,17 @@ export default async function TodoCalendarPage({
  * twice in full.
  */
 function title(view: CalendarView, days: readonly { day: string }[]): string {
-  const at = (day: string) => new Date(`${day}T00:00:00Z`);
-  const format = (day: string, options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', ...options }).format(at(day));
+  const UTC = { timeZone: 'UTC' } as const;
 
   if (view === 'day') {
-    return format(days[0].day, {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    return whenDate(days[0].day, { ...UTC, weekday: 'long', month: 'long' });
   }
 
   if (view === 'month') {
     // The middle of the six weeks is always in the month itself; the ends are
     // not.
-    return format(days[21].day, { month: 'long', year: 'numeric' });
+    return whenMonth(days[21].day, UTC);
   }
 
-  const first = days[0].day;
-  const last = days[days.length - 1].day;
-  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
-  const sameYear = first.slice(0, 4) === last.slice(0, 4);
-
-  const from = format(first, {
-    day: 'numeric',
-    ...(sameMonth ? {} : { month: 'long' }),
-    ...(sameYear ? {} : { year: 'numeric' }),
-  });
-  const to = format(last, { day: 'numeric', month: 'long', year: 'numeric' });
-
-  return `${from} – ${to}`;
+  return whenRange(days[0].day, days[days.length - 1].day, { ...UTC, month: 'long' });
 }

@@ -22,6 +22,7 @@ import { loadPlacedThemes } from '@/lib/learn/areas/themes-load';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { chooseTrackOffer } from '@/lib/learn/flow/offer';
+import { loadOfferSubjects } from '@/lib/learn/offer-setting';
 import { chooseRestingOffer } from '@/lib/learn/lessons/resting-load';
 import { TrackOffers } from '@/components/learn/track-offers';
 import { loadNotes } from '@/lib/vault/notes/load';
@@ -41,6 +42,7 @@ import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,7 +108,11 @@ export default async function KnowPage({
     console.error('[learn tracks] resting track', error instanceof Error ? error.message : error);
     return null;
   });
-  const themeOffer = resting
+  // A theme offer only while Learn settings has it on (plan #1937.10). A
+  // failed read leaves it on, as it was before the setting existed.
+  const offerOn = await loadOfferSubjects(supabase, user.id).catch(() => true);
+  const themeOffer =
+    resting || !offerOn
     ? null
     : await chooseTrackOffer(supabase, vault).catch((error: unknown) => {
         console.error('[learn tracks] track offer', error instanceof Error ? error.message : error);
@@ -202,6 +208,7 @@ export default async function KnowPage({
   return (
     <PageColumn>
       <PageHeader
+        subject={sectionSubject('/learn/know', 'Subjects')}
         title="Subjects"
         description="One graph per subject, and it grows every time you use it."
         actions={

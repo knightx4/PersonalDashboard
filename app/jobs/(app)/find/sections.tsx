@@ -1,20 +1,24 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Form from 'next/form';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react';
 import { Copy, ExternalLink, Mail, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
+import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
 import { ChipSelect } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useToast } from '@/components/ui/toast';
+import { CloseButton } from '@/components/inbox/close-button';
 import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
 import { OPENING_SOURCE_LABELS, OPENING_SOURCES, sourceText } from '@/lib/jobs/suggest/source';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
@@ -38,6 +42,7 @@ import type { RunLine } from '@/lib/jobs/suggest/search-runs';
 import {
   dismissOpening,
   dismissSuggestion,
+  reopenSuggestion,
   markSuggestionSent,
   saveOpening,
   suggestOpenings,
@@ -68,7 +73,8 @@ function RecommendedSection({
   empty,
   button,
   searching: searchingLabel,
-  paidHint,
+  paid,
+  what,
   action,
   count,
   toolbar,
@@ -82,8 +88,10 @@ function RecommendedSection({
   empty: string;
   button: string;
   searching: string;
-  /** The PaidHint for the search button, written out where the action is named. */
-  paidHint: React.ReactNode;
+  /** The server action the search button calls, for its cost hint. */
+  paid: PaidAction;
+  /** What the search costs, for a screen reader: "Cost of a search for roles". */
+  what: string;
   action: () => Promise<SuggestState>;
   count: number;
   /** Sort and filter controls, shown under the hint while the list is open. */
@@ -147,12 +155,19 @@ function RecommendedSection({
     ) : null,
   ].filter(Boolean);
   const search = (
-    <span className="flex shrink-0 items-center gap-1">
-      <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
-        {searching ? searchingLabel : button}
-      </Button>
-      {paidHint}
-    </span>
+    <DashAction
+      type="button"
+      size="sm"
+      variant="secondary"
+      pending={searching}
+      onClick={ask}
+      paid={paid}
+      what={what}
+      align="end"
+      wrapperClassName="shrink-0"
+    >
+      {searching ? searchingLabel : button}
+    </DashAction>
   );
   return (
     <CardSection
@@ -199,13 +214,8 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
       empty="Dash looks for new people every few days, from your career goals and CV, with what to say to each. Sent adds them to your contacts."
       button="Search now"
       searching="Searching…"
-      paidHint={
-        <PaidHint
-          action="app/jobs/(app)/find/recommend-actions.ts#suggestPeople"
-          what="Cost of a search for people"
-          align="end"
-        />
-      }
+      paid="app/jobs/(app)/find/recommend-actions.ts#suggestPeople"
+      what="Cost of a search for people"
       action={suggestPeople}
       count={suggestions.length}
     >
@@ -254,13 +264,8 @@ export function RecommendedRoles({
       empty="Dash searches for open roles every week, from your career goals, CV and the boards of companies you follow. Save one to add it to your pipeline as a lead."
       button="Search now"
       searching="Searching…"
-      paidHint={
-        <PaidHint
-          action="app/jobs/(app)/find/recommend-actions.ts#suggestOpenings"
-          what="Cost of a search for roles"
-          align="end"
-        />
-      }
+      paid="app/jobs/(app)/find/recommend-actions.ts#suggestOpenings"
+      what="Cost of a search for roles"
       action={suggestOpenings}
       count={suggestions.length}
       footer={<SourceStats stats={stats} searchCostMicros={searchCostMicros} />}
@@ -564,8 +569,15 @@ function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
   );
 }
 
+/** What a declined suggestion's toast calls it: the person to reach out to, or the role's headline. */
+function suggestionName(suggestion: OpenSuggestion): string {
+  if (suggestion.kind === 'reach_out' && suggestion.personName) return suggestion.personName;
+  return suggestion.headline;
+}
+
 function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const message = suggestion.message ?? '';
@@ -584,6 +596,16 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
     start(async () => {
       const result = await action();
       setError(result.error);
+    });
+  const decline = (action: () => Promise<{ error: string | null }>) =>
+    start(async () => {
+      const result = await action();
+      setError(result.error);
+      if (!result.error)
+        toast({
+          text: closedToast('declined', suggestionName(suggestion)),
+          undo: async () => void (await reopenSuggestion(suggestion.id)),
+        });
     });
 
   return (
@@ -686,15 +708,11 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
           </a>
         )}
         <span className="ml-auto flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
+          <CloseButton
+            lifecycle="declined"
             pending={busy}
-            onClick={() => act(() => dismissSuggestion(suggestion.id))}
-          >
-            Not now
-          </Button>
+            onClick={() => decline(() => dismissSuggestion(suggestion.id))}
+          />
           <Button
             type="button"
             size="sm"
@@ -831,6 +849,7 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
  */
 function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const steps = moveSteps(suggestion.move);
@@ -839,6 +858,16 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
     start(async () => {
       const result = await action();
       setError(result.error);
+    });
+  const decline = (action: () => Promise<{ error: string | null }>) =>
+    start(async () => {
+      const result = await action();
+      setError(result.error);
+      if (!result.error)
+        toast({
+          text: closedToast('declined', suggestionName(suggestion)),
+          undo: async () => void (await reopenSuggestion(suggestion.id)),
+        });
     });
 
   const title = (
@@ -908,15 +937,11 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
             )}
         </Disclosure>
         <span className="ml-auto flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
+          <CloseButton
+            lifecycle="declined"
             aria-expanded={choosing}
             onClick={() => setChoosing(!choosing)}
-          >
-            Not for me
-          </Button>
+          />
           <Button
             type="button"
             size="sm"
@@ -941,7 +966,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
               type="button"
               variant="link"
               disabled={busy}
-              onClick={() => act(() => dismissOpening(suggestion.id, reason))}
+              onClick={() => decline(() => dismissOpening(suggestion.id, reason))}
               className="text-ink"
             >
               {DISMISS_REASON_LABELS[reason]}

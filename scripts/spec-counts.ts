@@ -13,7 +13,7 @@
  * the check again; its baseline entry goes with it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { actionGaps } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
@@ -284,6 +284,192 @@ function routesWithoutSurface(root: string): string[] {
   return [...routes].sort();
 }
 
+// -- docs/ONE-INTERFACE-SPEC.md -------------------------------------------------
+
+/**
+ * Part 2: every page for one row says where it sits, drawn from the
+ * catalogue by refPath (lib/core/refs.ts, plan #1931). A page for one row is
+ * a `page.tsx` whose route has a dynamic segment (`[id]`, `[...path]`). It
+ * draws a path when it, or a file it imports from app/ or components/ (two
+ * imports deep, which reaches a page's view and that view's header), passes
+ * `crumbs` or a PageHeader or TabbedDetail `subject`, or draws a Breadcrumb itself. Pages
+ * that only send the visitor on are not counted, nor is /open/[ref], which is
+ * one of those that reads a row first, nor the two pages for someone with no
+ * account (a case page sent to an employer, a shared shelf), which sit in no
+ * workspace and have nowhere to lead back to.
+ */
+const DRAWS_PATH =
+  /\bcrumbs=\{|<Breadcrumb\b|<(?:PageHeader|TabbedDetail)\b[\s\S]{0,2000}?\bsubject=\{/;
+const LOCAL_IMPORT = /\bfrom\s+'((?:\.{1,2}\/|@\/(?:app|components)\/)[^']+)'/g;
+const NOT_ROW_PAGES = new Set(['app/open/[ref]/page.tsx', 'app/jobs/p/[slug]/page.tsx', 'app/s/[token]/page.tsx']);
+/**
+ * The shared shell and patterns pass a path through (PageHeader draws the
+ * Breadcrumb it is given), so importing them is not drawing one.
+ */
+const PASSES_PATH_THROUGH = /^components\/(?:shell|patterns)\//;
+
+function importedFiles(root: string, file: string, text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(LOCAL_IMPORT)) {
+    const spec = m[1];
+    const base = spec.startsWith('@/') ? spec.slice(2) : join(dirname(file), spec);
+    const found = ['.tsx', '.ts', '/index.tsx', '/index.ts']
+      .map((ext) => `${base}${ext}`)
+      .find((candidate) => existsSync(join(root, candidate)));
+    if (found && !PASSES_PATH_THROUGH.test(found)) out.push(found);
+  }
+  return out;
+}
+
+function drawsPath(root: string, file: string, depth: number, seen: Set<string>): boolean {
+  if (seen.has(file)) return false;
+  seen.add(file);
+  const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+  if (DRAWS_PATH.test(text)) return true;
+  if (depth === 0) return false;
+  return importedFiles(root, file, text).some((next) => drawsPath(root, next, depth - 1, seen));
+}
+
+function rowPagesWithoutPath(root: string): string[] {
+  return listFiles(root, ['app'], ['.tsx'])
+    .filter((file) => /\/page\.tsx$/.test(file) && /\/\[/.test(file) && !NOT_ROW_PAGES.has(file))
+    .filter((file) => routeOfFile(file) !== null)
+    .filter((file) => !isRedirectOnly(readFileSync(join(root, file), 'utf8')))
+    .filter((file) => !drawsPath(root, file, 2, new Set()))
+    .sort();
+}
+
+/**
+ * Part 2 (plan #1931.3): a row page has one back link, drawn by PageHeader
+ * through components/shell/back-link.tsx, which keeps the list's filters and
+ * its scroll. A hand-rolled one is a link whose first child is a left arrow or
+ * chevron followed by its label, or a button that calls the router's or the
+ * history's back(). A chevron alone in a link, such as the day before on a
+ * calendar or a review, is a step through siblings and is not counted; nor is
+ * the gallery, which draws pages that are not the app's.
+ */
+const HAND_BACK_LINK =
+  /<(?:Link|a)\b[^>]*\bhref=[^>]*>\s*<(?:ArrowLeft|ChevronLeft)\b[^>]*\/>\s*(?![<\s])/g;
+const HISTORY_BACK = /\b(?:router|history)\.back\(\)/g;
+const BACK_LINK_HOME = new Set(['components/shell/back-link.tsx']);
+
+function handRolledBackLinks(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !BACK_LINK_HOME.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(HAND_BACK_LINK), ...text.matchAll(HISTORY_BACK)].map(
+        (m) => `${file}:${lineAt(text, m.index ?? 0)}`,
+      );
+    })
+    .sort();
+}
+
+/**
+ * Part 3, R8 (plan #1950.3.4): a page whose only job is a form. Such a page
+ * takes the address of the thing it adds, so every `page.tsx` whose route has
+ * a `new` or `add` segment is counted (what were `/you/places/new` and
+ * `/shopping/inventory/add/books`). A page there that only sends the visitor
+ * on draws no form and is not counted. An add belongs in capture, aimed at
+ * the kind from the list's Add button.
+ */
+function formOnlyPages(root: string): string[] {
+  return listFiles(root, ['app'], ['.tsx', '.ts', '.jsx', '.js'])
+    .filter((file) => /\/page\.[jt]sx?$/.test(file))
+    .filter((file) => {
+      const route = routeOfFile(file);
+      return route !== null && route.split('/').some((segment) => segment === 'new' || segment === 'add');
+    })
+    .filter((file) => !isRedirectOnly(readFileSync(join(root, file), 'utf8')))
+    .sort();
+}
+
+/**
+ * docs/ONE-INTERFACE-SPEC.md, R6 (plan #1957.4): a date or time becomes words
+ * only in lib/core/when.ts. A file that calls one of the four platform
+ * formatters is counted, except when.ts and the tests.
+ */
+const DATE_FORMATTER = /\b(?:Intl\.DateTimeFormat|toLocaleDateString|toLocaleString|toLocaleTimeString)\b/;
+const WHEN_HOME = 'lib/core/when.ts';
+
+/**
+ * docs/ONE-INTERFACE-SPEC.md, R12 (plan #1964.1): a control that calls a
+ * model names Dash, and "AI" appears on no control. Counts each button or
+ * link under app/ and components/ whose label, the text between its tags,
+ * holds the word AI. The gallery's fixtures are not controls and are left out.
+ */
+const CONTROL_ELEMENT = /<(Button|button|Link|a|DashAction|RowAction)\b[^>]*>([\s\S]*?)<\/\1>/g;
+const AI_WORD = /(?<![\w-])AI(?![\w-])/;
+
+function aiOnControls(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(CONTROL_ELEMENT)]
+        .filter((m) => AI_WORD.test(m[2].replace(/\{\/\*[\s\S]*?\*\/\}/g, '')))
+        .map((m) => `${file}:${lineAt(text, m.index ?? 0)}`);
+    })
+    .sort();
+}
+
+/**
+ * Plan #1964.1: every press that spends a model run is a DashAction, which
+ * draws its cost hint itself. A PaidHint or CostHint written anywhere else
+ * under app/ and components/ is a paid button not yet moved onto it. The
+ * primitives that define them and the gallery are left out.
+ *
+ * A hint that is not on a Dash press is passed by a `dash-action-ok:`
+ * comment on its line or the line above, saying why: a composer whose send
+ * is an arrow beside the text, or a price that is not a model run, such as
+ * posting to X.
+ */
+const HINT_ELEMENT = /<(?:PaidHint|CostHint)\b/g;
+const HINT_HOMES = new Set([
+  'components/ui/paid-hint.tsx',
+  'components/ui/cost-hint.tsx',
+  'components/ui/dash-action.tsx',
+  // The one thread (plan #1964.3) prices a reply beside the arrow that sends
+  // it and the button that opens its box, the way DashAction prices a press,
+  // so every conversation takes its hint from here.
+  'components/thread/thread.tsx',
+]);
+
+function paidHintsOutsideDashAction(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !HINT_HOMES.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const raw = readFileSync(join(root, file), 'utf8');
+      const lines = raw.split('\n');
+      const text = withoutComments(raw);
+      return [...text.matchAll(HINT_ELEMENT)]
+        .map((m) => lineAt(text, m.index ?? 0))
+        .filter((line) => !/dash-action-ok:\s*\S/.test(`${lines[line - 2] ?? ''}\n${lines[line - 1]}`))
+        .map((line) => `${file}:${line}`);
+    })
+    .sort();
+}
+
+/**
+ * docs/ONE-INTERFACE-SPEC.md, "One thread" (plan #1964.3): one component
+ * draws every conversation. A file draws turns of its own when it names the
+ * person's turns "You" and draws both the person's glyph (CircleUser) and
+ * Dash's mark beside them. The gallery is left out; the target is the one
+ * thread, components/thread/thread.tsx.
+ */
+const PERSON_GLYPH = /\bCircleUser\b/;
+const YOU_NAME = /['"`]You['"`]/;
+
+function threadComponents(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .filter((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return PERSON_GLYPH.test(text) && /\bDashMark\b/.test(text) && YOU_NAME.test(text);
+    })
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -319,6 +505,18 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
         pattern: MODEL_ID,
         exclude: /\.test\.tsx?$/,
       }),
+  },
+  {
+    name: 'date-formatting-files',
+    counts: 'files other than lib/core/when.ts that turn a date or a time into words with the platform',
+    target: 0,
+    measure: (root) =>
+      filesMatching(root, {
+        dirs: ['app', 'components', 'lib'],
+        exts: ['.ts', '.tsx'],
+        pattern: DATE_FORMATTER,
+        exclude: /\.test\.tsx?$/,
+      }).filter((file) => file !== WHEN_HOME),
   },
   {
     name: 'link-tables-per-target-column',
@@ -382,6 +580,24 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
       }),
   },
   {
+    name: 'row-pages-without-path',
+    counts: 'pages for one row that draw no path to it',
+    target: 0,
+    measure: rowPagesWithoutPath,
+  },
+  {
+    name: 'form-only-pages',
+    counts: 'pages under app/ at a new or add address, whose only job is a form',
+    target: 0,
+    measure: formOnlyPages,
+  },
+  {
+    name: 'hand-rolled-back-links',
+    counts: 'back links a page draws itself rather than through PageHeader',
+    target: 0,
+    measure: handRolledBackLinks,
+  },
+  {
     // Plan #1895: the actions a page lets the person do that an agent should
     // be able to do and has no Dash tool for. Read from the catalogue the
     // modules declare (lib/agent-actions), which its own test holds to the
@@ -390,5 +606,23 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'server actions an agent should be able to do and has no tool for',
     target: 0,
     measure: () => actionGaps(),
+  },
+  {
+    name: 'ai-on-controls',
+    counts: 'buttons and links under app/ and components/ whose label says AI',
+    target: 0,
+    measure: aiOnControls,
+  },
+  {
+    name: 'thread-components',
+    counts: 'components under app/ and components/ that draw the turns of a conversation',
+    target: 1,
+    measure: threadComponents,
+  },
+  {
+    name: 'paid-hints-outside-dash-action',
+    counts: 'cost hints drawn beside a button rather than by DashAction',
+    target: 0,
+    measure: paidHintsOutsideDashAction,
   },
 ];

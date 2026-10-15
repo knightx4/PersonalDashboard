@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState, useTransition } from 'react';
+import { closedToast } from '@/lib/core/lifecycle';
+import { useState, useTransition } from 'react';
 import {
   deleteSavedItem,
   dismissSavedItem,
@@ -11,10 +12,13 @@ import {
 } from '@/app/shopping/saved/actions';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Property } from '@/components/shell/detail-layout';
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import { linkVariants } from '@/components/ui/link';
 import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
@@ -36,17 +40,40 @@ export type EditableSavedItem = {
 
 const initial: ActionState = {};
 
-function PurchasedButton({ itemId }: { itemId: string }) {
-  const [state, formAction, pending] = useActionState(markSavedPurchased, initial);
+/** Bought it: Done (plan #1957.3), with the way back in the toast. */
+function PurchasedButton({ itemId, title }: { itemId: string; title: string }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   return (
-    <form action={formAction}>
-      <input type="hidden" name="id" value={itemId} />
-      <Button type="submit" size="sm" variant="primary" pending={pending}>
-        {pending ? 'Updating…' : 'Mark purchased'}
-      </Button>
-      <FieldError>{state.error}</FieldError>
-    </form>
+    <div>
+      <Tooltip label="Bought it" align="end">
+        <CloseButton
+          lifecycle="done"
+          variant="primary"
+          pending={pending}
+          onClick={() =>
+            start(async () => {
+              const result = await markSavedPurchased(initial, idForm(itemId));
+              setError(result.error ?? null);
+              if (result.error) return;
+              toast({
+                text: closedToast('done', title),
+                undo: async () => void (await restoreSavedItem(initial, idForm(itemId))),
+              });
+            })
+          }
+        />
+      </Tooltip>
+      <FieldError>{error}</FieldError>
+    </div>
   );
+}
+
+function idForm(id: string): FormData {
+  const form = new FormData();
+  form.set('id', id);
+  return form;
 }
 
 type Fields = {
@@ -80,10 +107,13 @@ export function SavedItemBody({
   item,
   subtitle,
   banner,
+  path,
 }: {
   item: EditableSavedItem;
   subtitle: string;
   banner?: React.ReactNode;
+  /** The path to the saved item, which the page read from the catalogue. */
+  path?: Subject;
 }) {
   // The last values the server accepted, to tell a change from a visit.
   const [lastSaved, setLastSaved] = useState<Fields>({
@@ -101,6 +131,7 @@ export function SavedItemBody({
   const [editingImage, setEditingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
+  const toast = useToast();
 
   async function commit(patch: Partial<Fields>): Promise<string | null> {
     const next = { ...lastSaved, ...patch };
@@ -144,10 +175,18 @@ export function SavedItemBody({
   const menu: ActionMenuItem[] = [];
   if (item.status !== 'dismissed') {
     menu.push({
-      id: 'dismiss',
-      label: 'Dismiss',
-      formAction: (formData) => dismissSavedItem(initial, formData),
-      formFields: { id: item.id },
+      id: 'drop',
+      label: 'Drop',
+      lifecycle: 'dropped',
+      onSelect: () =>
+        start(async () => {
+          const result = await dismissSavedItem(initial, idForm(item.id));
+          if (result.error) return toast({ text: result.error });
+          toast({
+            text: closedToast('dropped', lastSaved.title),
+            undo: async () => void (await restoreSavedItem(initial, idForm(item.id))),
+          });
+        }),
     });
   }
   if (item.status !== 'saved') {
@@ -173,6 +212,7 @@ export function SavedItemBody({
       header={
         <>
           <PageHeader
+            subject={path}
             leading={
               lastSaved.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
@@ -196,7 +236,7 @@ export function SavedItemBody({
             description={subtitle}
           />
           <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
-            {item.status !== 'purchased' && <PurchasedButton itemId={item.id} />}
+            {item.status !== 'purchased' && <PurchasedButton itemId={item.id} title={lastSaved.title} />}
             <a
               href={lastSaved.url}
               target="_blank"

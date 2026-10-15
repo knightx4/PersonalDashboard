@@ -4,6 +4,7 @@ import type { YouChangeInput, YouChangeKind } from '@/lib/ask/you-changes';
 import { toRef } from '@/lib/core/refs';
 import { EDUCATION_HREF } from '@/lib/you/education';
 import { jobDates, jobHref, parseJob, type Job } from '@/lib/you/work-history';
+import { positionForSave } from '@/lib/you/place-position';
 import {
   checkPlace,
   draftOf,
@@ -122,7 +123,7 @@ async function addPlace(env: YouWriteEnv, args: Args): Promise<YouMade> {
 
   const { data, error } = await env.you
     .from('places')
-    .insert({ ...checked.row, user_id: env.userId })
+    .insert({ ...checked.row, ...positionForSave(null, checked.row), user_id: env.userId })
     .select('*')
     .single();
   if (error || !data) throw new Error(`Adding the place failed: ${error?.message ?? 'no row'}`);
@@ -161,7 +162,7 @@ async function changePlace(env: YouWriteEnv, args: Args): Promise<YouMade> {
 
   const { data, error } = await env.you
     .from('places')
-    .update(checked.row)
+    .update({ ...checked.row, ...positionForSave(before as unknown as PlaceRow, checked.row) })
     .eq('id', id)
     .eq('user_id', env.userId)
     .select('*')

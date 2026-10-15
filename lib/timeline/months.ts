@@ -5,6 +5,7 @@ import {
   type TimelineKind,
   type TimelineModule,
 } from './timeline';
+import { whenMonth, zoneDay, zoneOffset } from '@/lib/core/when';
 
 /**
  * The timeline page's arithmetic (plan #1118): which month an event falls in
@@ -36,14 +37,7 @@ export function isMonthKey(value: string | null | undefined): value is MonthKey 
 
 /** The month an instant falls in, read on the person's own calendar. */
 export function monthKeyOf(iso: string, timezone: string): MonthKey {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-  }).formatToParts(new Date(iso));
-  const year = parts.find((part) => part.type === 'year')?.value ?? '1970';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '01';
-  return `${year}-${month}`;
+  return zoneDay(iso, timezone).slice(0, 7) as MonthKey;
 }
 
 /** `key` moved by `delta` months. */
@@ -57,10 +51,7 @@ export function shiftMonth(key: MonthKey, delta: number): MonthKey {
 
 /** "September 2026". */
 export function monthLabel(key: MonthKey): string {
-  const [year, month] = key.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year, month - 1, 1)),
-  );
+  return whenMonth(key, { timeZone: 'UTC' });
 }
 
 /**
@@ -72,27 +63,9 @@ export function monthStart(key: MonthKey, timezone: string): string {
   const wall = Date.UTC(year, month - 1, 1);
   // The zone's offset at a guess, then again at the answer, which settles
   // the months whose first midnight sits on the other side of a clock change.
-  let instant = wall - offsetAt(wall, timezone);
-  instant = wall - offsetAt(instant, timezone);
+  let instant = wall - zoneOffset(wall, timezone);
+  instant = wall - zoneOffset(instant, timezone);
   return new Date(instant).toISOString();
-}
-
-/** How far `timezone`'s clock is ahead of UTC at `instant`, in milliseconds. */
-function offsetAt(instant: number, timezone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-  }).formatToParts(new Date(instant));
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value ?? 0);
-  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-  return wall - Math.floor(instant / 1000) * 1000;
 }
 
 /**
@@ -133,6 +106,25 @@ export function groupByMonth(
       counts: countKinds(monthEvents),
       events: monthEvents,
     }));
+}
+
+/**
+ * How many events each month of the window holds, oldest first, with the
+ * empty months kept at zero, for the chart above the listings (note
+ * 4968526a). `share` is the month's count as a part of the busiest month's.
+ */
+export function monthTotals(
+  months: readonly TimelineMonth[],
+  bounds: { first: MonthKey; last: MonthKey },
+): { key: MonthKey; count: number; share: number }[] {
+  const counts = new Map(months.map((month) => [month.key, month.events.length]));
+  const keys: MonthKey[] = [];
+  for (let key = bounds.first; key <= bounds.last; key = shiftMonth(key, 1)) keys.push(key);
+  const high = Math.max(0, ...keys.map((key) => counts.get(key) ?? 0));
+  return keys.map((key) => {
+    const count = counts.get(key) ?? 0;
+    return { key, count, share: high === 0 ? 0 : count / high };
+  });
 }
 
 /** How many of each kind, in TIMELINE_KINDS order, leaving out the zeros. */

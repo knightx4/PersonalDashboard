@@ -26,8 +26,14 @@ export const youActions: ModuleActions = {
     removeTranscriptAction: none('deletes'),
   },
   'app/you/places/actions.ts': {
-    savePlace: tool('add_place', 'change_place'),
+    // A place is added through capture (plan #1950.7); the form only changes one.
+    savePlace: tool('change_place'),
     removePlace: none('deletes'),
+    placeOnMap: none(
+      'own',
+      "A press on the map is the person pointing at where a place is; Dash places a place from its city when it saves it.",
+    ),
+    worldMap: none('page'),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).
   'app/you/work/job-actions.ts': {

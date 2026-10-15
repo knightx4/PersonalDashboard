@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Fragment,
-  useActionState,
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from '@/components/ui/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -37,7 +29,6 @@ import { Questions } from './questions';
 import {
   PLAN_COMMENTS,
   outlinesOf,
-  type TreeActionState,
   type TreeActions,
   type TreeCatalogEntry,
   type TreeComments,
@@ -53,12 +44,12 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * a session, the run behind a claim, commit checks, priority and size --
  * passed in by the page rather than written here. What is left is what any
  * page of steps shares: the tree guides and the fold, the number and title,
- * the health word you press to change, whose move it is, the count of what
+ * the health word you press to change, who it is on, the count of what
  * is beneath, and the opened panel with the detail, Done when,
  * Needs, the note, the questions, what it waits on and the thread.
  *
  * A page fills it in three steps: `useTreeRow` for the row's own state, which
- * the page's menus need; its own health, move and menus, worked out from that
+ * the page's menus need; its own health, assignee and menus, worked out from that
  * state; then `TreeRow` with those and any slots it uses. `body` is the slot
  * for what only that page has, drawn in the panel under the note.
  */
@@ -188,7 +179,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   trail,
   row,
   health,
-  move,
+  assignee,
   statusMenu,
   menu,
   actions,
@@ -214,7 +205,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
   titles,
   threadPlaceholder = 'A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it.',
   renderChild,
-  layout = 'grid',
+  roomy = false,
+  dimClosed = true,
   after,
   heading = false,
   titleHref,
@@ -233,13 +225,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
    */
   heading?: boolean;
   /**
-   * `grid` is the dev plan's row: the shared columns under a header, with the
-   * outline number, health word, move, priority and count of what is beneath.
-   * `list` is a goal's row (plan #1078): the status control before the title
-   * as a glyph, the title with its marks, the `priority` cell at the end
-   * (under the title on a phone), and the menu. The panel is the same.
+   * A goal's row (plan #2069.2). Every page draws its rows on the same
+   * columns (grid.tsx); the goal page's list layout, added by plan #1078,
+   * went with plan #2069.2, and this keeps what that layout said on a phone.
+   * On a phone the Needs line or note keeps a line of its own under the
+   * title, wrapping to two, and the line under it carries the number,
+   * status, assignee, the count of what is beneath and the `priority` cell,
+   * which on a goal is its date. The plan puts Needs on that line and drops
+   * the rest. The Steps cell is left empty on a row with nothing beneath.
    */
-  layout?: 'grid' | 'list';
+  roomy?: boolean;
+  /**
+   * Dim a closed row while it is folded. A goal's finished rows sit under a
+   * Finished fold that already says so, and dimmed as well their muted text
+   * fell under the contrast floor, so the goal page passes false.
+   */
+  dimClosed?: boolean;
   /** Drawn under the sub-steps while they show: on a goal, the fold of the finished ones. */
   after?: ReactNode;
   node: TreeRowNode;
@@ -248,10 +249,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   row: TreeRowState;
   health: TreeHealth;
   /**
-   * The cell beside health: on the plan, whose move it is, drawn with
-   * `MoveLabel` (components/ui/move-label.tsx); on a goal, who the step is on.
+   * The cell beside health: who the row is on, drawn with `AssigneeCell`
+   * (components/plan-tree/assignee-cell.tsx) on the plan (plan #2069.1).
+   * From sm up it fills the third column; on a phone it stands at the end of
+   * the line under the title, where the cell's word is hidden.
    */
-  move: React.ReactNode;
+  assignee: React.ReactNode;
   /** What pressing the health word offers. */
   statusMenu: ActionMenuItem[];
   /** The row's own menu, at the end of the line. */
@@ -342,6 +345,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // page knows, and a page without it draws the text as written.
   const outlines = useMemo(() => outlinesOf(titles), [titles]);
   const readable = (text: string) => readableRefs(text, outlines);
+  // Only the dev plan passes titles; there a bare `#1931` is a feature, and
+  // on a goal it is more likely a list number, so a goal links outlines only.
+  const stepRefs = titles ? 'all' : 'outlines';
   // A setup job still open. Closed, it is an ordinary finished row -- the
   // errand is run, and a box inviting you to run it again would be a lie.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -387,7 +393,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
     'min-w-0',
     open ? 'break-words' : 'break-words sm:truncate',
     // On a phone the title has the row's width, and two lines of it at most.
-    !open && layout === 'grid' && 'max-sm:line-clamp-2',
+    !open && 'max-sm:line-clamp-2',
     node.status === 'dropped' && 'text-ink-muted line-through',
   );
   const toggle = () => {
@@ -435,11 +441,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
     return () => window.removeEventListener('hashchange', openIfNamed);
   }, [anchorId, setOpen]);
 
-  const list = layout === 'list';
   // Health is a word you click to change, not a badge you have to open the
   // step to change: "where is this" is the question the page exists for, and
-  // answering it differently should not be a form. The grid draws it after
-  // the title; the list draws it before, where a checkbox would be.
+  // answering it differently should not be a form. It sits after the title.
   // What the state means rides on the menu's trigger as a Tooltip, rather
   // than on the label inside it, so the button keeps the one tab stop.
   const healthTrigger = (
@@ -448,9 +452,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
       items={statusMenu}
       align="start"
       triggerClassName={cn(
-        list
-          ? 'size-7 px-0 text-small font-medium'
-          : 'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
+        'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
         TONE_TEXT[health.tone],
       )}
       trigger={
@@ -470,28 +472,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // glyph is how they are told apart at a glance. The count
           // beside the module heading keeps its slash too, because there
           // a bare number would say nothing at all.
-          glyph={health.name === 'dropped' && !list ? null : health.glyph}
+          glyph={health.name === 'dropped' ? null : health.glyph}
           // On a phone the glyph stands for the word, which stays for
           // screen readers, so a dropped row gets its slash back there.
-          // In the list layout the glyph is the control at every width,
-          // and the word is its accessible name and tooltip.
-          wordClassName={list ? 'sr-only' : 'max-sm:sr-only'}
+          wordClassName="max-sm:sr-only"
         >
-          {health.name === 'dropped' && !list && (
-            <StatusGlyph glyph={health.glyph} className="sm:hidden" />
-          )}
+          {health.name === 'dropped' && <StatusGlyph glyph={health.glyph} className="sm:hidden" />}
         </StateLabel>
       }
     />
   );
   const healthMenu = health.title ? (
-    <Tooltip label={health.title} className={list ? 'shrink-0' : 'justify-self-start'}>
+    <Tooltip label={health.title} className="justify-self-start">
       <span className="inline-flex">{healthTrigger}</span>
     </Tooltip>
   ) : (
-    <span className={cn('inline-flex', list ? 'shrink-0' : 'justify-self-start')}>
-      {healthTrigger}
-    </span>
+    <span className="inline-flex justify-self-start">{healthTrigger}</span>
   );
 
   // What the title cell says: the title and the lines under it. A button
@@ -501,8 +497,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
     <>
       <span
         className={cn(
-          'flex min-w-0 items-baseline gap-1.5 text-ui',
-          !list && 'sm:leading-7',
+          'flex min-w-0 items-baseline gap-1.5 text-ui sm:leading-7',
           trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
         )}
       >
@@ -516,11 +511,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
               the search box takes either. */}
         {/* On a phone the number moves to the line under the title, with
             the health, so the title has the row's width (plan #1747). */}
-        {!list && (
-          <span className="tabular shrink-0 text-small text-ink-ghost max-sm:hidden">
-            #{node.outline}
-          </span>
-        )}
+        <span className="tabular shrink-0 text-small text-ink-ghost max-sm:hidden">
+          #{node.outline}
+        </span>
         {/* Truncated closed, whole open. A row is a line and a long title
          * has to give way to keep it one; but opening the step is the
          * gesture that means "show me this one", and a name still cut
@@ -596,20 +589,26 @@ export function TreeRow<E extends TreeCatalogEntry>({
       )}
       {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
       {need && !open && (
-        <span className={cn('block truncate text-small text-ink', !list && 'max-sm:hidden')}>
+        <span
+          className={cn(
+            'block truncate text-small text-ink',
+            roomy ? 'max-sm:line-clamp-2 max-sm:whitespace-normal' : 'max-sm:hidden',
+          )}
+        >
           <span className="font-medium text-caution">Needs: </span>
           {need}
         </span>
       )}
       {gloss && !open && !need && (
-        <span className={cn('block truncate text-small text-ink-muted', !list && 'max-sm:hidden')}>
+        <span
+          className={cn(
+            'block truncate text-small text-ink-muted',
+            roomy ? 'max-sm:line-clamp-2 max-sm:whitespace-normal' : 'max-sm:hidden',
+          )}
+        >
           {!node.detail && 'Note: '}
           {glossText}
         </span>
-      )}
-      {/* On a phone the list layout's last cell goes under the title. */}
-      {list && priority && (
-        <span className="block text-small text-ink-muted sm:hidden">{priority}</span>
       )}
     </>
   );
@@ -626,9 +625,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // so the health, the priority and the size read as part of the
           // title's line (plan #1747). On a phone the title takes the whole
           // first line and the rest go on a second.
-          list
-            ? 'flex items-start gap-x-1'
-            : cn(ROW_GRID, 'max-sm:grid-cols-[minmax(0,1fr)_2rem] sm:items-start'),
+          cn(ROW_GRID, 'max-sm:grid-cols-[minmax(0,1fr)_2rem] sm:items-start'),
           'group scroll-mt-24 px-3',
           (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
@@ -637,10 +634,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // under the contrast floor.
           // Opened, a finished step is being read, as its title already is
           // in full: dimmed, its #number fell to 2.3:1 (plan #1541).
-          closed && !list && !open && 'opacity-70',
+          closed && dimClosed && !open && 'opacity-70',
         )}
       >
-        <div className={cn('flex min-w-0 items-stretch', list ? 'flex-1' : 'max-sm:col-span-2')}>
+        <div className={cn('flex min-w-0 items-stretch', !heading && 'max-sm:col-span-2')}>
           <TreeGuides trail={trail} />
 
           {/* The fold, where there is something beneath to fold. A spacer
@@ -649,10 +646,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <Tooltip
               label={foldTip}
               className={cn(
-                'shrink-0',
-                // In the list the row can run to several lines (the title,
-                // Needs, a date), so the fold sits on the title's line.
-                list ? 'mt-1 self-start' : 'self-center sm:mt-1 sm:self-start',
+                'shrink-0 sm:mt-1 sm:self-start',
+                // On a goal the title can run to Needs on two lines beneath it,
+                // so the fold stays on the title's line.
+                roomy ? 'mt-0.5 self-start' : 'self-center',
               )}
             >
               <button
@@ -717,11 +714,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
 
-          {list && healthMenu}
-
           {/* The title and the chevron beside it are one fold: either opens
               the step's panel and its sub-steps together. Renamed in place
-              where the page gives the title an editor. */}
+              where the page gives the title an editor. On a step's own page
+              the status sits against the heading, since there is no column
+              header above it and nothing below lines up with the columns. */}
+          {heading && <span className="flex shrink-0 self-center">{healthMenu}</span>}
           {row.editing && titleEditor ? (
             <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
           ) : heading ? (
@@ -743,42 +741,41 @@ export function TreeRow<E extends TreeCatalogEntry>({
               </span>
             </h1>
           ) : titleHref ? (
-            <div
-              className={cn(
-                'min-w-0 flex-1 text-left',
-                list ? 'self-start py-1 pl-1' : 'self-center sm:self-start',
-              )}
-            >
-              {rowLines}
-            </div>
+            <div className="min-w-0 flex-1 self-center text-left sm:self-start">{rowLines}</div>
           ) : (
             <button
               type="button"
               onClick={toggle}
               aria-expanded={expanded}
               title={expanded ? `Close #${handle}` : `Open #${handle}`}
-              className={cn(
-                'min-w-0 flex-1 text-left hover:text-accent',
-                list ? 'self-start py-1 pl-1' : 'self-center sm:self-start',
-              )}
+              className="min-w-0 flex-1 self-center text-left hover:text-accent sm:self-start"
             >
               {rowLines}
             </button>
           )}
         </div>
 
-        {!list && <div className="max-sm:hidden">{healthMenu}</div>}
+        <div className="max-sm:hidden">{!heading && healthMenu}</div>
 
         {/* The phone's second line: the number, the health as its glyph, and
-            what the step involves, under the title from where it starts. */}
-        {!list && (
+            what the step involves, under the title from where it starts. Not
+            on a step's own page, where the status sits against the heading
+            and the menu on its line. */}
+        {!heading && (
           <div
             className="flex min-w-0 items-center gap-1.5 sm:hidden"
             style={{ paddingLeft: `${(trail.length + 1) * 1.25}rem` }}
           >
             <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
             {healthMenu}
-            {need && !open ? (
+            {assignee && <span className="flex shrink-0 items-center">{assignee}</span>}
+            {roomy ? (
+              node.rollup.live > 0 && (
+                <span className="flex shrink-0 items-center pl-1">
+                  <Breakdown rollup={node.rollup} />
+                </span>
+              )
+            ) : need && !open ? (
               <span className="min-w-0 truncate text-small text-ink">
                 <span className="font-medium text-caution">Needs: </span>
                 {need}
@@ -792,59 +789,46 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 </span>
               )
             )}
+            {roomy && priority && (
+              <span className="ml-auto shrink-0 pl-1 text-small">{priority}</span>
+            )}
           </div>
         )}
 
-        {/* Whose move it is, beside how far along it is.
+        {/* Who it is on, beside how far along it is (plan #2069.1).
 
-            A word and a tone, and deliberately no hexagon: the hexagons belong
-            to health, they are a scale from empty to full, and a second column
-            of them beside it would read as a second position on the same scale
-            rather than as an answer to a different question. The one shape is
-            Dash's working mark, which MoveLabel puts beside "Dash is on it".
+            Your initial, Dash's mark or both, and no hexagon: the hexagons
+            belong to Status, a scale from empty to full, and this answers a
+            different question. What it waits on and whether a session is
+            working it now are in the Status tooltip and the Needs line.
 
-            Not a menu, where health is one. Health is set by hand; this is
-            derived from what is already true of the row -- who it is assigned
-            to, what it waits on, whether it is a question -- so there is
-            nothing here to pick. Changing it means handing the step over or
-            answering what it asks, which are the buttons already on the row. */}
-        {list ? (
-          priority &&
-          !heading && (
-            <span className="hidden max-w-48 shrink-0 pt-1.5 text-right text-small sm:block">
-              {priority}
-            </span>
-          )
-        ) : (
-          <>
-            {/* Wraps rather than clips: "Waiting on 26 Oct" is wider than the
-                column, and a cut word lost the day it waits for (note 5025f689). */}
-            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">
-              {move}
-            </span>
+            Not a menu, where Status is one. It is derived from what is already
+            true of the row -- who it is assigned to, whether it is a question
+            or a setup job -- so there is nothing here to pick. Changing it
+            means keeping the step or handing it back, which is the Mine button
+            already on the row. */}
+        <>
+          {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
+          <span className="hidden min-w-0 text-small sm:flex sm:h-7 sm:items-center">
+            {!heading && assignee}
+          </span>
 
-            <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>
+          {/* Not on a step's own page, where its chips say its dates. */}
+          <span className="hidden truncate text-small sm:block sm:leading-7">
+            {!heading && priority}
+          </span>
 
-            {/* No "Who" column. It was a column of dashes with the occasional
-                name in it -- one fact, on a plan whose every approved step the
-                runner takes unless you keep it, and keeping it is a button. */}
-            {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
-            <span className="hidden sm:flex sm:h-7 sm:items-center">
-              <Breakdown rollup={node.rollup} />
-            </span>
-          </>
-        )}
+          {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
+          <span className="hidden sm:flex sm:h-7 sm:items-center">
+            {!heading && !(roomy && node.rollup.live === 0) && <Breakdown rollup={node.rollup} />}
+          </span>
+        </>
 
         {/* The things done to a step without reading it first, then the menu
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div
-          className={cn(
-            'flex items-center justify-self-end',
-            list ? 'shrink-0' : 'self-center sm:self-start',
-          )}
-        >
+        <div className="flex items-center self-center justify-self-end sm:self-start">
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
@@ -909,7 +893,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!isDecision && !setupOpen && detailView}
                   {node.detail && !isDecision && !setupOpen && !detailView && (
                     <p className="whitespace-pre-wrap text-ui text-ink-muted">
-                      <LinkedText text={readable(node.detail)} />
+                      <LinkedText text={readable(node.detail)} refs={stepRefs} />
                     </p>
                   )}
                   {(node.acceptance || acceptanceView) && (
@@ -917,7 +901,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       <SectionLabel>Done when</SectionLabel>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
-                          <LinkedText text={readable(node.acceptance ?? '')} />
+                          <LinkedText text={readable(node.acceptance ?? '')} refs={stepRefs} />
                         </p>
                       )}
                     </div>
@@ -929,13 +913,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     <div>
                       <SectionLabel>Needs</SectionLabel>
                       <p className="whitespace-pre-wrap text-ui text-ink">
-                        <LinkedText text={readable(node.blockAsk)} />
+                        <LinkedText text={readable(node.blockAsk)} refs={stepRefs} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
                     <Note className="whitespace-pre-wrap">
-                      <LinkedText text={readable(node.comment)} />
+                      <LinkedText text={readable(node.comment)} refs={stepRefs} />
                     </Note>
                   )}
 

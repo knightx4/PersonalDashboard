@@ -5,8 +5,7 @@ import { pageFor } from '@/lib/sources/catalogue';
 import type { PageRow } from '@/lib/sources/types';
 import type { AnyClient } from '@/lib/thread/store';
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -151,6 +150,7 @@ export const threadsSource: AgendaSource = {
   id: 'threads',
   label: 'Dash asked you something',
   module: 'todo',
+  crossesWorkspaces: true,
   alwaysOn: true,
   description: 'Threads where Dash replied last and asked you something.',
 
@@ -183,13 +183,15 @@ export const threadsSource: AgendaSource = {
     return threadItems(asking, titles);
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'thread', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'thread', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'thread', key, ctx.clients);
   },
 };

@@ -18,7 +18,9 @@ busy, and not marked `done` because the session is ending.
 
 ## The tool
 
-`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment.
+`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment, or in
+a cloud session `SUPABASE_SERVICE_ROLE_KEY`, which it uses to send each
+statement over HTTPS because the cloud proxy carries nothing else.
 
 ```
 npx tsx scripts/plan.ts next [--claude]        # what could be picked up, most urgent first
@@ -88,7 +90,8 @@ shows it with the outline, and you leave it as it is. Querying the database
 directly, join `plan_item_outlines` on `id` to get the outline
 (`reference/offline.md`).
 
-If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
+If both are missing, or `plan.ts` fails to reach the database, read
+`reference/offline.md` rather than guessing.
 
 **Writing by hand, record each write** to `plan_items` or `ideas` with
 `core.record_dash_action`, so Home lists it under what Dash did today with an
@@ -156,9 +159,11 @@ you close when they are all done.
 ## Building
 
 **One step, on its own** — "do #1073.4", or one step named in a brief. Read
-`reference/building.md` and follow it yourself, then put the commit on main as
-in step 4 below. A subagent for a single step is pure overhead, except on a
-Sonnet session for a step sized `m` or `l` (step 3 below).
+`reference/building.md` and follow it yourself, including its **When nobody
+sent you**, which puts the commit on main. A routine fired at one step is
+sent to that file directly and never reads this one. A subagent for a single
+step is pure overhead, except on a Sonnet session for a step sized `m` or `l`
+(step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -344,33 +349,29 @@ Each is one file. Read the one you were sent for; do not read the others.
 | | |
 |---|---|
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
+| `reference/screen.md` | The gallery, photograph and critic loop, for a step that changes a screen. `building.md` sends a builder there only when it does. |
 | `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
 | `reference/unsticking.md` | Finding out why a feature stalled, and fixing it or writing what it waits on. |
 | `reference/overhaul.md` | Working an overhaul: the design session, the three phases, the review against the Contract. |
+| `reference/routine-prompt.md` | The standing prompt for the routine that works the plan, and how it routes each turn to one file. |
 | `reference/overhaul-routine.md` | The standing prompt for the routine that works an overhaul, and how to set it up. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |
 | `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
 | `reference/raising.md` | The four places something a session has to say can go. |
 | `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
-| `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
+| `reference/offline.md` | The SQL to use when `plan.ts` cannot reach the database. |
 
-A shaping run, a re-shape and a re-shape after a vision edit each have a row
-in `plan_runs` (job `shape`, `reshape` or `vision_reshape`) that nothing else
-marks finished. As the last write of the run, mark yours, under its own job
-name: a row marked under the wrong one leaves yours `started`, and it is
-written back as failed hours later however well the run went.
+## Ending the run
 
-```sql
-update plan_runs set status = 'finished', error = null
-where id = (select id from plan_runs
-            where job = '<shape, reshape or vision_reshape>' and status = 'started'
-            order by created_at desc limit 1);
-```
-
-For a re-shape, add `and plan_item_id = '<the feature's id>'` inside the
-select. A re-shape after a vision edit is about no feature, so it adds
-nothing. A build run needs nothing: closing or blocking its step ends it.
+Every turn the app fires ends with a `## Ending this run` note and a `Dash
+run id:` line. As the last write of the run, whatever the job, run the
+update that note gives: it marks your own row in `plan_runs` finished, by
+its id. A shaping run, a comment reply, a raise, a spec change and a CI fix
+are about no step, so nothing else ends them, and a row left `started` is
+written back as failed two hours later however well the run went. A run
+that did none of what it was sent for says why instead, with `stopped` or
+the failed update the note gives.
 
 ## Statuses
 

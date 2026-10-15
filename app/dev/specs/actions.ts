@@ -354,3 +354,46 @@ export async function declineSpecChange(
   if (!id.success) return { error: id.error.issues[0].message };
   return (await decideChange(supabase, user.id, id.data, 'declined')).state;
 }
+
+/**
+ * The toast's Undo on Decline (plan #1957.3): the change is proposed again,
+ * as long as nothing else has decided it since.
+ */
+// latency: pending
+export async function undeclineSpecChange(id: string): Promise<SpecChangeActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  const parsed = changeIdSchema.safeParse(id);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { error } = await supabase
+    .from('spec_changes')
+    .update({ status: 'proposed', decided_at: null })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('status', 'declined');
+  if (error) return { error: error.message };
+  revalidatePath('/dev/specs');
+  revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
+  return {};
+}
+
+/** The toast's Undo on Decline of a vision edit (plan #1957.3): pending again. */
+// latency: pending
+export async function reopenVisionEdit(id: string): Promise<VisionEditActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  const parsed = editIdSchema.safeParse(id);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { error } = await supabase
+    .from('vision_reviews')
+    .update({ status: 'pending', decided_at: null })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('status', 'dismissed');
+  if (error) return { error: error.message };
+  revalidatePath('/dev/specs');
+  revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
+  return {};
+}

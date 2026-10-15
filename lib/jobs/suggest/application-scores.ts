@@ -1,4 +1,5 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
+import { formatMoney } from '@/lib/money';
 import { askJevAll, type JevFailure, type JevQuestion, type JevResult, type JevScoreAnswer } from '@/lib/jev/wire';
 import type { RequirementMatch } from '../evidence/match-payload';
 import type { Requirement } from '../jd/requirements';
@@ -86,7 +87,7 @@ export type ApplicationText = {
 };
 
 function dollars(cents: number): string {
-  return `$${Math.round(cents / 100).toLocaleString('en-US')}`;
+  return formatMoney(Math.round(cents / 100) * 100, 'USD', { showCents: false });
 }
 
 /** The pay as one line, or null when none is on file. */

@@ -261,3 +261,38 @@ export async function answerTrackOffer(formData: FormData): Promise<void> {
     outcome: parsed.data.outcome,
   });
 }
+
+const OfferPress = z.union([
+  z.object({ themeId: z.string().uuid() }),
+  z.object({ subjectId: z.string().uuid() }),
+]);
+
+/**
+ * The toast's Undo on Later, Decline or Drop of an offered track (plan
+ * #1957.3): the newest answer on that theme, or on that resting subject, is
+ * taken back, so the offer can come again as if it had not been answered.
+ */
+// latency: pending
+export async function takeBackOfferAnswer(
+  input: { themeId: string } | { subjectId: string },
+): Promise<void> {
+  const user = await requireUser();
+  const parsed = OfferPress.safeParse(input);
+  if (!parsed.success) return;
+  const supabase = await createLearnClient();
+  let query = supabase.from('track_offers').select('id').eq('user_id', user.id);
+  query =
+    'themeId' in parsed.data
+      ? query.eq('theme_id', parsed.data.themeId)
+      : query.eq('subject_id', parsed.data.subjectId).eq('kind', 'resting');
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1);
+  if (error) throw new Error(error.message);
+  const id = data?.[0]?.id as string | undefined;
+  if (!id) return;
+  const { error: deleteError } = await supabase
+    .from('track_offers')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
+  if (deleteError) throw new Error(deleteError.message);
+}

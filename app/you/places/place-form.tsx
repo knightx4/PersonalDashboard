@@ -11,7 +11,8 @@ import { draftOf, NAME_MAX, NOTE_MAX, placeHref, type Place } from '@/lib/you/pl
 import type { PlaceFormState } from './actions';
 
 /**
- * Adding a place, or changing one (plan #1991.5). One column of fields in the
+ * Changing a place (plan #1991.5); a new one is added through capture
+ * (plan #1950.7), from the Add on Places. One column of fields in the
  * order a person remembers a home: what they call it, where it is, when they
  * moved in and out, then anything else.
  *
@@ -27,7 +28,7 @@ export function PlaceForm({
   place,
   save,
 }: {
-  place: Place | null;
+  place: Place;
   save?: (prev: PlaceFormState, form: FormData) => Promise<PlaceFormState>;
 }) {
   const [state, action, pending] = useActionState(
@@ -36,23 +37,24 @@ export function PlaceForm({
   );
   const draft = state.values ?? draftOf(place);
   const errors = state.errors ?? {};
-  const back = place ? placeHref(place.id) : '/you/places';
+  const back = placeHref(place.id);
 
   return (
     <PageColumn className="max-w-xl">
       <PageHeader
-        title={place ? `Edit ${place.name}` : 'Add a place'}
-        crumbs={[
-          { label: 'You', href: '/you' },
-          { label: 'Places', href: '/you/places' },
-          place
-            ? { label: place.name, href: placeHref(place.id) }
-            : { label: 'Add a place', href: '/you/places/new' },
-        ]}
+        title={`Edit ${place.name}`}
+        subject={{
+          ref: `you.places:${place.id}`,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Places', href: '/you/places' },
+            { label: place.name, href: placeHref(place.id) },
+          ],
+        }}
       />
       <Card padding="standard">
         <form key={state.values ? JSON.stringify(state.values) : 'first'} action={action} className="space-y-5">
-          {place && <input type="hidden" name="id" value={place.id} />}
+          <input type="hidden" name="id" value={place.id} />
           <Field
             id="place-name"
             label="Name"
@@ -65,7 +67,6 @@ export function PlaceForm({
               defaultValue={draft.name}
               maxLength={NAME_MAX}
               required
-              autoFocus={!place}
               autoComplete="off"
             />
           </Field>
@@ -115,7 +116,7 @@ export function PlaceForm({
               Cancel
             </Link>
             <Button type="submit" variant="primary" size="md" pending={pending}>
-              {pending ? 'Saving…' : place ? 'Save' : 'Add place'}
+              {pending ? 'Saving…' : 'Save'}
             </Button>
           </div>
         </form>

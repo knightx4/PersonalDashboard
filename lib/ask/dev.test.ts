@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { AskContext, SchemaClient } from './db';
-import { MAX_DEV_COMMENTS, SECTION_CHARS, excerpt, queryWords } from './dev';
+import { MAX_DEV_COMMENTS, SECTION_CHARS, excerpt, queryWords, runLine } from './dev';
 import { executeAskTool } from './tools';
 
 /**
@@ -303,7 +303,7 @@ describe('read_dev_row', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1248 Read a row',
-        href: '/dev/plan?view=all&q=%231248',
+        href: '/dev/plan/1248',
       });
       expect(row.detail).toMatchObject({
         under: '#1319 Let Dash read your Dev pages in full',
@@ -337,7 +337,7 @@ describe('read_dev_row', () => {
       const [row] = result.rows;
       expect(row.title).toBe('#1319.1 Read a row');
       // The link still carries the number, the step's identity.
-      expect(row.href).toBe('/dev/plan?view=all&q=%231248');
+      expect(row.href).toBe('/dev/plan/1248');
       expect(row.detail).toMatchObject({
         step: '#1319.1',
         number: 1248,
@@ -499,7 +499,7 @@ describe('find_dev_text', () => {
         table: 'public.plan_items',
         ref: STEP,
         title: '#1400 Show counts',
-        href: '/dev/plan?view=all&q=%231400',
+        href: '/dev/plan/1400',
         detail: {
           kind: 'comment',
           field: 'comment',
@@ -522,7 +522,7 @@ describe('find_dev_text', () => {
     const result = await find({ query: 'drop step', kinds: ['comment'] }, { tables: outlined });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: '#1390.2 Show counts',
-      href: '/dev/plan?view=all&q=%231400',
+      href: '/dev/plan/1400',
       detail: { excerpt: 'Drop this step, #1320.3 covers it.' },
     });
   });
@@ -579,5 +579,28 @@ describe('find_dev_text', () => {
 describe('excerpt', () => {
   it('keeps a short text whole on one line', () => {
     expect(excerpt('One\n\ntwo ranking', ['ranking'])).toBe('One two ranking');
+  });
+});
+
+describe('runLine for a run still going (note be6278a2)', () => {
+  const now = Date.parse('2026-10-14T20:00:00Z');
+  const run = { status: 'started', error: null, stop_reason: null, stop_pieces: null, created_at: '2026-10-14T18:45:00Z' };
+
+  it('says a run that went quiet over half an hour ago has likely stopped', () => {
+    expect(runLine(run, { lastLineAt: '2026-10-14T18:50:00Z', now })).toBe(
+      '[2026-10-14] started. It started at 18:45 UTC, 75 minutes ago. Its newest line was written 70 minutes ago. That is over 30 minutes, so the session has likely stopped.',
+    );
+  });
+
+  it('gives a run writing now its last line, and one with none says so', () => {
+    expect(runLine(run, { lastLineAt: '2026-10-14T19:55:00Z', now })).toContain('Its newest line was written 5 minutes ago.');
+    expect(runLine(run, { lastLineAt: '2026-10-14T19:55:00Z', now })).not.toContain('likely stopped');
+    expect(runLine(run, { lastLineAt: null, now })).toContain('It has written no lines');
+  });
+
+  it('leaves a finished run as it was', () => {
+    expect(runLine({ ...run, status: 'failed', error: 'Too big.' }, { lastLineAt: null, now })).toBe(
+      "[2026-10-14] failed. The app's note: Too big.",
+    );
   });
 });

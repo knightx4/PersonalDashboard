@@ -1,9 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 /**
  * One email's HTML, drawn in a sandboxed frame.
@@ -72,21 +69,5 @@ export function EmailFrame({ html, title }: { html: string; title: string }) {
       style={{ height }}
       className="block w-full rounded-control bg-white"
     />
-  );
-}
-
-/** Back to wherever the link was tapped, or home when the reader was opened directly. */
-export function BackButton() {
-  const router = useRouter();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => (window.history.length > 1 ? router.back() : router.push('/home'))}
-      className="mb-3 -ml-2.5"
-    >
-      <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Back
-    </Button>
   );
 }

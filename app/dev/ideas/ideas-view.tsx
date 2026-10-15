@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -7,7 +8,6 @@ import { Lightbulb, Sparkles } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
-  addIdea,
   deleteIdea,
   dismissIdea,
   restoreIdea,
@@ -16,6 +16,7 @@ import {
   type IdeaActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -41,6 +42,7 @@ import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
 import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
 import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { useToast } from '@/components/ui/toast';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { Chip } from '@/components/ui/chip';
@@ -83,62 +85,12 @@ function ModuleSelect({
 }
 
 /**
- * Writing one down, which is the whole job.
- *
- * Deliberately two fields and a button. An idea that needs a form to describe
- * it is a request, and requests have a queue of their own next door.
- *
- * Closed until asked for (law 14). This page is read far more often than it is
- * written to -- the list of ideas is the point of visiting -- and a three-row
- * box standing open above that list was the first thing on the page.
- *
- * The label goes with it: the placeholder already says what to type, and a
- * caption above a box repeating it is law 15.
+ * Writing one down, which is the whole job: capture aimed at an idea (plan
+ * #1950.5). One press makes it, about the app as a whole until it is edited
+ * or triaged, and opens it.
  */
 function AddIdea() {
-  const [state, action, pending] = useActionState(addIdea, {} as IdeaActionState);
-  const [composing, setComposing] = useState(false);
-
-  // Close once it has saved. The new idea appearing in the list below is the
-  // confirmation; leaving the box open would put the fault straight back.
-  //
-  // Adjusted during render rather than in an effect: this is React's own
-  // pattern for reacting to a changed value, and an effect here is a second
-  // render for nothing -- which the lint rule says out loud.
-  const [seen, setSeen] = useState<string | undefined>(undefined);
-  if (state.message !== seen) {
-    setSeen(state.message);
-    if (state.message && !state.error) setComposing(false);
-  }
-
-  if (!composing) {
-    return <AddTrigger label="Add an idea" onClick={() => setComposing(true)} />;
-  }
-
-  return (
-    <form action={action} className={cardVariants({ padding: 'dense' })}>
-      <Textarea
-        id="idea-body"
-        name="body"
-        rows={3}
-        autoFocus
-        placeholder="Something worth doing one day. It will sit here until it is."
-      />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <ModuleSelect name="module" defaultValue={null} />
-        <Button type="submit" size="sm" pending={pending}>
-          {pending ? 'Saving…' : 'Add idea'}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setComposing(false)}>
-          Cancel
-        </Button>
-        <FieldError>{state.error}</FieldError>
-        {state.message && !state.error && (
-          <span className="text-small text-ink-muted">{state.message}</span>
-        )}
-      </div>
-    </form>
-  );
+  return <AddTrigger label="Add an idea" aim={{ kind: 'idea' }} />;
 }
 
 /**
@@ -168,10 +120,9 @@ export function ShapeIdea({ idea }: { idea: IdeaRow }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={idea.id} />
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
-        {pending ? 'Sending…' : 'Shape into a plan'}
-      </Button>
+      <DashAction type="submit" size="sm" variant="secondary" pending={pending}>
+        {pending ? 'Sending…' : 'Shape this into a plan'}
+      </DashAction>
       {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"
           is the system saying what it did. */}
       {state.message && <span className="text-small text-ink-muted">{state.message}</span>}
@@ -252,6 +203,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
   const [saveState, saveAction, savePending] = useActionState(updateIdea, {} as IdeaActionState);
   const [asideState, asideAction, asidePending] = useActionState(restoreIdea, {} as IdeaActionState);
   const [menuError, setMenuError] = useState<string | undefined>(undefined);
+  const toast = useToast();
 
   // The menu runs these as plain transitions, so the result is read here
   // rather than through useActionState.
@@ -268,9 +220,21 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
       ? []
       : [
           {
-            id: 'dismiss',
-            label: 'Dismiss',
-            formAction: (formData: FormData) => run(dismissIdea, formData),
+            id: 'drop',
+            label: 'Drop',
+            lifecycle: 'dropped' as const,
+            formAction: async (formData: FormData) => {
+              const result = await dismissIdea({}, formData);
+              setMenuError(result.error);
+              if (result.error) return;
+              toast({
+                text: closedToast('dropped', idea.body.split('\n')[0]),
+                undo: async () => {
+                  const back = await restoreIdea({}, formData);
+                  if (back.error) throw new Error(back.error);
+                },
+              });
+            },
             formFields: { id: idea.id },
           },
         ]),

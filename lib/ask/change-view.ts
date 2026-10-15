@@ -5,6 +5,8 @@ import { statusLabel } from '@/lib/jobs/status-label';
 import { noteHref } from '@/lib/vault/paths';
 import { learnChangeWords } from './learn-changes';
 import { isWrittenCard } from './todo-changes';
+import { whenDate } from '@/lib/core/when';
+import { planRefHref } from '@/lib/comments/refs';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -47,6 +49,8 @@ export function changeHref(change: DashChange): string {
       return '/jobs/pipeline';
     case 'add_quick_note':
       return noteHref(change.input.path);
+    case 'start_build':
+      return planRefHref(change.input.number);
   }
 }
 
@@ -123,18 +127,8 @@ function quoted(body: string, max = 80): string {
 export function dueDay(day: string, today?: string): string {
   const [year, month, date] = day.split('-').map(Number);
   if (!year || !month || !date) return day;
-  const at = new Date(Date.UTC(year, month - 1, date));
   const sameYear = !today || today.slice(0, 4) === day.slice(0, 4);
-  // Formatted in two halves: en-GB puts a comma after the weekday once the
-  // year is in, and the card reads better without one.
-  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(at);
-  const dayMonth = new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  }).format(at);
-  return `${weekday} ${dayMonth}`;
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long', year: sameYear ? 'never' : 'always' });
 }
 
 /**
@@ -243,6 +237,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: quoted(change.input.body),
         rest: " in your vault's Inbox",
       };
+    case 'start_build':
+      return {
+        verb: done ? 'Started the build of' : 'Start the build of',
+        what: `#${change.input.outline} ${change.input.title}`,
+        rest: '',
+      };
   }
 }
 
@@ -292,5 +292,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the pipeline';
     case 'add_quick_note':
       return 'Open the note';
+    case 'start_build':
+      return 'Open the step';
   }
 }

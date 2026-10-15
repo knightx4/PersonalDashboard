@@ -5,7 +5,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
-import { StateLabel } from '@/components/dev/state-label';
+import { AssigneeCell } from '@/components/plan-tree/assignee-cell';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
 import type { ActionMenuItem } from '@/components/ui/action-menu';
@@ -75,24 +75,26 @@ import {
   StepText,
   StepTitleEditor,
   formatDate,
+  useDeclineProposal,
   useMenuAction,
 } from './step-parts';
+import { closedToast } from '@/lib/core/lifecycle';
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
- * One goal step, drawn through the dev plan's shared row (plan #982) in its
- * list layout (plan #1078).
+ * One goal step, drawn through the dev plan's shared row (plan #982) on the
+ * plan's columns (plan #2069.2).
  *
- * The same fold, guides, status menu and opened panel as /dev/plan, with a
- * goal's writes behind them, but none of the plan's columns: a row is its
- * status glyph, its title with Dash's mark on Dash's steps, and at the end
- * its date, a rhythm's count or, on a stage, how far along it is. What only
- * a goal has goes in the row's slots: Dash's draft or result as a fold under
- * the row, a question's answer box, a rhythm's periods and an information
- * step's form in the panel body. Finished sub-steps fold under the open ones.
+ * The same fold, guides, status menu, opened panel and columns as /dev/plan,
+ * with a goal's writes behind them: Step, Status, Assignee, When and Steps.
+ * When is the plan's Priority cell holding the step's date or a rhythm's
+ * count. What only a goal has goes in the row's slots: Dash's draft or
+ * result as a fold under the row, a question's answer box, a rhythm's
+ * periods and an information step's form in the panel body. Finished
+ * sub-steps fold under the open ones.
  */
 
 /** The goal's writes, for the shared tree components. */
@@ -126,6 +128,8 @@ export type GoalRowContext = {
   opened: boolean;
   /** An information step's list as the gallery wants it. Nothing in the app passes it. */
   informationSeam?: InformationSeam;
+  /** The step whose Assignee tooltip starts open, for the gallery. */
+  tipOpenFor?: string;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs: Record<string, StepRunView>;
   /** The files each step links to, by step id (core.files through goals.links). */
@@ -406,7 +410,6 @@ export function GoalRow({
   unlinkId,
   fromGoal,
   unfolded,
-  summary,
   page = false,
 }: {
   node: GoalRowNode;
@@ -421,8 +424,6 @@ export function GoalRow({
   fromGoal?: { id: string; title: string };
   /** Start with the sub-steps showing, in place of the page's choice: a stage under Now does, one on the map does not. */
   unfolded?: boolean;
-  /** What the row says at its end in place of a date: on a stage, how far along it is. */
-  summary?: string;
   /**
    * The row is the step its own page is about (plan #1620): it starts opened,
    * and its panel does not link to the page it is already on.
@@ -495,6 +496,7 @@ export function GoalRow({
     {} as ShapingActionState,
   );
   const toast = useToast();
+  const declineProposal = useDeclineProposal(step);
   const menuAction = useMenuAction();
   const tree = (action: (prev: TreeActionState, form: FormData) => Promise<TreeActionState>) =>
     menuAction((form) => action({}, form));
@@ -517,7 +519,7 @@ export function GoalRow({
       return;
     }
     toast({
-      text: `Archived ${step.title}.`,
+      text: closedToast('dropped', step.title),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', step.id);
@@ -529,7 +531,7 @@ export function GoalRow({
   }
 
   // The health word is the status control, as on the plan. A proposal's
-  // moves are to approve it or turn it down, each taking the proposed steps
+  // moves are to approve it or decline it, each taking the proposed steps
   // beneath it along; a question's first move is to answer it, and Done is
   // not offered on one. Blocked asks what the step needs before it blocks.
   const beneath = proposed ? countProposed(step.children) : 0;
@@ -544,9 +546,9 @@ export function GoalRow({
         },
         {
           id: 'reject',
-          label: beneath > 0 ? `Turn down, with ${beneath} beneath` : 'Turn down',
-          formAction: settle,
-          formFields: { id: step.id, approve: '0' },
+          label: beneath > 0 ? `Decline, with ${beneath} beneath` : 'Decline',
+          lifecycle: 'declined',
+          onSelect: () => void declineProposal(),
         },
       ]
     : [
@@ -675,22 +677,29 @@ export function GoalRow({
     {
       id: 'archive',
       label: 'Archive step',
+      lifecycle: 'dropped',
       destructive: true,
       formAction: archive,
       formFields: { id: step.id },
       confirm:
         step.children.length > 0
-          ? `Archive ${step.title} and the ${countSteps(step.children).total} under it?`
+          ? `Drop ${step.title} and the ${countSteps(step.children).total} under it?`
           : undefined,
     },
   ];
 
-  // Dash's mark on a step that is Dash's (plan #1159), by the same reading
-  // the Who column used, so a stage over Dash's steps carries it too. Steps
-  // of yours carry no mark, since most steps are yours and a mark on every
-  // one said nothing (plan #1078). A step of yours that Dash closed from
-  // evidence carries Dash's mark as it arrives.
-  const dashes = node.who.word !== 'You' || arrived;
+  // Who the step is on is the Assignee column now (plan #2069.2), so the
+  // title carries Dash's mark only on a step Dash closed lately, where it
+  // flashes once as the step arrives (useDashArrival, moment "A step Dash
+  // finished").
+  const dashes = arrived;
+  // A Dash run is going on this row or a step beneath it: Dash's mark in the
+  // Assignee cell moves, and the Status tooltip says so (plan #2069.2).
+  const working = [node.id, ...idsBeneath(node)].some((id) => Boolean(context.runs[id]?.running));
+  const health =
+    working && node.health.name !== 'working'
+      ? { ...node.health, title: `${node.health.title ?? ''} Dash is working on it now.`.trim() }
+      : node.health;
   const onTodo = context.todoOn && step.onTodo && canShowOnTodo(step);
   const substeps = node.children.filter((child) => child.kind !== 'decision');
   // Finished sub-steps fold away under the open ones (plan #1078).
@@ -729,307 +738,300 @@ export function GoalRow({
 
   return (
     <SiblingMoveProvider move={children.move}>
-    <TreeRow
-      node={node}
-      trail={trail}
-      row={row}
-      health={node.health}
-      // Who the step is on, where the plan says whose move it is (note
-      // 6d242e62). That is a different fact from the move, so it keeps its own
-      // words rather than MoveLabel's; the goal's move is on GoalProgress.
-      move={
-        node.who.title ? (
-          <Tooltip label={node.who.title}>
-            <span className="inline-flex">
-              <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
-            </span>
-          </Tooltip>
-        ) : (
-          <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} />
-        )
-      }
-      layout="list"
-      heading={page}
-      statusMenu={statusMenu}
-      menu={menu}
-      actions={GOAL_TREE_ACTIONS}
-      anchorId={`step-${step.id}`}
-      // The title opens the step's own page (plan #1621); the chevron still
-      // opens the row in place, for editing here.
-      titleHref={page ? undefined : stepHref(fromGoal?.id ?? context.goalId, step.id)}
-      source={fromGoal ? `From ${fromGoal.title}` : undefined}
-      // What a step waiting on you is waiting for (note 5aa7216c), or the
-      // steps and questions it waits on (plan #1159), as the dev plan's Needs
-      // line says it.
-      need={node.need}
-      comments={GOAL_COMMENTS}
-      threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
-      dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
-      marks={
-        <>
-          {dashes && (
-            <Tooltip
-              label={
-                step.kind === 'claude'
-                  ? STEP_KIND_LABELS.claude
-                  : arrived
-                    ? 'Finished by Dash'
-                    : node.who.title || 'Dash is on this step'
-              }
-              className="shrink-0"
-            >
-              <span ref={markRef} className="inline-flex text-ink-muted">
-                <DashMark size="2xs" label="Dash's" />
-              </span>
-            </Tooltip>
-          )}
-          {step.kind === 'rhythm' && (
-            <Tooltip label={STEP_KIND_LABELS.rhythm} className="shrink-0">
-              <span className="inline-flex text-ink-muted">
-                <Repeat className="size-3.5" strokeWidth={1.75} aria-hidden />
-                <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
-              </span>
-            </Tooltip>
-          )}
-        </>
-      }
-      priority={
-        /* The shared cell truncates, which suits the plan's one word and
+      <TreeRow
+        node={node}
+        trail={trail}
+        row={row}
+        health={health}
+        // Who the step is on, in the plan's Assignee column (plan #2069.2):
+        // your initial, Dash's mark, or both over a stage split between you.
+        assignee={
+          <AssigneeCell
+            who={node.who.who}
+            working={working}
+            title={working ? `${node.who.title} Dash is working on it now.` : node.who.title}
+            defaultOpen={context.tipOpenFor === step.id}
+          />
+        }
+        // On a phone the Needs line keeps a line of its own, and the date and
+        // the count beneath stay on the line under the title.
+        roomy
+        // Finished rows sit under a Finished fold that says so.
+        dimClosed={false}
+        heading={page}
+        statusMenu={statusMenu}
+        menu={menu}
+        actions={GOAL_TREE_ACTIONS}
+        anchorId={`step-${step.id}`}
+        // The title opens the step's own page (plan #1621); the chevron still
+        // opens the row in place, for editing here.
+        titleHref={page ? undefined : stepHref(fromGoal?.id ?? context.goalId, step.id)}
+        source={fromGoal ? `From ${fromGoal.title}` : undefined}
+        // What a step waiting on you is waiting for (note 5aa7216c), or the
+        // steps and questions it waits on (plan #1159), as the dev plan's Needs
+        // line says it.
+        need={node.need}
+        comments={GOAL_COMMENTS}
+        threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
+        dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
+        marks={
+          <>
+            {dashes && (
+              <Tooltip label="Finished by Dash" className="shrink-0">
+                <span ref={markRef} className="inline-flex text-ink-muted">
+                  <DashMark size="2xs" label="Dash's" />
+                </span>
+              </Tooltip>
+            )}
+            {step.kind === 'rhythm' && (
+              <Tooltip label={STEP_KIND_LABELS.rhythm} className="shrink-0">
+                <span className="inline-flex text-ink-muted">
+                  <Repeat className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
+                </span>
+              </Tooltip>
+            )}
+          </>
+        }
+        priority={
+          /* The shared cell truncates, which suits the plan's one word and
            size. A rhythm's count runs to three or four words ("0 of 1 this
            week"), so it wraps onto a second line the way the plan's "Next ·
            L" does rather than being cut off (plan #983). */
-        summary ? (
-          <span className="text-ink-muted">{summary}</span>
-        ) : answerChanged ? (
-          <span className="whitespace-normal text-caution">An answer changed</span>
-        ) : current && step.rhythmPeriod ? (
-          <span className="whitespace-normal text-ink-muted">
-            {progressLine(step.rhythmPeriod, current, step.countSource)}
-          </span>
-        ) : step.waitsUntil ? (
-          <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
-        ) : step.dueOn ? (
-          <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
-        ) : null
-      }
-      quickActions={
-        askable && (
-          <form action={askAction}>
-            <input type="hidden" name="id" value={step.id} />
-            <RowIconButton type="submit" label={askLabel} pending={askPending}>
-              <DashMark size="2xs" decorative />
-            </RowIconButton>
-          </form>
-        )
-      }
-      notices={
-        <>
-          {blocking && (
-            <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
-          )}
-          {/* What the last Ask Dash started, or why it was refused, wherever it was pressed. */}
-          {pressNote && (
-            <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
-              <FieldError>{askState.error}</FieldError>
-              {!askState.error && <span className="text-ink-muted">{askState.message}</span>}
-            </li>
-          )}
-          {/* The step's own latest run, read with the page (plan #1044). */}
-          {run && <StepRunLine run={run} inset={rowInset(trail)} />}
-          {draft && <DashDraft {...draft} inset={rowInset(trail)} />}
-          {stepOpen && (
-            <ProgressLine
-              goalId={fromGoal?.id ?? context.goalId}
-              progress={progress}
-              beneath={context.progressBeneath?.[step.id]}
-              total={{ quantity: step.estimatedTotal, unit: step.totalUnit }}
-              inset={rowInset(trail)}
-            />
-          )}
-        </>
-      }
-      // Edited where it is read (plan #1435): the title on the row, the
-      // detail and done-when as text you press, the rest as chips.
-      titleEditor={<StepTitleEditor node={step} onDone={() => row.setEditing(false)} />}
-      detailView={<StepText node={step} field="detail" />}
-      acceptanceView={isDecision ? undefined : <StepText node={step} field="acceptance" />}
-      body={
-        <>
-          {!isDecision && (
-            <StepFacts
-              node={step}
-              links={links}
-              otherGoals={context.otherGoals}
-              // Quiet everywhere (plan #1671): an unset date or amount is one
-              // add control, not an empty editor, on the goal page too.
-              quiet
-            />
-          )}
-          {isDecision &&
-            step.status !== 'dropped' &&
-            (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
-          {/* What Dash wrote is the fold under the row (DashDraft); here
+          answerChanged ? (
+            <span className="inline-block whitespace-normal leading-snug text-caution sm:pt-1">
+              An answer changed
+            </span>
+          ) : current && step.rhythmPeriod ? (
+            <span className="inline-block whitespace-normal leading-snug text-ink-muted sm:pt-1">
+              {progressLine(step.rhythmPeriod, current, step.countSource)}
+            </span>
+          ) : step.waitsUntil ? (
+            <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
+          ) : step.dueOn ? (
+            <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
+          ) : null
+        }
+        quickActions={
+          askable && (
+            <form action={askAction}>
+              <input type="hidden" name="id" value={step.id} />
+              <RowIconButton type="submit" label={askLabel} pending={askPending}>
+                <DashMark size="2xs" decorative />
+              </RowIconButton>
+            </form>
+          )
+        }
+        notices={
+          <>
+            {blocking && (
+              <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
+            )}
+            {/* What the last Ask Dash started, or why it was refused, wherever it was pressed. */}
+            {pressNote && (
+              <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
+                <FieldError>{askState.error}</FieldError>
+                {!askState.error && <span className="text-ink-muted">{askState.message}</span>}
+              </li>
+            )}
+            {/* The step's own latest run, read with the page (plan #1044). */}
+            {run && <StepRunLine run={run} inset={rowInset(trail)} />}
+            {draft && <DashDraft {...draft} inset={rowInset(trail)} />}
+            {stepOpen && (
+              <ProgressLine
+                goalId={fromGoal?.id ?? context.goalId}
+                progress={progress}
+                beneath={context.progressBeneath?.[step.id]}
+                total={{ quantity: step.estimatedTotal, unit: step.totalUnit }}
+                inset={rowInset(trail)}
+              />
+            )}
+          </>
+        }
+        // Edited where it is read (plan #1435): the title on the row, the
+        // detail and done-when as text you press, the rest as chips.
+        titleEditor={<StepTitleEditor node={step} onDone={() => row.setEditing(false)} />}
+        detailView={<StepText node={step} field="detail" />}
+        acceptanceView={isDecision ? undefined : <StepText node={step} field="acceptance" />}
+        body={
+          <>
+            {!isDecision && (
+              <StepFacts
+                node={step}
+                links={links}
+                otherGoals={context.otherGoals}
+                // Quiet everywhere (plan #1671): an unset date or amount is one
+                // add control, not an empty editor, on the goal page too.
+                quiet
+              />
+            )}
+            {isDecision &&
+              step.status !== 'dropped' &&
+              (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
+            {/* What Dash wrote is the fold under the row (DashDraft); here
               only the files a step of another kind links to. */}
-          {!draft && stepFiles.length > 0 && <StepFiles files={stepFiles} />}
-          {prep && !prep.done && <PrepNote goalId={context.goalId} prep={prep} />}
-          {progress && <ProgressList progress={progress} />}
-          {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
-            <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
-          )}
-          {filled && (
-            <InformationStep
-              node={step}
-              collection={filled.collection}
-              records={filled.records}
-              answers={context.answers[step.id] ?? []}
-              kinds={filled.kinds}
-              seam={context.informationSeam}
-            />
-          )}
-        </>
-      }
-      meta={
-        <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
-          {/* On its own page the chips above already say the kind and the dates. */}
-          {!page && <span>{STEP_KIND_LABELS[step.kind]}</span>}
-          {fromGoal && (
-            <Link href={`/goals/${fromGoal.id}`} className="underline">
-              From {fromGoal.title}
-            </Link>
-          )}
-          {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
-            <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
-          )}
-          {current && step.rhythmPeriod && (
-            <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>
-          )}
-          {!page && step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
-          {!page && step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
-          {step.estimatedTotal && step.totalUnit && (
-            <span className="tabular">
-              About {amountWords(step.estimatedTotal, step.totalUnit)} in all
-            </span>
-          )}
-          {prepares && (
-            <Link href={stepHref(context.goalId, prepares.id)} className="press-area underline">
-              For {prepares.title}
-            </Link>
-          )}
-          {onTodo && (
-            <span>
-              {step.onTodoBy === 'claude' && step.onTodoReason
-                ? `On Todo, from Dash: ${step.onTodoReason}`
-                : 'On Todo'}
-            </span>
-          )}
-          {links.map((link) => (
-            <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
-              Also {link.title}
-            </Link>
-          ))}
-          {/* The step's own page (plan #1620), last in the line. */}
-          {!page && (
-            <Link
-              href={stepHref(fromGoal?.id ?? context.goalId, step.id)}
-              aria-label={`Open ${step.title} on its own page`}
-              className="press-area underline"
-            >
-              Open
-            </Link>
-          )}
-        </p>
-      }
-      panelActions={
-        <>
-          {proposed && <ProposalButtons node={step} />}
-          {/* Ask Dash, with room to say what you want: the words go into the
+            {!draft && stepFiles.length > 0 && <StepFiles files={stepFiles} />}
+            {prep && !prep.done && <PrepNote goalId={context.goalId} prep={prep} />}
+            {progress && <ProgressList progress={progress} />}
+            {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
+              <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
+            )}
+            {filled && (
+              <InformationStep
+                node={step}
+                collection={filled.collection}
+                records={filled.records}
+                answers={context.answers[step.id] ?? []}
+                kinds={filled.kinds}
+                seam={context.informationSeam}
+              />
+            )}
+          </>
+        }
+        meta={
+          <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
+            {/* On its own page the chips above already say the kind and the dates. */}
+            {!page && <span>{STEP_KIND_LABELS[step.kind]}</span>}
+            {fromGoal && (
+              <Link href={`/goals/${fromGoal.id}`} className="underline">
+                From {fromGoal.title}
+              </Link>
+            )}
+            {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
+              <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
+            )}
+            {current && step.rhythmPeriod && (
+              <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>
+            )}
+            {!page && step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
+            {!page && step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
+            {step.estimatedTotal && step.totalUnit && (
+              <span className="tabular">
+                About {amountWords(step.estimatedTotal, step.totalUnit)} in all
+              </span>
+            )}
+            {prepares && (
+              <Link href={stepHref(context.goalId, prepares.id)} className="press-area underline">
+                For {prepares.title}
+              </Link>
+            )}
+            {onTodo && (
+              <span>
+                {step.onTodoBy === 'claude' && step.onTodoReason
+                  ? `On Todo, from Dash: ${step.onTodoReason}`
+                  : 'On Todo'}
+              </span>
+            )}
+            {links.map((link) => (
+              <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
+                Also {link.title}
+              </Link>
+            ))}
+            {/* The step's own page (plan #1620), last in the line. */}
+            {!page && (
+              <Link
+                href={stepHref(fromGoal?.id ?? context.goalId, step.id)}
+                aria-label={`Open ${step.title} on its own page`}
+                className="press-area underline"
+              >
+                Open
+              </Link>
+            )}
+          </p>
+        }
+        panelActions={
+          <>
+            {proposed && <ProposalButtons node={step} />}
+            {/* Ask Dash, with room to say what you want: the words go into the
               run's brief as a comment's would. Left empty, the step says it.
               The first press opens the box; the second sends. */}
-          {askable && !asking && (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => setAsking(true)}
-              className="shrink-0"
-            >
-              <DashMark size="2xs" decorative />
-              {askLabel}
-            </Button>
-          )}
-          {askable && asking && (
-            <form
-              action={askAction}
-              className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 max-sm:flex-wrap"
-            >
-              <input type="hidden" name="id" value={step.id} />
-              <InlineInput
-                name="asked"
-                maxLength={4000}
-                placeholder="What you want, if anything"
-                autoFocus
-                className="max-sm:min-h-11 max-sm:basis-full"
-                aria-label={`What you want Dash to do with ${step.title}`}
-              />
+            {askable && !asking && (
               <Button
-                type="submit"
+                type="button"
                 size="sm"
                 variant="secondary"
-                pending={askPending}
+                onClick={() => setAsking(true)}
                 className="shrink-0"
               >
                 <DashMark size="2xs" decorative />
-                {askPending ? 'Asking…' : askLabel}
+                {askLabel}
               </Button>
-            </form>
-          )}
-        </>
-      }
-      addChild={
-        <StepComposer
-          parentId={step.id}
-          label={`Sub-step of ${step.title}`}
-          bare
-          startOpen
-          onClose={() => row.setAddingChild(false)}
-        />
-      }
-      after={
-        finished.length > 0 && (
-          <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
-            <FinishedFold count={finished.length}>
-              {() => (
-                <ul className="-ml-5.5">
-                  {finished.map((child) => (
-                    <GoalRow
-                      key={child.id}
-                      node={child}
-                      trail={[]}
-                      context={context}
-                      index={substeps.indexOf(child)}
-                      count={substeps.length}
-                    />
-                  ))}
-                </ul>
-              )}
-            </FinishedFold>
-          </li>
-        )
-      }
-      renderChild={(child, childTrail) => {
-        if (finished.includes(child as GoalRowNode)) return null;
-        const at = substeps.indexOf(child as GoalRowNode);
-        return (
-          <GoalRow
-            node={child as GoalRowNode}
-            trail={childTrail}
-            context={context}
-            index={at}
-            count={substeps.length}
+            )}
+            {askable && asking && (
+              <form
+                action={askAction}
+                className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 max-sm:flex-wrap"
+              >
+                <input type="hidden" name="id" value={step.id} />
+                <InlineInput
+                  name="asked"
+                  maxLength={4000}
+                  placeholder="What you want, if anything"
+                  autoFocus
+                  className="max-sm:min-h-11 max-sm:basis-full"
+                  aria-label={`What you want Dash to do with ${step.title}`}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  pending={askPending}
+                  className="shrink-0"
+                >
+                  <DashMark size="2xs" decorative />
+                  {askPending ? 'Asking…' : askLabel}
+                </Button>
+              </form>
+            )}
+          </>
+        }
+        addChild={
+          <StepComposer
+            parentId={step.id}
+            label={`Sub-step of ${step.title}`}
+            bare
+            startOpen
+            onClose={() => row.setAddingChild(false)}
           />
-        );
-      }}
-    />
+        }
+        after={
+          finished.length > 0 && (
+            <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
+              <FinishedFold count={finished.length}>
+                {() => (
+                  // Out to the row's own right edge, so the finished rows'
+                  // cells sit under the columns of the rows above them.
+                  <ul className="-ml-5.5 -mr-3">
+                    {finished.map((child) => (
+                      <GoalRow
+                        key={child.id}
+                        node={child}
+                        trail={[]}
+                        context={context}
+                        index={substeps.indexOf(child)}
+                        count={substeps.length}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </FinishedFold>
+            </li>
+          )
+        }
+        renderChild={(child, childTrail) => {
+          if (finished.includes(child as GoalRowNode)) return null;
+          const at = substeps.indexOf(child as GoalRowNode);
+          return (
+            <GoalRow
+              node={child as GoalRowNode}
+              trail={childTrail}
+              context={context}
+              index={at}
+              count={substeps.length}
+            />
+          );
+        }}
+      />
     </SiblingMoveProvider>
   );
 }

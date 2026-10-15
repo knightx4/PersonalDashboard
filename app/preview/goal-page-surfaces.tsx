@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
+import { WorkspaceDashTodayFixture } from './dash-today-surfaces';
 import { GoalsView } from '@/app/goals/goals-view';
 import { SONNET } from '@/lib/core/models';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
@@ -311,24 +312,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       hasSteps: true,
     },
   ],
-  done: {
-    since: '2026-09-24T19:30:00Z',
-    items: [
-      {
-        kind: 'result',
-        id: 'script',
-        title: 'Draft what to say on the call',
-        goalId: cards.id,
-        goalTitle: cards.title,
-        href: `/goals/${cards.id}/s/script`,
-        unread: true,
-        runId: 'run-1',
-        undo: null,
-        at: '2026-09-25T06:10:00Z',
-      },
-    ],
-    more: 0,
-  },
+  dashToday: <WorkspaceDashTodayFixture />,
   todayOn: TODAY,
   areas: [
     { id: 'a-money', name: 'Money' },
@@ -398,10 +382,25 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
   ],
   // Seven of Dash's files not opened (plan #1861): the line lists five and links the rest.
   filesToRead: [
-    ['f-rates', 'Which card to pay first', 'Paying the 27% card first saves about $310 over paying the smaller balance first.', 2],
-    ['f-letter', 'A letter asking Chase to lower the rate on the Sapphire Preferred card it has charged 27% on since March', 'Asks for the rate to drop to the 19% offered to new cardholders.', 1],
+    [
+      'f-rates',
+      'Which card to pay first',
+      'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+      2,
+    ],
+    [
+      'f-letter',
+      'A letter asking Chase to lower the rate on the Sapphire Preferred card it has charged 27% on since March',
+      'Asks for the rate to drop to the 19% offered to new cardholders.',
+      1,
+    ],
     ['f-firms', 'Firms hiring FP&A analysts in Boston this month', null, 1],
-    ['f-recruiters', 'What the three recruiters said, and when each will reply', 'Two reply by Monday; the third wants a call first.', 3],
+    [
+      'f-recruiters',
+      'What the three recruiters said, and when each will reply',
+      'Two reply by Monday; the third wants a call first.',
+      3,
+    ],
     ['f-race', 'Half marathons in the spring within two hours of home', null, 1],
     ['f-fund', 'How long the emergency fund takes at $300 a month', null, 1],
     ['f-gyms', 'Gyms near the new office', null, 1],
@@ -424,10 +423,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
 
 export function GoalsHomeSurface() {
   return (
-    <PageColumn>
-      <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" canRun />
-    </PageColumn>
+    <HomeView {...home} timeZone="Europe/London" canRun />
   );
 }
 
@@ -467,12 +463,46 @@ const areas: AreaWithGoals[] = [
   },
 ];
 
-export function GoalsAllSurface() {
+/** Notes on the areas that have none, for the surfaces that draw All goals with a menu open. */
+const AREA_NOTES: Record<string, string> = {
+  'a-money': 'Out of card debt by spring, with three months of rent put by.',
+  'a-career': 'A research seat where the maths is the job.',
+  'a-health':
+    'Fit enough to run a half marathon without thinking about it, and asleep before midnight most nights.',
+};
+
+/** A goal Dash proposed, added to Career when the surface needs more than five goals to tick. */
+const paper = goal('g-paper', 'a-career', 'Publish the volatility paper', {
+  status: 'proposed',
+  position: 20,
+});
+
+export function GoalsAllSurface({
+  notes = false,
+  more = false,
+  select,
+}: {
+  notes?: boolean;
+  /** Six goals rather than five, for archiving more than five at once (plan #2097.2). */
+  more?: boolean;
+  /** Select already on, with these goals ticked (plan #2097.2). */
+  select?: { selecting?: boolean; ticked?: string[] };
+}) {
+  const shown = more
+    ? areas.map((area) =>
+        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+      )
+    : areas;
   return (
     <PageColumn>
-      <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
+      <PageHeader title="All goals" subject={{ ref: null, path: allGoalsCrumbs() }} />
       <GoalsView
-        areas={areas}
+        areas={
+          notes
+            ? shown.map((area) => ({ ...area, note: area.note ?? AREA_NOTES[area.id] ?? null }))
+            : shown
+        }
+        select={select}
         view="open"
         onYou={{ [cards.id]: 1 }}
         progress={{
@@ -650,7 +680,8 @@ const cardFiles = [
   {
     fileId: 'f-letter',
     title: 'A letter asking Chase to lower the rate on the Sapphire card',
-    summary: 'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
+    summary:
+      'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
     meta: 'Written by Dash for “Draft the letter asking for a lower rate”',
     byDash: true,
   },
@@ -742,7 +773,7 @@ const CARD_SUGGESTIONS: Suggestion[] = [
  * one Learn goal linked and a file, as More holds them. The page header is
  * the real one, with the path above it (plan #1622).
  */
-export function GoalTopSurface() {
+export function GoalTopSurface({ frameOnly = false }: { frameOnly?: boolean } = {}) {
   const which = {
     ...step('which', {
       title: 'Which card first?',
@@ -760,94 +791,105 @@ export function GoalTopSurface() {
       review={cardsReview}
       progress={cardsProgress}
       timeZone="UTC"
-      pace={{ known: true, activeDays: 9, typicalGap: 5, lastOn: '2026-10-09', daysSince: 2, slower: false }}
+      pace={{
+        known: true,
+        activeDays: 9,
+        typicalGap: 5,
+        lastOn: '2026-10-09',
+        daysSince: 2,
+        slower: false,
+      }}
     >
-      <div className="space-y-6">
+      {frameOnly ? (
         <GoalDoneWhen goal={cards} />
-        <div className="space-y-4">
-          <GoalStatusCard
-            line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
-            brief={{
-              id: 'brief-1',
-              itemId: cards.id,
-              runId: null,
-              body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
-              createdAt: '2026-09-25T08:00:00Z',
-            }}
-            briefWhen="today"
-            current
-            change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
-            review={cardsReview}
-            ask={
-              <GoalShaping
-                goalId={cards.id}
-                approval={approvalLine({
-                  goalStatus: 'open',
-                  approvedAt: '2026-09-01T09:00:00Z',
-                  proposed: 0,
-                  questions: 1,
-                })}
-                runs={cardRuns}
-                moreRuns={false}
-                running={null}
-                canRun
-                quiet
-              />
-            }
-          />
-          <GoalLogDone goalId={cards.id} />
-          <GoalNumber
+      ) : (
+        <div className="space-y-6">
+          <GoalDoneWhen goal={cards} />
+          <div className="space-y-4">
+            <GoalStatusCard
+              line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
+              brief={{
+                id: 'brief-1',
+                itemId: cards.id,
+                runId: null,
+                body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+                createdAt: '2026-09-25T08:00:00Z',
+              }}
+              briefWhen="today"
+              current
+              change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
+              review={cardsReview}
+              ask={
+                <GoalShaping
+                  goalId={cards.id}
+                  approval={approvalLine({
+                    goalStatus: 'open',
+                    approvedAt: '2026-09-01T09:00:00Z',
+                    proposed: 0,
+                    questions: 1,
+                  })}
+                  runs={cardRuns}
+                  moreRuns={false}
+                  running={null}
+                  canRun
+                  quiet
+                />
+              }
+            />
+            <GoalLogDone goalId={cards.id} />
+            <GoalNumber
+              goalId={cards.id}
+              unit="$"
+              target={0}
+              dueOn={cards.dueOn}
+              duePrecision={cards.duePrecision}
+              readings={readings}
+              today={TODAY}
+            />
+            <WaitingOnYou
+              rows={[
+                {
+                  id: 'which',
+                  kind: 'question',
+                  label: 'Answer',
+                  title: 'Which card first?',
+                  href: '#step-which',
+                },
+                {
+                  id: 'compare',
+                  kind: 'read',
+                  label: 'Read Dash’s result',
+                  title: 'Compare the two cards’ rates',
+                  href: '#step-compare',
+                },
+                {
+                  id: 'call',
+                  kind: 'do',
+                  label: 'Do by 3 Oct',
+                  title: 'Call the card company',
+                  href: '#step-call',
+                },
+              ]}
+              flags={[]}
+              questions={{ which }}
+            />
+          </div>
+          <BurnUpChart days={MONTH_DAYS} />
+          <GoalSuggestions
             goalId={cards.id}
-            unit="$"
-            target={0}
-            dueOn={cards.dueOn}
-            duePrecision={cards.duePrecision}
-            readings={readings}
-            today={TODAY}
+            suggestions={CARD_SUGGESTIONS}
+            helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
           />
-          <WaitingOnYou
-            rows={[
-              {
-                id: 'which',
-                kind: 'question',
-                label: 'Answer',
-                title: 'Which card first?',
-                href: '#step-which',
-              },
-              {
-                id: 'compare',
-                kind: 'read',
-                label: 'Read Dash’s result',
-                title: 'Compare the two cards’ rates',
-                href: '#step-compare',
-              },
-              {
-                id: 'call',
-                kind: 'do',
-                label: 'Do by 3 Oct',
-                title: 'Call the card company',
-                href: '#step-call',
-              },
-            ]}
-            flags={[]}
-            questions={{ which }}
-          />
+          <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
+          <section aria-labelledby="files-heading" className="space-y-2">
+            <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
+              Files
+              <span className="ml-2 font-normal text-ink-muted">1 not read</span>
+            </h2>
+            <FileLinks files={cardFiles} />
+          </section>
         </div>
-        <BurnUpChart days={MONTH_DAYS} />
-        <GoalSuggestions
-          goalId={cards.id}
-          suggestions={CARD_SUGGESTIONS}
-          helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
-        />
-        <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
-        <section aria-labelledby="files-heading" className="space-y-2">
-          <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
-            Files
-            <span className="ml-2 font-normal text-ink-muted">1 not read</span>
-          </h2>
-          <FileLinks files={cardFiles} />
-        </section>
-      </div>
+      )}
     </GoalDetail>
   );
 }
@@ -1202,7 +1244,14 @@ export function TabbedGoal({
       pace={
         closed
           ? null
-          : { known: true, activeDays: 6, typicalGap: 4, lastOn: '2026-10-01', daysSince: 10, slower: true }
+          : {
+              known: true,
+              activeDays: 6,
+              typicalGap: 4,
+              lastOn: '2026-10-01',
+              daysSince: 10,
+              slower: true,
+            }
       }
     >
       {children}

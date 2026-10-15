@@ -14,15 +14,14 @@ import {
   GraduationCap,
   Play,
   Sparkle,
-  Sprout,
   Weight,
   X,
 } from 'lucide-react';
 import { CardNotes } from '@/components/learn/card-notes';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
@@ -63,6 +62,10 @@ import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 import { TeachBackCard } from './teach-back-card';
 import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { CloseButton } from '@/components/inbox/close-button';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
+import { useToast } from '@/components/ui/toast';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -92,13 +95,16 @@ import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
 const SWIPE_X = 90;
 const SWIPE_Y = 110;
 const LEAVE_MS = SWIPE_RELEASE_MS;
+/** How many passed cards Previous can bring back, as in Quick read. */
+const BACK_LIMIT = 5;
 
 type Leaving = { id: string; swipe: SwipeAction } | null;
 
 const SWIPE_LABEL: Record<SwipeAction, string> = {
   known: 'Got it',
   review: 'Work on this',
-  skipped: 'Not now',
+  // One of the four (plan #1957.3): the card comes back in three days.
+  skipped: LIFECYCLE_VERB.later,
 };
 
 type MadeTrack = NonNullable<NewTrackResult['track']>;
@@ -121,7 +127,10 @@ export function LearnNowFeed({
   ready: firstReady,
   low,
   subjectId = null,
+  earlier = [],
 }: {
+  /** Cards already passed this visit, which the gallery uses to draw Previous. */
+  earlier?: FeedCard[];
   first: FeedCard[];
   /**
    * Your notes on each of the first cards' ideas (plan #1113), by card, still
@@ -143,8 +152,16 @@ export function LearnNowFeed({
   const [ended, setEnded] = useState(first.length === 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [leaving, setLeaving] = useState<Leaving>(null);
-  const [passed, setPassed] = useState(0);
+  const [passed, setPassed] = useState(earlier.length);
+  // The last few cards passed, newest last, for Previous. The ref lets
+  // `advance` read the deck it is passing a card out of.
+  const [back, setBack] = useState<FeedCard[]>(earlier);
+  const deckNow = useRef(deck);
+  useEffect(() => {
+    deckNow.current = deck;
+  }, [deck]);
   const loaded = useRef(first.map((card) => card.id));
   const busy = useRef(false);
   const top = useRef<HTMLDivElement>(null);
@@ -222,11 +239,26 @@ export function LearnNowFeed({
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
     setLeaving(null);
+    const gone = deckNow.current.find((card) => card.id === id);
+    if (gone) setBack((cards) => [...cards, gone].slice(-BACK_LIMIT));
     setDeck((cards) => cards.filter((card) => card.id !== id));
     setPassed((count) => count + 1);
     const box = top.current;
     if (box && box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
   }, []);
+
+  /**
+   * Previous: the card just passed comes back on top, drawn again as it was
+   * loaded. What its swipe recorded stays until it is passed again.
+   */
+  const previous = useCallback(() => {
+    const card = back.at(-1);
+    if (!card || leaving) return;
+    setError(null);
+    setBack((cards) => cards.slice(0, -1));
+    setDeck((cards) => [card, ...cards.filter((other) => other.id !== card.id)]);
+    setPassed((count) => Math.max(0, count - 1));
+  }, [back, leaving]);
 
   const swipe = useCallback(
     (swipeAs: SwipeAction) => {
@@ -245,33 +277,31 @@ export function LearnNowFeed({
     [advance, current, leaving],
   );
 
+  /**
+   * Decline on a card, a unit check or a teach-back (plan #1957.8): the card
+   * goes, and the toast names it with an Undo that puts it back on top, as
+   * Previous does. A unit check declined leaves the unit done, and the idea
+   * keeps its state.
+   */
   const dismiss = useCallback(() => {
     if (!current) return;
-    const id = current.id;
+    const card = current;
     setError(null);
-    advance(id);
-    void dismissCard(id)
+    advance(card.id);
+    toast({
+      text: closedToast('declined', card.title),
+      undo: () => {
+        setBack((cards) => cards.filter((other) => other.id !== card.id));
+        setDeck((cards) => [card, ...cards.filter((other) => other.id !== card.id)]);
+        setPassed((count) => Math.max(0, count - 1));
+      },
+    });
+    void dismissCard(card.id)
       .then((result) => {
-        if (result.error) setError(`Not interested was not recorded: ${result.error}`);
+        if (result.error) setError(`Decline was not recorded: ${result.error}`);
       })
-      .catch(() => setError('Not interested was not recorded. Check your connection.'));
-  }, [advance, current]);
-
-  /**
-   * Skip on a unit check or a teach-back: it goes as Not interested does. The
-   * unit stays done, and the idea keeps its state.
-   */
-  const skipCheck = useCallback(() => {
-    if (!current) return;
-    const id = current.id;
-    setError(null);
-    advance(id);
-    void dismissCard(id)
-      .then((result) => {
-        if (result.error) setError(`Skipping that card was not recorded: ${result.error}`);
-      })
-      .catch(() => setError('Skipping that card was not recorded. Check your connection.'));
-  }, [advance, current]);
+      .catch(() => setError('Decline was not recorded. Check your connection.'));
+  }, [advance, current, toast]);
 
   // The arrow keys, away from anything you are typing in.
   useEffect(() => {
@@ -314,10 +344,26 @@ export function LearnNowFeed({
             className="mb-2 flex items-baseline justify-between gap-3 text-small text-ink-muted"
             aria-live="polite"
           >
-            <span>
-              {passed > 0
-                ? `${passed} done this visit`
-                : 'Swipe down if you know it, right to work on it, left for later.'}
+            <span className="flex min-w-0 items-baseline gap-3">
+              {back.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={previous}
+                  disabled={leaving !== null}
+                  className="-my-1 shrink-0 active:bg-sunken active:text-ink"
+                  data-deck-previous
+                >
+                  <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Previous
+                </Button>
+              )}
+              <span>
+                {passed > 0
+                  ? `${passed} done this visit`
+                  : 'Swipe down if you know it, right to work on it, left for later.'}
+              </span>
             </span>
             <span className="shrink-0">
               {ahead > 0 ? `${ahead} more loaded` : loading ? 'Loading more…' : ''}
@@ -327,14 +373,14 @@ export function LearnNowFeed({
             <UnitCheckCard
               key={current.id}
               card={current}
-              onSkip={skipCheck}
+              onSkip={dismiss}
               onNext={() => advance(current.id)}
             />
           ) : current.kind === 'teach' ? (
             <TeachBackCard
               key={current.id}
               card={current}
-              onSkip={skipCheck}
+              onSkip={dismiss}
               onNext={() => advance(current.id)}
             />
           ) : (
@@ -817,19 +863,14 @@ function DeckCard({
           {/* Ask about this card (plan #1052): a saved conversation with Dash,
               answered from the card and the passage it was written from. */}
           <section className="mt-4">
-            <TalkThread
+            <Thread
               id={`ask-${card.id}`}
               turns={card.conversation ?? []}
               send={(body) => askAboutCard(card.id, body)}
               label="Ask about this card"
               placeholder="What would you like to know?"
               activity="writing"
-              hint={
-                <PaidHint
-                  action="app/learn/now/actions.ts#askAboutCard"
-                  what="Cost of an answer"
-                />
-              }
+              cost={{ action: 'app/learn/now/actions.ts#askAboutCard', what: 'Cost of an answer' }}
             />
           </section>
 
@@ -899,62 +940,55 @@ function DeckCard({
                 {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </Button>
             )}
-            {card.kind !== 'research' && (
+            {/* A lesson's track already exists, so testing on it opens the
+                questions written already and costs nothing; a section's
+                starts a subject, which Dash writes. */}
+            {card.kind === 'lesson' && (
               <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
                 <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
-                {testing
-                  ? card.kind === 'lesson'
-                    ? 'Opening the questions…'
-                    : 'Starting a subject…'
-                  : 'Test me on this'}
+                {testing ? 'Opening the questions…' : 'Test me on this'}
               </Button>
             )}
-            {/* A lesson's track already exists, so testing on it costs nothing. */}
             {card.kind === 'section' && (
-              <PaidHint
-                action="app/learn/now/actions.ts#testMeOnCard"
+              <DashAction
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={testMe}
+                pending={testing}
+                paid="app/learn/now/actions.ts#testMeOnCard"
                 what="Cost of starting a subject from this card"
-              />
+              >
+                {testing ? 'Starting a subject…' : 'Test me on this'}
+              </DashAction>
             )}
             {canMakeTrack(card) && (
-              <span className="inline-flex items-center gap-1">
-                <Button
+              made ? (
+                <Button type="button" variant="ghost" size="sm" disabled>
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Subject made
+                </Button>
+              ) : (
+                <DashAction
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={makeTrack}
                   pending={making}
-                  disabled={made !== null || testing}
+                  disabled={testing}
+                  paid="app/learn/now/actions.ts#makeTrackOfCard"
+                  what="Cost of making a subject from this card"
                 >
-                  {made ? (
-                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  )}
-                  {made ? 'Subject made' : making ? 'Making a subject…' : 'Make this a subject'}
-                </Button>
-                {!made && (
-                  <PaidHint
-                    action="app/learn/now/actions.ts#makeTrackOfCard"
-                    what="Cost of making a subject from this card"
-                  />
-                )}
-              </span>
+                  {making ? 'Making a subject…' : 'Make this a subject'}
+                </DashAction>
+              )
             )}
-            {/* Not interested and the two ratings stay on one line, the
+            {/* Decline (plan #1957.3: a card is Dash's pick, so turning it
+                down is Decline) and the two ratings stay on one line, the
                 ratings to its right, down to a 360px phone: that is why the
                 labels drop "Too" below sm. */}
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onDismiss}
-                disabled={testing}
-              >
-                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-                Not interested
-              </Button>
+              <CloseButton lifecycle="declined" onClick={onDismiss} disabled={testing} />
               <Button
                 type="button"
                 variant="ghost"
@@ -1043,8 +1077,8 @@ function DeckCard({
               onClick={() => onSwipe('skipped')}
               aria-keyshortcuts="ArrowLeft"
             >
-              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              Not now
+              <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
+              {LIFECYCLE_VERB.later}
             </Button>
             <Button
               type="button"
@@ -1077,7 +1111,7 @@ type Marked = NonNullable<UnitCheckResult['marked']>;
  * The optional check on a unit you have finished (LEARN-LESSONS-SPEC, "The
  * unit check"; plan #971): one question needing the unit's ideas together,
  * answered in a sentence or two. Check my answer has it marked and shows the
- * mark with the answer expected; Skip moves on. Either way the unit stays
+ * mark with the answer expected; Decline moves on. Either way the unit stays
  * done, and only a right answer marks its ideas tested.
  */
 function UnitCheckCard({
@@ -1128,21 +1162,18 @@ function UnitCheckCard({
             />
           </Field>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1">
-              <Button
-                type="button"
-                variant="primary"
-                onClick={check}
-                pending={marking}
-                disabled={response.trim() === ''}
-              >
-                {marking ? 'Marking…' : 'Check my answer'}
-              </Button>
-              <PaidHint action="app/learn/now/actions.ts#answerUnitCheck" what="Cost of marking the answer" />
-            </span>
-            <Button type="button" variant="secondary" onClick={onSkip} disabled={marking}>
-              Skip
-            </Button>
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={check}
+              pending={marking}
+              disabled={response.trim() === ''}
+              paid="app/learn/now/actions.ts#answerUnitCheck"
+              what="Cost of marking the answer"
+            >
+              {marking ? 'Marking…' : 'Check my answer'}
+            </DashAction>
+            <CloseButton lifecycle="declined" variant="secondary" onClick={onSkip} disabled={marking} />
           </div>
           {error && <p className="mt-2 text-small text-danger">{error}</p>}
         </>

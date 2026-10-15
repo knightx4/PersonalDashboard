@@ -8,6 +8,7 @@ import { ChipSelect } from '@/components/ui/field';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { AIM_DEPTHS, AIM_DEPTH_LABELS, type AimDepth, type Level3Counts } from '@/lib/learn/aims';
 import { setLearnDepth, type LearnDepthState } from './learn-actions';
+import { formatNumber } from '@/lib/money';
 
 const initial: LearnDepthState = {};
 
@@ -20,7 +21,7 @@ export type GoalLearnAim = {
 };
 
 /** A count with thousands separators: 1,001. */
-const count = (n: number) => n.toLocaleString('en-GB');
+const count = (n: number) => formatNumber(n);
 
 /**
  * What Learn does with a goal in the Learn area (plan #1491), on the goal's

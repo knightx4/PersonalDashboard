@@ -1,9 +1,11 @@
 'use client';
 
 import Link from '@/components/ui/link';
-import { useActionState } from 'react';
+import { useActionState, useTransition } from 'react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { closedToast, type Lifecycle } from '@/lib/core/lifecycle';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { contextTitle, type ContextItem } from '@/lib/goals/context';
@@ -17,8 +19,9 @@ const initial: ContextActionState = {};
  * "Pulling in from the other modules"): a vault note on what you want, your
  * job search thoughts, a Learn aim. Claude finds them when it maps the goal;
  * each row says where it lives, why it matters here and the words that do,
- * and opens in its own module. What Claude proposed waits for Keep or Not
- * relevant; what you dismiss is not proposed again.
+ * and opens in its own module. What Dash proposed waits for Keep or Decline;
+ * one kept can be dropped from its menu later. Either way it is not proposed
+ * again, and the toast's Undo puts it back as it was (plan #1957.8).
  */
 export function GoalContext({ items }: { items: ContextItem[] }) {
   if (items.length === 0) return null;
@@ -41,12 +44,32 @@ export function GoalContext({ items }: { items: ContextItem[] }) {
 function ContextRow({ item }: { item: ContextItem }) {
   const toast = useToast();
   const [state, settle, settling] = useActionState(setContextStatusAction, initial);
-  const dismiss = async (form: FormData) => {
-    const result = await setContextStatusAction(initial, form);
-    if (result.error) toast({ text: result.error });
-  };
+  const [dismissing, startDismiss] = useTransition();
   const title = contextTitle(item.title);
   const proposed = item.status === 'proposed';
+
+  // Decline on what Dash proposed, Drop on one already kept.
+  async function dismiss(lifecycle: Lifecycle) {
+    const form = new FormData();
+    form.set('id', item.id);
+    form.set('status', 'dismissed');
+    const result = await setContextStatusAction(initial, form);
+    if (result.error) {
+      toast({ text: result.error });
+      return;
+    }
+    const was = item.status;
+    toast({
+      text: closedToast(lifecycle, title),
+      undo: async () => {
+        const back = new FormData();
+        back.set('id', item.id);
+        back.set('status', was);
+        const undone = await setContextStatusAction(initial, back);
+        if (undone.error) throw new Error(undone.error);
+      },
+    });
+  }
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
@@ -73,9 +96,12 @@ function ContextRow({ item }: { item: ContextItem }) {
             <Button type="submit" name="status" value="kept" size="sm" variant="secondary" pending={settling}>
               Keep
             </Button>
-            <Button type="submit" name="status" value="dismissed" size="sm" variant="ghost" disabled={settling}>
-              Not relevant
-            </Button>
+            <CloseButton
+              lifecycle="declined"
+              disabled={settling}
+              pending={dismissing}
+              onClick={() => startDismiss(() => dismiss('declined'))}
+            />
             {state.error && <span className="text-small text-danger">{state.error}</span>}
           </form>
         )}
@@ -86,9 +112,9 @@ function ContextRow({ item }: { item: ContextItem }) {
           items={[
             {
               id: 'dismiss',
-              label: 'Not relevant to this goal',
-              formAction: dismiss,
-              formFields: { id: item.id, status: 'dismissed' },
+              label: 'Drop',
+              lifecycle: 'dropped',
+              onSelect: () => void dismiss('dropped'),
             },
           ]}
         />

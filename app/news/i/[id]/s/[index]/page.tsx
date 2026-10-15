@@ -6,6 +6,8 @@ import { loadIssue } from '@/lib/news/issues/load';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
 import { loadSentInIssues, sentKey } from '@/lib/news/saved/sent';
 import { StoryView } from './story-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Story' };
 export const dynamic = 'force-dynamic';
@@ -49,6 +51,10 @@ export default async function StoryPage({
 
   return (
     <StoryView
+      path={await rowSubject(toRef('news.issues', issue.id), {
+        label: story.headline,
+        href: `/news/i/${issue.id}/s/${storyIndex}`,
+      })}
       back={back}
       issue={issue}
       story={story}

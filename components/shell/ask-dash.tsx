@@ -19,9 +19,9 @@ import { Maximize2, SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
-import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
@@ -53,6 +53,7 @@ import {
   askDashPageLabel,
   confirmDashChange,
   declineDashChange,
+  reopenDashChange,
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
@@ -217,6 +218,7 @@ const ACTIONS: AskSource = {
   save: saveDashAnswer,
   confirm: confirmDashChange,
   decline: declineDashChange,
+  reopen: reopenDashChange,
   undo: undoDashChange,
 };
 
@@ -439,7 +441,8 @@ export function AskThread({
   onAnswered?: () => void;
   label: string;
   placeholder?: string;
-  hint?: React.ReactNode;
+  /** Before the first question: what Dash says he can do, drawn as his opening turn. */
+  opening?: string;
   /** Just above the question box: the page Dash will be told (plan #1272). */
   above?: React.ReactNode;
   startWriting?: boolean;
@@ -500,18 +503,11 @@ export function AskThread({
   }, [changes]);
 
   return (
-    <TalkThread
+    <Thread
       id={id}
       turns={turns}
       withFiles
-      sendHint={(files) => (
-        <PaidHint
-          action={ACTION}
-          plus={filesEstimate(files, DASH_MODELS.ask)}
-          what={files.length > 0 ? 'Cost of this answer from Dash, reading the files' : 'Cost of this answer from Dash'}
-          align="end"
-        />
-      )}
+      cost={ASK_COST}
       // Heard as the question is sent, outside the transition that waits for
       // the answer, so what it changes (the sheet's opening message going)
       // happens with the press rather than when the answer lands (plan #1899.8).
@@ -606,6 +602,16 @@ function useHandoffReplies(
   return incoming;
 }
 
+/**
+ * What each answer costs, priced by the thread beside the button that opens
+ * the box and beside its send arrow, with reading any files added on top.
+ */
+const ASK_COST: ThreadCost = {
+  action: ACTION,
+  what: 'Cost of each answer from Dash',
+  plus: (files: readonly UploadedAttachment[]) => filesEstimate(files, DASH_MODELS.ask),
+};
+
 /** What Dash says while it looks: long enough that the wait needs a reason. */
 export const ASK_WAITING = 'Dash is looking it up. A question that needs several lookups can take up to a minute.';
 
@@ -694,7 +700,7 @@ export function AskDashPanel({
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      // Escape in the box closes the box first (TalkThread), and marks the
+      // Escape in the box closes the box first (Thread), and marks the
       // event handled; only a second Escape closes the sheet.
       if (event.key === 'Escape' && !event.defaultPrevented) onClose();
     }
@@ -713,7 +719,6 @@ export function AskDashPanel({
     setThreadKey((key) => key + 1);
   }
 
-  const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
   // Rows sent from a list say more than the page they are on, so they take the chip's place.
   const lookingAt = rows ? (
     <LookingAt
@@ -785,7 +790,6 @@ export function AskDashPanel({
                 page={page}
                 list={rows}
                 source={source}
-                hint={hint}
                 lookingAt={lookingAt}
                 onStarted={(ref) => {
                   setStarted(true);
@@ -801,7 +805,6 @@ export function AskDashPanel({
                 conversationRef={view.ref}
                 page={page}
                 source={source}
-                hint={hint}
                 lookingAt={lookingAt}
               />
             )}
@@ -817,7 +820,6 @@ function NewQuestion({
   page,
   list,
   source,
-  hint,
   lookingAt,
   onStarted,
   onReopen,
@@ -826,7 +828,6 @@ function NewQuestion({
   page: string | null;
   list?: AskRows;
   source: AskSource;
-  hint: React.ReactNode;
   lookingAt: React.ReactNode;
   onStarted: (ref: string) => void;
   onReopen: (conversation: ConversationSummary) => void;
@@ -852,24 +853,6 @@ function NewQuestion({
 
   return (
     <>
-      {/* The empty state: said once, before the first question, and gone
-          once there is an answer to read instead. */}
-      {!asked && (
-        <div className="flex gap-2">
-          <div className="flex w-4 shrink-0 justify-center pt-1">
-            <DashMark size="2xs" decorative className="text-ink-ghost" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <span className="text-small font-semibold text-ink">Dash</span>
-            <p className="text-body text-ink">
-              {list
-                ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
-                : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'}
-            </p>
-          </div>
-        </div>
-      )}
-
       <AskThread
         id="ask-dash"
         conversationRef={null}
@@ -882,7 +865,15 @@ function NewQuestion({
         startWriting
         ask={ask}
         initialDraft={draft}
-        hint={hint}
+        // The empty state: said once, before the first question, as Dash's
+        // opening turn, and gone once there is an answer to read instead.
+        opening={
+          asked
+            ? undefined
+            : list
+              ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
+              : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'
+        }
         above={lookingAt}
         onSend={() => setAsked(true)}
       />
@@ -943,13 +934,11 @@ function EarlierQuestion({
   conversationRef,
   page,
   source,
-  hint,
   lookingAt,
 }: {
   conversationRef: string;
   page: string | null;
   source: AskSource;
-  hint: React.ReactNode;
   lookingAt: React.ReactNode;
 }) {
   const [loaded, setLoaded] = useState<OpenedAsk | null>(null);
@@ -987,7 +976,6 @@ function EarlierQuestion({
         openHandoffs={loaded.openHandoffs}
         label="Ask a follow-up"
         placeholder="Ask more about this"
-        hint={hint}
         above={lookingAt}
       />
     </>

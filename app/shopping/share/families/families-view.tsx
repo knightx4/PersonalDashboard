@@ -1,5 +1,5 @@
-import Link from '@/components/ui/link';
-import { ArrowLeft, Layers } from 'lucide-react';
+import { sectionSubject } from '@/lib/core/section-path';
+import { Layers } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Card } from '@/components/ui/card';
@@ -14,14 +14,13 @@ import { PageColumn } from '@/components/shell/page-width';
 export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[] }) {
   return (
     <PageColumn className="[&_a]:press-area">
-      <Link
-        href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
-      </Link>
-
-      <PageHeader title="Possible families" />
+      <PageHeader
+        subject={sectionSubject('/shopping/share', 'Shared forms', {
+          label: 'Possible families',
+          href: '/shopping/share/families',
+        })}
+        title="Possible families"
+      />
 
       {suggestions.length === 0 ? (
         <EmptyState

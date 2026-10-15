@@ -1,6 +1,7 @@
 import { LayoutDashboard } from 'lucide-react';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { AimButton } from '@/components/shell/aim-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SpendHeadline } from '@/components/dashboard/spend-headline';
 import { CategoryDonut } from '@/components/dashboard/category-donut';
@@ -21,11 +22,14 @@ export function DashboardView({
   personId,
   people,
   data,
+  dashToday,
 }: {
   range: PresetRange;
   personId: string | null;
   people: Person[];
   data: DashboardData;
+  /** What Dash did today in Shopping, at the foot of the column (plan #1964.4). */
+  dashToday?: React.ReactNode;
 }) {
   const showPeople = people.length > 1;
 
@@ -68,8 +72,9 @@ export function DashboardView({
             title="No spending to show yet"
             description="Connect an inbox and we will pull in your past orders automatically, or add one by hand to see how this looks."
             action={{ label: 'Connect an inbox', href: '/shopping/settings#inboxes' }}
-            secondaryAction={{ label: 'Add an order', href: '/shopping/orders/new' }}
-          />
+          >
+            <AimButton aim={{ kind: 'order' }} label="Add an order" variant="secondary" size="md" />
+          </EmptyState>
         ) : (
           <div className="space-y-4">
             <SpendHeadline
@@ -104,6 +109,7 @@ export function DashboardView({
             <ReturnableList rows={data.returnable} />
           </div>
         )}
+        {dashToday}
       </div>
     </PageWide>
   );

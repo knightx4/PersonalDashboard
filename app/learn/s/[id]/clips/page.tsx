@@ -6,6 +6,8 @@ import { loadSubject } from '@/lib/learn/graph/load';
 import { loadPlayerClips } from '@/lib/learn/clips/player-clips';
 import { loadSubjectClipCounts } from '@/lib/learn/clips/subject';
 import { SubjectClipsView } from './view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,5 +34,15 @@ export default async function SubjectClipsPage({ params }: { params: Promise<{ i
     loadSubjectClipCounts(learn, user.id, id),
   ]);
 
-  return <SubjectClipsView subject={{ id, name: subject.name }} clips={clips} counts={counts} />;
+  return (
+    <SubjectClipsView
+      subject={{ id, name: subject.name }}
+      clips={clips}
+      counts={counts}
+      path={await rowSubject(toRef('learn.subjects', id), {
+        label: 'Clips',
+        href: `/learn/s/${id}/clips`,
+      })}
+    />
+  );
 }

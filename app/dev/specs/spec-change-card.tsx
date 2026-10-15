@@ -1,8 +1,15 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
-import { approveSpecChange, declineSpecChange, type SpecChangeActionState } from './actions';
+import {
+  approveSpecChange,
+  declineSpecChange,
+  undeclineSpecChange,
+  type SpecChangeActionState,
+} from './actions';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { Button } from '@/components/ui/button';
@@ -101,7 +108,15 @@ export function SpecChangeCard({
   const [declined, decline, declining] = useActionState(
     async (prev: SpecChangeActionState, formData: FormData) => {
       const next = await declineSpecChange(prev, formData);
-      if (next.message) toast({ text: next.message });
+      const id = String(formData.get('id') ?? '');
+      if (next.message)
+        toast({
+          text: closedToast('declined', change.title),
+          undo: async () => {
+            const back = await undeclineSpecChange(id);
+            if (back.error) throw new Error(back.error);
+          },
+        });
       return next;
     },
     {} as SpecChangeActionState,
@@ -154,9 +169,7 @@ export function SpecChangeCard({
           <Button type="submit" size="sm" formAction={approve} pending={pending}>
             {approving ? 'Approving…' : 'Approve'}
           </Button>
-          <Button type="submit" size="sm" variant="ghost" formAction={decline} pending={pending}>
-            {declining ? 'Declining…' : 'Decline'}
-          </Button>
+          <CloseButton lifecycle="declined" type="submit" formAction={decline} pending={pending} />
           <FieldError>{approved.error ?? declined.error}</FieldError>
         </form>
       ) : (

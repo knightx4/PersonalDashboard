@@ -17,10 +17,20 @@ import { cn } from '@/lib/cn';
 import { IconButton } from '@/components/ui/icon-button';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { Tooltip } from '@/components/ui/tooltip';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { useToast } from '@/components/ui/toast';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB, type Lifecycle } from '@/lib/core/lifecycle';
 
 export type ActionMenuItem = {
   id: string;
   label: string;
+  /**
+   * The item closes the row (plan #1957.3): drawn with that ending's glyph,
+   * and its label is the ending's verb, whatever `label` says. A label that
+   * opens with the verb is kept whole, so "Decline, with 2 beneath" can say
+   * what goes with it (plan #1957.8).
+   */
+  lifecycle?: Lifecycle;
   destructive?: boolean;
   disabled?: boolean;
   /** Server action (FormData). May redirect or return a result. */
@@ -44,6 +54,12 @@ export type ActionMenuItem = {
   /** Marks the link as the page you are already on. */
   current?: boolean;
 };
+
+/** The verb alone, or the label when it opens with the verb. */
+function lifecycleLabel(lifecycle: Lifecycle, label: string): string {
+  const verb = LIFECYCLE_VERB[lifecycle];
+  return label.startsWith(`${verb},`) ? label : verb;
+}
 
 type MenuPosition = { top: number; left: number; minWidth: number };
 
@@ -137,6 +153,7 @@ export function ActionMenu({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
   /** The item whose confirm is showing, if any. Cleared whenever the menu closes. */
   const [armed, setArmed] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -194,7 +211,7 @@ export function ActionMenu({
               : '';
           // redirect() from a server action — let Next.js navigate.
           if (digest.startsWith('NEXT_REDIRECT')) throw err;
-          window.alert(err instanceof Error ? err.message : 'Something went wrong.');
+          toast({ text: err instanceof Error ? err.message : 'Something went wrong.' });
         }
       });
       return;
@@ -322,7 +339,14 @@ export function ActionMenu({
                     runItem(item);
                   }}
                 >
-                  {item.label}
+                  {item.lifecycle ? (
+                    <span className="flex items-center gap-2">
+                      <StatusGlyph glyph={LIFECYCLE_GLYPH[item.lifecycle]} />
+                      {lifecycleLabel(item.lifecycle, item.label)}
+                    </span>
+                  ) : (
+                    item.label
+                  )}
                 </button>
               );
             })}

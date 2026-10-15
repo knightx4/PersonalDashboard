@@ -1,8 +1,7 @@
 import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { loadApplicationMoves, type ApplicationMoveRow } from '@/lib/jobs/applications/moves';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -69,13 +68,15 @@ export const applicationsSource: AgendaSource = {
     return applicationItems(await loadApplicationMoves(supabase, ctx.userId));
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'application', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'application', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'application', key, ctx.clients);
   },
 };

@@ -178,7 +178,9 @@ function StudyRow({
       )}
       {item.context && <p className="line-clamp-2 text-small text-ink-muted">{item.context}</p>}
       {item.sentence && (
-        <blockquote className="mt-1 border-l-2 border-border pl-3 text-ui text-ink">{item.sentence}</blockquote>
+        <blockquote className="mt-1 border-l-2 border-border pl-3 text-ui text-ink">
+          {item.sentence}
+        </blockquote>
       )}
       <div className="-ml-2 flex flex-wrap items-center">
         {link && (
@@ -248,7 +250,10 @@ export function EssayStudyCard({
     <Card padding="none" className={cn('hidden lg:block', className)}>
       <CardSection
         title="From your study"
-        action={<PaidHint action={STUDY_ACTION} what="Cost of searching with a new paragraph" />}
+        action={
+          // dash-action-ok: searches run on their own as you type, so no button carries this cost.
+          <PaidHint action={STUDY_ACTION} what="Cost of searching with a new paragraph" />
+        }
         meta={state.kind === 'searching' ? 'Searching…' : undefined}
       >
         {items.length > 0 && (

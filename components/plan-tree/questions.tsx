@@ -1,9 +1,12 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useState } from 'react';
 import { Check } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { ComposeTitle, FieldError } from '@/components/ui/field';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
@@ -91,6 +94,12 @@ function AskQuestion({
  * something untrue, because a decision carrying an invented answer would be
  * repeated to every session that reads the feature from then on.
  */
+/** Run an undo through a tree action, failing the toast's Undo when it is refused. */
+async function undoOrThrow(action: TreeAction, form: FormData): Promise<void> {
+  const result = await action({}, form);
+  if (result.error) throw new Error(result.error);
+}
+
 export function QuestionRow({
   node,
   titles,
@@ -106,12 +115,35 @@ export function QuestionRow({
     actions.answer,
     {} as TreeActionState,
   );
+  const toast = useToast();
+  // Drop and Later say so with the way back (plan #1957.3).
   const [dropState, dropAction, dropPending] = useActionState(
-    actions.setStatus,
+    async (prev: TreeActionState, form: FormData) => {
+      const next = await actions.setStatus(prev, form);
+      if (!next.error) {
+        const back = new FormData();
+        back.set('id', node.id);
+        back.set('status', node.status);
+        toast({ text: closedToast('dropped', node.title), undo: () => undoOrThrow(actions.setStatus, back) });
+      }
+      return next;
+    },
     {} as TreeActionState,
   );
   const [dismissState, dismissAction, dismissPending] = useActionState(
-    actions.dismissQuestion,
+    async (prev: TreeActionState, form: FormData) => {
+      const next = await actions.dismissQuestion(prev, form);
+      if (!next.error && form.get('dismissed') === '1') {
+        const back = new FormData();
+        back.set('id', node.id);
+        back.set('dismissed', '0');
+        toast({
+          text: closedToast('later', node.title),
+          undo: () => undoOrThrow(actions.dismissQuestion, back),
+        });
+      }
+      return next;
+    },
     {} as TreeActionState,
   );
   const [answering, setAnswering] = useState(false);
@@ -208,9 +240,7 @@ export function QuestionRow({
                 <form action={dropAction}>
                   <input type="hidden" name="id" value={node.id} />
                   <input type="hidden" name="status" value="dropped" />
-                  <Button type="submit" size="sm" variant="ghost" pending={dropPending}>
-                    Withdraw
-                  </Button>
+                  <CloseButton lifecycle="dropped" type="submit" pending={dropPending} />
                 </form>
               )}
               {/* The third way out, and the one that says nothing about the
@@ -220,14 +250,13 @@ export function QuestionRow({
                 <form action={dismissAction}>
                   <input type="hidden" name="id" value={node.id} />
                   <input type="hidden" name="dismissed" value={aside ? '0' : '1'} />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant={aside ? 'secondary' : 'ghost'}
-                    pending={dismissPending}
-                  >
-                    {aside ? 'Bring back' : 'Not now'}
-                  </Button>
+                  {aside ? (
+                    <Button type="submit" size="sm" variant="secondary" pending={dismissPending}>
+                      Bring back
+                    </Button>
+                  ) : (
+                    <CloseButton lifecycle="later" type="submit" pending={dismissPending} />
+                  )}
                 </form>
               )}
             </div>

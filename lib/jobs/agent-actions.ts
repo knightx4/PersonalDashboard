@@ -1,4 +1,4 @@
-import { GAP, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What the job search pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const jobsActions: ModuleActions = {
@@ -21,6 +21,8 @@ export const jobsActions: ModuleActions = {
     snoozeReminder: tool('change_reminder'),
     completeWaiting: tool('change_waiting'),
     snoozeWaiting: tool('change_waiting'),
+    restoreReminder: none('theirs', 'Undo: takes back their own Done or Later.'),
+    restoreWaiting: none('theirs', 'Undo: takes back their own Done or Later.'),
   },
   'app/jobs/(app)/_home/prepare-actions.ts': {
     prepareWithDash: none('spends'),
@@ -53,9 +55,10 @@ export const jobsActions: ModuleActions = {
     markTouchAnswered: tool('change_touch'),
   },
   'app/jobs/(app)/settings/actions.ts': {
-    updateProfile: none('setting'),
+    saveProfileField: none('setting'),
     disconnectInbox: none('account'),
     savePreference: none('setting'),
+    saveShowNudges: none('setting'),
   },
   'app/jobs/(app)/settings/sender-actions.ts': {
     addExcludedSender: none('setting'),
@@ -86,13 +89,12 @@ export const jobsActions: ModuleActions = {
     suggestPeople: none('spends'),
     suggestOpenings: none('spends'),
     dismissSuggestion: none('theirs'),
+    reopenSuggestion: none('theirs', 'Undo: takes back their own decline.'),
     dismissOpening: none('theirs'),
     markSuggestionSent: tool('mark_suggestion_sent'),
     saveOpening: none('theirs'),
   },
   'app/jobs/(app)/roles/actions.ts': {
-    createRole: tool('add_job_lead'),
-    fetchJobDescription: none('page'),
     updateRole: tool('change_role'),
     addQuestions: tool('add_application_questions'),
     saveAnswer: tool('save_answer'),
@@ -106,6 +108,7 @@ export const jobsActions: ModuleActions = {
     saveCoverLetter: tool('write_cover_letter'),
     renameRole: tool('change_role'),
     moveRoleToCompany: tool('change_role'),
+    saveApplicationMarks: tool('change_application'),
   },
   'app/jobs/(app)/roles/[id]/interview-actions.ts': {
     saveInterview: tool('change_interview'),

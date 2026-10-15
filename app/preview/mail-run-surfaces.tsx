@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
 import { RunChanges } from '@/app/goals/runs/[runId]/run-changes';
-import { BackButton, EmailFrame } from '@/app/mail/[id]/reader';
+import { EmailFrame } from '@/app/mail/[id]/reader';
 import { MessageHead } from '@/app/mail/[id]/message-head';
 import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
@@ -13,6 +13,7 @@ import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { RunLinesView } from '@/components/runs/run-lines';
 import type { RunActivity } from '@/lib/core/run-activities';
 import { PageColumn } from '@/components/shell/page-width';
+import { whenAt } from '@/lib/core/when';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -146,19 +147,24 @@ const MESSAGES: GmailMessageContent[] = [
 
 /** The markup of app/mail/[id]/page.tsx inside the shell, after its reads. */
 export function MailMessageSurface() {
-  const when = new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'America/New_York',
-  });
   const latest = MESSAGES.at(-1)!;
   const reply = replyMailto(latest);
   const subject = MESSAGES.find((m) => m.subject)?.subject ?? '(no subject)';
 
   return (
     <PageColumn>
-      <BackButton />
-      <PageHeader title={subject} description={`${MESSAGES.length} messages`} />
+      <PageHeader
+        subject={{
+          ref: null,
+          path: [
+            { label: 'Home', href: '/home' },
+            { label: subject, href: '/mail/t1' },
+          ],
+        }}
+        back={{ label: 'Home', href: '/home' }}
+        title={subject}
+        description={`${MESSAGES.length} messages`}
+      />
       <div className="mb-4 flex flex-wrap gap-2">
         {reply && (
           <a href={reply} className={buttonVariants({ variant: 'primary', size: 'md' })}>
@@ -180,7 +186,7 @@ export function MailMessageSurface() {
             <li key={entry.id} className="card-pad">
               <MessageHead
                 from={entry.fromAddress}
-                sent={entry.internalDate ? when.format(entry.internalDate) : null}
+                sent={entry.internalDate ? whenAt(entry.internalDate, { timeZone: 'America/New_York' }) : null}
               />
               {entry.html ? (
                 <EmailFrame html={entry.html} title={entry.subject ?? 'Email'} />

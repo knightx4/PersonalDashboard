@@ -1,46 +1,47 @@
 import { AppShell } from '@/components/shell/app-shell';
 import { DayBrief } from '@/app/home/day-brief';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   BriefLine,
   HomeColumns,
   HomeHeader,
-  TodayCard,
-  UpdatesCard,
-  WeekCard,
-  WorkspaceList,
-  WorkspaceMarks,
-  type WorkspaceEntry,
+  InboxLine,
+  TodayList,
+  UpdatesList,
+  WeekList,
 } from '@/app/home/home-view';
+import { HomeFold } from '@/app/home/home-fold';
 import type { Update } from '@/lib/shell/home-model';
+import { HOME_SECTIONS } from '@/lib/home/sections';
 import type { Brief } from '@/lib/shell/brief';
 import type { ModuleId } from '@/lib/modules';
-import { WatchingSurface } from './watching-surfaces';
-import { DashTodaySurface } from './dash-today-surfaces';
-import { DoneTodayCard } from '@/app/home/done-today';
+import { WATCHING_NOW, WATCHING_ROWS } from './watching-surfaces';
+import { DashTodayFoldSurface } from './dash-today-surfaces';
+import { WatchingList } from '@/app/home/watching';
+import { DoneTodayBody, doneTodayCount } from '@/app/home/done-today';
 import { DONE_TODAY } from './log-done-surfaces';
 
 /**
  * Home as a whole page (plan #1627), inside the shell, so the critic sees the
  * main column and the rail side by side at 1280 and the order they fall into
  * at 390. Every section is the component the page draws, with fixtures; the
- * Watching and Dash today sections reuse their own surfaces' fixtures.
+ * Watching and Dash today sections reuse their own surfaces' fixtures. Since
+ * plan #1937.8 the main column is the greeting, the date, the briefs and the
+ * Inbox count, and the rest is folds in the rail: open at 1280, shut at 390.
  */
 
 const TZ = 'Europe/London';
 const NOW = new Date('2026-10-06T15:10:00Z');
 
-const WORKSPACES: WorkspaceEntry[] = [
-  { id: 'jobs', label: 'Job search', href: '/jobs', stat: '3 to review' },
-  { id: 'todo', label: 'Todo', href: '/todo', stat: '8 open, 2 overdue' },
-  { id: 'shopping', label: 'Shopping', href: '/shopping', stat: '1 return due' },
-  { id: 'goals', label: 'Goals', href: '/goals', stat: '4 steps waiting on you' },
-  { id: 'learn', label: 'Learn', href: '/learn', stat: '2 cards due' },
-  { id: 'news', label: 'News', href: '/news', stat: '14 unread issues across 6 newsletters' },
-  { id: 'vault', label: 'Vault', href: '/vault', stat: 'Your notes, searchable' },
-];
-
 const BRIEFS: [ModuleId, Brief][] = [
-  ['jobs', { text: 'Northwind Health replied about the staff engineer role', href: '/jobs/review', tone: 'caution' }],
+  [
+    'jobs',
+    {
+      text: 'Northwind Health replied about the staff engineer role',
+      href: '/jobs/review',
+      tone: 'caution',
+    },
+  ],
   ['todo', { text: 'Two things overdue, the longest since Friday', href: '/todo' }],
   ['shopping', { text: 'The Uniqlo return window closes on Thursday', href: '/shopping' }],
   ['goals', { text: 'Four steps on Move to Lisbon are waiting on you', href: '/goals' }],
@@ -81,12 +82,97 @@ const UPDATES: Update[] = [
   },
 ];
 
+const HAPPENING = [
+  {
+    key: 'h1',
+    at: '2026-10-06T15:30:00Z',
+    label: 'Interview: Northwind Health',
+    detail: 'Video call, 60 min',
+    href: '/jobs/roles/r1',
+  },
+];
+
+const DUE = [
+  {
+    key: 'd1',
+    overdue: true,
+    title: 'Send the signed tenancy form back to the agent',
+    href: '/todo',
+  },
+  { key: 'd2', overdue: true, title: 'Renew the car insurance', href: '/todo' },
+  { key: 'd3', overdue: false, title: 'Book the dentist', href: '/todo' },
+  {
+    key: 'd4',
+    overdue: false,
+    title: 'Return the Uniqlo jacket that did not fit',
+    href: '/shopping',
+  },
+  { key: 'd5', overdue: false, title: 'Pay Sam back for the concert tickets', href: '/todo' },
+];
+
+const WEEK = [
+  {
+    key: 'w1',
+    day: '2026-10-07',
+    at: '2026-10-07T18:00:00Z',
+    label: 'Reading group',
+    detail: 'The Pinch',
+    href: '/todo',
+    booked: true,
+  },
+  {
+    key: 'w2',
+    day: '2026-10-08',
+    at: null,
+    label: 'Uniqlo return window closes',
+    detail: null,
+    href: '/shopping',
+    booked: false,
+  },
+  {
+    key: 'w3',
+    day: '2026-10-09',
+    at: null,
+    label: 'Take-home for Tallow due',
+    detail: null,
+    href: '/jobs',
+    booked: false,
+  },
+  {
+    key: 'w4',
+    day: '2026-10-10',
+    at: '2026-10-10T08:30:00Z',
+    label: 'Dentist',
+    detail: 'Check-up',
+    href: '/todo',
+    booked: true,
+  },
+  {
+    key: 'w5',
+    day: '2026-10-12',
+    at: null,
+    label: 'Council tax',
+    detail: null,
+    href: '/todo',
+    booked: false,
+  },
+];
+
+function AgendaLink() {
+  return (
+    <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
+      The agenda
+    </Link>
+  );
+}
+
 export function HomePageSurface() {
   return (
     <AppShell
       account="preview"
       module={null}
-      sections={[]}
+      sections={HOME_SECTIONS}
+      pathname="/home"
       displayName="Chris"
       email="chris@example.com"
       isOwner
@@ -98,83 +184,64 @@ export function HomePageSurface() {
         arrive={false}
         remember={false}
         day="2026-10-06"
-        header={
-          <HomeHeader
-            greeting="Good afternoon, Chris"
-            date="Tuesday 6 October"
-            brief={
-              <DayBrief
-                day="2026-10-06"
-                brief={{
-                  kind: 'picks',
-                  picks: [
-                    {
-                      key: 'p1',
-                      kind: 'interview',
-                      title: 'Second interview with Northwind Health at 4:30 PM',
-                      reason: 'The system design round; your prep notes are on the role.',
-                      href: '/jobs/roles/r1',
-                    },
-                    {
-                      key: 'p2',
-                      kind: 'reply',
-                      title: 'Reply to Priya about the flat in Alfama',
-                      reason: 'She asked on Saturday and the viewing slots go on Thursday.',
-                      href: '/goals',
-                    },
-                  ],
-                }}
-              />
-            }
+        header={<HomeHeader greeting="Good afternoon, Chris" date="Tuesday 6 October" />}
+        brief={
+          <DayBrief
+            day="2026-10-06"
+            brief={{
+              kind: 'picks',
+              picks: [
+                {
+                  key: 'p1',
+                  kind: 'interview',
+                  title: 'Second interview with Northwind Health at 4:30 PM',
+                  reason: 'The system design round; your prep notes are on the role.',
+                  href: '/jobs/roles/r1',
+                },
+                {
+                  key: 'p2',
+                  kind: 'reply',
+                  title: 'Reply to Priya about the flat in Alfama',
+                  reason: 'She asked on Saturday and the viewing slots go on Thursday.',
+                  href: '/goals',
+                },
+              ],
+            }}
           />
         }
         main={
           <>
-            <WorkspaceMarks workspaces={WORKSPACES} />
-            <ul className="mt-2 divide-y divide-border">
+            <ul className="divide-y divide-border">
               {BRIEFS.map(([module, brief]) => (
                 <BriefLine key={module} module={module} brief={brief} />
               ))}
             </ul>
-            <TodayCard
-              timezone={TZ}
-              more={3}
-              happening={[
-                {
-                  key: 'h1',
-                  at: '2026-10-06T15:30:00Z',
-                  label: 'Interview: Northwind Health',
-                  detail: 'Video call, 60 min',
-                  href: '/jobs/roles/r1',
-                },
-              ]}
-              due={[
-                { key: 'd1', overdue: true, title: 'Send the signed tenancy form back to the agent', href: '/todo' },
-                { key: 'd2', overdue: true, title: 'Renew the car insurance', href: '/todo' },
-                { key: 'd3', overdue: false, title: 'Book the dentist', href: '/todo' },
-                { key: 'd4', overdue: false, title: 'Return the Uniqlo jacket that did not fit', href: '/shopping' },
-                { key: 'd5', overdue: false, title: 'Pay Sam back for the concert tickets', href: '/todo' },
-              ]}
-            />
-            <DoneTodayCard done={DONE_TODAY} logging />
-            <UpdatesCard updates={UPDATES} now={NOW} timezone={TZ} />
+            <InboxLine count={7} />
           </>
         }
         rail={
           <>
-            <WatchingSurface />
-            <DashTodaySurface />
-            <WeekCard
-              timezone={TZ}
-              rows={[
-                { key: 'w1', day: '2026-10-07', at: '2026-10-07T18:00:00Z', label: 'Reading group', detail: 'The Pinch', href: '/todo', booked: true },
-                { key: 'w2', day: '2026-10-08', at: null, label: 'Uniqlo return window closes', detail: null, href: '/shopping', booked: false },
-                { key: 'w3', day: '2026-10-09', at: null, label: 'Take-home for Tallow due', detail: null, href: '/jobs', booked: false },
-                { key: 'w4', day: '2026-10-10', at: '2026-10-10T08:30:00Z', label: 'Dentist', detail: 'Check-up', href: '/todo', booked: true },
-                { key: 'w5', day: '2026-10-12', at: null, label: 'Council tax', detail: null, href: '/todo', booked: false },
-              ]}
-            />
-            <WorkspaceList workspaces={WORKSPACES} />
+            <HomeFold
+              id="today"
+              title="Today"
+              count={HAPPENING.length + DUE.length + 3}
+              action={<AgendaLink />}
+            >
+              <TodayList timezone={TZ} more={3} happening={HAPPENING} due={DUE} />
+            </HomeFold>
+            <HomeFold id="done-today" title="Done today" count={doneTodayCount(DONE_TODAY)}>
+              <DoneTodayBody done={DONE_TODAY} logging />
+            </HomeFold>
+            <HomeFold id="watching" title="Watching" count={WATCHING_ROWS.length}>
+              <WatchingList rows={WATCHING_ROWS} now={WATCHING_NOW} timezone="America/New_York" />
+            </HomeFold>
+            <DashTodayFoldSurface />
+            <HomeFold id="week" title="This week" count={WEEK.length} action={<AgendaLink />}>
+              <WeekList timezone={TZ} rows={WEEK} />
+            </HomeFold>
+            <HomeFold id="updates" title="Updates" count={UPDATES.length}>
+              <UpdatesList updates={UPDATES} now={NOW} timezone={TZ} />
+            </HomeFold>
           </>
         }
       />

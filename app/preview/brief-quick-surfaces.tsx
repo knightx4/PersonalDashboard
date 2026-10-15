@@ -109,7 +109,7 @@ const crumbs = [
 export function BriefQuickPreview({ state }: { state: 'deck' | 'researching' | 'end' }) {
   return (
     <PageColumn className="max-w-2xl">
-      <PageHeader crumbs={crumbs} title="Quick read" />
+      <PageHeader subject={{ ref: null, path: crumbs }} title="Quick read" />
       {state === 'end' ? (
         <QuickReadEnd briefId={BRIEF_ID} />
       ) : (

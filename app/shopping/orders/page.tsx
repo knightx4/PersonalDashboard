@@ -1,5 +1,4 @@
 import { Receipt } from 'lucide-react';
-import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
@@ -16,11 +15,11 @@ type OrderSourceMessage = {
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { OrdersAddActions, OrdersEmpty } from '../list-adds';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
-import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
@@ -48,6 +47,7 @@ import {
 import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Orders' };
 
@@ -436,13 +436,9 @@ export default async function OrdersPage({
 
       <div className="min-w-0 flex-1">
         <PageHeader
+          subject={sectionSubject('/shopping/orders', 'Orders')}
           title="Orders"
-          description="Everything you have bought, newest first."
-          actions={
-            <Link href="/shopping/orders/new" className={buttonVariants({ size: 'sm' })}>
-              Add an order
-            </Link>
-          }
+          actions={<OrdersAddActions />}
         />
 
         <FilterChips chips={chips} clearAllHref="/shopping/orders" />
@@ -463,24 +459,15 @@ export default async function OrdersPage({
 
         {orders.length === 0 && q ? (
           <SearchEmpty query={q} />
-        ) : orders.length === 0 ? (
+        ) : orders.length === 0 && filteredEmpty ? (
           <EmptyState
             icon={Receipt}
-            title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
-            description={
-              filteredEmpty
-                ? 'Try a different search, merchant, tag, status, or time range.'
-                : 'Orders appear here as we find them in your inboxes, grouped by month. You can also add one by hand at any time.'
-            }
-            action={
-              filteredEmpty
-                ? { label: 'Clear filters', href: filterHref({ range: 'last_12_months', person: personId ?? undefined }) }
-                : { label: 'Add an order', href: '/shopping/orders/new' }
-            }
-            secondaryAction={
-              filteredEmpty ? undefined : { label: 'Connect an inbox', href: '/shopping/settings#inboxes' }
-            }
+            title="No matching orders"
+            description="Try a different search, merchant, tag, status, or time range."
+            action={{ label: 'Clear filters', href: filterHref({ range: 'last_12_months', person: personId ?? undefined }) }}
           />
+        ) : orders.length === 0 ? (
+          <OrdersEmpty />
         ) : (
           <div className="space-y-8">
             {sections.map((section) => (

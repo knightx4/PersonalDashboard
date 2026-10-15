@@ -13,6 +13,7 @@ import { EventRow } from '../../event-row';
 import { ObservationList } from '../../observations';
 import { WriteYearButton } from './write-button';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * The year in review (plan #1121), apart from the reads so the surface
@@ -111,9 +112,7 @@ export function YearReviewView({
 }
 
 function dayText(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: timezone }).format(
-    new Date(iso),
-  );
+  return whenDate(iso, { timeZone: timezone, month: 'long' });
 }
 
 function eventsText(count: number): string {

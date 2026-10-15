@@ -4,8 +4,7 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { OwlIcon } from '@/components/shell/owl-icon';
-import { PaidHint } from '@/components/ui/paid-hint';
-import { TalkThread, type TalkAssistant } from '@/components/talk/talk-thread';
+import { Thread, type TalkAssistant } from '@/components/thread/thread';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -78,19 +77,13 @@ export function MayaConversation({
 
         <section aria-labelledby="replies-heading">
           <SectionHeading id="replies-heading" title="Replies" className="mb-2" />
-          <TalkThread
+          <Thread
             id={`maya-${threadId}`}
             turns={turns}
             assistant={MAYA}
-            onCard
             label="Reply to Maya"
             placeholder="Agree, push back, or take it somewhere else"
-            hint={
-              <PaidHint
-                action="app/vault/maya/actions.ts#replyToMaya"
-                what="Cost of a reply from Maya"
-              />
-            }
+            cost={{ action: 'app/vault/maya/actions.ts#replyToMaya', what: 'Cost of a reply from Maya' }}
             send={async (body) => {
               const result = await replyToMaya(threadId, body);
               if (result.summary) setSummary(result.summary);

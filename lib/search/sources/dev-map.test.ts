@@ -28,7 +28,7 @@ describe('dev search hits', () => {
   });
 
   it('lands a step on the plan with its number in the search box', () => {
-    expect(planHref(612)).toBe('/dev/plan?view=all&q=%23612');
+    expect(planHref(612)).toBe('/dev/plan/612');
     const [hit] = devHits({
       plan: [{ id: 'p', number: 612, title: 'Search', parent_id: 'f', status: 'not_started' }],
       ideas: [],
@@ -53,7 +53,7 @@ describe('dev search hits', () => {
     expect(hit).toMatchObject({
       subtitle: 'Step #1073.4 · not started',
       match: '#1073.4 #1084',
-      href: '/dev/plan?view=all&q=%231084',
+      href: '/dev/plan/1084',
     });
   });
 

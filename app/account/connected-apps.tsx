@@ -1,10 +1,9 @@
 'use client';
 
 import Link, { linkVariants } from '@/components/ui/link';
-import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Disclosure } from '@/components/ui/disclosure';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import type { ConnectedApp, ConnectedAppCall } from '@/lib/connector/apps';
 import { removeConnectedApp } from './connected-apps-actions';
 
@@ -30,8 +29,8 @@ export function ConnectedAppsSection({
     formatClock(at, { day: 'numeric', month: 'short', timeZone: timezone });
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Connected apps</h2>
+    <section>
+      <h3 className="text-ui font-semibold text-ink">Connected apps</h3>
       <p className="mt-0.5 text-ui text-ink-muted">
         The newest 100 calls are listed, including those from apps you have since removed.
       </p>

@@ -1,5 +1,7 @@
 'use client';
 
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import Link from '@/components/ui/link';
 import { useCallback, useMemo } from 'react';
 import { ClipboardCheck } from 'lucide-react';
@@ -39,10 +41,11 @@ import {
   ExcludeSenderButton,
 } from './review-buttons';
 import { AttachChoices, useAttachEmail } from './attach-email';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { AddFromEmailButton } from './add-from-email';
+import { AimButton } from '@/components/shell/aim-button';
 import { canReadAsOrder } from '@/lib/review/read-order';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -199,7 +202,7 @@ function ReviewBulkBar({ rows }: { rows: ReviewRow[] }) {
     let restore: DismissedEmail[] = [];
     run({
       ids: emailIds,
-      verb: 'Dismissed',
+      verb: 'Declined',
       one: 'email',
       write: async (ids) => {
         const result = await dismissEmailsReview([...ids]);
@@ -236,7 +239,8 @@ function ReviewBulkBar({ rows }: { rows: ReviewRow[] }) {
           pending={pending}
           onClick={dismissSelected}
         >
-          Dismiss {countNoun(emailIds.length, 'email')}
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
+          {LIFECYCLE_VERB.declined} {countNoun(emailIds.length, 'email')}
         </Button>
       )}
     </SelectionActionBar>
@@ -347,30 +351,9 @@ function EmailRow({
               Linked order
             </Link>
           )}
-          {readable && (
-            <Link
-              href={`/shopping/orders/new?from_email=${row.messageId}`}
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Add from this email
-            </Link>
-          )}
-          {readable && (
-            // The order form reads the email as it opens.
-            <PaidHint
-              action="app/shopping/orders/new/page.tsx#NewOrderPage"
-              count={1}
-              what="Cost of reading the email"
-              className="self-center"
-            />
-          )}
+          {readable && <AddFromEmailButton messageId={row.messageId} subject={subject} />}
           {!row.linkedOrderId && !readable && (
-            <Link
-              href="/shopping/orders/new"
-              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-            >
-              Add manually
-            </Link>
+            <AimButton aim={{ kind: 'order' }} label="Add manually" variant="ghost" />
           )}
           {row.gmailHref && (
             <GmailAnchor
@@ -382,7 +365,7 @@ function EmailRow({
               Open in Gmail
             </GmailAnchor>
           )}
-          <DismissEmailButton messageId={row.messageId} />
+          <DismissEmailButton messageId={row.messageId} subject={subject} />
           <ExcludeSenderButton
             messageId={row.messageId}
             fromAddress={row.fromAddress}

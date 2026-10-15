@@ -1,11 +1,10 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { loadYourInitial } from '@/lib/core/account/your-initial';
+import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { featureTable } from '@/lib/plan/feature-table';
 import { updateOverdueDays } from '@/lib/plan/updates';
 import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
-import Link from '@/components/ui/link';
-import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { buttonVariants } from '@/components/ui/button';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
@@ -27,7 +26,7 @@ import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
-import { NEW_FEATURE_PARAM, NEW_FEATURE_VALUE, newFeatureHref } from '@/lib/plan/feature-page';
+import { NewFeatureButton } from './feature-compose';
 import {
   applyView,
   buildPlanTree,
@@ -42,6 +41,7 @@ import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { catalogOf } from './plan-catalog';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -132,8 +132,6 @@ export async function renderPlanPage({
   // What to put in the plan's own search box on arrival. The app-wide search
   // sends a step here as `q=#612`, which unfolds the feature it sits under.
   const query = (Array.isArray(params.q) ? params.q[0] : params.q) ?? '';
-  // The "New feature" surface, open from the header's link (plan #1670).
-  const newFeatureOpen = params[NEW_FEATURE_PARAM] === NEW_FEATURE_VALUE;
 
   // Before the load, so anything new appears on this render rather than the
   // next one. It carries its failure back instead of throwing: a plan that
@@ -264,21 +262,20 @@ export async function renderPlanPage({
   // "New feature" is a link to this page with the surface open (plan #1670),
   // keeping the view it was pressed from.
   const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
+  // Your initial, for the Assignee cells (plan #2069.1).
+  const initial = await loadYourInitial(user);
 
   return (
+    <YourInitialProvider initial={initial}>
     <PageColumn className="space-y-6">
       <PageHeader
-        title={project ? project.label : 'Plan'}
-        actions={
-          <Link
-            href={newFeatureHref(basePath, requested)}
-            scroll={false}
-            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-          >
-            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-            New feature
-          </Link>
+        subject={
+          project
+            ? sectionSubject('/dev/plan', 'Plan', { label: project.label, href: basePath })
+            : sectionSubject('/dev/plan', 'Plan')
         }
+        title={project ? project.label : 'Plan'}
+        actions={<NewFeatureButton module={project?.id ?? null} />}
         description={
           project
             ? // One line naming where it is built (plan #1688): the paragraph
@@ -311,10 +308,6 @@ export async function renderPlanPage({
       )}
       <PlanViewComponent
         basePath={basePath}
-        newFeature={{
-          open: newFeatureOpen,
-          ...(project ? { module: project.id, scopes: [project.id] } : {}),
-        }}
         sections={sections}
         finished={finished}
         summary={summary}
@@ -338,5 +331,6 @@ export async function renderPlanPage({
         canSend={canSend}
       />
     </PageColumn>
+    </YourInitialProvider>
   );
 }

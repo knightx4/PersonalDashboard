@@ -22,6 +22,8 @@ import { loadRunActivities } from '@/lib/core/run-activities-store';
 import type { RunOutcome } from '@/lib/goals/runs';
 import { acknowledgeGoalRunAction, answerGoalRunAction } from './actions';
 import { PageColumn } from '@/components/shell/page-width';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Run' };
 export const dynamic = 'force-dynamic';
@@ -80,6 +82,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
   return (
     <PageColumn className="space-y-4">
       <PageHeader
+        subject={await rowSubject(toRef('goals.runs', runId))}
         title={JOB_LABELS[run.job]}
         description={
           <>

@@ -92,7 +92,9 @@ export function dayBounds(today: string, timezone: string): { start: string; end
 }
 
 /**
- * One row as Home lists it, or null for a row that wrote nothing.
+ * One row as Home lists it, or null for a row that wrote nothing or that the
+ * person made themselves: an Add button aimed at capture records its row so
+ * the toast's Undo works (plan #1950.1), but Dash did not make it.
  * `threads` maps a row thread's conversation id to the ref it sits under.
  */
 export function dashTodayEntry(
@@ -102,6 +104,7 @@ export function dashTodayEntry(
 ): DashTodayEntry | null {
   const action = toDashAction(row);
   if (action.status !== 'done' && action.status !== 'undone') return null;
+  if (action.surface === 'capture' && action.undo?.aimed === true) return null;
   const at = action.doneAt ?? action.createdAt;
   const table = action.subjectRef ? (parseRef(action.subjectRef)?.table ?? null) : null;
   const workspace = table ? tableWorkspace(table) : null;
@@ -170,7 +173,7 @@ export function groupDashToday(
 }
 
 /**
- * Today's changes, grouped. Reads through the person's core client, so row
+ * Today's changes, grouped, for one workspace when `workspace` is given. Reads through the person's core client, so row
  * level security keeps it to their own rows as well as the filter.
  */
 export async function loadDashToday(
@@ -180,6 +183,11 @@ export async function loadDashToday(
     today: string;
     timezone: string;
     shown?: (workspace: ModuleId) => boolean;
+    /**
+     * Only this workspace's changes, for its own Now (plan #1964.4). Left
+     * out, every workspace's, which is Home's list.
+     */
+    workspace?: ModuleId;
   },
 ): Promise<DashTodayGroup[]> {
   const { start, end } = dayBounds(input.today, input.timezone);
@@ -197,7 +205,7 @@ export async function loadDashToday(
   const threads = await threadSubjects(core, input.userId, rows);
   const entries = rows
     .map((row) => dashTodayEntry(row, input.today, threads))
-    .filter((entry): entry is DashTodayEntry => entry !== null);
+    .filter((entry): entry is DashTodayEntry => entry !== null && (!input.workspace || entry.workspace === input.workspace));
   return groupDashToday(entries, input.shown);
 }
 

@@ -133,7 +133,7 @@ describe('displayValue and inputValue', () => {
     expect(displayValue(field('rate'), 6.8)).toBe('6.8%');
     expect(displayValue(field('due_day'), 2)).toBe('2nd');
     expect(displayValue(field('due_day'), 23)).toBe('23rd');
-    expect(displayValue({ key: 'd', label: 'D', type: 'date' }, '2026-09-24')).toBe('Sep 24, 2026');
+    expect(displayValue({ key: 'd', label: 'D', type: 'date' }, '2026-09-24')).toBe('24 Sep 2026');
     expect(displayValue({ key: 'y', label: 'Y', type: 'yes_no' }, false)).toBe('No');
     expect(displayValue(field('name'), null)).toBe('');
   });

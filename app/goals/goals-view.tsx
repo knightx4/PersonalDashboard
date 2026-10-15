@@ -4,17 +4,19 @@ import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
-import { Archive, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { closedToast, LIFECYCLE_GLYPH, type Lifecycle } from '@/lib/core/lifecycle';
 import { Card, cardVariants } from '@/components/ui/card';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PaidHint } from '@/components/ui/paid-hint';
-import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
+import { InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
@@ -29,22 +31,13 @@ import { VIEW_LABEL } from '@/lib/core/move';
 import { goalViewHref } from '@/lib/goals/plan-rows';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
-import {
-  AREA_NAME_MAX,
-  AREA_NOTE_MAX,
-  GOAL_ACCEPTANCE_MAX,
-  GOAL_TITLE_MAX,
-  type AreaWithGoals,
-  type Goal,
-} from '@/lib/goals/tree';
+import { AREA_NAME_MAX, AREA_NOTE_MAX, type AreaWithGoals, type Goal } from '@/lib/goals/tree';
 import { cn } from '@/lib/cn';
 import { reopenedGoal } from '@/lib/goals/optimistic';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { OrderedSiblings, useMoveSelf, type SiblingMove } from '@/lib/use-sibling-order';
 import { approveGoalAction } from './[goalId]/shaping-actions';
 import {
-  addArea,
-  addGoal,
   approveAreaAction,
   archiveAreaAction,
   archiveGoalAction,
@@ -59,6 +52,8 @@ import {
 import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
+import { usePutAwayItems } from './put-away';
+import { GoalSelectBar, GoalSelectProvider, GoalTick, SelectGoalsToggle } from './select-goals';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
 import { areaCrumbs } from '@/lib/goals/crumbs';
@@ -161,7 +156,7 @@ async function writeReopen(id: string) {
 const EMPTY_VIEW: Record<AllGoalsView, { title: string; description: string }> = {
   open: {
     title: 'No open goals',
-    description: 'Every goal is finished or archived. Everything shows them all.',
+    description: 'Every goal is finished, parked or archived. Everything shows them all.',
   },
   you: {
     title: 'Nothing is waiting on you',
@@ -180,6 +175,7 @@ export function GoalsView({
   canRun,
   areaId,
   planCost = null,
+  select,
 }: {
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
@@ -197,6 +193,8 @@ export function GoalsView({
   areaId?: string;
   /** The usual cost of one Plan this area run, for the hint beside its button; none draws no hint. */
   planCost?: CostEstimate | null;
+  /** The gallery's way in: Select already on, with these goals ticked. */
+  select?: { selecting?: boolean; ticked?: string[] };
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
   // Where a goal can be moved to: every live area, shown in this view or not.
@@ -207,75 +205,90 @@ export function GoalsView({
   const chips = counted.length > 0 && (
     <div className="flex items-center gap-2">
       <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-      <ViewChips
-        view={view}
-        chips={ALL_GOALS_VIEWS}
-        labels={VIEW_LABEL}
-        hrefOf={(candidate) =>
-          goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
-        }
-        counts={{
-          open: countAllGoalsView(counted, 'open', onYou),
-          you: countAllGoalsView(counted, 'you', onYou),
-        }}
-        scroll={false}
-      />
+      <div className="min-w-0 flex-1">
+        <ViewChips
+          view={view}
+          chips={ALL_GOALS_VIEWS}
+          labels={VIEW_LABEL}
+          hrefOf={(candidate) =>
+            goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
+          }
+          counts={{
+            open: countAllGoalsView(counted, 'open', onYou),
+            you: countAllGoalsView(counted, 'you', onYou),
+          }}
+          scroll={false}
+        />
+      </div>
+      {/* Several goals parked or archived at once (plan #2097.2). */}
+      <SelectGoalsToggle />
     </div>
   );
 
   if (pageArea) {
     const area = areaInView(pageArea, view, onYou);
     return (
-      <AreaSection
-        area={area}
-        index={pageIndex}
-        count={allAreas.length}
-        progress={progress}
-        run={areaRuns[area.id] ?? null}
-        rhythms={rhythms[area.id] ?? []}
-        canRun={canRun}
-        planCost={planCost}
-        places={places}
-        page={{
-          chips,
-          empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
-        }}
-      />
+      <GoalSelectProvider goals={selectable([area])} initial={select}>
+        <AreaSection
+          area={area}
+          index={pageIndex}
+          count={allAreas.length}
+          progress={progress}
+          run={areaRuns[area.id] ?? null}
+          rhythms={rhythms[area.id] ?? []}
+          canRun={canRun}
+          planCost={planCost}
+          places={places}
+          page={{
+            chips,
+            empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
+          }}
+        />
+        <GoalSelectBar />
+      </GoalSelectProvider>
     );
   }
 
   const areas = areasInView(allAreas, view, onYou);
   return (
-    <div className="space-y-6">
-      {chips}
-      {allAreas.length === 0 ? (
-        <EmptyState
-          icon={Flag}
-          title="No areas yet"
-          description="Start with the directions you care about, such as money, career or the city, then put goals under each."
-        />
-      ) : areas.length === 0 ? (
-        <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
-      ) : (
-        areas.map((area, index) => (
-          <AreaSection
-            key={area.id}
-            area={area}
-            index={index}
-            count={areas.length}
-            progress={progress}
-            run={areaRuns[area.id] ?? null}
-            rhythms={rhythms[area.id] ?? []}
-            canRun={canRun}
-            planCost={planCost}
-            places={places}
-            view={view}
+    <GoalSelectProvider goals={selectable(areas)} initial={select}>
+      <div className="space-y-6">
+        {chips}
+        {allAreas.length === 0 ? (
+          <EmptyState
+            icon={Flag}
+            title="No areas yet"
+            description="Start with the directions you care about, such as money, career or the city, then put goals under each."
           />
-        ))
-      )}
-      <AreaComposer />
-    </div>
+        ) : areas.length === 0 ? (
+          <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
+        ) : (
+          areas.map((area, index) => (
+            <AreaSection
+              key={area.id}
+              area={area}
+              index={index}
+              count={areas.length}
+              progress={progress}
+              run={areaRuns[area.id] ?? null}
+              rhythms={rhythms[area.id] ?? []}
+              canRun={canRun}
+              planCost={planCost}
+              places={places}
+              view={view}
+            />
+          ))
+        )}
+        <AreaComposer />
+        <GoalSelectBar />
+      </div>
+    </GoalSelectProvider>
   );
+}
+
+/** The goals Select can tick: every one shown that is not archived already. */
+function selectable(areas: readonly AreaInView[]): Goal[] {
+  return areas.flatMap((area) => area.goals.filter((goal) => !goal.archivedAt));
 }
 
 function AreaSection({
@@ -327,7 +340,7 @@ function AreaSection({
     // An archived area has no page, so its own page goes back to All goals.
     if (page) router.push('/goals/all');
     toast({
-      text: `Archived ${area.name}.`,
+      text: closedToast('dropped', area.name),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', area.id);
@@ -346,13 +359,14 @@ function AreaSection({
     {
       id: 'archive',
       label: 'Archive area',
+      lifecycle: 'dropped',
       destructive: true,
       formAction: archive,
       formFields: { id: area.id },
       confirm:
         liveCount === 0
-          ? `Archive ${area.name}?`
-          : `Archive ${area.name} and its ${liveCount === 1 ? 'goal' : `${liveCount} goals`}?`,
+          ? `Drop ${area.name}?`
+          : `Drop ${area.name} and its ${liveCount === 1 ? 'goal' : `${liveCount} goals`}?`,
     },
   ];
 
@@ -365,7 +379,7 @@ function AreaSection({
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
       {page ? (
         <PageHeader
-          crumbs={areaCrumbs(area)}
+          subject={{ ref: `goals.areas:${area.id}`, path: areaCrumbs(area) }}
           title={
             <form action={rename}>
               <input type="hidden" name="id" value={area.id} />
@@ -496,7 +510,7 @@ function AreaSection({
             cost={planCost}
           />
         )}
-        <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+        <GoalComposer areaId={area.id} areaName={area.name} />
       </div>
     </section>
   );
@@ -523,17 +537,18 @@ function GoalRow({
     write: () => writeReopen(served.id),
   });
   const moveSelf = useMoveSelf(served.id, writeGoalMove);
-  const [editState, edit, editing] = useActionState(editGoal, initial);
+  const [editState] = useActionState(editGoal, initial);
   const toast = useToast();
 
-  async function archive(form: FormData) {
+  // Dropping a goal archives it; declining one Dash proposed does the same.
+  async function archive(form: FormData, lifecycle: Lifecycle = 'dropped') {
     const result = await archiveGoalAction(form);
     if (result.error) {
       toast({ text: result.error });
       return;
     }
     toast({
-      text: `Archived ${goal.title}.`,
+      text: closedToast(lifecycle, goal.title),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', goal.id);
@@ -551,6 +566,8 @@ function GoalRow({
   }
 
   const moveToItems = useMoveToItems(goal, places);
+  // Later for any open goal, and Drop (plan #2097.1; words from plan #1957.8).
+  const putAwayItems = usePutAwayItems(goal, steps?.live ?? 0);
 
   // An archived goal, shown only under Everything, is restored or left be.
   const archived = Boolean(goal.archivedAt);
@@ -570,17 +587,12 @@ function GoalRow({
           onSelect: () => moveSelf('down'),
         },
         ...moveToItems,
-        {
-          id: 'archive',
-          label: 'Archive goal',
-          destructive: true,
-          formAction: archive,
-          formFields: { id: goal.id },
-        },
+        ...putAwayItems,
       ];
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
+      {!archived && <GoalTick id={goal.id} title={goal.title} />}
       <div className="min-w-0 flex-1">
         {/* The name opens the tree, where it is renamed; editing it here
             took the click meant for opening the goal. */}
@@ -609,7 +621,10 @@ function GoalRow({
           {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}
-            className={cn('press-area inline-flex items-center gap-1 text-small', linkVariants({ tone: 'quiet' }))}
+            className={cn(
+              'press-area inline-flex items-center gap-1 text-small',
+              linkVariants({ tone: 'quiet' }),
+            )}
           >
             <ListTree className="size-3.5" strokeWidth={1.75} aria-hidden />
             {goal.status === 'proposed'
@@ -621,12 +636,12 @@ function GoalRow({
         </div>
         {archived && (
           <p className="flex items-center gap-1 px-1 pt-0.5 text-small text-ink-muted">
-            <Archive className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Archived. Restore it from its menu to work on it again.
+            <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
+            Dropped. Restore it from its menu to work on it again.
           </p>
         )}
         {!archived && goal.status === 'proposed' && (
-          <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />
+          <SettleProposedGoal goalId={goal.id} onDecline={(form) => archive(form, 'declined')} />
         )}
         {!archived && (goal.status === 'parked' || goal.status === 'done') && (
           <TakeBackUp status={goal.status} onReopen={() => reopen('reopen')} />
@@ -639,16 +654,16 @@ function GoalRow({
 }
 
 /**
- * Approve or turn down a goal Claude proposed, where it stands. Approving
- * opens it with the steps proposed under it; turning it down archives it,
- * with an undo, and Claude does not propose it again.
+ * Approve or decline a goal Dash proposed, where it stands. Approving opens
+ * it with the steps proposed under it; declining archives it, with an undo,
+ * and Dash does not propose it again.
  */
 function SettleProposedGoal({
   goalId,
-  onTurnDown,
+  onDecline,
 }: {
   goalId: string;
-  onTurnDown: (form: FormData) => Promise<void>;
+  onDecline: (form: FormData) => Promise<void>;
 }) {
   const [state, approve, approving] = useActionState(approveGoalAction, {});
   return (
@@ -659,11 +674,9 @@ function SettleProposedGoal({
           Approve
         </Button>
       </form>
-      <form action={onTurnDown}>
+      <form action={onDecline}>
         <input type="hidden" name="id" value={goalId} />
-        <Button type="submit" size="sm" variant="ghost" disabled={approving}>
-          Turn down
-        </Button>
+        <CloseButton lifecycle="declined" type="submit" disabled={approving} />
       </form>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </div>
@@ -749,130 +762,18 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
 }
 
 /**
- * A new goal: a title, and a done-when if you know it. A goal you cannot
- * describe yet still goes in with the title alone.
+ * A new goal opens capture aimed at a goal in this area (plan #1950.5): the
+ * title, and one press makes it and opens its page, where the done-when is
+ * written. A goal in the Learn area is still placed and given a plan once it
+ * is made.
  */
-function GoalComposer({
-  areaId,
-  areaName,
-  learn,
-}: {
-  areaId: string;
-  areaName: string;
-  /** The Learn area, where a new goal is placed and given a plan, which costs. */
-  learn: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
-    const next = await addGoal(prev, form);
-    if (next.done) setOpen(false);
-    return next;
-  }, initial);
-
-  if (!open) return <AddTrigger label="New goal" onClick={() => setOpen(true)} />;
-
+function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }) {
   return (
-    <Card>
-      <form
-        action={add}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <input type="hidden" name="areaId" value={areaId} />
-        <div className="space-y-3 px-3 py-3">
-          <ComposeTitle
-            name="title"
-            required
-            autoFocus
-            maxLength={GOAL_TITLE_MAX}
-            placeholder="A goal: an outcome that ends, such as pay off the credit cards"
-            aria-label={`New goal in ${areaName}`}
-          />
-          <ComposeBody
-            key="acceptance"
-            name="acceptance"
-            rows={1}
-            maxLength={GOAL_ACCEPTANCE_MAX}
-            placeholder="Done when… (optional)"
-            aria-label="When it is done"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-          <span className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={adding}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={adding}>
-              {adding ? 'Adding…' : 'Add goal'}
-            </Button>
-            {learn && (
-              <PaidHint
-                action="app/goals/actions.ts#addGoal"
-                what="Cost of placing the goal and writing its plan"
-                align="end"
-              />
-            )}
-          </span>
-        </div>
-      </form>
-    </Card>
+    <AddTrigger label="New goal" aim={{ kind: 'goal', under: { id: areaId, title: areaName } }} />
   );
 }
 
+/** A new area, by its name alone, through capture (plan #1950.5). */
 function AreaComposer() {
-  const [open, setOpen] = useState(false);
-  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
-    const next = await addArea(prev, form);
-    if (next.done) setOpen(false);
-    return next;
-  }, initial);
-
-  if (!open) return <AddTrigger label="New area" onClick={() => setOpen(true)} />;
-
-  return (
-    <Card>
-      <form
-        action={add}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <div className="px-3 py-3">
-          <ComposeTitle
-            name="name"
-            required
-            autoFocus
-            maxLength={AREA_NAME_MAX}
-            placeholder="An area: a direction that never finishes, such as Career or The city"
-            aria-label="New area"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-          <span className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={adding}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={adding}>
-              {adding ? 'Adding…' : 'Add area'}
-            </Button>
-          </span>
-        </div>
-      </form>
-    </Card>
-  );
+  return <AddTrigger label="New area" aim={{ kind: 'goal-area' }} />;
 }

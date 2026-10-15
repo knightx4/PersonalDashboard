@@ -1,18 +1,21 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Sparkle } from 'lucide-react';
+import { Sparkle } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { Card, CardSection } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { Switch } from '@/components/ui/field';
 import { LiveDot } from '@/components/ui/live-dot';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
 import { watchLine } from '@/lib/learn/briefs/watch';
 import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
@@ -29,6 +32,9 @@ import {
 import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
 
 /** How often a researching brief asks the server for what the run has written. */
 const POLL_MS = 4000;
@@ -222,10 +228,12 @@ function Failed({ brief }: { brief: Brief }) {
       <p className="text-body font-semibold text-ink">The research stopped before it finished</p>
       <p className="text-ui text-ink-muted">{brief.error?.trim() || 'Dash did not say why.'}</p>
       <div className="flex flex-wrap items-center gap-3">
-        <Button
+        <DashAction
           type="button"
           variant="primary"
           pending={pending}
+          paid="app/learn/b/[id]/actions.ts#retryBrief"
+          what="Cost of researching it again"
           onClick={() =>
             start(async () => {
               const result = await retryBrief(brief.id);
@@ -234,9 +242,8 @@ function Failed({ brief }: { brief: Brief }) {
             })
           }
         >
-          Try again
-        </Button>
-        <PaidHint action="app/learn/b/[id]/actions.ts#retryBrief" what="Cost of researching it again" />
+          Research it again
+        </DashAction>
       </div>
       {error && <p className="text-small text-danger">{error}</p>}
     </Card>
@@ -307,6 +314,7 @@ function NewSince({ sources }: { sources: BriefSource[] }) {
 function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const switchId = useId();
@@ -356,21 +364,45 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
           />
         </label>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            pending={pending}
-            onClick={() =>
-              start(async () => {
-                const result = await setBriefArchived(brief.id, !archived);
-                if (result.error) setError(result.error);
-                else setArchived(!archived);
-              })
-            }
-          >
-            {archived ? 'Restore' : 'Archive'}
-          </Button>
+          {archived ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              pending={pending}
+              onClick={() =>
+                start(async () => {
+                  const result = await setBriefArchived(brief.id, false);
+                  if (result.error) setError(result.error);
+                  else setArchived(false);
+                })
+              }
+            >
+              Bring back
+            </Button>
+          ) : (
+            <CloseButton
+              lifecycle="dropped"
+              variant="secondary"
+              pending={pending}
+              onClick={() =>
+                start(async () => {
+                  const result = await setBriefArchived(brief.id, true);
+                  if (result.error) return setError(result.error);
+                  setArchived(true);
+                  // Drop, with Undo in the toast (plan #1957.3).
+                  toast({
+                    text: closedToast('dropped', brief.question),
+                    undo: async () => {
+                      const back = await setBriefArchived(brief.id, false);
+                      if (back.error) throw new Error(back.error);
+                      setArchived(false);
+                    },
+                  });
+                })
+              }
+            />
+          )}
           <span className="text-small text-ink-muted">
             {archived ? 'Off your list in Learn.' : 'Takes it off your list in Learn.'}
           </span>
@@ -400,11 +432,14 @@ export function BriefView({
   live = true,
   openQuote,
   editing = false,
+  path,
 }: {
   page: BriefPage;
   live?: boolean;
   openQuote?: string;
   editing?: boolean;
+  /** The path to the brief, from the page (rowSubject); the gallery passes none and keeps the link to Now. */
+  path?: PageSubject;
 }) {
   const { brief, sources } = page;
   const sourcesFound = Object.keys(sources).length;
@@ -413,13 +448,9 @@ export function BriefView({
 
   const main = (
     <div className="flex flex-col gap-4">
-      <Link
-        href="/learn/now"
-        className="-mb-1 inline-flex min-h-11 items-center gap-1 self-start text-ui text-ink-muted hover:text-ink lg:min-h-8"
-      >
-        <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-        Now
-      </Link>
+      {/* The path, Learn › this brief, and the one back link (plans
+          #1931.2, #1931.3). */}
+      {path && <PathLine crumbs={path.path} fallback={parentCrumb(path.path)} className="-mb-1" />}
       <header>
         <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{brief.question}</h1>
       </header>

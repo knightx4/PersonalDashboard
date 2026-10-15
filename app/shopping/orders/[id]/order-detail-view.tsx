@@ -17,6 +17,8 @@ import type { DevComment } from '@/lib/comments/load';
 import { threadRef } from '@/lib/thread/subjects';
 import { OrderActionsMenu } from './order-actions-menu';
 import { OrderItemTags } from '../order-item-tags';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * One order as the page shows it. Every amount is already a label in the
@@ -96,13 +98,15 @@ export function OrderDetailView({
   emails,
   items,
   thread,
-}: OrderDetail) {
+  path,
+}: OrderDetail & { path?: PageSubject }) {
   return (
     <DetailPage
       className="[&_a]:press-area max-sm:[&_input]:min-h-11"
       header={
         <>
           <PageHeader
+            subject={path}
             title={order.title}
             description={`${order.order_date}${
               order.external_order_number ? ` · #${order.external_order_number}` : ''
@@ -201,10 +205,10 @@ export function OrderDetailView({
                   {[
                     shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
                     shipment.shipped_at
-                      ? `Shipped ${new Date(shipment.shipped_at).toLocaleDateString()}`
+                      ? `Shipped ${whenDate(shipment.shipped_at, { timeZone: 'UTC' })}`
                       : null,
                     shipment.delivered_at
-                      ? `Delivered ${new Date(shipment.delivered_at).toLocaleDateString()}`
+                      ? `Delivered ${whenDate(shipment.delivered_at, { timeZone: 'UTC' })}`
                       : null,
                   ]
                     .filter(Boolean)
@@ -299,7 +303,7 @@ export function OrderDetailView({
                     {[
                       message.classification?.replaceAll('_', ' '),
                       message.received_at
-                        ? new Date(message.received_at).toLocaleDateString()
+                        ? whenDate(message.received_at, { timeZone: 'UTC' })
                         : null,
                     ]
                       .filter(Boolean)
@@ -406,7 +410,6 @@ export function OrderDetailView({
           subject={threadRef('order', order.id)}
           turns={thread}
           placeholder="A note on this order, or a question for Dash."
-          onCard
         />
       </Card>
     </DetailPage>

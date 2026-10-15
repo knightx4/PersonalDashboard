@@ -1,7 +1,6 @@
 import { SectionHeading } from '@/components/ui/section-heading';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
-import { ChevronLeft } from 'lucide-react';
 import { MapQuote } from '@/components/vault/map-position';
 import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MayaThreadDetail, MayaThreadNote } from '@/lib/vault/maya/store';
@@ -13,6 +12,10 @@ import { MayaConversation } from './conversation';
 import { QuestionField } from './question-field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { PageColumn } from '@/components/shell/page-width';
+import { PathLine } from '@/components/shell/back-link';
+import { parentCrumb } from '@/lib/core/back-from';
+import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * One thread with Maya, drawn from what the page read (page.tsx), so the
@@ -22,9 +25,12 @@ import { PageColumn } from '@/components/shell/page-width';
 export function MayaThreadView({
   thread,
   cited,
+  path,
 }: {
   thread: MayaThreadDetail;
   cited: Map<string, MayaThreadNote>;
+  /** The path to the thread, from the page (rowSubject); the gallery passes none. */
+  path?: PageSubject;
 }) {
   const thought = thread.messages.find((message) => message.kind === 'thought')?.thought ?? null;
   const turns: TalkTurn[] = thread.messages
@@ -39,15 +45,11 @@ export function MayaThreadView({
   return (
     <PageColumn>
     <article>
-      <div className="mb-4">
-        <Link
-          href="/vault/maya"
-          className="press-area inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Maya
-        </Link>
-      </div>
+      {/* The path, Vault › Maya › this page, and the one back link
+        (plans #1931.2, #1931.3). */}
+      {path && (
+        <PathLine crumbs={path.path} fallback={parentCrumb(path.path)} className="mb-4" />
+      )}
 
       <header className="mb-6">
         <QuestionField
@@ -195,9 +197,5 @@ function Synthesis({ synthesis }: { synthesis: MayaSynthesis }) {
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

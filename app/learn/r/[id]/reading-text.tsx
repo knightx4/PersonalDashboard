@@ -11,6 +11,8 @@ import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { readingPdfPath, readingPdfProblem } from '@/lib/learn/tracks/reading-pdf';
 import { MAX_READING_TEXT } from '@/lib/learn/tracks/reading-text';
 import { clearReadingText, saveReadingPdf, saveReadingText } from './actions';
+import { formatNumber } from '@/lib/money';
+import { whenDate } from '@/lib/core/when';
 
 /** Where this section sits, for the link under a summary that could not read the link. */
 export const READING_TEXT_ANCHOR = 'reading-text';
@@ -142,7 +144,7 @@ export function ReadingText({
               disabled={pending}
             />
             <p className={cn('text-small', over ? 'text-danger' : 'text-ink-muted')}>
-              {draft.length.toLocaleString('en-GB')} of {MAX_READING_TEXT.toLocaleString('en-GB')} characters
+              {formatNumber(draft.length)} of {formatNumber(MAX_READING_TEXT)} characters
             </p>
             {error && <FieldError>{error}</FieldError>}
             <div className="flex flex-wrap gap-2">
@@ -209,10 +211,5 @@ export function ReadingText({
 }
 
 function formatAdded(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

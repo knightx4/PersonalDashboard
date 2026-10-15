@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useState, useTransition } from 'react';
-import { Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -246,15 +245,6 @@ function ColourPicker({
           />
         </Tooltip>
       ))}
-    </span>
-  );
-}
-
-export function PeopleTitle() {
-  return (
-    <span className="flex items-center gap-2">
-      <Users className="size-4 text-ink-muted" strokeWidth={1.75} />
-      People
     </span>
   );
 }

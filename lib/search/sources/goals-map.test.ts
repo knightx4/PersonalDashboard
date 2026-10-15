@@ -20,6 +20,18 @@ const rows: GoalItemRow[] = [
   row({ id: 'o1', parent_id: 'gone', title: 'Orphan running step' }),
 ];
 
+describe('goals search hits open the row (plan #1931.4)', () => {
+  it('sends a goal found by name to the page its ref opens, not the list of goals', async () => {
+    const { refTitles } = await import('@/lib/core/refs');
+    const [hit] = goalHits(rows, { query: 'marathon', limit: 6 });
+    const read = async () => [{ id: 'g1', title: 'Run a marathon', level: 'goal', parent_id: null }];
+    const target = (await refTitles([hit.ref!], read)).get(hit.ref!);
+    expect(target?.href).toBe('/goals/g1');
+    expect(hit.href).toBe(target?.href);
+    expect(hit.href).not.toContain('/goals/all');
+  });
+});
+
 describe('goals search hits', () => {
   it('opens a goal on its own page', () => {
     expect(goalHits(rows, { query: 'marathon', limit: 6 })).toEqual([

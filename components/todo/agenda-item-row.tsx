@@ -1,6 +1,7 @@
 'use client';
 
-import { Clock, ExternalLink, X } from 'lucide-react';
+import { useRef } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { IconButton } from '@/components/ui/icon-button';
@@ -10,10 +11,13 @@ import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
 import { putAway } from '@/components/motion/place';
 import { moduleById, moduleForPath } from '@/lib/modules';
-import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
+import { answerItem, completeItem, deferItem, dismissItem, restoreItem } from '@/app/todo/source-actions';
+import { useToast } from '@/components/ui/toast';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
 type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
@@ -28,6 +32,7 @@ type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
  */
 export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: string }) {
   const owner = moduleById(moduleForPath(item.link?.href ?? null));
+  const toast = useToast();
   const home = owner ? { href: owner.home, name: owner.label } : null;
 
   /**
@@ -35,8 +40,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
    *
    * The row cannot take itself off the list -- the page rebuilds the agenda
    * from the sources -- so the immediate answer is the row marking itself:
-   * ticked and struck through for a finish, faded for a "later" or a "not this
-   * one". It is drawn against a fixed 'open', because an item is on the agenda
+   * ticked and struck through for a finish, faded for a Later or a Drop. It is drawn against a fixed 'open', because an item is on the agenda
    * exactly while it is outstanding, so a refused write leaves the row as it
    * was and the hook's toast says which source refused it and why.
    */
@@ -54,6 +58,22 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
     write: (change) => change.write(),
     onDone: (change) => {
       if (change.state === 'done') completionMoment();
+      // Later and Drop say so, with the way back where the source has one
+      // (plan #1957.3).
+      if (change.state === 'deferred' || change.state === 'dismissed') {
+        const text = closedToast(change.state === 'deferred' ? 'later' : 'dropped', item.title);
+        toast(
+          item.restorable
+            ? {
+                text,
+                undo: async () => {
+                  const back = await restoreItem(item.source, item.key);
+                  if (back.error) throw new Error(back.error);
+                },
+              }
+            : { text },
+        );
+      }
       // Finished, put off or set aside, the item goes back to the workspace
       // that owns it (plan #1578): that is where it lives, and the agenda only
       // ever borrowed it. An item with no link names no workspace and stays.
@@ -64,6 +84,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
   });
 
   const acted = shown !== 'open';
+  const laterAt = useRef<HTMLSpanElement>(null);
 
   return (
     <div
@@ -92,10 +113,10 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           ladder at all: an interview or a return deadline is an appointment,
           not something you finish. */}
       {item.completable ? (
-        <Tooltip label="Mark done" className="shrink-0">
+        <Tooltip label={LIFECYCLE_VERB.done} className="shrink-0">
           <button
             type="button"
-            aria-label="Mark done"
+            aria-label={LIFECYCLE_VERB.done}
             onClick={(event) =>
               run({
                 state: 'done',
@@ -137,7 +158,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             <Link
               href={item.link.href}
               className={cn(
-                'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
+                'press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
                 shown === 'done' && 'line-through',
               )}
             >
@@ -164,9 +185,14 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               affordance anyone sees -- least of all on a phone, where there is
               no hover to reveal it. This matches a linked task's anchor, so
               "click through to the job" reads the same on both kinds of row. */}
+          {/* 44px to a finger on a phone (press-area); the label truncates
+              inside, so the link's own area is not clipped with it. */}
           {item.link && (
-            <Link href={item.link.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }))}>
-              {item.link.label}
+            <Link
+              href={item.link.href}
+              className={cn('press-area min-w-0 max-w-full text-small', linkVariants({ tone: 'quiet' }))}
+            >
+              <span className="block truncate">{item.link.label}</span>
             </Link>
           )}
 
@@ -175,7 +201,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className={cn('inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
+              className={cn('press-area inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
             >
               <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               {item.action.label}
@@ -198,23 +224,23 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        <Tooltip label="Later" align="end">
-          <IconButton
-            label="Later"
-            onClick={(event) =>
+        {/* The one Later menu (plan #1957.9): the source puts it off to the day chosen. */}
+        <span ref={laterAt} className="flex">
+          <LaterMenu
+            compact
+            label={item.title}
+            onChoose={(choice) =>
               run({
                 state: 'deferred',
-                write: () => deferItem(item.source, item.key),
-                from: event.currentTarget.getBoundingClientRect(),
+                write: () => deferItem(item.source, item.key, choice),
+                from: laterAt.current?.getBoundingClientRect(),
               })
             }
-          >
-            <Clock strokeWidth={1.75} aria-hidden />
-          </IconButton>
-        </Tooltip>
-        <Tooltip label="Not this one" align="end">
+          />
+        </span>
+        <Tooltip label={LIFECYCLE_VERB.dropped} align="end">
           <IconButton
-            label="Not this one"
+            label={`${LIFECYCLE_VERB.dropped}: ${item.title}`}
             onClick={(event) =>
               run({
                 state: 'dismissed',
@@ -223,7 +249,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               })
             }
           >
-            <X strokeWidth={1.75} aria-hidden />
+            <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
           </IconButton>
         </Tooltip>
       </div>

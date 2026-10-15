@@ -10,6 +10,7 @@ import type { ChannelSummary, Usage } from '@/lib/learn/youtube/load';
 import type { WatchListSettings } from '@/lib/learn/youtube/watch-list';
 import { AddChannel } from '@/app/learn/youtube/add-channel';
 import { WatchListPlaylist } from '@/app/learn/youtube/watch-list-playlist';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The YouTube library as a section of Videos (plan #1488): the playlist your
@@ -29,7 +30,7 @@ export const YOUTUBE_HREF = '/learn/videos?open=youtube#youtube';
 
 function listedLine(channel: ChannelSummary): string {
   const parts = [
-    `${channel.videos.toLocaleString('en-GB')} ${channel.videos === 1 ? 'video' : 'videos'}`,
+    `${formatNumber(channel.videos)} ${channel.videos === 1 ? 'video' : 'videos'}`,
     `${channel.playlists} ${channel.playlists === 1 ? 'playlist' : 'playlists'}`,
   ];
   if (channel.autoTranscribe) parts.push('new uploads transcribed');
@@ -47,7 +48,7 @@ function listLine(list: WatchListSettings, now: number): string {
   if (!list.playlistId) {
     return 'YouTube does not let apps read Watch later. Save videos to a playlist of your own instead, set it to unlisted, and paste its link here; it is read four times a day.';
   }
-  const count = `${list.videos.toLocaleString('en-GB')} ${list.videos === 1 ? 'video' : 'videos'} on your list`;
+  const count = `${formatNumber(list.videos)} ${list.videos === 1 ? 'video' : 'videos'} on your list`;
   return list.readAt ? `${count}, read ${hoursAgo(list.readAt, now)}.` : `${count}; not read yet.`;
 }
 

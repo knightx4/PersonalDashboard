@@ -9,12 +9,14 @@ import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components
 import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
@@ -42,6 +44,7 @@ import {
   answerQuestionAction,
   setQuestionAsideAction,
   settleProposalAction,
+  undoDeclineProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -49,7 +52,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
  * on a question, what Claude produced, a rhythm's past periods, the approve
- * and turn-down pair on a proposal, the composer that adds a step, and the
+ * and decline pair on a proposal, the composer that adds a step, and the
  * pieces that edit one where it is read.
  * The goal's row in goal-row.tsx puts these in the shared tree row's slots.
  */
@@ -75,14 +78,31 @@ const answerInitial: ShapingActionState = {};
  * The lettered options in its detail are buttons, with the one Claude
  * recommends marked; pressing one writes it into the box, where it can be
  * sent as it is or said differently. Answering closes the step and the next
- * run reads the answer. Not now puts an unanswered question out of sight
+ * run reads the answer. Later puts an unanswered question out of sight
  * until it is brought back. An answered question shows its answer and can be
  * given a new one, which is kept in the goal's history with the one it
  * replaced. The pieces are the dev plan's, from components/dev/question.tsx.
  */
 export function Question({ node }: { node: StepNode }) {
   const [state, answerAction, answering] = useActionState(answerQuestionAction, answerInitial);
-  const [asideState, asideAction, putting] = useActionState(setQuestionAsideAction, answerInitial);
+  const [asideError, setAsideError] = useState<string | null>(null);
+  const [putting, startAside] = useTransition();
+  const toast = useToast();
+  // Later on an unanswered question, with Undo in the toast (plan #1957.3).
+  function putAside(aside: boolean) {
+    const form = new FormData();
+    form.set('id', node.id);
+    form.set('aside', aside ? '1' : '0');
+    return setQuestionAsideAction(answerInitial, form);
+  }
+  function later() {
+    startAside(async () => {
+      const result = await putAside(true);
+      setAsideError(result.error ?? null);
+      if (result.error) return;
+      toast({ text: closedToast('later', node.title), undo: async () => void (await putAside(false)) });
+    });
+  }
   // The box is open when it was opened since the last answer was saved, so a
   // save closes it without an effect.
   const [openedAt, setOpenedAt] = useState<number | null>(null);
@@ -115,18 +135,10 @@ export function Question({ node }: { node: StepNode }) {
                   setOpenedAt(null);
                 }
           }
-          error={state.error ?? asideState.error}
+          error={state.error ?? asideError ?? undefined}
           extra={
             unanswered && !aside ? (
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                formAction={asideAction}
-                pending={putting}
-              >
-                Not now
-              </Button>
+              <CloseButton lifecycle="later" pending={putting} onClick={later} />
             ) : undefined
           }
         />
@@ -144,13 +156,20 @@ export function Question({ node }: { node: StepNode }) {
         </Button>
       )}
       {unanswered && aside && (
-        <form action={asideAction}>
-          <input type="hidden" name="id" value={node.id} />
-          <input type="hidden" name="aside" value="0" />
-          <Button type="submit" size="sm" variant="secondary" pending={putting}>
-            Bring back
-          </Button>
-        </form>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          pending={putting}
+          onClick={() =>
+            startAside(async () => {
+              const result = await putAside(false);
+              setAsideError(result.error ?? null);
+            })
+          }
+        >
+          Bring back
+        </Button>
       )}
     </div>
   );
@@ -238,21 +257,62 @@ export function formatDate(isoDate: string): string {
   return formatDay(isoDate);
 }
 /**
- * Approve and Turn down beside a proposal's Needs line (plan #960), the same
+ * Decline a step Dash proposed, with the proposed steps beneath it, and say
+ * so in a toast that names it and offers Undo (plan #1957.8). The menu's
+ * Decline and the button beside the Needs line both come here.
+ */
+export function useDeclineProposal(node: { id: string; title: string }) {
+  const toast = useToast();
+  return async function decline() {
+    const form = new FormData();
+    form.set('id', node.id);
+    form.set('approve', '0');
+    const result = await settleProposalAction(answerInitial, form);
+    if (result.error) {
+      toast({ text: result.error });
+      return;
+    }
+    const declined = result.declined ?? [];
+    toast({
+      text: closedToast('declined', node.title),
+      undo:
+        declined.length > 0
+          ? async () => {
+              const back = await undoDeclineProposalAction(declined);
+              if (back.error) throw new Error(back.error);
+            }
+          : undefined,
+    });
+  };
+}
+
+/**
+ * Approve and Decline beside a proposal's Needs line (plan #960), the same
  * two moves its menu offers.
  */
 export function ProposalButtons({ node }: { node: StepNode }) {
   const [state, settle, settling] = useActionState(settleProposalAction, answerInitial);
+  const [declining, startDecline] = useTransition();
+  const decline = useDeclineProposal(node);
   const beneath = countProposed(node.children);
   const with_ = beneath > 0 ? `, with ${beneath} beneath` : '';
   return (
     <form action={settle} className="mt-1.5 flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={node.id} />
-      <Button type="submit" size="sm" name="approve" value="1" pending={settling}>
+      <Button type="submit" size="sm" name="approve" value="1" pending={settling} disabled={declining}>
         Approve{with_}
       </Button>
-      <Button type="submit" size="sm" variant="ghost" name="approve" value="0" disabled={settling}>
-        Turn down{with_}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={settling}
+        pending={declining}
+        onClick={() => startDecline(decline)}
+      >
+        <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
+        {LIFECYCLE_VERB.declined}
+        {with_}
       </Button>
       {state.error && (
         <p role="alert" className="text-small text-danger">

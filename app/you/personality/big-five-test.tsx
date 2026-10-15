@@ -3,8 +3,8 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { cardVariants } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { Rating } from '@/components/ui/rating';
 import { cn } from '@/lib/cn';
 import { IPIP_ITEMS, IPIP_ITEM_COUNT, IPIP_SCALE } from '@/lib/you/personality/ipip';
@@ -161,15 +161,16 @@ export function BigFiveTest({
         <span className="min-w-0 text-small tabular-nums text-ink-muted" aria-live="polite">
           {message ?? `${answered} of ${IPIP_ITEM_COUNT} answered`}
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1">
-          <Button size="lg" onClick={finish} pending={pending}>
-            {pending ? 'Scoring…' : 'See my scores'}
-          </Button>
-          <PaidHint
-            action="app/you/personality/actions.ts#saveBigFiveAction"
-            what="Cost of Dash reading your result against your notes"
-          />
-        </span>
+        <DashAction
+          size="lg"
+          onClick={finish}
+          pending={pending}
+          paid="app/you/personality/actions.ts#saveBigFiveAction"
+          what="Cost of Dash reading your result against your notes"
+          wrapperClassName="shrink-0"
+        >
+          {pending ? 'Scoring…' : 'See my scores'}
+        </DashAction>
       </div>
       {shown ? (
         <div className="mt-3">

@@ -2,7 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { parseSnoozeRef } from './inbox-snoozes';
+import { dayStartIn, snoozeDay } from './snooze-days';
 import { currentRowStamps } from './inbox-snoozes-server';
 
 export type SnoozeActionState = { error?: string };
@@ -46,6 +49,19 @@ export async function snoozeInboxRow(ref: string, until: string): Promise<Snooze
   return {};
 }
 
+/**
+ * Later on an inbox row (plan #1957.2): one of Later's choices or a picked day
+ * (lib/core/snooze-days.ts), read in the account's timezone, so the row comes
+ * back at the start of that day where the person is.
+ */
+export async function laterInboxRow(ref: string, choice: string): Promise<SnoozeActionState> {
+  const user = await requireUser();
+  const { timezone } = await loadAccountSettings(user.id);
+  const day = snoozeDay(choice, todayIn(timezone));
+  if (!day) return { error: 'Pick a day after today.' };
+  return snoozeInboxRow(ref, dayStartIn(day, timezone).toISOString());
+}
+
 /** Take a snooze off, so the row is back in the inbox. */
 export async function unsnoozeInboxRow(ref: string): Promise<SnoozeActionState> {
   const user = await requireUser();
@@ -57,7 +73,16 @@ export async function unsnoozeInboxRow(ref: string): Promise<SnoozeActionState> 
     .delete()
     .eq('user_id', user.id)
     .eq('ref', ref);
-  if (error) return { error: 'Dash could not unsnooze that. Try again.' };
+  if (error) return { error: 'Dash could not bring that back. Try again.' };
   refresh();
   return {};
+}
+
+/**
+ * Bring back, from an Inbox's Later fold (plan #1937.4): unsnoozeInboxRow
+ * taking the ref from the form, so the shared Inbox page can post it.
+ */
+export async function bringBackInboxRow(form: FormData): Promise<SnoozeActionState & { message?: string }> {
+  const result = await unsnoozeInboxRow(String(form.get('ref') ?? ''));
+  return result.error ? result : { message: 'Back on you.' };
 }

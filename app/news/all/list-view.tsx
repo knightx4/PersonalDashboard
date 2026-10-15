@@ -30,6 +30,9 @@ import type { DeliveryGap } from '@/lib/news/inbound/readiness';
 import { setSenderMuted } from '../actions';
 import { NeedsConfirming } from './needs-confirming';
 import { PageColumn } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
+import { MoveLabel } from '@/components/ui/move-label';
+import { rowRef, workingMove } from '@/lib/core/move';
 
 /**
  * The newsletter list, drawn from what the page read (app/news/all/page.tsx),
@@ -46,6 +49,7 @@ export function NewsListView({
   topic,
   viewParam,
   gap,
+  working,
 }: {
   timezone: string;
   senders: NewsSender[];
@@ -58,6 +62,8 @@ export function NewsListView({
   viewParam: string | undefined;
   /** What is missing for mail to arrive (deliveryGap), or null when nothing is. */
   gap: DeliveryGap;
+  /** The refs a run or an Ask Dash hand-off is about (plan #1964.2.2); left out, none. */
+  working?: readonly string[];
 }) {
   const byId = new Map(senders.map((sender) => [sender.id, sender]));
   const selected = from && byId.has(from) ? from : null;
@@ -86,7 +92,7 @@ export function NewsListView({
      */
     return (
       <PageColumn className="space-y-6">
-        <PageHeader title="Newsletters" />
+        <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
         <EmptyState
           icon={Mail}
           title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
@@ -108,7 +114,9 @@ export function NewsListView({
     );
   }
 
-  const header = <PageHeader title="Newsletters" />;
+  const header = (
+    <PageHeader subject={sectionSubject('/news/all', 'Newsletters')} title="Newsletters" />
+  );
 
   return (
     <PageColumn className="space-y-4">
@@ -163,60 +171,81 @@ export function NewsListView({
       ) : (
         <div>
           <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-            {shown.map((issue) => {
-              const sender = byId.get(issue.senderId);
-              return (
-                <li key={issue.id}>
-                  <Link
-                    // Which list this was opened from, carried so that back
-                    // comes back to it. An issue knows its sender and
-                    // cannot know whether you were filtered to them, so the
-                    // list is the only thing that can say -- note 71889d79.
-                    href={selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`}
-                    className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
-                  >
-                    <span
-                      className={cn(
-                        'mt-1.5 size-2 shrink-0 rounded-full',
-                        issue.readAt ? 'bg-transparent' : 'bg-accent',
-                      )}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1">
-                      {/* The headline has the row's width and two lines for
-                          itself; the date sits on the sender's line. */}
-                      <span
-                        className={cn(
-                          'relative block line-clamp-2 text-body text-ink [overflow-wrap:anywhere]',
-                          issue.readAt ? '' : 'font-medium',
-                        )}
-                      >
-                        {issue.subject ?? 'No subject'}
-                        {!issue.readAt && <span className="sr-only"> (unread)</span>}
-                      </span>
-                      <span className="mt-0.5 flex items-baseline gap-3 text-ui text-ink-muted">
-                        <span className="min-w-0 flex-1 truncate">
-                          {sender ? senderLabel(sender) : 'Unknown sender'}
-                        </span>
-                        <span className="shrink-0 tabular-nums">
-                          {formatArrival(issue.receivedAt, timezone)}
-                        </span>
-                      </span>
-                      {issue.summaryLine && (
-                        <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                          {issue.summaryLine}
-                        </span>
-                      )}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {shown.map((issue) => (
+              <IssueListRow
+                key={issue.id}
+                issue={issue}
+                sender={byId.get(issue.senderId)}
+                from={selected}
+                timezone={timezone}
+                working={working}
+              />
+            ))}
           </ul>
           <p className="mt-3 text-small text-ink-muted">{countLabel(shown.length)}</p>
         </div>
       )}
     </PageColumn>
+  );
+}
+
+/**
+ * One issue in the Latest list: unread dot, headline, sender and arrival, and
+ * the summary line. While a run or an Ask Dash hand-off is about the issue
+ * (plan #1964.2.2), Dash's mark leads the sender's line.
+ */
+export function IssueListRow({
+  issue,
+  sender,
+  from,
+  timezone,
+  working,
+}: {
+  issue: NewsIssue;
+  sender: NewsSender | undefined;
+  /** The sender the list is narrowed to, or null. */
+  from: string | null;
+  timezone: string;
+  working?: readonly string[];
+}) {
+  const dash = workingMove(working, [rowRef('news.issues', issue.id)]);
+  return (
+    <li>
+      <Link
+        // Which list this was opened from, carried so that back comes back
+        // to it. An issue knows its sender and cannot know whether you were
+        // filtered to them, so the list is the only thing that can say --
+        // note 71889d79.
+        href={from ? `/news/i/${issue.id}?from=${from}` : `/news/i/${issue.id}`}
+        className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
+      >
+        <span
+          className={cn('mt-1.5 size-2 shrink-0 rounded-full', issue.readAt ? 'bg-transparent' : 'bg-accent')}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          {/* The headline has the row's width and two lines for itself; the
+              date sits on the sender's line. */}
+          <span
+            className={cn(
+              'relative block line-clamp-2 text-body text-ink [overflow-wrap:anywhere]',
+              issue.readAt ? '' : 'font-medium',
+            )}
+          >
+            {issue.subject ?? 'No subject'}
+            {!issue.readAt && <span className="sr-only"> (unread)</span>}
+          </span>
+          <span className="mt-0.5 flex items-baseline gap-3 text-ui text-ink-muted">
+            {dash && <MoveLabel move={dash.move} title={dash.title} className="shrink-0" />}
+            <span className="min-w-0 flex-1 truncate">{sender ? senderLabel(sender) : 'Unknown sender'}</span>
+            <span className="shrink-0 tabular-nums">{formatArrival(issue.receivedAt, timezone)}</span>
+          </span>
+          {issue.summaryLine && (
+            <span className="mt-0.5 block truncate text-ui text-ink-muted">{issue.summaryLine}</span>
+          )}
+        </span>
+      </Link>
+    </li>
   );
 }
 

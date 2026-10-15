@@ -10,7 +10,7 @@ import { todoSources } from '@/lib/todo/sources';
 import { vaultSources } from '@/lib/vault/sources';
 import { youSources } from '@/lib/you/sources';
 import type { ModuleId } from '@/lib/modules';
-import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Source } from './types';
+import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Parent, type Source } from './types';
 
 /**
  * Every module's sources, gathered (lib/sources/types.ts). Goals reads this
@@ -95,6 +95,15 @@ export function sourceHref(table: string, ref: string): string | null {
   return source?.href ? source.href(ref) : null;
 }
 
+/**
+ * How a source's row names the row it belongs to: its own `parent`, or the
+ * one its `page` declares. Null for a table that sits under nothing.
+ */
+export function sourceParent(table: string): Parent | null {
+  const source = byTable.get(table);
+  return source?.parent ?? source?.page?.parent ?? null;
+}
+
 /** The module a source belongs to, as the page names it; the schema for one not listed. */
 export function sourceModule(table: string): string {
   return byTable.get(table)?.module ?? table.split('.')[0];
@@ -112,6 +121,9 @@ function sourcePage(source: Source): Page | null {
   if (source.page !== undefined) return source.page;
   const href = source.href;
   if (!href) return null;
+  // Every page has a place in the nav; a source that forgets says so at once,
+  // in every test that reads the catalogue, rather than drawing no path.
+  if (source.section === undefined) throw new Error(`${source.table} has a page but no section`);
   const key = source.ref ?? 'id';
   return {
     title: source.title,
@@ -120,6 +132,8 @@ function sourcePage(source: Source): Page | null {
       return value === null || value === undefined ? null : href(String(value));
     },
     reads: key === 'id' ? [] : [key],
+    section: source.section,
+    ...(source.parent ? { parent: source.parent } : {}),
   };
 }
 

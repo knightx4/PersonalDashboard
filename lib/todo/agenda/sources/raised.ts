@@ -1,8 +1,7 @@
 import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -49,6 +48,8 @@ export function raisedItems(rows: readonly RaisedRowIn[]): AgendaItem[] {
       action: null,
       detail: row.ask?.trim() || null,
       completable: false,
+      // A goal's flag is Goals'; the rest are Dev's, by their table.
+      ...(row.goal_id ? { workspace: 'goals' as const } : {}),
     }));
 }
 
@@ -56,6 +57,7 @@ export const raisedSource: AgendaSource = {
   id: 'raised',
   label: 'Questions Dash raised',
   module: 'todo',
+  crossesWorkspaces: true,
   alwaysOn: true,
   description: 'Questions Dash has raised for you and you have not answered yet.',
 
@@ -72,13 +74,15 @@ export const raisedSource: AgendaSource = {
     return raisedItems((data ?? []) as RaisedRowIn[]);
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'raised_item', key, until, ctx.clients);
   },
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'raised_item', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'raised_item', key, ctx.clients);
   },
 };

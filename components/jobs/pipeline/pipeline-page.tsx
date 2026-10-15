@@ -1,5 +1,6 @@
 import Link from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
+import { AimButton } from '@/components/shell/aim-button';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';
 import { PipelineFocus } from '@/components/jobs/pipeline/focus';
@@ -9,6 +10,7 @@ import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageHeader } from '@/components/shell/page-header';
+import { sectionSubject } from '@/lib/core/section-path';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
@@ -74,7 +76,7 @@ export function PipelinePage({
   if (rows.length === 0) {
     return (
       <>
-        <PageHeader title="Pipeline" />
+        <PageHeader subject={sectionSubject('/jobs/pipeline', 'Pipeline')} title="Pipeline" />
         <EmptyState
           icon={KanbanSquare}
           title="Nothing in the pipeline yet"
@@ -83,7 +85,7 @@ export function PipelinePage({
               ? 'Add a role by pasting a job link, or wait for the next inbox scan to find your confirmations.'
               : 'Add a role by pasting a job link, or capture one with the bookmarklet.'
           }
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
           secondaryAction={
             hasInbox
               ? { label: 'Inbox settings', href: '/jobs/settings' }
@@ -109,20 +111,25 @@ export function PipelinePage({
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of scoped) countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
+  const marks = {
+    ready: scoped.filter((row) => row.readyToApply).length,
+    notReady: scoped.filter((row) => !row.readyToApply).length,
+    letter: scoped.filter((row) => row.hasCoverLetter === true).length,
+    noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
+  };
   const scored = rows.some((row) => row.scoreNote);
 
   const askFilter = askListFilter('pipeline', params);
   const header = (
     <PageHeader
+      subject={sectionSubject('/jobs/pipeline', 'Pipeline')}
       title="Pipeline"
       actions={
         <>
           <AskDashRowsButton filter={askFilter} count={filtered.length} className="max-sm:hidden" />
           <PipelineViewToggle view={state.view} params={params} />
           {state.view === 'table' && <DisplayMenu menu={menu} className="max-sm:hidden" />}
-          <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-            Add a role
-          </Link>
+          <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
         </>
       }
     />
@@ -143,6 +150,7 @@ export function PipelinePage({
               (source) => [source, countsBySource.get(source) ?? 0] as const,
             )}
             scored={scored}
+            marks={marks}
           />
         </div>
         <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />

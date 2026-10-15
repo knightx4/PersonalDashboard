@@ -3,6 +3,11 @@
  * the app reads it. Pure, so the ordering can be tested without a database.
  */
 
+/**
+ * What backs an idea. A topic can also be backed by an idea of yours, as
+ * source_kind 'idea' (plan #2016.3); that kind is TopicSourceKind in ./topics,
+ * since only links to topics carry it.
+ */
 export const EVIDENCE_SOURCE_KINDS = ['note', 'course', 'work', 'reading', 'video'] as const;
 export type EvidenceSourceKind = (typeof EVIDENCE_SOURCE_KINDS)[number];
 
@@ -19,6 +24,8 @@ export type EvidenceRow = {
   weight: number;
   basis: string;
   found_at: string;
+  /** Links to topics only: how the source touched it (plan #2016.3). */
+  matched_by?: 'name' | 'similarity' | null;
 };
 
 export type EvidenceLink = {
@@ -35,6 +42,8 @@ export type EvidenceLink = {
   /** One sentence on why it counts: "you wrote about this in <note>". */
   basis: string;
   foundAt: string;
+  /** For a link to a topic, whether the source names it or its vector agreed; null otherwise. */
+  matchedBy?: 'name' | 'similarity' | null;
 };
 
 /**
@@ -53,6 +62,7 @@ export function evidenceFromRows(rows: EvidenceRow[]): EvidenceLink[] {
       weight: row.weight,
       basis: row.basis,
       foundAt: row.found_at,
+      matchedBy: row.matched_by ?? null,
     }))
     .sort(
       (a, b) =>

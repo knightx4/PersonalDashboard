@@ -9,6 +9,7 @@ import { resumeHash } from '@/lib/you/resume-hash';
 import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
 import { EducationSection } from './education-section';
 import { JobsSection } from './jobs-section';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Work & school' };
 
@@ -76,7 +77,7 @@ export default async function Page() {
 
   return (
     <PageColumn>
-      <PageHeader title="Work & school" />
+      <PageHeader subject={sectionSubject('/you/work', 'Work & school')} title="Work & school" />
       <JobsSection
         jobs={sortJobs(jobs)}
         resume={resumeChoice ? { label: resumeChoice.label } : null}

@@ -10,6 +10,8 @@ import { loadSavedHeadlines } from '@/lib/news/saved/stories';
 import { loadSentInIssues, sentKey, type StorySent } from '@/lib/news/saved/sent';
 import { loadElsewhere } from '@/lib/news/issues/elsewhere';
 import { IssueView } from './issue-view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Newsletter' };
 export const dynamic = 'force-dynamic';
@@ -96,6 +98,7 @@ export default async function IssuePage({
 
   return (
     <IssueView
+      path={await rowSubject(toRef('news.issues', issue.id))}
       issueId={issue.id}
       subject={issue.subject}
       byline={`${from} · ${formatArrival(issue.receivedAt, settings.timezone)}`}

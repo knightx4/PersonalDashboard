@@ -1,9 +1,12 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { Sparkles } from 'lucide-react';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
+import { CloseButton } from '@/components/inbox/close-button';
 import {
   craftTakeaway,
   dismissTakeaway,
@@ -13,7 +16,7 @@ import {
 
 /**
  * The buttons under a takeaway (plan #1413). An open one can be crafted into
- * a plan or dismissed; a dismissed one can be brought back. A crafted or
+ * a plan or declined; a declined one can be brought back. A crafted or
  * covered one has nothing to press, since its row already says where it went.
  *
  * A crafted row still draws this, with no buttons, so what the press said
@@ -24,11 +27,34 @@ import {
  * Crafting a takeaway shown under two videos is one press for both: the row
  * is the same, so once it is crafted the button is gone under each.
  */
-export function TakeawayActions({ id, status }: { id: string; status: 'open' | 'crafted' | 'dismissed' }) {
+export function TakeawayActions({
+  id,
+  title,
+  status,
+}: {
+  id: string;
+  title: string;
+  status: 'open' | 'crafted' | 'dismissed';
+}) {
   const dismissed = status === 'dismissed';
   const [crafted, craft, crafting] = useActionState(craftTakeaway, {} as InspirationActionState);
+  const toast = useToast();
+  // Decline, with Undo in the toast (plan #1957.3); a declined one keeps its
+  // Bring back.
   const [aside, setAside, setting] = useActionState(
-    dismissed ? restoreTakeaway : dismissTakeaway,
+    async (prev: InspirationActionState, formData: FormData) => {
+      if (dismissed) return restoreTakeaway(prev, formData);
+      const next = await dismissTakeaway(prev, formData);
+      if (!next.error)
+        toast({
+          text: closedToast('declined', title),
+          undo: async () => {
+            const back = await restoreTakeaway({}, formData);
+            if (back.error) throw new Error(back.error);
+          },
+        });
+      return next;
+    },
     {} as InspirationActionState,
   );
   const error = crafted.error ?? aside.error;
@@ -48,9 +74,13 @@ export function TakeawayActions({ id, status }: { id: string; status: 'open' | '
       {status !== 'crafted' && (
         <form action={setAside}>
           <input type="hidden" name="id" value={id} />
-          <Button type="submit" size="sm" variant="ghost" pending={setting} disabled={crafting}>
-            {dismissed ? 'Bring back' : 'Dismiss'}
-          </Button>
+          {dismissed ? (
+            <Button type="submit" size="sm" variant="ghost" pending={setting} disabled={crafting}>
+              Bring back
+            </Button>
+          ) : (
+            <CloseButton lifecycle="declined" type="submit" pending={setting} disabled={crafting} />
+          )}
         </form>
       )}
       {crafted.message && <span className="text-small text-ink-muted">{crafted.message}</span>}

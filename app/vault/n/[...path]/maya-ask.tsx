@@ -78,6 +78,7 @@ export function MayaAsk({ notePath, thread }: { notePath: string; thread: NoteTh
           {state.error && <p className="mt-2 text-ui text-caution">{state.error}</p>}
           <div className="mt-3 flex items-center gap-3">
             <AskButton again={Boolean(state.message || state.error)} />
+            {/* dash-action-ok: Maya is the voice Dash takes in the vault and keeps her own name and owl (ONE-INTERFACE-SPEC Part 7), so her button carries no Dash mark. */}
             <PaidHint
               action="app/vault/n/[...path]/actions.ts#askMaya"
               what="Cost of asking Maya"

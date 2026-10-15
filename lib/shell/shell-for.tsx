@@ -3,7 +3,6 @@ import 'server-only';
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
-import type { Notification } from '@/components/shell/notifications-button';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { getUser } from '@/lib/auth/server';
 import type { SessionUser } from '@/lib/auth/session-user';
@@ -21,7 +20,6 @@ import { isOwner } from '@/lib/dev/owner';
 import type { ModuleId } from '@/lib/modules';
 import { loadModuleCounts, type ModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadGoalsBrief, loadNewsBrief, type Brief } from '@/lib/shell/brief';
 import { loadMainCheck } from '@/lib/shell/main-check';
@@ -51,8 +49,6 @@ export type ShellFrame = {
   settings: AccountSettings;
   owner: boolean;
   counts: ModuleCounts;
-  /** The open raises, which the bell lists and Dev's Inbox badge counts. */
-  raised: Notification[];
 };
 
 /**
@@ -90,7 +86,6 @@ export type ShellOptions = {
   sections?: FromFrame<readonly NavSection[]>;
   settingsHref?: string;
   settingsLabel?: string;
-  feedbackHref?: string;
   /**
    * The workspace's one-line brief, when it needs more than the frame. Omitted,
    * the shell uses the workspace's own from FRAME_BRIEFS, if it has one.
@@ -135,11 +130,10 @@ export async function shellFor(options: ShellOptions) {
         ]
       : undefined);
 
-  const [settings, counts, activity, raised, mainCheck, owner, costs] = await Promise.all([
+  const [settings, counts, activity, mainCheck, owner, costs] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
-    loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
     paidActions
@@ -149,7 +143,7 @@ export async function shellFor(options: ShellOptions) {
       : null,
   ]);
 
-  const frame: ShellFrame = { user, settings, owner, counts, raised };
+  const frame: ShellFrame = { user, settings, owner, counts };
   const [sections, brief, banner, page] = await Promise.all([
     resolve(options.sections, frame),
     (options.brief ?? (options.module ? FRAME_BRIEFS[options.module] : undefined))?.(frame),
@@ -177,14 +171,12 @@ export async function shellFor(options: ShellOptions) {
         sections={sections ?? []}
         settingsHref={options.settingsHref}
         settingsLabel={options.settingsLabel}
-        feedbackHref={options.feedbackHref}
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
         isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
-        notifications={raised}
         activity={activity}
         mainCheck={mainCheck}
         brief={brief}

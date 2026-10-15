@@ -41,7 +41,9 @@ describe('Breadcrumb', () => {
     const plain = renderToStaticMarkup(<PageHeader title="All goals" />);
     expect(plain).not.toContain('Breadcrumb');
     expect(plain).toMatch(/^<div class="[^"]*\bmb-5\b[^"]*">/);
-    const html = renderToStaticMarkup(<PageHeader title="All goals" crumbs={crumbs.slice(0, 2)} />);
+    const html = renderToStaticMarkup(
+      <PageHeader title="All goals" subject={{ ref: null, path: crumbs.slice(0, 2) }} />,
+    );
     expect(html.indexOf('aria-label="Breadcrumb"')).toBeLessThan(html.indexOf('<h1'));
   });
 });

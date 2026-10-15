@@ -127,9 +127,11 @@ describe('the ideas page', () => {
       />,
     );
 
-    // Two chips, each opening with a mark before its word.
+    // Two chips, each opening with a mark before its word. Dash's own mark on
+    // each idea's Shape button is not a module mark and is left out.
     expect(
-      html.match(/<span[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)?.length,
+      html.match(/<span(?![^>]*data-dash-state)[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)
+        ?.length,
     ).toBe(2);
     expect(html).toMatch(/<\/svg><\/span>Vault<\/span>/);
     expect(html).toMatch(/<\/svg><\/span>Everything<\/span>/);

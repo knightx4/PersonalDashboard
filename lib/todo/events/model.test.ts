@@ -122,13 +122,13 @@ describe('compareEvents', () => {
 describe('spanLabel', () => {
   it('says a one-day all-day event once', () => {
     expect(spanLabel(event({ startsOn: '2026-03-10', endsOn: '2026-03-10' }), 'UTC')).toBe(
-      'Tuesday, 10 March 2026, all day',
+      'Tuesday 10 March 2026, all day',
     );
   });
 
   it('names both ends of an all-day event that runs over days', () => {
     expect(spanLabel(event({ startsOn: '2026-03-10', endsOn: '2026-03-12' }), 'UTC')).toBe(
-      'Tuesday, 10 March 2026 – Thursday, 12 March 2026',
+      'Tuesday 10 March 2026 – Thursday 12 March 2026',
     );
   });
 
@@ -138,7 +138,7 @@ describe('spanLabel', () => {
         event({ startsAt: '2026-03-10T14:00:00.000Z', endsAt: '2026-03-10T15:30:00.000Z' }),
         'UTC',
       ),
-    ).toBe('Tuesday, 10 March 2026, 2:00\u00a0PM – 3:30\u00a0PM');
+    ).toBe('Tuesday 10 March 2026, 2:00\u00a0PM – 3:30\u00a0PM');
   });
 
   it("reads a timed event in the reader's own zone", () => {
@@ -151,7 +151,7 @@ describe('spanLabel', () => {
         event({ startsAt: '2026-03-10T14:00:00.000Z', endsAt: '2026-03-10T15:00:00.000Z' }),
         'Asia/Tokyo',
       ),
-    ).toBe('Tuesday, 10 March 2026, 11:00\u00a0PM – 12:00\u00a0AM');
+    ).toBe('Tuesday 10 March 2026, 11:00\u00a0PM – 12:00\u00a0AM');
   });
 
   it('names both days for an evening that runs past midnight', () => {
@@ -160,6 +160,6 @@ describe('spanLabel', () => {
         event({ startsAt: '2026-03-10T23:00:00.000Z', endsAt: '2026-03-11T01:00:00.000Z' }),
         'UTC',
       ),
-    ).toBe('Tuesday, 10 March 2026, 11:00\u00a0PM – Wednesday, 11 March 2026, 1:00\u00a0AM');
+    ).toBe('Tuesday 10 March 2026, 11:00\u00a0PM – Wednesday 11 March 2026, 1:00\u00a0AM');
   });
 });

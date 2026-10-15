@@ -1,5 +1,4 @@
-import { Package, SearchX } from 'lucide-react';
-import Link from '@/components/ui/link';
+import { SearchX } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { InventoryBulkBar } from '@/components/inventory/inventory-selection';
@@ -7,11 +6,11 @@ import { SelectionProvider } from '@/components/ui/selection';
 import { LeftRail, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
 import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
+import { InventoryAddActions, InventoryEmpty } from '../list-adds';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
-import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
@@ -47,6 +46,7 @@ import { SendToShare } from '@/components/share/send-to-share';
 import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { askListFilter } from '@/lib/ask/list-filter';
 import { PageWide } from '@/components/shell/page-width';
+import { sectionSubject } from '@/lib/core/section-path';
 
 export const metadata = { title: 'Inventory' };
 
@@ -675,8 +675,8 @@ export default async function InventoryPage({
           }))}
         >
           <PageHeader
+            subject={sectionSubject('/shopping/inventory', 'Inventory')}
             title="Inventory"
-            description="Everything you currently own, so you can check before buying it again."
             bulk={<InventoryBulkBar total={finalItems.length} />}
             actions={
               <>
@@ -685,12 +685,7 @@ export default async function InventoryPage({
                   shares={shareOptions}
                   inventoryItemIds={finalItems.map((item) => item.id)}
                 />
-                <Link
-                  href="/shopping/inventory/add"
-                  className={buttonVariants({ variant: 'primary', size: 'sm' })}
-                >
-                  Add new item
-                </Link>
+                <InventoryAddActions />
               </>
             }
           />
@@ -720,24 +715,15 @@ export default async function InventoryPage({
 
           {finalItems.length === 0 && q ? (
             <SearchEmpty query={q} />
-          ) : finalItems.length === 0 ? (
+          ) : finalItems.length === 0 && filtered ? (
             <EmptyState
-              icon={filtered ? SearchX : Package}
-              title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
-              description={
-                filtered
-                  ? 'Try a different list, merchant, category, or date range.'
-                  : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
-              }
-              action={
-                filtered
-                  ? { label: 'Clear filters', href: '/shopping/inventory' }
-                  : { label: 'Add new item', href: '/shopping/inventory/add' }
-              }
-              secondaryAction={
-                filtered ? undefined : { label: 'Add an order', href: '/shopping/orders/new' }
-              }
+              icon={SearchX}
+              title="No matching items"
+              description="Try a different list, merchant, category, or date range."
+              action={{ label: 'Clear filters', href: '/shopping/inventory' }}
             />
+          ) : finalItems.length === 0 ? (
+            <InventoryEmpty />
           ) : (
             <div className="space-y-5">
               {groups.map((section) => (
