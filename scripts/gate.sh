@@ -86,7 +86,9 @@ step "Apply migrations" scripts/db-reset.sh
 rm -rf .next/types
 
 start=$SECONDS
-lane types "Typecheck" npm run -s typecheck -- "Build" npm run -s build -- "Phone checks" npm run -s check:phone &
+# The Typecheck before it has checked types, so the build skips its own check
+# (next.config.ts), as CI's does.
+lane types "Typecheck" npm run -s typecheck -- "Build" env SKIP_BUILD_TYPECHECK=1 npm run -s build --"Phone checks" npm run -s check:phone &
 types=$!
 lane lint "Lint" npm run -s lint -- "Contrast" npm run -s check:contrast -- "UI laws" npm run -s check:ui -- "Spec counts" npm run -s check:specs &
 lint=$!

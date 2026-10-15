@@ -25,6 +25,16 @@ const MOVED_TO_SHOPPING = [
 
 const nextConfig: NextConfig = {
   /**
+   * CI and the gate run `tsc --noEmit` as their own step before the build,
+   * so checking types again inside `next build` only doubled the memory: the
+   * check alone takes about 5 GB, and it ran the build out of memory on CI in
+   * October 2026. They set SKIP_BUILD_TYPECHECK=1. Vercel does not, so a
+   * deploy still refuses to build with a type error.
+   */
+  typescript: {
+    ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === '1',
+  },
+  /**
    * /dev/specs reads the documents in `docs/` off disk at request time, and
    * nothing imports them, so the tracer is right to leave them out of the
    * deployment unless told otherwise. Without this the page is empty in
