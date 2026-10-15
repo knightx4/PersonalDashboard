@@ -243,7 +243,9 @@ describe('a question asked from anywhere', () => {
     expect(await asUser(userB, (tx) => tx`select id from conversations where subject_kind = 'ask'`)).toHaveLength(0);
   });
 
-  it('refuses a ref other than its own id, and citations on the person\'s turn', async () => {
+  // A question's citations are the rows added with @ (plan #1899.5,
+  // migration 0238), so the check now holds only their shape: a list.
+  it('refuses a ref other than its own id, and citations that are not a list', async () => {
     await expect(
       asUser(
         userA,
@@ -258,7 +260,7 @@ describe('a question asked from anywhere', () => {
         userA,
         (tx) => tx`
           insert into conversation_turns (conversation_id, user_id, role, body, citations)
-          values (${conversation.id}, ${userA}, 'user', 'Mine', ${tx.json([])})`,
+          values (${conversation.id}, ${userA}, 'user', 'Mine', ${tx.json({ table: 'todo.tasks' })})`,
       ),
     ).rejects.toThrow();
   });

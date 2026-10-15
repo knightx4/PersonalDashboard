@@ -823,7 +823,18 @@ const raise: RaisedRow = {
   title: 'The share link page has no rate limit on its answer route',
   detail: 'Found while building the gallery surface for the shared form. Anyone with the link can send answers as fast as they like.',
   ask: 'Add a limit of thirty answers a minute per link?',
-  consequence: null,
+  // A yes Dash carries out, so the row shows "Yes, do it" with Dash's mark.
+  consequence: {
+    action: {
+      name: 'file_idea',
+      text: 'Limit the share link answer route to thirty answers a minute per link',
+      module: 'shopping',
+      field: null,
+      detail: null,
+      kind: null,
+    },
+    said: 'Files this on the ideas page, about Shopping: Limit the share link answer route to thirty answers a minute per link',
+  },
   outcome: null,
   module: 'shopping',
   source: 'plan #1599',
@@ -1174,11 +1185,17 @@ export function DevRunnerCrewSurface() {
             endedAt: null,
             step: {
               number: 1700,
-              ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own visor',
+              ref: '#1700',
+              title: 'Four Dashes on the runner card, one for each thing it can run at once',
             },
             module: 'Dev',
             doing: null,
+            steps: [
+              { ref: '#1700.1', title: 'Slots for the four sessions', status: 'done' },
+              { ref: '#1700.2', title: 'A visor shape for each Dash', status: 'done' },
+              { ref: '#1700.3', title: 'Pose from the newest line', status: 'done' },
+              { ref: '#1700.4', title: 'Show the four Dashes on the runner card, each in its own visor', status: 'in_progress' },
+            ],
           },
           {
             id: 's2',

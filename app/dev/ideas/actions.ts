@@ -10,7 +10,6 @@ import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
 import { withThreads } from '@/lib/thread/store';
 import { FOLLOW_ON_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
-import { shapeHoldReason } from '@/lib/plan/hold';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { loadVisionBodies } from '@/lib/specs/vision';
 
@@ -254,9 +253,6 @@ export async function shapeIdea(
   });
   const idea = ideaRowFrom(withThread);
   if (idea.planItem) return { error: 'This idea is already in the plan.' };
-  // The four-week hold (plan #1484): a session's own suggestion waits.
-  const held = shapeHoldReason(idea.source);
-  if (held) return { error: held };
 
   const scope = idea.module;
   const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';

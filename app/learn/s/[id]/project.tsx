@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { PROJECT_ANSWER_MAX, type ProjectView } from '@/lib/learn/lessons/project';
 import { PracticeData } from './p/[piece]/piece-view';
 import { handInPlanProject, writePlanProject, type ProjectResult } from './project-actions';
@@ -105,12 +104,15 @@ export function ProjectCard({
           ) : writing ? (
             <p className="text-small text-ink-muted">Dash is writing the final project…</p>
           ) : (
-            <span className="inline-flex items-center gap-1">
-              <Button type="button" variant="primary" onClick={write}>
-                Write the project
-              </Button>
-              <PaidHint action="app/learn/s/[id]/project-actions.ts#writePlanProject" what="Cost of writing the project" />
-            </span>
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={write}
+              paid="app/learn/s/[id]/project-actions.ts#writePlanProject"
+              what="Cost of writing the project"
+            >
+              Write the project
+            </DashAction>
           )}
         </div>
       )}
@@ -187,12 +189,17 @@ export function ProjectCard({
                   disabled={marking}
                 />
               </Field>
-              <span className="inline-flex items-center gap-1">
-                <Button type="button" variant="primary" onClick={handIn} pending={marking} disabled={!typedSomething}>
-                  {marking ? 'Marking…' : 'Hand it in'}
-                </Button>
-                <PaidHint action="app/learn/s/[id]/project-actions.ts#handInPlanProject" what="Cost of marking what you hand in" />
-              </span>
+              <DashAction
+                type="button"
+                variant="primary"
+                onClick={handIn}
+                pending={marking}
+                disabled={!typedSomething}
+                paid="app/learn/s/[id]/project-actions.ts#handInPlanProject"
+                what="Cost of marking what you hand in"
+              >
+                {marking ? 'Marking…' : 'Hand it in'}
+              </DashAction>
             </div>
           )}
 

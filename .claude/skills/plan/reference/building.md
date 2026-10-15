@@ -46,7 +46,7 @@ npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detai
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # one close to an idea already filed is
-                                               # refused; two an hour is the most you may file
+                                               # refused; sessions together may file three a day
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 ```
 

@@ -49,6 +49,7 @@ export function CommandPalette({
   theme,
   open,
   opensOn = 'everything',
+  opensWith = 'here',
   onOpenChange,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
@@ -66,6 +67,12 @@ export function CommandPalette({
    * so a narrowed box does not stay narrowed for the next one.
    */
   opensOn?: SearchScope;
+  /**
+   * What the box lists before anything is typed: what is here, or every
+   * workspace when the phone's dock button opened it (note 5f3ef44f). Read on
+   * each opening, like `opensOn`.
+   */
+  opensWith?: 'here' | 'workspaces';
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -77,6 +84,7 @@ export function CommandPalette({
    * for (plans #1363 and #1364).
    */
   const [scope, setScope] = useState<SearchScope>(opensOn);
+  const [shows, setShows] = useState(opensWith);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -89,6 +97,7 @@ export function CommandPalette({
     setWasOpen(open);
     if (open) {
       setScope(opensOn);
+      setShows(opensWith);
       setActive(0);
     }
   }
@@ -102,6 +111,7 @@ export function CommandPalette({
     theme,
     query,
     active: open,
+    emptyShows: shows,
   });
 
   /**
@@ -120,8 +130,11 @@ export function CommandPalette({
     setActive(0);
   }, [module]);
 
+  // On a phone the field waits for a tap (note 3a901719): focusing it on open
+  // raised the keyboard over half the list, which is mostly what you opened
+  // the box to pick from. With a keyboard of your own it is focused at once.
   useEffect(() => {
-    if (!open) return;
+    if (!open || typesOnTouch()) return;
     inputRef.current?.focus();
   }, [open]);
 
@@ -143,8 +156,9 @@ export function CommandPalette({
     setActive(0);
     reset();
     // The cursor goes back where it was: switching what is being searched is
-    // something you do in the middle of typing, not instead of typing.
-    inputRef.current?.focus();
+    // something you do in the middle of typing, not instead of typing. Not on
+    // a phone, where it would raise the keyboard the opening kept down.
+    if (!typesOnTouch()) inputRef.current?.focus();
   }
 
   if (!open) return null;
@@ -211,7 +225,16 @@ export function CommandPalette({
           <Kbd always>esc</Kbd>
         </div>
 
-        <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
+        {/* Opened on every workspace, the list takes the room it needs, up to
+            most of the screen, so the last workspace is never cut off at the
+            edge (note 5f3ef44f). */}
+        <div
+          ref={listRef}
+          className={cn(
+            'overflow-y-auto p-1',
+            shows === 'workspaces' && !query.trim() ? 'max-h-[70dvh]' : 'max-h-80',
+          )}
+        >
           {rows.length === 0 ? (
             <p className="px-3 py-6 text-center text-ui text-ink-muted">
               {/* Only once looking has finished. "Nothing matches" while a
@@ -240,4 +263,12 @@ export function CommandPalette({
       </div>
     </div>
   );
+}
+
+/**
+ * Whether typing here means a keyboard on the screen: a touch screen with no
+ * pointer that hovers, which is a phone or a tablet without a trackpad.
+ */
+export function typesOnTouch(): boolean {
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useState, useTransition } from 'react';
 import {
   deleteSavedItem,
@@ -40,7 +41,7 @@ export type EditableSavedItem = {
 const initial: ActionState = {};
 
 /** Bought it: Done (plan #1957.3), with the way back in the toast. */
-function PurchasedButton({ itemId }: { itemId: string }) {
+function PurchasedButton({ itemId, title }: { itemId: string; title: string }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
@@ -57,7 +58,7 @@ function PurchasedButton({ itemId }: { itemId: string }) {
               setError(result.error ?? null);
               if (result.error) return;
               toast({
-                text: 'Done: bought',
+                text: closedToast('done', title),
                 undo: async () => void (await restoreSavedItem(initial, idForm(itemId))),
               });
             })
@@ -182,7 +183,7 @@ export function SavedItemBody({
           const result = await dismissSavedItem(initial, idForm(item.id));
           if (result.error) return toast({ text: result.error });
           toast({
-            text: 'Dropped',
+            text: closedToast('dropped', lastSaved.title),
             undo: async () => void (await restoreSavedItem(initial, idForm(item.id))),
           });
         }),
@@ -235,7 +236,7 @@ export function SavedItemBody({
             description={subtitle}
           />
           <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
-            {item.status !== 'purchased' && <PurchasedButton itemId={item.id} />}
+            {item.status !== 'purchased' && <PurchasedButton itemId={item.id} title={lastSaved.title} />}
             <a
               href={lastSaved.url}
               target="_blank"

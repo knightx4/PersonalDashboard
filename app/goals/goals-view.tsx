@@ -4,12 +4,15 @@ import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
-import { Archive, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { closedToast, LIFECYCLE_GLYPH, type Lifecycle } from '@/lib/core/lifecycle';
 import { Card, cardVariants } from '@/components/ui/card';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -337,7 +340,7 @@ function AreaSection({
     // An archived area has no page, so its own page goes back to All goals.
     if (page) router.push('/goals/all');
     toast({
-      text: `Archived ${area.name}.`,
+      text: closedToast('dropped', area.name),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', area.id);
@@ -356,13 +359,14 @@ function AreaSection({
     {
       id: 'archive',
       label: 'Archive area',
+      lifecycle: 'dropped',
       destructive: true,
       formAction: archive,
       formFields: { id: area.id },
       confirm:
         liveCount === 0
-          ? `Archive ${area.name}?`
-          : `Archive ${area.name} and its ${liveCount === 1 ? 'goal' : `${liveCount} goals`}?`,
+          ? `Drop ${area.name}?`
+          : `Drop ${area.name} and its ${liveCount === 1 ? 'goal' : `${liveCount} goals`}?`,
     },
   ];
 
@@ -536,14 +540,15 @@ function GoalRow({
   const [editState] = useActionState(editGoal, initial);
   const toast = useToast();
 
-  async function archive(form: FormData) {
+  // Dropping a goal archives it; declining one Dash proposed does the same.
+  async function archive(form: FormData, lifecycle: Lifecycle = 'dropped') {
     const result = await archiveGoalAction(form);
     if (result.error) {
       toast({ text: result.error });
       return;
     }
     toast({
-      text: `Archived ${goal.title}.`,
+      text: closedToast(lifecycle, goal.title),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', goal.id);
@@ -561,7 +566,7 @@ function GoalRow({
   }
 
   const moveToItems = useMoveToItems(goal, places);
-  // Park goal for any open goal, and Archive goal (plan #2097.1).
+  // Later for any open goal, and Drop (plan #2097.1; words from plan #1957.8).
   const putAwayItems = usePutAwayItems(goal, steps?.live ?? 0);
 
   // An archived goal, shown only under Everything, is restored or left be.
@@ -631,12 +636,12 @@ function GoalRow({
         </div>
         {archived && (
           <p className="flex items-center gap-1 px-1 pt-0.5 text-small text-ink-muted">
-            <Archive className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Archived. Restore it from its menu to work on it again.
+            <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
+            Dropped. Restore it from its menu to work on it again.
           </p>
         )}
         {!archived && goal.status === 'proposed' && (
-          <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />
+          <SettleProposedGoal goalId={goal.id} onDecline={(form) => archive(form, 'declined')} />
         )}
         {!archived && (goal.status === 'parked' || goal.status === 'done') && (
           <TakeBackUp status={goal.status} onReopen={() => reopen('reopen')} />
@@ -649,16 +654,16 @@ function GoalRow({
 }
 
 /**
- * Approve or turn down a goal Claude proposed, where it stands. Approving
- * opens it with the steps proposed under it; turning it down archives it,
- * with an undo, and Claude does not propose it again.
+ * Approve or decline a goal Dash proposed, where it stands. Approving opens
+ * it with the steps proposed under it; declining archives it, with an undo,
+ * and Dash does not propose it again.
  */
 function SettleProposedGoal({
   goalId,
-  onTurnDown,
+  onDecline,
 }: {
   goalId: string;
-  onTurnDown: (form: FormData) => Promise<void>;
+  onDecline: (form: FormData) => Promise<void>;
 }) {
   const [state, approve, approving] = useActionState(approveGoalAction, {});
   return (
@@ -669,11 +674,9 @@ function SettleProposedGoal({
           Approve
         </Button>
       </form>
-      <form action={onTurnDown}>
+      <form action={onDecline}>
         <input type="hidden" name="id" value={goalId} />
-        <Button type="submit" size="sm" variant="ghost" disabled={approving}>
-          Turn down
-        </Button>
+        <CloseButton lifecycle="declined" type="submit" disabled={approving} />
       </form>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </div>

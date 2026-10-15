@@ -299,8 +299,8 @@ export async function archiveGoalAction(form: FormData): Promise<GoalsActionStat
 const Move = z.enum(['close', 'park', 'keep', 'reopen']);
 
 const MOVE_WORDS: Record<z.infer<typeof Move>, string> = {
-  close: 'Closed.',
-  park: 'Parked. Take it back up from All goals.',
+  close: 'Done.',
+  park: 'Later. Take it back up from All goals.',
   keep: 'Kept open.',
   reopen: 'Taken back up.',
 };

@@ -2,7 +2,6 @@ import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { loadWaitingOnYou, setWaitingDismissal, type WaitingOnYou } from '@/lib/jobs/today/waiting';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -15,7 +14,7 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * is on you.
  *
  * Read and written where it lives (lib/jobs/today/waiting.ts). Done says it
- * is dealt with for good, Later puts it off a week, and Not this one is Done:
+ * is dealt with for good, Later puts it off to the day chosen, and Not this one is Done:
  * a request you have decided not to answer is finished with.
  */
 
@@ -59,9 +58,7 @@ export const jobWaitingSource: AgendaSource = {
     await answer(ctx, key, null);
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await answer(ctx, key, until.toISOString());
   },
 

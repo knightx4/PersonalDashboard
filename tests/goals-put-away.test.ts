@@ -51,16 +51,17 @@ describe('putting goals away (plan #2097.1)', () => {
     await expect(bringBackGoals(['g1'], 'park')).rejects.toThrow('no');
   });
 
-  it('says where the goal went, and counts several', () => {
-    expect(putAwayText(1, 'park')).toBe('Parked. It is under Everything.');
-    expect(putAwayText(1, 'archive')).toBe('Archived. It is under Everything.');
-    expect(putAwayText(3, 'park')).toBe('Parked 3 goals. See Everything.');
+  it('names the goal it put away, and counts several (plan #1957.8)', () => {
+    expect(putAwayText(1, 'park', 'Run a half marathon')).toBe('Later: Run a half marathon');
+    expect(putAwayText(1, 'archive', 'Run a half marathon')).toBe('Dropped: Run a half marathon');
+    expect(putAwayText(3, 'park')).toBe('Later: 3 goals. See Everything.');
+    expect(putAwayText(2, 'archive')).toBe('Dropped: 2 goals. See Everything.');
   });
 
   it('names the steps that go with an archived goal', () => {
-    expect(archiveConfirm(0)).toBe('Archive this goal? It has no steps yet.');
+    expect(archiveConfirm(0)).toBe('Drop this goal? It has no steps yet.');
     expect(archiveConfirm(1)).toBe(
-      'Archive this goal and its 1 step? They come back if you restore it.',
+      'Drop this goal and its 1 step? They come back if you restore it.',
     );
     expect(archiveConfirm(7)).toContain('its 7 steps');
   });
@@ -96,6 +97,6 @@ describe('putting several goals away at once (plan #2097.2)', () => {
   it('asks before archiving more than five', async () => {
     const { ARCHIVE_CONFIRM_OVER, archiveManyConfirm } = await import('@/app/goals/select-goals');
     expect(ARCHIVE_CONFIRM_OVER).toBe(5);
-    expect(archiveManyConfirm(6)).toBe('Archive 6 goals and their steps?');
+    expect(archiveManyConfirm(6)).toBe('Drop 6 goals and their steps?');
   });
 });

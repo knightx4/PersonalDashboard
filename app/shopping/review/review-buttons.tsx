@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useState, useTransition } from 'react';
 import { CloseButton } from '@/components/inbox/close-button';
 import { useToast } from '@/components/ui/toast';
@@ -59,7 +60,7 @@ export function DiscardOrderButton({ orderId }: { orderId: string }) {
 }
 
 /** Not an order: Decline the sync's guess, with Undo in the toast (plan #1957.3). */
-export function DismissEmailButton({ messageId }: { messageId: string }) {
+export function DismissEmailButton({ messageId, subject }: { messageId: string; subject: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const toast = useToast();
@@ -78,7 +79,7 @@ export function DismissEmailButton({ messageId }: { messageId: string }) {
               if (result.error) return;
               const restore = result.restore;
               toast({
-                text: 'Declined: not an order',
+                text: closedToast('declined', subject),
                 undo: async () => {
                   const back = await restoreDismissedEmails(restore);
                   if (back.error) throw new Error(back.error);

@@ -91,6 +91,8 @@ export type QuickReadViewProps = {
    * #1557). Drawn only once no story is left; left out, no card.
    */
   gotThrough?: GotThroughSummary | null;
+  /** What Dash did today in News, at the foot of the page (plan #1964.4). */
+  dashToday?: React.ReactNode;
 };
 
 /** One story of the laptop page, with what the grid card needs beside the story. */
@@ -132,6 +134,7 @@ export function QuickReadView({
   upNext = null,
   nextPage = [],
   gotThrough = null,
+  dashToday,
 }: QuickReadViewProps) {
   const topic = topics.selected;
   // No description under the title, and the chips pulled up to it: the page is
@@ -182,6 +185,7 @@ export function QuickReadView({
         {/* What you got through (plan #1557). In the same place below, so it
             stays mounted as the last story goes and can tell the two apart. */}
         <GotThrough done summary={gotThrough} className="mt-4" />
+        {dashToday}
       </PageColumn>
     );
   }
@@ -302,6 +306,7 @@ export function QuickReadView({
         )}
       </QueueCleared>
       <GotThrough done={false} summary={gotThrough} />
+      {dashToday}
     </PageColumn>
   );
 }
@@ -429,7 +434,7 @@ function PhoneCard({
                 />
               )}
               {issueHref && (
-                <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
+                <Link href={issueHref} className={`press-area text-ui ${linkVariants()}`}>
                   {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
                 </Link>
               )}
@@ -491,7 +496,7 @@ function gridStory(
       from,
       actions: (
         <>
-          <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
+          <Link href={issueHref} className={`press-area text-ui ${linkVariants()}`}>
             Read the newsletter
           </Link>
           <ReactionButtons

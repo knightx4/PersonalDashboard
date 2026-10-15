@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Field, Textarea } from '@/components/ui/field';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 
 /**
  * The box an applied case is answered in.
@@ -19,20 +20,23 @@ import { Field, Textarea } from '@/components/ui/field';
  * happens, and a box that emptied itself would take that away.
  */
 
-function GradeButton() {
+function GradeButton({ paid }: { paid?: PaidAction }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
-      {pending ? 'Marking…' : 'Answer'}
-    </Button>
+    <DashAction type="submit" pending={pending} paid={paid} what="Cost of marking the answer">
+      {pending ? 'Marking…' : 'Check my answer'}
+    </DashAction>
   );
 }
 
 export function WrittenAnswer({
   response,
+  paid,
   beside,
 }: {
   response?: string | null;
+  /** The server action that marks the answer, for the cost beside the button. */
+  paid?: PaidAction;
   /** Anything else that can be done with this case, shown next to Answer. */
   beside?: ReactNode;
 }) {
@@ -62,7 +66,7 @@ export function WrittenAnswer({
 
       {!answered && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <GradeButton />
+          <GradeButton paid={paid} />
           {beside}
         </div>
       )}

@@ -100,15 +100,6 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 export const SOON_DAYS = 7;
 
 /**
- * How far "Later" pushes a snoozed task.
- *
- * The same seven days the job side already means by "Later"
- * (`SNOOZE_DAYS` in lib/jobs/today/load.ts). Long enough that deferring is a
- * decision rather than a way of clearing the screen.
- */
-export const SNOOZE_DAYS = 7;
-
-/**
  * Today, as a calendar day, in a given zone.
  *
  * Taking the zone as an argument rather than reading it is what makes "which

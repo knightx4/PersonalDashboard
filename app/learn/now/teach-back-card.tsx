@@ -3,11 +3,11 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import {
   stateLine,
@@ -78,7 +78,7 @@ export function TeachBackCard({
       <p className="mt-3 text-body text-ink">{card.question}</p>
 
       <div className="mt-3">
-        <TalkThread
+        <Thread
           id={`teach-${card.id}`}
           turns={card.conversation ?? []}
           send={send}
@@ -87,9 +87,7 @@ export function TeachBackCard({
           waiting="Dash is marking it…"
           activity="reading"
           closed={() => (done ? 'Marked. That is the end of this one.' : null)}
-          hint={
-            <PaidHint action="app/learn/now/actions.ts#explainBack" what="Cost of marking the answer" />
-          }
+          cost={{ action: 'app/learn/now/actions.ts#explainBack', what: 'Cost of marking the answer' }}
         />
       </div>
 
@@ -114,9 +112,7 @@ export function TeachBackCard({
             Next
           </Button>
         ) : (
-          <Button type="button" variant="secondary" onClick={onSkip}>
-            Skip
-          </Button>
+          <CloseButton lifecycle="declined" variant="secondary" onClick={onSkip} />
         )}
         <label className="ml-auto flex items-center gap-2 text-small text-ink-muted">
           Explain-back cards

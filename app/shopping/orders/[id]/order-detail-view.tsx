@@ -410,7 +410,6 @@ export function OrderDetailView({
           subject={threadRef('order', order.id)}
           turns={thread}
           placeholder="A note on this order, or a question for Dash."
-          onCard
         />
       </Card>
     </DetailPage>

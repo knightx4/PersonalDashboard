@@ -46,6 +46,14 @@ type Common = {
   shows: string;
   /** How long to record, up to MAX_RECORD_MS. */
   durationMs?: number;
+  /**
+   * Let the form the input lands on send. The recorder holds every form by
+   * default, since a gallery fixture has nothing behind it; a surface whose
+   * fixture does answer the form, as Dash's box does, sets this so the answer
+   * is part of what is recorded (plan #1899.8). Timers in the fixture run
+   * four times faster than a strip's clock, as with any script timer.
+   */
+  submits?: boolean;
 };
 
 export type Interaction =

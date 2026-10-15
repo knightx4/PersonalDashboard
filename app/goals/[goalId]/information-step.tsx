@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -543,8 +544,11 @@ function RecordTable({
       return;
     }
     if (opened === record.id) setOpened(null);
+    // The toast names the row by its first column, as the table leads with it.
+    const first = columns[0] ? record.data[columns[0].key] : null;
+    const name = first === null || first === undefined || first === '' ? 'the row' : String(first);
     toast({
-      text: 'Row archived.',
+      text: closedToast('dropped', name),
       undo: async () => {
         const back = new FormData();
         back.set('recordId', record.id);
@@ -587,6 +591,7 @@ function RecordTable({
                 {
                   id: 'archive',
                   label: 'Archive row',
+                  lifecycle: 'dropped' as const,
                   destructive: true,
                   onSelect: () => void archive(record),
                 },

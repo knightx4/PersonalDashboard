@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ChipInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { completionMoment } from '@/components/motion/complete';
+import { closedToast } from '@/lib/core/lifecycle';
 import { formatDue, type DuePrecision } from '@/lib/goals/due-precision';
 import type { GoalStatus } from '@/lib/goals/tree';
 import { editGoal, settleGoalAction } from '../actions';
@@ -19,8 +20,8 @@ import { usePutAwayItems } from '../put-away';
  * always has a date it is due by, so turning a goal with no due date into
  * one asks for the date first, in a line beside the menu. An open goal can
  * be closed from here, and a closed or parked one taken back up (plan #1341),
- * with the same move Today and All goals use. Park goal and Archive goal put
- * it away (plan #2097.1) and go back to All goals, where the toast offers the
+ * with the same move Today and All goals use. Later and Drop put it away
+ * (plan #2097.1) and go back to All goals, where the toast offers the
  * undo.
  */
 export function GoalAreaMenu({
@@ -79,17 +80,38 @@ export function GoalAreaMenu({
     const form = new FormData();
     form.set('id', goal.id);
     form.set('move', move);
-    const result = await settleGoalAction({}, form);
-    if (move === 'close' && !result.error) completionMoment();
+    return settleGoalAction({}, form);
+  }
+
+  // Done closes the goal, and the toast names it with the Undo that takes it
+  // back up (plan #1957.8).
+  async function close() {
+    const result = await settle('close');
+    if (result.error) {
+      toast({ text: result.error });
+      return;
+    }
+    completionMoment();
+    toast({
+      text: closedToast('done', goal.title),
+      undo: async () => {
+        const back = await settle('reopen');
+        if (back.error) throw new Error(back.error);
+      },
+    });
+  }
+
+  async function reopen() {
+    const result = await settle('reopen');
     const text = result.error ?? result.message;
     if (text) toast({ text });
   }
 
   const settleItems: ActionMenuItem[] =
     goal.status === 'open'
-      ? [{ id: 'close', label: 'Close the goal', onSelect: () => void settle('close') }]
+      ? [{ id: 'close', label: 'Done', lifecycle: 'done', onSelect: () => void close() }]
       : goal.status === 'done' || goal.status === 'parked'
-        ? [{ id: 'reopen', label: 'Take it back up', onSelect: () => void settle('reopen') }]
+        ? [{ id: 'reopen', label: 'Take it back up', onSelect: () => void reopen() }]
         : [];
 
   return (

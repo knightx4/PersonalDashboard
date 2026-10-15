@@ -692,6 +692,31 @@ export function LearnReadingUnreadableSurface() {
   );
 }
 
+/** A reading queued for a gap, just marked read: Check it now and Not now under the status buttons (plan #2152.1). */
+export function LearnReadingCheckSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: elasticity.id }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+      checkOffered={{ href: `/learn/s/${SUBJECT.id}/probe?concept=${elasticity.id}` }}
+    />
+  );
+}
+
+/** A reading you added yourself, marked read: no concept, so nothing is offered (plan #2152.1). */
+export function LearnReadingCheckOwnSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: null, why: null }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+    />
+  );
+}
+
 // ---- One piece of a learning goal's plan ------------------------------------------
 
 const piecePage: PiecePage = {
@@ -757,14 +782,33 @@ const reviews: DueReview[] = [
   },
 ];
 
+/* Typical figures for the piece's two marked presses, so their hints draw
+ * inside the Dash buttons as the learn layout would hand them (plan #1964.1.2). */
+const PIECE_RUN = {
+  lowMicros: 2_000,
+  medianMicros: 4_000,
+  highMicros: 9_000,
+  runs: 14,
+  basis: 'measured',
+  per: 'run',
+  models: [MODELS.learnProbe],
+} as const;
+
 export function LearnPieceSurface() {
   return (
-    <PiecePageView
-      page={piecePage}
-      practice={practice}
-      standing={{ practicePassed: false, checkPassed: false }}
-      reviews={reviews}
-    />
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={piecePage}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={reviews}
+      />
+    </PaidCostsProvider>
   );
 }
 

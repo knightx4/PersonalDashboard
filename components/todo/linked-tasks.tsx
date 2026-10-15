@@ -1,7 +1,7 @@
 'use client';
 
 import { useToast } from '@/components/ui/toast';
-import { LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Plus, Unlink } from 'lucide-react';
@@ -169,7 +169,7 @@ function LinkedRow({
     onDone: (next) => {
       if (next !== 'done') return;
       toast({
-        text: LIFECYCLE_WORD.done,
+        text: closedToast('done', task.title),
         undo: async () => {
           const back = await reopenTask(task.id);
           if (back.error) throw new Error(back.error);

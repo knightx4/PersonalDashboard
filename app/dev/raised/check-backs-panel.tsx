@@ -68,7 +68,7 @@ export function CheckBacksPanel({
               <li key={row.id} className="row-pad">
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 flex-1 text-body break-words text-ink">{row.title}</p>
-                  <DropCheckBack id={row.id} />
+                  <DropCheckBack id={row.id} title={row.title} />
                 </div>
                 <p>
                   <Tooltip label={`${how}. Nothing is needed from you unless you drop it.`}>

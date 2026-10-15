@@ -11,16 +11,17 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import Link, { linkVariants } from '@/components/ui/link';
-import { IconButton } from '@/components/ui/icon-button';
+import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { SquarePen, X } from 'lucide-react';
+import { Maximize2, SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
-import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
+import { AnswerActions } from '@/components/talk/answer-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
@@ -28,7 +29,18 @@ import { isAskPath, roughPageName } from '@/lib/ask/page-name';
 import type { AskListFilter, AskRows } from '@/lib/ask/list-filter';
 import type { AskDashResult } from '@/lib/dash/ask';
 import type { DashChange } from '@/lib/talk/changes';
-import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
+import {
+  heardLookup,
+  readAskStream,
+  STREAM_CUT,
+  type AskedWire,
+  type LookupLine,
+  type LookupWire,
+} from '@/lib/talk/lookups';
+import type { AskMention } from '@/lib/talk/ask-input';
+import type { ModuleId } from '@/lib/modules';
+import type { SearchHit } from '@/lib/search/sources';
+import { useAskBox, type AskBoxStart } from '@/components/talk/ask-box';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -45,6 +57,7 @@ import {
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
+  saveDashAnswer,
   undoDashChange,
 } from '@/app/ask/actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -70,6 +83,12 @@ import { Tooltip } from '@/components/ui/tooltip';
  */
 
 /**
+ * What else goes with a question (plan #1899.5): the signal that stops it,
+ * the rows added with @, and the workspace its lookups are kept to.
+ */
+export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+
+/**
  * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
@@ -78,7 +97,8 @@ export type AskSource = ChangePresses & {
    * Ask, and hear each lookup as it starts and finishes (plan #1438) and
    * each piece of the answer as it is written (plan #1902). A source that
    * cannot say either ignores the listener, and the thread shows the waiting
-   * line until the answer lands.
+   * line until the answer lands. When `more.signal` aborts, it resolves with
+   * the question and the answer as kept when it was stopped (plan #1899.5).
    */
   ask: (
     question: string,
@@ -88,12 +108,15 @@ export type AskSource = ChangePresses & {
     files?: UploadedAttachment[],
     list?: AskListFilter | null,
     onText?: (piece: string) => void,
+    more?: AskMore,
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
   poll: typeof pollAskQuestion;
   costs: typeof askDashCosts;
   label: typeof askDashPageLabel;
+  /** Make an answer a todo or a vault note, kept as a change under it (plan #1899.7). */
+  save: typeof saveDashAnswer;
 };
 
 /**
@@ -110,15 +133,22 @@ async function askLive(
   files?: UploadedAttachment[],
   list: AskListFilter | null = null,
   onText?: (piece: string) => void,
+  more: AskMore = {},
 ): Promise<AskDashResult> {
+  const { signal, rows, scope } = more;
+  // The question as the route kept it, heard before Dash answers: what a
+  // stopped answer is found again by (plan #1899.5).
+  let asked: AskedWire | null = null;
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list }),
+      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
+      signal,
     });
   } catch {
+    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   if (response.status === 401) return { turns: [], error: 'You are signed out. Sign in again to ask Dash.' };
@@ -126,14 +156,56 @@ async function askLive(
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   try {
-    return await readAskStream(
+    const result = await readAskStream(
       response.body,
       (lookup) => onLookup?.(lookup),
       (piece) => onText?.(piece),
+      (heard) => {
+        asked = heard;
+      },
     );
+    if (signal?.aborted && result.error === STREAM_CUT) return keptWhenStopped(asked);
+    return result;
   } catch {
+    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: STREAM_CUT };
   }
+}
+
+/** How long a stopped question is looked for: the route keeps it a moment after the stop. */
+const STOPPED_LOOKS = 10;
+const STOPPED_LOOK_MS = 400;
+
+/**
+ * The question and its answer as the route kept them after Stop (plan
+ * #1899.5). Stopping cuts the stream, so the result line never arrives; the
+ * conversation the `asked` line named is read back until the answer is in
+ * it. A question stopped before it was kept comes back with no turns, which
+ * puts the words back in the box.
+ */
+async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> {
+  if (!asked) return { turns: [], error: 'Stopped before Dash had your question.' };
+  const question = asked.turns.find((turn) => turn.role === 'user');
+  for (let look = 0; look < STOPPED_LOOKS; look++) {
+    await new Promise((resolve) => setTimeout(resolve, STOPPED_LOOK_MS));
+    const opened = await openAskQuestion(asked.conversation.ref).catch(() => null);
+    if (!opened || opened.error) continue;
+    const at = question ? opened.turns.findIndex((turn) => turn.id === question.id) : -1;
+    const since = at >= 0 ? opened.turns.slice(at) : [];
+    if (!since.some((turn) => turn.role === 'assistant')) continue;
+    const ids = new Set(since.map((turn) => turn.id));
+    return {
+      conversation: asked.conversation,
+      turns: since,
+      stop: 'stopped',
+      changes: opened.changes.filter((change) => change.turnId && ids.has(change.turnId)),
+    };
+  }
+  return {
+    conversation: asked.conversation,
+    turns: asked.turns,
+    error: 'Stopped. What Dash had written is being kept; reopen this chat in a moment to read it.',
+  };
 }
 
 const ACTIONS: AskSource = {
@@ -143,6 +215,7 @@ const ACTIONS: AskSource = {
   poll: pollAskQuestion,
   costs: askDashCosts,
   label: askDashPageLabel,
+  save: saveDashAnswer,
   confirm: confirmDashChange,
   decline: declineDashChange,
   reopen: reopenDashChange,
@@ -156,6 +229,14 @@ type AskDashHandle = {
    */
   open: (question?: string, rows?: AskRows) => void;
   source: AskSource;
+  /** Whose rows @ in the box searches (plan #1899.5); absent, @ offers none. */
+  account?: string;
+  /** The workspaces the box's scope chip and commands offer. */
+  workspaces?: readonly ModuleId[];
+  /** For the gallery: the rows @ searches in place of the account's. */
+  searchHits?: readonly SearchHit[];
+  /** For the gallery: the words the sheet's box opens with, unsent (plan #1899.8). */
+  draft?: string;
 };
 
 const AskDashContext = createContext<AskDashHandle | null>(null);
@@ -178,11 +259,14 @@ type Session = { key: number; ask?: string; rows?: AskRows };
  * can wrap the whole shell in one fed with fixtures and the shell's own
  * provider leaves the job to it.
  */
+type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft'>;
+
 export function AskDashProvider({
   source,
   page,
   children,
-}: {
+  ...box
+}: AskDashBox & {
   source?: AskSource;
   /** The address the sheet treats as the page, for the gallery; the real one otherwise. */
   page?: string;
@@ -191,7 +275,7 @@ export function AskDashProvider({
   const outer = useContext(AskDashContext);
   if (outer) return <>{children}</>;
   return (
-    <AskDashRoot source={source ?? ACTIONS} page={page}>
+    <AskDashRoot source={source ?? ACTIONS} page={page} {...box}>
       {children}
     </AskDashRoot>
   );
@@ -201,7 +285,11 @@ function AskDashRoot({
   source,
   page,
   children,
-}: {
+  account,
+  workspaces,
+  searchHits,
+  draft,
+}: AskDashBox & {
   source: AskSource;
   page?: string;
   children: React.ReactNode;
@@ -214,7 +302,10 @@ function AskDashRoot({
     setSession({ key: opened.current, ask: ask || undefined, rows });
   }, []);
   const close = useCallback(() => setSession(null), []);
-  const handle = useMemo<AskDashHandle>(() => ({ open, source }), [open, source]);
+  const handle = useMemo<AskDashHandle>(
+    () => ({ open, source, account, workspaces, searchHits, draft }),
+    [open, source, account, workspaces, searchHits, draft],
+  );
 
   // A link in an answer goes somewhere else in the app, and the sheet should
   // not stay over the page it opened.
@@ -275,12 +366,14 @@ export function useAskSend(
   onLookup?: (lookup: LookupWire) => void,
   list: AskListFilter | null = null,
   onText?: (piece: string) => void,
+  /** What else goes with each question as it is sent: its stop signal, the rows added with @ and the scope (plan #1899.5). */
+  more?: () => AskMore,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, onText, page, list });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list };
+    heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more };
   });
   return useCallback<TalkSend>(async (body, files) => {
     const result = await source.ask(
@@ -291,6 +384,7 @@ export function useAskSend(
       files,
       heard.current.list,
       (piece) => heard.current.onText?.(piece),
+      heard.current.more?.(),
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -326,6 +420,8 @@ export function AskThread({
   openHandoffs = 0,
   onConversation,
   onSend,
+  onAnswered,
+  boxStart,
   ...thread
 }: {
   id: string;
@@ -341,15 +437,34 @@ export function AskThread({
   onConversation?: (ref: string) => void;
   /** Heard on every question sent, before the answer comes. */
   onSend?: () => void;
+  /** Heard once each answer has come back, kept or not: the Dash page re-reads what the chat used (plan #1899.4). */
+  onAnswered?: () => void;
   label: string;
   placeholder?: string;
-  hint?: React.ReactNode;
+  /** Before the first question: what Dash says he can do, drawn as his opening turn. */
+  opening?: string;
   /** Just above the question box: the page Dash will be told (plan #1272). */
   above?: React.ReactNode;
   startWriting?: boolean;
+  /** The box always open at the foot of the pane, as on the Dash page. */
+  dock?: boolean;
   ask?: string;
+  /** For the preview gallery: the box opens with these words in it. */
+  initialDraft?: string;
+  /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
+  boxStart?: AskBoxStart;
 }) {
-  const source = useAskDash()?.source ?? ACTIONS;
+  const handle = useAskDash();
+  const source = handle?.source ?? ACTIONS;
+  // The question on its way, which Stop ends (plan #1899.5).
+  const running = useRef<AbortController | null>(null);
+  // @ rows, / commands and the scope chip in the box (plan #1899.5).
+  const box = useAskBox({
+    account: handle?.account,
+    workspaces: handle?.workspaces,
+    fixtureHits: handle?.searchHits,
+    start: boxStart,
+  });
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
@@ -372,6 +487,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
+    () => ({ ...box.take(), signal: running.current?.signal }),
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -389,36 +505,53 @@ export function AskThread({
   }, [changes]);
 
   return (
-    <TalkThread
+    <Thread
       id={id}
       turns={turns}
       withFiles
-      sendHint={(files) => (
-        <PaidHint
-          action={ACTION}
-          plus={filesEstimate(files, DASH_MODELS.ask)}
-          what={files.length > 0 ? 'Cost of this answer from Dash, reading the files' : 'Cost of this answer from Dash'}
-          align="end"
-        />
-      )}
-      send={(body, files) => {
-        onSend?.();
+      cost={ASK_COST}
+      // Heard as the question is sent, outside the transition that waits for
+      // the answer, so what it changes (the sheet's opening message going)
+      // happens with the press rather than when the answer lands (plan #1899.8).
+      onSubmit={onSend}
+      send={async (body, files) => {
         setLive([]);
         setWritten('');
-        return send(body, files);
+        const controller = new AbortController();
+        running.current = controller;
+        const result = await send(body, files).finally(() => onAnswered?.());
+        if (running.current === controller) running.current = null;
+        // A question that was not kept goes back in the box, and its rows with it.
+        if (!result.turns?.length) box.restore();
+        return result;
       }}
+      onStop={() => running.current?.abort()}
+      {...box.thread}
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}
       activity="searching"
       incoming={incoming}
-      below={(turn) => {
+      below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
             <LookupFold calls={turn.toolCalls} />
+            {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
+                A todo or a note comes back as a change, drawn above with Undo. */}
+            <AnswerActions
+              body={turn.body}
+              question={thread.question}
+              busy={thread.busy}
+              onRetry={thread.resend}
+              onEdit={thread.edit}
+              save={ref ? (to) => source.save(ref, turn.id, to) : undefined}
+              onSaved={(change) =>
+                setChanges((current) => [...current.filter((c) => c.id !== change.id), change])
+              }
+            />
           </>
         );
       }}
@@ -471,6 +604,16 @@ function useHandoffReplies(
   return incoming;
 }
 
+/**
+ * What each answer costs, priced by the thread beside the button that opens
+ * the box and beside its send arrow, with reading any files added on top.
+ */
+const ASK_COST: ThreadCost = {
+  action: ACTION,
+  what: 'Cost of each answer from Dash',
+  plus: (files: readonly UploadedAttachment[]) => filesEstimate(files, DASH_MODELS.ask),
+};
+
 /** What Dash says while it looks: long enough that the wait needs a reason. */
 export const ASK_WAITING = 'Dash is looking it up. A question that needs several lookups can take up to a minute.';
 
@@ -522,6 +665,9 @@ export function AskDashPanel({
   // Whether the question on screen has become a conversation, which is when
   // "New question" has something to leave.
   const [started, setStarted] = useState(false);
+  // The chat on screen once it has an address, for the button that opens it
+  // on the full page (plan #1899.2).
+  const [chatRef, setChatRef] = useState<string | null>(null);
   const [costs, setCosts] = useState<PaidCosts>({});
 
   useEffect(() => {
@@ -556,7 +702,7 @@ export function AskDashPanel({
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      // Escape in the box closes the box first (TalkThread), and marks the
+      // Escape in the box closes the box first (Thread), and marks the
       // event handled; only a second Escape closes the sheet.
       if (event.key === 'Escape' && !event.defaultPrevented) onClose();
     }
@@ -571,10 +717,10 @@ export function AskDashPanel({
   function show(next: View) {
     setView(next);
     setStarted(next.kind === 'earlier');
+    setChatRef(next.kind === 'earlier' ? next.ref : null);
     setThreadKey((key) => key + 1);
   }
 
-  const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
   // Rows sent from a list say more than the page they are on, so they take the chip's place.
   const lookingAt = rows ? (
     <LookingAt
@@ -614,6 +760,15 @@ export function AskDashPanel({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
+              <Tooltip label="Open on Dash's page" align="end">
+                <Link
+                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  aria-label="Open on Dash's page"
+                  className={iconButtonVariants()}
+                >
+                  <Maximize2 strokeWidth={1.75} aria-hidden />
+                </Link>
+              </Tooltip>
               {started && (
                 <Tooltip label="New question" align="end">
                   <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
@@ -637,9 +792,11 @@ export function AskDashPanel({
                 page={page}
                 list={rows}
                 source={source}
-                hint={hint}
                 lookingAt={lookingAt}
-                onStarted={() => setStarted(true)}
+                onStarted={(ref) => {
+                  setStarted(true);
+                  setChatRef(ref);
+                }}
                 onReopen={(conversation) =>
                   show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
                 }
@@ -650,7 +807,6 @@ export function AskDashPanel({
                 conversationRef={view.ref}
                 page={page}
                 source={source}
-                hint={hint}
                 lookingAt={lookingAt}
               />
             )}
@@ -666,7 +822,6 @@ function NewQuestion({
   page,
   list,
   source,
-  hint,
   lookingAt,
   onStarted,
   onReopen,
@@ -675,12 +830,12 @@ function NewQuestion({
   page: string | null;
   list?: AskRows;
   source: AskSource;
-  hint: React.ReactNode;
   lookingAt: React.ReactNode;
-  onStarted: () => void;
+  onStarted: (ref: string) => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));
+  const draft = useAskDash()?.draft;
   const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
     null,
   );
@@ -700,24 +855,6 @@ function NewQuestion({
 
   return (
     <>
-      {/* The empty state: said once, before the first question, and gone
-          once there is an answer to read instead. */}
-      {!asked && (
-        <div className="flex gap-2">
-          <div className="flex w-4 shrink-0 justify-center pt-1">
-            <DashMark size="2xs" decorative className="text-ink-ghost" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <span className="text-small font-semibold text-ink">Dash</span>
-            <p className="text-body text-ink">
-              {list
-                ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
-                : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'}
-            </p>
-          </div>
-        </div>
-      )}
-
       <AskThread
         id="ask-dash"
         conversationRef={null}
@@ -729,7 +866,16 @@ function NewQuestion({
         placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'What did I spend on eBay this month?'}
         startWriting
         ask={ask}
-        hint={hint}
+        initialDraft={draft}
+        // The empty state: said once, before the first question, as Dash's
+        // opening turn, and gone once there is an answer to read instead.
+        opening={
+          asked
+            ? undefined
+            : list
+              ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
+              : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'
+        }
         above={lookingAt}
         onSend={() => setAsked(true)}
       />
@@ -790,13 +936,11 @@ function EarlierQuestion({
   conversationRef,
   page,
   source,
-  hint,
   lookingAt,
 }: {
   conversationRef: string;
   page: string | null;
   source: AskSource;
-  hint: React.ReactNode;
   lookingAt: React.ReactNode;
 }) {
   const [loaded, setLoaded] = useState<OpenedAsk | null>(null);
@@ -834,7 +978,6 @@ function EarlierQuestion({
         openHandoffs={loaded.openHandoffs}
         label="Ask a follow-up"
         placeholder="Ask more about this"
-        hint={hint}
         above={lookingAt}
       />
     </>

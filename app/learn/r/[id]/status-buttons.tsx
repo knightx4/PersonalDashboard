@@ -1,10 +1,12 @@
 'use client';
 
-import { useActionState } from 'react';
+import Link from '@/components/ui/link';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { updateStatus, type ReadingActionState } from './actions';
+import { updateStatus, type StatusActionState } from './actions';
 
 /**
  * Where you are with a reading.
@@ -61,11 +63,19 @@ function Option({
 export function StatusButtons({
   readingId,
   status,
+  offered,
 }: {
   readingId: string;
   status: string;
+  /** Draws the Check it now prompt as if the reading had just been marked read; the gallery only. */
+  offered?: { href: string };
 }) {
-  const [state, formAction] = useActionState<ReadingActionState, FormData>(updateStatus, {});
+  const [state, formAction] = useActionState<StatusActionState, FormData>(
+    updateStatus,
+    offered ? { check: offered } : {},
+  );
+  const [dismissed, setDismissed] = useState(false);
+  const check = status === 'read' && !dismissed ? state.check : undefined;
 
   return (
     <form action={formAction}>
@@ -81,6 +91,17 @@ export function StatusButtons({
         ))}
       </div>
       {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
+      {check && (
+        <div className={cn(cardVariants({ padding: 'dense' }), 'mt-3 flex flex-wrap items-center gap-2')}>
+          <p className="w-full text-ui text-ink">Want one question on the idea you read this for?</p>
+          <Link href={check.href} className={buttonVariants({ variant: 'primary', size: 'md' })}>
+            Check it now
+          </Link>
+          <Button type="button" variant="secondary" size="md" onClick={() => setDismissed(true)}>
+            Not now
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

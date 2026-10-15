@@ -1,4 +1,3 @@
-import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -8,15 +7,13 @@ import { isOwner } from '@/lib/dev/owner';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import type { DoneSince } from '@/lib/goals/done-since';
-import { loadDoneSince } from '@/lib/goals/done-since-store';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { loadHomeForRequest } from '@/lib/goals/home-request';
 import { loadAreas } from '@/lib/goals/store';
 import { catchUpSince } from '@/lib/goals/catch-up';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { HomeView } from './home-view';
-import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Goals' };
 export const dynamic = 'force-dynamic';
@@ -61,20 +58,13 @@ export default async function GoalsPage() {
       .then(loadUnreadFiles)
       .catch((): FileListing[] | null => null),
   ]);
-  // A failed read says so in its section rather than failing the page.
-  const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
-    (): DoneSince | null => null,
-  );
-
-  // The day you come back after time away, the line for what Dash did starts open.
+  // The day you come back after time away, Dash's card says so.
   const awayFrom = catchUpSince(visit, today);
 
   return (
-    <PageColumn>
-      <PageHeader title="Goals" />
+    <>
       <HomeView
         {...home}
-        done={done}
         brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
         todayOn={today}
@@ -82,7 +72,8 @@ export default async function GoalsPage() {
         canRun={owner}
         awayFrom={awayFrom}
         filesToRead={filesToRead}
+        dashToday={<NowDashToday workspace="goals" className="" />}
       />
-    </PageColumn>
+    </>
   );
 }

@@ -62,7 +62,7 @@ const onYou = [
   item('a', { title: 'Pay the card' }),
   item('q', { kind: 'question', title: 'Avalanche or snowball?', action: 'Answer' }),
   item('f', { kind: 'flag', title: 'A late fee was charged', action: 'Answer' }),
-  item('c', { kind: 'close', title: 'Close Pay off the debts?', action: 'Close goal' }),
+  item('c', { kind: 'close', title: 'Close Pay off the debts?', action: 'Done' }),
 ];
 
 describe('sorting what is on you', () => {

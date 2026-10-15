@@ -12,7 +12,7 @@ import { JOBS, SHOPPING, TODO } from './workspace-inbox-surfaces';
  */
 
 const write = (message: string): InboxWrite => ({ action: async () => ({ message }), fields: {} });
-const putOff = write('Put off for now.');
+const later = write('Later.');
 const decline = write('Declined.');
 const onYou = { state: 'on_you' as const };
 
@@ -24,7 +24,7 @@ const GOALS: InboxRow[] = [
     line: 'Dash flagged it on the goal',
     href: '/goals/g1',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'The goal', tone: 'primary', href: '/goals/g1' }],
     decline,
   },
@@ -38,7 +38,7 @@ const DEV: InboxRow[] = [
     line: 'Asked Mon 13 Oct',
     href: '/dev/inbox#raise-r1',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Dash', tone: 'primary', href: '/dev/inbox#raise-r1' }],
     decline,
   },
@@ -49,7 +49,7 @@ const DEV: InboxRow[] = [
     line: 'Plan #1940.2',
     href: '/dev/plan',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Answer', tone: 'primary', href: '/dev/plan' }],
     decline,
   },

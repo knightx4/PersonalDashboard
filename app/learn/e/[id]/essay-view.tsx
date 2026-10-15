@@ -5,7 +5,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';
@@ -822,11 +822,10 @@ export function EssayView({
           <span />
         )}
         <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
+          <DashAction
+            paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
             what="Cost of a rephrase"
-          />
-          <Button
+            hintFirst
             type="button"
             variant="ghost"
             size="sm"
@@ -838,7 +837,7 @@ export function EssayView({
             title={selected ? undefined : 'Select some text to have Dash reword it'}
           >
             {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
-          </Button>
+          </DashAction>
           <Button
             type="button"
             variant="ghost"

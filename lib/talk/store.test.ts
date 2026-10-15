@@ -24,6 +24,7 @@ function fakeClient(rows: {
         select: (...args: unknown[]) => (calls.push({ table, op: 'select', args }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
         in: (...args: unknown[]) => (calls.push({ table, op: 'in', args }), chain),
+        is: (...args: unknown[]) => (calls.push({ table, op: 'is', args }), chain),
         order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
         limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
         upsert: async (...args: unknown[]) => {
@@ -152,7 +153,7 @@ describe('an ask conversation', () => {
     });
   });
 
-  it('keeps what Dash looked up and cited on its own turn, and nothing on the person\'s', async () => {
+  it('keeps what Dash looked up on its own turn, and the rows added with @ on the person\'s', async () => {
     const citation = { table: 'job_search.applications', ref: 'app-1', title: 'Acme', href: '/job-search/app-1' };
     const toolCall = { name: 'search', input: { q: 'Acme' }, result: [citation] };
     const { client, calls } = fakeClient({
@@ -172,7 +173,7 @@ describe('an ask conversation', () => {
     expect(upsert?.args[0]).toMatchObject({ id: 'conv-1', subject_kind: 'ask', subject_ref: 'conv-1' });
     const insert = calls.find((call) => call.op === 'insert');
     expect(insert?.args[0]).toEqual([
-      { conversation_id: 'conv-1', user_id: 'user-1', role: 'user', body: 'Acme?' },
+      { conversation_id: 'conv-1', user_id: 'user-1', role: 'user', body: 'Acme?', citations: [citation] },
       {
         conversation_id: 'conv-1',
         user_id: 'user-1',

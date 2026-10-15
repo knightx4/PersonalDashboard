@@ -1,9 +1,10 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sprout } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -60,12 +61,14 @@ function AskButton({ label }: { label: string }) {
   // Usually the next question was written ahead and comes straight back. The
   // wait is only long when the queue ran dry and it is being written now.
   return (
-    <span className="inline-flex items-center gap-1">
-      <Button type="submit" pending={pending}>
-        {pending ? 'Getting the next question…' : label}
-      </Button>
-      <PaidHint action="app/learn/flow/actions.ts#flowStep:ask" what="Cost of the next question" />
-    </span>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:ask"
+      what="Cost of the next question"
+    >
+      {pending ? 'Getting the next question…' : label}
+    </DashAction>
   );
 }
 
@@ -120,15 +123,17 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
 function DontKnowButton() {
   const { pending } = useFormStatus();
   return (
-    <Button
+    <DashAction
       variant="link"
       type="submit"
       name="dontKnow"
       value="1"
       pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:answer"
+      what="Cost of answering"
     >
       I don&rsquo;t know
-    </Button>
+    </DashAction>
   );
 }
 
@@ -157,9 +162,16 @@ function StartButton() {
   // One call to write the track's ideas and one to write its first question,
   // so this is the slowest press in the flow and says so.
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      {pending ? 'Writing the subject…' : 'Start'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      size="sm"
+      pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:start-track"
+      what="Cost of starting the subject"
+    >
+      {pending ? 'Writing the subject…' : 'Start this subject'}
+    </DashAction>
   );
 }
 
@@ -192,7 +204,7 @@ function TrackOfferCard({
     setHidden(true);
     await answerTrackOffer(formData);
     toast({
-      text: formData.get('outcome') === 'never' ? 'Declined' : 'Later',
+      text: closedToast(formData.get('outcome') === 'never' ? 'declined' : 'later', offer.name),
       undo: async () => {
         await takeBackOfferAnswer({ themeId: offer.themeId });
         setHidden(false);
@@ -218,13 +230,7 @@ function TrackOfferCard({
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
             <TrackField track={track} only={only} goal={null} />
-            <span className="inline-flex items-center gap-1">
-              <StartButton />
-              <PaidHint
-                action="app/learn/flow/actions.ts#flowStep:start-track"
-                what="Cost of starting the subject"
-              />
-            </span>
+            <StartButton />
           </form>
           {(['not_now', 'never'] as const).map((outcome) => (
             <form key={outcome} action={setAside}>
@@ -376,12 +382,10 @@ export function FlowSession({
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
         {!live.answered && (
           <div className="flex flex-wrap items-center gap-4 pt-1">
-            <span className="inline-flex items-center gap-1">
-              <DontKnowButton />
-              <PaidHint action="app/learn/flow/actions.ts#flowStep:answer" what="Cost of answering" />
-            </span>
+            <DontKnowButton />
             <span className="inline-flex items-center gap-1">
               <NotNowButton />
+              {/* dash-action-ok: the hint sits beside the Later close button, which does not run the model. */}
               <PaidHint
                 action="app/learn/flow/actions.ts#flowStep:ask"
                 what="Cost of the next question"

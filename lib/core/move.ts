@@ -114,8 +114,12 @@ export const VIEW_LABEL = {
   read: 'To read',
 } as const satisfies Record<string, string>;
 
-/** What a row reads while an Ask Dash hand-off about it is open (plan #1568). */
-export const HANDOFF_WORKING_TITLE = 'Dash is working on what you asked about this in Ask Dash.';
+/**
+ * What a row reads while an Ask Dash hand-off or a run about it is going
+ * (plans #1568 and #1964.2.2). The page cannot tell which without a second
+ * read, so the tooltip names both.
+ */
+export const HANDOFF_WORKING_TITLE = 'Dash is working on this now, from Ask Dash or a run.';
 
 /**
  * A row's move with the runs in progress laid over it (plan #1568). `running`
@@ -135,10 +139,24 @@ export function withRun<T extends { move: Move; title: string }>(
   refs: readonly (string | null | undefined)[],
   title: string = HANDOFF_WORKING_TITLE,
 ): T | { move: Move; title: string } | null {
-  if (!rowMove || !running) return rowMove;
+  if (!rowMove) return rowMove;
+  return workingMove(running, refs, title) ?? rowMove;
+}
+
+/**
+ * The same for a row that has no move of its own (plan #1964.2.2): a reading,
+ * a vault note, a newsletter story. It reads "Dash is on it" while a run or
+ * hand-off is about it, and nothing otherwise.
+ */
+export function workingMove(
+  running: readonly string[] | ReadonlySet<string> | undefined,
+  refs: readonly (string | null | undefined)[],
+  title: string = HANDOFF_WORKING_TITLE,
+): { move: Move; title: string } | null {
+  if (!running) return null;
   const has = (ref: string) => ('has' in running ? running.has(ref) : running.includes(ref));
   const working = refs.some((ref) => ref != null && has(ref));
-  return working ? { move: { state: 'dash_working' }, title } : rowMove;
+  return working ? { move: { state: 'dash_working' }, title } : null;
 }
 
 /** The ref a row is named by: `schema.table:id`, as lib/core/refs.ts toRef writes it. */

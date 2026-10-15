@@ -5,7 +5,8 @@ import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { disconnectInbox, reparseInboxOrders, resetInboxImport } from './actions';
 import { PaidHint } from '@/components/ui/paid-hint';
 
@@ -208,27 +209,31 @@ export function InboxControls({
     );
   } else if (canSync && backfillCompleted) {
     primary = (
-      <Button
+      <DashAction
         type="button"
         variant="secondary"
         size="sm"
         disabled={busy}
         onClick={() => startMode('incremental')}
+        paid={SYNC_HINT}
+        what="Cost of reading each order email"
       >
         {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
-      </Button>
+      </DashAction>
     );
   } else if (canSync) {
     primary = (
-      <Button
+      <DashAction
         type="button"
         variant="secondary"
         size="sm"
         disabled={busy}
         onClick={() => startMode('backfill')}
+        paid={SYNC_HINT}
+        what="Cost of reading each order email"
       >
         {starting || active ? 'Importing…' : 'Import orders'}
-      </Button>
+      </DashAction>
     );
   }
 
@@ -238,13 +243,12 @@ export function InboxControls({
         <div className="min-w-0 flex-1">{heading}</div>
         <div className="flex shrink-0 items-center gap-1">
           {primary}
-          {/* Per order email the import reads, which it finds out as it goes. */}
-          {canSync && <PaidHint action={SYNC_HINT} what="Cost of reading each order email" />}
           <ActionMenu label={`More for ${email}`} items={menu} />
           {/* Re-parse is in the menu, whose items are words, so its cost sits
               beside the menu. Per order email: how many there are is known
               only once the reparse has looked. */}
           {canSync && backfillCompleted && (
+            // dash-action-ok: a menu item's price, drawn beside the menu because the item is a word.
             <PaidHint
               action="app/shopping/settings/actions.ts#reparseInboxOrders"
               what="Cost of re-parsing each order email, from the menu"

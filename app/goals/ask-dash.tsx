@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { Folder, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { ChipInput, ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -146,28 +146,34 @@ export function AskDash({
               ))}
             </ChipSelect>
           )}
-          <span className="ml-auto flex items-center gap-2">
-            {/* An ask on a goal is a reply from Dash; a new errand or goal starts a run, which is not metered here. */}
-            {!handing && (
-              <PaidHint
-                action="app/goals/home-actions.ts#askDashAction"
-                what="Cost of Dash's reply"
-                align="end"
-                className="self-center"
-              />
-            )}
-            {learnGoal && (
-              <PaidHint
-                action="app/goals/home-actions.ts#askDashAction:new-goal"
-                what="Cost of placing the goal and writing its plan"
-                align="end"
-                className="self-center"
-              />
-            )}
-            <Button type="submit" size="sm" disabled={asking || !body.trim()}>
-              {asking ? 'Asking Dash…' : handing ? 'Hand it to Dash' : 'Ask Dash'}
-            </Button>
-          </span>
+          {/* An ask on a goal is a reply from Dash; a new errand or goal starts a
+              run, which is not metered here, unless a Learn goal is placed. */}
+          <DashAction
+            type="submit"
+            size="sm"
+            disabled={asking || !body.trim()}
+            wrapperClassName="ml-auto"
+            hintFirst
+            align="end"
+            paid={
+              !handing
+                ? 'app/goals/home-actions.ts#askDashAction'
+                : learnGoal
+                  ? 'app/goals/home-actions.ts#askDashAction:new-goal'
+                  : undefined
+            }
+            what={!handing ? "Cost of Dash's reply" : 'Cost of placing the goal and writing its plan'}
+          >
+            {asking
+              ? handing
+                ? 'Starting…'
+                : 'Asking Dash…'
+              : errand
+                ? 'Start this errand'
+                : goal
+                  ? 'Start this goal'
+                  : 'Ask Dash'}
+          </DashAction>
         </div>
       </ComposeBox>
       {state.error && <p className="text-small text-danger">{state.error}</p>}

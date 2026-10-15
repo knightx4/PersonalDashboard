@@ -2,10 +2,20 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { LATER_REFUSED, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import { setWaitingDismissal } from '@/lib/jobs/today/waiting';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Later's day, from the one Later menu (plan #1957.9): one of
+ * lib/core/snooze-days.ts's choices or a day picked, read in the account's
+ * zone. Null when the day is not after today.
+ */
+async function laterFor(userId: string, choice: string): Promise<{ until: string; words: string } | null> {
+  const { timezone } = await loadAccountSettings(userId);
+  const later = laterUntil(choice, timezone);
+  return later ? { until: later.until.toISOString(), words: untilWords(later.day, timezone) } : null;
+}
 
 /**
  * Done with a nudge.
@@ -61,14 +71,18 @@ export async function restoreReminder(
 }
 
 /**
- * Not now. Pushes the nudge out rather than deciding anything about it, and
- * hands back when it was due so the toast's Undo can put it back.
+ * Not now. Pushes the nudge out to the day chosen rather than deciding
+ * anything about it, and hands back when it was due so the toast's Undo can
+ * put it back, with when it comes back in words for the toast.
  */
 // latency: pending -- should be optimistic: a snooze that waits for the round trip
 export async function snoozeReminder(
   id: string,
-): Promise<{ error: string | null; dueAt?: string | null }> {
+  choice: string,
+): Promise<{ error: string | null; dueAt?: string | null; until?: string }> {
   const user = await requireUser();
+  const later = await laterFor(user.id, choice);
+  if (!later) return { error: LATER_REFUSED };
   const supabase = await createClient();
 
   const { data: before } = await supabase
@@ -80,7 +94,7 @@ export async function snoozeReminder(
 
   const { error } = await supabase
     .from('reminders')
-    .update({ due_at: new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString() })
+    .update({ due_at: later.until })
     .eq('id', id)
     .eq('user_id', user.id);
 
@@ -89,7 +103,7 @@ export async function snoozeReminder(
   revalidatePath('/jobs/roles/[id]', 'page');
   // And on the company, which rolls up the to-dos of every role it has.
   revalidatePath('/jobs/companies/[slug]', 'page');
-  return { error: null, dueAt: (before?.due_at as string | null | undefined) ?? null };
+  return { error: null, dueAt: (before?.due_at as string | null | undefined) ?? null, until: later.words };
 }
 
 /**
@@ -116,9 +130,13 @@ export async function completeWaiting(eventId: string): Promise<{ error: string 
   return dismissWaiting(eventId, null);
 }
 
+/** Later on a request, to the day chosen from the one Later menu. */
 // latency: pending -- should be optimistic: a snooze that waits for the round trip
-export async function snoozeWaiting(eventId: string): Promise<{ error: string | null }> {
-  return dismissWaiting(eventId, new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString());
+export async function snoozeWaiting(eventId: string, choice: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const later = await laterFor(user.id, choice);
+  if (!later) return { error: LATER_REFUSED };
+  return dismissWaiting(eventId, later.until);
 }
 
 /**

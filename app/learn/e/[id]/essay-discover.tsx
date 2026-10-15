@@ -4,7 +4,7 @@ import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineTextarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { BRIEF_FIELDS, type EssayBrief, type EssayInterview } from '@/lib/learn/essays/model';
 import type { Stage } from '@/lib/learn/essays/plan';
 import { saveEssayBriefField } from './actions';
@@ -89,19 +89,19 @@ export function DiscoverStage({
           title="Dash’s read"
           hint="Where your thinking is still loose. Reply in your own words, or change your answers above."
           action={
-            <span className="flex items-center gap-1">
-              <PaidHint action={READ_ACTION} what="Cost of Dash reading your brief" />
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                pending={reading}
-                disabled={reading}
-                onClick={readAgain}
-              >
-                {reading ? 'Reading…' : readback ? 'Read it again' : 'Have Dash read it'}
-              </Button>
-            </span>
+            <DashAction
+              paid={READ_ACTION}
+              what="Cost of Dash reading your brief"
+              hintFirst
+              type="button"
+              size="sm"
+              variant="secondary"
+              pending={reading}
+              disabled={reading}
+              onClick={readAgain}
+            >
+              {reading ? 'Reading…' : readback ? 'Read it again' : 'Have Dash read it'}
+            </DashAction>
           }
         >
           {!readback && !reading && (

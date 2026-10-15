@@ -55,6 +55,6 @@ describe('RoundPrep', () => {
   it('has nothing to fold before a note is written', () => {
     const html = render(null);
     expect(html).not.toContain('<details');
-    expect(html).toContain('Prepare me');
+    expect(html).toContain('Prepare for this interview');
   });
 });

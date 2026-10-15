@@ -8,12 +8,6 @@
   "anatomy-settings": {
     "targets": 1
   },
-  "ask-dash-changes": {
-    "targets": 1
-  },
-  "ask-made-changes": {
-    "targets": 3
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 3
@@ -81,23 +75,8 @@
   "news-issue-digest-no-pictures": {
     "targets": 2
   },
-  "news-quick-essay": {
-    "targets": 1
-  },
-  "news-quick-in-shell": {
-    "targets": 5
-  },
-  "news-quick-page": {
-    "targets": 5
-  },
-  "news-quick-page-full": {
-    "targets": 5
-  },
-  "news-quick-story": {
-    "targets": 5
-  },
   "news-saved": {
-    "targets": 3
+    "targets": 2
   },
   "news-story-grid": {
     "targets": 4

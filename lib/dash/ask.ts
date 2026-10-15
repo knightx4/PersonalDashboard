@@ -6,7 +6,7 @@ import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/chang
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
 import type { DashFile } from './files';
-import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
@@ -20,6 +20,8 @@ import {
   type DashVoice,
   type DashWriter,
 } from './loop';
+import { lookupInScope } from '@/lib/ask/tools';
+import { moduleById, type ModuleId } from '@/lib/modules';
 import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 
 /**
@@ -170,6 +172,14 @@ outside the app, or to tell them when it drops, call propose_watch. Nothing is
 written: it shows as a card under your answer and they confirm or decline it.
 Say what it will do and when it stops.
 
+A BUILD IS PROPOSED, NOT STARTED. When they ask you to build, start, send or
+restart a step on the plan, look the step up with read_dev_row and call
+propose_build, never hand_off. Nothing starts until they confirm the card,
+which names the step and says the start cannot be undone, so your sentence
+need not repeat either: say only what the card does not, such as how long a
+quiet run has gone without pushing.
+When it is refused, say why in plain words and do not propose anything else.
+
 ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
 change something none of your tools can (a job application, a contact, a
 vault note, a goal's done-when), or to do work your lookups cannot finish
@@ -191,6 +201,16 @@ about anything else, ignore the page and answer as if it had not been said.`;
 
 /** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
+
+/**
+ * Ask's voice for a question kept to one workspace (plan #1899.5): every
+ * tool but the lookups outside it (lookupInScope). Writes stay, since a
+ * change the person asks for is not a lookup.
+ */
+export function scopedVoice(scope: ModuleId | null | undefined): DashVoice {
+  if (!scope) return ASK_VOICE;
+  return { ...ASK_VOICE, tools: ASK_VOICE.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+}
 
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
@@ -230,9 +250,22 @@ export async function answerQuestion(input: {
   onLookup?: (event: AskLookupEvent) => void;
   /** Hears the answer's text as it is written (plan #1902); present, the calls stream. */
   onText?: (piece: string) => void;
+  /** Stops the answer, keeping what was written (plan #1899.5). */
+  signal?: AbortSignal;
+  /** The workspace the question is kept to (plan #1899.5); null or absent for every one. */
+  scope?: ModuleId | null;
 }): Promise<AskAnswer> {
-  const { page, ...rest } = input;
-  return runDash({ ...rest, voice: ASK_VOICE, context: { surface: 'ask', subject: null, page: page ?? null } });
+  const { page, scope, ...rest } = input;
+  return runDash({
+    ...rest,
+    voice: scopedVoice(scope),
+    context: {
+      surface: 'ask',
+      subject: null,
+      page: page ?? null,
+      scope: scope ? (moduleById(scope)?.label ?? scope) : null,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -353,6 +386,18 @@ export async function askDash(
     onLookup?: (event: AskLookupEvent) => void;
     /** Hears the answer's text as it is written (plan #1902). */
     onText?: (piece: string) => void;
+    /**
+     * Hears the question once it is kept, before Dash is asked (plan
+     * #1899.5): the streaming route tells the browser, so a question stopped
+     * mid-answer can be found again.
+     */
+    onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
+    /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
+    signal?: AbortSignal;
+    /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
+    mentions?: readonly TalkCitation[];
+    /** The workspace the question is kept to (plan #1899.5). */
+    scope?: ModuleId | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -373,11 +418,23 @@ export async function askDash(
     } else {
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [{ role: 'user', body: question, files: input.files }]);
+    asked = await stores.append(subject, [
+      {
+        role: 'user',
+        body: question,
+        files: input.files,
+        ...(input.mentions?.length ? { citations: input.mentions } : {}),
+      },
+    ]);
   } catch {
     return { turns: [], error: 'Your question was not kept. Try again.' };
   }
   const conversation = { ref: subject.ref, title: subject.title ?? null };
+  try {
+    input.onAsked?.({ conversation, turns: asked });
+  } catch (error) {
+    console.error('ask question listener failed', error);
+  }
 
   if (!input.anthropicApiKey) {
     return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
@@ -484,6 +541,8 @@ export async function askDash(
     now: input.now,
     onLookup: input.onLookup,
     onText: input.onText,
+    signal: input.signal,
+    scope: input.scope,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);

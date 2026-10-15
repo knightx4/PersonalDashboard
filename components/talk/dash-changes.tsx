@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
@@ -119,7 +120,7 @@ export function DashChangeRow({
       const reopen = presses.reopen;
       if (outcome.ok && which === 'decline' && reopen) {
         toast({
-          text: 'Declined',
+          text: closedToast('declined', words.what),
           undo: async () => {
             const back = await reopen(change.id);
             if (!back.ok) throw new Error(back.error);
@@ -164,6 +165,15 @@ export function DashChangeRow({
         </p>
       )}
 
+      {change.kind === 'start_build' && change.status === 'proposed' && (
+        <p className="text-small text-ink-muted">
+          {change.input.quiet
+            ? 'Confirm writes off its quiet last run and starts a new session now.'
+            : 'Confirm starts a session on this step now.'}{' '}
+          It cannot be undone.
+        </p>
+      )}
+
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -173,7 +183,7 @@ export function DashChangeRow({
             disabled={pressing !== null}
             onClick={() => press('confirm')}
           >
-            {pressing === 'confirm' ? 'Writing…' : 'Confirm'}
+            {pressing === 'confirm' ? (change.kind === 'start_build' ? 'Starting…' : 'Writing…') : 'Confirm'}
           </Button>
           <CloseButton
             lifecycle="declined"
@@ -190,22 +200,25 @@ export function DashChangeRow({
           <ChangeStatus change={change} />
           <Link
             href={changeHref(change)}
-            className={`${linkVariants({ tone: 'inline' })} text-small`}
+            className={`${linkVariants({ tone: 'inline' })} press-area text-small`}
           >
             {changeWhere(change)}
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="-ml-1"
-            pending={pressing === 'undo'}
-            disabled={pressing !== null}
-            onClick={() => press('undo')}
-          >
-            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {pressing === 'undo' ? 'Undoing…' : 'Undo'}
-          </Button>
+          {/* A started build cannot be taken back (plan #2106.1). */}
+          {change.kind !== 'start_build' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="-ml-1"
+              pending={pressing === 'undo'}
+              disabled={pressing !== null}
+              onClick={() => press('undo')}
+            >
+              <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pressing === 'undo' ? 'Undoing…' : 'Undo'}
+            </Button>
+          )}
         </div>
       )}
 

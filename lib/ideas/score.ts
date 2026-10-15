@@ -62,13 +62,16 @@ export const SCORE_FLOOR = TRIAGE_FLOOR;
 /**
  * The score a suggestion needs to be offered (note 073cacdf).
  *
- * A session writes follow-ons by the handful, and one Jev scores under 40
- * barely helps its workspace. It goes in a fold of its own rather than
+ * A session writes follow-ons by the handful, and one Jev scores under the
+ * floor barely helps its workspace. It goes in a fold of its own rather than
  * nowhere, so "did a session already think of that" still has an answer. Only
  * a suggestion: an idea you wrote down yourself is never hidden by a score.
  * An unscored suggestion is offered until it is scored.
+ *
+ * The floor was 40 until 15 October 2026, when 99 of the 138 open
+ * suggestions scored under 60 and the person asked for a higher bar.
  */
-export const SUGGESTION_SCORE_FLOOR = 40;
+export const SUGGESTION_SCORE_FLOOR = 60;
 
 export function isSureScore(score: IdeaScore | null): boolean {
   return score !== null && score.confidence >= SCORE_FLOOR;

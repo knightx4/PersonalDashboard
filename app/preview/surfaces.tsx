@@ -13,9 +13,12 @@ import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouTabEmpty } from '@/app/you/you-tabs';
 import { PlacesView } from '@/app/you/places/places-view';
+import { DetailsView } from '@/app/you/details/details-view';
+import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
 import { PlaceView } from '@/app/you/places/place-view';
 import { PlaceForm } from '@/app/you/places/place-form';
 import type { Place } from '@/lib/you/places';
+import { drawPlaceMap, drawPlacesMap } from '@/lib/you/places-map-outlines';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -104,7 +107,7 @@ import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
-import { LaterMenuRows } from './later-menu-surface';
+import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
 import {
   GoalArchiveConfirmSurface,
@@ -166,6 +169,8 @@ import {
   LearnReadingSummarySurface,
   LearnReadingChatSurface,
   LearnReadingUnreadableSurface,
+  LearnReadingCheckSurface,
+  LearnReadingCheckOwnSurface,
   LearnVideoSurface,
   LearnVideosSurface,
   LearnYoutubeChannelSurface,
@@ -217,6 +222,8 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { StatusLine } from '@/components/shell/status-line';
+import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
@@ -279,12 +286,20 @@ import {
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
-import { DashSeenDemo } from './dash-moment-demos';
+import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
+import { DashWorkingReadingDemo } from './dash-working-rows';
+import { NoteListRow } from '@/components/vault/note-list-row';
+import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
+  AskBuildSurface,
   AskChangesSurface,
+  AT_WORK_QUESTION,
   AskDashSurface,
   AskMadeChangesSurface,
+  DashPageSurface,
+  AskAnswerActionsSurface,
+  AskBoxSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -292,8 +307,9 @@ import {
 import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
+import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
-import { DashTodaySurface } from './dash-today-surfaces';
+import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
@@ -305,6 +321,12 @@ import {
   GoalMetricPropsSurface,
 } from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
+import {
+  SubjectArticlesEmptySurface,
+  SubjectArticlesErrorSurface,
+  SubjectArticlesLoadingSurface,
+  SubjectArticlesSurface,
+} from './subject-articles-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -369,6 +391,7 @@ import {
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
+import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -533,6 +556,7 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  coverLetterDraft: null,
   readyToApply: false,
   hasCoverLetter: null,
   timezone: 'Europe/London',
@@ -612,8 +636,11 @@ const rolePanels: PanelProps = {
       timesSeen: 3,
       evidenceItemIds: [],
       unsupportedClaims: [],
+      wordLimit: null,
     },
   ],
+  answerDrafts: {},
+  dashAsks: [],
   thread: [],
   interviewGroups: [
     { id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] },
@@ -1861,6 +1888,47 @@ const subjectConcepts: Concept[] = [
   },
 ];
 
+/** Vault notes for the working rows surface; the second has a run on it, named by path as a goal's context names it. */
+const workingNotes = [
+  {
+    id: 'wn1',
+    path: 'Work/Interview notes, Halloran-Achterberg.md',
+    title: 'Interview notes, Halloran-Achterberg',
+    excerpt: 'Second round with the platform team. They asked about the replication lag incident twice.',
+  },
+  {
+    id: 'wn2',
+    path: 'Work/What I want from the next role.md',
+    title: 'What I want from the next role',
+    excerpt: 'A team that owns its own on-call, a manager who writes things down, and no more than two days in the office.',
+  },
+  { id: 'wn3', path: 'Work/Salary bands.md', title: 'Salary bands', excerpt: null },
+];
+
+/** Newsletter issues for the working rows surface; the first has a run on it. */
+const workingSenders = new Map([
+  ['ws1', { id: 'ws1', email: 'hello@moneystuff.example', name: 'Money Stuff', muted: false }],
+  ['ws2', { id: 'ws2', email: 'editor@thedispatch.example', name: 'The Morning Dispatch from the Engineering Desk', muted: false }],
+]);
+const workingIssues = [
+  {
+    id: 'wi1',
+    senderId: 'ws1',
+    subject: 'The bond market is pricing in two more cuts, and why the curve disagrees',
+    receivedAt: '2026-10-15T06:40:00.000Z',
+    readAt: null,
+    summaryLine: 'Rate cuts, a fund that gated withdrawals, and a lawsuit over a rounding error.',
+  },
+  {
+    id: 'wi2',
+    senderId: 'ws2',
+    subject: 'Postgres 18 ships asynchronous I/O',
+    receivedAt: '2026-10-14T17:05:00.000Z',
+    readAt: '2026-10-14T19:00:00.000Z',
+    summaryLine: null,
+  },
+];
+
 const trackReadings: ReadingRow[] = [
   readingRow({
     id: 'rd1',
@@ -2660,6 +2728,8 @@ const youPlaces: Place[] = [
     movedIn: '2019-08',
     movedOut: null,
     note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-leeds',
@@ -2670,6 +2740,8 @@ const youPlaces: Place[] = [
     movedIn: '2015',
     movedOut: '2019-08',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-lisbon',
@@ -2680,6 +2752,8 @@ const youPlaces: Place[] = [
     movedIn: '2014-02',
     movedOut: '2014-09',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-childhood',
@@ -2690,12 +2764,36 @@ const youPlaces: Place[] = [
     movedIn: '1992',
     movedOut: '2014',
     note: null,
+    latitude: null,
+    longitude: null,
   },
 ];
+
+/** The same places with positions for the Map view (plan #2091.4); the childhood home has none. */
+const PLACE_POSITIONS: Record<string, [number, number]> = {
+  'place-york': [53.96, -1.08],
+  'place-leeds': [53.8, -1.55],
+  'place-lisbon': [38.72, -9.14],
+};
+const youPlacesOnMap: Place[] = youPlaces.map((place) => {
+  const at = PLACE_POSITIONS[place.id];
+  return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
+});
+
+/** Six details filled in, LinkedIn typed without its scheme (plan #2124.2). */
+const youDetails: Details = {
+  phone: '+1 (415) 555-0142',
+  linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+  citizenship: 'United States and Ireland',
+  race: 'White',
+  gender: 'Man',
+  sexuality: 'Straight',
+};
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
   { href: '/you/personality', label: 'Personality', icon: 'personality' },
+  { href: '/you/details', label: 'Details', icon: 'details' },
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
@@ -3341,6 +3439,145 @@ function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   );
 }
 
+/** The foot of a page with the status line under it, the run as given. */
+function StatusRunSurface({ going }: { going: GoingRunLine }) {
+  return (
+    <div className="flex min-h-48 flex-col justify-between overflow-hidden rounded-card bg-sunken">
+      <div className="p-4 text-small text-ink-muted">Today</div>
+      <StatusLine
+        lines={[{ text: 'mail: 14 new', at: null }]}
+        brief={{ text: '3 roles waiting on you', tone: 'caution', href: '/jobs' }}
+        main={null}
+        going={going}
+      />
+    </div>
+  );
+}
+
+/**
+ * An application with four questions after Draft all answers (plan #2130.4):
+ * three drafts waiting, one over its character limit, one answer already
+ * approved, and three questions Dash asked back, one of them replied to.
+ */
+const draftedAnswers: PanelProps['answers'] = [
+  { ...rolePanels.answers[0], wordLimit: 150 },
+  {
+    id: 'a2',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q2',
+    questionText: 'Tell us about a time you shipped something under a hard deadline. (400 characters)',
+    questionKind: 'behavioural',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+  {
+    id: 'a3',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q3',
+    questionText:
+      'What would you want to change about how research tooling is built here in your first ninety days, and how would you know it had worked?',
+    questionKind: 'motivation',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: 200,
+  },
+  {
+    id: 'a4',
+    answer: 'Yes. I hold settled status and need no sponsorship.',
+    status: 'approved',
+    questionId: 'q4',
+    questionText: 'Are you authorised to work in the UK?',
+    questionKind: 'logistics',
+    canonicalAnswer: null,
+    timesSeen: 5,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+];
+
+const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
+  a1: {
+    text: 'The research tooling team owns the pipeline every strategy desk reads from, and that is the work I have been doing at Kestrel: making market data people can trust. I would rather fix a bad day of ticks at the source than work around it downstream, and this team is where the source is.',
+    evidenceItemIds: ['ev-1', 'ev-2'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a2: {
+    text: 'In March the exchange moved its feed to a new binary format with three weeks of notice. I rewrote our decoder, ran it beside the old one on a week of recorded traffic until the two agreed to the tick, and cut over on the Sunday before the switch. The desks lost no trading time. What made it work was the side-by-side check: every difference was a bug in one or the other, and I fixed eleven of them before anyone downstream saw one.',
+    evidenceItemIds: ['ev-3'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a3: {
+    text: 'First I would sit with two desks and time how long an idea takes to become a backtest. I expect most of it is waiting on data to be cleaned by hand. I would move that cleaning into the pipeline, once, and measure the same journey again at the end of the quarter.',
+    evidenceItemIds: [],
+    unsupportedClaims: ['most of it is waiting on data'],
+    bannedFound: [],
+  },
+};
+
+/**
+ * Dash's cover letter after Draft a cover letter (plan #2135.2): five
+ * paragraphs citing three items, one claim to check, and two questions back,
+ * the first already replied to.
+ */
+const draftedLetter: NonNullable<PanelProps['coverLetterDraft']> = {
+  letter: [
+    'Dear hiring team,',
+    'I am applying for the quantitative developer role on your systematic trading teams. For the last three years at Kestrel I have built the research tooling our desk runs on: the backtester, the tick store behind it, and the checks that stop a bad day of market data reaching a live strategy.',
+    'The part of your posting I keep coming back to is turning an idea into a backtest and a backtest into a live strategy. At Kestrel that path took two weeks when I joined. After I moved the backtester onto the same data path as production it took two days, and the strategies that went live behaved the way their backtests said they would.',
+    'I write Python every day and C++ where the hot path needs it, and I have run market data at the scale of every US equity tick. I would like to bring that to the team that owns the pipeline every desk reads from.',
+    'Thank you for reading. I would be glad to talk it through.',
+  ].join('\n\n'),
+  words: 178,
+  evidenceItemIds: ['ev-1', 'ev-2', 'ev-3'],
+  unsupportedClaims: ['the strategies that went live behaved the way their backtests said they would'],
+  bannedFound: [],
+  asks: [
+    {
+      id: 'letter-ask-1',
+      answer_id: null,
+      question: 'Who should the letter be addressed to? The posting names no hiring manager.',
+      reply: 'Dana Okafor, who ran the phone screen',
+    },
+    {
+      id: 'letter-ask-2',
+      answer_id: null,
+      question: 'Is the move from two weeks to two days something you can say publicly, or should it stay vaguer?',
+      reply: null,
+    },
+  ],
+};
+
+const draftedAsks: PanelProps['dashAsks'] = [
+  {
+    id: 'ask-1',
+    answer_id: 'a2',
+    question: 'Which deadline should this be: the feed migration in March, or the regulatory report in 2024?',
+    reply: null,
+  },
+  {
+    id: 'ask-2',
+    answer_id: 'a3',
+    question: 'Have you used their open-source backtester, or only read about it?',
+    reply: 'Ran the examples and read the docs, never in production.',
+  },
+  {
+    id: 'ask-3',
+    answer_id: null,
+    question: 'Would you move to London for this, or is it remote only for you?',
+    reply: null,
+  },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -3432,15 +3669,116 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-questions',
+    label: 'Role · Answers drafted, with Dash\'s questions',
+    module: 'jobs',
+    width: 'wide',
+    // After Draft all answers (plan #2130.4): a draft beside every unanswered
+    // question, one over its character limit, and Dash's questions above the
+    // cards with one already replied to.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        answerDrafts={draftedAnswerDrafts}
+        dashAsks={draftedAsks}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-drafting',
+    label: 'Role · Answers, drafting all',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers mid-run: the button reads Drafting and the cards stay open.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-error',
+    label: 'Role · Answers, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: false, error: 'Dash ran out of time before the answers were written. Nothing was saved; try again.' }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-draft',
+    label: "Role · Cover letter drafted, with Dash's questions",
+    module: 'jobs',
+    width: 'wide',
+    // After Draft a cover letter (plan #2135.2): the draft beside the empty
+    // letter, one claim to check, and Dash's two questions with Redraft.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterDraft={draftedLetter}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-drafting',
+    label: 'Role · Cover letter, drafting',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter mid-run: the button reads Drafting with a note under it.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-error',
+    label: 'Role · Cover letter, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{
+          pending: false,
+          error: 'Dash ran out of time before the letter was written. Nothing was saved; try again.',
+        }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
     width: 'wide',
     // The draft beside a question after Draft is pressed (note ad554975): one
-    // drawn from the posting alone, citing nothing from the bank.
+    // drawn from the posting alone, citing nothing from the bank, counted
+    // against the question's 150-word limit (plan #2130.4).
     render: () => (
       <AnswerCard
-        answer={rolePanels.answers[0]}
+        answer={{ ...rolePanels.answers[0], wordLimit: 150 }}
         closed={false}
         initialDraft={{
           text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
@@ -3604,14 +3942,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Kestrel Bank is in Closed”.',
+        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “Declined: Kestrel Bank · 5 open” with Undo.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p4"
         to="rejected"
-        label="Reject Kestrel Bank"
+        label="Decline Kestrel Bank"
       />
     ),
   },
@@ -3705,7 +4043,6 @@ export const SURFACES: readonly Surface[] = [
         </p>
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
-          onCard
           turns={[
             {
               id: 'seen-1',
@@ -3715,6 +4052,30 @@ export const SURFACES: readonly Surface[] = [
               acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
+        />
+      </div>
+    ),
+  },
+  {
+    /* "Dash at work" on the button that started a run (plan #1964.2.1): the
+     * press hands the area to Dash and the button's working mark stands in
+     * place of its label while the run goes. */
+    id: 'dash-action-run',
+    label: 'Dash action · a run going',
+    module: 'goals',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-run"]',
+      shows:
+        'Pressing “Plan this area” turns its mark to working beside the label, then the label gives way to the working mark alone, pulsing in the middle of a button that keeps its width, as the line beside it says Dash is planning the area.',
+    },
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">Health</p>
+        <DashRunButtonDemo
+          label="Plan this area"
+          line="Dash is planning this area · Reading your notes"
         />
       </div>
     ),
@@ -4114,7 +4475,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSurface />,
   },
   {
-    /* A goal's row menu on All goals, open: Park goal and Archive goal (plan #2097.1). */
+    /* A goal's row menu on All goals, open: Later and Drop (plans #2097.1, #1957.8). */
     id: 'goals-all-menu',
     label: 'Goals · all goals, a goal’s menu',
     module: 'goals',
@@ -4130,7 +4491,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllPutAwayToastSurface />,
   },
   {
-    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    /* Select on, three goals ticked: the bar with Later and Drop (plans #2097.2, #1957.8). */
     id: 'goals-all-select',
     label: 'Goals · all goals, several selected',
     module: 'goals',
@@ -4138,9 +4499,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSelectSurface />,
   },
   {
-    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    /* Drop pressed with six ticked: the bar asks first (plan #2097.2). */
     id: 'goals-all-select-confirm',
-    label: 'Goals · all goals, archiving six',
+    label: 'Goals · all goals, dropping six',
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSelectConfirmSurface />,
@@ -4154,7 +4515,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSelectToastSurface />,
   },
   {
-    /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
+    /* The goal page's heading menu, open, with Later and Drop (plans #2097.1, #1957.8). */
     id: 'goals-page-top-menu',
     label: 'Goal · the heading menu',
     module: 'goals',
@@ -4162,9 +4523,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPutAwayMenuSurface />,
   },
   {
-    /* Archive goal pressed: the confirm naming its steps (plan #2097.1). */
+    /* Drop pressed: the confirm naming its steps (plan #2097.1). */
     id: 'goals-page-top-archive',
-    label: 'Goal · archiving it',
+    label: 'Goal · dropping it',
     module: 'goals',
     width: 'page',
     render: () => <GoalArchiveConfirmSurface />,
@@ -4997,6 +5358,73 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* "Dash is on it" on a row while a run or an Ask Dash hand-off is about
+     * it (plan #1964.2.2), in the three workspaces whose rows had no move of
+     * their own: a reading, a vault note and a newsletter issue. The press
+     * starts a run about the reading with no source; the note and the issue
+     * are drawn with a run already going. */
+    id: 'dash-working-rows',
+    label: 'Rows · Dash is on it',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-row"]',
+      shows:
+        'Pressing “Find a source” turns the button’s mark to working beside its words, which become “Finding a source”, and on the reading with no source “No source yet” gives way to Dash’s pulsing mark and “Dash is on it” in the same place, with nothing below moving.',
+    },
+    render: () => (
+      <div className="space-y-6">
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Learn · Distributed systems</h2>
+          <DashWorkingReadingDemo readings={trackReadings.slice(1, 4)} target="rd4" />
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Vault · Work</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingNotes.map((note) => (
+              <NoteListRow key={note.id} note={note} working={['obsidian.notes:Work/What I want from the next role.md']} />
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">News · Latest</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingIssues.map((issue) => (
+              <IssueListRow
+                key={issue.id}
+                issue={issue}
+                sender={workingSenders.get(issue.senderId)}
+                from={null}
+                timezone="Europe/London"
+                working={['news.issues:wi1']}
+              />
+            ))}
+          </ul>
+        </section>
+      </div>
+    ),
+  },
+  {
+    /* Due for review on Learn now (note 9b011a39): the list folds under its
+     * heading, with the count on the closed line. Fixtures in
+     * notes-batch-surfaces.tsx. */
+    id: 'learn-review-list',
+    label: 'Now · Due for review',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface />,
+  },
+  {
+    /* The same list folded shut: one line, the chevron, Due for review and
+     * the count (note 9b011a39). */
+    id: 'learn-review-list-folded',
+    label: 'Now · Due for review, folded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface folded />,
+  },
+  {
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
@@ -5185,6 +5613,17 @@ export const SURFACES: readonly Surface[] = [
   },
 
   {
+    /* The search box as the phone's dock button opens it (note 5f3ef44f):
+     * the switcher and the search in one, so before anything is typed it
+     * lists every workspace, Home first, the one you are in marked. */
+    id: 'shell-go-to',
+    label: 'Dock · Go to, before anything is typed',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => <GoToSurface />,
+  },
+
+  {
     /* The one capture box (plan #1581) that the plus in the top bar and ⌥C
      * open: the line under the field while a sentence is typed, the chips
      * when Dash is not sure, and where three filed things went. */
@@ -5285,6 +5724,27 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Dash at work in the sheet (plan #1899.8): Send pressed on a question,
+     * each lookup appearing under Dash's name as it is made, the answer's
+     * words after them, and the mark coming to rest when it lands. */
+    id: 'ask-dash-at-work',
+    label: 'Ask Dash · Dash at work',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => (
+      <AskDashSurface open draft={AT_WORK_QUESTION}>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
     /* An answer that failed (plan #1337): the question was kept, the answer
      * was not, and Dash's mark shows failed with the error beside it where
      * the working line was. */
@@ -5351,6 +5811,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskChangesSurface />,
   },
   {
+    /* Ask Dash asked to build plan steps (plan #2106.1): a card naming the
+     * step with Confirm and Decline, one whose last run has gone quiet, and
+     * a step that cannot be built, refused in words with no card. */
+    id: 'ask-dash-build',
+    label: 'Ask Dash · Start a build',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface />,
+  },
+  {
+    /* The build card after a Confirm the server refused, the reason under it. */
+    id: 'ask-dash-build-refused',
+    label: 'Ask Dash · Start a build, refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface refused />,
+  },
+  {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind
      * newest first, one undone, Undo on the step refused with its reason. */
     id: 'ask-made-changes',
@@ -5361,7 +5839,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Ask Dash thread on its own (plan #1708), where a change to
-     * components/talk/talk-thread.tsx is looked at: a short answer with its
+     * components/thread/thread.tsx without a subject is looked at: a short answer with its
      * rows, a long markdown one, one with bars and one with a table. */
     id: 'ask-dash-thread',
     label: 'Ask Dash · The thread',
@@ -5378,6 +5856,147 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadFilesSurface />,
+  },
+  {
+    /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
+     * left, grouped by day with the workspaces each used and chips to narrow
+     * them, and the open chat beside them. On a phone the chat is drawn over
+     * the list, with the way back above its title. */
+    id: 'ask-page',
+    label: 'Dash · A chat open beside the list',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface />,
+  },
+  {
+    /* Dash at work on the full page (plan #1899.8): Send pressed in an open
+     * chat, each lookup appearing under Dash's name, the answer written out
+     * after them and the mark coming to rest. */
+    id: 'ask-page-at-work',
+    label: 'Dash · Dash at work in a chat',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
+  },
+  {
+    /* The same page at /ask, a new chat beside the list; on a phone the
+     * list is the whole page. */
+    id: 'ask-page-new',
+    label: 'Dash · The list and a new chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* The list hidden to its strip (New chat and the button to show it),
+     * with the chat centred at its reading width. The column of what Dash
+     * used is folded too, to its button in the chat's header (#1899.4). */
+    id: 'ask-page-hidden',
+    label: 'Dash · The list hidden',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
+  },
+  {
+    /* What Dash used in the open chat (plan #1899.4): with the list hidden
+     * there is room, so the column sits beside the chat: the rows read, the
+     * change made with Undo, the lookups, the file sent and the cost. A
+     * phone has no room, so the chat shows the Used button. */
+    id: 'ask-page-used',
+    label: 'Dash · What Dash used, beside the chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* Dash's box (plan #1899.5): a question that carried two rows added
+     * with @, shown under it; an answer stopped part way, kept as far as it
+     * got; and the box open on "@cat" with the rows the top bar's search
+     * finds, one already added as a chip, the scope chip on Shopping. */
+    id: 'ask-box-rows',
+    label: 'Dash · Adding a row with @',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="rows" />,
+  },
+  {
+    /* The same box with / typed: the things Dash can already do, each
+     * written into the box for you to finish. */
+    id: 'ask-box-commands',
+    label: 'Dash · The commands / offers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="commands" />,
+  },
+  {
+    /* The scope chip's menu open: Everything, or one workspace Dash's
+     * lookups are kept to, Learn chosen. */
+    id: 'ask-box-scope',
+    label: 'Dash · Keeping the lookups to one workspace',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="scope" />,
+  },
+  {
+    /* The list searched for "Catan" (plan #1899.6): two chats found by what
+     * was said in them, one only in Dash's answer, each with the words
+     * around it. On a phone the list is the page. */
+    id: 'ask-page-search',
+    label: 'Dash · Searching the chats',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="search" />,
+  },
+  {
+    /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
+    id: 'ask-page-menu',
+    label: "Dash · A chat's menu",
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="menu" />,
+  },
+  {
+    /* A chat being renamed in place in the list (plan #1899.6). */
+    id: 'ask-page-rename',
+    label: 'Dash · Renaming a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="rename" />,
+  },
+  {
+    /* An archived chat opened from Archived at the foot of the list (plan
+     * #1899.6), with the line above it that puts it back. */
+    id: 'ask-page-archived',
+    label: 'Dash · An archived chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="archived" usedOpen={false} />,
+  },
+  {
+    /* The presses under each answer (plan #1899.7): the first answer made a
+     * todo and saved to the vault, each card with Undo, and Edit pressed on
+     * the second, so its question is back in the box. */
+    id: 'ask-answer-actions',
+    label: 'Dash · An answer kept as a todo and a note',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface />,
+  },
+  {
+    /* The same column opened as a sheet from the right, as it opens on a
+     * phone and on a laptop with the list shown. */
+    id: 'ask-page-used-sheet',
+    label: 'Dash · What Dash used, as a sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface sheetOpen />,
   },
 
   {
@@ -5406,6 +6025,38 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SubjectClipsEmptySurface />,
+  },
+  {
+    /* The list after the press: five articles to keep or strike, one with a very long title. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
+    id: 'learn-subject-articles',
+    label: 'Learn · Find articles, proposed list',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectArticlesSurface />,
+  },
+  {
+    /* Mid-lookup, while idea names resolve one at a time. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
+    id: 'learn-subject-articles-loading',
+    label: 'Learn · Find articles, looking up',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectArticlesLoadingSurface />,
+  },
+  {
+    /* Every article the ideas name is already in the catalogue. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
+    id: 'learn-subject-articles-empty',
+    label: 'Learn · Find articles, all held',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectArticlesEmptySurface />,
+  },
+  {
+    /* Wikipedia did not answer. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
+    id: 'learn-subject-articles-error',
+    label: 'Learn · Find articles, Wikipedia down',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectArticlesErrorSurface />,
   },
   {
     /* The Big Five test (plan #1632): fifty statements, the first seven
@@ -5722,6 +6373,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashTodaySurface />,
   },
   {
+    /* A workspace's Now carries the same fold, filtered to that workspace
+     * (plan #1964.4). Fixtures in dash-today-surfaces.tsx. */
+    id: 'now-dash-today',
+    label: 'Workspace Now · What Dash did today',
+    module: 'todo',
+    width: 'wide',
+    render: () => <NowDashTodaySurface />,
+  },
+  {
     /* The "What did you do?" box (plan #1740): Home's Done today with a line
      * filed as three changes and the day's list, the same card with nothing
      * done yet, and the box on a goal's Overview. Fixtures in
@@ -5850,6 +6510,42 @@ export const SURFACES: readonly Surface[] = [
   },
 
   {
+    /* The status line while Dash is on a run (plan #1964.2.3): its mark, working,
+     * and the run's newest line in the run's own words, linking to the run. The
+     * line is drawn from lg up only, as everywhere, so the phone shots are the
+     * page without it by design. The longest line a run writes, beside the
+     * workspace summary and the main dot, is the fixture. */
+    id: 'shell-status-run',
+    label: 'The shell · Status line while Dash is on a run',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <StatusRunSurface
+        going={{
+          href: '/goals/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+          line: {
+            id: 'line-1',
+            user_id: 'u',
+            run_table: 'goals.runs',
+            run_id: '6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+            kind: 'action',
+            body: 'Reading the three most recent statements from Gmail to fill in what the mortgage step still needs before the end of the month',
+            options: null,
+            created_at: '2026-10-15T10:00:00Z',
+          },
+        }}
+      />
+    ),
+  },
+  {
+    id: 'shell-status-run-new',
+    label: 'The shell · Status line, run started and no line written yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <StatusRunSurface going={{ href: '/dev/plan/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03', line: null }} />,
+  },
+
+  {
     /* The You workspace in its shell, on Personality, its first tab (plan
      * #1991.1): the four tabs in the sidebar and, since #1991.2, the tab
      * with a result taken and read. */
@@ -5881,12 +6577,88 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouTabEmpty tab="insights" />,
   },
   {
+    /* Details (plan #2124.2): the six facts a form asks for, read as a
+     * list, LinkedIn as a link, with the count in the rail. */
+    id: 'you-details',
+    label: 'You · Details, all six set',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} />,
+  },
+  {
+    id: 'you-details-empty',
+    label: 'You · Details, before any are given',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={EMPTY_DETAILS} />,
+  },
+  {
+    /* Edit details turns the list into its six fields in place. Two not set. */
+    id: 'you-details-edit',
+    label: 'You · Details, being edited',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={{ ...youDetails, race: null, sexuality: null }} editing />,
+  },
+  {
+    /* A save that did not go through keeps what was typed and says why. */
+    id: 'you-details-error',
+    label: 'You · Details, a save that did not go through',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <DetailsView
+        details={youDetails}
+        editing
+        state={{
+          error: 'The connection dropped before your details saved. What you typed is still here: press Save to try again.',
+          values: {
+            phone: '+353 87 555 0199',
+            linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+            citizenship: 'United States and Ireland',
+            race: 'White',
+            gender: 'Man',
+            sexuality: '',
+          },
+        }}
+      />
+    ),
+  },
+  {
     /* Places they have lived, newest first, the home they live in now marked (plan #1991.5). */
     id: 'you-places',
     label: 'You · Places, four homes',
     module: 'you',
     width: 'page',
     render: () => <PlacesView places={youPlaces} />,
+  },
+  {
+    /* The Map view (plan #2091.4): three homes on the map, two of them in
+     * neighbouring cities fanned apart, joined in move-in order, the home
+     * they live in now marked, and one with no position listed beneath. */
+    id: 'you-places-map',
+    label: 'You · Places on the map',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} />,
+  },
+  {
+    /* Hovering a dot names the place and its years. */
+    id: 'you-places-map-tooltip',
+    label: 'You · Places on the map, a dot hovered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} tipOpenFor="place-lisbon" />
+    ),
+  },
+  {
+    /* The Map view before any place has a position. */
+    id: 'you-places-map-empty',
+    label: 'You · Places on the map, before any has a position',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} view="map" map={drawPlacesMap(youPlaces)} />,
   },
   {
     id: 'you-places-empty',
@@ -5909,7 +6681,55 @@ export const SURFACES: readonly Surface[] = [
     label: 'You · One place, the home they live in now',
     module: 'you',
     width: 'page',
-    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+    render: () => (
+      <PlaceView place={youPlaces[0]} thisMonth="2026-10" map={drawPlaceMap(youPlaces[0], youPlaces)} />
+    ),
+  },
+  {
+    /* A place on the map (plan #2091.5): its region, its dot, Move and Clear. */
+    id: 'you-place-map',
+    label: 'You · One place, on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[0]}
+        thisMonth="2026-10"
+        map={drawPlaceMap(youPlacesOnMap[0], youPlacesOnMap)}
+      />
+    ),
+  },
+  {
+    /* Set on map pressed for a place with no position: the hint line, the
+     * map of the region their other places are in, and Cancel. */
+    id: 'you-place-map-placing',
+    label: 'You · One place, being set on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{ ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap), start: { placing: true } }}
+      />
+    ),
+  },
+  {
+    /* The same, after a press whose save did not go through. */
+    id: 'you-place-map-error',
+    label: 'You · One place, a position that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{
+          ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap),
+          start: { placing: true, error: 'The place was not put on the map. Try again.' },
+        }}
+      />
+    ),
   },
   {
     id: 'you-place-form',
@@ -6381,6 +7201,16 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Rows the agenda borrows from other workspaces (plan #1957.9): one that
+     * can be ticked, one that is a date and cannot, each with the one Later
+     * menu as its clock and Drop beside it. */
+    id: 'todo-agenda-rows',
+    label: 'Todo · Agenda rows from elsewhere',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaRowsSurface />,
+  },
+  {
     /* The agenda opens with a button, not a box (plan #1950.6). */
     id: 'todo-agenda-header',
     label: 'Todo · Add a todo',
@@ -6850,6 +7680,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalRunSurface />,
   },
   {
+    /* One plan run's page (plan #1964.2.4): its facts, its lines and every
+     * row it touched as a link. Fixtures in plan-run-surfaces.tsx. */
+    id: 'dev-plan-run',
+    label: 'Plan · One run and what it touched',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanRunSurface />,
+  },
+  {
     /* A run's lines as Dash writes them (plan #1826), on a plan step's run
      * and on a goal run's page: going, waiting on you, gone quiet with its
      * Acknowledge press, just started, and with the live connection lost.
@@ -6996,6 +7835,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnReadingUnreadableSurface />,
+  },
+  {
+    id: 'learn-reading-check',
+    label: 'Reading · Just marked read, with one question offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingCheckSurface />,
+  },
+  {
+    id: 'learn-reading-check-own',
+    label: 'Reading · One you added, marked read, nothing offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingCheckOwnSurface />,
   },
   {
     id: 'learn-piece',

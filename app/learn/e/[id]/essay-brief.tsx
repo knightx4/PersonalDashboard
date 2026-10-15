@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { InlineTextarea, Textarea } from '@/components/ui/field';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { askNumber, BRIEF_LABELS, nextField, PIN_LABELS } from '@/lib/learn/essays/interview';
@@ -149,12 +150,14 @@ export function EssayInterviewCard({
           />
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
+          <DashAction
             type="submit"
             size="sm"
             variant="primary"
             pending={pending}
             disabled={busy || !answer.trim()}
+            paid="app/learn/e/[id]/actions.ts#answerEssayInterview"
+            what={last ? 'Cost of Dash reading your answers' : 'Cost of the next question'}
           >
             {pending
               ? last
@@ -163,11 +166,7 @@ export function EssayInterviewCard({
               : last
                 ? 'Done'
                 : 'Next'}
-          </Button>
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#answerEssayInterview"
-            what={last ? 'Cost of Dash reading your answers' : 'Cost of the next question'}
-          />
+          </DashAction>
           <Button
             type="button"
             size="sm"
@@ -248,6 +247,7 @@ function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: Study
         <p className="text-small text-ink-muted">
           {state.kind === 'searching' ? 'Looking in your study…' : 'From your study'}
         </p>
+        {/* dash-action-ok: searches run on their own as you type, so no button carries this cost. */}
         <PaidHint action={STUDY_ACTION} what="Cost of searching your study" />
       </div>
       {state.kind === 'found' && items.length === 0 && (

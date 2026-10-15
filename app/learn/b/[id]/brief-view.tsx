@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkle } from 'lucide-react';
@@ -14,7 +15,7 @@ import { Switch } from '@/components/ui/field';
 import { LiveDot } from '@/components/ui/live-dot';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
 import { watchLine } from '@/lib/learn/briefs/watch';
 import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
@@ -227,10 +228,12 @@ function Failed({ brief }: { brief: Brief }) {
       <p className="text-body font-semibold text-ink">The research stopped before it finished</p>
       <p className="text-ui text-ink-muted">{brief.error?.trim() || 'Dash did not say why.'}</p>
       <div className="flex flex-wrap items-center gap-3">
-        <Button
+        <DashAction
           type="button"
           variant="primary"
           pending={pending}
+          paid="app/learn/b/[id]/actions.ts#retryBrief"
+          what="Cost of researching it again"
           onClick={() =>
             start(async () => {
               const result = await retryBrief(brief.id);
@@ -239,9 +242,8 @@ function Failed({ brief }: { brief: Brief }) {
             })
           }
         >
-          Try again
-        </Button>
-        <PaidHint action="app/learn/b/[id]/actions.ts#retryBrief" what="Cost of researching it again" />
+          Research it again
+        </DashAction>
       </div>
       {error && <p className="text-small text-danger">{error}</p>}
     </Card>
@@ -390,7 +392,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
                   setArchived(true);
                   // Drop, with Undo in the toast (plan #1957.3).
                   toast({
-                    text: 'Dropped',
+                    text: closedToast('dropped', brief.question),
                     undo: async () => {
                       const back = await setBriefArchived(brief.id, false);
                       if (back.error) throw new Error(back.error);

@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { CloseButton } from '@/components/inbox/close-button';
@@ -7,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { Card, CardSection } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { cn } from '@/lib/cn';
 import { locateAnchor, makeAnchor } from '@/lib/learn/essays/anchor';
@@ -199,7 +200,7 @@ export function useEssayNotes(
       }
       apply(result);
       toast({
-        text: outcome === 'done' ? 'Done' : 'Declined',
+        text: closedToast(outcome === 'done' ? 'done' : 'declined', note.body),
         undo: async () => {
           const back = await reopenEssayNote(essayId, note.id);
           if (!back.ok) throw new Error(back.error);
@@ -363,20 +364,18 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
         )}
         {!detached && note.rung === 3 && (
           <>
-            <Button
+            <DashAction
               type="button"
               variant="secondary"
               size="sm"
               pending={api.suggesting === note.id}
               disabled={api.suggesting !== null}
               onClick={() => void api.suggest(note)}
+              paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
+              what="Cost of a suggested wording"
             >
               {api.suggesting === note.id ? 'Suggesting…' : 'Suggest wording'}
-            </Button>
-            <PaidHint
-              action="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
-              what="Cost of a suggested wording"
-            />
+            </DashAction>
           </>
         )}
         {!detached && (
@@ -438,26 +437,37 @@ export function EssayNotesCard({ api, paragraphs }: { api: EssayNotesApi; paragr
               </option>
             ))}
           </Select>
-          {check.kind === 'model' && calls > 0 && (
-            <PaidHint
-              action={
-                check.id === 'already_said'
-                  ? 'app/learn/e/[id]/actions.ts#runEssayCheck:already-said'
-                  : 'app/learn/e/[id]/actions.ts#runEssayCheck:model'
+          {check.kind === 'model' ? (
+            <DashAction
+              type="button"
+              variant="secondary"
+              disabled={stopped || api.running !== null}
+              pending={api.running === check.id}
+              onClick={() => void api.run(check.id)}
+              paid={
+                calls === 0
+                  ? undefined
+                  : check.id === 'already_said'
+                    ? 'app/learn/e/[id]/actions.ts#runEssayCheck:already-said'
+                    : 'app/learn/e/[id]/actions.ts#runEssayCheck:model'
               }
               count={calls}
               what={`Cost of running ${check.name}`}
-            />
+              hintFirst
+            >
+              {api.running === check.id ? 'Running…' : 'Run'}
+            </DashAction>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={stopped || api.running !== null}
+              pending={api.running === check.id}
+              onClick={() => void api.run(check.id)}
+            >
+              {api.running === check.id ? 'Running…' : 'Run'}
+            </Button>
           )}
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={stopped || api.running !== null}
-            pending={api.running === check.id}
-            onClick={() => void api.run(check.id)}
-          >
-            {api.running === check.id ? 'Running…' : 'Run'}
-          </Button>
         </div>
         <p className="mt-2 text-small text-ink-muted">
           {stopped

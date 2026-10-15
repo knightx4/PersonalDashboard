@@ -5,7 +5,7 @@ import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineTextarea, Textarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import {
   DIG_KINDS,
@@ -206,10 +206,16 @@ function PointWork({ essayId, point, api }: { essayId: string; point: PlanPoint;
               disabled={busy}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="sm" pending={answering} disabled={busy || !answer.trim()}>
+              <DashAction
+                type="submit"
+                size="sm"
+                pending={answering}
+                disabled={busy || !answer.trim()}
+                paid={ANSWER_ACTION}
+                what="Cost of the next question"
+              >
                 {answering ? 'Keeping it…' : 'Answer and ask me more'}
-              </Button>
-              <PaidHint action={ANSWER_ACTION} what="Cost of the next question" />
+              </DashAction>
               <Button
                 type="button"
                 size="sm"
@@ -235,20 +241,21 @@ function PointWork({ essayId, point, api }: { essayId: string; point: PlanPoint;
       ) : (
         <CardSection title={point.notes.length ? 'Keep going' : 'Start'}>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
+            <DashAction
               type="button"
               size="sm"
               pending={asking}
               disabled={busy}
               onClick={() => ask(null)}
+              paid={ASK_ACTION}
+              what="Cost of one question"
             >
               {asking
                 ? 'Asking…'
                 : point.notes.length
                   ? 'Ask me another question'
                   : 'Ask me about this point'}
-            </Button>
-            <PaidHint action={ASK_ACTION} what="Cost of one question" />
+            </DashAction>
             <Button
               type="button"
               size="sm"

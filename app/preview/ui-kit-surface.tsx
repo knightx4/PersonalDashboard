@@ -1,5 +1,8 @@
 import { Card, CardSection } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
+import { DashAction } from '@/components/ui/dash-action';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
+import { SONNET } from '@/lib/core/models';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ChipSelect, InlineInput, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Figure } from '@/components/ui/figure';
@@ -28,6 +31,18 @@ import { ENTRIES } from './overhaul/entries';
  * (app/preview/overhaul/entries.tsx), so the two cannot disagree. The rest
  * follow.
  */
+
+/** A figure the ledger has measured, and one it is guessing at. */
+const MEASURED: CostEstimate = {
+  lowMicros: 300_000,
+  medianMicros: 400_000,
+  highMicros: 760_000,
+  runs: 12,
+  basis: 'measured',
+  per: 'run',
+  models: [SONNET],
+};
+const GUESSED: CostEstimate = { ...MEASURED, lowMicros: 30_000, medianMicros: 50_000, highMicros: 90_000, runs: 0, basis: 'guess' };
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -123,7 +138,36 @@ export function UiKit() {
             <ModuleMark module="jobs" />
             <ModuleMark module="learn" />
             <ModuleMark module={null} />
+            <ModuleMark module="dash" />
           </div>
+        </div>
+      </Group>
+
+      <Group title="Dash action">
+        <div className="flex flex-wrap items-center gap-3">
+          <DashAction type="button" estimate={MEASURED} what="Cost of the summary">
+            Summarize this reading
+          </DashAction>
+          <DashAction type="button" size="sm" variant="secondary" estimate={GUESSED} what="Cost of the prep note">
+            Prepare for this interview
+          </DashAction>
+          <DashAction type="button" size="sm" variant="secondary">
+            Shape this into a plan
+          </DashAction>
+          <DashAction type="button" size="sm" variant="secondary" pending estimate={GUESSED}>
+            Looking it up…
+          </DashAction>
+          <DashAction
+            type="button"
+            size="sm"
+            variant="secondary"
+            run={{ table: 'plan_runs', id: 'ui-kit-run', going: true }}
+          >
+            Send to Dash
+          </DashAction>
+          <DashAction type="button" variant="link" estimate={GUESSED} what="Cost of the search">
+            Find a reading on this idea
+          </DashAction>
         </div>
       </Group>
 

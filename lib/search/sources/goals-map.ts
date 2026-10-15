@@ -7,8 +7,7 @@ import { areaHref, stepHref } from '@/lib/goals/all-goals';
  *
  * An area has a page, /goals/area/<id> (areaHref), and so does a goal,
  * /goals/<id>. A step does not: it is a row on its goal's
- * page, anchored as `step-<id>` (the same href the done-since list and the
- * files page write). A step can sit under another step, so its goal is found
+ * page, anchored as `step-<id>` (the same href the files page writes). A step can sit under another step, so its goal is found
  * by walking `parent_id` up to the item whose level is `goal`; a step whose
  * goal is not among the rows read (archived, merged, dropped) has no page to
  * open and is left out.

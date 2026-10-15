@@ -9,6 +9,7 @@ import {
   LIFECYCLE_WORD,
   NOT_A_CLOSING_STATUS,
   applicationLifecycle,
+  closedToast,
   feedCardLifecycle,
   goalItemLifecycle,
   lifecycleOf,
@@ -124,6 +125,13 @@ describe('closing words', () => {
     expect(LIFECYCLES.map((l) => LIFECYCLE_WORD[l])).toEqual(['Done', 'Dropped', 'Later', 'Declined']);
     expect(LIFECYCLES.map((l) => LIFECYCLE_VERB[l])).toEqual(['Done', 'Drop', 'Later', 'Decline']);
     for (const lifecycle of LIFECYCLES) expect(STATUS_GLYPHS).toContain(LIFECYCLE_GLYPH[lifecycle]);
+  });
+
+  it('names the row a closing toast closed (plan #1957.8)', () => {
+    expect(closedToast('dropped', 'Book the boiler service')).toBe('Dropped: Book the boiler service');
+    expect(closedToast('done', '  Renew the\n passport ')).toBe('Done: Renew the passport');
+    expect(closedToast('declined', '')).toBe('Declined');
+    expect(closedToast('later', null)).toBe('Later');
   });
 
   it('uses all four somewhere', () => {

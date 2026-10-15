@@ -14,7 +14,8 @@ import type { PlanRefTitles } from '@/lib/comments/refs';
  */
 
 /** What a comment is allowed to draw. Everything else is unwrapped to its text. */
-const ALLOWED = ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'span'];
+// A quote is kept: the thread draws it in the quote voice (plan #1964.3).
+const ALLOWED = ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'span', 'blockquote'];
 
 export function CommentBody({
   body,

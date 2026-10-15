@@ -96,11 +96,12 @@ export type AppModule = {
  * the notes are kept; the summit because a goal is somewhere you are climbing
  * to. Learn's own Goals tab draws a target, so Goals does not.
  *
- * 'dash' is the app itself: Dash's capsule visor on a dark plate, the same
- * drawing as the app icon.
+ * 'dash' is Dash: its capsule visor on a dark plate, the same drawing as the
+ * app icon. 'house' is Home, the page outside every workspace.
  */
 export type MarkShape =
   | 'dash'
+  | 'house'
   | 'tag'
   | 'briefcase'
   | 'check'
@@ -119,12 +120,18 @@ export interface MarkKey {
    * deep stop is some other rose than the rose the workspace paints its
    * buttons is two products in one sidebar. Change one, change both.
    *
-   * See HOME_MARK for the one place two hues are allowed to meet.
+   * See DASH_MARK for the one place two hues are allowed to meet.
    */
   from: string;
   to: string;
-  /** A third stop, mid-ramp. Only the home mark has one. */
+  /** A third stop, mid-ramp. Only Dash's mark has one. */
   mid?: string;
+  /**
+   * Iridescent glass: pearl over the white, and bright bands flowing across it
+   * that split blue and orange at their edges, like liquid chrome. Only Home's
+   * mark has it: a white pane is otherwise a grey one.
+   */
+  prism?: true;
 }
 
 export const MODULES: readonly AppModule[] = [
@@ -252,31 +259,46 @@ export const MODULES: readonly AppModule[] = [
 ] as const;
 
 /**
- * The mark for the whole app: the topbar when no module is active, every
- * signed-out page, and the favicon.
+ * Home's mark: the topbar when no workspace is active, the Home row of the
+ * switcher, and search across everything.
  *
- * Dash at rest: the capsule visor with its glowing core, on a dark plate. It
- * is the one mark that draws no object, because the app is not one of the
- * modules; it is the assistant that works across all of them. The same
- * drawing is the favicon and the home-screen icon (app/icon.svg).
+ * A glass house with its chimney behind, in white rather than a hue. Home is
+ * not a workspace and has no colour of its own to claim, so it is the one mark
+ * drawn without one. Its glass is iridescent instead, pearl with bright bands
+ * flowing across it, which is what keeps a white pane from reading as a grey one.
  */
 export const HOME_MARK = {
   label: 'Home',
   accent: '--color-accent',
+  /** White into a cool silver; the silver is the edge and the detail on a light page. */
+  key: { shape: 'house', from: '#ffffff', to: '#7a849a', prism: true },
+} as const satisfies { label: string; accent: string; key: MarkKey };
+
+/**
+ * Dash's mark, and the app's: the Dash row of the switcher, every signed-out
+ * page, and the favicon.
+ *
+ * Dash at rest: the capsule visor with its glowing core, on a dark plate. It
+ * draws no object, because Dash is not one of the workspaces; it is the
+ * assistant that works across all of them. The same drawing is the favicon
+ * and the home-screen icon (app/icon.svg).
+ */
+export const DASH_MARK = {
+  label: 'Dash',
   /**
-   * The app's own key, and the one place more than one hue is allowed.
+   * The one place more than one hue is allowed.
    *
    * Everywhere else a gradient stays inside a single hue and lands on the
    * workspace's accent, because a many-hue ramp on a module mark is decoration
    * pretending to be identity. Here it *is* the identity: blue into pink is
-   * what this product has used for itself since before it had modules, and the
-   * home mark is the only thing entitled to wear it.
+   * what this product has used for itself since before it had modules, and
+   * Dash is the only thing entitled to wear it.
    *
    * It is the glowing core inside Dash's capsule visor. The violet in the
    * middle keeps the blue-to-pink ramp from passing through a dead mauve.
    */
   key: { shape: 'dash', from: '#6a82fb', mid: '#8b5cf6', to: '#ff6b9d' },
-} as const;
+} as const satisfies { label: string; key: MarkKey };
 
 /**
  * The modules an account is allowed to see.

@@ -54,14 +54,14 @@ describe('the Todo writes', () => {
     expect(change.summary).toBe('Dash changed the todo "Book the dentist": its notes written and pinned.');
   });
 
-  it('puts a todo off for a week, drops one and reopens one', async () => {
+  it('puts a todo off to a day, drops one and reopens one', async () => {
     const tables = { 'todo.tasks': [task()] };
-    const later = await made('edit_todo', tables, { todo_ref: TASK, later: true });
+    const later = await made('edit_todo', tables, { todo_ref: TASK, later: '2099-01-15' });
     expect(typeof later.after.snoozed_until).toBe('string');
-    expect(later.summary).toBe('Dash changed the todo "Book the dentist": put off for 7 days.');
+    expect(later.summary).toBe('Dash changed the todo "Book the dentist": put off until Thu 15 Jan 2099.');
     const dropped = await made('edit_todo', tables, { todo_ref: TASK, state: 'dropped' });
     expect(dropped.after).toMatchObject({ status: 'dropped' });
-    const reopened = await made('edit_todo', tables, { todo_ref: TASK, state: 'open', later: false });
+    const reopened = await made('edit_todo', tables, { todo_ref: TASK, state: 'open', later: 'back' });
     expect(reopened.after).toMatchObject({ status: 'open', snoozed_until: null });
   });
 

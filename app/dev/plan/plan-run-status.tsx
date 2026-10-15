@@ -34,6 +34,8 @@ import { subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { Chip } from '@/components/ui/chip';
 import { LiveDot } from '@/components/ui/live-dot';
 import { SectionLabel } from '@/components/ui/section-heading';
+import Link, { linkVariants } from '@/components/ui/link';
+import { runHref } from '@/lib/core/run-link';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import type { RunLinesState } from '@/components/runs/run-lines';
@@ -196,7 +198,15 @@ export function RunWork({
 
   return (
     <div>
-      <SectionLabel>Its run</SectionLabel>
+      <div className="flex items-baseline justify-between gap-3">
+        <SectionLabel>Its run</SectionLabel>
+        {/* The run's own page, listing every row it touched (plan #1964.2.4). */}
+        {run.id && (
+          <Link href={runHref('plan_runs', run.id)} className={`press-area text-small ${linkVariants({ tone: 'quiet' })}`}>
+            Open the run
+          </Link>
+        )}
+      </div>
       <p className="text-ui text-ink">{runStartedLine(work, now, run.waiting === 'stale')}</p>
       {/* When a run that went quiet was last heard from (plan #1825); its
           Acknowledge sits with its lines below. */}

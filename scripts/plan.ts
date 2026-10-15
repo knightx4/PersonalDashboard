@@ -27,7 +27,7 @@
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
  *                                # either way, one close to an idea already
  *                                # filed is refused and names what it matched,
- *                                # and at most two an hour are written
+ *                                # and at most three a day are written
  *   npx tsx scripts/plan.ts raise "<title>" --ask "…" --consequence "<action>: <what>"
  *                                [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
@@ -767,9 +767,10 @@ async function main(): Promise<void> {
      * ideas that were open when this check was added, over four days, several
      * of them the same thought in different words, because nothing here
      * looked first. An idea close to one already filed is refused and the
-     * refusal names what it matched (lib/ideas/duplicate.ts), and a session
-     * gets two an hour (lib/ideas/rate.ts) so one run cannot add ten rows to
-     * a list somebody has to read.
+     * refusal names what it matched (lib/ideas/duplicate.ts), and sessions
+     * get three a day between them (lib/ideas/rate.ts), so runs cannot add
+     * rows faster than somebody reads them. One Jev scores under
+     * SUGGESTION_SCORE_FLOOR (lib/ideas/score.ts) is folded out of the list.
      */
     if (command === 'idea') {
       const file = arg('--file');

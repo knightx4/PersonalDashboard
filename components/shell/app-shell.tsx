@@ -30,11 +30,10 @@ import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import { MAIN_BOX } from '@/components/shell/main-box';
 import {
-  WorkspaceSheet,
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
-import { ModuleMark } from '@/components/ui/module-mark';
+import { isAskPath } from '@/lib/ask/page-name';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
 import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
@@ -154,7 +153,6 @@ export function AppShell({
   const router = useRouter();
   const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);
-  const [switcher, setSwitcher] = useState(false);
   /**
    * Whether the search box is up.
    *
@@ -170,8 +168,15 @@ export function AppShell({
    * sets it, so a narrowed opening never carries to the next one.
    */
   const [searchOn, setSearchOn] = useState<SearchScope>('everything');
+  /**
+   * What the box lists before anything is typed. The phone's dock button is
+   * the switcher and the search in one (note 5f3ef44f), so it opens the box on
+   * every workspace; every other way in opens it on what is here.
+   */
+  const [searchShows, setSearchShows] = useState<'here' | 'workspaces'>('here');
   function openSearch(scope: SearchScope = 'everything') {
     setSearchOn(scope);
+    setSearchShows('here');
     setSearching(true);
   }
   const [collapsed, setCollapsed] = useState(false);
@@ -181,13 +186,13 @@ export function AppShell({
    * The workspaces this person may switch to: the ones they switched on,
    * minus any this account is not allowed to see at all.
    *
-   * Three lists below read it -- the column's switcher, the phone's sheet and
-   * ⌘K -- and the filtering happens once here rather than in each of them,
-   * because three lists disagreeing about which workspaces exist is the bug
+   * Two lists below read it -- the column's switcher and the search box,
+   * which is also the phone's switcher -- and the filtering happens once here rather than in each of them,
+   * because two lists disagreeing about which workspaces exist is the bug
    * this shell was written to end.
    *
    * The rule itself is in lib/modules, where it can be read by a test without
-   * a DOM -- these three lists are a menu, a sheet and a palette, and none of
+   * a DOM -- these lists are a menu and a palette, and neither of
    * them puts a workspace in its markup until it is opened.
    */
   const workspaces = switchableModules(enabledModules, isOwner);
@@ -328,6 +333,7 @@ export function AppShell({
       if (!isSearchShortcut(event)) return;
       event.preventDefault();
       setSearchOn('everything');
+      setSearchShows('here');
       setSearching((open) => !open);
     }
     document.addEventListener('keydown', onKey);
@@ -338,7 +344,9 @@ export function AppShell({
   // page sits inside it is the page's own path, drawn once above its heading
   // by PageHeader's `subject`; the bar used to add the section after a ›,
   // which repeated the first part of that path a few inches lower.
-  const title = moduleById(module)?.label ?? 'Home';
+  // Dash's page is outside every workspace and is not Home (plan #1899.2).
+  const onDash = module === null && isAskPath(pathname ?? '');
+  const title = moduleById(module)?.label ?? (onDash ? 'Dash' : 'Home');
 
   useEffect(() => {
     if (!drawer) return;
@@ -405,7 +413,7 @@ export function AppShell({
             'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
             on ? 'opacity-100' : 'opacity-0',
           )}
-          style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+          style={{ background: moduleById(module)?.key.from ?? `var(${HOME_MARK.accent})` }}
           aria-hidden
         />
         {/* Muted until the row is current, so the column reads as a list
@@ -473,6 +481,7 @@ export function AppShell({
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
+          dash={onDash}
           enabled={workspaces}
           counts={counts}
           onShell
@@ -524,7 +533,9 @@ export function AppShell({
   const overflow = sections.length > 3 || Boolean(settingsHref);
   const tabs = sections.slice(0, overflow ? 3 : 4);
 
-  const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
+  // Home's mark is white, which would vanish on a light shell, so Home's bar
+  // is its accent instead.
+  const dockKey = moduleById(module)?.key.from ?? `var(${HOME_MARK.accent})`;
   // Taller than the icons need: a thumb target, and on a phone a bar you can
   // hit without looking. The icons stay at the dock's 20px (the icon law);
   // the room is around them. The height is --dock-h in app/globals.css, less
@@ -584,26 +595,28 @@ export function AppShell({
   }
 
   /**
-   * The centre slot. The mark rather than an icon, because it is the one
-   * control on the bar that answers "where am I" as well as "where else could
-   * I be" -- and it is already the thing a person taps at the top of the
-   * column on a desktop.
+   * The centre slot: the switcher and the search in one (note 5f3ef44f). It
+   * opens the search box, which lists every workspace before anything is
+   * typed and finds anything once something is, so the phone has one way to
+   * go anywhere where it had a switcher at the foot and a magnifier at the
+   * top. The ring with a dot inside is the search mark the box itself uses.
    */
   const dockSwitcher = (
     <li key="__switcher">
       <button
         type="button"
-        onClick={() => setSwitcher(true)}
-        aria-haspopup="menu"
+        onClick={() => {
+          setSearchOn('everything');
+          setSearchShows('workspaces');
+          setSearching(true);
+        }}
+        aria-haspopup="dialog"
         data-capture-switcher=""
-        aria-expanded={switcher}
-        className={cn(dockItem, switcher ? 'text-shell-ink' : 'text-shell-muted')}
+        aria-expanded={searching}
+        className={cn(dockItem, searching ? 'text-shell-ink' : 'text-shell-muted')}
       >
-        {/* The mark is 24px against the tabs' 20px icons, so it is pulled back
-            in by 2px a side -- otherwise the centre label sits lower than the
-            four beside it. */}
-        <ModuleMark module={module} size="sm" className="-my-0.5" />
-        <span className="truncate">Switch</span>
+        <SearchMark className="size-5" strokeWidth={searching ? 2 : 1.75} />
+        <span className="truncate">Go to</span>
       </button>
     </li>
   );
@@ -624,7 +637,7 @@ export function AppShell({
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
-      <AskDashProvider>
+      <AskDashProvider account={account} workspaces={workspaces}>
         <div
           className={cn(
             // The ground, not a container: the sidebar and the page pane are both
@@ -736,7 +749,10 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
+              {/* Below lg the bar is 5rem tall and its icons were the desk's
+              16px in 32px buttons, too small to hit or read on a phone (note
+              55df4819): there they are 20px in 40px buttons, the dock's size. */}
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5 max-lg:[&_button_[data-dash-state]]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
@@ -746,22 +762,6 @@ export function AppShell({
                     <Menu strokeWidth={1.75} aria-hidden />
                   </IconButton>
                 </Tooltip>
-
-                {/* The mark in the bar is the switcher, not a picture of one.
-                From lg up the column carries it -- and still does when the
-                column is collapsed, as its mark. Below lg there is no column
-                until you open the drawer, and this icon sat there looking
-                exactly like the thing that switches workspaces while doing
-                nothing, which made changing module a drawer away. */}
-                <span className="lg:hidden">
-                  <WorkspaceSwitcher
-                    current={module}
-                    enabled={workspaces}
-                    counts={counts}
-                    onShell
-                    compact
-                  />
-                </span>
 
                 {/* Allowed to shrink, and truncate, as the last thing in the row
                 that can: on a phone the account controls (six with Dash and
@@ -839,22 +839,9 @@ export function AppShell({
                 their theme, their feedback, their account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center sm:gap-0.5">
-                  {/* Search, below lg, where there is no field in the bar. It
-                  opens the same box the shortcut opens, on everything you own,
-                  with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
-                  the left and a second way in beside it would be two controls
-                  for one thing. */}
-                  <Tooltip label="Search" className="shrink-0 lg:hidden">
-                    <IconButton
-                      label="Search"
-                      onClick={() => openSearch()}
-                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                    >
-                      <SearchMark />
-                      <span className="sr-only">Search</span>
-                    </IconButton>
-                  </Tooltip>
-
+                  {/* No search or switcher here below lg: the dock's centre
+                  button is both (note 5f3ef44f). From lg up the field is in
+                  the bar a few inches to the left. */}
                   {/* Dash, from any page (plan #1090): a question about
                   anything in the app, answered with links to what it used. */}
                   <AskDashButton />
@@ -866,7 +853,7 @@ export function AppShell({
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
                     <Link
                       href="/account"
-                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
                     >
                       {initial}
                       <span className="sr-only">Account</span>
@@ -932,14 +919,6 @@ export function AppShell({
             </nav>
           </div>
 
-          <WorkspaceSheet
-            current={module}
-            enabled={workspaces}
-            counts={counts}
-            open={switcher}
-            onClose={() => setSwitcher(false)}
-          />
-
           <ThemeRepair value={theme} />
 
           <CommandPalette
@@ -950,6 +929,7 @@ export function AppShell({
             theme={theme}
             open={searching}
             opensOn={searchOn}
+            opensWith={searchShows}
             onOpenChange={setSearching}
           />
         </div>

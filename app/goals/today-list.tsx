@@ -28,6 +28,8 @@ import { answerFlagAction } from './[goalId]/flag-actions';
 import { answerGoalQuestion } from './[goalId]/tree-actions';
 import { reactToSuggestionAction, recordAttendedAction, undoDeclineAction } from './suggestion-actions';
 import { CloseButton } from '@/components/inbox/close-button';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { closedToast, LIFECYCLE_GLYPH, type Lifecycle } from '@/lib/core/lifecycle';
 
 /**
  * A row of what is on you on the Goals home (plan #1077): everything worth doing,
@@ -81,6 +83,13 @@ const PRIMARY_VALUE: Partial<Record<TodayKind, [string, string]>> = {
   suggestion: ['reaction', 'going'],
   close: ['move', 'close'],
   park: ['move', 'park'],
+};
+
+/** The kinds whose one button closes the row, drawn with that ending's glyph (plan #1957.8). */
+const PRIMARY_LIFECYCLE: Partial<Record<TodayKind, Lifecycle>> = {
+  step: 'done',
+  close: 'done',
+  park: 'later',
 };
 
 /**
@@ -168,6 +177,7 @@ export function TodayRow({
   const field = ANSWER_FIELD[item.kind];
   const primary = PRIMARY_VALUE[item.kind];
   const second = SECOND[item.kind];
+  const closing = PRIMARY_LIFECYCLE[item.kind];
   const href = hrefFor(item);
   const meta = [item.on ? formatDay(item.on) : null, item.detail].filter(Boolean).join(' · ');
 
@@ -251,10 +261,13 @@ export function TodayRow({
               </Button>
             ) : (
               <Button type="submit" name={primary?.[0]} value={primary?.[1]} pending={pending}>
+                {!field && closing && <StatusGlyph glyph={LIFECYCLE_GLYPH[closing]} />}
                 {field ? 'Send' : item.action}
               </Button>
             )}
-            {item.kind === 'suggestion' && <DeclineSuggestion id={item.id} onAside={onAside} />}
+            {item.kind === 'suggestion' && (
+              <DeclineSuggestion id={item.id} title={item.title} onAside={onAside} />
+            )}
             {second && (
               <Button
                 type="submit"
@@ -289,7 +302,15 @@ export function TodayRow({
  * Decline on a suggestion from the weekly run (plan #1957.3): the row goes,
  * and the toast's Undo brings it back unanswered.
  */
-function DeclineSuggestion({ id, onAside }: { id: string; onAside: (hidden: boolean) => void }) {
+function DeclineSuggestion({
+  id,
+  title,
+  onAside,
+}: {
+  id: string;
+  title: string;
+  onAside: (hidden: boolean) => void;
+}) {
   const [pending, start] = useTransition();
   const toast = useToast();
   return (
@@ -305,7 +326,7 @@ function DeclineSuggestion({ id, onAside }: { id: string; onAside: (hidden: bool
           if (result.error) return toast({ text: result.error });
           onAside(true);
           toast({
-            text: 'Declined',
+            text: closedToast('declined', title),
             undo: async () => {
               const back = await undoDeclineAction(id);
               if (back.error) throw new Error(back.error);
@@ -400,7 +421,7 @@ function SetAside({ item, onAside }: { item: TodayItem; onAside: (hidden: boolea
     }
     const before = result.before;
     toast({
-      text: result.message ?? 'Later.',
+      text: laterText(item.title, result.message),
       undone: 'Put back.',
       undo: async () => {
         const back = new FormData();
@@ -414,6 +435,12 @@ function SetAside({ item, onAside }: { item: TodayItem; onAside: (hidden: boolea
     });
   };
   return <LaterMenu label={item.title} onChoose={(choice) => void choose(choice)} />;
+}
+
+/** "Later: Book the boiler service, until 3 Oct.": the ending, the row, then the day. */
+function laterText(title: string, until?: string): string {
+  const text = closedToast('later', title);
+  return until ? `${text}, ${until}` : text;
 }
 
 /**
@@ -439,7 +466,7 @@ function SnoozeRow({ item, onSnoozed }: { item: TodayItem; onSnoozed: (hidden: b
       return;
     }
     toast({
-      text: result.message ?? 'Later.',
+      text: laterText(item.title, result.message),
       undone: 'Brought back.',
       undo: async () => {
         const back = await unsnoozeInboxRowAction(fields());

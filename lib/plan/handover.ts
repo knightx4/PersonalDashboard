@@ -114,31 +114,39 @@ export type HandOverResult =
       confirm?: true;
     };
 
+/** A step that may be sent, with what the send goes on to use. */
+export type StepSendable = {
+  ok: true;
+  sections: PlanSection[];
+  node: PlanNode;
+  runs: Awaited<ReturnType<typeof loadLastRuns>>;
+  liveness: ReturnType<typeof planLiveness>;
+  builder: { project: DevProject | null; routine: RoutineTarget };
+  now: number;
+  /**
+   * The step's own run has gone quiet, and the send goes through only because
+   * `confirmQuiet` said so. Ask Dash's card says so before Confirm (#2106.1).
+   */
+  quiet: boolean;
+};
+
 /**
- * Send a step to be built, now.
+ * Whether a step may be sent to be built, without sending it or writing
+ * anything: every refusal `handStepToClaude` gives, in the same order and
+ * the same words.
  *
- * It refuses a proposal — approving is the person's move — a question and a
- * blocked step, both of which are waiting on them rather than on a session,
- * and anything under a feature that already has a session running, because a
- * batch holds the whole feature and a second run would land in the middle of
- * it. Taking the first one back (to not started) is how that last one is
- * overridden when a session has died.
+ * The plan page's Send and Ask Dash's start_build card (plan #2106.1) both
+ * ask here, so the card cannot offer a start the press would refuse.
  */
-export async function handStepToClaude(input: {
+export async function checkStepSend(input: {
   supabase: Db;
   userId: string;
   /** The step's id, not its number. */
   id: string;
-  /**
-   * Send it even though its run has gone quiet, and write that run off.
-   *
-   * The answer to the question the refusal asked, so it only means anything on
-   * a step whose claim reads `quiet`. It does not loosen any other refusal: a
-   * run still pushing is still refused, and so is a question, a proposal and a
-   * feature with another session in it.
-   */
+  /** See `handStepToClaude`. */
   confirmQuiet?: boolean;
-}): Promise<HandOverResult> {
+  now?: number;
+}): Promise<StepSendable | { ok: false; error: string; confirm?: true }> {
   const { supabase, userId } = input;
 
   const sections = buildPlanTree(await loadPlan(supabase, userId));
@@ -181,7 +189,7 @@ export async function handStepToClaude(input: {
   // twenty-minute mark reads wrong on a session that is reading files, and
   // #574 settled that a quiet step is re-sent by asking first.
   const feature = topFeatureOf(sections, node);
-  const now = Date.now();
+  const now = input.now ?? Date.now();
   const runs = await loadLastRuns(supabase, userId);
 
   // A re-shape is rewriting this feature. Sending a step out of it now hands a
@@ -248,6 +256,57 @@ export async function handStepToClaude(input: {
     return { ok: false, error: betweenStepsRefusal(feature) };
   }
 
+  // A project's step with no routine to build it is refused before anything
+  // is written, rather than after the step has been marked underway.
+  const builder = builderFor(sections, node);
+  if (!builder.ok) return { ok: false, error: builder.error };
+
+  const quiet =
+    input.confirmQuiet === true &&
+    !sendOverClaim({ number: node.number, liveness: liveness[node.id] ?? null, run: runs[node.id], now, confirmed: false }).send;
+
+  return {
+    ok: true,
+    sections,
+    node,
+    runs,
+    liveness,
+    builder: { project: builder.project, routine: builder.routine },
+    now,
+    quiet,
+  };
+}
+
+/**
+ * Send a step to be built, now.
+ *
+ * It refuses a proposal — approving is the person's move — a question and a
+ * blocked step, both of which are waiting on them rather than on a session,
+ * and anything under a feature that already has a session running, because a
+ * batch holds the whole feature and a second run would land in the middle of
+ * it. Taking the first one back (to not started) is how that last one is
+ * overridden when a session has died. The refusals are `checkStepSend`.
+ */
+export async function handStepToClaude(input: {
+  supabase: Db;
+  userId: string;
+  /** The step's id, not its number. */
+  id: string;
+  /**
+   * Send it even though its run has gone quiet, and write that run off.
+   *
+   * The answer to the question the refusal asked, so it only means anything on
+   * a step whose claim reads `quiet`. It does not loosen any other refusal: a
+   * run still pushing is still refused, and so is a question, a proposal and a
+   * feature with another session in it.
+   */
+  confirmQuiet?: boolean;
+}): Promise<HandOverResult> {
+  const { supabase, userId } = input;
+  const checked = await checkStepSend(input);
+  if (!checked.ok) return checked;
+  const { sections, node, runs, liveness, builder, now } = checked;
+
   // The run this press is replacing stops here.
   //
   // Only when a quiet claim was confirmed through: every other send either had
@@ -296,9 +355,6 @@ export async function handStepToClaude(input: {
   // to orchestrate a batch, and neither applies to one step -- reading it is a
   // couple of hundred lines the session then carries for the whole run. A step
   // with anything beneath it is a batch, so it goes to the front door.
-  const builder = builderFor(sections, node);
-  if (!builder.ok) return { ok: false, error: builder.error };
-
   const alone = flatten([node]).length === 1;
   // Named by its outline, the way the plan page heads the row, so what the
   // session says back and writes into the plan reads the same as the page.

@@ -79,8 +79,8 @@ A note can turn out to be bigger than it looked. When the notes run claims one
 and finds that the fix needs a migration, a new screen or changes in more than
 one workspace, or that triage's route was plan and the code agrees, it does not
 build it. It files an idea on `/dev/ideas` from the note's own text, with
-source `me` because you wrote it, so the hold on ideas filed by sessions and
-the limit of two an hour do not apply. It marks the note `planned` with a
+source `me` because you wrote it, so the score threshold on ideas filed by
+sessions and the limit of three a day do not apply. It marks the note `planned` with a
 resolution naming the idea, and lists the note in its report under *Moved to
 ideas*. You approve the work there before any of it is done.
 

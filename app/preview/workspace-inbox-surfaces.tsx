@@ -14,7 +14,7 @@ import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
 
 const write = (message: string): InboxWrite => ({ action: async () => ({ message }), fields: {} });
 const done = { label: 'Done', tone: 'primary' as const, write: write('Done.') };
-const putOff = write('Put off for now.');
+const later = write('Later.');
 const decline = write('Declined.');
 const onYou = { state: 'on_you' as const };
 
@@ -29,7 +29,7 @@ export const SHOPPING: InboxRow[] = [
     line: 'Screwfix · was due Mon 13 Oct',
     href: '/shopping/orders/o1',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/returns' }],
     decline,
   },
@@ -40,7 +40,7 @@ export const SHOPPING: InboxRow[] = [
     line: 'The window closes in four days · due today',
     href: '/shopping/orders/o2',
     move: onYou,
-    putOff,
+    later,
     verbs: [done, { label: 'Send in Gmail', tone: 'secondary', href: '#' }],
     decline,
   },
@@ -51,7 +51,7 @@ export const SHOPPING: InboxRow[] = [
     line: '£148.00 · due Sat 18 Oct',
     href: '/shopping/recurring',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Open Recurring', tone: 'primary', href: '/shopping/recurring' }],
     decline,
   },
@@ -65,7 +65,7 @@ const jobsWaiting: InboxRow = {
   line: 'Asked for two references and your notice period before the final round · Software Developer',
   href: '/jobs/roles/r4',
   move: onYou,
-  putOff,
+  later,
   verbs: [done],
   decline,
 };
@@ -88,7 +88,7 @@ export const JOBS: InboxRow[] = [
     line: 'No reply in three weeks · was due Fri 10 Oct',
     href: '/jobs/roles/r1',
     move: onYou,
-    putOff,
+    later,
     verbs: [done, { label: 'Write it', tone: 'secondary', href: '/jobs/roles/r1' }],
     decline,
   },
@@ -99,7 +99,7 @@ export const JOBS: InboxRow[] = [
     line: 'They wrote on Tue 7 Oct',
     href: '/jobs/roles/r2',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Open the role', tone: 'primary', href: '/jobs/roles/r2' }],
     decline,
   },
@@ -110,7 +110,7 @@ export const JOBS: InboxRow[] = [
     line: 'Dash asked on the role',
     href: '/jobs/roles/r3',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Reply', tone: 'primary', href: '/jobs/roles/r3' }],
     decline,
   },
@@ -123,7 +123,7 @@ export const TODO: InboxRow[] = [
     title: 'Book the boiler service before the first cold week of the winter',
     line: '1 of 3 left',
     move: onYou,
-    putOff,
+    later,
     verbs: [done],
   },
   {
@@ -131,7 +131,7 @@ export const TODO: InboxRow[] = [
     section: 'actions',
     title: 'Sort the loft',
     move: onYou,
-    putOff,
+    later,
     verbs: [done],
   },
   {
@@ -141,7 +141,7 @@ export const TODO: InboxRow[] = [
     line: 'Dash asked on Buy hinges for the shed door',
     href: '/todo',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Reply', tone: 'primary', href: '/todo' }],
     decline,
   },
@@ -156,7 +156,7 @@ const VAULT: InboxRow[] = [
     line: 'Dash asked on Lease 2026',
     href: '/vault/n/Inbox/Lease%202026',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Reply', tone: 'primary', href: '/vault/n/Inbox/Lease%202026' }],
     decline,
   },
@@ -171,7 +171,7 @@ const LEARN: InboxRow[] = [
     line: 'Dash asked on Bayesian updating',
     href: '/learn/c/c1',
     move: onYou,
-    putOff,
+    later,
     verbs: [{ label: 'Reply', tone: 'primary', href: '/learn/c/c1' }],
     decline,
   },

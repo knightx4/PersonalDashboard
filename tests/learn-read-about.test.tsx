@@ -1,5 +1,5 @@
 /**
- * When "Find something to read for this" is drawn.
+ * When "Find a reading on this idea" is drawn.
  *
  * A claim's own page offers it on every claim, whatever state the claim is in
  * (#1070); a subject's chain offers it only beside claims marked shaky or
@@ -20,7 +20,7 @@ function concept(state: KnowledgeState): Concept {
   return { id: '00000000-0000-4000-8000-000000000002', state } as Concept;
 }
 
-const LABEL = 'Find something to read for this';
+const LABEL = 'Find a reading on this idea';
 
 describe('the read button on a claim', () => {
   it.each(KNOWLEDGE_STATES)('shows on the claim page for a claim that is %s', (state) => {

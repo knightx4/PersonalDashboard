@@ -1,22 +1,24 @@
 /**
- * How many ideas a session may file in an hour.
+ * How many ideas sessions may file in a day.
  *
  * The duplicate check beside this one (lib/ideas/duplicate.ts) stops the same
- * suggestion arriving twice; it does nothing about ten different ones from a
- * single run, which is the other half of how 53 session-written ideas built
- * up over four days. The list is only useful if it can be read in one
- * sitting, so a session gets two an hour and has to pick which two.
+ * suggestion arriving twice; it does nothing about many different ones, which
+ * is how 53 session-written ideas built up over four days in September. The
+ * cap began at two an hour. In the 30 days to 15 October 2026 sessions still
+ * filed 147, and 138 sat unread, so the person asked for it to be slowed: now
+ * three a day, counting every idea a session filed, the night digest's
+ * included. A session that meets the cap has to pick which ideas are worth it.
  *
  * Pure and here rather than in `scripts/plan.ts` so the count and the window
  * are pinned by tests. It applies to what a session files; ideas written on
  * the page are the person's own list and are not counted or capped.
  */
 
-/** Ideas a session may file inside one window. */
-export const IDEA_LIMIT = 2;
+/** Ideas sessions may file inside one window. */
+export const IDEA_LIMIT = 3;
 
-/** How far back the count reaches. */
-export const IDEA_WINDOW_MINUTES = 60;
+/** How far back the count reaches: a day. */
+export const IDEA_WINDOW_MINUTES = 24 * 60;
 
 const WINDOW_MS = IDEA_WINDOW_MINUTES * 60_000;
 
@@ -46,6 +48,12 @@ export function ideaAllowance(filedAt: readonly number[], now: number): IdeaAllo
   return { allowed: false, filed: inWindow.length, freeAt: inWindow[IDEA_LIMIT - 1] + WINDOW_MS };
 }
 
+/** A wait as "40m" under two hours and "5h" from there, rounded up. */
+function waitText(ms: number): string {
+  const minutes = Math.max(1, Math.ceil(ms / 60_000));
+  return minutes < 120 ? `${minutes}m` : `${Math.ceil(minutes / 60)}h`;
+}
+
 /**
  * The refusal, written so a session can report it as it stands.
  *
@@ -53,9 +61,9 @@ export function ideaAllowance(filedAt: readonly number[], now: number): IdeaAllo
  * reading it has no timezone and the person reading the run wants the wait.
  */
 export function ideaCapRefusal(allowance: IdeaAllowance, now: number): string {
-  const minutes = allowance.freeAt ? Math.max(1, Math.ceil((allowance.freeAt - now) / 60_000)) : 0;
+  const wait = allowance.freeAt ? waitText(allowance.freeAt - now) : '1m';
   return (
-    `${allowance.filed} ideas already filed in the last hour, which is the cap ` +
-    `(${IDEA_LIMIT} an hour from a session). The next can be filed in ${minutes}m.`
+    `${allowance.filed} ideas already filed by sessions in the last day, which is the cap ` +
+    `(${IDEA_LIMIT} a day). The next can be filed in ${wait}.`
   );
 }

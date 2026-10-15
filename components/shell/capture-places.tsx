@@ -1,12 +1,13 @@
 'use client';
 
-import { Paperclip, Plus, Undo2 } from 'lucide-react';
+import { Paperclip, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { ToggleChip } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/ui/kbd';
 import type { CaptureAction } from '@/lib/capture/actions';
 import { capturePartLabel, filedMessage, filedModule, type FiledCapture } from '@/lib/capture/place';
@@ -108,11 +109,11 @@ export function PlaceLine({
       className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2 text-small"
     >
       {picked ? (
-        <span className="text-ink-muted">Dash will file this as</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash will file this as</span>
       ) : guess.state === 'reading' ? (
-        <span className="text-ink-muted">Dash is working out where this goes…</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is working out where this goes…</span>
       ) : sure && sort ? (
-        <span className="min-w-0 flex-1 text-ink-muted">
+        <span className="voice-dash min-w-0 flex-1 px-2 py-0.5 text-ink-muted">
           {sort.parts.length === 1 ? 'Dash will file this as ' : `Dash will file this in ${sort.parts.length} places: `}
           {sort.parts.map((part, index) => (
             <span key={index}>
@@ -122,7 +123,7 @@ export function PlaceLine({
           ))}
         </span>
       ) : (
-        <span className="text-ink-muted">Dash is not sure where this goes. Which is it?</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is not sure where this goes. Which is it?</span>
       )}
       {(asking || picked) && (
         <span className="flex w-full flex-wrap gap-1.5">
@@ -183,12 +184,17 @@ export function CaptureFoot({
         <span role="status" aria-live="polite" className="text-small text-ink-muted">
           {message}
         </span>
-        <Button type="submit" size="sm" pending={pending}>
-          <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {pending ? 'Filing…' : 'File it'}
-        </Button>
         <PaidCostsProvider costs={costs}>
-          <PaidHint action="app/capture-actions.ts#fileCaptureBox" what="Cost of filing it" align="end" />
+          <DashAction
+            type="submit"
+            size="sm"
+            pending={pending}
+            paid="app/capture-actions.ts#fileCaptureBox"
+            what="Cost of filing it"
+            align="end"
+          >
+            {pending ? 'Filing…' : 'File it'}
+          </DashAction>
         </PaidCostsProvider>
       </span>
     </div>

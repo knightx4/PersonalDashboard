@@ -82,11 +82,11 @@ describe('jobWaitingSource', () => {
     ]);
   });
 
-  it('puts it off a week on Later', async () => {
-    await jobWaitingSource.defer!(ctx, 'job_waiting:e1');
+  it('puts it off to the day chosen on Later', async () => {
+    await jobWaitingSource.defer!(ctx, 'job_waiting:e1', new Date('2026-10-05T00:00:00.000Z'));
     const [, , eventId, until] = setWaitingDismissal.mock.calls[0] as unknown[];
     expect(eventId).toBe('e1');
-    expect(until).toBe('2026-10-08T12:00:00.000Z');
+    expect(until).toBe('2026-10-05T00:00:00.000Z');
   });
 
   it('reads the requests through the shared reader', async () => {

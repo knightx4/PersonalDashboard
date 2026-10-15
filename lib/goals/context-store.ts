@@ -27,7 +27,7 @@ export async function loadContext(client: GoalsSupabaseClient, goalId: string): 
 export async function setContextStatus(
   client: GoalsSupabaseClient,
   id: string,
-  status: 'kept' | 'dismissed',
+  status: 'proposed' | 'kept' | 'dismissed',
 ): Promise<boolean> {
   const { data, error } = await client.from('context').update({ status }).eq('id', id).select('id');
   if (error) throw new Error(error.message);

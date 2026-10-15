@@ -164,6 +164,14 @@ For four weeks from when this spec is approved:
   on continues.
 - The inspiration and X post routines keep running (decision 2).
 
+On 15 October 2026 the person lifted the hold on shaping. Pressing *Shape this
+into a plan* is already their decision, and every shape run starts from them,
+so refusing it slowed nobody but them. Session-filed ideas are slowed where
+they are written instead: sessions may file three a day between them
+(`lib/ideas/rate.ts`, two an hour before), and a suggestion has to score 60 to
+stay in the list rather than 40 (`SUGGESTION_SCORE_FLOOR` in
+`lib/ideas/score.ts`).
+
 Two things found while writing this get fixed regardless. The Sunday week
 review is scheduled `11 * * * 0`, which fires every hour on Sundays, and
 `core.week_reviews` has no rows, so the review has never been written. And the
