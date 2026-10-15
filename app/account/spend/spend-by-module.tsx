@@ -1,7 +1,7 @@
 import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { formatMicroDollars } from '@/lib/money';
+import { formatMicroDollars, formatNumber } from '@/lib/money';
 import { isModuleId, moduleById } from '@/lib/modules';
 import type { FunctionTotal, ModuleSpend } from '@/lib/core/spend/summary';
 
@@ -14,7 +14,7 @@ import type { FunctionTotal, ModuleSpend } from '@/lib/core/spend/summary';
 
 /** The calls and what was not priced, under a module or a function. */
 function callsLine(total: { calls: number; unpriced: number }): string {
-  return `${total.calls.toLocaleString('en-US')} ${total.calls === 1 ? 'call' : 'calls'}${
+  return `${formatNumber(total.calls)} ${total.calls === 1 ? 'call' : 'calls'}${
     total.unpriced > 0 ? ` · ${total.unpriced} not priced` : ''
   }`;
 }
