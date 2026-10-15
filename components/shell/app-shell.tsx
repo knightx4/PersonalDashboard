@@ -743,7 +743,10 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
+              {/* Below lg the bar is 5rem tall and its icons were the desk's
+              16px in 32px buttons, too small to hit or read on a phone (note
+              55df4819): there they are 20px in 40px buttons, the dock's size. */}
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
@@ -844,7 +847,7 @@ export function AppShell({
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
                     <Link
                       href="/account"
-                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
                     >
                       {initial}
                       <span className="sr-only">Account</span>

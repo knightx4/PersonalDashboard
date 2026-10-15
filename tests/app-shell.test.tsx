@@ -339,6 +339,12 @@ describe('search and switching on a phone', () => {
     expect(button).toContain('data-mark="search"');
     expect(button).toContain('aria-haspopup="dialog"');
   });
+
+  it('draws the top icons at the dock size below lg (note 55df4819)', () => {
+    const top = header(shell('todo'));
+    expect(top).toContain('max-lg:[&amp;_button]:size-10');
+    expect(top).toContain('max-lg:[&amp;_button_svg]:size-5');
+  });
 });
 
 describe('the top bar title', () => {
