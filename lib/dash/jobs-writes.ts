@@ -2855,7 +2855,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'save_answer',
     description:
-      "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. To keep a drafted answer with what it rests on, also give evidence_refs and any unsupported_claims. Give only what to change. Name the answer by answer_ref (list_rows on job_search.application_answers), or by question with application_ref or role_ref. Nothing is sent to the employer.",
+      "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. When they ask you to write or rewrite an answer, write it yourself rather than asking for the words: read their evidence bank with list_rows on job_search.evidence_items and the role's description with open_row on job_search.roles, write the answer from what those hold, and save it as a draft with the evidence_refs it rests on and any unsupported_claims it makes. Give only what to change. Name the answer by answer_ref (list_rows on job_search.application_answers), or by question with application_ref or role_ref. Nothing is sent to the employer.",
     input_schema: {
       type: 'object',
       properties: {
