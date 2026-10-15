@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
 import { DayBrief } from '@/app/home/day-brief';
 import {
@@ -131,11 +132,13 @@ export function HomePageSurface() {
         main={
           <>
             <WorkspaceMarks workspaces={WORKSPACES} />
-            <ul className="mt-2 divide-y divide-border">
+            <Card padding="dense" className="mt-2">
+<ul className="divide-y divide-border">
               {BRIEFS.map(([module, brief]) => (
                 <BriefLine key={module} module={module} brief={brief} />
               ))}
             </ul>
+</Card>
             <TodayCard
               timezone={TZ}
               more={3}
