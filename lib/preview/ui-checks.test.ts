@@ -53,7 +53,7 @@ describe('parseOwner', () => {
 });
 
 describe('file names', () => {
-  it('match the ones building.md and the notes skill give', () => {
+  it('match the ones screen.md and the notes skill give', () => {
     const step = parseOwner('1533');
     expect(verdictFile(step, 'vault-note', 1)).toBe('.preview-shots/checks/1533--vault-note--r1.json');
     expect(keptShotFile(step, 'vault-note', 1, 'phone-dark')).toBe(

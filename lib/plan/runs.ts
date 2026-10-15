@@ -47,7 +47,7 @@ import {
   type RunStatus,
   type StoredRunReading,
 } from './run-end';
-import { runMarker } from './auto-line';
+import { runEndNote, runMarker } from './auto-line';
 import { commitSubjects, listPushes } from './ci';
 import type { RunRaise } from './work';
 import {
@@ -166,10 +166,11 @@ export async function startRoutineRun(input: {
 }): Promise<FireRoutineResult> {
   // The id is made before the fire so the brief can carry it: the session's
   // run-line hook reads it there to know which run its lines belong to
-  // (lib/plan/auto-line.ts). The row is still written after the fire, which
-  // is what decides whether it reads started or failed.
+  // (lib/plan/auto-line.ts), and the session ends the run against it. The row
+  // is still written after the fire, which is what decides whether it reads
+  // started or failed.
   const id = crypto.randomUUID();
-  const text = [input.text?.trim(), runMarker(id)].filter(Boolean).join('\n\n');
+  const text = [input.text?.trim(), runEndNote(id), runMarker(id)].filter(Boolean).join('\n\n');
   const result = await fireFeatureRoutine({
     apiKey: input.routine.token,
     routineId: input.routine.id,

@@ -24,6 +24,35 @@ export function runMarker(runId: string): string {
   return `${RUN_MARKER_PREFIX} ${runId}`;
 }
 
+/**
+ * How a session ends the run it was fired as, appended to every brief.
+ *
+ * The sweep ends a run on evidence: the step it was sent at closing or
+ * blocking, or the rows its job is known to leave (`run-work.ts`). A comment
+ * reply, a raise, a spec change or a CI fix leaves neither, so every one of
+ * them reached the two-hour cutoff and was written off as failed, whatever it
+ * had done. In the three weeks to 15 October that was 24 of 29 comment runs
+ * and 13 of 15 spec changes, and half the failed comment runs had answered in
+ * the thread. Only the session knows it is done, so it is told how to say so,
+ * against its own row rather than the newest of its job.
+ */
+export function runEndNote(runId: string): string {
+  return [
+    '## Ending this run',
+    '',
+    'As your last write, whatever the job, mark this run over through the Supabase connector:',
+    '',
+    "`update plan_runs set status = 'finished', error = null " +
+      `where id = '${runId}' and status in ('started', 'stale');\``,
+    '',
+    'Finished means you did what this turn asked, or part of it; for a build, at least one ' +
+      'step closed, marked built or blocked. If you did none of it, say why instead: ' +
+      '`plan.ts stopped <n> --reason "…"` when the turn named a step or feature, otherwise the ' +
+      "same update with `status = 'failed', error = '<why, in one line>'`. Nothing else ends a " +
+      'run sent at no step, and one left open is written off as failed two hours later.',
+  ].join('\n');
+}
+
 const MARKER = /Dash run id: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
 
 /** The run id in a brief, or null when it carries none. */
