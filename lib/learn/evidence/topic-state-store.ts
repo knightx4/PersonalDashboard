@@ -80,6 +80,7 @@ export async function loadTopicStates(
       .from('evidence_links')
       .select('target_id, weight, similarity, found_at, matched_by')
       .eq('target_kind', 'topic')
+      .is('held_reason', null)
       .order('id')
       .range(a, b);
     if (userId) q = q.eq('user_id', userId);

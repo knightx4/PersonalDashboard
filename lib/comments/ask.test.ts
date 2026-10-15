@@ -128,4 +128,27 @@ describe('Dash on a dev row', () => {
     expect(toolResults(model.sent)).toEqual(['That is longer than an idea can be.']);
     expect(said()).toEqual(['That was too long to file.']);
   });
+
+  it('offers rewrite_post on a post draft and reads the draft as the row (plan #2202.2)', async () => {
+    model = scriptedModel([answerCall('Cut it to one post.')]);
+    const outcome = await askDash({
+      supabase,
+      userId: 'u',
+      target: 'post',
+      id: IDEA,
+      commentId: 'c',
+      question: 'make this shorter',
+      dash: fakeDashDeps({}, 'u'),
+      dashThread: stubThreadDash(),
+      anthropic: model.client,
+    });
+    expect(outcome).toEqual({ ok: true, message: 'Answered in the thread.' });
+    const names = model.sent[0].tools.map((t) => t.name);
+    expect(names).toContain('rewrite_post');
+    expect(names).not.toContain('reword');
+    expect(JSON.stringify(model.sent[0].messages[0].content)).toContain(`public.social_posts, ref ${IDEA}`);
+    expect(JSON.stringify(model.sent[0].messages[0].content)).toContain('An X post draft');
+    expect(JSON.stringify((model.sent[0] as { system?: unknown }).system)).toContain('Never post it to X');
+    expect(mocks.inserted.find((row) => row.table === 'thread')?.ref).toBe(`public.social_posts:${IDEA}`);
+  });
 });

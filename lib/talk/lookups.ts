@@ -10,6 +10,7 @@ import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
+import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -89,6 +90,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...VAULT_CHANGE_KINDS,
   ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
+  ...POST_CHANGE_KINDS,
 ];
 
 /**
