@@ -1,4 +1,4 @@
-import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * What the You pages let the person do, and the tool that does each
@@ -31,9 +31,14 @@ export const youActions: ModuleActions = {
     removePlace: none('deletes'),
     placeOnMap: none(
       'own',
-      "A press on the map is the person pointing at where a place is; Dash places a place from its city when it saves it.",
+      'A press on the map is the person pointing at where a place is; Dash places a place from its city when it saves it.',
     ),
     worldMap: none('page'),
+  },
+  'app/you/details/actions.ts': {
+    saveDetailsForm: gap(
+      'No Dash tool changes your phone, LinkedIn, citizenship, race, gender or sexuality yet; Dash reads them but the Details tab is the only place to edit.',
+    ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).
   'app/you/work/job-actions.ts': {
