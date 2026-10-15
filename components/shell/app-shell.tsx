@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
+import { PendingPage } from '@/components/shell/pending-page';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
@@ -913,7 +914,7 @@ export function AppShell({
                 'pb-[calc(var(--dock-h)+2.125rem+env(safe-area-inset-bottom))] lg:pb-6',
               )}
             >
-              {children}
+              <PendingPage>{children}</PendingPage>
             </main>
             {/* The brief goes down here from lg up, which is exactly the width
             this line is drawn at, so the two copies above and this one never

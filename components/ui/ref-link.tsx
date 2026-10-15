@@ -204,7 +204,7 @@ export function RefLink({
         }}
       >
         {children}
-        <LinkPending />
+        <LinkPending href={href} />
       </NextLink>
       {open && (
         // A span, not Popover's div: the link sits inside a paragraph, where
