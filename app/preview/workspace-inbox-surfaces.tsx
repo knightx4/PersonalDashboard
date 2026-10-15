@@ -3,6 +3,7 @@
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
+import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
 
 /**
  * Each workspace's Inbox (plan #1937.5), drawn from rows shaped as the
@@ -56,8 +57,30 @@ const SHOPPING: InboxRow[] = [
   },
 ];
 
+/** A request from a company, as the job_waiting source makes it (plan #1937.9). */
+const jobsWaiting: InboxRow = {
+  ref: 'job_search.application_events:e1',
+  section: 'actions',
+  title: 'Reply to The Halloran-Achterberg group',
+  line: 'Asked for two references and your notice period before the final round · Software Developer',
+  href: '/jobs/roles/r4',
+  move: onYou,
+  putOff,
+  verbs: [done],
+  decline,
+};
+
 const JOBS: InboxRow[] = [
   ...queue(queueRow('jobs-review', 2)),
+  {
+    ...jobsWaiting,
+    card: (
+      <WaitingInboxRow
+        row={jobsWaiting}
+        prepare={async () => ({ error: null, message: 'Dash replied on the role.', href: '/jobs/roles/r4?tab=notes' })}
+      />
+    ),
+  },
   {
     ref: 'job_search.reminders:r1',
     section: 'actions',
@@ -66,7 +89,8 @@ const JOBS: InboxRow[] = [
     href: '/jobs/roles/r1',
     move: onYou,
     putOff,
-    verbs: [done, { label: 'Write the follow-up', tone: 'secondary', href: '/jobs/roles/r1' }],
+    verbs: [done, { label: 'Write it', tone: 'secondary', href: '/jobs/roles/r1' }],
+    decline,
   },
   {
     ref: 'job_search.applications:a2',

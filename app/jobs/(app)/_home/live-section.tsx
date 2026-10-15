@@ -5,7 +5,6 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { Stat } from '@/components/ui/stat';
 import { MOVE_WORD } from '@/lib/core/move';
 import {
-  INTERVIEW_HORIZON_DAYS,
   SENT_WINDOW_DAYS,
   sentHref,
   stageHref,
@@ -22,15 +21,16 @@ import { Tooltip } from '@/components/ui/tooltip';
  *
  * The numbers each open the applications they counted: Live opens Pipeline,
  * which opens on the live ones; a stage opens the table narrowed to it; sent
- * opens the table narrowed to what was sent in the window, closed or not; and
- * the interviews go to This week, higher on this page, which lists them.
+ * opens the table narrowed to what was sent in the window, closed or not. The
+ * interviews coming up are not counted here: This week, above, lists them,
+ * and the count made the row wrap beside the rail (plan #1937.9).
  *
  * The groups are lib/jobs/today/live.ts's: yours, theirs, and the ones not
  * sent yet. A group with nothing in it is left out (law 1).
  */
 export function LiveSection({ summary, live }: { summary: SearchSummary; live: LiveByMove }) {
-  // Each label has a short form for a phone, where seven numbers have to
-  // fit two rows of four without a label wrapping.
+  // Each label has a short form for a phone, where the numbers have to fit
+  // rows of four without a label wrapping.
   const stats: Array<{ label: string; short: string; value: string; href: string }> = [
     { label: 'Live', short: 'Live', value: String(summary.live), href: PIPELINE_PATH },
     ...summary.byStage.map((stage) => ({
@@ -44,13 +44,6 @@ export function LiveSection({ summary, live }: { summary: SearchSummary; live: L
       short: `Sent ${SENT_WINDOW_DAYS}d`,
       value: String(summary.sentRecently),
       href: sentHref(),
-    },
-    {
-      label: `Interviews in ${INTERVIEW_HORIZON_DAYS} days`,
-      short: 'Interviews',
-      // Law 2: a failed read says so rather than passing for none.
-      value: summary.interviewsSoon === null ? 'Could not load' : String(summary.interviewsSoon),
-      href: '#this-week',
     },
   ];
 

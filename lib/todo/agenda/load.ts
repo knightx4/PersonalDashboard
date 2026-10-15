@@ -9,7 +9,7 @@ import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
-import { activeSources } from '@/lib/todo/agenda/registry';
+import { activeSources, allSources } from '@/lib/todo/agenda/registry';
 import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
@@ -75,7 +75,20 @@ export async function loadAgenda(
 
   // A switched-off module's sources never run, whatever this module's own
   // settings say. Turning off a workspace has to mean it stops appearing.
-  const active = activeSources(account, agendaSettings.enabledSources).filter(
+  //
+  // Todo's switches say what the agenda borrows from other workspaces. A
+  // workspace's own Inbox lists its own sources whatever they say (plan
+  // #1937.9): Jobs' reminders left Today for the Jobs Inbox, and a switch on
+  // Todo's settings must not be what hides them there.
+  const enabled = workspace
+    ? [
+        ...agendaSettings.enabledSources,
+        ...allSources()
+          .filter((source) => source.module === workspace)
+          .map((source) => source.id),
+      ]
+    : agendaSettings.enabledSources;
+  const active = activeSources(account, enabled).filter(
     (source) => !workspace || source.module === workspace || source.crossesWorkspaces,
   );
 
