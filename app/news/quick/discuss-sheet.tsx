@@ -129,6 +129,7 @@ function DiscussSheet({
               <h2 id={`${id}-title`} className="text-ui font-semibold text-ink">
                 Discuss
               </h2>
+              {/* dash-action-ok: the price of each reply in a conversation with Dash, whose send is the composer's arrow. */}
               <PaidHint action={ACTION} what="Cost of each reply from Dash" />
             </div>
             <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">{headline}</p>

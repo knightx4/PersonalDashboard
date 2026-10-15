@@ -355,6 +355,7 @@ function SuggestedActions({
           <Button type="button" size="sm" onClick={() => setPosting(true)}>
             {send.requests < card.post.body.length ? 'Post the rest' : 'Post'}
           </Button>
+          {/* dash-action-ok: X's price for a post the person makes; Dash never posts and no model runs. */}
           <CostHint text={xPriceLine(send)} what="Cost of posting to X" />
           {send.warnings.length > 0 && (
             <Tooltip label={`Worth a look: ${send.warnings.join('; ')}.`}>

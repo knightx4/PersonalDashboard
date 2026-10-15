@@ -67,6 +67,7 @@ export function AskConversation({
       openHandoffs={openHandoffs}
       label="Ask a follow-up"
       placeholder="Ask more about this"
+      // dash-action-ok: the follow-up box's send is an arrow beside what is typed, under Dash's answers.
       hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
     />
   );

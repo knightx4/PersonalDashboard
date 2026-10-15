@@ -1,13 +1,12 @@
 'use client';
 
 import { startTransition, useActionState, useEffect, useRef } from 'react';
-import { ExternalLink, RotateCw } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatArrival } from '@/lib/news/issues/list';
 import { groupPicks, type NewsletterPick } from '@/lib/news/recommend/picks';
@@ -62,11 +61,18 @@ export function RecommendedNewsletters({
 
   const reload = (
     <form action={run} className="flex items-center gap-1">
-      <PaidHint action={ACTION} what="Cost of making a new list" align="end" />
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <RotateCw className="size-3.5" strokeWidth={1.75} aria-hidden />
+      <DashAction
+        type="submit"
+        size="sm"
+        variant="secondary"
+        pending={pending}
+        paid={ACTION}
+        what="Cost of making a new list"
+        align="end"
+        hintFirst
+      >
         {pending ? 'Searching…' : list ? 'Reload' : 'Make the list'}
-      </Button>
+      </DashAction>
     </form>
   );
 

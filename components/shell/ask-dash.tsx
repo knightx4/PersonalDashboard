@@ -394,6 +394,7 @@ export function AskThread({
       turns={turns}
       withFiles
       sendHint={(files) => (
+        // dash-action-ok: Ask Dash's send is the composer's arrow beside what is typed, and this prices it.
         <PaidHint
           action={ACTION}
           plus={filesEstimate(files, DASH_MODELS.ask)}
@@ -574,6 +575,7 @@ export function AskDashPanel({
     setThreadKey((key) => key + 1);
   }
 
+  // dash-action-ok: the price of each answer in the Ask Dash sheet, whose send is the composer's arrow.
   const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
   // Rows sent from a list say more than the page they are on, so they take the chip's place.
   const lookingAt = rows ? (

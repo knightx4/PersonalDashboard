@@ -17,7 +17,8 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ToggleChip, toggleChipClass } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/ui/kbd';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -584,14 +585,17 @@ function CapturePanel({
             <span role="status" aria-live="polite" className="text-small text-ink-muted">
               {state.message}
             </span>
-            <Button type="submit" size="sm" pending={pending}>
-              <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-              {pending ? 'Filing…' : 'File it'}
-            </Button>
-            {paid && (
+            {paid ? (
               <PaidCostsProvider costs={costs}>
-                <PaidHint action={paid} what="Cost of filing it" align="end" />
+                <DashAction type="submit" size="sm" pending={pending} paid={paid} what="Cost of filing it" align="end">
+                  {pending ? 'Filing…' : 'File it'}
+                </DashAction>
               </PaidCostsProvider>
+            ) : (
+              <Button type="submit" size="sm" pending={pending}>
+                <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+                {pending ? 'Filing…' : 'File it'}
+              </Button>
             )}
           </span>
         </div>
@@ -1258,39 +1262,35 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
         tabIndex={-1}
         className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
       >
-        <AimedCaptureForm
-          kind={kind}
-          role={aim.role}
-          under={aim.under}
-          page={aim.page}
-          files={
-            kind.files ? (
-              <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
-            ) : undefined
-          }
-          text={text}
-          onText={(value) => {
-            setText(value);
-            if (error && !aimProblem(aim)) setError(null);
-          }}
-          day={day}
-          onDay={setDay}
-          pending={pending}
-          error={error}
-          fieldRef={(node) => {
-            fieldRef.current = node;
-          }}
-          onSubmit={submit}
-          attached={camera.attached}
-          tools={camera.tools}
-          hint={
-            press ? (
-              <PaidCostsProvider costs={costs}>
-                <PaidHint action={press.action} what={press.what} align="end" />
-              </PaidCostsProvider>
-            ) : null
-          }
-        />
+        <PaidCostsProvider costs={costs}>
+          <AimedCaptureForm
+            kind={kind}
+            role={aim.role}
+            under={aim.under}
+            page={aim.page}
+            files={
+              kind.files ? (
+                <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+              ) : undefined
+            }
+            text={text}
+            onText={(value) => {
+              setText(value);
+              if (error && !aimProblem(aim)) setError(null);
+            }}
+            day={day}
+            onDay={setDay}
+            pending={pending}
+            error={error}
+            fieldRef={(node) => {
+              fieldRef.current = node;
+            }}
+            onSubmit={submit}
+            attached={camera.attached}
+            tools={camera.tools}
+            paid={press}
+          />
+        </PaidCostsProvider>
       </form>
     </div>
   );

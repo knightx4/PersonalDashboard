@@ -19,6 +19,21 @@ import { goalsPlaceName } from '@/lib/capture/destination';
 import type { FiledCapture } from '@/lib/capture/place';
 import type { CapturePlace, CaptureSort } from '@/lib/capture/sort';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { HAIKU } from '@/lib/core/models';
+import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+
+/** What filing a sentence costs, as the ledger would price it, so File it shows its hint. */
+const FILE_COSTS: PaidCosts = {
+  'app/capture-actions.ts#fileCaptureBox': {
+    lowMicros: 400,
+    medianMicros: 700,
+    highMicros: 1_100,
+    runs: 30,
+    basis: 'measured',
+    per: 'run',
+    models: [HAIKU],
+  },
+};
 
 /** A photo added with the sentence (plan #1714), already in the bucket. */
 const UPLOADED: UploadedAttachment[] = [
@@ -139,7 +154,7 @@ export function CaptureBoxSurface() {
         <PlaceLine guess={{ state: 'answered', sort: TWO_PARTS }} places={PLACES} picked={null} onPick={nothing} />
         <CaptureFoot
           pending={false}
-          costs={{}}
+          costs={FILE_COSTS}
           files={<AddFile value={UPLOADED} onChange={nothing} />}
         />
       </Box>
@@ -150,7 +165,7 @@ export function CaptureBoxSurface() {
           picked={null}
           onPick={nothing}
         />
-        <CaptureFoot pending={false} costs={{}} files={<AddFile value={[]} onChange={nothing} />} />
+        <CaptureFoot pending={false} costs={FILE_COSTS} files={<AddFile value={[]} onChange={nothing} />} />
         <FiledCaptures
           filed={FILED}
           busy={null}
