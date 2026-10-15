@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/money';
+import { whenMonth } from '@/lib/core/when';
 import { moduleById } from '@/lib/modules';
 import { monthLabel, monthTotals, type MonthKey, type TimelineMonth } from '@/lib/timeline/months';
 import { weekLabel, type ShownObservation } from '@/lib/timeline/observations-view';
@@ -241,7 +242,7 @@ function MonthChart({ months, bounds }: { months: TimelineMonth[]; bounds: { fir
 
 /** "Oct", and "Jan" with no year: the heading names the years. */
 function shortMonth(key: MonthKey): string {
-  return new Date(`${key}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+  return whenMonth(key, { timeZone: 'UTC', month: 'short', year: false });
 }
 
 function moduleLabel(module: TimelineModule): string {
