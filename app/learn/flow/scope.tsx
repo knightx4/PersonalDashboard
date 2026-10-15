@@ -14,7 +14,7 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
       <span>
         Only asking about <span className="font-medium text-ink">{name}</span>
       </span>
-      <Link href={practiceHref()} className={linkVariants()}>
+      <Link href={practiceHref({ only: 'all' })} className={linkVariants()}>
         {back}
       </Link>
     </p>
@@ -30,7 +30,9 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
  */
 export function ScopeFilter({ filter }: { filter: FlowOnly }) {
   const options = [
-    { key: 'all', label: 'Everything', href: practiceHref(), on: filter === null },
+    // Written out as `only=all`, since with Goals only on Learn settings the
+    // bare link opens on Goals only (plan #2164.1).
+    { key: 'all', label: 'Everything', href: practiceHref({ only: 'all' }), on: filter === null },
     {
       key: 'tracks',
       label: 'Subjects only',

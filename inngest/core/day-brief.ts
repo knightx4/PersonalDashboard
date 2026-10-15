@@ -128,20 +128,24 @@ async function newsStory(userId: string, now: Date): Promise<{ headline: string;
 }
 
 /** The check question on the next Learn card waiting to be read. */
-async function learnQuestion(clients: AgendaClients, userId: string): Promise<string | null> {
+async function learnQuestion(
+  clients: AgendaClients,
+  userId: string,
+): Promise<{ id: string; question: string } | null> {
   const learn = await clients.learn();
   const { data, error } = await learn
     .from('feed_cards')
-    .select('check_question')
+    .select('id, check_question')
     .eq('user_id', userId)
     .eq('status', 'ready')
     .not('context', 'is', null)
+    .not('hook', 'is', null)
     .not('check_question', 'is', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`Reading the Learn cards failed: ${error.message}`);
-  return (data?.check_question as string | undefined) ?? null;
+  return data ? { id: data.id as string, question: data.check_question as string } : null;
 }
 
 /** A part that fails costs its lines, not the brief. */
@@ -288,7 +292,7 @@ async function readDashResults(clients: AgendaClients, userId: string, since: st
   return (data ?? []) as DashResultRow[];
 }
 
-type Gathered = { facts: BriefFact[]; candidates: Candidate[] };
+type Gathered = { facts: BriefFact[]; candidates: Candidate[]; learnCardId: string | null };
 
 /**
  * The day's facts (plan #1123) and its candidates (plan #1237), from one read
@@ -345,10 +349,11 @@ async function gatherDay(
   ]);
 
   return {
-    facts: [...facts, goal, newsFact(story), learnFact(question)].filter(
+    facts: [...facts, goal, newsFact(story), learnFact(question?.question ?? null)].filter(
       (fact): fact is BriefFact => fact !== null,
     ),
     candidates,
+    learnCardId: question?.id ?? null,
   };
 }
 
@@ -457,7 +462,11 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
       if (!push) return;
       // The brief is saved; a notification that fails costs the buzz, not the day.
       try {
-        await sendToPerson(push, row.user_id, briefPayload(row), now);
+        const learnCardId = await part(
+          gather(row.user_id, row.day).then((gathered) => gathered.learnCardId),
+          null,
+        );
+        await sendToPerson(push, row.user_id, briefPayload({ ...row, learnCardId }), now);
       } catch {
         // Tried again tomorrow; the home page already shows today's.
       }

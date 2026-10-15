@@ -220,6 +220,7 @@ export const learnActions: ModuleActions = {
     setWatchListPlaylistAction: none('setting'),
   },
   'app/learn/settings/actions.ts': {
+    setGoalsOnly: none('setting'),
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },
