@@ -145,6 +145,32 @@ describe('the Jobs writes', () => {
     expect(await refused('change_application', tables(), { application_ref: APP_2, excitement: 9 })).toMatch(/1 to 5/);
   });
 
+  it('marks an application ready to apply and answers whether it has a cover letter (plan #2102.1)', async () => {
+    const t = tables();
+    const ready = await made('change_application', t, { application_ref: APP_1, ready_to_apply: true, has_cover_letter: false });
+    expect(ready.after).toMatchObject({ ready_to_apply: true, has_cover_letter: false });
+    expect(ready.summary).toBe(
+      'Dash marked it ready to apply and marked that it has no cover letter for the role Role from email at Acme.',
+    );
+    const cleared = await made('change_application', t, { application_ref: APP_1, ready_to_apply: false, has_cover_letter: null });
+    expect(cleared.before).toMatchObject({ ready_to_apply: true, has_cover_letter: false });
+    expect(cleared.after).toMatchObject({ ready_to_apply: false, has_cover_letter: null });
+  });
+
+  it('refuses marks that are not true or false', async () => {
+    expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: 'yes' })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: null })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1, has_cover_letter: 1 })).toMatch(/null to clear/);
+  });
+
+  it("refuses an application mark on someone else's application", async () => {
+    const t = tables();
+    const app = t['job_search.applications'].find((row) => row.id === APP_1)!;
+    app.user_id = SOMEONE;
+    expect(await refused('change_application', t, { application_ref: APP_1, ready_to_apply: true })).toMatch(/no application of theirs/);
+    expect(app.ready_to_apply).toBeUndefined();
+  });
+
   it("refuses a referral contact that is not theirs", async () => {
     const t = tables();
     t['job_search.contacts'][0].user_id = SOMEONE;
