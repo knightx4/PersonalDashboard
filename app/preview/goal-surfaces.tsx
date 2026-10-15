@@ -262,6 +262,20 @@ export function GoalTreeSurface() {
   );
 }
 
+/**
+ * The same steps with the Assignee tooltip held open on Move the
+ * balance (plan #2069.2), a stage split between you and Dash, whose tip says
+ * how many steps each holds.
+ */
+export function GoalAssigneeTipSurface() {
+  return <StepTree map={map} todoOn={false} tipOpenFor="move" />;
+}
+
+/** A goal with no steps yet: the empty state and Add a step. */
+export function GoalEmptySurface() {
+  return <StepTree map={{ ...map, steps: [], linked: [] }} todoOn={false} />;
+}
+
 /** The same steps with every row opened: the panel behind each row. */
 export function GoalOpenedSurface() {
   return <StepTree map={map} todoOn={false} opened />;

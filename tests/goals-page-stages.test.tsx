@@ -3,7 +3,8 @@
  * draws the stages `nowStages` opens under Now, unfolded, and every other
  * stage under Other stages as one folded line saying how far along it is. A
  * goal that is one list is Now alone, its finished steps folded under the
- * open ones. There are no view chips, column header or tally.
+ * open ones. Each card opens with the dev plan's column header (plan
+ * #2069.2); there are no view chips or tally.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -129,15 +130,17 @@ describe('a goal in stages', () => {
   });
 
   it('draws every other stage on the map as one line, folded, saying how far along it is', () => {
+    // Its Status word says it is done, and the Steps column counts what is beneath (plan #2069.2).
     expect(map).toContain('Walk into interviews ready');
-    expect(map).toContain('done');
+    expect(map).toMatch(/ Done /);
     expect(map).toContain('Resume ready to send');
-    expect(map).toContain('1 step');
     expect(map).not.toContain('Update your resume');
     expect(map).not.toContain('Draft five answers');
   });
 
-  it('has no view chips, column header or tally', () => {
+  it('heads each card with the plan’s columns, and has no view chips or tally', () => {
+    // Now and Other stages, each under Step, Status, Assignee, When, Steps (plan #2069.2).
+    expect(html.match(/>When</g)).toHaveLength(2);
     expect(html).not.toContain('aria-current="page"');
     expect(html).not.toMatch(/>Who</);
     expect(html).not.toContain('Everything');

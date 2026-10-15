@@ -991,9 +991,20 @@ closed, done or dropped, newest first with the day each closed and Dash's
 mark on Dash's own, each going to the step's page; the goal's last ten runs;
 and its comments.
 
-A step's row is its status glyph, its title, Dash's mark on Dash's steps
-and, at the end, its date or a rhythm's count; on a stage, how far along it
-is. The glyph is the status menu. Finished steps fold under **Finished** at
+Each card on Steps (Now, Other stages, and Also counts towards this goal)
+opens with the dev plan's column header, and every row's cells sit under it
+as they do on /dev/plan (plan #2069.2): **Step**, the outline number and
+title; **Status**, the health word and glyph, which is the status menu;
+**Assignee**, your avatar initial on your steps, Dash's mark on Dash's, and
+both on a stage split between you; **When**, the step's date or a rhythm's
+count, in the column the plan heads Priority; and **Steps**, the count of
+what is beneath. On a phone the title takes the first line and the number,
+status, assignee, Needs line and When go on the second. The step a row
+waits on is in the Status tooltip and the Needs line, and while a Dash run
+is going on a row, or on a step beneath it, Dash's mark in its Assignee cell
+moves and the Status tooltip says Dash is working on it.
+`tests/plan-view.test.tsx` fails if the goal page and /dev/plan stop drawing
+the same header. Finished steps fold under **Finished** at
 every level. Pressing the title opens the panel with the detail, done-when,
 questions, dependencies, thread and the row's actions, as on the dev plan.
 A date or amount that is set reads as text and turns into its editor when
@@ -1289,10 +1300,12 @@ autopay (yours); then log the balance monthly and a quarterly Claude review.
 
 The dev plan page already has these, and Goals reuses the components rather
 than rebuilding them. The goal page draws each step with the plan's shared
-row in its list layout (`layout="list"` in
-`components/plan-tree/tree-row.tsx`): the same fold, status menu and panel,
-without the plan's column header, outline numbers, Who and When columns,
-tally or banded bar.
+row (`components/plan-tree/tree-row.tsx`) under the plan's column header
+(`ColumnHeader` in `components/plan-tree/grid.tsx`, with When for
+Priority), and the Assignee cell from `components/plan-tree/assignee-cell.tsx`:
+the same fold, status menu, panel and columns, without the plan's tally or
+banded bar. From 6 to 14 October 2026 it used a list layout with no header
+(plan #1078); plan #2069.2 put the columns back and removed that layout.
 
 1. **Question buttons**, from `components/dev/question.tsx` and
    `lib/plan/options.ts`: the lettered options as buttons with the
@@ -1304,8 +1317,8 @@ tally or banded bar.
    hands anything bigger to the goals routine.
 3. **Status words and colours**: On you, With Claude, Waiting, the health
    glyphs with their tooltips, and the question marker on rows waiting on
-   you. On a goal the glyph is the status control and the word is its
-   tooltip.
+   you. On a goal, as on the plan, the glyph and word are the status
+   control, and on a phone the glyph stands alone.
 4. **Read-only detail**: an opened step shows its detail, Done when and Needs
    as text, with Edit as a separate action.
 5. **Proposals**: approve or reject one proposed step.
