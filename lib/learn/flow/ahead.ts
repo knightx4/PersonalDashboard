@@ -63,7 +63,9 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  * readers here tell it apart by the subject's `aim_id`, and name it after the
  * goal. A waiting question about a goal archived since is thrown away unshown.
  * The Level 3 goal takes its turns too, with questions about the articles you
- * claimed and have not been tested on (plan #1386).
+ * claimed and have not been tested on (plan #1386). A goal question asks you
+ * to explain the idea rather than pick an option (plan #2164.2, `explain.ts`);
+ * multiple choice on a goal's idea is only ever a re-check.
  *
  * `goalsOnly` asks about your goals and nothing else (plan #1387), and `aim`
  * about one goal: every question written ahead is a goal question, and a
@@ -160,7 +162,13 @@ export type FlowQuestion = {
    */
   goal?: GoalAbout;
   question: string;
+  /** The options to pick from. Empty on an explain question. */
   options: string[];
+  /**
+   * Set on an explain question (plan #2164.2): answered in your own words and
+   * marked the way a teach-back is, rather than picked from `options`.
+   */
+  explain?: true;
 };
 
 export type SurveyAbout = { themeName: string; fieldName: string };
@@ -180,9 +188,16 @@ type QueuedRow = {
   picked_state: KnowledgeState;
   picked_recheck: 'tested' | 'declared' | null;
   shown_at: string | null;
+  rung: 'recognise' | 'apply' | 'defend';
 };
 
-const QUEUED_COLUMNS = 'id, concept_id, question, options, picked_state, picked_recheck, shown_at';
+const QUEUED_COLUMNS =
+  'id, concept_id, question, options, picked_state, picked_recheck, shown_at, rung';
+
+/** An explain question: no options, at the rung the teach-back marks at. */
+function isExplain(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
+  return row.options === null && row.rung === 'defend';
+}
 
 function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
@@ -390,7 +405,8 @@ async function claimsNow(
 }
 
 function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
-  if (!row.options) return null;
+  const explain = isExplain(row);
+  if (!row.options && !explain) return null;
   return {
     probeId: row.id,
     conceptId: row.concept_id,
@@ -401,14 +417,22 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
     ...(claim.survey ? { survey: claim.survey } : {}),
     ...(claim.goal ? { goal: claim.goal } : {}),
     question: row.question,
-    options: row.options,
+    options: row.options ?? [],
+    ...(explain ? { explain: true as const } : {}),
   };
 }
 
-/** Whether the pick a question came from still holds. */
+/**
+ * Whether the pick a question came from still holds. A goal question is
+ * asked as an explain question unless it is a re-check (plan #2164.2), so a
+ * multiple-choice one written before that is thrown away and written again.
+ */
 function holds(row: QueuedRow, claims: Map<string, ClaimNow>): boolean {
   const claim = claims.get(row.concept_id);
-  return claim !== undefined && claim.state === row.picked_state && row.options !== null;
+  if (claim === undefined || claim.state !== row.picked_state) return false;
+  if (isExplain(row)) return true;
+  if (row.options === null) return false;
+  return claim.goal === null || row.picked_recheck !== null;
 }
 
 async function discard(supabase: LearnSupabaseClient, ids: string[]): Promise<void> {
@@ -746,8 +770,8 @@ async function writeGoals(input: {
   const written: FlowQuestion[] = [];
   if (input.count <= 0 || input.goals.length === 0) return written;
 
+  // The idea is a model call; the question is not (plan #2164.2).
   const ideaSpend = collectSpend();
-  const questionSpend = collectSpend();
   try {
     // Rotated after each question, so the next goal turn goes to the next
     // goal. A goal that cannot be written for is dropped for this round.
@@ -764,7 +788,6 @@ async function writeGoals(input: {
         anthropicApiKey: input.apiKey,
         flow: { shownAt: input.shownAt },
         onIdeaSpend: ideaSpend.sink,
-        onSpend: questionSpend.sink,
       });
       if (!result.ok) {
         if (result.reason === 'error') console.error('[learn flow] goal question', result.detail);
@@ -781,15 +804,13 @@ async function writeGoals(input: {
         goal: { aimId: question.aimId, aimName: question.aimName },
         question: question.question,
         options: question.options,
+        explain: true,
       });
     }
   } catch (error) {
     console.error('[learn flow] goal question', error instanceof Error ? error.message : error);
   }
-  await Promise.all([
-    recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports),
-    recordLearnSpend(input.userId, 'write-survey-question', questionSpend.reports),
-  ]);
+  await recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports);
   return written;
 }
 

@@ -120,7 +120,12 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/flow/actions.ts#flowStep:answer': [
+    'name-misconception',
+    'grade-applied-answer',
+    'mark-teach-back',
+  ],
+  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
   'app/learn/flow/actions.ts#flowStep:start-track': [
     'generate-track-from-theme',
     'place-track',

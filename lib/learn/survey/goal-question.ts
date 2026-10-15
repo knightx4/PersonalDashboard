@@ -8,8 +8,8 @@ import { embedIdeaClaim } from '@/lib/learn/embed/idea-embedding';
 import type { AimDepth } from '@/lib/learn/aims';
 import type { Depth } from '@/lib/learn/feed/depth';
 import { loadConcept } from '@/lib/learn/graph/load';
-import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
-import { nextMasteryCheck, recordProbe } from '@/lib/learn/graph/session';
+import { nextMasteryCheck, recordExplainProbe } from '@/lib/learn/graph/session';
+import { explainPrompt } from '@/lib/learn/flow/explain';
 import type { SurveyIdea } from './idea';
 import { cardBasisPrefix, goalQuestionDepth, ideaForGoal, type GoalCardSource } from './goal-idea';
 import { loadGoalCards, loadGoalSubjectState, type GoalSubjectIdea } from './goal-load';
@@ -31,6 +31,10 @@ import { surveySubjectForAim } from './subject';
  *
  * A new idea is pitched at `goalQuestionDepth`: the goal's own depth, a level
  * up for every two right answers on it at first.
+ *
+ * The question asks you to explain the idea rather than pick an option (plan
+ * #2164.2): `explainPrompt` writes it from the idea's name and checks, with no
+ * model call, and the flow marks the answer the way a teach-back is marked.
  *
  * The Level 3 goal is not written here: its questions are about the articles
  * claimed on it (#1386), so it is refused as `list`.
@@ -60,7 +64,10 @@ export type GoalQuestion = {
   /** "Article: Section" of the card it came from, when it did. */
   cardTitle: string | null;
   question: string;
+  /** Always empty: a goal question is answered in your own words. */
   options: string[];
+  /** Always true: a goal question is an explain prompt (plan #2164.2). */
+  explain: true;
 };
 
 export type WrittenGoalQuestion =
@@ -136,8 +143,6 @@ export async function writeGoalQuestion(input: {
   client?: Anthropic;
   /** The idea's model call. Record it as 'write-survey-idea'. */
   onIdeaSpend?: SpendSink;
-  /** The question's model call. Record it as 'write-survey-question'. */
-  onSpend?: SpendSink;
 }): Promise<WrittenGoalQuestion> {
   const { supabase, userId, aim } = input;
   if (aim.listSource) {
@@ -186,42 +191,11 @@ export async function writeGoalQuestion(input: {
     };
   }
 
-  // A new idea, or one whose question failed, has had nothing asked about it.
-  const check = nextMasteryCheck(idea.mastery, []);
-  const written = await writeProbe({
-    concept: idea.name,
-    claim: idea.claim,
-    check,
-    otherChecks: idea.mastery.filter((other) => other !== check),
-    anthropicApiKey: input.anthropicApiKey,
-    client: input.client,
-    onSpend: input.onSpend,
-  });
-  // The idea stays, unasked, and the next call uses it.
-  if (!written.ok) {
-    return { ok: false, reason: written.reason === 'error' ? 'error' : 'ungrounded', detail: written.detail };
-  }
-
-  let flow;
-  if (input.flow) {
-    const concept = await loadConcept(supabase, idea.conceptId);
-    flow = {
-      pickedState: concept?.state ?? 'unknown',
-      pickedRecheck: null,
-      shownAt: input.flow.shownAt,
-    };
-  }
-  const probeId = await recordProbe(supabase, userId, {
-    conceptId: idea.conceptId,
-    probe: written.probe,
-    model: PROBE_MODEL,
-    flow,
-  });
-
+  const asked = await recordGoalExplain(supabase, userId, idea, input.flow);
   return {
     ok: true,
     question: {
-      probeId,
+      probeId: asked.probeId,
       conceptId: idea.conceptId,
       conceptName: idea.name,
       subjectId: subject.id,
@@ -230,8 +204,42 @@ export async function writeGoalQuestion(input: {
       depth,
       source: idea.source,
       cardTitle: idea.cardTitle,
-      question: written.probe.question,
-      options: written.probe.options,
+      question: asked.question,
+      options: [],
+      explain: true,
     },
   };
+}
+
+/**
+ * Store the explain question on a goal's idea, as one of Practice Flow's when
+ * `flow` is set, and return its id. The prompt leads with the check nothing
+ * has been asked about, which a new idea's first check always is.
+ */
+export async function recordGoalExplain(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  idea: { conceptId: string; name: string; claim: string; mastery: string[] },
+  flow: { shownAt: string | null } | undefined,
+): Promise<{ probeId: string; question: string }> {
+  const check = nextMasteryCheck(idea.mastery, []);
+  const checks = check ? [check, ...idea.mastery.filter((other) => other !== check)] : idea.mastery;
+  let picked;
+  if (flow) {
+    const concept = await loadConcept(supabase, idea.conceptId);
+    picked = {
+      pickedState: concept?.state ?? 'unknown',
+      pickedRecheck: null,
+      shownAt: flow.shownAt,
+    };
+  }
+  const question = explainPrompt(idea.name, checks);
+  const probeId = await recordExplainProbe(supabase, userId, {
+    conceptId: idea.conceptId,
+    question,
+    expected: idea.claim,
+    masteryCheck: check,
+    flow: picked,
+  });
+  return { probeId, question };
 }
