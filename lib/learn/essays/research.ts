@@ -82,6 +82,10 @@ export type EssayResearch = {
   sources: ResearchSource[];
   positions: ResearchPosition[];
   claims: ResearchClaim[];
+  /** On a first pass written up as a map: the short version, about a hundred words. Empty on older runs. */
+  summary: string;
+  /** On a map: the questions it ends on, asking the writer where they stand. */
+  asks: string[];
   costMicros: number | null;
   createdAt: string;
 };
@@ -486,6 +490,8 @@ export type ResearchRow = {
   sources: unknown;
   findings: unknown;
   cost_micros: number | string | null;
+  summary?: string | null;
+  asks?: string[] | null;
   created_at: string;
 };
 
@@ -535,6 +541,8 @@ export function researchFromRow(row: ResearchRow): EssayResearch | null {
     sources,
     positions,
     claims,
+    summary: typeof row.summary === 'string' ? row.summary : '',
+    asks: Array.isArray(row.asks) ? row.asks.filter((a): a is string => typeof a === 'string') : [],
     costMicros: cost !== null && Number.isFinite(cost) ? cost : null,
     createdAt: row.created_at,
   };
