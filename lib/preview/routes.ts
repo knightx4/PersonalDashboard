@@ -134,6 +134,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-work-check': ['/you/work'],
   'you-work-list': ['/you/work'],
   'learn-track-readings': ['/learn/t/[id]'],
+  'dash-working-rows': ['/learn/t/[id]', '/vault', '/news/all'],
   'learn-track-header': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
   'learn-now-subject-empty': ['/learn/now'],

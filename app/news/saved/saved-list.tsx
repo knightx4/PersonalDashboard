@@ -17,6 +17,8 @@ import { DiscussButton } from '../quick/discuss-sheet';
 import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
 import { threadRef } from '@/lib/thread/subjects';
+import { MoveLabel } from '@/components/ui/move-label';
+import { HANDOFF_WORKING_TITLE } from '@/lib/core/move';
 import { removeSaved } from './actions';
 
 /**
@@ -33,6 +35,8 @@ export type SavedListStory = SavedStory & {
   related?: readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
   /** The thread under the saved story (plan #1471), its discussion included; left out, none. */
   thread?: readonly DevComment[];
+  /** Whether a run or an Ask Dash hand-off is about the story (plan #1964.2.2); left out, not. */
+  working?: boolean;
 };
 
 /**
@@ -88,16 +92,21 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
             <article>
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-ui text-ink-muted">
-                    {story.issueId ? (
-                      <Link href={`/news/i/${story.issueId}`} className="hover:text-ink hover:underline">
-                        {story.senderName}
-                      </Link>
-                    ) : (
-                      story.senderName
+                  <div className="flex items-center gap-3">
+                    {story.working && (
+                      <MoveLabel move={{ state: 'dash_working' }} title={HANDOFF_WORKING_TITLE} className="shrink-0" />
                     )}
-                    {` · ${story.arrived}`}
-                  </p>
+                    <p className="min-w-0 flex-1 truncate text-ui text-ink-muted">
+                      {story.issueId ? (
+                        <Link href={`/news/i/${story.issueId}`} className="hover:text-ink hover:underline">
+                          {story.senderName}
+                        </Link>
+                      ) : (
+                        story.senderName
+                      )}
+                      {` · ${story.arrived}`}
+                    </p>
+                  </div>
                   <h2 className="mt-0.5 break-words text-body font-semibold text-ink">
                     {story.headline}
                   </h2>
