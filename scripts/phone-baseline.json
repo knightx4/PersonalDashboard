@@ -8,12 +8,6 @@
   "anatomy-settings": {
     "targets": 1
   },
-  "ask-dash-changes": {
-    "targets": 1
-  },
-  "ask-made-changes": {
-    "targets": 3
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 3

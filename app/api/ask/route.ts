@@ -15,15 +15,23 @@ export const dynamic = 'force-dynamic';
  * The sheet and /ask ask Dash here. A route handler rather than a server
  * action, which is where this used to be, because an action hands back one
  * value when it is finished and this has to say something while it works.
- * The body is newline-delimited JSON: a `lookup` line as each lookup starts
+ * The body is newline-delimited JSON: an `asked` line once the question is
+ * kept (plan #1899.5), a `lookup` line as each lookup starts
  * and as it finishes, a `text` line for each piece of the answer as Dash
  * writes it (plan #1902), then one `result` line holding the AskDashResult,
  * whose saved turn is the answer as kept.
  * lib/talk/lookups.ts writes and reads both.
  *
+ * Stop (plan #1899.5) is the browser ending the request: the request's
+ * signal, or the stream being cancelled, aborts the answer, which ends the
+ * model call in flight and keeps what Dash had written as the answer. The
+ * browser then reads the kept answer back by the conversation the `asked`
+ * line named. Leaving the page mid-answer ends it the same way.
+ *
  * The person comes from the session and nowhere else; the body names only the
- * question, the conversation it continues, the page it was asked on and the filter
- * of a list sent with it (plan #1658), all
+ * question, the conversation it continues, the page it was asked on, the filter
+ * of a list sent with it (plan #1658), the rows added with @ and the workspace
+ * the lookups are kept to (plan #1899.5), all
  * checked by parseAskInput. JSON only, so a form on another site cannot post
  * here without the browser asking first.
  *
@@ -53,7 +61,14 @@ export async function POST(request: Request) {
     body.files,
     user.id,
     body.list,
+    body.rows,
+    body.scope,
   );
+
+  const stopping = new AbortController();
+  const stop = () => stopping.abort();
+  if (request.signal.aborted) stop();
+  else request.signal.addEventListener('abort', stop, { once: true });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -86,6 +101,8 @@ export async function POST(request: Request) {
       try {
         const result = await askDashInRequest({
           ...checked.input,
+          signal: stopping.signal,
+          onAsked: (asked) => send({ asked }),
           onLookup: (event) => {
             const lookup = lookupWire(event);
             if (lookup) send({ lookup });
@@ -106,7 +123,8 @@ export async function POST(request: Request) {
       end();
     },
     cancel() {
-      // Nothing to stop: the answer runs to its end and is kept.
+      // The browser stopped reading: Stop was pressed, or the page went.
+      stop();
     },
   });
 

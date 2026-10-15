@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from 'react';
-import { ArrowUp, Check, CircleUser, CornerDownRight, X } from 'lucide-react';
+import { ArrowUp, AtSign, Check, CircleUser, CornerDownRight, Square, X } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
@@ -32,6 +32,9 @@ import { turnBody, MAX_TURN, type TalkCitation, type TalkTurn } from '@/lib/talk
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
+import { Tooltip } from '@/components/ui/tooltip';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
+import { boxTrigger, replaceTrigger, type BoxTrigger } from '@/lib/talk/box-commands';
 
 /**
  * Every conversation in the app, and the box for adding to it
@@ -188,6 +191,14 @@ function Composer({
   sendDisabled,
   hidden,
   error,
+  className,
+  over,
+  attached,
+  onCaret,
+  boxProps,
+  onKey,
+  holdSend = false,
+  send,
 }: {
   formRef: React.RefObject<HTMLFormElement | null>;
   boxRef?: React.RefObject<HTMLTextAreaElement | null>;
@@ -213,11 +224,27 @@ function Composer({
   sendDisabled: boolean;
   hidden?: React.ReactNode;
   error?: React.ReactNode;
+  className?: string;
+  /** Drawn in the form over the box: the menu an @ or a / opens (plan #1899.5). */
+  over?: React.ReactNode;
+  /** In the box above the words: the rows added with @. */
+  attached?: React.ReactNode;
+  /** Heard as the words or the caret move. */
+  onCaret?: (box: HTMLTextAreaElement) => void;
+  /** More attributes for the words: the menu's aria wiring. */
+  boxProps?: React.TextareaHTMLAttributes<HTMLTextAreaElement>;
+  /** Heard first on each key; true when it took the key. */
+  onKey?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  /** Enter does not send: an answer is on its way and Stop stands in for Send. */
+  holdSend?: boolean;
+  /** In place of the arrow: Stop while an answer is written. */
+  send?: React.ReactNode;
 }) {
   return (
     <form
       ref={formRef}
       action={action}
+      className={className}
       onSubmit={onSubmit}
       onBlur={(event) => {
         if (draft.trim()) return;
@@ -226,7 +253,9 @@ function Composer({
       }}
     >
       {hidden}
+      {over}
       <ComposeBox>
+        {attached}
         <div className="flex items-start gap-2">
           {lead}
           {boxLabel && boxId && (
@@ -245,9 +274,15 @@ function Composer({
             maxLength={maxLength}
             placeholder={placeholder}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              onCaret?.(event.target);
+            }}
+            onSelect={onCaret ? (event) => onCaret(event.currentTarget) : undefined}
+            {...boxProps}
             onPaste={onPaste}
             onKeyDown={(event) => {
+              if (onKey?.(event)) return;
               if (event.key === 'Escape') {
                 event.preventDefault();
                 onClose();
@@ -260,6 +295,7 @@ function Composer({
               if (event.nativeEvent.isComposing) return;
               if (!draft.trim()) return;
               event.preventDefault();
+              if (holdSend) return;
               formRef.current?.requestSubmit();
             }}
           />
@@ -271,16 +307,18 @@ function Composer({
             {/* A glyph, so the send control is the same size wherever it
                 sits. What a caller's own action is called is what a screen
                 reader reads and what the tooltip says. */}
-            <Button
-              type="submit"
-              size="sm"
-              className="size-7 shrink-0 px-0"
-              disabled={sendDisabled}
-              title={sendLabel}
-            >
-              <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">{sendLabel}</span>
-            </Button>
+            {send ?? (
+              <Button
+                type="submit"
+                size="sm"
+                className="size-7 shrink-0 px-0 active:brightness-90"
+                disabled={sendDisabled}
+                title={sendLabel}
+              >
+                <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">{sendLabel}</span>
+              </Button>
+            )}
           </div>
         </div>
       </ComposeBox>
@@ -763,6 +801,41 @@ function RowThread({
 export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
 
 /**
+ * One choice in the menu over the box (plan #1899.5): a row to add with @,
+ * or a command with /. Choosing it puts `insert` where the @ or / and what
+ * followed it were, then calls `onPick`.
+ */
+export type BoxItem = {
+  key: string;
+  label: string;
+  /** What it is, beside the label, quieter. */
+  hint?: string | null;
+  /** Drawn before the label: the row's workspace mark. */
+  mark?: React.ReactNode;
+  insert: string;
+  onPick?: () => void;
+};
+
+/** What the menu over the box offers for what is being typed. */
+export type BoxMenu = { label: string; items: readonly BoxItem[]; empty: string };
+
+/**
+ * What a turn's `below` can do to the thread (plan #1899.7): the question
+ * the turn answered, and the two ways to ask it again. Both add turns at the
+ * end, so a thread stays one line of turns.
+ */
+export type TurnControls = {
+  /** The person's turn before this one; null for a turn with none before it. */
+  question: string | null;
+  /** A reply is being written, so another question would wait. */
+  busy: boolean;
+  /** Send `body` as a new question now, leaving the box as it is. */
+  resend: (body: string) => void;
+  /** Open the box with `body` in it, to change and send. */
+  edit: (body: string) => void;
+};
+
+/**
  * The thread's own turns with any written elsewhere slotted in by time.
  * A check-back that lands while a question is on its way reads that question
  * as already kept, and the answer too if it has been written: those belong to
@@ -846,13 +919,17 @@ function AssistantMark({
 // which draws no space of its own, so the rows stay one tight list (plan #1708).
 const CITED_LINK = `press-area flex min-w-0 text-ui ${linkVariants({ tone: 'inline' })}`;
 
-/** The rows an answer rests on, each a link to where it lives (plan #1090). */
-function Cited({ citations }: { citations: readonly TalkCitation[] }) {
+/**
+ * The rows an answer rests on, each a link to where it lives (plan #1090).
+ * On a question, the rows the person added with @ (plan #1899.5).
+ */
+function Cited({ citations, added = false }: { citations: readonly TalkCitation[]; added?: boolean }) {
+  const Glyph = added ? AtSign : CornerDownRight;
   return (
-    <ul className="pt-1" aria-label="What this answer used">
+    <ul className="pt-1" aria-label={added ? 'Rows you added' : 'What this answer used'}>
       {citations.map((citation) => (
         <li key={`${citation.table}:${citation.ref}`} className="flex min-w-0 items-baseline gap-1.5">
-          <CornerDownRight className="size-3 shrink-0 translate-y-0.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+          <Glyph className="size-3 shrink-0 translate-y-0.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
           {citation.href.startsWith('/') ? (
             <Link href={citation.href} className={CITED_LINK}>
               <span className="min-w-0 truncate">{citation.title}</span>
@@ -914,8 +991,12 @@ type TalkThreadProps = {
    * the question News' Discuss opens with.
    */
   opening?: string;
-  /** What to draw under an assistant turn: the changes an answer proposed (plan #1190). */
-  below?: (turn: TalkTurn) => React.ReactNode;
+  /**
+   * What to draw under a turn: the changes an answer proposed (plan #1190),
+   * and the presses under each answer (plan #1899.7), which `thread` lets ask
+   * again.
+   */
+  below?: (turn: TalkTurn, thread: TurnControls) => React.ReactNode;
   /** Who answers: Dash when left out. */
   assistant?: TalkAssistant;
   /** What kind of work the mark shows while a reply is coming. */
@@ -932,6 +1013,24 @@ type TalkThreadProps = {
   initialDraft?: string;
   /** For the preview gallery: the box opens with these files added. */
   initialFiles?: UploadedAttachment[];
+  /** Heard as each question is sent, before the transition that waits for its answer starts. */
+  onSubmit?: () => void;
+  /**
+   * Stops the answer on its way (plan #1899.5). Given, the box stays open
+   * once a question is sent and Send turns into Stop while Dash answers; a
+   * Stop button stands in for the opener when the box is closed.
+   */
+  onStop?: () => void;
+  /** Hears what the words at the caret ask the menu for: an @ row or a / command, or null. */
+  onTrigger?: (trigger: BoxTrigger | null) => void;
+  /** The menu over the box for the trigger last heard; null or absent draws none. */
+  menu?: BoxMenu | null;
+  /** In the box above the words: the rows added with @. */
+  attached?: React.ReactNode;
+  /** In the box's foot after Add a file: the workspace the lookups are kept to. */
+  boxStart?: React.ReactNode;
+  /** The rows added with @, drawn on the question as it is sent. */
+  questionCitations?: readonly TalkCitation[];
 };
 
 /**
@@ -963,6 +1062,13 @@ function TalkThread({
   withFiles = false,
   initialDraft = '',
   initialFiles = [],
+  onSubmit,
+  onStop,
+  onTrigger,
+  menu,
+  attached,
+  boxStart,
+  questionCitations,
 }: TalkThreadProps) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   const turns = useMemo(() => withIncoming(own, incoming), [own, incoming]);
@@ -975,22 +1081,93 @@ function TalkThread({
   const [landed, setLanded] = useState<string | null>(null);
   const [sending, startSend] = useTransition();
   const form = useRef<HTMLFormElement>(null);
+  // Keep the box, and with it Stop, in view while the answer is written
+  // beneath the question: a phone's screen is shorter than the lookups and
+  // the words that follow, with room under it for the dock (plan #1899.8).
+  // Watching the thread's size catches each line as it lands; nothing moves
+  // when the box is already in view.
+  useEffect(() => {
+    const box = form.current;
+    if (!sending || !box) return;
+    const keep = () => box.scrollIntoView({ block: 'nearest' });
+    keep();
+    // Again once the question and the working line have been laid out.
+    const frame = requestAnimationFrame(() => requestAnimationFrame(keep));
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(keep);
+    if (box.parentElement) watch?.observe(box.parentElement);
+    return () => {
+      cancelAnimationFrame(frame);
+      watch?.disconnect();
+    };
+  }, [sending]);
   const adder = useRef<AddFileHandle>(null);
+  // What the words at the caret ask the menu for (plan #1899.5), and which
+  // of its items is lit. A menu closed with Escape stays closed until the
+  // trigger moves on. Words the box opens with are read as typed, caret at
+  // their end, so the gallery can draw the menu an @ or a / in them opens.
+  const [trigger, setTrigger] = useState<BoxTrigger | null>(() =>
+    onTrigger && initialDraft && startWriting && !ask ? boxTrigger(initialDraft, initialDraft.length) : null,
+  );
+  const [lit, setLit] = useState(0);
+  const [shut, setShut] = useState<number | null>(null);
+  const noteAt = (value: string, caret: number) => {
+    const next = onTrigger ? boxTrigger(value, caret) : null;
+    const same =
+      trigger?.kind === next?.kind && trigger?.query === next?.query && trigger?.start === next?.start;
+    if (same) return;
+    if (!next) setShut(null);
+    setTrigger(next);
+    setLit(0);
+    onTrigger?.(next);
+  };
+  const noteCaret = (box: HTMLTextAreaElement) => noteAt(box.value, box.selectionStart ?? box.value.length);
+  useEffect(() => {
+    if (!trigger || !initialDraft) return;
+    onTrigger?.(trigger);
+    const box = document.getElementById(`${id}-talk`);
+    if (box instanceof HTMLTextAreaElement) box.setSelectionRange(initialDraft.length, initialDraft.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
+  const menuOpen = Boolean(trigger && menu && shut !== trigger.start);
+  const items = menuOpen && menu ? menu.items : [];
+  const choose = (item: BoxItem) => {
+    if (!trigger) return;
+    const next = replaceTrigger(draft, trigger, item.insert);
+    setDraft(next.draft);
+    setTrigger(null);
+    onTrigger?.(null);
+    item.onPick?.();
+    requestAnimationFrame(() => {
+      const box = document.getElementById(`${id}-talk`);
+      if (box instanceof HTMLTextAreaElement) {
+        box.focus();
+        box.setSelectionRange(next.caret, next.caret);
+      }
+    });
+  };
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
+  const stopping = sending && Boolean(onStop);
 
-  const submit = (raw: string = draft) => {
+  /**
+   * Send a question. From the box, the box empties and its files go with it;
+   * a question sent again from under an answer (`fromBox` false) leaves
+   * whatever is in the box where it is.
+   */
+  const submit = (raw: string = draft, fromBox = true) => {
     const checked = turnBody(raw);
     if ('error' in checked) {
       setError(checked.error);
       return;
     }
-    const sentFiles = withFiles ? files : [];
+    const sentFiles = withFiles && fromBox ? files : [];
+    const added = fromBox && questionCitations?.length ? [...questionCitations] : [];
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
       body: checked.body,
       createdAt: new Date().toISOString(),
+      ...(added.length > 0 ? { citations: added } : {}),
       ...(sentFiles.length > 0 ? { files: sentFiles.map((file) => ({ ...file, id: file.path, href: '' })) } : {}),
     };
     // Outside the transition: the question is in the thread on this commit,
@@ -998,10 +1175,16 @@ function TalkThread({
     setError(null);
     setFailed(null);
     setLanded(null);
-    setDraft('');
-    setFiles([]);
-    setWriting(false);
+    if (fromBox) {
+      setDraft('');
+      setFiles([]);
+      setTrigger(null);
+      onTrigger?.(null);
+      // With Stop to offer, the box stays where Stop is (plan #1899.5).
+      if (!onStop) setWriting(false);
+    }
     setTurns((current) => [...current, question]);
+    onSubmit?.();
     startSend(async () => {
       const result = await send(checked.body, sentFiles.length > 0 ? sentFiles : undefined).catch(() => ({
         turns: undefined,
@@ -1014,7 +1197,7 @@ function TalkThread({
         setTurns((current) => [...current.filter((turn) => turn.id !== PENDING), ...kept]);
         if (result.error) setFailed(result.error);
         else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
-        if (kept.length === 0) {
+        if (kept.length === 0 && fromBox) {
           setDraft(checked.body);
           setFiles(sentFiles);
           setWriting(true);
@@ -1028,6 +1211,30 @@ function TalkThread({
     const timer = setTimeout(() => setLanded(null), DONE_FOR_MS);
     return () => clearTimeout(timer);
   }, [landed]);
+
+  const resend = (body: string) => {
+    if (sending) return;
+    submit(body, false);
+  };
+  const edit = (body: string) => {
+    setError(null);
+    setDraft(body);
+    setWriting(true);
+    // The box may already be open, where autoFocus does not fire again.
+    requestAnimationFrame(() => {
+      const box = document.getElementById(`${id}-talk`);
+      if (box instanceof HTMLTextAreaElement) {
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+      }
+    });
+  };
+  const questionBefore = (index: number): string | null => {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (turns[i].role === 'user') return turns[i].body;
+    }
+    return null;
+  };
 
   // Once per mount, including under Strict Mode's second effect run: a
   // question sent twice is two answers paid for.
@@ -1076,8 +1283,10 @@ function TalkThread({
                 {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
-                {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
-                {turn.id === PENDING ? undefined : below?.(turn)}
+                {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}
+                {turn.id === PENDING
+                  ? undefined
+                  : below?.(turn, { question: questionBefore(index), busy: sending, resend, edit })}
               </ThreadTurn>
             );
           })}
@@ -1111,16 +1320,111 @@ function TalkThread({
       ) : !writing ? (
         <div className="flex items-center gap-1">
           <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
-          {cost && <PaidHint action={cost.action} what={cost.what} />}
+          {stopping ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onStop}>
+              <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
+              Stop
+            </Button>
+          ) : (
+            cost && <PaidHint action={cost.action} what={cost.what} />
+          )}
         </div>
       ) : (
         <Composer
           formRef={form}
+          className="relative scroll-mb-28"
           onSubmit={(event) => {
             event.preventDefault();
+            if (stopping) return;
             submit();
           }}
           onClose={() => setWriting(false)}
+          holdSend={stopping}
+          attached={attached}
+          onCaret={onTrigger ? noteCaret : undefined}
+          boxProps={
+            onTrigger
+              ? {
+                  'aria-autocomplete': 'list',
+                  'aria-expanded': menuOpen,
+                  'aria-controls': menuOpen ? `${id}-menu` : undefined,
+                  'aria-activedescendant': items.length > 0 ? `${id}-menu-${lit}` : undefined,
+                }
+              : undefined
+          }
+          onKey={(event) => {
+            if (!menuOpen || !trigger) return false;
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setShut(trigger.start);
+              return true;
+            }
+            if (items.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+              event.preventDefault();
+              const step = event.key === 'ArrowDown' ? 1 : -1;
+              setLit((current) => (current + step + items.length) % items.length);
+              return true;
+            }
+            if (items.length > 0 && (event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey) {
+              if (event.nativeEvent.isComposing) return true;
+              event.preventDefault();
+              choose(items[Math.min(lit, items.length - 1)]);
+              return true;
+            }
+            return false;
+          }}
+          over={
+            menuOpen &&
+            menu && (
+              <div
+                id={`${id}-menu`}
+                role="listbox"
+                aria-label={menu.label}
+                className={cn(popoverSurface, 'absolute inset-x-0 bottom-full z-overlay mb-1.5 p-1 sm:right-auto sm:w-80')}
+              >
+                <p className="px-2.5 pb-0.5 pt-1 text-small text-ink-muted">{menu.label}</p>
+                {items.length === 0 ? (
+                  <p className="px-2.5 py-1.5 text-ui text-ink-muted">{menu.empty}</p>
+                ) : (
+                  items.map((item, index) => (
+                    <button
+                      key={item.key}
+                      id={`${id}-menu-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={index === lit}
+                      tabIndex={-1}
+                      // Kept off the focus path, so the words keep the caret.
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setLit(index)}
+                      onClick={() => choose(item)}
+                      className={cn(menuItemClass(), 'min-h-11 sm:min-h-0', index === lit && 'bg-sunken')}
+                    >
+                      {item.mark}
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.hint && <span className="min-w-0 shrink truncate text-small text-ink-muted">{item.hint}</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            )
+          }
+          send={
+            stopping ? (
+              // Send turns into Stop while Dash answers (plan #1899.5).
+              <Tooltip label="Stop the answer and keep what Dash has written">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="size-7 shrink-0 px-0 active:brightness-90"
+                  aria-label="Stop"
+                  onClick={onStop}
+                >
+                  <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
+                </Button>
+              </Tooltip>
+            ) : undefined
+          }
           draft={draft}
           setDraft={setDraft}
           boxId={`${id}-talk`}
@@ -1132,9 +1436,12 @@ function TalkThread({
             if (adder.current?.paste(event.clipboardData)) event.preventDefault();
           }}
           footer={
-            withFiles ? (
-              <div className="min-w-0 flex-1">
-                <AddFile ref={adder} value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+            withFiles || boxStart ? (
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                {withFiles && (
+                  <AddFile ref={adder} value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+                )}
+                {boxStart}
               </div>
             ) : undefined
           }

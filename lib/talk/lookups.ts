@@ -1,5 +1,5 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
-import type { TalkToolCall } from './talk';
+import type { TalkToolCall, TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
@@ -51,7 +51,14 @@ export type LookupWire = {
  * answer's text as Dash writes it (plan #1902), each following the last, or
  * the result, which carries the answer as kept.
  */
-export type AskStreamLine = { lookup: LookupWire } | { text: string } | { result: AskDashResult };
+/** The question as kept, sent before Dash is asked (plan #1899.5), so a stopped answer can be found again. */
+export type AskedWire = { conversation: { ref: string; title: string | null }; turns: TalkTurn[] };
+
+export type AskStreamLine =
+  | { asked: AskedWire }
+  | { lookup: LookupWire }
+  | { text: string }
+  | { result: AskDashResult };
 
 /**
  * The write tools (lib/dash/writes.ts, plan #1440), named here because this
@@ -259,6 +266,7 @@ export async function readAskStream(
   body: ReadableStream<Uint8Array>,
   onLookup: (wire: LookupWire) => void,
   onText?: (piece: string) => void,
+  onAsked?: (asked: AskedWire) => void,
 ): Promise<AskDashResult> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -278,6 +286,7 @@ export async function readAskStream(
       try {
         if ('lookup' in parsed) onLookup(parsed.lookup);
         else if ('text' in parsed && typeof parsed.text === 'string') onText?.(parsed.text);
+        else if ('asked' in parsed) onAsked?.(parsed.asked);
       } catch {
         // A listener that throws must not lose the answer.
       }

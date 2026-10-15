@@ -133,6 +133,7 @@ export function ActionMenu({
   className,
   triggerClassName,
   onOpenChange,
+  defaultOpen = false,
 }: {
   label?: string;
   items: ActionMenuItem[];
@@ -147,8 +148,10 @@ export function ActionMenu({
    */
   triggerClassName?: string;
   onOpenChange?: (open: boolean) => void;
+  /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   /** The item whose confirm is showing, if any. Cleared whenever the menu closes. */

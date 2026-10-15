@@ -200,7 +200,7 @@ export function DashChangeRow({
           <ChangeStatus change={change} />
           <Link
             href={changeHref(change)}
-            className={`${linkVariants({ tone: 'inline' })} text-small`}
+            className={`${linkVariants({ tone: 'inline' })} press-area text-small`}
           >
             {changeWhere(change)}
           </Link>
