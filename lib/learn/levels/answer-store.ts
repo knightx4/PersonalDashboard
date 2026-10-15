@@ -14,7 +14,7 @@ import {
 } from '@/lib/learn/levels/grade';
 import { writeLevelCase } from '@/lib/learn/levels/case-call';
 import { gradeCellAnswer, LEVEL_GRADE_MODEL, LEVEL_GRADE_SECOND_MODEL } from '@/lib/learn/levels/grade-call';
-import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
+import { loadGradeMap, territoryOf } from '@/lib/learn/levels/loader-grade';
 import { questionFormat, readCells } from '@/lib/learn/levels/model';
 
 /**
@@ -56,7 +56,7 @@ export async function askCell(
   const { data: cell, error } = await learn
     .from('topic_cells')
     .select('id, level, descriptor, topic:topics!inner(name, status)')
-    .eq('user_id', userId)
+    .or(territoryOf(userId))
     .eq('id', cellId)
     .maybeSingle();
   if (error) return { ok: false, error: `Reading that level failed: ${error.message}` };

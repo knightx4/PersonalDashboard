@@ -449,35 +449,114 @@ export function dueRechecks(map: TopicMap, readings: Readings, now: Date): Reche
     .sort((a, b) => (a.heldSince < b.heldSince ? -1 : a.heldSince > b.heldSince ? 1 : 0));
 }
 
+/**
+ * How a held cell is held, as every count above a cell keeps it (plan
+ * #2138.10): `tested` is shown by a graded answer, `inferred` is implied by a
+ * cell that was, and `declared` is said without being asked. They are
+ * different amounts of evidence, so nothing here adds one kind to another.
+ */
+export const HELD_KINDS = ['tested', 'inferred', 'declared'] as const;
+export type HeldKind = (typeof HELD_KINDS)[number];
+export type KindCounts = Record<HeldKind, number>;
+
+/** The kind a status is held as, or null when it is not held. */
+export function heldKind(status: CellStatus): HeldKind | null {
+  if (status === 'shown') return 'tested';
+  if (status === 'implied') return 'inferred';
+  if (status === 'declared') return 'declared';
+  return null;
+}
+
+function noKinds(): KindCounts {
+  return { tested: 0, inferred: 0, declared: 0 };
+}
+
+/**
+ * Where you stand on anything above a cell, as two numbers that are never
+ * folded into one.
+ *
+ * `breadth` is how many of its children are touched, per kind, out of
+ * `children`. For a topic the children are its cells up to the ceiling. For
+ * a group of topics (a lens, or a frame topic and the topics that refine it)
+ * they are the topics, and a topic counts under every kind it holds a cell
+ * by. `depth` is the best level beneath, per kind: the highest level held
+ * that way, 0 where none is.
+ */
+export type Reach = {
+  children: number;
+  breadth: KindCounts;
+  depth: KindCounts;
+};
+
+function reachOf(ix: Indexed, readings: Readings, topicId: string): Reach {
+  const breadth = noKinds();
+  const depth = noKinds();
+  const levels = ix.byTopic.get(topicId);
+  for (const [level, cell] of levels ?? []) {
+    const kind = heldKind(readings.get(cell.id)?.status ?? 'open');
+    if (!kind) continue;
+    breadth[kind] += 1;
+    depth[kind] = Math.max(depth[kind], level);
+  }
+  return { children: levels?.size ?? 0, breadth, depth };
+}
+
+/** One topic: breadth over its cells and depth, per kind. */
+export function topicReach(map: TopicMap, readings: Readings, topicId: string): Reach {
+  return reachOf(index(map), readings, topicId);
+}
+
+/**
+ * A group of topics: breadth is the topics touched, per kind, and depth is
+ * the best level any of them reaches, per kind. A topic that is not on the
+ * map still counts as a child, untouched.
+ */
+export function groupReach(map: TopicMap, readings: Readings, topicIds: readonly string[]): Reach {
+  const ix = index(map);
+  const ids = [...new Set(topicIds)];
+  const breadth = noKinds();
+  const depth = noKinds();
+  for (const id of ids) {
+    const reach = reachOf(ix, readings, id);
+    for (const kind of HELD_KINDS) {
+      if (reach.breadth[kind] > 0) breadth[kind] += 1;
+      depth[kind] = Math.max(depth[kind], reach.depth[kind]);
+    }
+  }
+  return { children: ids.length, breadth, depth };
+}
+
 export type LensTarget = { topicId: string; targetLevel: number };
 
 export type LensProgress = {
-  held: number;
+  /** Cells held at or below each target, per kind. */
+  held: KindCounts;
+  /** Cells at or below each target. */
   total: number;
-  /** held / total; 0 for a lens with no cells to count. */
-  fraction: number;
-  topics: Array<{ topicId: string; targetLevel: number; level: number; held: number; total: number }>;
+  topics: Array<{ topicId: string; targetLevel: number; level: number; held: KindCounts; total: number }>;
 };
 
 /**
- * Held cells at or below each target, over all cells at or below each
- * target. Adding a topic to a lens lowers it, which the lens page says.
+ * Held cells at or below each target, per kind, over all cells at or below
+ * each target. Adding a topic to a lens lowers it, which the lens page says.
  */
 export function lensProgress(map: TopicMap, readings: Readings, targets: readonly LensTarget[]): LensProgress {
   const ix = index(map);
   const topics = targets.map(({ topicId, targetLevel }) => {
-    let held = 0;
+    const held = noKinds();
     let total = 0;
     for (const [l, cell] of ix.byTopic.get(topicId) ?? []) {
       if (l > targetLevel) continue;
       total += 1;
-      if (isHeld(readings.get(cell.id)?.status ?? 'open')) held += 1;
+      const kind = heldKind(readings.get(cell.id)?.status ?? 'open');
+      if (kind) held[kind] += 1;
     }
     return { topicId, targetLevel, level: topicLevel(map, readings, topicId).level, held, total };
   });
-  const held = topics.reduce((n, t) => n + t.held, 0);
+  const held = noKinds();
+  for (const t of topics) for (const kind of HELD_KINDS) held[kind] += t.held[kind];
   const total = topics.reduce((n, t) => n + t.total, 0);
-  return { held, total, fraction: total === 0 ? 0 : held / total, topics };
+  return { held, total, topics };
 }
 
 /** The question a level calls for (the spec's "Levels are not rungs"). */

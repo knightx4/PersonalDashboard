@@ -15,11 +15,20 @@ import {
   lensProgress,
   topicLevel,
   type FringeRow,
-  type LensProgress,
+  type KindCounts,
   type LensTarget,
   type Readings,
   type TopicMap,
 } from '@/lib/learn/levels/model';
+
+/**
+ * Held cells of every kind together. The model keeps tested, inferred and
+ * declared apart (plan #2138.10); the lens meters on the Know and lens pages
+ * still draw one bar of all three until they show the kinds apart.
+ */
+function anyHeld(held: KindCounts): number {
+  return held.tested + held.inferred + held.declared;
+}
 
 /**
  * The level a learning goal's depth asks for on each of its topics, never
@@ -93,13 +102,14 @@ export function summariseLens(
 ): LensSummary {
   const approved = approvedTargets(lens, topics);
   const progress = lensProgress(map, readings, approved);
+  const held = anyHeld(progress.held);
   return {
     id: lens.id,
     name: lens.name,
     origin: lens.origin,
-    held: progress.held,
+    held,
     total: progress.total,
-    fraction: progress.fraction,
+    fraction: progress.total === 0 ? 0 : held / progress.total,
     topics: approved.length,
     drafts: lens.targets.length - approved.length,
   };
@@ -147,7 +157,7 @@ export type LensTopicView = {
 };
 
 export type LensDetailView = {
-  progress: Pick<LensProgress, 'held' | 'total' | 'fraction'>;
+  progress: { held: number; total: number; fraction: number };
   bands: BandCount[];
   /** Approved topics first by name, then drafts. */
   topics: LensTopicView[];
@@ -186,7 +196,7 @@ export function lensDetail(
         ceiling: topic.ceiling,
         target: Math.min(target.targetLevel, topic.ceiling),
         level: topic.approved ? (p?.level ?? topicLevel(map, readings, topic.id).level) : 0,
-        held: p?.held ?? 0,
+        held: p ? anyHeld(p.held) : 0,
         total: p?.total ?? 0,
         addedAt: target.addedAt,
         fringe: ready
@@ -202,7 +212,11 @@ export function lensDetail(
   views.sort((a, b) => Number(b.approved) - Number(a.approved) || a.name.localeCompare(b.name));
 
   return {
-    progress: { held: progress.held, total: progress.total, fraction: progress.fraction },
+    progress: {
+      held: anyHeld(progress.held),
+      total: progress.total,
+      fraction: progress.total === 0 ? 0 : anyHeld(progress.held) / progress.total,
+    },
     bands: bandCounts(views.filter((v) => v.approved).map((v) => v.level)),
     topics: views,
     addedToday: views.filter((v) => day.dayOf(v.addedAt) === day.today).map((v) => v.name),
