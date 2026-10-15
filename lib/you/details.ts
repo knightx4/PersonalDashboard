@@ -13,6 +13,28 @@ export type DetailKey = (typeof DETAIL_KEYS)[number];
 /** The six details; null is one they have not given. */
 export type Details = Record<DetailKey, string | null>;
 
+/** What the Details tab calls each one, in the order it lists them. */
+export const DETAIL_LABELS: Record<DetailKey, string> = {
+  phone: 'Phone',
+  linkedin_url: 'LinkedIn',
+  citizenship: 'Citizenship',
+  race: 'Race',
+  gender: 'Gender',
+  sexuality: 'Sexuality',
+};
+
+/**
+ * Where a LinkedIn address, kept as typed, opens. One typed without its
+ * scheme ('linkedin.com/in/someone') gets https in front; anything but http
+ * or https is treated as having none, so a stored value never becomes a
+ * script link.
+ */
+export function linkedinHref(value: string): string {
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^[a-z][a-z0-9+.-]*:\/*/i, '')}`;
+}
+
 /** The columns a row is read with. */
 export const DETAIL_COLUMNS = DETAIL_KEYS.join(', ');
 
@@ -60,4 +82,18 @@ export function checkDetails(patch: Partial<Record<DetailKey, string | null>>): 
     }
   }
   return null;
+}
+
+/**
+ * Why a save of the details did not go through, in words that say whether
+ * pressing Save again will help: after a dropped connection it will, after a
+ * refused value it will not.
+ */
+export function whyNotSaved(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/fetch failed|network|timed? ?out|ECONN|ENOTFOUND|socket/i.test(message)) {
+    return 'The connection dropped before your details saved. What you typed is still here: press Save to try again.';
+  }
+  const reason = message.replace(/^Saving your details failed: /, '').replace(/\.$/, '');
+  return `The database refused these details (${reason}). What you typed is still here.`;
 }

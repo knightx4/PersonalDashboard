@@ -26,6 +26,7 @@ import {
   History,
   Hourglass,
   House,
+  IdCard,
   Inbox,
   KanbanSquare,
   LayoutDashboard,
@@ -190,6 +191,8 @@ export const NAV_ICONS = {
   review: ClipboardCheck,
 
   personality: Fingerprint,
+  // Details: phone, LinkedIn and the facts a form asks for (plan #2124.2).
+  details: IdCard,
   places: MapPin,
   workSchool: GraduationCap,
   insights: Sparkles,
