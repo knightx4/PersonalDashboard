@@ -280,6 +280,14 @@ import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
+import {
+  GoalMetricsEmptySurface,
+  GoalMetricsErrorSurface,
+  GoalMetricsFormSurface,
+  GoalMetricsMenuSurface,
+  GoalMetricsPendingSurface,
+  GoalMetricsSurface,
+} from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -5611,6 +5619,57 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSuggestionsSurface />,
+  },
+  {
+    /* A goal's metrics in its properties column (plan #2084.3): two metrics,
+     * one with the longest name, and the line that adds another. The column
+     * is drawn as a phone's opened fold and the laptop's rail. Fixtures in
+     * goal-metric-props-surfaces.tsx, as are the parts below. */
+    id: 'goals-metrics-props',
+    label: 'Goal · Metrics in the properties',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsSurface />,
+  },
+  {
+    /* The add line pressed: the form open in place. */
+    id: 'goals-metrics-props-form',
+    label: 'Goal · Metrics, adding one',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsFormSurface />,
+  },
+  {
+    /* A metric's row pointed at, its Change and Remove menu showing. */
+    id: 'goals-metrics-props-menu',
+    label: 'Goal · Metrics, a row’s menu',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsMenuSurface />,
+  },
+  {
+    /* No list on the goal has a date to count by. */
+    id: 'goals-metrics-props-empty',
+    label: 'Goal · Metrics, nothing to count',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsEmptySurface />,
+  },
+  {
+    /* A new metric mid-save: the button's pending state. */
+    id: 'goals-metrics-props-pending',
+    label: 'Goal · Metrics, saving',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsPendingSurface />,
+  },
+  {
+    /* A change refused, its message beside the field. */
+    id: 'goals-metrics-props-error',
+    label: 'Goal · Metrics, a change refused',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricsErrorSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,

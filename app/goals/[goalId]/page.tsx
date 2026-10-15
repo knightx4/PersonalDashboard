@@ -79,6 +79,10 @@ import { GoalHelp } from './goal-help';
 import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
+import { MetricsProperty } from './metrics-property';
+import { metricLists } from '@/lib/goals/metric-form';
+import type { Metric } from '@/lib/goals/metrics';
+import { loadMetrics } from '@/lib/goals/metrics-store';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
@@ -342,6 +346,9 @@ export default async function GoalMapPage({
   // The saved step counts behind the burn-up chart (plan #1837). A failed
   // read leaves the chart out rather than the page.
   const scopeDays = loadScopeDays(core, goalScopeRef(map.goal.id)).catch((): ScopeDay[] => []);
+  // The goal's metrics for the properties column (plan #2084.3). A failed
+  // read leaves them out rather than the page.
+  const metricsRead = loadMetrics(client, map.goal.id).catch((): Metric[] | null => null);
   const related = relatedNotes(
     vault,
     user.id,
@@ -467,6 +474,15 @@ export default async function GoalMapPage({
   const runs = shapingView?.runs ?? runRowsOf(history, account.timezone);
 
   const burnUpDays = await scopeDays;
+  const metrics = await metricsRead;
+  const lists = metricLists(sources);
+  const metricsPart =
+    metrics && (metrics.length > 0 || lists.length > 0)
+      ? {
+          node: <MetricsProperty goalId={map.goal.id} metrics={metrics} lists={lists} />,
+          count: Math.max(1, metrics.length),
+        }
+      : null;
   const overview = (
     <div className="space-y-6">
       <GoalDoneWhen goal={map.goal} />
@@ -535,6 +551,7 @@ export default async function GoalMapPage({
       progress={progress}
       timeZone={account.timezone}
       pace={pace}
+      metrics={metricsPart}
     >
       {tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
