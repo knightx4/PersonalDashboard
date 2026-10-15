@@ -238,6 +238,17 @@ fails a source Dash cannot list unless it says why. Before it, a table no
 lookup was written for was invisible: on 7 October 2026 Dash told the person
 it had no way to pick a YouTube video, with 122 on their watch list.
 
+`table_info` (`lib/ask/table-info.ts`) gives the same tables' columns, with
+their types and the keys between them, from `public.ask_table_columns`.
+`query_rows` (`lib/ask/query.ts`) uses those columns to answer a question
+about one table in a single call: it takes conditions (equals, not equals,
+greater, less, one of, contains, empty, not empty), the columns to return and
+an order, and lists up to 200 rows, counts them, or counts them by one
+column. A column the table does not have is refused before anything is sent.
+The query is built with the client's filter methods, never from SQL text, and
+always carries the owner filter. Every lookup ends its note with how many rows
+matched and how many it shows.
+
 **Refusing.** The `answer` tool takes `could_not`, a sentence for what the
 person asked that Dash did not do. An answer that sets it before any lookup
 is sent back once with `LOOK_FIRST` (`lib/dash/loop.ts`). In Ask, a

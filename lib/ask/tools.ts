@@ -23,6 +23,7 @@ import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { withParents } from './parents';
 import { tableInfoLookup } from './table-info';
+import { QUERY_OPS, QUERY_ROWS_MAX, queryRowsLookup } from './query';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
@@ -50,6 +51,7 @@ export const ASK_TOOL_NAMES = [
   'open_row',
   'list_rows',
   'table_info',
+  'query_rows',
   'spend_by_merchant',
   'job_applications',
   'application_answers',
@@ -176,6 +178,57 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
           description: 'One table, for its columns and links. Leave out to list them all.',
         },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'query_rows',
+    description: `Ask one table of the person's own rows a precise question: the rows where a column equals, differs from, is above or below a value, is one of a list, contains some text, or is empty or not. List them (up to ${QUERY_ROWS_MAX}, in any order), count them (count_only), or count them by the values of one column (group_by). Use it for "how many applications at each status" (group_by status), "which applications have no cover letter" (a condition with op empty) or "videos added since March" (greater on the date column), in one call; use list_rows to read the newest rows or find rows by words. Column names must be the table's own: check them with table_info first when unsure. Every result says how many rows matched and how many it lists. The tables are the ones list_rows reads.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: { type: 'string', enum: LISTABLE.map((s) => s.table) },
+        where: {
+          type: 'array',
+          description: 'Conditions every row must meet. Leave out for all their rows in the table.',
+          items: {
+            type: 'object',
+            properties: {
+              column: { type: 'string', description: 'A column of the table, as table_info names it.' },
+              op: {
+                type: 'string',
+                enum: [...QUERY_OPS],
+                description:
+                  'equals, not_equals (rows with nothing in the column count as not equal), greater, less (dates as YYYY-MM-DD), one_of (value is a list), contains (text holding the value, ignoring case, or a list holding it), empty (nothing in it: no value, empty text or an empty list), not_empty.',
+              },
+              value: {
+                description: 'The value to compare with; a list for one_of; left out for empty and not_empty.',
+              },
+            },
+            required: ['column', 'op'],
+            additionalProperties: false,
+          },
+        },
+        columns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: "The columns to return for each row. Leave out for the table's usual ones.",
+        },
+        order: {
+          type: 'object',
+          properties: {
+            column: { type: 'string' },
+            ascending: { type: 'boolean', description: 'Smallest or oldest first. Largest or newest first when left out.' },
+          },
+          required: ['column'],
+          additionalProperties: false,
+          description: 'How to order the rows listed. Newest first when left out.',
+        },
+        count_only: { type: 'boolean', description: 'Only count the rows that match; list none.' },
+        group_by: { type: 'string', description: 'Count the rows that match by the values of this one column, most common first; list none.' },
+        limit: { type: 'integer', minimum: 1, maximum: QUERY_ROWS_MAX, description: `How many rows to list, up to ${QUERY_ROWS_MAX}; 50 when left out.` },
+      },
+      required: ['table'],
       additionalProperties: false,
     },
   },
@@ -460,6 +513,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   list_rows: { run: listRowsLookup, module: null },
   // Leaves out the tables of switched-off workspaces itself.
   table_info: { run: tableInfoLookup, module: null },
+  // Checks the workspace of the table it is given, below.
+  query_rows: { run: queryRowsLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   application_answers: { run: applicationAnswersLookup, module: 'jobs' },
@@ -540,7 +595,7 @@ export async function executeAskTool(
     module ??
     (name === 'open_row' && typeof args.table === 'string'
       ? (SCHEMA_MODULES[args.table.split('.')[0] as AskSchema] ?? null)
-      : name === 'list_rows' && typeof args.table === 'string'
+      : (name === 'list_rows' || name === 'query_rows') && typeof args.table === 'string'
         ? (() => {
             const source = listableSource(args.table);
             return source ? sourceWorkspace(source) : null;
