@@ -1,3 +1,5 @@
+import { whenDate } from '@/lib/core/when';
+
 /**
  * Check-backs: work a session means to come back to after some time
  * (supabase/migrations/0103_check_backs.sql).
@@ -155,11 +157,7 @@ export function placeCheckBacks(
 
 /** "26 Oct": the day a check-back falls due, as a waiting step names it. */
 export function checkDay(dueAt: string): string {
-  return new Date(dueAt).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+  return whenDate(dueAt, { timeZone: 'UTC', year: 'auto' });
 }
 
 /**

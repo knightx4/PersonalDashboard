@@ -1,5 +1,5 @@
 import { requireUser } from '@/lib/auth/server';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { createNewsClient } from '@/lib/news/auth/server';

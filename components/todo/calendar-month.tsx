@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { SectionLabel } from '@/components/ui/section-heading';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { NewEventLink } from '@/components/todo/new-event-link';
 
 /**

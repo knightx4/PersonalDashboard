@@ -6,17 +6,11 @@ import { wordCountLabel, type EssaySummary } from '@/lib/learn/essays/model';
 import { NewEssayButton } from './new-essay-button';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { whenDay } from '@/lib/core/when';
 
-/** "12 Oct", or "12 Oct 2025" when it is not this year. */
+/** "Today", "Friday", "12 Oct", or "12 Oct 2025" when it is not this year. */
 function shortDate(iso: string, now: Date): string {
-  const date = new Date(iso);
-  const sameYear = date.getUTCFullYear() === now.getUTCFullYear();
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
+  return whenDay(iso, { timeZone: 'UTC', now });
 }
 
 /**

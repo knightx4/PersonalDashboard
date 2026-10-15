@@ -104,6 +104,8 @@ import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
+import { LaterMenuRows } from './later-menu-surface';
+import { CloseButtonRows } from './close-buttons-surface';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -3423,7 +3425,7 @@ export const SURFACES: readonly Surface[] = [
             status: 'rejected',
             reached: 'in_process',
             everSubmitted: true,
-            closedOn: '8 Sept 2026',
+            closedOn: '8 Sep',
             interviewCount: 1,
           })}
         />
@@ -6010,6 +6012,26 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <TooltipRows />,
+  },
+  {
+    /* Later, the one menu for putting a thing off (plan #1957.2): the word
+     * and the clock that open it, the menu open with its five days, and the
+     * field Pick a day opens. */
+    id: 'core-later-menu',
+    label: 'Later · the menu every put-off opens',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <LaterMenuRows />,
+  },
+  {
+    /* The four words that close a row (plan #1957.3): Done, Drop, Later and
+     * Decline with their glyphs, as buttons, as icons and as menu entries,
+     * and the toast each leaves with Undo. */
+    id: 'core-close-buttons',
+    label: 'Closing · the four words, their glyphs and Undo',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <CloseButtonRows />,
   },
   {
     /* /account/spend: every operation's estimate beside its thirty-day median.

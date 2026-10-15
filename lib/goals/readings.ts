@@ -11,6 +11,7 @@
 
 import type { CollectionField, FieldType } from '@/lib/goals/collections';
 import { isDuePrecision, periodEnd, type DuePrecision } from '@/lib/goals/due-precision';
+import { formatNumber } from '@/lib/money';
 
 /** The limits the table's checks set (supabase/migrations-goals/0004 and 0001). */
 export const UNIT_MAX = 40;
@@ -134,7 +135,7 @@ const CURRENCY = new Set(['$', '£', '€']);
 
 /** "$18,250.40" for a currency sign, "182.5 lb" for anything else. */
 export function formatReading(value: number, unit: string | null): string {
-  const number = Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const number = formatNumber(Math.abs(value), { maximumFractionDigits: 2 });
   const sign = value < 0 ? '-' : '';
   if (!unit) return `${sign}${number}`;
   if (CURRENCY.has(unit)) return `${sign}${unit}${number}`;

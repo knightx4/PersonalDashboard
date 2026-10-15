@@ -1,4 +1,4 @@
-import { formatMoney } from '@/lib/money';
+import { formatMoney, formatNumber } from '@/lib/money';
 import type { TalkToolCall } from './talk';
 
 /**
@@ -140,10 +140,10 @@ export function chartValue(chart: Pick<DashChart, 'currency' | 'rows'>, value: n
       return formatMoney(Math.round(value * 100), chart.currency, { showCents });
     } catch {
       // A code Intl does not know: the number and the code, as the lookup said it.
-      return `${value.toLocaleString('en-US')} ${chart.currency}`;
+      return `${formatNumber(value)} ${chart.currency}`;
     }
   }
-  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
 /** A table's headings: its own, or the label and what the values are. */

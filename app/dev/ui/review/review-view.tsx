@@ -1,6 +1,8 @@
 'use client';
 
-import { useActionState, useLayoutEffect, useRef, useState } from 'react';
+import { useActionState, useLayoutEffect, useRef, useState, useTransition } from 'react';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import Link, { linkVariants } from '@/components/ui/link';
 import { toggleChipClass } from '@/components/ui/chip';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -136,6 +138,30 @@ function ConfirmAll({ ids }: { ids: string[] }) {
 /** One thing a pass found, with the two answers it is waiting for. */
 function FindingRow({ finding }: { finding: UiFinding }) {
   const [state, action, pending] = useActionState(decideUiFinding, {} as UiReviewActionState);
+  const [declineError, setDeclineError] = useState<string | undefined>();
+  const [declining, startDecline] = useTransition();
+  const toast = useToast();
+  // Decline, with Undo in the toast (plan #1957.3).
+  function decide(decision: 'dismissed' | 'open') {
+    const form = new FormData();
+    form.set('id', finding.id);
+    form.set('decision', decision);
+    return decideUiFinding({} as UiReviewActionState, form);
+  }
+  function decline() {
+    startDecline(async () => {
+      const result = await decide('dismissed');
+      setDeclineError(result.error);
+      if (result.error) return;
+      toast({
+        text: 'Declined',
+        undo: async () => {
+          const back = await decide('open');
+          if (back.error) throw new Error(back.error);
+        },
+      });
+    });
+  }
 
   return (
     <li className="flex flex-col gap-1.5 px-4 py-3">
@@ -182,16 +208,12 @@ function FindingRow({ finding }: { finding: UiFinding }) {
             <Button type="submit" name="decision" value="confirmed" size="sm" pending={pending}>
               Confirm
             </Button>
-            <Button
-              type="submit"
-              name="decision"
-              value="dismissed"
-              size="sm"
-              variant="ghost"
+            <CloseButton
+              lifecycle="declined"
               disabled={pending}
-            >
-              Dismiss
-            </Button>
+              pending={declining}
+              onClick={decline}
+            />
           </>
         ) : (
           <Button
@@ -205,7 +227,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
             Put it back
           </Button>
         )}
-        <FieldError>{state.error}</FieldError>
+        <FieldError>{state.error ?? declineError}</FieldError>
       </form>
     </li>
   );

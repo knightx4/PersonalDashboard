@@ -16,6 +16,7 @@ import {
 import { summarizeReading } from './actions';
 import { READING_TEXT_ANCHOR, ReadingText } from './reading-text';
 import { linkVariants } from '@/components/ui/link';
+import { whenDate } from '@/lib/core/when';
 
 export type SummaryFailure = { error: string; unreadable?: boolean };
 
@@ -160,10 +161,5 @@ function Failure({ failure }: { failure: SummaryFailure }) {
 }
 
 function formatWritten(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC' });
 }

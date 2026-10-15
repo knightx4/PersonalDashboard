@@ -119,7 +119,7 @@ describe('DashTodaySection', () => {
   it('draws two or more changes as a timeline with times, and one as a plain list', () => {
     const two = render([{ workspace: 'dev', label: 'Dev', entries: [entry(1), entry(2)] }]);
     expect(two).toContain('<ol');
-    expect(two).toMatch(/<time[^>]*>\d{1,2}:\d{2} [AP]M</);
+    expect(two).toMatch(/<time[^>]*>\d{1,2}:\d{2}\u00a0[AP]M</);
     expect(two.match(/>Undo</g)).toHaveLength(2);
     const one = render([{ workspace: 'dev', label: 'Dev', entries: [entry(1)] }]);
     expect(one).toContain('<ul');

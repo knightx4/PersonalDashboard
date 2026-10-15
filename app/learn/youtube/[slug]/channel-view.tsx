@@ -12,6 +12,7 @@ import { Press } from '../press';
 import { VideoList } from '../video-list';
 import { PageColumn } from '@/components/shell/page-width';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { formatNumber } from '@/lib/money';
 
 /**
  * One channel: its playlists, then its videos newest first.
@@ -127,7 +128,7 @@ export function ChannelView({
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-ui font-semibold text-ink-muted">
-              Videos <span className="tabular-nums font-normal">{channel.videos.toLocaleString('en-GB')}</span>
+              Videos <span className="tabular-nums font-normal">{formatNumber(channel.videos)}</span>
             </h2>
             <div className="w-full max-w-xs">
               <SearchField placeholder="Search this channel's videos" />

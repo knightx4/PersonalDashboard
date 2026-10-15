@@ -144,7 +144,7 @@ Next week and Next month, and the inbox snooze with Tomorrow and Next week.
 
 116 files format a date or a time, through four APIs: `Intl.DateTimeFormat`
 in 106 places, `toLocaleDateString` in 33, `toLocaleString` in 36 and
-`toLocaleTimeString` in one. `lib/clock.ts` holds the one shared formatter,
+`toLocaleTimeString` in one. `lib/clock.ts` held the one shared formatter,
 for the clock face. The preference "times are 12-hour with AM and PM,
 everywhere" (`taste.ts`) is kept by 116 files agreeing, which is the same
 arrangement that let 24-hour times reach the calendar in September.
@@ -361,7 +361,7 @@ knows the account's timezone. Four functions:
   than the date.
 
 A time never shows beside a day the person did not give a time for (law 3).
-`lib/clock.ts` folds in. The 116 files move onto it one workspace at a
+`lib/clock.ts` has folded in. The files move onto it one workspace at a
 time, and the count holds the rest from growing.
 
 ## Part 6: One shell, mounted once
@@ -469,11 +469,11 @@ Checked by: count `hand-rolled-back-links`, baseline 32, target 0.
 Checked by: test `tests/flows/search-open-back.test.ts`.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
-Checked by: count `date-formatting-files`, baseline 116, target 1, pending #1961.
+Checked by: count `date-formatting-files`, baseline 122, target 0.
 
 **R7.** A row is closed with one of Done, Dropped, Later or Declined, and
 every workspace status maps onto one.
-Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
+Checked by: test `tests/lifecycle-words.test.ts`.
 
 **R8.** No section links to a page whose only job is a form.
 Checked by: count `form-only-pages`, baseline 9, target 0.

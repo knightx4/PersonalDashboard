@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/clock';
+import { whenDay, whenTime } from '@/lib/core/when';
 import { money } from '@/lib/watch/format';
 import type { Update } from '@/lib/shell/home-model';
 
@@ -85,28 +85,12 @@ export function hearLabel(row: Pick<WatchingRow, 'below' | 'currency' | 'reportT
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function dayKey(at: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
-}
-
-/** "Ends today at 11:00 PM", "Ends tomorrow at 9:00 AM", "Ends Sat 4 Oct". */
+/** "Ends today at 11:00 PM", "Ends tomorrow at 9:00 AM", then "Ends Saturday" or "Ends 14 Oct". */
 export function endsLabel(endsAt: string, now: Date, timezone: string): string {
-  const end = new Date(endsAt);
-  const day = dayKey(end, timezone);
-  const clock = formatClock(end, { timeZone: timezone });
-  if (day === dayKey(now, timezone)) return `Ends today at ${clock}`;
-  if (day === dayKey(new Date(now.getTime() + 86_400_000), timezone)) return `Ends tomorrow at ${clock}`;
-  return `Ends ${new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: timezone,
-  }).format(end)}`;
+  const day = whenDay(endsAt, { timeZone: timezone, now });
+  const clock = whenTime(endsAt, { timeZone: timezone });
+  if (day === 'Today' || day === 'Tomorrow') return `Ends ${day.toLowerCase()} at ${clock}`;
+  return `Ends ${day}`;
 }
 
 /** A watch that is no longer running, as the loader reads it for Updates. */

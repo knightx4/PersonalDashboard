@@ -1,4 +1,5 @@
 import type { ModuleId } from '@/lib/modules';
+import { whenAgo } from '@/lib/core/when';
 import { WAITING_GROUP, type WaitingItem } from '@/lib/goals/daily';
 
 /**
@@ -75,31 +76,12 @@ export function mergeUpdates(
 }
 
 /**
- * When, said the way a person would: "3h ago" today, "Yesterday", then the
- * weekday. The feed only reaches back a few days, so nothing older is needed.
+ * When, as Updates says it (`whenAgo`): "3 h ago" today, "Yesterday", then
+ * the weekday. Capitalised, since it stands alone in its column.
  */
 export function whenLabel(at: string, now: Date, timezone: string): string {
-  const then = new Date(at);
-  const minutes = Math.max(0, Math.round((now.getTime() - then.getTime()) / 60_000));
-  const day = (date: Date) =>
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
-
-  const today = day(now);
-  const yesterday = day(new Date(now.getTime() - 86_400_000));
-  const thenDay = day(then);
-
-  if (thenDay === today) {
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    return `${Math.floor(minutes / 60)}h ago`;
-  }
-  if (thenDay === yesterday) return 'Yesterday';
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: timezone }).format(then);
+  const text = whenAgo(at, { timeZone: timezone, now });
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**

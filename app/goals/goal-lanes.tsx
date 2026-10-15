@@ -36,7 +36,7 @@ import { stepHref } from '@/lib/goals/all-goals';
  *   Dash shows only to the account that owns the app, as on a goal's page,
  *   because only that account can start a run.
  * - What Dash did since your last visit, passed in as `since`.
- * - Set aside: what is off you until a later day, with Bring back now. The
+ * - Later: what is off you until a later day, with Bring back now. The
  *   rest of what is on you is on the Inbox tab, which Do next links to.
  * - Other goals: the goals that are not this week's, one line each, under
  *   their areas.
@@ -228,7 +228,7 @@ export function GoalLanes({
         {since}
 
         {later.length > 0 && (
-          <FoldLine title="Set aside" meta={String(later.length)}>
+          <FoldLine title="Later" meta={String(later.length)}>
             <Card>
               <ul className="divide-y divide-border">
                 {later.map((item) => (

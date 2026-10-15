@@ -7,6 +7,7 @@ import { essayAddress } from '@/lib/learn/essays/address';
 import { unpublishEssay, type PublishResult, type UnpublishResult } from './actions';
 import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Publish (plan #1863.11; spec, "Finishing and publishing"). One press saves
@@ -29,7 +30,7 @@ export const SITE = 'selveyknight.com';
 function when(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return whenDate(date, { timeZone: 'UTC', month: 'long' });
 }
 
 /** The line saying where the essay stands on the site. */

@@ -3,12 +3,14 @@
 import { useCallback, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card, CardSection } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { EssayClaim, OfferedClaim } from '@/lib/learn/essays/finish';
 import type { EssayStage } from '@/lib/learn/essays/note';
 import { acceptEssayFinish, type AcceptFinishResult, type FinishResult } from './actions';
 import { Checkbox, CheckRow } from '@/components/ui/field';
+import { deviceTimeZone, whenDate } from '@/lib/core/when';
 
 /**
  * Finish (plan #1873; spec, "Finishing and publishing"). One press saves the
@@ -34,15 +36,11 @@ export type FinishView =
 function when(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return whenDate(date, { timeZone: 'UTC', month: 'long' });
 }
 
 function browserTimeZone(): string | null {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
-  } catch {
-    return null;
-  }
+  return deviceTimeZone();
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -166,9 +164,7 @@ function Offering({
         >
           {busy ? 'Adding…' : addLabel(picked.size, bank)}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
-          Not now
-        </Button>
+        <CloseButton lifecycle="later" disabled={busy} onClick={onSkip} />
       </div>
     </div>
   );

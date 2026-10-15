@@ -19,6 +19,7 @@
  * and already installed.
  */
 
+import { zoneOffset } from '@/lib/core/when';
 import { toIanaZone } from './windows-zones';
 
 export interface IcsAttendee {
@@ -133,39 +134,9 @@ function parseLine(line: string): RawProperty | null {
   return { name: segments[0].trim().toUpperCase(), params, value: value.trim() };
 }
 
-/**
- * Offset of a zone at an instant, in milliseconds.
- *
- * Formatting the instant in the target zone and reading the wall clock back
- * gives the offset without shipping a timezone database — the one the platform
- * already has is authoritative and stays current through DST rule changes.
- */
+/** Offset of a zone at an instant, in milliseconds, read from the platform's own zone data. */
 function zoneOffsetMs(instantMs: number, timeZone: string): number {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-
-  const parts: Record<string, number> = {};
-  for (const part of formatter.formatToParts(new Date(instantMs))) {
-    if (part.type !== 'literal') parts[part.type] = Number(part.value);
-  }
-
-  const asUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
-  return asUtc - instantMs;
+  return zoneOffset(instantMs, timeZone);
 }
 
 /**

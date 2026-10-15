@@ -1421,7 +1421,7 @@ async function changeGoalsInbox(env: GoalsWriteEnv, args: Args): Promise<GoalsMa
 
   if (change === 'snooze') {
     const day = snoozeDay(text(args, 'until'), todayOf(env));
-    if (!day) throw new GoalsRefused(`until must be ${SNOOZE_CHOICES.join(' or ')}, or a day after today as YYYY-MM-DD.`);
+    if (!day) throw new GoalsRefused(`until must be ${SNOOZE_CHOICES.join(', ')}, or a day after today as YYYY-MM-DD.`);
     const outcome = await snoozeRow(core, { userId: env.userId, ref, until: dayStartIn(day, env.timezone ?? 'UTC') });
     if (outcome.error) throw new GoalsRefused(outcome.error);
     const after = await readSnooze(core, env.userId, ref);
@@ -1671,7 +1671,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       properties: {
         change: { type: 'string', enum: [...INBOX_CHANGES], description: 'What to do.' },
         row_ref: { type: 'string', description: 'For snooze and unsnooze: the goals.items ref a lookup returned for the goal or step.' },
-        until: { type: 'string', description: 'For snooze: tomorrow, next_week, or a day after today as YYYY-MM-DD.' },
+        until: { type: 'string', description: 'For snooze: tomorrow, weekend, next_week, next_month, or a day after today as YYYY-MM-DD.' },
         event: { type: 'string', description: 'For went and did_not_go: the event, in words from its name, or its goals.suggestions ref.' },
       },
       required: ['change'],

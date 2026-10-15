@@ -32,6 +32,7 @@ export const goalsActions: ModuleActions = {
   },
   'app/goals/suggestion-actions.ts': {
     reactToSuggestionAction: none('theirs'),
+    undoDeclineAction: none('theirs', 'Undo: takes back their own decline.'),
     recordAttendedAction: tool('change_goals_inbox'),
     addSuggestedStepAction: none('theirs'),
   },

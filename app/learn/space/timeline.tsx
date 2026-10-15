@@ -6,6 +6,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { countText } from '@/lib/learn/map/view';
 import { DAY_MS, type DayCounts } from '@/lib/learn/map/timeline';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * The timeline under Idea Space (plan #1997.8): from the day of your first
@@ -16,8 +17,7 @@ import { DAY_MS, type DayCounts } from '@/lib/learn/map/timeline';
  * The day is held by the map section, which relights the sky from it.
  */
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-const SHORT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const UTC = { timeZone: 'UTC' } as const;
 
 /** A whole replay takes about this long, a day at a time within the bounds below. */
 const REPLAY_MS = 8000;
@@ -67,7 +67,7 @@ export function MapTimeline({
 
   const isToday = day >= days;
   const shown = isToday ? null : new Date(start + day * DAY_MS);
-  const when = shown ? DAY.format(shown) : 'Today';
+  const when = shown ? whenDate(shown, UTC) : 'Today';
   const play = () => {
     if (playing) {
       setPlaying(false);
@@ -94,7 +94,7 @@ export function MapTimeline({
             {playing ? <Pause strokeWidth={1.75} aria-hidden /> : <Play strokeWidth={1.75} aria-hidden />}
           </IconButton>
         </Tooltip>
-        <span className="tabular shrink-0 text-small text-ink-muted">{SHORT.format(new Date(start))}</span>
+        <span className="tabular shrink-0 text-small text-ink-muted">{whenDate(start, { ...UTC, year: 'never' })}</span>
         <input
           type="range"
           min={0}

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } fro
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Input } from '@/components/ui/field';
+import { deviceTimeZone, zoneOffsetLabel } from '@/lib/core/when';
 
 /**
  * Type-and-pick timezone field.
@@ -39,21 +40,13 @@ function allZones(): string[] {
 
 /** What this computer is set to. */
 export function detectTimeZone(): string | null {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
-  } catch {
-    return null;
-  }
+  return deviceTimeZone();
 }
 
 /** "GMT-4", for the hint beside each option. */
 function offsetLabel(zone: string, now: Date): string {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(now);
-    return parts.find((part) => part.type === 'timeZoneName')?.value ?? '';
+    return zoneOffsetLabel(zone, now);
   } catch {
     return '';
   }

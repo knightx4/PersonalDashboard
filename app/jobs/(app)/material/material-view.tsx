@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { Group } from '@/components/ui/disclosure';
-import { IconButton } from '@/components/ui/icon-button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Checkbox, ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
@@ -471,7 +471,6 @@ function EvidenceSection({
 }) {
   const [state, action] = useActionState(addEvidence, {});
   const [adding, setAdding] = useCloseOnSuccess(state);
-  const [, startTransition] = useTransition();
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -516,20 +515,17 @@ function EvidenceSection({
                 {item.skills.map((skill) => (
                   <Chip key={skill}>{skill.replace(/_/g, ' ')}</Chip>
                 ))}
-                <Tooltip label="Delete this piece of evidence" align="end" className="ml-auto self-center">
-                  <IconButton
-                    size="sm"
-                    label={`Delete ${item.title}`}
-                    className="hover:text-danger"
-                    onClick={() =>
-                      startTransition(async () => {
-                        await deleteEvidence(item.id);
-                      })
-                    }
-                  >
-                    <Trash2 strokeWidth={1.75} aria-hidden />
-                  </IconButton>
-                </Tooltip>
+                <ConfirmStep
+                  size="xs"
+                  className="ml-auto self-center text-danger"
+                  prompt="This piece of evidence goes for good, and drafts stop drawing on it."
+                  onConfirm={async () => {
+                    await deleteEvidence(item.id);
+                  }}
+                >
+                  <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Delete
+                </ConfirmStep>
               </div>
               <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
               {item.metrics && <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>}

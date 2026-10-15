@@ -20,7 +20,7 @@ import {
   type MainCheck,
   type MainDot,
 } from '@/lib/plan/main-check';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**

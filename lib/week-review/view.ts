@@ -5,7 +5,7 @@ import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { localDay, WEEK_REVIEW_ZONE, type WeekFact, type WeekFacts } from './facts';
 import { REVIEW_HOUR, type ReviewObservation } from './review';
-import { formatClock } from '@/lib/clock';
+import { whenDate, whenRange, whenTime } from '@/lib/core/when';
 
 /**
  * The Week page's rules (plan #1233): a stored core.week_reviews row turned
@@ -63,39 +63,20 @@ export function parseWeek(raw: string): string | null {
   return at.getUTCDay() === 0 ? raw : null;
 }
 
-const DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-const DAY_MONTH_YEAR = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-/** "20 to 26 September 2026", for the week starting on a Sunday. */
+/** "20 – 26 September 2026", for the week starting on a Sunday. */
 export function weekRangeLabel(week: string): string {
-  const saturday = addDays(week, 6);
-  const start = new Date(`${week}T00:00:00Z`);
-  const end = new Date(`${saturday}T00:00:00Z`);
-  const first =
-    start.getUTCFullYear() !== end.getUTCFullYear()
-      ? DAY_MONTH_YEAR.format(start)
-      : start.getUTCMonth() !== end.getUTCMonth()
-        ? DAY_MONTH.format(start)
-        : String(start.getUTCDate());
-  return `${first} to ${DAY_MONTH_YEAR.format(end)}`;
+  return whenRange(week, addDays(week, 6), { timeZone: 'UTC', month: 'long', year: 'always' });
 }
 
 /** "Week of 20 September", short enough for a link. */
 export function weekShortLabel(week: string): string {
-  return `Week of ${DAY_MONTH.format(new Date(`${week}T00:00:00Z`))}`;
+  return `Week of ${whenDate(week, { timeZone: 'UTC', month: 'long', year: 'never' })}`;
 }
 
-/** A day and time in the reader's zone: "Sunday 4 October, 09:00". */
+/** A day and time in the reader's zone: "Sunday 4 October, 9:00 AM". */
 export function whenLabel(iso: string, timezone: string): string {
-  const at = new Date(iso);
-  const day = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: timezone }).format(at);
-  const time = formatClock(at, { timeZone: timezone });
-  return `${day}, ${time}`;
+  const day = whenDate(iso, { timeZone: timezone, weekday: 'long', month: 'long', year: 'auto' });
+  return `${day}, ${whenTime(iso, { timeZone: timezone })}`;
 }
 
 /**
@@ -116,9 +97,7 @@ export function nextReviewDay(now: Date, timezone: string = WEEK_REVIEW_ZONE): {
 
 /** "Sunday 4 October", for a calendar day. */
 export function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
-    new Date(`${day}T00:00:00Z`),
-  );
+  return whenDate(day, { timeZone: 'UTC', weekday: 'long', month: 'long', year: 'auto' });
 }
 
 /** A fact's figure as the page writes it: a count, or an amount in its currency. */

@@ -1,4 +1,5 @@
 import type { ModuleId } from '@/lib/modules';
+import { zoneDay } from '@/lib/core/when';
 import { eventRef, type TimelineEvent } from '@/lib/timeline/timeline';
 import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
@@ -166,12 +167,7 @@ export function weekBounds(week: string, timezone: string = WEEK_REVIEW_ZONE): {
 
 /** The local calendar day of an instant, YYYY-MM-DD. */
 export function localDay(at: Date, timezone: string = WEEK_REVIEW_ZONE): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
+  return zoneDay(at, timezone);
 }
 
 /**

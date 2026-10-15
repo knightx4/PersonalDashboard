@@ -47,7 +47,7 @@ export async function snoozeInboxRowAction(form: FormData): Promise<SnoozeState>
   });
   if (outcome.error) return { error: outcome.error };
   revalidatePath('/goals', 'layout');
-  return { message: `Snoozed until ${formatDay(day)}.` };
+  return { message: `Later, until ${formatDay(day)}.` };
 }
 
 /** Undo a snooze: the row is back at once. */

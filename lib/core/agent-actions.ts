@@ -46,6 +46,7 @@ export const coreActions: ModuleActions = {
     confirmDashChange: none('theirs'),
     declineDashChange: none('theirs'),
     undoDashChange: none('theirs'),
+    reopenDashChange: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
