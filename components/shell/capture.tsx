@@ -938,15 +938,15 @@ function MoveGuess({
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2 text-small">
       {picked ? (
-        <span className="text-ink-muted">Filing as</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Filing as</span>
       ) : guess?.sure ? (
-        <span className="text-ink-muted">
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">
           Dash reads this as{' '}
           <span className="font-medium text-ink">{CAPTURE_MOVE_LABELS[guess.move]}</span>
           <span className="tabular"> · {Math.round(guess.confidence * 100)}% sure</span>
         </span>
       ) : (
-        <span className="text-ink-muted">Dash is not sure what this does. Which is it?</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is not sure what this does. Which is it?</span>
       )}
       {(asking || picked) &&
         CAPTURE_MOVES.map((move) => {

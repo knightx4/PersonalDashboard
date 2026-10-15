@@ -146,24 +146,28 @@ export function HomeView({
                   <span className="text-small text-ink-muted">written {brief.when}</span>
                 )}
               </div>
-              {away !== null && (
-                <p className="text-body text-ink">
-                  Welcome back. You were away {away} days. What Dash did today is below, and every
-                  run it made while you were gone is on Every run.
-                </p>
-              )}
-              {summary && <p className="text-body text-ink">{summary}</p>}
-              {note && (
-                <div className="max-w-prose space-y-1">
-                  <FileBody markdown={note.lead} compact />
-                  {note.rest && (
-                    <Disclosure
-                      title="More"
-                      summaryClassName="text-small max-sm:min-h-11"
-                      bodyClassName="mt-1"
-                    >
-                      <FileBody markdown={note.rest} compact />
-                    </Disclosure>
+              {(away !== null || summary || note) && (
+                <div className="voice-dash space-y-3 px-3 py-2">
+                  {away !== null && (
+                    <p className="text-body text-ink">
+                      Welcome back. You were away {away} days. What Dash did today is below, and every
+                      run it made while you were gone is on Every run.
+                    </p>
+                  )}
+                  {summary && <p className="text-body text-ink">{summary}</p>}
+                  {note && (
+                    <div className="max-w-prose space-y-1">
+                      <FileBody markdown={note.lead} compact />
+                      {note.rest && (
+                        <Disclosure
+                          title="More"
+                          summaryClassName="text-small max-sm:min-h-11"
+                          bodyClassName="mt-1"
+                        >
+                          <FileBody markdown={note.rest} compact />
+                        </Disclosure>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
