@@ -154,7 +154,7 @@ Named sets of topics they are working towards, each topic with a target level.
 - Search: `name`
 - Name a row by `name`; link it by `id`
 - Opens at `/learn/lens/<id>`
-- Every subject and every learning goal has one (subject_id or aim_id; learn 0137). The topics and targets are in learn.lens_targets. Progress is computed, never stored.
+- Every subject and every learning goal has one (subject_id or aim_id; learn 0137), and a vault theme can have one made at the end of a practice run (theme_id; learn 0143). The topics and targets are in learn.lens_targets. Progress is computed, never stored.
 
 ### `news.preferences` (News)
 

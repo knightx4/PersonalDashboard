@@ -36,7 +36,7 @@ export function goalTargetLevel(depth: string, ceiling: number): number {
   return Math.min(ceiling, wanted);
 }
 
-export type LensOrigin = 'subject' | 'goal';
+export type LensOrigin = 'subject' | 'goal' | 'theme';
 
 /** One lens row with its targets, as the store reads them. */
 export type LensRecord = {
