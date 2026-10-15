@@ -76,8 +76,10 @@ export function GoalDetail({
             dueOn: goal.dueOn ?? null,
             duePrecision: goal.duePrecision,
             status: goal.status,
+            archivedAt: goal.archivedAt ?? null,
           }}
           places={places}
+          steps={progress.live}
         />
       }
       glance={<GoalGlance goal={goal} review={review} progress={progress} pace={pace} />}

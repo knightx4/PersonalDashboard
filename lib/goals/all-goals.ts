@@ -53,9 +53,14 @@ export function onYouByGoal(items: readonly { goalId: string }[]): Map<string, n
   return counts;
 }
 
-/** A goal still to be worked: not archived, not finished, not dropped. */
+/**
+ * A goal still to be worked: not archived, parked, finished or dropped. A
+ * parked goal waits under Everything until it is taken back up (plan #2097.1).
+ */
 function isOpen(goal: Goal): boolean {
-  return !goal.archivedAt && goal.status !== 'done' && goal.status !== 'dropped';
+  return (
+    !goal.archivedAt && goal.status !== 'done' && goal.status !== 'dropped' && goal.status !== 'parked'
+  );
 }
 
 export function goalInView(
