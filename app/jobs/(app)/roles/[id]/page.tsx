@@ -14,7 +14,7 @@ import { applicationMove, lastTurnEvent } from '@/lib/jobs/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
-import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
+import { formatCompBand, formatDate, formatDateInline } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
 import {
@@ -374,7 +374,7 @@ export default async function RoleDetailPage({
             (interviews ?? []).map((interview) => interview.kind as string),
           ),
           everSubmitted: current.submitted_at !== null,
-          closedOn: current.closed_at ? formatDate(current.closed_at as string, timezone) : null,
+          closedOn: current.closed_at ? formatDateInline(current.closed_at as string, timezone) : null,
           interviewCount: (interviews ?? []).length,
         })
       : null;

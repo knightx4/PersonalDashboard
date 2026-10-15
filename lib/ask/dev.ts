@@ -1,3 +1,4 @@
+import { lineSilent, readLastLines, RUN_SILENT_MINUTES } from '@/lib/core/run-liveness';
 import { SPECS, readSpec as readSpecFile, specBySlug, type SpecDoc } from '@/lib/specs/registry';
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
 import { firstLine, planHref, raiseAnchor, waitingAnchor } from '@/lib/search/sources/dev-map';
@@ -453,7 +454,7 @@ async function readStep(
       : Promise.resolve({ data: [], error: null }),
     client
       .from('plan_runs')
-      .select('status, error, stop_reason, stop_pieces, created_at')
+      .select('id, status, error, stop_reason, stop_pieces, created_at')
       .eq('user_id', ctx.userId)
       .eq('plan_item_id', row.id)
       .order('created_at', { ascending: false })
@@ -462,7 +463,14 @@ async function readStep(
   if (below.error) throw new Error(`plan_items: ${below.error.message}`);
   if (above.error) throw new Error(`plan_items: ${above.error.message}`);
   if (sent.error) throw new Error(`plan_runs: ${sent.error.message}`);
-  const runs = ((sent.data ?? []) as StepRun[]).map(runLine);
+  const sentRuns = (sent.data ?? []) as StepRun[];
+  // A run still going says when it was last heard from, so "it says building
+  // but I see nothing" has an answer (note be6278a2).
+  const going = sentRuns.filter((run) => GOING.includes(run.status) && run.id).map((run) => run.id as string);
+  const lastLines =
+    going.length > 0 ? await readLastLines((await ctx.db('core')) as never, 'plan_runs', going) : new Map<string, string>();
+  const now = ctx.now ?? Date.now();
+  const runs = sentRuns.map((run) => runLine(run, { lastLineAt: run.id ? (lastLines.get(run.id) ?? null) : null, now }));
   const decisions = ((below.data ?? []) as { number: number; title: string; status: string; resolution: string | null }[])
     .filter((d) => d.status !== 'dropped')
     .map((d) =>
@@ -499,6 +507,7 @@ async function readStep(
 }
 
 type StepRun = {
+  id?: string;
   status: string;
   error: string | null;
   stop_reason: string | null;
@@ -511,8 +520,9 @@ type StepRun = {
  * session's own reason for stopping and the split it proposed, or the app's
  * note when the session gave none (a timeout, a refused fire).
  */
-export function runLine(run: StepRun): string {
+export function runLine(run: StepRun, live?: { lastLineAt: string | null; now: number }): string {
   const parts = [`[${run.created_at.slice(0, 10)}] ${run.status}.`];
+  if (live && GOING.includes(run.status)) parts.push(goingLine(run.created_at, live.lastLineAt, live.now));
   if (run.stop_reason) {
     parts.push(`The session said why it stopped: ${run.stop_reason}`);
     if (run.stop_pieces && run.stop_pieces.length > 0) {
@@ -526,6 +536,29 @@ export function runLine(run: StepRun): string {
     parts.push('Nothing was written about how it ended.');
   }
   return parts.join(' ');
+}
+
+/** The run statuses still going, which say when they were last heard from. */
+const GOING = ['started', 'stale'];
+
+/** Minutes between an instant and now, never below zero. */
+function minutesSince(at: string, now: number): number {
+  return Math.max(0, Math.round((now - Date.parse(at)) / 60_000));
+}
+
+/**
+ * When a run still going started and when it last wrote a line, in minutes,
+ * and whether it has gone quiet long enough to have likely stopped
+ * (RUN_SILENT_MINUTES, the rule that marks it stale on the plan page).
+ */
+function goingLine(startedAt: string, lastLineAt: string | null, now: number): string {
+  const started = `It started at ${startedAt.slice(11, 16)} UTC, ${minutesSince(startedAt, now)} minutes ago.`;
+  if (!lastLineAt) return `${started} It has written no lines, so whether it is still working cannot be told from here.`;
+  const quiet = minutesSince(lastLineAt, now);
+  const said = `${started} Its newest line was written ${quiet} minutes ago.`;
+  return lineSilent(lastLineAt, now)
+    ? `${said} That is over ${RUN_SILENT_MINUTES} minutes, so the session has likely stopped.`
+    : said;
 }
 
 async function readRaise(client: SchemaClient, ctx: AskContext, id: string, outlines: OutlineIndex): Promise<Found | null> {

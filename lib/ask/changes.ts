@@ -692,6 +692,27 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
 }
 
 /**
+ * Take a Decline back (plan #1957.3, the toast's Undo): the change is
+ * proposed again, nothing having been written for it.
+ */
+export async function reopenChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({ status: 'proposed', declined_at: null })
+    .eq('id', id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'declined')
+    .select(DASH_CHANGE_SELECT);
+  if (error) throw new Error(`Putting the change back failed: ${error.message}`);
+  const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+  if (rows.length === 0) {
+    const current = await loadOne(deps, id);
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+  return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
  * Take a confirmed change back and mark it undone. Refused, with a sentence
  * saying why, once the row it wrote has moved on.
  */

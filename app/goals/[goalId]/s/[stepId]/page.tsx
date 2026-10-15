@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { loadYourInitial } from '@/lib/core/account/your-initial';
+import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import type { LinkedFile } from '@/lib/files/files';
@@ -92,16 +94,19 @@ export default async function StepOwnPage({
   // page loaded, not a close watched.
   return (
     <StepCloseRing key={step.id} closed={step.status === 'done'}>
-      <StepPage
-        map={map}
-        stepId={step.id}
-        todoOn={moduleEnabled(account, 'todo')}
-        runs={stepRunLines(runs)}
-        files={filesOf}
-        progress={summariseProgress(entries)}
-        arrivals={arrivals}
-        canRun={owner}
-      />
+      {/* Your initial, for the Assignee column (plan #2069.2). */}
+      <YourInitialProvider initial={await loadYourInitial(user)}>
+        <StepPage
+          map={map}
+          stepId={step.id}
+          todoOn={moduleEnabled(account, 'todo')}
+          runs={stepRunLines(runs)}
+          files={filesOf}
+          progress={summariseProgress(entries)}
+          arrivals={arrivals}
+          canRun={owner}
+        />
+      </YourInitialProvider>
     </StepCloseRing>
   );
 }

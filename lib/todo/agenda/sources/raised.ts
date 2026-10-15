@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -80,5 +80,9 @@ export const raisedSource: AgendaSource = {
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'raised_item', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'raised_item', key, ctx.clients);
   },
 };

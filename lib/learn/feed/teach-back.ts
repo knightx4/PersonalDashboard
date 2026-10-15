@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Explaining an idea back and having it marked (plan #1054).
@@ -96,11 +97,7 @@ export function teachBackPrompt(name: string): string {
 
 /** The line above the title: when the idea was kept. */
 export function teachBackWhy(keptAt: string): string {
-  const day = new Date(keptAt).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  const day = whenDate(keptAt, { timeZone: 'UTC', month: 'long', year: 'never' });
   return `You kept this idea on ${day}.`;
 }
 

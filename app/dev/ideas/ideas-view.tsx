@@ -40,6 +40,7 @@ import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
 import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
 import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { useToast } from '@/components/ui/toast';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { Chip } from '@/components/ui/chip';
@@ -201,6 +202,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
   const [saveState, saveAction, savePending] = useActionState(updateIdea, {} as IdeaActionState);
   const [asideState, asideAction, asidePending] = useActionState(restoreIdea, {} as IdeaActionState);
   const [menuError, setMenuError] = useState<string | undefined>(undefined);
+  const toast = useToast();
 
   // The menu runs these as plain transitions, so the result is read here
   // rather than through useActionState.
@@ -217,9 +219,21 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
       ? []
       : [
           {
-            id: 'dismiss',
-            label: 'Dismiss',
-            formAction: (formData: FormData) => run(dismissIdea, formData),
+            id: 'drop',
+            label: 'Drop',
+            lifecycle: 'dropped' as const,
+            formAction: async (formData: FormData) => {
+              const result = await dismissIdea({}, formData);
+              setMenuError(result.error);
+              if (result.error) return;
+              toast({
+                text: 'Dropped',
+                undo: async () => {
+                  const back = await restoreIdea({}, formData);
+                  if (back.error) throw new Error(back.error);
+                },
+              });
+            },
             formFields: { id: idea.id },
           },
         ]),

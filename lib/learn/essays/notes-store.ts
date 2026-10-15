@@ -229,6 +229,25 @@ export async function closeNote(
   return shown(notes);
 }
 
+/**
+ * The toast's Undo on Done or Decline (plan #1957.3): the note is open again.
+ * A waiting note opened in its place stays open too.
+ */
+export async function reopenNote(
+  supabase: LearnSupabaseClient,
+  essayId: string,
+  noteId: string,
+): Promise<EssayNotes> {
+  const { error } = await supabase
+    .from('essay_notes')
+    .update({ status: 'open', updated_at: new Date().toISOString() })
+    .eq('essay_id', essayId)
+    .eq('id', noteId)
+    .in('status', ['done', 'dismissed']);
+  if (error) throw new Error(error.message);
+  return shown(await loadRows(supabase, essayId));
+}
+
 /** Where the notes sit now, as the editor has moved them with the person's edits. */
 export async function moveNotes(
   supabase: LearnSupabaseClient,

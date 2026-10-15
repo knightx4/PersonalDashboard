@@ -49,7 +49,8 @@ describe('AgendaItemRow for a question', () => {
     expect(html).toContain('title="Answer A: The local one"');
     expect(html).toContain('title="Answer B: The online one (recommended)"');
     expect(html).toContain('ring-positive/50');
-    expect(html).not.toContain('Mark done');
+    // No tick: a question is answered, not done (plan #1957.3 named it Done).
+    expect(html).not.toContain('aria-label="Done"');
   });
 
   it('draws no buttons for a question without options, only the link to it', () => {

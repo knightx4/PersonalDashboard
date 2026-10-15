@@ -11,6 +11,7 @@ import { MergeLog } from './merge-log';
 import { SweepAction, SweepPanel } from './sweep-panel';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { formatNumber } from '@/lib/money';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
@@ -66,7 +67,7 @@ export function VaultMapView({
           <>
             {' · '}
             <a href="#merges" className={linkVariants()}>
-              {mergeTotal.toLocaleString('en-GB')} {mergeTotal === 1 ? 'merge' : 'merges'} below
+              {formatNumber(mergeTotal)} {mergeTotal === 1 ? 'merge' : 'merges'} below
             </a>
           </>
         )}

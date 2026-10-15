@@ -4,6 +4,8 @@
  * Kept on the reading as given_text, capped at this many characters. Pasted
  * text and, later, text read out of a PDF both go through cleanReadingText.
  */
+
+import { formatNumber } from '@/lib/money';
 export const MAX_READING_TEXT = 200_000;
 
 export const PASTED_LABEL = 'Pasted';
@@ -17,7 +19,7 @@ export function cleanReadingText(raw: string): CleanedText {
   if (text.length > MAX_READING_TEXT) {
     return {
       ok: false,
-      error: `That is ${text.length.toLocaleString('en-GB')} characters and a reading keeps at most ${MAX_READING_TEXT.toLocaleString('en-GB')}. Paste the part you want Dash to read.`,
+      error: `That is ${formatNumber(text.length)} characters and a reading keeps at most ${formatNumber(MAX_READING_TEXT)}. Paste the part you want Dash to read.`,
     };
   }
   return { ok: true, text };

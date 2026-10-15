@@ -12,6 +12,7 @@ import {
 } from '@/lib/learn/youtube/videos';
 import { moveVideoAction } from './actions';
 import { WatchedToggle } from './watched-toggle';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * Videos on your list as one surface with hairlines between rows (law 13).
@@ -23,13 +24,7 @@ import { WatchedToggle } from './watched-toggle';
  */
 
 export function addedLabel(iso: string, now: Date = new Date()): string {
-  const date = new Date(iso);
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(date.getUTCFullYear() === now.getUTCFullYear() ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
+  return whenDate(iso, { timeZone: 'UTC', year: 'auto', now });
 }
 
 /** What the pile means for this video, in a few words beside the pile's name. */

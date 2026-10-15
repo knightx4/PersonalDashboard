@@ -6,6 +6,8 @@ import { Sparkle } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import { Card, CardSection } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { Switch } from '@/components/ui/field';
@@ -310,6 +312,7 @@ function NewSince({ sources }: { sources: BriefSource[] }) {
 function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const switchId = useId();
@@ -359,21 +362,45 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
           />
         </label>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            pending={pending}
-            onClick={() =>
-              start(async () => {
-                const result = await setBriefArchived(brief.id, !archived);
-                if (result.error) setError(result.error);
-                else setArchived(!archived);
-              })
-            }
-          >
-            {archived ? 'Restore' : 'Archive'}
-          </Button>
+          {archived ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              pending={pending}
+              onClick={() =>
+                start(async () => {
+                  const result = await setBriefArchived(brief.id, false);
+                  if (result.error) setError(result.error);
+                  else setArchived(false);
+                })
+              }
+            >
+              Bring back
+            </Button>
+          ) : (
+            <CloseButton
+              lifecycle="dropped"
+              variant="secondary"
+              pending={pending}
+              onClick={() =>
+                start(async () => {
+                  const result = await setBriefArchived(brief.id, true);
+                  if (result.error) return setError(result.error);
+                  setArchived(true);
+                  // Drop, with Undo in the toast (plan #1957.3).
+                  toast({
+                    text: 'Dropped',
+                    undo: async () => {
+                      const back = await setBriefArchived(brief.id, false);
+                      if (back.error) throw new Error(back.error);
+                      setArchived(false);
+                    },
+                  });
+                })
+              }
+            />
+          )}
           <span className="text-small text-ink-muted">
             {archived ? 'Off your list in Learn.' : 'Takes it off your list in Learn.'}
           </span>

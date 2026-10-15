@@ -1,6 +1,7 @@
 'use client';
 
 import { Tooltip } from '@/components/ui/tooltip';
+import { whenDate } from '@/lib/core/when';
 import { useActionState, useState } from 'react';
 import { ArrowUp, CircleUser, MessagesSquare } from 'lucide-react';
 import { ThreadPanel } from '@/components/patterns/thread';
@@ -119,11 +120,7 @@ function drafted(view: InterviewCardView): string {
   if (!view.finishedAt) return `Drafted from ${answers}`;
   // The day as stored, read in UTC on both sides so the server's and the
   // browser's renderings agree.
-  const day = new Date(`${view.finishedAt.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  const day = whenDate(view.finishedAt.slice(0, 10), { timeZone: 'UTC', month: 'long', year: 'auto' });
   return `Drafted on ${day} from ${answers}`;
 }
 

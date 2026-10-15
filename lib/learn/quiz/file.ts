@@ -1,4 +1,5 @@
 import { MAX_PASTE_CHARS } from '@/lib/learn/quiz/model';
+import { formatNumber } from '@/lib/money';
 
 /**
  * A file handed over to be quizzed on.
@@ -88,7 +89,7 @@ export function quizFileMessage(reason: QuizFileRejection, name: string): string
     case 'too-big':
       return `${name} is too big to read. Files up to a megabyte.`;
     case 'too-long':
-      return `${name} is longer than a quiz reads — ${MAX_PASTE_CHARS.toLocaleString()} characters. Paste the part you want to be asked about.`;
+      return `${name} is longer than a quiz reads — ${formatNumber(MAX_PASTE_CHARS)} characters. Paste the part you want to be asked about.`;
     case 'not-text':
       return `${name} is not text, whatever it is called. ${QUIZ_FILE_KINDS}`;
     case 'empty':

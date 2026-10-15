@@ -54,6 +54,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { deviceTimeZone, whenTime } from '@/lib/core/when';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -79,7 +80,7 @@ export type VaultState =
   | { kind: 'failed'; reason: EssayVaultFailure; error: string };
 
 function clock(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return whenTime(iso, { timeZone: deviceTimeZone() ?? 'UTC' });
 }
 
 function saveLine(draft: SaveState, vault: VaultState): string {
@@ -114,11 +115,7 @@ function draftKey(draft: Draft): string {
 }
 
 function browserTimeZone(): string | null {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
-  } catch {
-    return null;
-  }
+  return deviceTimeZone();
 }
 
 /**

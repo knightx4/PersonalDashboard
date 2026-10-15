@@ -5,7 +5,7 @@ import { loadPlan, type PlanData } from '@/lib/plan/load';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingOnYou, type WaitingRow } from '@/lib/plan/waiting';
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -106,5 +106,9 @@ export const planStepsSource: AgendaSource = {
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'plan_item', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'plan_item', key, ctx.clients);
   },
 };

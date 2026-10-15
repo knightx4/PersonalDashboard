@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { safeTimeZone } from '@/lib/core/timezone';
+import { whenDate } from '@/lib/core/when';
 import { GmailLink } from './shared';
 import type { PanelProps } from './types';
 
@@ -113,16 +114,8 @@ const KEY_EVENTS: Record<string, { label: string; dot: string }> = {
 
 /** A stop's date: day and month, and the year only when it is not this year's. */
 function stopDate(iso: string, timezone: string): string {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '—';
-  const zone = safeTimeZone(timezone);
-  const year = (d: Date) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: zone }).format(d);
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(year(date) === year(new Date()) ? {} : { year: 'numeric' }),
-    timeZone: zone,
-  }).format(date);
+  if (!Number.isFinite(new Date(iso).getTime())) return '—';
+  return whenDate(iso, { timeZone: safeTimeZone(timezone), year: 'auto' });
 }
 
 function TimelineStrip({

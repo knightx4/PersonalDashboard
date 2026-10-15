@@ -10,11 +10,12 @@ import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
-import { confirmDashChange, declineDashChange, undoDashChange } from './actions';
+import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from './actions';
 
 const PRESSES: ChangePresses = {
   confirm: confirmDashChange,
   decline: declineDashChange,
+  reopen: reopenDashChange,
   undo: undoDashChange,
 };
 

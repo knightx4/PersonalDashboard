@@ -5,7 +5,8 @@ import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
 import { projectedMonthEnd } from '@/lib/learn/youtube/budget';
 import type { Usage } from '@/lib/learn/youtube/load';
-import { formatClock } from '@/lib/clock';
+import { formatClock, whenDate } from '@/lib/core/when';
+import { formatNumber } from '@/lib/money';
 
 /**
  * TranscriptAPI credits this month, against the plan.
@@ -30,7 +31,7 @@ const OUTCOME_WORDS: Record<string, string> = {
 };
 
 function monthDay(date: Date): string {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return whenDate(date, { timeZone: 'UTC', year: 'never' });
 }
 
 function when(instant: string): string {
@@ -47,7 +48,7 @@ export function TranscriptCredits({ usage, now = new Date() }: { usage: Usage; n
     queue.queued > 0 ? `${queue.queued} queued` : null,
     queue.failed > 0 ? `${queue.failed} to retry` : null,
     queue.none > 0 ? `${queue.none} with no captions` : null,
-    `${queue.fetched.toLocaleString('en-GB')} stored`,
+    `${formatNumber(queue.fetched)} stored`,
   ].filter(Boolean);
 
   return (
@@ -55,7 +56,7 @@ export function TranscriptCredits({ usage, now = new Date() }: { usage: Usage; n
       title="TranscriptAPI credits"
       action={
         <span className="text-ui tabular-nums text-ink">
-          {credits.used.toLocaleString('en-GB')} of {credits.allowance.toLocaleString('en-GB')}
+          {formatNumber(credits.used)} of {formatNumber(credits.allowance)}
         </span>
       }
     >
@@ -67,8 +68,8 @@ export function TranscriptCredits({ usage, now = new Date() }: { usage: Usage; n
         height="md"
       />
       <p className={cn('mt-2 text-small tabular-nums', nearlyOut ? 'text-danger' : 'text-ink-muted')}>
-        {credits.remaining.toLocaleString('en-GB')} left · resets {monthDay(credits.resetsAt)}
-        {projected !== null ? ` · on pace for ${projected.toLocaleString('en-GB')}` : ''}
+        {formatNumber(credits.remaining)} left · resets {monthDay(credits.resetsAt)}
+        {projected !== null ? ` · on pace for ${formatNumber(projected)}` : ''}
       </p>
       <p className="mt-1 text-small text-ink-muted">
         {waiting.join(' · ')}. Counts what this app spent; the TranscriptAPI dashboard has the balance.

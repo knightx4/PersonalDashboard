@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { whenDate, whenTime } from '@/lib/core/when';
 
 /**
  * A line of things that happened, newest first.
@@ -88,20 +89,10 @@ export function gapLabel(newer: Date | string, older: Date | string): string | n
   return `${months} months earlier`;
 }
 
+/** The row's date as when.ts writes it ("Wed 14 Oct") and its time. */
 function parts(time: Date | string, timeZone: string) {
-  const date = time instanceof Date ? time : new Date(time);
-  const day = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  }).format(date);
-  const clock = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date);
+  const day = whenDate(time, { timeZone, weekday: 'short', year: 'never' });
+  const clock = whenTime(time, { timeZone });
   return { day, clock };
 }
 

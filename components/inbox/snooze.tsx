@@ -2,103 +2,39 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input } from '@/components/ui/field';
+import { FieldError } from '@/components/ui/field';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { StateLabel } from '@/components/dev/state-label';
-import { snoozeInboxRow, unsnoozeInboxRow } from '@/lib/core/inbox-snooze-actions';
-import { localDayStart, pickedDayStart, snoozeChoices } from '@/lib/core/inbox-snoozes';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
+import { laterInboxRow, unsnoozeInboxRow } from '@/lib/core/inbox-snooze-actions';
 import { cn } from '@/lib/cn';
+import { deviceTimeZone, whenDate } from '@/lib/core/when';
 
 /**
- * Snooze one inbox row, in Dev and in Goals (plan #1843). Closed to a single
- * ghost button; pressed, it offers tomorrow, next week or a day to pick.
- * `snoozeRef` is the row's `schema.table:id` (lib/core/inbox-snoozes.ts).
- * The row leaves the list when the page refreshes after the press.
+ * Later on one inbox row in Dev (plan #1843, #1957.2): the one Later menu,
+ * whose days are read in the account's timezone on the server. `snoozeRef` is
+ * the row's `schema.table:id` (lib/core/inbox-snoozes.ts). The row leaves the
+ * list when the page refreshes after the press.
  */
-export function SnoozeMenu({ snoozeRef }: { snoozeRef: string }) {
-  const [open, setOpen] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [day, setDay] = useState('');
+export function SnoozeMenu({ snoozeRef, label }: { snoozeRef: string; label: string }) {
   const [error, setError] = useState<string | undefined>();
-  const [pending, start] = useTransition();
-
-  function snooze(until: Date | null) {
-    if (!until) {
-      setError('Pick a day.');
-      return;
-    }
-    setError(undefined);
-    start(async () => {
-      const result = await snoozeInboxRow(snoozeRef, until.toISOString());
-      if (result.error) setError(result.error);
-    });
-  }
-
-  if (!open) {
-    return (
-      <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Snooze
-      </Button>
-    );
-  }
-
-  const now = new Date();
-  const { tomorrow, nextWeek } = snoozeChoices(now);
-  const first = localDayStart(now, 1);
-  const tomorrowIso = [
-    first.getFullYear(),
-    String(first.getMonth() + 1).padStart(2, '0'),
-    String(first.getDate()).padStart(2, '0'),
-  ].join('-');
+  const [, start] = useTransition();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-small text-ink-muted">Snooze until</span>
-      <Button type="button" size="sm" variant="secondary" pending={pending} onClick={() => snooze(tomorrow)}>
-        Tomorrow
-      </Button>
-      <Button type="button" size="sm" variant="secondary" pending={pending} onClick={() => snooze(nextWeek)}>
-        Next week
-      </Button>
-      {picking ? (
-        <>
-          <Input
-            type="date"
-            aria-label="Snooze until this day"
-            value={day}
-            min={tomorrowIso}
-            onChange={(event) => setDay(event.target.value)}
-            className="w-auto"
-          />
-          <Button
-            type="button"
-            size="sm"
-            pending={pending}
-            onClick={() => snooze(pickedDayStart(day))}
-          >
-            Snooze
-          </Button>
-        </>
-      ) : (
-        <Button type="button" size="sm" variant="secondary" onClick={() => setPicking(true)}>
-          Pick a day
-        </Button>
-      )}
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        onClick={() => {
-          setOpen(false);
-          setPicking(false);
+    <span className="flex flex-wrap items-center gap-2">
+      <LaterMenu
+        label={label}
+        onChoose={(choice) => {
           setError(undefined);
+          start(async () => {
+            const result = await laterInboxRow(snoozeRef, choice);
+            if (result.error) setError(result.error);
+          });
         }}
-      >
-        Cancel
-      </Button>
+      />
       <FieldError>{error}</FieldError>
-    </div>
+    </span>
   );
 }
 
@@ -107,9 +43,9 @@ export function BackFromSnoozeMark() {
   return (
     <StateLabel
       glyph="clock"
-      word="Back from snooze"
+      word="Back from Later"
       tone="quiet"
-      title="You snoozed this, and the day has come."
+      title="You put this off until today."
     />
   );
 }
@@ -124,11 +60,7 @@ export type SnoozedItem = {
 
 /** "Fri 16 Oct", in the reader's own time zone. */
 function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  return whenDate(iso, { timeZone: deviceTimeZone() ?? 'UTC', weekday: 'short', year: 'never' });
 }
 
 function SnoozedRow({ item }: { item: SnoozedItem }) {
@@ -152,7 +84,7 @@ function SnoozedRow({ item }: { item: SnoozedItem }) {
           })
         }
       >
-        Unsnooze
+        Bring back
       </Button>
       <FieldError>{error}</FieldError>
     </li>
@@ -166,7 +98,7 @@ function SnoozedRow({ item }: { item: SnoozedItem }) {
 export function SnoozedList({ items }: { items: readonly SnoozedItem[] }) {
   if (items.length === 0) return null;
   return (
-    <SectionFold title="Snoozed" count={items.length} defaultOpen={false}>
+    <SectionFold title="Later" count={items.length} defaultOpen={false}>
       <ul className={cn(cardVariants(), 'divide-y divide-border')}>
         {items.map((item) => (
           <SnoozedRow key={item.ref} item={item} />

@@ -15,6 +15,7 @@
  */
 
 import { authorshipBlock, shiftMarks, type AuthorMark } from './authorship';
+import { zoneDay } from '@/lib/core/when';
 
 /** The vault folder new essays are written into. */
 export const ESSAYS_FOLDER = 'Essays';
@@ -334,12 +335,7 @@ export function uniqueSlug(base: string, taken: ReadonlySet<string>): string {
 /** Today as `YYYY-MM-DD` in a time zone, falling back to UTC for one Intl does not know. */
 export function essayDay(now: Date, timeZone: string | null): string {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(now);
+    return zoneDay(now, timeZone || 'UTC');
   } catch {
     return now.toISOString().slice(0, 10);
   }

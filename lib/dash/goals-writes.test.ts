@@ -602,7 +602,7 @@ describe('the Goals writes', () => {
         'There is no goal or step of theirs with that row_ref. Look it up first.',
       );
       expect(await refused('change_goals_inbox', inboxTables(), { change: 'snooze', row_ref: STEP, until: '2026-10-01' })).toBe(
-        'until must be tomorrow or next_week, or a day after today as YYYY-MM-DD.',
+        'until must be tomorrow, weekend, next_week, next_month, or a day after today as YYYY-MM-DD.',
       );
     });
 

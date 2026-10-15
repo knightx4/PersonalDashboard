@@ -63,6 +63,9 @@ import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 import { TeachBackCard } from './teach-back-card';
 import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { CloseButton } from '@/components/inbox/close-button';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -100,7 +103,8 @@ type Leaving = { id: string; swipe: SwipeAction } | null;
 const SWIPE_LABEL: Record<SwipeAction, string> = {
   known: 'Got it',
   review: 'Work on this',
-  skipped: 'Not now',
+  // One of the four (plan #1957.3): the card comes back in three days.
+  skipped: LIFECYCLE_VERB.later,
 };
 
 type MadeTrack = NonNullable<NewTrackResult['track']>;
@@ -279,13 +283,13 @@ export function LearnNowFeed({
     advance(id);
     void dismissCard(id)
       .then((result) => {
-        if (result.error) setError(`Not interested was not recorded: ${result.error}`);
+        if (result.error) setError(`Decline was not recorded: ${result.error}`);
       })
-      .catch(() => setError('Not interested was not recorded. Check your connection.'));
+      .catch(() => setError('Decline was not recorded. Check your connection.'));
   }, [advance, current]);
 
   /**
-   * Skip on a unit check or a teach-back: it goes as Not interested does. The
+   * Skip on a unit check or a teach-back: it goes as Decline does. The
    * unit stays done, and the idea keeps its state.
    */
   const skipCheck = useCallback(() => {
@@ -984,20 +988,12 @@ function DeckCard({
                 )}
               </span>
             )}
-            {/* Not interested and the two ratings stay on one line, the
+            {/* Decline (plan #1957.3: a card is Dash's pick, so turning it
+                down is Decline) and the two ratings stay on one line, the
                 ratings to its right, down to a 360px phone: that is why the
                 labels drop "Too" below sm. */}
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onDismiss}
-                disabled={testing}
-              >
-                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-                Not interested
-              </Button>
+              <CloseButton lifecycle="declined" onClick={onDismiss} disabled={testing} />
               <Button
                 type="button"
                 variant="ghost"
@@ -1086,8 +1082,8 @@ function DeckCard({
               onClick={() => onSwipe('skipped')}
               aria-keyshortcuts="ArrowLeft"
             >
-              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              Not now
+              <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
+              {LIFECYCLE_VERB.later}
             </Button>
             <Button
               type="button"

@@ -12,7 +12,7 @@ import { describeRun, type SyncProgress, type SyncRunSummary } from '@/lib/vault
 import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
-import { formatClock } from '@/lib/clock';
+import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 import { PageColumn } from '@/components/shell/page-width';
 

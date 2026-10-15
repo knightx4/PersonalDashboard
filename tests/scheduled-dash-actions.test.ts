@@ -574,7 +574,7 @@ describe('the mail sync and the receipt re-read, on recurring payments (plan #15
       undo: null,
     });
     expect(String(records(fake)[0].summary)).toContain('Dash added Netflix to your recurring payments');
-    expect(String(records(fake)[0].summary)).toContain('$15.49 charge on 21 Sept');
+    expect(String(records(fake)[0].summary)).toContain('$15.49 charge on 21 Sep');
 
     const undone = await undoDashAction(fakeDashDeps(fake, USER), String(records(fake)[0].id));
     expect(undone.ok).toBe(true);
@@ -734,7 +734,7 @@ describe('the mail sync, on the orders it imports (plan #1576)', () => {
     expectScheduled(rows);
     expect(rows[0]).toMatchObject({ kind: 'import_order', subject_ref: 'public.orders:order-1', op: 'insert', undo: null });
     expect(rows[0].summary).toBe(
-      'Dash added your order from Bookshop of 28 Sept, and 3 things to your inventory: Desk lamp and 2 × Dune.',
+      'Dash added your order from Bookshop of 28 Sep, and 3 things to your inventory: Desk lamp and 2 × Dune.',
     );
 
     const entry = dashTodayEntry(
@@ -773,11 +773,11 @@ describe('the mail sync, on the orders it imports (plan #1576)', () => {
       lines: ['A', 'B', 'C', 'D', 'E'].map((name) => ({ name: `${name} ${'x'.repeat(80)}`, quantity: 1 })),
       units: 5,
     });
-    expect(many).toMatch(/^Dash added your order of 28 Sept, and 5 things to your inventory: .* and 2 more\.$/);
+    expect(many).toMatch(/^Dash added your order of 28 Sep, and 5 things to your inventory: .* and 2 more\.$/);
     expect(many.length).toBeLessThanOrEqual(300);
 
     expect(orderImportedSummary({ merchant: 'Shop', orderDate: '2026-09-28', lines: [], units: 0 })).toBe(
-      'Dash added your order from Shop of 28 Sept. Nothing in it went into your inventory.',
+      'Dash added your order from Shop of 28 Sep. Nothing in it went into your inventory.',
     );
   });
 });
@@ -858,7 +858,7 @@ describe('the mail sync, on later mail about an order (plan #1577)', () => {
     const shipment = rows[1];
     expect(shipment).toMatchObject({ kind: 'add_shipment', op: 'insert', undo: null });
     expect(shipment.subject_ref).toBe(`public.shipments:${fake['public.shipments'][0].id}`);
-    expect(shipment.summary).toBe('Dash added a shipment to your order from Bookshop of 28 Sept: on its way, due 1 Oct.');
+    expect(shipment.summary).toBe('Dash added a shipment to your order from Bookshop of 28 Sep: on its way, due 1 Oct.');
 
     const deps = fakeDashDeps(fake, USER);
     expect((await undoDashAction(deps, String(rows[0].id))).ok).toBe(false);
@@ -875,7 +875,7 @@ describe('the mail sync, on later mail about an order (plan #1577)', () => {
 
     const rows = records(fake);
     expect(rows.map((row) => row.kind)).toEqual(['add_shipment', 'update_shipment']);
-    expect(rows[1]).toMatchObject({ op: 'update', summary: 'Dash marked your order from Bookshop of 28 Sept delivered.' });
+    expect(rows[1]).toMatchObject({ op: 'update', summary: 'Dash marked your order from Bookshop of 28 Sep delivered.' });
 
     const deps = fakeDashDeps(fake, USER);
     // The add waits on the later change, which goes back first.
@@ -896,7 +896,7 @@ describe('the mail sync, on later mail about an order (plan #1577)', () => {
       kind: 'cancel_order',
       op: 'update',
       subject_ref: 'public.orders:order-1',
-      summary: 'Dash marked your order from Bookshop of 28 Sept cancelled.',
+      summary: 'Dash marked your order from Bookshop of 28 Sep cancelled.',
     });
     expect((await undoDashAction(fakeDashDeps(fake, USER), String(rows[0].id))).ok).toBe(true);
     expect(fake['public.orders'][0].cancelled_at).toBeNull();
@@ -913,13 +913,13 @@ describe('the mail sync, on later mail about an order (plan #1577)', () => {
     await sync(single, 'return', reading({ refundAmountCents: 1200 }));
     const [record] = records(single);
     expect(record).toMatchObject({ kind: 'mark_returned', op: 'insert', undo: null });
-    expect(record.summary).toBe('Dash marked Dune from your order from Bookshop of 28 Sept returned and refunded.');
+    expect(record.summary).toBe('Dash marked Dune from your order from Bookshop of 28 Sep returned and refunded.');
     expect((await undoDashAction(fakeDashDeps(single, USER), String(record.id))).ok).toBe(true);
     expect(single['public.returns']).toHaveLength(0);
 
     const [both] = records(one);
     expect(both).toMatchObject({ kind: 'mark_returned', undo: { none: RETURNS_NO_UNDO } });
-    expect(both.summary).toBe('Dash marked 2 things from your order from Bookshop of 28 Sept returned and refunded.');
+    expect(both.summary).toBe('Dash marked 2 things from your order from Bookshop of 28 Sep returned and refunded.');
     const entry = dashTodayEntry(
       { ...(both as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
       '2026-10-03',

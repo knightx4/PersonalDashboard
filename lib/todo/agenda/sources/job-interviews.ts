@@ -11,6 +11,7 @@ import {
   type DayContext,
   type SourceContext,
 } from '@/lib/todo/agenda/sources';
+import { zoneDay } from '@/lib/core/when';
 
 /**
  * Interviews already in the diary, from job_search.interviews.
@@ -133,10 +134,5 @@ function byDay<T extends { day: string }>(interviews: readonly T[]): T[][] {
 }
 
 function dayIn(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso));
+  return zoneDay(iso, timezone);
 }

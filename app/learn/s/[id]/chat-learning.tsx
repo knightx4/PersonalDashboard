@@ -4,6 +4,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import type { SubjectLearning } from '@/lib/learn/chat/subject-load';
+import { whenDay } from '@/lib/core/when';
 
 /**
  * The readings related to a subject and the conversations logged about it
@@ -28,7 +29,6 @@ export function ChatLearningSection({
   if (readings.length === 0 && sessions.length === 0) return null;
 
   const open = readings.filter((row) => row.status === 'queued' || row.status === 'reading').length;
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: timezone });
 
   return (
     <>
@@ -66,7 +66,7 @@ export function ChatLearningSection({
               <li key={row.id} className="card-pad">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <h3 className="text-body font-semibold text-ink">{row.topic}</h3>
-                  <span className="text-small text-ink-muted">{day.format(new Date(row.createdAt))}</span>
+                  <span className="text-small text-ink-muted">{whenDay(row.createdAt, { timeZone: timezone })}</span>
                 </div>
                 <p className="mt-1 text-ui text-ink">{row.summary}</p>
                 {row.ideas.length > 0 && <p className="mt-1 text-ui text-ink-muted">{row.ideas.join(' · ')}</p>}

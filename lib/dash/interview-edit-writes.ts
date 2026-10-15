@@ -1,5 +1,6 @@
 import { isUuid, type AskDb, type SchemaClient } from '@/lib/ask/db';
 import { toRef } from '@/lib/core/refs';
+import { formatNumber } from '@/lib/money';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KINDS, interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import { nextRoundNumber } from '@/lib/jobs/interview/rounds';
@@ -443,7 +444,7 @@ async function changeInterview(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   ] as const) {
     if (!given(args, key)) continue;
     const value = text(args, key);
-    if (value.length > NOTES_MAX) throw new JobsRefused(`Keep ${key} under ${NOTES_MAX.toLocaleString('en-GB')} characters.`);
+    if (value.length > NOTES_MAX) throw new JobsRefused(`Keep ${key} under ${formatNumber(NOTES_MAX)} characters.`);
     if ((value || null) === (interview[column] ?? null)) continue;
     update[column] = value || null;
     said.push(value ? `wrote ${words}` : `cleared ${words}`);
@@ -623,7 +624,7 @@ async function editRound(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promi
   }
   if (given(args, 'notes')) {
     const notes = text(args, 'notes');
-    if (notes.length > NOTES_MAX) throw new JobsRefused(`Keep notes under ${NOTES_MAX.toLocaleString('en-GB')} characters.`);
+    if (notes.length > NOTES_MAX) throw new JobsRefused(`Keep notes under ${formatNumber(NOTES_MAX)} characters.`);
     if ((notes || null) !== (round.notes ?? null)) {
       update.notes = notes || null;
       said.push(notes ? 'wrote its notes' : 'cleared its notes');

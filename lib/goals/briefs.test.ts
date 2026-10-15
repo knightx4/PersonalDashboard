@@ -14,12 +14,12 @@ describe('writtenWhen', () => {
     expect(writtenWhen({ createdAt: lateEvening }, 'America/New_York', Date.parse('2026-09-26T03:00:00Z'))).toBe(
       'today',
     );
-    expect(writtenWhen({ createdAt: lateEvening }, 'America/New_York', NOW)).toBe('on 25 Sept');
+    expect(writtenWhen({ createdAt: lateEvening }, 'America/New_York', NOW)).toBe('on 25 Sep');
   });
 
   it('says how old a note over a week old is', () => {
     const old = { createdAt: '2026-09-10T09:00:00Z' };
     expect(briefIsStale(old, NOW)).toBe(true);
-    expect(writtenWhen(old, 'UTC', NOW)).toBe('on 10 Sept, over a week ago');
+    expect(writtenWhen(old, 'UTC', NOW)).toBe('on 10 Sep, over a week ago');
   });
 });

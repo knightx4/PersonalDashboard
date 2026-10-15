@@ -21,7 +21,8 @@ import {
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { useClockNow } from '@/lib/use-clock-now';
-import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { useOptimisticWrite, writeError } from '@/lib/use-optimistic-write';
+import { useToast } from '@/components/ui/toast';
 import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,8 @@ import { Note } from '@/components/ui/note';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
 import { checkWaitName } from '@/lib/plan/check-backs';
 import {
+  assigneeOf,
+  assigneeTitle,
   flatten,
   healthOf as planHealthOf,
   moveOf as planMoveOf,
@@ -73,6 +76,7 @@ import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
+import { AssigneeCell } from '@/components/plan-tree/assignee-cell';
 import { MoveLabel } from '@/components/ui/move-label';
 import { MOVE_TONE, waitingOnName, type Move } from '@/lib/core/move';
 import { StateLabel } from '@/components/dev/state-label';
@@ -492,6 +496,31 @@ function moveFor(node: PlanNode, context?: MoveContext) {
   return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
+/**
+ * What a waiting row needs before it can move, for the Needs line under its
+ * title (plan #2069.1): the step it waits on by outline, or the day of the
+ * check it waits for. Only on a row whose own state is the wait, the way the
+ * move column used to name it.
+ */
+function waitNeed(node: PlanNode, context?: MoveContext): string | null {
+  if (ownMoveWord(node, context) !== 'waiting') return null;
+  if (node.waitingOn.length > 0) {
+    const names = node.waitingOn.map((ref) => stepRef(ref));
+    const list =
+      names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    return `${list} to close first`;
+  }
+  if (node.waitsUntil.length > 0) return `the check on ${checkWaitName(node.waitsUntil)}`;
+  return null;
+}
+
+/** The steps at or beneath this row that a session is working now, by outline. */
+function workedNow(node: PlanNode, context?: MoveContext): string[] {
+  return flatten([node])
+    .filter((row) => !isClosed(row.status) && (context?.working?.has(row.id) ?? false))
+    .map((row) => stepRef(row));
+}
+
 /** What this row alone would say, to tell a rollup from a row's own state. */
 function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
   return planMoveOf({ ...node, children: [] }, context);
@@ -518,17 +547,10 @@ function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
 export function withSessionDrop(
   node: Pick<PlanNode, 'id' | 'status' | 'comment'>,
   menu: ActionMenuItem[],
+  drop: () => void,
 ): ActionMenuItem[] {
   if (isClosed(node.status) || !sessionOrigin(node.comment)) return menu;
-  return [
-    {
-      id: 'drop-session-step',
-      label: 'Drop',
-      formAction: (formData: FormData) => setPlanItemStatus({}, formData),
-      formFields: { id: node.id, status: 'dropped' },
-    },
-    ...menu,
-  ];
+  return [{ id: 'drop-session-step', label: 'Drop', lifecycle: 'dropped', onSelect: drop }, ...menu];
 }
 
 function useResolving(
@@ -701,10 +723,24 @@ export function usePlanRow({
     () => ({ status: served.status, priority: served.priority, assignee: served.assignee }),
     [served.status, served.priority, served.assignee],
   );
+  const toast = useToast();
   const { shown: fields, run: changeRow } = useOptimisticWrite<RowFields, RowChange>({
     value: serverFields,
     apply: applyRowChange,
     write: (change) => writeRowChange(served.id, change),
+    // Done or Dropped from the row says so with the way back (plan #1957.3).
+    onDone: (change) => {
+      if (change.kind !== 'status' || !isClosed(change.status) || isClosed(served.status)) return;
+      const back = served.status;
+      toast({
+        text: change.status === 'done' ? 'Done' : 'Dropped',
+        undo: async () => {
+          const result = await writeRowChange(served.id, { kind: 'status', status: back });
+          const error = writeError(result);
+          if (error) throw new Error(error);
+        },
+      });
+    },
   });
   // The steps beneath draw in the order their list holds, so a press of Move up
   // on one of them swaps it here before the server has answered.
@@ -807,7 +843,7 @@ export function usePlanRow({
   );
   // The same outlines by number, for stored text that names a step `#1084`.
   const outlines = useMemo(() => outlinesOf(refTitles), [refTitles]);
-  const health = healthOf(node, liveness, outlines);
+  const ownHealth = healthOf(node, liveness, outlines);
   const claim = liveness[node.id];
   // The run behind this row, where there is one to account for. Typed as
   // possibly missing because most rows have no run at all -- the index
@@ -838,6 +874,20 @@ export function usePlanRow({
         title: 'The overhaul routine is working this now.',
       }
     : moveFor(node, resolving);
+  // Who the row is on (plan #2069.1). An overhaul's routine is a session
+  // working the row, so its mark moves too.
+  const assigneeFacts = assigneeOf(node, resolving);
+  const assignee = overhaulRunning ? { ...assigneeFacts, working: true } : assigneeFacts;
+  // "Working now" is said in the Status tooltip, by the steps it is true of,
+  // where the row's own word does not already say a session is on it.
+  const working = workedNow(node, resolving);
+  const health =
+    working.length > 0 && ownHealth.name !== 'working'
+      ? {
+          ...ownHealth,
+          title: `${ownHealth.title ?? ''} Dash is working on ${working.join(', ')} now.`.trim(),
+        }
+      : ownHealth;
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
   // child's buttons that should be shut, not this one's.
@@ -996,7 +1046,7 @@ export function usePlanRow({
       formAction: (formData: FormData) => deletePlanItem({}, formData),
       formFields: { id: node.id },
     },
-  ]);
+  ], () => changeRow({ kind: 'status', status: 'dropped' }));
 
   const actionError =
     sendState.error ??
@@ -1396,6 +1446,14 @@ export function usePlanRow({
     batchAction,
     node: criticStop ? { ...node, blockAsk: criticStopNeeds() } : node,
     health,
+    need: waitNeed(node, resolving),
+    assignee: (
+      <AssigneeCell
+        who={assignee.who}
+        working={assignee.working}
+        title={assigneeTitle(assignee)}
+      />
+    ),
     move: move.move ? (
       moveAfter && afterWord(move.move) ? (
         // Waiting on one step, the words link to it (on this page, its row).
@@ -1473,7 +1531,8 @@ export function PlanRow(props: PlanRowProps) {
       trail={trail}
       row={parts.row}
       health={parts.health}
-      move={parts.move}
+      assignee={parts.assignee}
+      need={parts.need}
       statusMenu={parts.statusMenu}
       menu={parts.menu}
       actions={PLAN_TREE_ACTIONS}

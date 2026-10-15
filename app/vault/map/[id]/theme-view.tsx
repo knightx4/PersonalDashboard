@@ -10,6 +10,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { whenMonth } from '@/lib/core/when';
 
 /**
  * One theme on the map, drawn from what the page read (page.tsx), so the
@@ -140,5 +141,5 @@ function seenSpan(first: string | null, last: string | null): string | null {
 }
 
 function month(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  return whenMonth(iso, { timeZone: 'UTC', month: 'short' });
 }
