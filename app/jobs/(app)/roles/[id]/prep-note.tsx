@@ -18,7 +18,6 @@ import { useRef, useState, useTransition } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { Note } from '@/components/ui/note';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -27,7 +26,7 @@ import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
 import { writeRoundPrepNote } from './prep-actions';
 import { VERDICT_STYLE } from './verdict';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 
 const PREP_HINT = {
   action: 'app/jobs/(app)/roles/[id]/prep-actions.ts#writeRoundPrepNote',
@@ -136,10 +135,18 @@ export function RoundPrep({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           {heading}
           <div className="flex items-center gap-2">
-            <PaidHint {...PREP_HINT} align="end" />
-            <Button type="button" size="sm" pending={pending} onClick={() => prepare(false)}>
-              {pending ? 'Preparing…' : 'Prepare me'}
-            </Button>
+            <DashAction
+              type="button"
+              size="sm"
+              pending={pending}
+              onClick={() => prepare(false)}
+              paid={PREP_HINT.action}
+              what={PREP_HINT.what}
+              align="end"
+              hintFirst
+            >
+              {pending ? 'Preparing…' : 'Prepare for this interview'}
+            </DashAction>
           </div>
         </div>
 
@@ -287,10 +294,18 @@ export function RoundPrep({
       </details>
 
       <div className="absolute right-0 top-0 flex items-center gap-2">
-        <PaidHint {...PREP_HINT} align="end" />
-        <Button type="button" variant="link" disabled={pending} onClick={() => prepare(true)}>
+        <DashAction
+          type="button"
+          variant="link"
+          disabled={pending}
+          onClick={() => prepare(true)}
+          paid={PREP_HINT.action}
+          what={PREP_HINT.what}
+          align="end"
+          hintFirst
+        >
           {pending ? 'Preparing…' : 'Regenerate'}
-        </Button>
+        </DashAction>
       </div>
     </div>
   );

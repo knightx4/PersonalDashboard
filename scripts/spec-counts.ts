@@ -392,6 +392,50 @@ function formOnlyPages(root: string): string[] {
 const DATE_FORMATTER = /\b(?:Intl\.DateTimeFormat|toLocaleDateString|toLocaleString|toLocaleTimeString)\b/;
 const WHEN_HOME = 'lib/core/when.ts';
 
+/**
+ * docs/ONE-INTERFACE-SPEC.md, R12 (plan #1964.1): a control that calls a
+ * model names Dash, and "AI" appears on no control. Counts each button or
+ * link under app/ and components/ whose label, the text between its tags,
+ * holds the word AI. The gallery's fixtures are not controls and are left out.
+ */
+const CONTROL_ELEMENT = /<(Button|button|Link|a|DashAction|RowAction)\b[^>]*>([\s\S]*?)<\/\1>/g;
+const AI_WORD = /(?<![\w-])AI(?![\w-])/;
+
+function aiOnControls(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(CONTROL_ELEMENT)]
+        .filter((m) => AI_WORD.test(m[2].replace(/\{\/\*[\s\S]*?\*\/\}/g, '')))
+        .map((m) => `${file}:${lineAt(text, m.index ?? 0)}`);
+    })
+    .sort();
+}
+
+/**
+ * Plan #1964.1: every press that spends a model run is a DashAction, which
+ * draws its cost hint itself. A PaidHint or CostHint written anywhere else
+ * under app/ and components/ is a paid button not yet moved onto it. The
+ * primitives that define them and the gallery are left out.
+ */
+const HINT_ELEMENT = /<(?:PaidHint|CostHint)\b/g;
+const HINT_HOMES = new Set([
+  'components/ui/paid-hint.tsx',
+  'components/ui/cost-hint.tsx',
+  'components/ui/dash-action.tsx',
+]);
+
+function paidHintsOutsideDashAction(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !HINT_HOMES.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(HINT_ELEMENT)].map((m) => `${file}:${lineAt(text, m.index ?? 0)}`);
+    })
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -528,5 +572,17 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'server actions an agent should be able to do and has no tool for',
     target: 0,
     measure: () => actionGaps(),
+  },
+  {
+    name: 'ai-on-controls',
+    counts: 'buttons and links under app/ and components/ whose label says AI',
+    target: 0,
+    measure: aiOnControls,
+  },
+  {
+    name: 'paid-hints-outside-dash-action',
+    counts: 'cost hints drawn beside a button rather than by DashAction',
+    target: 0,
+    measure: paidHintsOutsideDashAction,
   },
 ];

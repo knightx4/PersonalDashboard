@@ -15,6 +15,7 @@ import {
   type IdeaActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -118,10 +119,9 @@ export function ShapeIdea({ idea }: { idea: IdeaRow }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={idea.id} />
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
-        {pending ? 'Sending…' : 'Shape into a plan'}
-      </Button>
+      <DashAction type="submit" size="sm" variant="secondary" pending={pending}>
+        {pending ? 'Sending…' : 'Shape this into a plan'}
+      </DashAction>
       {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"
           is the system saying what it did. */}
       {state.message && <span className="text-small text-ink-muted">{state.message}</span>}

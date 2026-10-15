@@ -491,7 +491,7 @@ Checked by: test `tests/proxy-launch.test.ts`.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.
-Checked by: count `ai-on-controls`, baseline 1, target 0, pending #1965.
+Checked by: count `ai-on-controls`, baseline 1, target 0.
 
 **R13.** There is one thread component.
 Checked by: count `thread-components`, baseline 2, target 1, pending #1967.

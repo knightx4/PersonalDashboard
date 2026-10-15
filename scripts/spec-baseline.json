@@ -1,5 +1,6 @@
 {
   "agent-action-gaps": 0,
+  "ai-on-controls": 0,
   "conversational-model-paths": 8,
   "date-formatting-files": 1,
   "form-only-pages": 0,
@@ -9,6 +10,7 @@
   "link-tables-per-target-column": 4,
   "model-id-files": 1,
   "off-token-radius": 0,
+  "paid-hints-outside-dash-action": 104,
   "raw-motion-values": 0,
   "routes-without-surface": 0,
   "row-pages-without-path": 0,

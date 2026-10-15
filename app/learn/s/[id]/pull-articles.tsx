@@ -38,7 +38,7 @@ export function PullArticles() {
       <Field
         label="Pull Wikipedia articles into the catalogue"
         id="catalogue-titles"
-        hint={`One article per line, by title or by link, up to ${MAX_TITLES}. Each is split into its sections and embedded, and the embedding is charged to your account. Pressing Find something to read on an idea then looks through them.`}
+        hint={`One article per line, by title or by link, up to ${MAX_TITLES}. Each is split into its sections and embedded, and the embedding is charged to your account. Pressing Find a reading on this idea then looks through them.`}
       >
         <Textarea
           id="catalogue-titles"
