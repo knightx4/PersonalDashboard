@@ -14,9 +14,10 @@ import { proposeGoal, type ProposeState } from './actions';
  * call drafts the topic's levels, and the press opens the draft to be read,
  * reworded and approved. Nothing is asked about it until then.
  *
- * The subject, unit and opening-question ids the callers still pass are
- * ignored: a topic belongs to the one shared map, not to a subject, and a
- * subject's lens takes it in once the topic is on the map.
+ * A topic belongs to the one shared map, not to a subject. Named on a
+ * subject's page, it also joins that subject's lens at solid (plan #2138.7),
+ * so the subject's progress counts it. The unit and opening-question ids the
+ * callers still pass are ignored.
  */
 
 function AskButton() {
@@ -38,6 +39,7 @@ function AskButton() {
 }
 
 export function GoalForm({
+  subjectId,
   goal,
   bare = false,
 }: {
@@ -55,6 +57,7 @@ export function GoalForm({
   // Written as a question rather than filled in as a field (plan #1435).
   return (
     <form action={propose} className={bare ? 'mt-3' : 'mt-6'}>
+      {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
       <ComposeBox className="space-y-2 py-2.5">
         <ComposeTitle
           name="goal"

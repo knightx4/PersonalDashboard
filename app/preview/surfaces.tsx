@@ -165,6 +165,17 @@ import {
   LearnTopicLoadingPreview,
 } from './learn-topic-surfaces';
 import {
+  LearnKnowLensesEmptyPreview,
+  LearnKnowLensesPreview,
+  LearnLensEditPreview,
+  LearnLensEmptyPreview,
+  LearnLensErrorPreview,
+  LearnLensFringePreview,
+  LearnLensLoadingPreview,
+  LearnLensPreview,
+  LearnLensUntouchedPreview,
+} from './learn-lens-surfaces';
+import {
   LearnTopicsReviewEmptyPreview,
   LearnTopicsReviewPreview,
   LearnTopicsReviewRunningPreview,
@@ -7956,6 +7967,71 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicsReviewEmptyPreview />,
+  },
+  {
+    /* A subject or learning goal as a lens (plan #2138.7). */
+    id: 'learn-lens',
+    label: 'Lens · A subject as topics to targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensPreview />,
+  },
+  {
+    id: 'learn-lens-fringe',
+    label: 'Lens · What you are ready for on one topic, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensFringePreview />,
+  },
+  {
+    id: 'learn-lens-edit',
+    label: 'Lens · Setting the targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEditPreview />,
+  },
+  {
+    id: 'learn-lens-untouched',
+    label: 'Lens · A goal with no answers yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensUntouchedPreview />,
+  },
+  {
+    id: 'learn-lens-empty',
+    label: 'Lens · No topics yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEmptyPreview />,
+  },
+  {
+    id: 'learn-lens-loading',
+    label: 'Lens · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensLoadingPreview />,
+  },
+  {
+    id: 'learn-lens-error',
+    label: 'Lens · When it cannot be read',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensErrorPreview />,
+  },
+  {
+    /* The Know page's lenses and fields (plan #2138.7). */
+    id: 'learn-know-lenses',
+    label: 'Subjects · Lenses, goals and fields by level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesPreview />,
+  },
+  {
+    id: 'learn-know-lenses-empty',
+    label: 'Subjects · Before anything is on topics',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesEmptyPreview />,
   },
   {
     id: 'learn-concept',

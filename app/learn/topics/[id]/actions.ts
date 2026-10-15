@@ -10,6 +10,7 @@ import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { MAX_LEVEL } from '@/lib/learn/levels/model';
 import { approveDraft, mergeDraftInto, settleWanted } from '@/lib/learn/levels/store';
 import { rewriteCell } from '@/lib/learn/levels/store-page';
+import { carryLensTargets } from '@/lib/learn/levels/lens-store';
 
 /**
  * What a draft topic's page does (plan #2138.2): approve it with the checks
@@ -65,13 +66,16 @@ export type MergeState = { error?: string };
 
 // latency: pending
 export async function mergeTopicDraft(_prev: MergeState, formData: FormData): Promise<MergeState> {
-  await requireUser();
+  const user = await requireUser();
   const draftId = Id.safeParse(formData.get('topicId'));
   const intoId = Id.safeParse(formData.get('intoId'));
   if (!draftId.success || !intoId.success) return { error: 'Could not work out which topics these were.' };
 
   const supabase = await createLearnClient();
   try {
+    // A draft named on a subject's page is on that subject's lens already
+    // (plan #2138.7), so the topic it merges into takes its place there.
+    await carryLensTargets(supabase, user.id, draftId.data, intoId.data);
     await mergeDraftInto(supabase, draftId.data, intoId.data);
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Merging the draft failed.' };
