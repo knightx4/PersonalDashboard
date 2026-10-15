@@ -156,7 +156,7 @@ export const jobsSources: ModuleSources = {
     {
       table: 'job_search.application_answers',
       module: 'Job search',
-      holds: 'Their answers to application questions.',
+      holds: "Their answers to application questions. The answers on one application, each with its question, are in application_answers.",
       weight: 'record',
       search: ['answer'],
       title: 'answer',
