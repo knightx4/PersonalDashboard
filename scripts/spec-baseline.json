@@ -15,5 +15,6 @@
   "routes-without-surface": 0,
   "row-pages-without-path": 0,
   "shell-mounts": 1,
+  "thread-components": 1,
   "thread-tables": 1
 }

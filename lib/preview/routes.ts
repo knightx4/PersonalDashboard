@@ -441,9 +441,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  * shows. A piece a page imports for itself still reaches that page.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
-  'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  // The one thread (plan #1964.3), with a subject or none: a change to it is
+  // looked at here and on the dev-comment-thread surfaces, rather than on
+  // every page that draws a thread.
+  'ask-dash-thread': ['components/thread/thread.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
-  'ask-dash-files': ['components/talk/talk-thread.tsx'],
+  'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).

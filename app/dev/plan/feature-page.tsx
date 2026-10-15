@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -62,7 +62,7 @@ import {
   type HeldBy,
 } from '@/lib/plan/split';
 import { TAB_PARAM, tabFrom } from '@/lib/tabs';
-import { deletePlanItem, type PlanActionState } from './actions';
+import { deletePlanItem } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
@@ -520,7 +520,6 @@ export function FeaturePage({
               subject={threadRef(PLAN_COMMENTS.target, node.id)}
               turns={node.thread}
               titles={parts.refTitles}
-              onCard
               placeholder="A note on this feature. Tag @dash to ask something, or to tell it to reword the feature, file an idea or build it."
             />
           </div>

@@ -3,8 +3,9 @@
 import { Tooltip } from '@/components/ui/tooltip';
 import { whenDate } from '@/lib/core/when';
 import { useActionState, useState } from 'react';
-import { ArrowUp, CircleUser, MessagesSquare } from 'lucide-react';
+import { ArrowUp, MessagesSquare } from 'lucide-react';
 import { ThreadPanel } from '@/components/patterns/thread';
+import { ThreadTurn } from '@/components/thread/thread';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,6 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
-import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { DevComment } from '@/lib/comments/load';
 import type { InterviewCardView } from '@/lib/specs/interview-view';
 import type { VisionScope } from '@/lib/specs/vision';
@@ -53,46 +53,32 @@ import Link, { linkVariants } from '@/components/ui/link';
 const START: PaidAction = 'app/dev/specs/interview-actions.ts#startInterview';
 const ANSWER: PaidAction = 'app/dev/specs/interview-actions.ts#answerInterviewQuestion';
 
-const AUTHOR_NAME = { me: 'You', claude: 'Dash' } as const;
-
+/** A question or an answer, drawn as every thread draws a turn. */
 function Turn({ turn, now }: { turn: DevComment; now: number }) {
   const dash = turn.author === 'claude';
   return (
-    <li className={cn('flex gap-2', dash && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        {dash ? (
-          <DashMark size="2xs" decorative className="text-ink-ghost" />
-        ) : (
-          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
-        )}
+    <ThreadTurn voice={dash ? 'dash' : 'you'} name={dash ? 'Dash' : 'You'} at={turn.createdAt} now={now}>
+      <div className="text-body">
+        <CommentBody body={turn.body} refs="outlines" />
       </div>
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className="text-small font-semibold text-ink">{AUTHOR_NAME[turn.author]}</span>
-          <time dateTime={turn.createdAt} title={exactTime(turn.createdAt)} className="tabular text-small text-ink-muted">
-            {commentWhen(turn.createdAt, now)}
-          </time>
-        </div>
-        <div className="text-body text-ink">
-          <CommentBody body={turn.body} refs="outlines" />
-        </div>
-      </div>
-    </li>
+    </ThreadTurn>
   );
 }
 
 /** Dash's line while it writes, in the place its turn will take. */
 function Writing({ children }: { children: React.ReactNode }) {
+  const now = useClockNow();
   return (
-    <li className="-mx-2 flex gap-2 rounded-control bg-sunken px-2 py-1.5" aria-live="polite">
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        <DashMark size="2xs" state="working" activity="writing" tone="brand" decorative />
-      </div>
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <span className="text-small font-semibold text-ink-muted">Dash</span>
-        <p className="text-body text-ink-muted">{children}</p>
-      </div>
-    </li>
+    <ThreadTurn
+      voice="dash"
+      name="Dash"
+      muted
+      now={now}
+      aria-live="polite"
+      mark={<DashMark size="2xs" state="working" activity="writing" tone="brand" decorative />}
+    >
+      <p className="text-body text-ink-muted">{children}</p>
+    </ThreadTurn>
   );
 }
 

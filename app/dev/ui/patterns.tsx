@@ -260,7 +260,6 @@ function ThreadSurface() {
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
           turns={TURNS}
-          onCard
         />
       </ThreadPanel>
     </PageColumn>

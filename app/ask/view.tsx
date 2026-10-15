@@ -3,7 +3,6 @@
 import { DashMark } from '@/components/ui/dash-mark';
 import { AskThread, useAskDash } from '@/components/shell/ask-dash';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
 import type { ChangePresses } from '@/components/talk/dash-changes';
 import { MadeChanges } from '@/components/talk/made-changes';
 import { commentWhen, exactTime } from '@/lib/comments/when';
@@ -67,8 +66,6 @@ export function AskConversation({
       openHandoffs={openHandoffs}
       label="Ask a follow-up"
       placeholder="Ask more about this"
-      // dash-action-ok: the follow-up box's send is an arrow beside what is typed, under Dash's answers.
-      hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
     />
   );
 }

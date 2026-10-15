@@ -18,10 +18,10 @@ import {
   type AskSource,
 } from '@/components/shell/ask-dash';
 import { useSearchRows } from '@/components/shell/use-search-rows';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { scopeForModule } from '@/lib/search/scope';
 import { SYSTEM_THEME } from '@/lib/theme';
-import type { TalkSend } from '@/components/talk/talk-thread';
+import type { TalkSend } from '@/components/thread/thread';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
@@ -103,7 +103,7 @@ describe('an answer in the thread', () => {
 
   it('links each row it used', () => {
     const html = renderToStaticMarkup(
-      <TalkThread id="t" turns={turns} send={never} label="Ask a follow-up" />,
+      <Thread id="t" turns={turns} send={never} label="Ask a follow-up" />,
     );
     expect(html).toContain('href="/shopping/orders/o1"');
     expect(html).toContain('Catan lot');
@@ -111,7 +111,7 @@ describe('an answer in the thread', () => {
 
   it('draws a card or story thread as before, with no list of rows', () => {
     const html = renderToStaticMarkup(
-      <TalkThread id="t" turns={turns.map((turn) => ({ ...turn, citations: undefined }))} send={never} label="Reply" />,
+      <Thread id="t" turns={turns.map((turn) => ({ ...turn, citations: undefined }))} send={never} label="Reply" />,
     );
     expect(html).not.toContain('What this answer used');
   });

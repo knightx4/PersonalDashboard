@@ -51,7 +51,6 @@ export function DashSeenDemo({
       </Button>
       <Thread
         subject={subject}
-        onCard
         awaitingReply={phase === 'working'}
         turns={[phase === 'seen' ? { ...comment, acknowledgedAt: seenAt } : comment]}
       />

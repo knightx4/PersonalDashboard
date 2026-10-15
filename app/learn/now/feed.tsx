@@ -18,11 +18,10 @@ import {
   X,
 } from 'lucide-react';
 import { CardNotes } from '@/components/learn/card-notes';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
@@ -864,20 +863,14 @@ function DeckCard({
           {/* Ask about this card (plan #1052): a saved conversation with Dash,
               answered from the card and the passage it was written from. */}
           <section className="mt-4">
-            <TalkThread
+            <Thread
               id={`ask-${card.id}`}
               turns={card.conversation ?? []}
               send={(body) => askAboutCard(card.id, body)}
               label="Ask about this card"
               placeholder="What would you like to know?"
               activity="writing"
-              hint={
-                // dash-action-ok: the hint sits on the thread composer, which has no button of its own.
-                <PaidHint
-                  action="app/learn/now/actions.ts#askAboutCard"
-                  what="Cost of an answer"
-                />
-              }
+              cost={{ action: 'app/learn/now/actions.ts#askAboutCard', what: 'Cost of an answer' }}
             />
           </section>
 

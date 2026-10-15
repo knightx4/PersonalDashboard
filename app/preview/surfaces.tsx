@@ -3685,7 +3685,6 @@ export const SURFACES: readonly Surface[] = [
         </p>
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
-          onCard
           turns={[
             {
               id: 'seen-1',
@@ -5325,7 +5324,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Ask Dash thread on its own (plan #1708), where a change to
-     * components/talk/talk-thread.tsx is looked at: a short answer with its
+     * components/thread/thread.tsx without a subject is looked at: a short answer with its
      * rows, a long markdown one, one with bars and one with a table. */
     id: 'ask-dash-thread',
     label: 'Ask Dash · The thread',
