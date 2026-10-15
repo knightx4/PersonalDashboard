@@ -82,17 +82,17 @@ function Metrics({
 }
 
 /** Two metrics, one with the longest name, and the line that adds another. */
-export function GoalMetricsSurface() {
+export function GoalMetricPropsSurface() {
   return <Metrics />;
 }
 
 /** The add line pressed: the form open in place, on the first list with a date. */
-export function GoalMetricsFormSurface() {
+export function GoalMetricPropsFormSurface() {
   return <Metrics shown={{ open: 'add' }} />;
 }
 
 /** A row pointed at, its menu pressed open: Change and Remove. */
-export function GoalMetricsMenuSurface() {
+export function GoalMetricPropsMenuSurface() {
   return (
     <PressOnMount selector='button[aria-label="Interviews actions"]'>
       <Metrics shown={{ revealed: 'm-interviews' }} />
@@ -101,17 +101,17 @@ export function GoalMetricsMenuSurface() {
 }
 
 /** A goal whose only list has no date: nothing to count, and it says so. */
-export function GoalMetricsEmptySurface() {
+export function GoalMetricPropsEmptySurface() {
   return <Metrics metrics={[]} lists={[LISTS[1]]} />;
 }
 
 /** A new metric being saved: the button holds its pending state. */
-export function GoalMetricsPendingSurface() {
+export function GoalMetricPropsPendingSurface() {
   return <Metrics shown={{ open: 'add', pending: true }} />;
 }
 
 /** A change refused: the message sits beside the date it is about. */
-export function GoalMetricsErrorSurface() {
+export function GoalMetricPropsErrorSurface() {
   return (
     <Metrics
       shown={{

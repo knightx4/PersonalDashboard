@@ -287,12 +287,12 @@ import { DashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
-  GoalMetricsEmptySurface,
-  GoalMetricsErrorSurface,
-  GoalMetricsFormSurface,
-  GoalMetricsMenuSurface,
-  GoalMetricsPendingSurface,
-  GoalMetricsSurface,
+  GoalMetricPropsEmptySurface,
+  GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormSurface,
+  GoalMetricPropsMenuSurface,
+  GoalMetricPropsPendingSurface,
+  GoalMetricPropsSurface,
 } from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
@@ -5667,7 +5667,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics in the properties',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsSurface />,
+    render: () => <GoalMetricPropsSurface />,
   },
   {
     /* The add line pressed: the form open in place. */
@@ -5675,7 +5675,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics, adding one',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsFormSurface />,
+    render: () => <GoalMetricPropsFormSurface />,
   },
   {
     /* A metric's row pointed at, its Change and Remove menu showing. */
@@ -5683,7 +5683,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics, a row’s menu',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsMenuSurface />,
+    render: () => <GoalMetricPropsMenuSurface />,
   },
   {
     /* No list on the goal has a date to count by. */
@@ -5691,7 +5691,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics, nothing to count',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsEmptySurface />,
+    render: () => <GoalMetricPropsEmptySurface />,
   },
   {
     /* A new metric mid-save: the button's pending state. */
@@ -5699,7 +5699,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics, saving',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsPendingSurface />,
+    render: () => <GoalMetricPropsPendingSurface />,
   },
   {
     /* A change refused, its message beside the field. */
@@ -5707,7 +5707,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Goal · Metrics, a change refused',
     module: 'goals',
     width: 'narrow',
-    render: () => <GoalMetricsErrorSurface />,
+    render: () => <GoalMetricPropsErrorSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
