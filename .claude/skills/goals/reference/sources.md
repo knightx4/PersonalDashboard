@@ -138,6 +138,24 @@ Topics they asked Dash to research: the question, why they want it and the short
 - Opens at `/learn/b/<id>`
 - Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.
 
+### `learn.topics` (Learn)
+
+Topics they study, each with what it covers and how deep it goes, on a ladder of ten levels.
+
+- Search: `name`, `scope`
+- Name a row by `name`; link it by `id`
+- Opens at `/learn/topics/<id>`
+- A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.
+
+### `learn.lenses` (Learn)
+
+Named sets of topics they are working towards, each topic with a target level.
+
+- Search: `name`
+- Name a row by `name`; link it by `id`
+- Opens at `/learn/lens/<id>`
+- Every subject and every learning goal has one (subject_id or aim_id; learn 0137). The topics and targets are in learn.lens_targets. Progress is computed, never stored.
+
 ### `news.preferences` (News)
 
 The neighbourhood they want local news for.
@@ -406,6 +424,14 @@ What backs each idea, and which topics their notes, courses, work and ideas touc
 - Search: `basis`
 - Name a row by `basis`; link it by `id`
 - target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.
+
+### `learn.cell_evidence` (Learn)
+
+What their answers showed about one level of a topic: met, not met, or said they already knew it.
+
+- Search: `quote`
+- Name a row by `verdict`; link it by `id`
+- One row per verdict on a cell (learn.topic_cells, one level of a topic); the latest row for a cell is the one that counts. The quote is the part of their answer that met the level.
 
 ### `todo.tasks` (Todo)
 

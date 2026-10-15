@@ -70,7 +70,7 @@ function learnSections(owner: boolean, readNow: number): NavSection[] {
       label: 'Subjects',
       icon: 'know',
       exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz'],
+      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
     },
     // Idea Space (plan #1857): every idea on one map, placed by what it says.
     // A tab of its own at the person's ask on 12 October 2026, which made it
