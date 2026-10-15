@@ -746,7 +746,7 @@ export function AppShell({
               {/* Below lg the bar is 5rem tall and its icons were the desk's
               16px in 32px buttons, too small to hit or read on a phone (note
               55df4819): there they are 20px in 40px buttons, the dock's size. */}
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5">
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5 max-lg:[&_button_[data-dash-state]]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
