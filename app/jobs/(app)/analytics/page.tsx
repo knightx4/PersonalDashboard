@@ -26,7 +26,7 @@ export default async function AnalyticsPage() {
           icon={BarChart3}
           title="Nothing to measure yet"
           description="These numbers need applications with a submission date. They start being useful at about fifteen, and trustworthy at about forty."
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         />
       </PageWide>
     );

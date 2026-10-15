@@ -20,10 +20,11 @@ import {
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { freshXAccessToken, hasXWriteScope, loadXAccount, XDisconnectedError } from '@/lib/x/account';
+import { freshXAccessToken, hasXMediaScope, hasXWriteScope, loadXAccount, XDisconnectedError } from '@/lib/x/account';
+import { requestOrigin } from '@/lib/auth/origin';
 import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
 import { revokeXToken } from '@/lib/x/oauth';
-import { sendXThread, XPostError, xPostUrl, xSendCheck } from '@/lib/x/post';
+import { sendXThread, uploadXImage, X_MAX_IMAGES, XPostError, xPostUrl, xSendCheck, type XImage } from '@/lib/x/post';
 import { runXRead, xRunMessage } from '@/lib/x/read';
 
 /**
@@ -602,8 +603,8 @@ const X_SEND_CLAIM_MS = 2 * 60 * 1000;
  * link: the same fields "Is this it?" fills in (confirmXMatch).
  *
  * Never automatic and never more than one draft: the tab sends one id after
- * the person confirms. The draft is checked again here (xSendCheck), since an
- * action can be posted without the page.
+ * the person confirms. The check's findings only warn (xSendCheck); the
+ * person has seen them beside the button, and X refuses what it will not take.
  *
  * A double press sends nothing twice. The send first claims the draft by
  * setting x_sending_at where it is unset (or older than two minutes, so a
@@ -628,7 +629,7 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
 
   const { data: row, error: readError } = await supabase
     .from('social_posts')
-    .select('id, body, x_thread_ids')
+    .select('id, body, x_thread_ids, image_paths')
     .eq('user_id', user.id)
     .eq('id', id.data)
     .eq('status', 'suggested')
@@ -639,10 +640,17 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
   const body = Array.isArray(row.body) ? (row.body as unknown[]).map(String) : [];
   const already = Array.isArray(row.x_thread_ids) ? (row.x_thread_ids as string[]) : [];
   const check = xSendCheck({ body, sent: already.length });
-  if (!check.ok) {
+  if (!check.ok) return { ok: false, error: 'Nothing left to send.' };
+
+  // The images go on the first post, so they matter only while it is still to send.
+  const imagePaths =
+    already.length === 0 && Array.isArray(row.image_paths)
+      ? (row.image_paths as unknown[]).map(String).slice(0, X_MAX_IMAGES)
+      : [];
+  if (imagePaths.length > 0 && !hasXMediaScope(account.scope)) {
     return {
       ok: false,
-      error: check.problems.length ? `Not sent: ${check.problems.join('; ')}.` : 'Nothing left to send.',
+      error: 'The X sign-in cannot post images yet. Press Disconnect, then Connect X, and press Post again.',
     };
   }
 
@@ -666,10 +674,16 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
       client: xClient(env),
       encryptionKey: env.TOKEN_ENCRYPTION_KEY,
     });
+    const mediaIds: string[] = [];
+    for (const path of imagePaths) {
+      const image = await readPostImage(supabase, user.id, path);
+      mediaIds.push(await uploadXImage({ token, image }));
+    }
     ids = await sendXThread({
       token,
       posts: body,
       sent: already,
+      mediaIds,
       onSent: async (sent) => {
         const { error } = await supabase
           .from('social_posts')
@@ -683,7 +697,7 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
   } catch (err) {
     await supabase.from('social_posts').update({ x_sending_at: null }).eq('user_id', user.id).eq('id', id.data);
     revalidatePath(POSTS_PATH);
-    if (err instanceof XDisconnectedError) return { ok: false, error: err.message };
+    if (err instanceof XDisconnectedError || err instanceof PostImageError) return { ok: false, error: err.message };
     if (err instanceof XPostError) {
       const up = err.sent.length;
       const partial =
@@ -714,4 +728,32 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
     return { ok: false, error: `Posted on X, but the draft could not be marked posted: ${error.message}` };
   }
   return { ok: true, message: ids.length > 1 ? `Posted the thread of ${ids.length} to X.` : 'Posted to X.' };
+}
+
+class PostImageError extends Error {}
+
+/**
+ * The bytes of one of a draft's images, for uploading to X. An upload is read
+ * from the private bucket on the person's session; a committed screenshot
+ * (`/posts/…png`) is fetched from this site, and a full link as it is.
+ */
+async function readPostImage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  path: string,
+): Promise<XImage> {
+  const fail = () => new PostImageError('One of the draft’s images could not be read, so nothing was posted. Remove it or add it again, then press Post.');
+  if (isUploadedPostImage(path)) {
+    if (!ownsPostImagePath(userId, path)) throw fail();
+    const { data, error } = await supabase.storage.from(POST_IMAGES_BUCKET).download(path);
+    if (error || !data) throw fail();
+    return { bytes: data, type: data.type || 'image/png' };
+  }
+  const url = /^https:\/\//.test(path) ? path : /^\/(?!\/)/.test(path) ? `${await requestOrigin()}${path}` : null;
+  if (!url) throw fail();
+  const res = await fetch(url, { cache: 'no-store' }).catch(() => null);
+  if (!res?.ok) throw fail();
+  const type = res.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+  if (!type.startsWith('image/')) throw fail();
+  return { bytes: await res.blob(), type };
 }

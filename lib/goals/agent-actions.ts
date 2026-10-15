@@ -3,14 +3,12 @@ import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 /** What the Goals pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const goalsActions: ModuleActions = {
   'app/goals/actions.ts': {
-    addArea: tool('change_goal_area'),
     renameAreaAction: tool('change_goal_area'),
     setAreaNoteAction: tool('change_goal_area'),
     planAreaAction: none('spends'),
     approveAreaAction: none('theirs'),
     moveAreaAction: tool('change_goal_area'),
     archiveAreaAction: tool('change_goal_area'),
-    addGoal: tool('add_goal'),
     editGoal: tool('set_goal_done_when', 'change_goal'),
     moveGoalAction: tool('change_goal'),
     archiveGoalAction: tool('change_goal'),

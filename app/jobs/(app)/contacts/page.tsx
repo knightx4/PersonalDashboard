@@ -43,7 +43,7 @@ export default async function ContactsPage() {
           icon={Users}
           title="No contacts yet"
           description="Add a role first so there is a company to attach people to — or add someone unattached and link them later."
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         />
       </PageColumn>
     );

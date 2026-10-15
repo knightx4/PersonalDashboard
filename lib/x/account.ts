@@ -76,6 +76,8 @@ export type XConnectionView =
       problem?: string | null;
       /** Whether the sign-in carries tweet.write (plan #2072). */
       canPost?: boolean;
+      /** Whether it also carries media.write, which a post with images needs. */
+      canPostImages?: boolean;
     }
   | { state: 'disconnected'; handle: string };
 
@@ -100,12 +102,18 @@ export function xConnectionView(
     lastSyncedAt: row.last_synced_at,
     problem: row.read_problem ?? null,
     canPost: hasXWriteScope(row.scope ?? null),
+    canPostImages: hasXMediaScope(row.scope ?? null),
   };
 }
 
 /** Whether a stored grant may post: X lists its scopes space-separated. */
 export function hasXWriteScope(scope: string | null): boolean {
   return Boolean(scope?.split(/\s+/).includes('tweet.write'));
+}
+
+/** Whether a stored grant may upload a post's images: sign-ins before media.write cannot. */
+export function hasXMediaScope(scope: string | null): boolean {
+  return Boolean(scope?.split(/\s+/).includes('media.write'));
 }
 
 /** Thrown when the account cannot be read until the person connects again. */

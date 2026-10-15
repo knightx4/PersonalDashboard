@@ -477,7 +477,7 @@ every workspace status maps onto one.
 Checked by: test `tests/lifecycle-words.test.ts`, pending #1958.
 
 **R8.** No section links to a page whose only job is a form.
-Checked by: count `form-only-pages`, baseline 9, target 0, pending #1953.
+Checked by: count `form-only-pages`, baseline 9, target 0.
 
 **R9.** The shell is mounted in one place.
 Checked by: count `shell-mounts`, baseline 15, target 1.

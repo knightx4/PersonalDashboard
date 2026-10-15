@@ -143,9 +143,18 @@ Posting through the API is pay-per-use. Prices read from the X console on
 
 Each post in a thread is its own request, so a 5-post thread costs $0.075.
 Drafts contain no links, so the URL price applies only if the person adds a
-link when posting. The Post button shows its price beside it and warns before
-sending a post that contains a link. The prices live in one constant in code,
-so the button and the warning read the same numbers.
+link when posting. The Post button shows its price in the $ hint beside it
+and warns before sending a post that contains a link. The prices live in one
+constant in code, so the button and the warning read the same numbers.
+
+The checks above never take the Post button away on the tab. What they find
+shows as a ! beside the button and again on the confirm step, and the person
+decides. X refuses what it will not take, such as a post past 280
+characters, and the tab shows its reason.
+
+A draft's images, up to four, go on its first post. Each is uploaded with
+POST /2/media/upload before the post is sent, which needs the sign-in to
+carry `media.write`; X lists no price for the upload.
 
 ## Examples
 

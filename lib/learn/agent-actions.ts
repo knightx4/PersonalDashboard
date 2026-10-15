@@ -89,14 +89,8 @@ export const learnActions: ModuleActions = {
       note: 'A ready-made goal offered as one press on Subjects; asked for in words, Dash adds the goal with add_goal.',
     },
   },
-  'app/learn/new/actions.ts': {
-    parseImport: none('page'),
-    resolveCandidate: none('page'),
+  'app/learn/lists/actions.ts': {
     startTrack: tool('add_learn_track'),
-    confirmImport: {
-      tool: ['add_learn_track', 'add_track_reading'],
-      note: 'Dash starts the list and adds each work to it, where the page reads a pasted list first.',
-    },
   },
   'app/learn/save/actions.ts': {
     saveReadingLink: {
@@ -135,9 +129,6 @@ export const learnActions: ModuleActions = {
   'app/learn/quiz/[id]/take/actions.ts': {
     answerQuiz: none('own'),
     skipQuiz: none('own'),
-  },
-  'app/learn/quiz/new/actions.ts': {
-    startQuiz: none('spends'),
   },
   'app/learn/r/[id]/actions.ts': {
     findSources: none('spends'),

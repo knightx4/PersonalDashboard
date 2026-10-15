@@ -11,8 +11,6 @@ import { runInFlight } from '@/lib/goals/shaping';
 import { approveGoal, loadAreaRuns, startAreaRun } from '@/lib/goals/shaping-store';
 import {
   archiveArea,
-  insertArea,
-  insertGoal,
   moveArea,
   moveGoal,
   renameArea,
@@ -64,19 +62,6 @@ function saved(): GoalsActionState {
   revalidatePath('/goals', 'layout');
   // A new number each time, so a form can tell one save from the next.
   return { done: Date.now() };
-}
-
-// latency: pending
-export async function addArea(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
-  const user = await requireUser();
-  const name = parseAreaName(form.get('name'));
-  if (!name.ok) return { error: name.error };
-  try {
-    await insertArea(await createGoalsClient(), user.id, name.value);
-  } catch {
-    return { error: 'The area could not be saved. Try again.' };
-  }
-  return saved();
 }
 
 // latency: pending
@@ -249,29 +234,6 @@ export async function archiveAreaAction(form: FormData): Promise<GoalsActionStat
     if (!changed) return { error: 'That area has already changed. Reload to see it.' };
   } catch {
     return { error: 'The area could not be archived. Try again.' };
-  }
-  return saved();
-}
-
-// latency: pending
-export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
-  const user = await requireUser();
-  const areaId = Id.safeParse(form.get('areaId'));
-  if (!areaId.success) return { error: 'Could not tell which area that goal is for.' };
-  const parsed = parseGoalFields((key) => form.get(key), { requireTitle: true });
-  if (!parsed.ok) return { error: parsed.error };
-  // insertGoal reads the area from its own argument, never from these fields.
-  const { title, ...rest } = parsed.value;
-  if (!title) return { error: 'Give the goal a title.' };
-  try {
-    const added = await insertGoal(await createGoalsClient(), user.id, areaId.data, {
-      title,
-      ...rest,
-    });
-    if (!added) return { error: 'That area is no longer on the page.' };
-    steerLearnLater(user.id, added);
-  } catch {
-    return { error: 'The goal could not be saved. Try again.' };
   }
   return saved();
 }

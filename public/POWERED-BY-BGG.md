@@ -8,5 +8,5 @@ To add it:
 1. Download the official logo from https://boardgamegeek.com/using_the_xml_api
 2. Save it in this directory as `powered-by-bgg.png`
 
-`app/(app)/inventory/add/games/powered-by-bgg.tsx` picks it up automatically
+`app/shopping/inventory/[id]/powered-by-bgg.tsx`, on a game's details, picks it up automatically
 and falls back to a text credit while the file is absent.

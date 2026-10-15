@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendXThread, X_TWEETS_URL, XPostError, xPostProblem, xPostUrl, xSendCheck } from './post';
+import {
+  sendXThread,
+  uploadXImage,
+  X_MEDIA_UPLOAD_URL,
+  X_TWEETS_URL,
+  XPostError,
+  xPostProblem,
+  xPostUrl,
+  xSendCheck,
+} from './post';
 import { formatXPrice } from './price';
 
 /** Posting a draft to X from the Posts tab (plan #2072). X is always a stand-in here. */
@@ -40,14 +49,57 @@ describe('the price and the check before sending', () => {
     expect(xSendCheck({ body, sent: 3 })).toMatchObject({ ok: false, requests: 0, priceUsd: 0 });
   });
 
-  it('refuses a post past 280 and the never-in-a-post rules, but lets a link through', () => {
+  it('warns about a post past 280 and the never-in-a-post rules without stopping the send, and prices a link', () => {
     const long = xSendCheck({ body: ['x'.repeat(281)] });
-    expect(long.ok).toBe(false);
-    expect(long.problems.join(' ')).toMatch(/281 characters; the limit is 280/);
+    expect(long.ok).toBe(true);
+    expect(long.warnings.join(' ')).toMatch(/281 characters; the limit is 280/);
     const mention = xSendCheck({ body: ['Thanks @someone for the idea'] });
-    expect(mention.ok).toBe(false);
-    expect(mention.problems.join(' ')).toMatch(/mentions an account/);
-    expect(xSendCheck({ body: ['Read www.example.com'] }).problems).toEqual([]);
+    expect(mention.ok).toBe(true);
+    expect(mention.warnings.join(' ')).toMatch(/mentions an account/);
+    expect(xSendCheck({ body: ['Read www.example.com'] }).warnings).toEqual([]);
+  });
+});
+
+describe('images', () => {
+  it('uploads an image as multipart tweet_image and returns its media id', async () => {
+    let form: FormData | null = null;
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe(X_MEDIA_UPLOAD_URL);
+      expect((init?.headers as Record<string, string>).authorization).toBe('Bearer tok');
+      form = init?.body as FormData;
+      return json(200, { data: { id: '555', media_key: '3_555' } });
+    }) as unknown as typeof fetch;
+    const id = await uploadXImage({
+      token: 'tok',
+      image: { bytes: new Blob([new Uint8Array([1, 2, 3])]), type: 'image/png' },
+      fetchImpl,
+    });
+    expect(id).toBe('555');
+    expect(form!.get('media_category')).toBe('tweet_image');
+    const media = form!.get('media') as Blob;
+    expect(media.type).toBe('image/png');
+    expect(media.size).toBe(3);
+  });
+
+  it('says the image did not upload when X refuses it', async () => {
+    const fetchImpl = vi.fn(async () => json(403, { title: 'Forbidden' })) as unknown as typeof fetch;
+    const err = await uploadXImage({
+      token: 'tok',
+      image: { bytes: new Blob([new Uint8Array([1])]), type: 'image/png' },
+      fetchImpl,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(XPostError);
+    expect(err.message).toMatch(/^The image did not upload/);
+    expect(err.reconnect).toBe(true);
+  });
+
+  it('puts the images on the first post of a thread only', async () => {
+    const { fetchImpl, sent } = fakeX([json(201, { data: { id: '1' } }), json(201, { data: { id: '2' } })]);
+    await sendXThread({ token: 'tok', posts: ['one', 'two'], mediaIds: ['555', '556'], fetchImpl });
+    expect(sent).toEqual([
+      { text: 'one', media: { media_ids: ['555', '556'] } },
+      { text: 'two', reply: { in_reply_to_tweet_id: '1' } },
+    ]);
   });
 });
 

@@ -1,13 +1,13 @@
 'use client';
 
 import { useActionState, useRef } from 'react';
-import Link, { linkVariants } from '@/components/ui/link';
+import { AimButton } from '@/components/shell/aim-button';
 import {
   confirmBookEdition,
   switchBookEdition,
   updateBookCondition,
   type BookActionState,
-} from '@/app/shopping/inventory/add/actions';
+} from '@/app/shopping/inventory/book-actions';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
@@ -183,27 +183,32 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
             <>
             <form ref={conditionForm} action={conditionAction}>
               <input type="hidden" name="inventory_item_id" value={book.inventoryItemId} />
-              <ChipSelect
-                name="condition"
-                aria-label="Condition"
-                // Re-keyed on the saved value, so the chip follows a save
-                // rather than holding whatever was picked last.
-                key={book.condition ?? ''}
-                defaultValue={book.condition ?? ''}
-                placeholderValue=""
-                disabled={conditionPending}
-                onChange={() => conditionForm.current?.requestSubmit()}
-                // Pulls the chip's own inset back, so its value sits on the
-                // same left edge as every other one in the grid.
-                className="-ml-1.5"
-              >
-                <option value="">Not set yet</option>
-                <option value="new">New</option>
-                <option value="like_new">Like new</option>
-                <option value="very_good">Very good</option>
-                <option value="good">Good</option>
-                <option value="acceptable">Acceptable</option>
-              </ChipSelect>
+              {/* The label around the chip is its press area: 44 pixels tall
+                  for a thumb, pulled back into the row so the row keeps the
+                  height of the facts around it. */}
+              <label className="-my-3 flex min-h-11 items-center">
+                <ChipSelect
+                  name="condition"
+                  aria-label="Condition"
+                  // Re-keyed on the saved value, so the chip follows a save
+                  // rather than holding whatever was picked last.
+                  key={book.condition ?? ''}
+                  defaultValue={book.condition ?? ''}
+                  placeholderValue=""
+                  disabled={conditionPending}
+                  onChange={() => conditionForm.current?.requestSubmit()}
+                  // Pulls the chip's own inset back, so its value sits on the
+                  // same left edge as every other one in the grid.
+                  className="-ml-1.5"
+                >
+                  <option value="">Not set yet</option>
+                  <option value="new">New</option>
+                  <option value="like_new">Like new</option>
+                  <option value="very_good">Very good</option>
+                  <option value="good">Good</option>
+                  <option value="acceptable">Acceptable</option>
+                </ChipSelect>
+              </label>
             </form>
             <FieldError>{conditionState.error}</FieldError>
             </>
@@ -287,12 +292,14 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
           )}
 
           <p className="mt-3 text-small text-ink-muted">
-            Neither one? Scan the barcode on the back cover from{' '}
-            <Link href="/shopping/inventory/add/books" className={linkVariants()}>
-              Add books
-            </Link>{' '}
-            — the ISBN settles it in one shot.
+            Neither one? Scanning the ISBN on the back cover adds the exact printing as a new copy.
           </p>
+          <AimButton
+            aim={{ kind: 'inventory-item' }}
+            label="Scan the barcode"
+            variant="secondary"
+            className="mt-2"
+          />
         </Banner>
       )}
     </div>

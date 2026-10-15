@@ -59,7 +59,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ],
     settingsHref: '/shopping/settings',
     settingsLabel: 'Shopping settings',
-    feedbackHref: '/dev/bugs',
     brief: async ({ settings }) => loadShoppingBrief(user.id, settings.timezone, await reviewCount),
     children,
   });

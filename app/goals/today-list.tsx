@@ -161,9 +161,10 @@ export function TodayRow({
     (_prev: State, form: FormData) => act(item.kind, form),
     initial,
   );
+  // A row that wants words opens its box on press (law 14), not before.
+  const [answering, setAnswering] = useState(false);
   const answered = !state.error && (state.message !== undefined || state.done !== undefined);
   const field = ANSWER_FIELD[item.kind];
-  const [answering, setAnswering] = useState(false);
   const primary = PRIMARY_VALUE[item.kind];
   const second = SECOND[item.kind];
   const href = hrefFor(item);

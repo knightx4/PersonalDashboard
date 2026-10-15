@@ -92,7 +92,9 @@ export function dayBounds(today: string, timezone: string): { start: string; end
 }
 
 /**
- * One row as Home lists it, or null for a row that wrote nothing.
+ * One row as Home lists it, or null for a row that wrote nothing or that the
+ * person made themselves: an Add button aimed at capture records its row so
+ * the toast's Undo works (plan #1950.1), but Dash did not make it.
  * `threads` maps a row thread's conversation id to the ref it sits under.
  */
 export function dashTodayEntry(
@@ -102,6 +104,7 @@ export function dashTodayEntry(
 ): DashTodayEntry | null {
   const action = toDashAction(row);
   if (action.status !== 'done' && action.status !== 'undone') return null;
+  if (action.surface === 'capture' && action.undo?.aimed === true) return null;
   const at = action.doneAt ?? action.createdAt;
   const table = action.subjectRef ? (parseRef(action.subjectRef)?.table ?? null) : null;
   const workspace = table ? tableWorkspace(table) : null;

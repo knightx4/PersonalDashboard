@@ -12,11 +12,12 @@ import { X_POST_PRICE_USD, X_POST_WITH_URL_PRICE_USD } from './price';
  * that stops part-way then carries on from the last post that went up rather
  * than posting the start again, which X would refuse as a duplicate anyway.
  *
- * Before anything is sent the draft passes the same check the posts run
- * holds every draft to (lib/dev/post-check.ts): X's 280-character count and
- * the never-in-a-post rules. One rule is softened here. docs/X-POSTS.md keeps
- * links out of Dash's drafts and says the person may add one when posting,
- * so a link is a warning with its price rather than a refusal.
+ * The draft is read against the same check the posts run holds every draft
+ * to (lib/dev/post-check.ts): X's 280-character count and the never-in-a-post
+ * rules. On the tab these are warnings, never a refusal: the person decides,
+ * and X refuses what it will not take (a post past 280) with its own reason.
+ * A link is left out of the warnings, since docs/X-POSTS.md says the person
+ * may add one when posting; it is priced instead.
  *
  * Prices are X's pay-per-use rates, read from the owner's X console on
  * 14 October 2026: a post is one Post: Create request, and a post holding a
@@ -26,6 +27,50 @@ import { X_POST_PRICE_USD, X_POST_WITH_URL_PRICE_USD } from './price';
  */
 
 export const X_TWEETS_URL = 'https://api.x.com/2/tweets';
+export const X_MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
+
+/** How many images X takes on one post. */
+export const X_MAX_IMAGES = 4;
+
+/** An image's bytes and type, read from wherever the draft keeps it. */
+export type XImage = { bytes: Blob; type: string };
+
+/**
+ * Upload one image for a post with POST /2/media/upload, the one-request form
+ * that takes the file as multipart (images are small enough not to need the
+ * chunked upload). Needs a sign-in carrying media.write. Returns the media id
+ * a post names in `media.media_ids`.
+ */
+export async function uploadXImage(input: {
+  token: string;
+  image: XImage;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const form = new FormData();
+  form.set('media', new Blob([input.image.bytes], { type: input.image.type }), 'image');
+  form.set('media_category', 'tweet_image');
+  let res: Response;
+  try {
+    res = await fetchImpl(X_MEDIA_UPLOAD_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${input.token}` },
+      body: form,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new XPostError('Could not reach X to upload the image. Press Post again in a minute.', [], null);
+  }
+  const json = (await res.json().catch(() => null)) as { data?: { id?: unknown } } | null;
+  const id = typeof json?.data?.id === 'string' ? json.data.id : null;
+  if (!res.ok || !id) {
+    const said = res.ok
+      ? { message: 'X took the image but did not say its id. Press Post again.', reconnect: false }
+      : xPostProblem(res.status, json);
+    throw new XPostError(`The image did not upload: ${said.message}`, [], res.status, said.reconnect);
+  }
+  return id;
+}
 
 /** Whether X bills this post as one with a URL. */
 export function postHasLink(text: string): boolean {
@@ -36,10 +81,10 @@ export function postHasLink(text: string): boolean {
 }
 
 export type XSendCheck = {
-  /** False while any problem stands; the Post button is then not offered. */
+  /** False only when nothing is left to send. */
   ok: boolean;
-  /** What stops the send, as the check words it ("post 2 is 291 characters…"). */
-  problems: string[];
+  /** What the check found, as it words it ("post 2 is 291 characters…"). They warn and do not stop the send. */
+  warnings: string[];
   /** The posts, numbered from 1, that hold a link and so cost the URL rate. */
   linkPosts: number[];
   /** How many requests the send makes: the posts not yet on X. */
@@ -48,11 +93,12 @@ export type XSendCheck = {
   priceUsd: number;
 };
 
-/** The check's wording for a link, which the send turns into a warning. */
+/** The check's wording for a link, which the send prices instead of warning about. */
 const LINK_PROBLEM = /has a link or a domain$/;
 
 /**
- * Whether a draft may be sent, and what sending it costs. `sent` is how many
+ * Whether a draft has anything left to send, what sending it costs, and what
+ * the check would warn about. `sent` is how many
  * of its posts are already on X from a send that stopped part-way; they are
  * neither checked again nor paid for again.
  *
@@ -62,7 +108,7 @@ const LINK_PROBLEM = /has a link or a domain$/;
 export function xSendCheck(input: { body: readonly string[]; sent?: number }): XSendCheck {
   const sent = Math.min(input.sent ?? 0, input.body.length);
   const result = checkDraft({ angle: 'A post', posts: input.body });
-  const problems = result.problems.filter((p) => !LINK_PROBLEM.test(p));
+  const warnings = result.problems.filter((p) => !LINK_PROBLEM.test(p));
   const linkPosts: number[] = [];
   let priceUsd = 0;
   input.body.forEach((text, i) => {
@@ -71,8 +117,8 @@ export function xSendCheck(input: { body: readonly string[]; sent?: number }): X
     if (i >= sent) priceUsd += link ? X_POST_WITH_URL_PRICE_USD : X_POST_PRICE_USD;
   });
   return {
-    ok: problems.length === 0 && input.body.length > sent,
-    problems,
+    ok: input.body.length > sent,
+    warnings,
     linkPosts,
     requests: input.body.length - sent,
     // Summed in floating point; three places is what is shown.
@@ -133,7 +179,8 @@ export function xPostProblem(status: number, body: unknown): { message: string; 
 /**
  * Send the posts of a draft that are not on X yet, in order, each a reply to
  * the one before. `sent` holds the ids already up from an earlier send that
- * stopped part-way; the next post replies to the last of them.
+ * stopped part-way; the next post replies to the last of them. A draft's
+ * images go on its first post, which is what shows in the timeline.
  *
  * `onSent` is called with the whole list after every post X accepts, before
  * the next is sent, so the stored list never trails what is on X by more than
@@ -143,6 +190,8 @@ export async function sendXThread(input: {
   token: string;
   posts: readonly string[];
   sent?: readonly string[];
+  /** Uploaded images (uploadXImage) for the first post; ignored once it is on X. */
+  mediaIds?: readonly string[];
   onSent?: (ids: string[]) => Promise<void>;
   fetchImpl?: typeof fetch;
 }): Promise<string[]> {
@@ -152,6 +201,7 @@ export async function sendXThread(input: {
     const previous = ids.at(-1);
     const payload: Record<string, unknown> = { text: input.posts[i] };
     if (previous) payload.reply = { in_reply_to_tweet_id: previous };
+    if (i === 0 && input.mediaIds?.length) payload.media = { media_ids: [...input.mediaIds] };
 
     let res: Response;
     try {

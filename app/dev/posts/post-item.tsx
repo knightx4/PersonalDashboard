@@ -1,9 +1,11 @@
 'use client';
 
 import Link, { linkVariants } from '@/components/ui/link';
-import { Check, Copy, Download, Plus } from 'lucide-react';
+import { Check, CircleAlert, Copy, Download, Plus } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
+import { Tooltip } from '@/components/ui/tooltip';
 import { formatXPrice, X_POST_PRICE_USD, X_POST_WITH_URL_PRICE_USD } from '@/lib/x/price';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
@@ -227,6 +229,16 @@ function MarkPosted({ id, onCancel }: { id: string; onCancel: () => void }) {
   );
 }
 
+/** What the $ beside Post says: the exact price, since X's rates are fixed. */
+function xPriceLine(send: NonNullable<PostCard['send']>): string {
+  const posts = send.requests === 1 ? 'one post' : `${send.requests} posts`;
+  const link =
+    send.linkPosts.length > 0
+      ? ` A post with a link costs ${formatXPrice(X_POST_WITH_URL_PRICE_USD)} instead of ${formatXPrice(X_POST_PRICE_USD)}.`
+      : '';
+  return `X charges ${formatXPrice(send.priceUsd)} for ${posts}.${link}`;
+}
+
 function postNumbers(numbers: number[], total: number): string {
   if (total === 1) return 'This post has';
   const named = numbers.map(String);
@@ -268,14 +280,19 @@ function ConfirmPost({
       <p className="max-w-prose text-small text-ink-muted">
         {what}. X charges {formatXPrice(send.priceUsd)}.
       </p>
+      {send.warnings.length > 0 && (
+        <p className="max-w-prose text-small text-caution">Worth a look first: {send.warnings.join('; ')}.</p>
+      )}
       {send.linkPosts.length > 0 && (
         <p className="max-w-prose text-small text-caution">
           {postNumbers(send.linkPosts, total)} a link, which X charges {formatXPrice(X_POST_WITH_URL_PRICE_USD)} a
           post for instead of {formatXPrice(X_POST_PRICE_USD)}, about 13 times more.
         </p>
       )}
-      {card.images.length > 0 && (
-        <p className="max-w-prose text-small text-ink-muted">The images stay here: the post goes out as text only.</p>
+      {card.images.length > 0 && partial === 0 && (
+        <p className="max-w-prose text-small text-ink-muted">
+          {card.images.length === 1 ? 'The image goes' : 'The images go'} on the {total > 1 ? 'first post' : 'post'}.
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -305,9 +322,10 @@ function ConfirmPost({
 
 /**
  * Post (plan #2072): the button that sends this draft to X as the connected
- * account, with what sending costs beside its label. The first press opens
- * ConfirmPost in place of the row; only Yes, post it sends. A draft the check
- * refuses gets no button, only what to fix.
+ * account, with the $ beside it saying what X charges. The first press opens
+ * ConfirmPost in place of the row; only Yes, post it sends. What the check
+ * finds (a mention, a post past 280) never takes the button away: it shows as
+ * a ! beside it, and again on the confirm step, and the person decides.
  */
 function SuggestedActions({
   card,
@@ -323,23 +341,33 @@ function SuggestedActions({
   const [posting, setPosting] = useState(postArmed);
   const [dropped, drop, dropping] = useActionState(dropPost, {} as PostsActionState);
   const thread = card.post.body.length > 1;
-  const send = postAs ? card.send : null;
+  const send = postAs && card.send?.ok ? card.send : null;
 
   if (marking) return <MarkPosted id={card.post.id} onCancel={() => setMarking(false)} />;
-  if (posting && postAs && send?.ok) {
+  if (posting && postAs && send) {
     return <ConfirmPost card={card} send={send} handle={postAs} onCancel={() => setPosting(false)} />;
   }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-      {send && !send.ok && (
-        <p className="basis-full text-small text-caution">Not ready to post: {send.problems.join('; ')}.</p>
-      )}
-      {send?.ok && (
-        <Button type="button" size="sm" onClick={() => setPosting(true)}>
-          {send.requests < card.post.body.length ? 'Post the rest' : 'Post'}
-          <span className="tabular font-normal">{formatXPrice(send.priceUsd)}</span>
-        </Button>
+      {send && (
+        <span className="inline-flex items-center">
+          <Button type="button" size="sm" onClick={() => setPosting(true)}>
+            {send.requests < card.post.body.length ? 'Post the rest' : 'Post'}
+          </Button>
+          <CostHint text={xPriceLine(send)} what="Cost of posting to X" />
+          {send.warnings.length > 0 && (
+            <Tooltip label={`Worth a look: ${send.warnings.join('; ')}.`}>
+              <span
+                tabIndex={0}
+                aria-label="Something to check before posting"
+                className="flex size-8 items-center justify-center rounded-control text-caution"
+              >
+                <CircleAlert className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </span>
+            </Tooltip>
+          )}
+        </span>
       )}
       <Button
         type="button"
@@ -348,7 +376,7 @@ function SuggestedActions({
         onClick={() => copy('all', threadCopyText(card.post.body))}
       >
         {/* Beside Post the row runs out of room at 390, so Copy drops its icon there. */}
-        {send?.ok ? null : copied === 'all' ? (
+        {send ? null : copied === 'all' ? (
           <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
         ) : (
           <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
