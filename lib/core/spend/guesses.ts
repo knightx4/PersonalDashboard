@@ -94,6 +94,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Learn: tracks and their questions.
   'generate-chain': run(SONNET, 4_000, 3_000),
   'generate-track-from-theme': run(SONNET, 10_000, 5_000),
+
+  // Learn: drafting a topic with its levels (plan #2138.2). The map's topic
+  // names go in, ten levels of checks and the links come out; the scope is
+  // embedded in the same press to find a duplicate.
+  'draft-topic': run(SONNET, 5_000, 4_000),
+  'embed-topic-scope': run(VOYAGE_LITE, 60, 0),
   'write-probe': run(HAIKU, 2_000, 200),
   'write-probe-ahead': background(unit(HAIKU, 1_800, 170)),
   'name-misconception': run(HAIKU, 1_500, 200),
@@ -112,6 +118,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'grade-quiz-answer': run(HAIKU, 1_500, 200),
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
+  'grade-cell-answer': run(HAIKU, 3_000, 600),
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),

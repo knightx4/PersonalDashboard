@@ -37,6 +37,11 @@ export const PAID_ACTIONS = {
     'generate-chain',
   ],
   'app/learn/know/actions.ts#approveChain': ['place-track', 'write-curriculum'],
+  // Learn: a topic with ten levels (plan #2138.2). Drafting embeds the scope
+  // in the same press to find a topic it duplicates; a topic the draft's links
+  // need is drafted the same way.
+  'app/learn/topics/actions.ts#draftTopicFromGoal': ['draft-topic', 'embed-topic-scope'],
+  'app/learn/topics/[id]/actions.ts#draftWantedTopic': ['draft-topic', 'embed-topic-scope'],
   'app/learn/know/actions.ts#proposePrior': ['concepts-from-prior'],
   'app/learn/know/actions.ts#approvePrior': ['place-track'],
   'app/learn/know/actions.ts#proposeBrief': ['concepts-from-brief'],
@@ -126,6 +131,8 @@ export const PAID_ACTIONS = {
     'place-track',
     'write-probe',
   ],
+  // Learn: an explanation graded against the levels of a topic (plan #2138.5)
+  'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
