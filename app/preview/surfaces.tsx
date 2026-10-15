@@ -742,7 +742,7 @@ const pipelineRows: PipelineRow[] = [
     status: 'in_process',
     excitement: 4,
     readyToApply: true,
-    allQuestionsAdded: false,
+    allQuestionsAdded: true,
     hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
@@ -3599,6 +3599,7 @@ export const SURFACES: readonly Surface[] = [
             everSubmitted: true,
             closedOn: '8 Sep',
             interviewCount: 1,
+            allQuestionsAdded: true,
           })}
         />
         <RoleTodos
@@ -3870,12 +3871,12 @@ export const SURFACES: readonly Surface[] = [
     /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
      * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
     id: 'jobs-pipeline-marks',
-    label: 'Pipeline · Ready and cover letter filters',
+    label: 'Pipeline · Ready, questions and cover letter filters',
     module: 'jobs',
     width: 'wide',
     render: () => (
       <PreviewShell>
-        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes', questions: 'yes' }} />
       </PreviewShell>
     ),
   },
