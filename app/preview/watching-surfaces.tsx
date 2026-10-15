@@ -7,9 +7,9 @@ import type { WatchingRow } from '@/lib/shell/watching-model';
  * stopped reading.
  */
 
-const NOW = new Date('2026-09-30T15:10:00Z');
+export const WATCHING_NOW = new Date('2026-09-30T15:10:00Z');
 
-const ROWS: WatchingRow[] = [
+export const WATCHING_ROWS: WatchingRow[] = [
   {
     id: 'w1',
     title: 'Jamie xx at Nowadays',
@@ -68,5 +68,5 @@ const ROWS: WatchingRow[] = [
 ];
 
 export function WatchingSurface() {
-  return <WatchingSection rows={ROWS} now={NOW} timezone="America/New_York" />;
+  return <WatchingSection rows={WATCHING_ROWS} now={WATCHING_NOW} timezone="America/New_York" />;
 }

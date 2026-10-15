@@ -151,6 +151,7 @@ export const threadsSource: AgendaSource = {
   id: 'threads',
   label: 'Dash asked you something',
   module: 'todo',
+  crossesWorkspaces: true,
   alwaysOn: true,
   description: 'Threads where Dash replied last and asked you something.',
 

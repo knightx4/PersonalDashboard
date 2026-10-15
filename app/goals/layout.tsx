@@ -27,13 +27,17 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
         .then((home) => goalInboxCount(home.onYou, home.dash, home.waitingRuns))
         .catch(() => undefined);
       return [
-        { href: '/goals', label: 'Home', icon: 'goalsHome', exact: true },
+        // Now and Inbox first, as in every workspace (plan #1937.6).
+        { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },
         // Everything on you across the goals, as the Inbox in Dev holds what is
         // waiting on you there.
         { href: '/goals/inbox', label: 'Inbox', icon: 'inbox', badge: inbox },
         { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
       ];
     },
+    // Whether the morning and weekly runs start (plan #1937.10).
+    settingsHref: '/goals/settings',
+    settingsLabel: 'Goals settings',
     children,
   });
 }

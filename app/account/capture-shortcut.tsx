@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 
 /**
@@ -10,9 +9,9 @@ import { Disclosure } from '@/components/ui/disclosure';
  */
 export function CaptureShortcutSection({ address }: { address: string }) {
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
+    <section>
       <Disclosure
-        title={<h2 className="text-body font-semibold">Add to Dash with Siri</h2>}
+        title={<h3 className="text-ui font-semibold">Add to Dash with Siri</h3>}
         meta="Six steps"
         remember="account-siri-shortcut"
         bodyClassName="mt-3"

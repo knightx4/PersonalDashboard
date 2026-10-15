@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
-import { cardVariants } from '@/components/ui/card';
 import { Switch } from '@/components/ui/field';
-import { cn } from '@/lib/cn';
 import { removeNotificationSubscription, saveNotificationSubscription } from './notification-actions';
 
 /**
@@ -116,8 +114,8 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
   return (
     // Dash points at this tab when a watch would reach no phone (lib/watch/start.ts);
     // the id is where links written before Account had tabs still point.
-    <section id="notifications" className={cn(cardVariants({ padding: 'standard' }), 'scroll-mt-bar')}>
-      <h2 className="text-body font-semibold text-ink">Morning brief</h2>
+    <section>
+      <h3 className="text-ui font-semibold text-ink">Morning brief</h3>
       <div className="mt-4 border-y border-border">
         {!publicKey ? (
           <p className="row-pad text-small text-ink-muted">

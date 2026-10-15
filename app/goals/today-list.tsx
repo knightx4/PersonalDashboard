@@ -53,7 +53,7 @@ import { CloseButton } from '@/components/inbox/close-button';
  * - "Did you go?": yes, with a quiet No beside it
  * - a rhythm behind for the period: one more logged against it
  * - a step of yours: done
- * - a suggestion: going, which puts it on Todo, with a quiet Not for me
+ * - a suggestion: going, which puts it on Todo, with a quiet Decline
  * - proposed steps or goals: a link to where they are approved
  * - a goal whose done-when is met: close it, with a quiet Keep it open
  * - a goal nothing has moved on for three weeks: park it, with the same
@@ -234,6 +234,7 @@ export function TodayRow({
           <form action={action} className="flex flex-wrap items-center gap-2 pt-1">
             <input type="hidden" name="id" value={item.id} />
             {item.startsOn && <input type="hidden" name="startsOn" value={item.startsOn} />}
+            {/* An answer in words stays one press until it is started (law 14). */}
             {field && answering && (
               <Input
                 name={field}
@@ -250,7 +251,7 @@ export function TodayRow({
               </Button>
             ) : (
               <Button type="submit" name={primary?.[0]} value={primary?.[1]} pending={pending}>
-                {item.action}
+                {field ? 'Send' : item.action}
               </Button>
             )}
             {item.kind === 'suggestion' && <DeclineSuggestion id={item.id} onAside={onAside} />}

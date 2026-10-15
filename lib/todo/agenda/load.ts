@@ -9,11 +9,12 @@ import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
-import { activeSources } from '@/lib/todo/agenda/registry';
+import { activeSources, allSources } from '@/lib/todo/agenda/registry';
 import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
+import type { ModuleId } from '@/lib/modules';
 import { withoutCoveredThreads } from '@/lib/todo/agenda/sources/threads';
 
 /**
@@ -33,18 +34,30 @@ export interface Agenda {
   failed: string[];
 }
 
+export interface AgendaOptions {
+  /**
+   * Only what a workspace's Inbox needs (plan #1937.5): the sources that can
+   * find its rows, no calendar, and Todo's tasks only for Todo. The piles
+   * still come from the one merge, so the rows and their dismissals are the
+   * agenda's own; lib/todo/agenda/workspace.ts cuts them to the workspace.
+   */
+  workspace?: ModuleId;
+}
+
 export async function loadAgenda(
   userId: string,
   now: Date = new Date(),
   clients: AgendaClients = sessionClients,
+  options: AgendaOptions = {},
 ): Promise<Agenda> {
+  const { workspace } = options;
   // Asked for once and shared: on a page each is a cookie-bound client, and
   // from the morning brief's cron each is a service-role one.
   const [core, todo] = await Promise.all([clients.core(), clients.todo()]);
   const [account, agendaSettings, tasks] = await Promise.all([
     loadAccountSettings(userId, core),
     loadAgendaSettings(userId, todo),
-    loadOpenTasks(userId, todo),
+    workspace && workspace !== 'todo' ? Promise.resolve([]) : loadOpenTasks(userId, todo),
   ]);
 
   const today = todayIn(account.timezone, now);
@@ -62,7 +75,22 @@ export async function loadAgenda(
 
   // A switched-off module's sources never run, whatever this module's own
   // settings say. Turning off a workspace has to mean it stops appearing.
-  const active = activeSources(account, agendaSettings.enabledSources);
+  //
+  // Todo's switches say what the agenda borrows from other workspaces. A
+  // workspace's own Inbox lists its own sources whatever they say (plan
+  // #1937.9): Jobs' reminders left Today for the Jobs Inbox, and a switch on
+  // Todo's settings must not be what hides them there.
+  const enabled = workspace
+    ? [
+        ...agendaSettings.enabledSources,
+        ...allSources()
+          .filter((source) => source.module === workspace)
+          .map((source) => source.id),
+      ]
+    : agendaSettings.enabledSources;
+  const active = activeSources(account, enabled).filter(
+    (source) => !workspace || source.module === workspace || source.crossesWorkspaces,
+  );
 
   // Events are this module's own, so they are read here beside the tasks
   // rather than through a source. A source is for an obligation another
@@ -71,11 +99,16 @@ export async function loadAgenda(
   // before today, because a meeting you have been to is over, not overdue.
   const [[items, context, failed], events, feedEvents] = await Promise.all([
     runSources(active, ctx),
-    loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
+    // An Inbox lists what is on you; a meeting in the day is not.
+    workspace
+      ? Promise.resolve([])
+      : loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
     // The calendars you subscribe to, read from the stored copy over the same
     // days. An appointment somebody else scheduled is context like any other
     // event: it is on your day and there is nothing to tick.
-    loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
+    workspace
+      ? Promise.resolve([])
+      : loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
   ]);
 
   const links = await loadLinksForTasks(

@@ -1,17 +1,16 @@
-import { PageHeader } from '@/components/shell/page-header';
+import { SettingsPage } from '@/components/patterns/settings-page';
+import { SettingText } from '@/components/patterns/settings-fields';
 import { Banner } from '@/components/ui/banner';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DeliveryGap } from '@/lib/news/inbound/readiness';
 import { NEWS_TOPICS, type NewsTopic } from '@/lib/news/issues/topics';
 import { AddressCard } from './address-card';
 import { TopicPicker } from './hidden-topics';
-import { LocalAreaField } from './local-area';
-import { replaceAddress } from './actions';
-import { PageColumn } from '@/components/shell/page-width';
+import { replaceAddress, setLocalArea } from './actions';
 
 /**
- * News settings, drawn from what the page read (page.tsx), so the gallery
- * can draw it from fixtures (plan #1603).
+ * News settings on the settings page pattern (plan #1937.11), drawn from what
+ * the page read (page.tsx), so the gallery can draw it from fixtures (plan
+ * #1603). Three sections, so they stack.
  */
 export function NewsSettingsView({
   address,
@@ -26,57 +25,62 @@ export function NewsSettingsView({
   localArea: string | null;
 }) {
   return (
-    <PageColumn>
-      <PageHeader title="News settings" />
-
-      <div className="space-y-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Your newsletter address</CardTitle>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            {address ? (
-              <AddressCard address={address} onReplace={replaceAddress} />
-            ) : (
-              <Banner tone="bad">
-                This deployment has no mail domain set, so there is no address to show. Set
-                NEWS_MAIL_DOMAIN to the domain Mailgun receives on. The random half of your
-                address already exists and will not change when you do.
-              </Banner>
-            )}
-            {gap === 'no-signing-key' && (
-              <Banner tone="bad">
-                This address cannot receive anything yet. MAILGUN_SIGNING_KEY is not set, so the
-                app cannot prove a delivery came from Mailgun and answers every one with an
-                error. Copy the HTTP webhook signing key from Mailgun (Sending → Webhooks, not
-                the API key) into the deployment&rsquo;s settings. The address itself is fine and
-                does not change.
-              </Banner>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Local news</CardTitle>
-          </CardHeader>
-          <CardBody>
-            <LocalAreaField area={localArea} />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Topics in Quick read</CardTitle>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <TopicPicker topics={NEWS_TOPICS} hidden={hidden} />
-            <p className="text-ui text-ink-muted">
-              Hidden topics still appear in the newsletter list.
-            </p>
-          </CardBody>
-        </Card>
-      </div>
-    </PageColumn>
+    <SettingsPage
+      title="News settings"
+      href="/news/settings"
+      sections={[
+        {
+          id: 'address',
+          title: 'Your newsletter address',
+          content: (
+            <div className="space-y-4">
+              {address ? (
+                <AddressCard address={address} onReplace={replaceAddress} />
+              ) : (
+                <Banner tone="bad">
+                  This deployment has no mail domain set, so there is no address to show. Set
+                  NEWS_MAIL_DOMAIN to the domain Mailgun receives on. The random half of your
+                  address already exists and will not change when you do.
+                </Banner>
+              )}
+              {gap === 'no-signing-key' && (
+                <Banner tone="bad">
+                  This address cannot receive anything yet. MAILGUN_SIGNING_KEY is not set, so
+                  the app cannot prove a delivery came from Mailgun and answers every one with an
+                  error. Copy the HTTP webhook signing key from Mailgun (Sending → Webhooks, not
+                  the API key) into the deployment&rsquo;s settings. The address itself is fine
+                  and does not change.
+                </Banner>
+              )}
+            </div>
+          ),
+        },
+        {
+          id: 'local',
+          title: 'Local news',
+          content: (
+            <SettingText
+              title="Your area"
+              titleHidden
+              defaultValue={localArea ?? ''}
+              placeholder="Your city or area, like NYC"
+              save={setLocalArea}
+            />
+          ),
+        },
+        {
+          id: 'topics',
+          title: 'Topics in Quick read',
+          content: (
+            <div className="space-y-4">
+              <TopicPicker topics={NEWS_TOPICS} hidden={hidden} />
+              <p className="text-ui text-ink-muted">
+                Hidden topics still appear in the newsletter list.
+              </p>
+            </div>
+          ),
+        },
+      ]}
+    />
   );
 }

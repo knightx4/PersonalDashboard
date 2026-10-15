@@ -24,7 +24,6 @@ const OUTSIDE = [/^app\/preview\//, /^app\/dev\/ui\//, /^app\/\(legal\)\//, /^ap
 /** Pieces with a header of their own, each drawn inside a page that has a width. */
 const DRAWN_INSIDE: Record<string, string> = {
   'app/goals/goals-view.tsx': 'app/goals/all/page.tsx and app/goals/area/[areaId]/page.tsx',
-  'app/account/view.tsx': 'app/account/page.tsx',
   'app/learn/now/header.tsx': 'app/learn/now/page.tsx',
   'app/shopping/review/review-list.tsx': 'app/shopping/review/page.tsx',
   'app/jobs/(app)/review/list.tsx': 'app/jobs/(app)/review/page.tsx',

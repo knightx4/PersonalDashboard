@@ -81,7 +81,7 @@ export async function updateAccountSettings(
  * switcher and stops contributing to the agenda. Nothing is deleted, no link
  * breaks, and turning it back on restores exactly what was there.
  */
-// latency: pending
+// latency: optimistic -- the box is ticked at once, and a refused save puts it back with a toast
 export async function updateEnabledModules(
   _prev: AccountState,
   formData: FormData,

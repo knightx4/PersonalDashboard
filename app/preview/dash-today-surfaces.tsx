@@ -1,6 +1,8 @@
 'use client';
 
-import { DashTodaySection } from '@/app/home/dash-today';
+import { DashTodayGroups, DashTodaySection } from '@/app/home/dash-today';
+import { HomeFold } from '@/app/home/home-fold';
+import { changesLabel, dashTodayCount } from '@/lib/shell/dash-today-count';
 import type { DashTodayEntry, DashTodayGroup } from '@/lib/shell/dash-today';
 
 /**
@@ -84,5 +86,18 @@ export function DashTodaySurface() {
       timezone="America/New_York"
       undo={async () => ({ ok: true })}
     />
+  );
+}
+
+/**
+ * The same fixtures as Home's rail draws them, in their fold (plan #1937.8),
+ * for the whole-page surface. Here because the fixture Undo is a function,
+ * which only a client module can hand to the section.
+ */
+export function DashTodayFoldSurface() {
+  return (
+    <HomeFold id="dash-today" title="What Dash did today" count={changesLabel(dashTodayCount(GROUPS))}>
+      <DashTodayGroups groups={GROUPS} timezone="America/New_York" undo={async () => ({ ok: true })} />
+    </HomeFold>
   );
 }

@@ -203,10 +203,9 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
   });
 
   it('does not follow a type-only import, which draws nothing', () => {
-    // lib/raised/notifications.ts takes only the Notification type from the bell.
-    expect(surfacesForFiles(['components/shell/notifications-button.tsx'], using)).toEqual([
-      'shell-full',
-    ]);
+    // lib/home/sections.ts takes only the NavSection type from the shell, so
+    // Home's pages, which read the sections, are not reached through it.
+    expect(surfacesForFiles(['components/shell/app-shell.tsx'], using)).toEqual(['shell-full']);
   });
 
   it('names a surface in the gallery for every shared component', () => {
