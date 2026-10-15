@@ -111,6 +111,9 @@ import {
   GoalPutAwayMenuSurface,
   GoalsAllPutAwayMenuSurface,
   GoalsAllPutAwayToastSurface,
+  GoalsAllSelectConfirmSurface,
+  GoalsAllSelectSurface,
+  GoalsAllSelectToastSurface,
 } from './goal-put-away-surfaces';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
@@ -4066,6 +4069,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllPutAwayToastSurface />,
+  },
+  {
+    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    id: 'goals-all-select',
+    label: 'Goals · all goals, several selected',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectSurface />,
+  },
+  {
+    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    id: 'goals-all-select-confirm',
+    label: 'Goals · all goals, archiving six',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectConfirmSurface />,
+  },
+  {
+    /* Three goals parked together: one toast and one Undo (plan #2097.2). */
+    id: 'goals-all-select-toast',
+    label: 'Goals · all goals, parked three with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectToastSurface />,
   },
   {
     /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
