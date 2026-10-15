@@ -393,6 +393,7 @@ export default async function RoleDetailPage({
           everSubmitted: current.submitted_at !== null,
           closedOn: current.closed_at ? formatDateInline(current.closed_at as string, timezone) : null,
           interviewCount: (interviews ?? []).length,
+          allQuestionsAdded: current.all_questions_added === true,
         })
       : null;
 

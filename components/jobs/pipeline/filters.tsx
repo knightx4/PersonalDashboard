@@ -45,7 +45,14 @@ export function PipelineFilters({
   /** Whether any application has a fit or a chance to filter by. */
   scored: boolean;
   /** How many applications in scope each ready and cover letter choice would show. */
-  marks: { ready: number; notReady: number; letter: number; noLetter: number };
+  marks: {
+    ready: number;
+    notReady: number;
+    questions: number;
+    noQuestions: number;
+    letter: number;
+    noLetter: number;
+  };
 }) {
   const router = useRouter();
   // On a phone the line holds status, source and More; the other three come
@@ -53,7 +60,7 @@ export function PipelineFilters({
   const [more, setMore] = useState(false);
   const tucked = (set: boolean) => (more || set ? undefined : 'max-sm:hidden');
   const anyTucked =
-    !more && (state.ready === null || state.letter === null || !state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
+    !more && (state.ready === null || state.questions === null || state.letter === null || !state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
   const go = (changes: Partial<Record<keyof PipelineParams, string | undefined>>) =>
     router.push(pipelineHref(params, changes), { scroll: false });
 
@@ -158,6 +165,18 @@ export function PipelineFilters({
         <option value="">Any readiness</option>
         <option value="yes">Ready to apply · {marks.ready}</option>
         <option value="no">Not ready · {marks.notReady}</option>
+      </PressChip>
+      <PressChip
+        className={tucked(state.questions !== null)}
+        name="questions"
+        aria-label="Filter by all questions added"
+        placeholderValue=""
+        value={state.questions === null ? '' : state.questions ? 'yes' : 'no'}
+        onChange={(event) => go({ questions: event.currentTarget.value || undefined })}
+      >
+        <option value="">Any questions status</option>
+        <option value="yes">All questions added · {marks.questions}</option>
+        <option value="no">Questions not all added · {marks.noQuestions}</option>
       </PressChip>
       <PressChip
         className={tucked(state.letter !== null)}

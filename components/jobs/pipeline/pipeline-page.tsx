@@ -114,6 +114,8 @@ export function PipelinePage({
   const marks = {
     ready: scoped.filter((row) => row.readyToApply).length,
     notReady: scoped.filter((row) => !row.readyToApply).length,
+    questions: scoped.filter((row) => row.allQuestionsAdded).length,
+    noQuestions: scoped.filter((row) => !row.allQuestionsAdded).length,
     letter: scoped.filter((row) => row.hasCoverLetter === true).length,
     noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
   };
