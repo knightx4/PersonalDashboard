@@ -56,6 +56,7 @@ export const vaultSources: ModuleSources = {
       weight: 'intent',
       search: ['sentence'],
       title: 'sentence',
+      parent: parentBy('older_note_id', 'obsidian.notes'),
       note:
         'older_note_id and recent_note_ids point at obsidian.notes. week_ending is the day the week was read back from. ' +
         'A row with dismissed_at set is one they hid as not useful.',
@@ -82,6 +83,7 @@ export const vaultSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentBy('thread_id', 'obsidian.maya_threads'),
       note:
         "Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. " +
         'thread_id points at maya_threads. Every message here was copied into core.conversation_turns with the same id.',

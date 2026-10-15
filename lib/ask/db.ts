@@ -76,7 +76,16 @@ export type AskRow = {
   title: string;
   href: string;
   detail?: Record<string, string | number | boolean | null>;
+  /**
+   * The row this one belongs to, for a table whose catalogue entry declares
+   * a parent (Source.parent): a cover letter's application, a goal step's
+   * goal. Added to every lookup's rows by withParents (lib/ask/parents.ts).
+   */
+  parent?: AskParent;
 };
+
+/** The row another belongs to: its table, its id, what it is called and where it opens. */
+export type AskParent = { table: string; ref: string; title: string; href: string | null };
 
 export type AskToolResult =
   | {
@@ -96,6 +105,16 @@ export type AskToolResult =
   | { ok: false; error: string };
 
 /** A lookup's rows as the citations a turn may carry (lib/talk/talk.ts). */
+/**
+ * How a capped lookup ends its note: "12 matched, showing 5", or "5 matched,
+ * showing all" when nothing was cut. `atLeast` is for a count that is itself a
+ * floor, because the lookup stopped reading before it ran out of rows.
+ */
+export function matchedNote(matched: number, shown: number, atLeast = false): string {
+  const n = `${atLeast ? 'at least ' : ''}${matched}`;
+  return shown >= matched && !atLeast ? `${n} matched, showing all` : `${n} matched, showing ${Math.min(shown, matched)}`;
+}
+
 export function citationsOf(result: AskToolResult): TalkCitation[] {
   if (!result.ok) return [];
   return result.rows.map(({ table, ref, title, href }) => ({ table, ref, title, href }));

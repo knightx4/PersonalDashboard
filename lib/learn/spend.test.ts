@@ -138,6 +138,12 @@ describe('the operation names', () => {
       'summarize-reading',
       'name-places',
       'research-topic',
+      'read-essay-brief',
+      'find-essay-points',
+      'shape-essay-plan',
+      'review-essay-plan',
+      'word-point-question',
+      'write-essay-research',
     ]);
   });
 });

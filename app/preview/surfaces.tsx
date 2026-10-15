@@ -53,7 +53,7 @@ import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -107,6 +107,15 @@ import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
 import { LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  GoalArchiveConfirmSurface,
+  GoalPutAwayMenuSurface,
+  GoalsAllPutAwayMenuSurface,
+  GoalsAllPutAwayToastSurface,
+  GoalsAllSelectConfirmSurface,
+  GoalsAllSelectSurface,
+  GoalsAllSelectToastSurface,
+} from './goal-put-away-surfaces';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -176,6 +185,12 @@ import {
   LearnEssayPublishSurface,
   LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
+  LearnEssayDiscoverSurface,
+  LearnEssayResearchMapSurface,
+  LearnEssayPlanSurface,
+  LearnEssayStructureSurface,
+  LearnEssayDevelopSurface,
+  LearnEssayWritePlanSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectConversationsSurface,
@@ -4119,6 +4134,62 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSurface />,
   },
   {
+    /* A goal's row menu on All goals, open: Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-all-menu',
+    label: 'Goals · all goals, a goal’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayMenuSurface />,
+  },
+  {
+    /* Back on All goals after parking a goal: the toast with Undo (plan #2097.1). */
+    id: 'goals-all-toast',
+    label: 'Goals · all goals, parked with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayToastSurface />,
+  },
+  {
+    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    id: 'goals-all-select',
+    label: 'Goals · all goals, several selected',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectSurface />,
+  },
+  {
+    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    id: 'goals-all-select-confirm',
+    label: 'Goals · all goals, archiving six',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectConfirmSurface />,
+  },
+  {
+    /* Three goals parked together: one toast and one Undo (plan #2097.2). */
+    id: 'goals-all-select-toast',
+    label: 'Goals · all goals, parked three with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectToastSurface />,
+  },
+  {
+    /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-page-top-menu',
+    label: 'Goal · the heading menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPutAwayMenuSurface />,
+  },
+  {
+    /* Archive goal pressed: the confirm naming its steps (plan #2097.1). */
+    id: 'goals-page-top-archive',
+    label: 'Goal · archiving it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalArchiveConfirmSurface />,
+  },
+  {
     /* An area's own page (plan #1619): one area, its goals and proposals. */
     id: 'goals-area',
     label: 'Goals · an area',
@@ -6362,6 +6433,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SpendOverviewSurface />,
   },
   {
+    id: 'account-spend-by-module',
+    label: 'Account · Spend, where it goes, one fold per module',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface />,
+  },
+  {
+    id: 'account-spend-by-module-open',
+    label: 'Account · Spend, where it goes, a module opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface open="jobs" />,
+  },
+  {
     id: 'usage-day-bars-empty',
     label: 'Usage · Per-day bar chart, nothing in the period',
     module: 'dev',
@@ -7207,6 +7292,48 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayInterviewLaterSurface />,
+  },
+  {
+    id: 'learn-essay-discover',
+    label: 'Essay · Discover, with Dash’s read of the brief',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayDiscoverSurface />,
+  },
+  {
+    id: 'learn-essay-research-map',
+    label: 'Essay · Research step, the question mapped',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayResearchMapSurface />,
+  },
+  {
+    id: 'learn-essay-plan',
+    label: 'Essay · Plan, thesis and points',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayPlanSurface />,
+  },
+  {
+    id: 'learn-essay-structure',
+    label: 'Essay · Structure, shapes offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayStructureSurface />,
+  },
+  {
+    id: 'learn-essay-develop',
+    label: 'Essay · Develop, a question about one point',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayDevelopSurface />,
+  },
+  {
+    id: 'learn-essay-write-plan',
+    label: 'Essay · Write, with the plan beside an empty draft',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayWritePlanSurface />,
   },
   {
     id: 'learn-plan-finished',

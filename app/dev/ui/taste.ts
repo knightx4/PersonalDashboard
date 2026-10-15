@@ -101,6 +101,15 @@ export const TASTE: readonly Taste[] = [
     example: 'jobs-recommended-roles',
   },
   {
+    id: 'pictures-paste',
+    sentence: 'Anywhere a picture can be added, it can be pasted from the clipboard too.',
+    sources: [
+      { where: 'Pipeline', on: '2026-10-14' },
+      { where: 'Posts', on: '2026-10-14' },
+    ],
+    example: 'dev-posts-write',
+  },
+  {
     id: 'name-opens',
     sentence: "Pressing a thing's name opens it. It never starts editing it.",
     sources: [{ where: 'Goals', on: '2026-09-27' }],

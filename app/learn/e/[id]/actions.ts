@@ -16,7 +16,12 @@ import {
   skippedBrief,
 } from '@/lib/learn/essays/interview';
 import { askNextQuestion } from '@/lib/learn/essays/interview-model';
-import { DEFAULT_SELF_NAME, MARK_AUTHORS, readDraftMarks, type AuthorMark } from '@/lib/learn/essays/authorship';
+import {
+  DEFAULT_SELF_NAME,
+  MARK_AUTHORS,
+  readDraftMarks,
+  type AuthorMark,
+} from '@/lib/learn/essays/authorship';
 import { rephraseContext, rephraseProblem } from '@/lib/learn/essays/rephrase';
 import { rephraseSelection } from '@/lib/learn/essays/rephrase-model';
 import {
@@ -56,6 +61,8 @@ import {
   type EssayInterview,
 } from '@/lib/learn/essays/model';
 import { essayDay, type EssayStage } from '@/lib/learn/essays/note';
+import { planJson, readPlan, type EssayPlan } from '@/lib/learn/essays/plan';
+import { readbackPlan } from '@/lib/learn/essays/guide-run';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
@@ -66,13 +73,17 @@ import {
   loadVaultEssay,
   recordEssayNote,
   saveBriefJson,
+  loadPlanContext,
+  savePlanJson,
   saveDraft,
   saveWordTarget,
   takenEssaySlugs,
 } from '@/lib/learn/essays/store';
 import { searchStudy, type StudySearch } from '@/lib/learn/essays/study-store';
-import { deeperProblem, firstPassBasis, type EssayResearch } from '@/lib/learn/essays/research';
-import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass, runFirstPass } from '@/lib/learn/essays/research-model';
+import { deeperProblem, type EssayResearch } from '@/lib/learn/essays/research';
+import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass } from '@/lib/learn/essays/research-model';
+import { mapBasis } from '@/lib/learn/essays/research-map';
+import { GUIDE_MODEL, MAP_SEARCH_MODEL, runResearchMap } from '@/lib/learn/essays/guide-model';
 import { insertEssayResearch } from '@/lib/learn/essays/research-store';
 import { costMicrosFor, totalMicros, type SpendReport } from '@/lib/core/spend/pricing';
 import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
@@ -138,13 +149,23 @@ function marksOf(data: { body: string; marks: MarksPayload }): AuthorMark[] {
 }
 
 // latency: optimistic
-export async function saveEssayDraft(id: string, body: string, marks: MarksPayload): Promise<DraftSaveResult> {
+export async function saveEssayDraft(
+  id: string,
+  body: string,
+  marks: MarksPayload,
+): Promise<DraftSaveResult> {
   await requireUser();
   const parsed = DraftInput.safeParse({ id, body, marks });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save.' };
   try {
     const supabase = await createLearnClient();
-    const { updatedAt } = await saveDraft(supabase, parsed.data.id, parsed.data.body, marksOf(parsed.data));
+    const { updatedAt } = await saveDraft(
+      supabase,
+      parsed.data.id,
+      parsed.data.body,
+      marksOf(parsed.data),
+    );
     return { ok: true, savedAt: updatedAt };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Could not save.' };
@@ -154,7 +175,10 @@ export async function saveEssayDraft(id: string, body: string, marks: MarksPaylo
 export type TargetState = { error?: string; target?: number | null };
 
 // latency: pending
-export async function setEssayWordTarget(_prev: TargetState, formData: FormData): Promise<TargetState> {
+export async function setEssayWordTarget(
+  _prev: TargetState,
+  formData: FormData,
+): Promise<TargetState> {
   await requireUser();
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Could not find that essay.' };
@@ -200,11 +224,21 @@ export async function saveEssayToVaultAction(
   const user = await requireUser();
   const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
   if (!parsed.success) {
-    return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? 'Could not save.' };
+    return {
+      ok: false,
+      reason: 'error',
+      error: parsed.error.issues[0]?.message ?? 'Could not save.',
+    };
   }
   const saved = await writeEssayToVault(user.id, parsed.data);
   if (!saved.ok) return saved;
-  return { ok: true, savedAt: saved.savedAt, path: saved.path, blobSha: saved.blobSha, stage: saved.stage };
+  return {
+    ok: true,
+    savedAt: saved.savedAt,
+    path: saved.path,
+    blobSha: saved.blobSha,
+    stage: saved.stage,
+  };
 }
 
 /** A vault save as the server sees it: on success, with the file it wrote. */
@@ -232,7 +266,10 @@ async function writeEssayToVault(
           deadline: Date.now() + EMBED_AFTER_SAVE_MS,
         });
       } catch (error) {
-        console.error('[essay vault] note embedding', error instanceof Error ? error.message : error);
+        console.error(
+          '[essay vault] note embedding',
+          error instanceof Error ? error.message : error,
+        );
       }
     });
   };
@@ -273,7 +310,11 @@ async function writeEssayToVault(
     };
   } catch (error) {
     console.error('[essay vault]', error instanceof Error ? error.message : error);
-    return { ok: false, reason: 'error', error: 'The essay could not be saved to your vault. Try again in a moment.' };
+    return {
+      ok: false,
+      reason: 'error',
+      error: 'The essay could not be saved to your vault. Try again in a moment.',
+    };
   }
 }
 
@@ -301,9 +342,13 @@ export type ReloadResult =
  * the editor opened, the newer one has not come in yet and nothing changes.
  */
 // latency: pending
-export async function reloadEssayFromVault(id: string, openedBlobSha: string | null): Promise<ReloadResult> {
+export async function reloadEssayFromVault(
+  id: string,
+  openedBlobSha: string | null,
+): Promise<ReloadResult> {
   await requireUser();
-  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
+  if (!z.string().uuid().safeParse(id).success)
+    return { ok: false, error: 'Could not find that essay.' };
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
   try {
     const essay = await loadVaultEssay(supabase, id);
@@ -315,14 +360,23 @@ export async function reloadEssayFromVault(id: string, openedBlobSha: string | n
       .eq('id', essay.noteId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    const note = data as { path: string; body: string; blob_sha: string; deleted_at: string | null } | null;
+    const note = data as {
+      path: string;
+      body: string;
+      blob_sha: string;
+      deleted_at: string | null;
+    } | null;
     if (!note || note.deleted_at) {
-      return { ok: false, error: 'The note is not in your vault any more. Saving again writes a new one.' };
+      return {
+        ok: false,
+        error: 'The note is not in your vault any more. Saving again writes a new one.',
+      };
     }
     if (note.blob_sha === openedBlobSha) {
       return {
         ok: false,
-        error: 'Dash has not read the newer version from your vault yet. It comes in with the next sync; reload after that.',
+        error:
+          'Dash has not read the newer version from your vault yet. It comes in with the next sync; reload after that.',
       };
     }
     // The whole file, for the authorship block's offsets and hash. Without
@@ -332,9 +386,15 @@ export async function reloadEssayFromVault(id: string, openedBlobSha: string | n
       const source = await openConnectedSource(vault);
       if (typeof source !== 'string') file = await source.readBlob(note.blob_sha);
     } catch (error) {
-      console.error('[essay reload] reading the file', error instanceof Error ? error.message : error);
+      console.error(
+        '[essay reload] reading the file',
+        error instanceof Error ? error.message : error,
+      );
     }
-    const reloaded = essayFromVault(file, note.body, { body: essay.draftBody ?? '', marks: essay.marks ?? [] });
+    const reloaded = essayFromVault(file, note.body, {
+      body: essay.draftBody ?? '',
+      marks: essay.marks ?? [],
+    });
     await adoptNoteVersion(supabase, id, {
       path: note.path,
       body: reloaded.body,
@@ -345,18 +405,23 @@ export async function reloadEssayFromVault(id: string, openedBlobSha: string | n
     return { ok: true, blobSha: note.blob_sha, ...reloaded };
   } catch (error) {
     console.error('[essay reload]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'The note could not be read from your vault. Try again in a moment.' };
+    return {
+      ok: false,
+      error: 'The note could not be read from your vault. Try again in a moment.',
+    };
   }
 }
 
 export type BriefResult =
-  | { ok: true; brief: EssayBrief; interview: EssayInterview | null }
+  | { ok: true; brief: EssayBrief; interview: EssayInterview | null; plan?: EssayPlan }
   | { ok: false; error: string };
 
 const BriefInput = z.object({
   id: z.string().uuid(),
   field: z.enum(BRIEF_FIELDS),
-  value: z.string().max(ANSWER_MAX * 2, 'That is longer than a brief needs; keep it to a paragraph.'),
+  value: z
+    .string()
+    .max(ANSWER_MAX * 2, 'That is longer than a brief needs; keep it to a paragraph.'),
 });
 
 function briefResult(json: unknown): BriefResult {
@@ -373,16 +438,22 @@ function briefResult(json: unknown): BriefResult {
  * tab got there first) changes nothing and returns where it is.
  */
 // latency: pending
-export async function answerEssayInterview(id: string, field: string, answer: string): Promise<BriefResult> {
+export async function answerEssayInterview(
+  id: string,
+  field: string,
+  answer: string,
+): Promise<BriefResult> {
   const user = await requireUser();
   const parsed = BriefInput.safeParse({ id, field, value: answer });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that answer.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that answer.' };
   const supabase = await createLearnClient();
   try {
     const row = await loadBriefJson(supabase, parsed.data.id);
     if (!row) return { ok: false, error: 'That essay is not there any more.' };
     const interview = readInterview(row.brief);
-    if (interview?.status !== 'asking' || interview.field !== parsed.data.field) return briefResult(row.brief);
+    if (interview?.status !== 'asking' || interview.field !== parsed.data.field)
+      return briefResult(row.brief);
 
     const following = nextField(parsed.data.field);
     let next: { field: BriefField; ask: string } | null = null;
@@ -390,7 +461,9 @@ export async function answerEssayInterview(id: string, field: string, answer: st
       next = { field: following, ask: PLAIN_ASKS[following] };
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (apiKey) {
-        const sofar = readBrief(answeredBrief(row.brief, parsed.data.field, parsed.data.value, null));
+        const sofar = readBrief(
+          answeredBrief(row.brief, parsed.data.field, parsed.data.value, null),
+        );
         const spend = collectSpend();
         const asked = await askNextQuestion({
           brief: sofar,
@@ -406,9 +479,31 @@ export async function answerEssayInterview(id: string, field: string, answer: st
     const brief = answeredBrief(row.brief, parsed.data.field, parsed.data.value, next);
     await saveBriefJson(supabase, parsed.data.id, brief);
     revalidatePath('/learn/essays');
+    // The last answer: Dash reads the whole brief back, so the interview ends
+    // on what to tighten next rather than on an empty page.
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!following && apiKey) {
+      const context = await loadPlanContext(supabase, parsed.data.id);
+      const spend = collectSpend();
+      const read = await readbackPlan({
+        brief: readBrief(brief),
+        plan: readPlan(context?.plan),
+        anthropicApiKey: apiKey,
+        onSpend: spend.sink,
+      });
+      await recordLearnSpend(user.id, 'read-essay-brief', spend.reports);
+      if (read.ok) {
+        await savePlanJson(supabase, parsed.data.id, planJson(read.plan));
+        return { ...briefResult(brief), plan: read.plan } as BriefResult;
+      }
+      console.error('[essay readback]', read.detail);
+    }
     return briefResult(brief);
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not keep that answer.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not keep that answer.',
+    };
   }
 }
 
@@ -416,7 +511,8 @@ export async function answerEssayInterview(id: string, field: string, answer: st
 // latency: pending
 export async function skipEssayInterview(id: string): Promise<BriefResult> {
   await requireUser();
-  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
+  if (!z.string().uuid().safeParse(id).success)
+    return { ok: false, error: 'Could not find that essay.' };
   const supabase = await createLearnClient();
   try {
     const row = await loadBriefJson(supabase, id);
@@ -425,16 +521,24 @@ export async function skipEssayInterview(id: string): Promise<BriefResult> {
     await saveBriefJson(supabase, id, brief);
     return briefResult(brief);
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not skip the interview.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not skip the interview.',
+    };
   }
 }
 
 /** One line of the brief, edited where it is read. */
 // latency: optimistic
-export async function saveEssayBriefField(id: string, field: string, value: string): Promise<BriefResult> {
+export async function saveEssayBriefField(
+  id: string,
+  field: string,
+  value: string,
+): Promise<BriefResult> {
   await requireUser();
   const parsed = BriefInput.safeParse({ id, field, value });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save the brief.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save the brief.' };
   const supabase = await createLearnClient();
   try {
     const row = await loadBriefJson(supabase, parsed.data.id);
@@ -444,7 +548,10 @@ export async function saveEssayBriefField(id: string, field: string, value: stri
     revalidatePath('/learn/essays');
     return briefResult(brief);
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not save the brief.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not save the brief.',
+    };
   }
 }
 
@@ -479,22 +586,33 @@ export async function rephraseEssaySelection(
 ): Promise<RephraseResult> {
   const user = await requireUser();
   const parsed = RephraseInput.safeParse({ id, doc, from, to, noteId });
-  if (!parsed.success || parsed.data.to > parsed.data.doc.length || parsed.data.from >= parsed.data.to) {
+  if (
+    !parsed.success ||
+    parsed.data.to > parsed.data.doc.length ||
+    parsed.data.from >= parsed.data.to
+  ) {
     return { ok: false, error: 'Select the words you want reworded first.' };
   }
   const selection = parsed.data.doc.slice(parsed.data.from, parsed.data.to);
   const problem = rephraseProblem(selection);
   if (problem) return { ok: false, error: problem };
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, error: 'Rephrase needs the Anthropic key, which is not set on this deployment.' };
+  if (!apiKey)
+    return {
+      ok: false,
+      error: 'Rephrase needs the Anthropic key, which is not set on this deployment.',
+    };
 
   try {
     const supabase = await createLearnClient();
     const row = await loadBriefJson(supabase, parsed.data.id);
     if (!row) return { ok: false, error: 'That essay is not there any more.' };
     const brief = readBrief(row.brief);
-    const note = parsed.data.noteId ? await loadNote(supabase, parsed.data.id, parsed.data.noteId) : null;
-    if (parsed.data.noteId && note?.status !== 'open') return { ok: false, error: 'That note is closed now.' };
+    const note = parsed.data.noteId
+      ? await loadNote(supabase, parsed.data.id, parsed.data.noteId)
+      : null;
+    if (parsed.data.noteId && note?.status !== 'open')
+      return { ok: false, error: 'That note is closed now.' };
     const spend = collectSpend();
     const result = await rephraseSelection({
       selection,
@@ -508,7 +626,10 @@ export async function rephraseEssaySelection(
     await recordLearnSpend(user.id, 'rephrase-essay-selection', spend.reports);
     if (!result.ok) {
       console.error('[essay rephrase]', result.detail);
-      return { ok: false, error: 'Dash could not reword that. Try again, or select a little more or less.' };
+      return {
+        ok: false,
+        error: 'Dash could not reword that. Try again, or select a little more or less.',
+      };
     }
     if (note) await setNoteRung(supabase, note, 4);
     return {
@@ -526,7 +647,9 @@ export async function rephraseEssaySelection(
 }
 
 export type NotesResult = ({ ok: true } & EssayNotes) | { ok: false; error: string };
-export type CheckResult = ({ ok: true; raised: number } & EssayNotes) | { ok: false; error: string };
+export type CheckResult =
+  | ({ ok: true; raised: number } & EssayNotes)
+  | { ok: false; error: string };
 
 const CheckInput = z.object({
   id: z.string().uuid(),
@@ -552,7 +675,11 @@ const COMPARED_CHARS = 1_500;
  * on this essay does not run.
  */
 // latency: pending
-export async function runEssayCheck(id: string, checkId: string, doc: string): Promise<CheckResult> {
+export async function runEssayCheck(
+  id: string,
+  checkId: string,
+  doc: string,
+): Promise<CheckResult> {
   const user = await requireUser();
   const parsed = CheckInput.safeParse({ id, check: checkId, doc });
   const check = parsed.success ? checkById(parsed.data.check) : null;
@@ -562,9 +689,14 @@ export async function runEssayCheck(id: string, checkId: string, doc: string): P
     const essay = await loadCheckEssay(supabase, parsed.data.id);
     if (!essay) return { ok: false, error: 'That essay is not there any more.' };
     const states = await loadNoteStates(supabase, parsed.data.id);
-    const dismissed = states.filter((note) => note.checkName === check.id && note.status === 'dismissed').length;
+    const dismissed = states.filter(
+      (note) => note.checkName === check.id && note.status === 'dismissed',
+    ).length;
     if (dismissed >= DISMISSALS_TO_STOP) {
-      return { ok: false, error: `You dismissed ${check.name} twice, so it no longer runs on this essay.` };
+      return {
+        ok: false,
+        error: `You dismissed ${check.name} twice, so it no longer runs on this essay.`,
+      };
     }
 
     let found: Finding[];
@@ -572,13 +704,23 @@ export async function runEssayCheck(id: string, checkId: string, doc: string): P
       found = writingGuideFindings(parsed.data.doc);
     } else {
       if (parsed.data.doc.length > CHECK_ESSAY_MAX) {
-        return { ok: false, error: 'Checks read essays up to about 4,000 words. This one is longer.' };
+        return {
+          ok: false,
+          error: 'Checks read essays up to about 4,000 words. This one is longer.',
+        };
       }
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) return { ok: false, error: 'Checks need the Anthropic key, which is not set on this deployment.' };
+      if (!apiKey)
+        return {
+          ok: false,
+          error: 'Checks need the Anthropic key, which is not set on this deployment.',
+        };
       const units = checkUnits(check, parsed.data.doc);
       if (units.length === 0) {
-        return { ok: false, error: 'Write a paragraph or two first; there is nothing to check yet.' };
+        return {
+          ok: false,
+          error: 'Write a paragraph or two first; there is nothing to check yet.',
+        };
       }
       const brief = readBrief(essay.brief);
       const spend = collectSpend();
@@ -587,7 +729,9 @@ export async function runEssayCheck(id: string, checkId: string, doc: string): P
           ? await notesToCompare(user.id, units, essay.noteId)
           : new Map<Paragraph | null, ComparedNote[]>();
       const runnable =
-        check.id === 'already_said' ? units.filter((unit) => (compare.get(unit) ?? []).length > 0) : units;
+        check.id === 'already_said'
+          ? units.filter((unit) => (compare.get(unit) ?? []).length > 0)
+          : units;
       const call = (unit: Paragraph | null) =>
         runCheckCall({
           check,
@@ -682,11 +826,15 @@ export async function helpEssayNote(id: string, noteId: string): Promise<NotesRe
     const note = await loadNote(supabase, parsed.data.id, parsed.data.noteId);
     if (!note || note.status !== 'open') return { ok: false, error: 'That note is closed now.' };
     const rung = nextRung(note.rung);
-    if (rung === null) return { ok: false, error: 'This note is as far up the ladder as Help goes.' };
+    if (rung === null)
+      return { ok: false, error: 'This note is as far up the ladder as Help goes.' };
     await setNoteRung(supabase, note, rung);
     return { ok: true, ...(await shownNotes(supabase, parsed.data.id)) };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not move the note.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not move the note.',
+    };
   }
 }
 
@@ -704,9 +852,15 @@ export async function closeEssayNote(
   }
   const supabase = await createLearnClient();
   try {
-    return { ok: true, ...(await closeNote(supabase, parsed.data.id, parsed.data.noteId, outcome)) };
+    return {
+      ok: true,
+      ...(await closeNote(supabase, parsed.data.id, parsed.data.noteId, outcome)),
+    };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not close the note.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not close the note.',
+    };
   }
 }
 
@@ -720,7 +874,10 @@ export async function reopenEssayNote(id: string, noteId: string): Promise<Notes
   try {
     return { ok: true, ...(await reopenNote(supabase, parsed.data.id, parsed.data.noteId)) };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not bring the note back.' };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not bring the note back.',
+    };
   }
 }
 
@@ -809,7 +966,10 @@ const HideInput = z.object({ id: z.string().uuid(), key: z.string().min(1).max(6
 
 /** Hide one item from the study panel, for this essay only. */
 // latency: optimistic -- the item leaves the panel at once and comes back with the error if refused
-export async function hideEssayStudyItem(id: string, key: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function hideEssayStudyItem(
+  id: string,
+  key: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
   const parsed = HideInput.safeParse({ id, key });
   if (!parsed.success) return { ok: false, error: 'Could not hide that.' };
@@ -844,12 +1004,20 @@ const ResearchInput = z.object({
  * ledger and kept on the run, which the card shows beside the result.
  */
 // latency: pending
-export async function researchEssay(id: string, level: string, doc: string): Promise<ResearchResult> {
+export async function researchEssay(
+  id: string,
+  level: string,
+  doc: string,
+): Promise<ResearchResult> {
   const user = await requireUser();
   const parsed = ResearchInput.safeParse({ id, level, doc });
   if (!parsed.success) return { ok: false, error: 'Could not start that research.' };
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, error: 'Research needs the Anthropic key, which is not set on this deployment.' };
+  if (!apiKey)
+    return {
+      ok: false,
+      error: 'Research needs the Anthropic key, which is not set on this deployment.',
+    };
 
   try {
     const supabase = await createLearnClient();
@@ -859,22 +1027,40 @@ export async function researchEssay(id: string, level: string, doc: string): Pro
     const spend = collectSpend();
 
     if (parsed.data.level === 'first') {
-      const basis = firstPassBasis(brief);
-      if (!basis) return { ok: false, error: 'Write the essay’s question in the brief first; the first pass searches with it.' };
-      const result = await runFirstPass({ basis, anthropicApiKey: apiKey, onSpend: spend.sink });
-      await recordLearnSpend(user.id, 'research-essay-question', spend.reports);
+      const basis = mapBasis(brief);
+      if (!basis)
+        return {
+          ok: false,
+          error: 'Write the essay’s question first; the research searches with it.',
+        };
+      const result = await runResearchMap({ basis, anthropicApiKey: apiKey, onSpend: spend.sink });
+      await recordLearnSpend(
+        user.id,
+        'research-essay-question',
+        spend.reports.filter((report) => report.model === MAP_SEARCH_MODEL),
+      );
+      await recordLearnSpend(
+        user.id,
+        'write-essay-research',
+        spend.reports.filter((report) => report.model !== MAP_SEARCH_MODEL),
+      );
       if (!result.ok) {
         console.error('[essay research] first', result.detail);
-        return { ok: false, error: 'Dash could not find sources on that question. Try again in a moment.' };
+        return {
+          ok: false,
+          error: 'Dash could not find sources on that question. Try again in a moment.',
+        };
       }
       const run = await insertEssayResearch(supabase, user.id, parsed.data.id, {
         level: 'first',
         question: brief.question,
         queries: result.queries,
         sources: result.sources,
-        findings: result.positions,
+        findings: result.parts,
         costMicros: runCost(spend.reports),
-        model: RESEARCH_MODEL,
+        model: `${GUIDE_MODEL},${MAP_SEARCH_MODEL}`,
+        summary: result.summary,
+        asks: result.asks,
       });
       return { ok: true, run };
     }
@@ -899,7 +1085,10 @@ export async function researchEssay(id: string, level: string, doc: string): Pro
     );
     if (!result.ok) {
       console.error('[essay research] deeper', result.detail);
-      return { ok: false, error: 'Dash could not check the draft against the web just now. Try again in a moment.' };
+      return {
+        ok: false,
+        error: 'Dash could not check the draft against the web just now. Try again in a moment.',
+      };
     }
     const run = await insertEssayResearch(supabase, user.id, parsed.data.id, {
       level: 'deeper',
@@ -919,7 +1108,9 @@ export async function researchEssay(id: string, level: string, doc: string): Pro
 
 /** What a run cost in all, or null when a model it used has no price. */
 function runCost(reports: SpendReport[]): number | null {
-  const { micros, unpriced } = totalMicros(reports.map((report) => costMicrosFor(report.model, report.usage)));
+  const { micros, unpriced } = totalMicros(
+    reports.map((report) => costMicrosFor(report.model, report.usage)),
+  );
   return unpriced > 0 ? null : micros;
 }
 
@@ -966,9 +1157,14 @@ export async function finishEssay(
 ): Promise<FinishResult> {
   const user = await requireUser();
   const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not finish the essay.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not finish the essay.' };
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, error: 'Finish needs the Anthropic key, which is not set on this deployment.' };
+  if (!apiKey)
+    return {
+      ok: false,
+      error: 'Finish needs the Anthropic key, which is not set on this deployment.',
+    };
 
   const saved = await writeEssayToVault(user.id, parsed.data, 'seedling');
   if (!saved.ok) return { ok: false, error: saved.error, reason: saved.reason };
@@ -1038,7 +1234,8 @@ export async function finishEssay(
     console.error('[essay finish]', error instanceof Error ? error.message : error);
     return {
       ok: false,
-      error: 'Your essay is saved to the vault, but Finish could not complete. Press Finish again in a moment.',
+      error:
+        'Your essay is saved to the vault, but Finish could not complete. Press Finish again in a moment.',
       saved: kept,
     };
   }
@@ -1047,7 +1244,12 @@ export async function finishEssay(
 const AcceptInput = z.object({
   id: z.string().uuid(),
   claims: z
-    .array(z.object({ name: z.string().trim().min(1).max(120), claim: z.string().trim().min(1).max(600) }))
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        claim: z.string().trim().min(1).max(600),
+      }),
+    )
     .max(MAX_CLAIMS),
   /** The names of the claims to make a note for. */
   create: z.array(z.string().max(120)).max(MAX_CLAIMS),
@@ -1111,7 +1313,12 @@ export async function acceptEssayFinish(
       const ports = noteCreatePorts({ supabase: vault, afterSave: embed });
       // One at a time: each is a commit to the same repository.
       for (const claim of chosen) {
-        const made = await createCapturedNote(ports, claimNote(claim, title), claim.name, INBOX_FOLDER);
+        const made = await createCapturedNote(
+          ports,
+          claimNote(claim, title),
+          claim.name,
+          INBOX_FOLDER,
+        );
         if (made.ok) created.push({ name: claim.name, href: noteHref(made.path) });
         else {
           failed.push(claim.name);
@@ -1140,7 +1347,8 @@ export async function acceptEssayFinish(
         } else {
           bank = 'failed';
           if (!added.ok) console.error('[essay finish] evidence', added.error);
-          error = error ?? 'The essay could not be added to your evidence bank. Try again in a moment.';
+          error =
+            error ?? 'The essay could not be added to your evidence bank. Try again in a moment.';
         }
       }
     }
@@ -1191,12 +1399,17 @@ export async function publishEssay(
 ): Promise<PublishResult> {
   const user = await requireUser();
   const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not publish the essay.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not publish the essay.' };
 
   const learn = await createLearnClient();
   const before = await loadPublishRow(learn, parsed.data.id);
   if (!before) return { ok: false, error: 'That essay is not there any more.' };
-  if (!before.finishedAt) return { ok: false, error: 'Finish the essay before you publish it. A draft is never published.' };
+  if (!before.finishedAt)
+    return {
+      ok: false,
+      error: 'Finish the essay before you publish it. A draft is never published.',
+    };
 
   const now = new Date();
   const today = essayDay(now, parsed.data.timeZone);
@@ -1206,13 +1419,23 @@ export async function publishEssay(
 
   try {
     const row = await loadPublishRow(learn, parsed.data.id);
-    if (!row?.slug) return { ok: false, error: 'The essay has no web address yet. Press Publish again.', saved: kept };
+    if (!row?.slug)
+      return {
+        ok: false,
+        error: 'The essay has no web address yet. Press Publish again.',
+        saved: kept,
+      };
     const links = await publishedLinkMap(learn, { path: saved.path, slug: row.slug });
     const snapshot = essaySnapshot(saved.file, { path: saved.path, today, published: links });
     if (snapshot.stage === 'draft') {
-      return { ok: false, error: 'The note is still marked as a draft, so it was not published.', saved: kept };
+      return {
+        ok: false,
+        error: 'The note is still marked as a draft, so it was not published.',
+        saved: kept,
+      };
     }
-    if (!snapshot.body.trim()) return { ok: false, error: 'There is nothing to publish yet.', saved: kept };
+    if (!snapshot.body.trim())
+      return { ok: false, error: 'There is nothing to publish yet.', saved: kept };
     const at = new Date().toISOString();
     const first = row.firstPublishedAt ?? at;
     await savePublished(learn, parsed.data.id, snapshot, at, first);
@@ -1222,7 +1445,8 @@ export async function publishEssay(
     console.error('[essay publish]', error instanceof Error ? error.message : error);
     return {
       ok: false,
-      error: 'Your essay is saved to the vault, but it could not be published. Press Publish again in a moment.',
+      error:
+        'Your essay is saved to the vault, but it could not be published. Press Publish again in a moment.',
       saved: kept,
     };
   }
@@ -1238,7 +1462,8 @@ export type UnpublishResult = { ok: true } | { ok: false; error: string };
 // latency: pending
 export async function unpublishEssay(id: string): Promise<UnpublishResult> {
   await requireUser();
-  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not unpublish the essay.' };
+  if (!z.string().uuid().safeParse(id).success)
+    return { ok: false, error: 'Could not unpublish the essay.' };
   try {
     const learn = await createLearnClient();
     const row = await loadPublishRow(learn, id);
@@ -1249,6 +1474,9 @@ export async function unpublishEssay(id: string): Promise<UnpublishResult> {
     return { ok: true };
   } catch (error) {
     console.error('[essay unpublish]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'The essay could not be taken off the site. Try again in a moment.' };
+    return {
+      ok: false,
+      error: 'The essay could not be taken off the site. Try again in a moment.',
+    };
   }
 }

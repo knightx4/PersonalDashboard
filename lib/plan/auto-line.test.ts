@@ -6,6 +6,7 @@ import {
   lineForThought,
   lineForTool,
   newestThought,
+  runEndNote,
   runIdIn,
   runMarker,
   worthWriting,
@@ -31,6 +32,19 @@ describe('the run marker', () => {
       ]),
     ).toBe(RUN);
     expect(briefRunId([entry('user', 'Hello'), entry('user', runMarker(RUN))])).toBeNull();
+  });
+});
+
+describe('the run end note', () => {
+  it('ends this run by its id, and only while it is still open', () => {
+    const note = runEndNote(RUN);
+    expect(note).toContain(`where id = '${RUN}' and status in ('started', 'stale')`);
+    expect(note).toContain("status = 'finished', error = null");
+    expect(note).toContain('plan.ts stopped');
+  });
+
+  it('leaves the marker readable when it follows the brief', () => {
+    expect(runIdIn(`Build #1.\n\n${runEndNote(RUN)}\n\n${runMarker(RUN)}`)).toBe(RUN);
   });
 });
 

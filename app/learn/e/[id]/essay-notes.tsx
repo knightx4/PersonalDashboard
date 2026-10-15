@@ -395,7 +395,11 @@ function NoteItem({ note, api }: { note: EssayNote; api: EssayNotesApi }) {
             detached note's text has gone from the draft, so it is Done. */}
         <CloseButton size="xs" lifecycle="done" onClick={() => void api.close(note, 'done')} />
         {!detached && (
-          <CloseButton size="xs" lifecycle="declined" onClick={() => void api.close(note, 'dismissed')} />
+          <CloseButton
+            size="xs"
+            lifecycle="declined"
+            onClick={() => void api.close(note, 'dismissed')}
+          />
         )}
       </div>
     </li>
