@@ -75,6 +75,11 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
     { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
+  // A subject, an idea, a quiz, an essay and a reading are reached through
+  // their list, so they light its tab through `alsoMatches` rather than having
+  // tabs of their own. No Goals tab (plan #1491): learning goals live on
+  // /goals. Idea Space and Essays became tabs at the person's ask in October
+  // 2026 (docs/CUT-BACK-SPEC.md, R1).
   learn: [
     { href: '/learn/now', label: 'Now', icon: 'readNow', exact: true },
     { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true },
@@ -137,6 +142,14 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
   ],
+  // Now, then the Inbox of questions a session needs answered. Then three
+  // lists: what is being built (the plan leads, as the page worked from most
+  // days, note ab08d2d3), what is wrong, and what is only being thought about.
+  // UI and Surfaces sit below them because they are the standard the work is
+  // held to, not work. The changelog is near the end because it is looked up,
+  // not worked, and Posts follows it since a post is written from it. No tab
+  // per module or per outside project: each would repeat the plan's sections
+  // (note 4308875b).
   dev: [
     // The route stays /dev/raised, so links already written into
     // notifications, comments and old summaries keep working.
@@ -145,11 +158,13 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
+    // Beside Ideas, since a takeaway is an idea someone else had (plan #1412).
     { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
     { href: '/dev/modules', label: 'Modules', icon: 'modules' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
+    // Which pages are opened and what each workspace spends (plan #1482).
     { href: '/dev/usage', label: 'Usage', icon: 'usage' },
     { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
     { href: '/dev/posts', label: 'Posts', icon: 'posts' },

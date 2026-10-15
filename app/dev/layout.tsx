@@ -6,6 +6,7 @@ import type { NavSection } from '@/components/shell/app-shell';
 import { loadOpenRaises, type OpenRaise } from '@/lib/raised/open-raises';
 import { loadDevBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
@@ -75,7 +76,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   return shellFor({
     module: 'dev',
     user,
-    sections: async () => devSections(...(await inboxReads)),
+    sections: async ({ owner }) => devSections(owner, ...(await inboxReads)),
     brief: async () => loadDevBrief(devWaiting(...(await inboxReads))),
     // The routines that work the repository, moved off Home (plan #1937.10).
     settingsHref: '/dev/settings',
@@ -111,78 +112,17 @@ function devWaiting(
 }
 
 function devSections(
+  owner: boolean,
   raised: OpenRaise[],
   plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
   specChanges: number,
   runQuestions: number,
   snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
 ): NavSection[] {
-  const waiting = devWaiting(raised, plan, specChanges, runQuestions, snoozes);
-
-  /**
-   * Now (Home until plan #1937.6) is first because it is the page the day starts on: what is running,
-   * the summary of the last 24 hours, and every conversation you have had with
-   * Dash. The Inbox beside it holds the questions a session needs answered
-   * before it can carry on. A question nobody reads is a session that guessed.
-   *
-   * Then three lists: what was decided and is being built, what is wrong now,
-   * and what is only being thought about. The plan leads them because it is
-   * the page worked from most days (note ab08d2d3); a bug is filed when
-   * something built is wrong, and an idea becomes a plan step when it is
-   * decided on.
-   *
-   * UI sits below the three because it is not a list of work; it is the
-   * standard the work is held to, and Surfaces below that because it is where
-   * the standard gets checked against the thing: every surface framed at the width
-   * it is read at, with a box to say what is wrong. A note written there lands
-   * in the same queue as Bugs and requests, which is the point -- one inbox,
-   * not two. It lives here rather than in a document because a
-   * document describing an interface goes stale the week after it is written,
-   * and this one renders the real components from the real tokens: if a swatch
-   * on that page is wrong, the app is wrong.
-   *
-   * The changelog is last, at the bottom of the list. Everything above it is
-   * something you go there to do; it is the one page you go to to look
-   * something up, and its lines are the closed rows of the three lists at the
-   * top. Finished work is consulted, not worked, so it sits at the end rather
-   * than in the middle of the things that still want doing. Posts sits below
-   * it, since a post is written from what the changelog lists.
-   */
-  return [
-    // The route stays /dev/raised, which keeps every link already written into
-    // a notification, a comment and an old summary working.
-    // Named Now, as every workspace's first section is (plan #1937.6).
-    { href: '/dev/raised', label: 'Now', icon: 'devHome' },
-    // Everything waiting on you, the way an inbox holds what is addressed to
-    // you. Home carried it until the summary and the conversations pushed it
-    // down the page; the badge is the length of this list.
-    {
-      href: '/dev/inbox',
-      label: 'Inbox',
-      icon: 'inbox',
-      badge: waiting,
-    },
-    { href: '/dev/plan', label: 'Plan', icon: 'plan' },
-    { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
-    { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
-    // What Dash took from the videos saved for this app (plan #1412); beside
-    // Ideas because a takeaway is an idea someone else had.
-    { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
-    { href: '/dev/specs', label: 'Specs', icon: 'specs' },
-    // One page per workspace, gathering its rows from the lists above and
-    // below. A single entry rather than one per module: a tab for each would
-    // be the plan's sections again (note 4308875b).
-    { href: '/dev/modules', label: 'Modules', icon: 'modules' },
-    { href: '/dev/ui', label: 'UI', icon: 'ui' },
-    { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
-    // Which pages are opened, and the model spend of each workspace (plan
-    // #1482): what the cut-back is decided from.
-    { href: '/dev/usage', label: 'Usage', icon: 'usage' },
-    { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
-    // X posts Dash drafts about building the app (plan #1419).
-    { href: '/dev/posts', label: 'Posts', icon: 'posts' },
-    // No entry per project built outside this app (lib/plan/projects): each
-    // already has its own section on the plan, and a tab beside it was the
-    // same list twice (note 4308875b).
-  ];
+  // The tabs and their order are in lib/shell/tabs.ts (plan #2208.2), where the
+  // command panel reads them too. The Inbox's badge is everything waiting on
+  // you, the length of the list it opens.
+  return withBadges(tabsFor('dev', owner), {
+    '/dev/inbox': devWaiting(raised, plan, specChanges, runQuestions, snoozes),
+  });
 }
