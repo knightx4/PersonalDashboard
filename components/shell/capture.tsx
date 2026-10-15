@@ -1150,6 +1150,7 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const router = useRouter();
   const toast = useToast();
   const [text, setText] = useState(aim.seed ?? '');
+  const adder = useRef<AddFileHandle>(null);
   const [day, setDay] = useState<CaptureDay>('today');
   const [error, setError] = useState<string | null>(aimProblem(aim));
   const [pending, start] = useTransition();
@@ -1265,9 +1266,17 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           page={aim.page}
           files={
             kind.files ? (
-              <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+              <AddFile
+                ref={adder}
+                value={uploads}
+                onChange={setUploads}
+                disabled={pending}
+                onUploadingChange={setUploading}
+              />
             ) : undefined
           }
+          // A picture pasted into the field goes in as a file (note 90153e80).
+          onPaste={kind.files ? (data) => adder.current?.paste(data) ?? false : undefined}
           text={text}
           onText={(value) => {
             setText(value);

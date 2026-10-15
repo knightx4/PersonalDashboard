@@ -109,6 +109,14 @@ describe('All goals views (plan #1158)', () => {
     expect(countAllGoalsView(areas, 'all', onYou)).toBe(4);
   });
 
+  it('leaves a parked goal out of Open and On you, and keeps it under Everything', () => {
+    const parked = goal('parked', { status: 'parked' });
+    const busy = new Map([[parked.id, 2]]);
+    expect(goalInView(parked, 'open', busy)).toBe(false);
+    expect(goalInView(parked, 'you', busy)).toBe(false);
+    expect(goalInView(parked, 'all', busy)).toBe(true);
+  });
+
   it('puts a goal Dash proposed on you, since it waits for your approval', () => {
     expect(goalInView(goal('proposed', { status: 'proposed' }), 'you', new Map())).toBe(true);
   });
