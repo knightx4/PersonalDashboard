@@ -757,14 +757,33 @@ const reviews: DueReview[] = [
   },
 ];
 
+/* Typical figures for the piece's two marked presses, so their hints draw
+ * inside the Dash buttons as the learn layout would hand them (plan #1964.1.2). */
+const PIECE_RUN = {
+  lowMicros: 2_000,
+  medianMicros: 4_000,
+  highMicros: 9_000,
+  runs: 14,
+  basis: 'measured',
+  per: 'run',
+  models: [MODELS.learnProbe],
+} as const;
+
 export function LearnPieceSurface() {
   return (
-    <PiecePageView
-      page={piecePage}
-      practice={practice}
-      standing={{ practicePassed: false, checkPassed: false }}
-      reviews={reviews}
-    />
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={piecePage}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={reviews}
+      />
+    </PaidCostsProvider>
   );
 }
 

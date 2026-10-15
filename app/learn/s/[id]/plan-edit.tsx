@@ -7,7 +7,7 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { addUnitToPlan, moveUnitInPlan, removeUnitFromPlan, type PlanEditState } from './actions';
 
 /**
@@ -90,10 +90,16 @@ export function UnitMenu({
 function AddButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-      {pending ? 'Adding…' : 'Add unit'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      size="sm"
+      pending={pending}
+      paid="app/learn/s/[id]/actions.ts#addUnitToPlan"
+      what="Cost of writing what the unit covers"
+    >
+      {pending ? 'Adding…' : 'Add the unit'}
+    </DashAction>
   );
 }
 
@@ -123,7 +129,6 @@ export function AddUnitForm({ subjectId }: { subjectId: string }) {
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Add a unit
         </Button>
-        <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />
       </div>
     );
   }
@@ -149,7 +154,6 @@ export function AddUnitForm({ subjectId }: { subjectId: string }) {
             className="min-h-11 min-w-0 flex-1 lg:min-h-0"
           />
           <AddButton />
-          <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />
           <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:min-h-0" onClick={() => setOpen(false)}>
             Cancel
           </Button>

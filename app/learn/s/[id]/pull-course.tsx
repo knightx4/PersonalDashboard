@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Field, Input } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -44,10 +44,6 @@ export function PullCourse() {
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <PullButton />
-        <PaidHint
-          action="app/learn/s/[id]/actions.ts#pullLectureCourse"
-          what="Cost of pulling the course"
-        />
         <CloseButton onClose={() => setOpen(false)} hasReport={Boolean(state.report)} />
         {state.error && (
           <span role="alert" className="text-ui text-danger">
@@ -78,9 +74,15 @@ function CloseButton({ onClose, hasReport }: { onClose: () => void; hasReport: b
 function PullButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" pending={pending}>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/s/[id]/actions.ts#pullLectureCourse"
+      what="Cost of pulling the course"
+    >
       {pending ? 'Fetching lectures and embedding…' : 'Pull it in'}
-    </Button>
+    </DashAction>
   );
 }
 

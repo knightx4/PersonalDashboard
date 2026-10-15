@@ -3,10 +3,9 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
 import { Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Textarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import { nextDueLine, type DueReview, type ReviewQuestion } from '@/lib/learn/lessons/review';
 import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult } from './actions';
@@ -115,19 +114,19 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
               disabled={marking}
             />
           </Field>
-          <span className="mt-2 inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={answer}
-              pending={marking}
-              disabled={response.trim() === ''}
-            >
-              {marking ? 'Marking…' : 'Check my answer'}
-            </Button>
-            <PaidHint action="app/learn/review/actions.ts#answerReview" what="Cost of marking the answer" />
-          </span>
+          <DashAction
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={answer}
+            pending={marking}
+            disabled={response.trim() === ''}
+            paid="app/learn/review/actions.ts#answerReview"
+            what="Cost of marking the answer"
+            wrapperClassName="mt-2"
+          >
+            {marking ? 'Marking…' : 'Check my answer'}
+          </DashAction>
         </>
       )}
 
@@ -149,12 +148,18 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
       )}
 
       {!question && (
-        <span className="mt-2 inline-flex items-center gap-1">
-          <Button type="button" variant="secondary" size="sm" onClick={ask} pending={asking}>
-            {asking ? 'Writing a question…' : 'Ask me'}
-          </Button>
-          <PaidHint action="app/learn/review/actions.ts#askReview" what="Cost of writing the question" />
-        </span>
+        <DashAction
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={ask}
+          pending={asking}
+          paid="app/learn/review/actions.ts#askReview"
+          what="Cost of writing the question"
+          wrapperClassName="mt-2"
+        >
+          {asking ? 'Writing a question…' : 'Ask me a question'}
+        </DashAction>
       )}
 
       {error && <p className="mt-2 text-small text-danger">{error}</p>}

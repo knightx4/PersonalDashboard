@@ -1,9 +1,7 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { after } from 'next/server';
 import { z } from 'zod';
-import { ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
@@ -229,14 +227,15 @@ export default async function NowPage({
                     {url ? (
                       <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
-                        <Button type="submit" variant="primary" size="sm">
-                          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-                          Open
-                        </Button>
-                        <PaidHint
-                          action="app/learn/r/[id]/actions.ts#openReading"
+                        <DashAction
+                          type="submit"
+                          variant="primary"
+                          size="sm"
+                          paid="app/learn/r/[id]/actions.ts#openReading"
                           what="Cost of finding the passage"
-                        />
+                        >
+                          Open at the passage
+                        </DashAction>
                       </form>
                     ) : (
                       <Link
