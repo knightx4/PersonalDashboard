@@ -107,3 +107,40 @@ describe('the topic tables', () => {
     ).rejects.toThrow(/cell_evidence_quote_ck/);
   });
 });
+
+describe('questions about a cell (plan #2138.5)', () => {
+  async function ask(userId: string, cellId: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into cell_questions (user_id, cell_id, format, question)
+      values (${userId}, ${cellId}, 'explain', 'In your own words, what is CAPM?')
+      returning id`;
+    return row.id;
+  }
+
+  it('shows each account only its own questions', async () => {
+    await ask(userA, capm[2]);
+    const seen = await asUser(userB, async (tx) => (await tx`select id from cell_questions`).length);
+    expect(seen).toBe(0);
+  });
+
+  it('ties evidence to its question, and refuses a declaration that names one', async () => {
+    const question = await ask(userA, capm[1]);
+    await admin`insert into cell_evidence (user_id, cell_id, verdict, quote, question_id)
+                values (${userA}, ${capm[1]}, 'met', 'a way of pricing risk', ${question})`;
+    await expect(
+      admin`insert into cell_evidence (user_id, cell_id, verdict, question_id)
+            values (${userA}, ${capm[1]}, 'declared', ${question})`,
+    ).rejects.toThrow(/cell_evidence_declared_question_ck/);
+  });
+
+  it('refuses an answer with no time, and a case with no expected answer', async () => {
+    const question = await ask(userA, capm[3]);
+    await expect(admin`update cell_questions set response = 'An answer.' where id = ${question}`).rejects.toThrow(
+      /cell_questions_answered_ck/,
+    );
+    await expect(
+      admin`insert into cell_questions (user_id, cell_id, format, question)
+            values (${userA}, ${capm[5]}, 'case', 'Value this firm.')`,
+    ).rejects.toThrow(/cell_questions_case_ck/);
+  });
+});

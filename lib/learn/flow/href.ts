@@ -18,6 +18,8 @@ export type PracticeScope = {
   track?: string | null;
   goal?: string | null;
   only?: string | null;
+  /** One level of a topic to ask an explain question about (plan #2138.5). */
+  cell?: string | null;
 };
 
 export function practiceHref(scope: PracticeScope = {}): string {
@@ -25,6 +27,7 @@ export function practiceHref(scope: PracticeScope = {}): string {
   if (scope.track) params.set('track', scope.track);
   if (scope.goal) params.set('goal', scope.goal);
   if (scope.only) params.set('only', scope.only);
+  if (scope.cell) params.set('cell', scope.cell);
   return `${NOW_HREF}?${params.toString()}`;
 }
 

@@ -126,6 +126,8 @@ export const PAID_ACTIONS = {
     'place-track',
     'write-probe',
   ],
+  // Learn: an explanation graded against the levels of a topic (plan #2138.5)
+  'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
