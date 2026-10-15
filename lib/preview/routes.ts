@@ -209,6 +209,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'home-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
   'goals-suggestions': ['/goals/[goalId]'],
+  'goals-metrics-props': ['/goals/[goalId]'],
+  'goals-metrics-props-form': ['/goals/[goalId]'],
+  'goals-metrics-props-menu': ['/goals/[goalId]'],
+  'goals-metrics-props-empty': ['/goals/[goalId]'],
+  'goals-metrics-props-pending': ['/goals/[goalId]'],
+  'goals-metrics-props-error': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
@@ -457,6 +463,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'goals-log-done': ['components/goals/log-done.tsx'],
   // A goal's Suggestions section (plan #1739), drawn full and empty.
   'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
+  // A goal's metrics in its properties column (plan #2084.3), drawn with
+  // each part open on a surface of its own.
+  'goals-metrics-props': ['app/goals/[goalId]/metrics-property.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).
