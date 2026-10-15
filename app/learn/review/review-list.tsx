@@ -2,8 +2,9 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useState, useTransition } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, ChevronRight, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { FoldDetails } from '@/components/ui/fold-details';
 import { Field, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
@@ -15,33 +16,75 @@ import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult 
  * and at the top of a piece's page. One surface with a row an idea: Ask me
  * writes the question, Check my answer marks it and says when the idea comes
  * back. An answered row stays on the page until it is next opened.
+ *
+ * Given `remember`, the list folds away under its heading and stays folded in
+ * this browser (note 9b011a39), with the count on the closed line. A folding
+ * list leaves out `description`, which pushed the first row three lines down
+ * on a phone (law 15).
  */
 export function ReviewList({
   reviews,
   title,
   description,
   showPlan,
+  remember,
+  defaultOpen = true,
 }: {
   reviews: readonly DueReview[];
   title: string;
   description: string;
   /** Whether each row names its track, and the piece that taught it when one did, for Learn now. */
   showPlan: boolean;
+  /** Fold the list under its heading, kept in this browser under this key. */
+  remember?: string;
+  /** Open to begin with, for a folding list. The gallery draws it shut. */
+  defaultOpen?: boolean;
 }) {
   if (reviews.length === 0) return null;
+  const list = (
+    <ul className="divide-y divide-border">
+      {reviews.map((review) => (
+        <li key={review.conceptId} className="card-pad-x row-pad">
+          <ReviewRow review={review} showPlan={showPlan} />
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (!remember) {
+    return (
+      <Card padding="none" className="mb-4">
+        <div className="card-pad-x pt-(--card-p)">
+          <h2 className="text-ui font-semibold text-ink">{title}</h2>
+          <p className="mt-1 text-small text-ink-muted">{description}</p>
+        </div>
+        {list}
+      </Card>
+    );
+  }
+
   return (
     <Card padding="none" className="mb-4">
-      <div className="card-pad-x pt-(--card-p)">
-        <h2 className="text-ui font-semibold text-ink">{title}</h2>
-        <p className="mt-1 text-small text-ink-muted">{description}</p>
-      </div>
-      <ul className="divide-y divide-border">
-        {reviews.map((review) => (
-          <li key={review.conceptId} className="card-pad-x row-pad">
-            <ReviewRow review={review} showPlan={showPlan} />
-          </li>
-        ))}
-      </ul>
+      <FoldDetails remember={remember} defaultOpen={defaultOpen} className="group/review">
+        <summary
+          className={cn(
+            'press card-pad-x block cursor-pointer list-none py-(--card-p) group-open/review:pb-0',
+            'focus-visible:outline-2 focus-visible:-outline-offset-2',
+            '[&::-webkit-details-marker]:hidden',
+          )}
+        >
+          <h2 className="flex items-baseline gap-2 text-ui font-semibold text-ink">
+            <ChevronRight
+              aria-hidden
+              strokeWidth={1.75}
+              className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-quick group-open/review:rotate-90"
+            />
+            {title}
+            <span className="tabular font-normal text-ink-muted">({reviews.length})</span>
+          </h2>
+        </summary>
+        {list}
+      </FoldDetails>
     </Card>
   );
 }
@@ -89,7 +132,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
         {showPlan && (review.pieceId || review.trackName) && (
           <Link
             href={review.pieceId ? `/learn/s/${review.subjectId}/p/${review.pieceId}` : `/learn/s/${review.subjectId}`}
-            className={cn('text-small', linkVariants({ tone: 'quiet' }))}
+            className={cn('press-area text-small', linkVariants({ tone: 'quiet' }))}
           >
             {[review.trackName, review.pieceTitle].filter(Boolean).join(' · ')}
           </Link>

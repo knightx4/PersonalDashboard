@@ -272,6 +272,7 @@ export default async function NowPage({
         <ReviewList
           reviews={(reviews ?? []).slice(0, REVIEWS_IN_LEARN_NOW)}
           title="Due for review"
+          remember="learn.fold.reviews"
           description="Ideas you answered questions on or said you know. A right answer brings the next question later; a miss brings it back tomorrow."
           showPlan
         />

@@ -299,6 +299,7 @@ import {
 import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
+import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
@@ -5151,6 +5152,25 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Due for review on Learn now (note 9b011a39): the list folds under its
+     * heading, with the count on the closed line. Fixtures in
+     * notes-batch-surfaces.tsx. */
+    id: 'learn-review-list',
+    label: 'Now · Due for review',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface />,
+  },
+  {
+    /* The same list folded shut: one line, the chevron, Due for review and
+     * the count (note 9b011a39). */
+    id: 'learn-review-list-folded',
+    label: 'Now · Due for review, folded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface folded />,
+  },
+  {
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
@@ -5336,6 +5356,17 @@ export const SURFACES: readonly Surface[] = [
         <SearchBarSurface />
       </div>
     ),
+  },
+
+  {
+    /* The search box as the phone's dock button opens it (note 5f3ef44f):
+     * the switcher and the search in one, so before anything is typed it
+     * lists every workspace, Home first, the one you are in marked. */
+    id: 'shell-go-to',
+    label: 'Dock · Go to, before anything is typed',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => <GoToSurface />,
   },
 
   {

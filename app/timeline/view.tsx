@@ -1,10 +1,14 @@
 import Link, { linkVariants } from '@/components/ui/link';
+import { Card } from '@/components/ui/card';
+import { DashMark } from '@/components/ui/dash-mark';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/money';
+import { whenMonth } from '@/lib/core/when';
 import { moduleById } from '@/lib/modules';
-import type { MonthKey, TimelineMonth } from '@/lib/timeline/months';
+import { monthLabel, monthTotals, type MonthKey, type TimelineMonth } from '@/lib/timeline/months';
 import { weekLabel, type ShownObservation } from '@/lib/timeline/observations-view';
 import { eventRef, kindCount, type TimelineModule } from '@/lib/timeline/timeline';
 import { EventRow } from './event-row';
@@ -35,6 +39,8 @@ export type TimelineViewProps = {
    * already left out. Each shows at the top of the month its week begins in.
    */
   observations?: ShownObservation[];
+  /** The first and last month of the page, for the chart above the months. */
+  bounds?: { first: MonthKey; last: MonthKey };
 };
 
 export function timelineUrl({ module, to }: { module: TimelineModule | null; to: MonthKey | null }): string {
@@ -54,6 +60,7 @@ export function TimelineView({
   later,
   timezone,
   observations = [],
+  bounds,
 }: TimelineViewProps) {
   return (
     <>
@@ -66,6 +73,7 @@ export function TimelineView({
         />
       ) : (
         <div className="space-y-4">
+          {bounds && <MonthChart months={months} bounds={bounds} />}
           {months.map((month, index) => (
             <SectionFold
               key={month.key}
@@ -155,10 +163,18 @@ function MonthObservations({ observations, timezone }: { observations: ShownObse
   const weeks = [...new Set(observations.map((observation) => observation.week))];
   if (weeks.length === 0) return null;
   return (
-    <div className="mb-3 space-y-3">
+    // Dash's words on a panel of their own, apart from the rows under them
+    // and the page's ground (taste:no-bare-text): one panel for the month,
+    // a week to a section.
+    <Card padding="standard" className="mb-3 divide-y divide-border">
       {weeks.map((week) => (
-        <section key={week} aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}>
-          <h3 className="mb-1.5 text-small font-medium text-ink-muted">
+        <section
+          key={week}
+          aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}
+          className="py-3 first:pt-0 last:pb-0"
+        >
+          <h3 className="mb-1.5 flex items-center gap-1.5 text-small font-medium text-ink-muted">
+            <DashMark size="icon" tone="brand" decorative />
             {`Dash noticed · ${weekLabel(week).toLowerCase()}`}
           </h3>
           <ObservationList
@@ -167,8 +183,66 @@ function MonthObservations({ observations, timezone }: { observations: ShownObse
           />
         </section>
       ))}
-    </div>
+    </Card>
   );
+}
+
+/**
+ * How much happened in each month of the page, oldest on the left (note
+ * 4968526a), above the months themselves. Every month of the window has a
+ * slot, and an empty one is a stub on the baseline, so a quiet stretch reads
+ * as quiet rather than as missing. Each bar carries its count, so the reading
+ * never rests on height alone. Plain markup, like the rest of the page.
+ */
+function MonthChart({ months, bounds }: { months: TimelineMonth[]; bounds: { first: MonthKey; last: MonthKey } }) {
+  const totals = monthTotals(months, bounds);
+  const total = totals.reduce((sum, month) => sum + month.count, 0);
+  const label = totals
+    .map((month) => `${monthLabel(month.key)}: ${month.count}`)
+    .join(', ');
+  return (
+    <Card padding="standard" className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-ui font-semibold text-ink">By month</h2>
+        <p className="tabular text-small text-ink-muted">
+          {`${formatNumber(total)} ${total === 1 ? 'thing' : 'things'} from ${monthLabel(bounds.first)} to ${monthLabel(bounds.last)}`}
+        </p>
+      </div>
+      <figure role="img" aria-label={`Things that happened by month. ${label}.`} className="space-y-1">
+        <div aria-hidden className="flex h-32 items-end gap-1 border-b border-border-strong">
+          {totals.map((month) => (
+            <div key={month.key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              {month.count > 0 && <span className="tabular text-small text-ink-muted">{month.count}</span>}
+              {month.count === 0 ? (
+                /* ui-ok: hand-rolled-box -- an empty month's stub on the chart's baseline, as in DayBarChart, not a box */
+                <div className="h-1 w-full max-w-10 rounded-t-control border border-b-0 border-border-strong" />
+              ) : (
+                <div
+                  className="w-full max-w-10 rounded-t-control bg-accent"
+                  style={{ height: `max(2px, calc((100% - 1.25rem) * ${month.share}))` }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        <div aria-hidden className="flex gap-1">
+          {totals.map((month) => (
+            <span key={month.key} className="min-w-0 flex-1 text-center text-small text-ink-muted">
+              {/* Twelve three-letter months do not fit a phone's width, so
+                  there each is its initial. */}
+              <span className="sm:hidden">{shortMonth(month.key).charAt(0)}</span>
+              <span className="hidden sm:inline">{shortMonth(month.key)}</span>
+            </span>
+          ))}
+        </div>
+      </figure>
+    </Card>
+  );
+}
+
+/** "Oct", and "Jan" with no year: the heading names the years. */
+function shortMonth(key: MonthKey): string {
+  return whenMonth(key, { timeZone: 'UTC', month: 'short', year: false });
 }
 
 function moduleLabel(module: TimelineModule): string {

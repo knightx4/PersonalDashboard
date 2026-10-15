@@ -85,6 +85,7 @@ export function TimelineSurface() {
         later={null}
         timezone="America/New_York"
         observations={OBSERVATIONS}
+        bounds={{ first: '2025-10', last: '2026-09' }}
       />
     </PageColumn>
   );

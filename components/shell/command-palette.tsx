@@ -49,6 +49,7 @@ export function CommandPalette({
   theme,
   open,
   opensOn = 'everything',
+  opensWith = 'here',
   onOpenChange,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
@@ -66,6 +67,12 @@ export function CommandPalette({
    * so a narrowed box does not stay narrowed for the next one.
    */
   opensOn?: SearchScope;
+  /**
+   * What the box lists before anything is typed: what is here, or every
+   * workspace when the phone's dock button opened it (note 5f3ef44f). Read on
+   * each opening, like `opensOn`.
+   */
+  opensWith?: 'here' | 'workspaces';
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -77,6 +84,7 @@ export function CommandPalette({
    * for (plans #1363 and #1364).
    */
   const [scope, setScope] = useState<SearchScope>(opensOn);
+  const [shows, setShows] = useState(opensWith);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -89,6 +97,7 @@ export function CommandPalette({
     setWasOpen(open);
     if (open) {
       setScope(opensOn);
+      setShows(opensWith);
       setActive(0);
     }
   }
@@ -102,6 +111,7 @@ export function CommandPalette({
     theme,
     query,
     active: open,
+    emptyShows: shows,
   });
 
   /**
@@ -211,7 +221,16 @@ export function CommandPalette({
           <Kbd always>esc</Kbd>
         </div>
 
-        <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
+        {/* Opened on every workspace, the list takes the room it needs, up to
+            most of the screen, so the last workspace is never cut off at the
+            edge (note 5f3ef44f). */}
+        <div
+          ref={listRef}
+          className={cn(
+            'overflow-y-auto p-1',
+            shows === 'workspaces' && !query.trim() ? 'max-h-[70dvh]' : 'max-h-80',
+          )}
+        >
           {rows.length === 0 ? (
             <p className="px-3 py-6 text-center text-ui text-ink-muted">
               {/* Only once looking has finished. "Nothing matches" while a
