@@ -22,6 +22,7 @@ import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
 import { formatClock } from '@/lib/core/when';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const metadata = { title: 'Agenda' };
 
@@ -207,6 +208,8 @@ export default async function TodoPage() {
           </div>
         )}
       </QueueCleared>
+
+      <NowDashToday workspace="todo" className="mt-8" />
     </PageColumn>
   );
 }

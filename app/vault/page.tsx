@@ -18,6 +18,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,8 @@ export default async function VaultPage({
       {composing !== undefined && <NewVaultNote />}
 
       {!search && <QuickNoteRow waiting={waiting} writable={writable} />}
+
+      {!search && <NowDashToday workspace="vault" className="mb-5" />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

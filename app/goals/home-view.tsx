@@ -11,7 +11,6 @@ import { cn } from '@/lib/cn';
 import { authorLine, type FileListing } from '@/lib/files/files';
 import { daysAway } from '@/lib/goals/catch-up';
 import { formatInstant } from '@/lib/goals/dates';
-import type { DoneSince } from '@/lib/goals/done-since';
 import type { DashOffer } from '@/lib/goals/hand-off';
 import {
   areaButtons,
@@ -29,9 +28,10 @@ import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
 import { goalInboxCount } from '@/lib/goals/inbox';
 import type { RunQuestion } from '@/lib/core/run-questions';
 import { AskDash } from './ask-dash';
-import { DoneSinceList } from './done-since-list';
 import { FoldLine } from './fold-line';
 import { GoalLanes } from './goal-lanes';
+import { MainRail } from '@/components/patterns/main-rail';
+import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 
 /**
@@ -49,21 +49,20 @@ import { PageColumn } from '@/components/shell/page-width';
  *    lib/goals/home.ts).
  *    Everything else on you is on the Inbox tab (app/goals/inbox), which
  *    Do next links to with its count.
- * 4. Lines that open in place: what Dash is on, what Dash did since your
- *    last visit (done-since-list.tsx), the files Dash wrote that you have not
- *    opened (plan #1861), what you set aside, and Other goals.
+ * 4. Lines that open in place: what Dash is on, the files Dash wrote that
+ *    you have not opened (plan #1861), what you set aside, and Other goals.
+ * 5. What Dash did today, the fold every workspace's Now carries (plan
+ *    #1964.4), and the link to every run. It replaced the line for what Dash
+ *    did since your last visit.
  *
  * The day you come back after five or more days away (lib/goals/catch-up.ts),
- * Dash's card says how long you were gone and the line for what Dash did
- * starts open.
+ * Dash's card says how long you were gone and points at the runs.
  */
 
 export type HomeViewProps = {
   goals: HomeGoal[];
   /** Everything on you, ranked (todayRanked), each step with what Dash prepared for it. */
   onYou: TodayItem[];
-  /** What Dash did since your last visit; null when it could not be read. */
-  done: DoneSince | null;
   /** Dash's latest note on all the goals (goals.briefs), and when it was written. */
   brief: { body: string; when: string | null } | null;
   /** The account's zone, for the time of your last visit. */
@@ -90,12 +89,13 @@ export type HomeViewProps = {
   waitingRuns?: RunQuestion[];
   /** Dash's files you have not opened, newest first (plan #1861); null when they could not be read. */
   filesToRead?: FileListing[] | null;
+  /** What Dash did today in Goals, the fold every Now carries (plan #1964.4). */
+  dashToday?: React.ReactNode;
 };
 
 export function HomeView({
   goals,
   onYou,
-  done,
   brief,
   timeZone,
   todayOn,
@@ -109,15 +109,19 @@ export function HomeView({
   awayFrom = null,
   waitingRuns = [],
   filesToRead = [],
+  dashToday,
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
-      <EmptyState
-        icon={Flag}
-        title="No goals yet"
-        description="Add the goals you are working towards. Each gets a status every morning, and what to do about them shows here."
-        action={{ label: 'Add a goal', href: '/goals/all' }}
-      />
+      <PageColumn>
+        <PageHeader title="Goals" />
+        <EmptyState
+          icon={Flag}
+          title="No goals yet"
+          description="Add the goals you are working towards. Each gets a status every morning, and what to do about them shows here."
+          action={{ label: 'Add a goal', href: '/goals/all' }}
+        />
+      </PageColumn>
     );
   }
 
@@ -127,66 +131,74 @@ export function HomeView({
   const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
-    <PageColumn className="space-y-6">
-      <section aria-labelledby="briefing-heading">
-        <Card padding="standard" className="space-y-3">
-          <div className="flex items-center gap-2">
-            <DashMark size="sm" tone="brand" decorative />
-            <h2 id="briefing-heading" className="text-ui font-semibold text-ink">
-              Dash
-            </h2>
-            {brief?.when && <span className="text-small text-ink-muted">written {brief.when}</span>}
-          </div>
-          {away !== null && (
-            <p className="text-body text-ink">
-              Welcome back. You were away {away} days. What Dash did while you were gone is open
-              below Do next.
-            </p>
-          )}
-          {summary && <p className="text-body text-ink">{summary}</p>}
-          {note && (
-            <div className="max-w-prose space-y-1">
-              <FileBody markdown={note.lead} compact />
-              {note.rest && (
-                <Disclosure
-                  title="More"
-                  summaryClassName="text-small max-sm:min-h-11"
-                  bodyClassName="mt-1"
-                >
-                  <FileBody markdown={note.rest} compact />
-                </Disclosure>
+    <MainRail
+      main={
+        <div className="space-y-6">
+          <PageHeader title="Goals" />
+          <section aria-labelledby="briefing-heading">
+            <Card padding="standard" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <DashMark size="sm" tone="brand" decorative />
+                <h2 id="briefing-heading" className="text-ui font-semibold text-ink">
+                  Dash
+                </h2>
+                {brief?.when && (
+                  <span className="text-small text-ink-muted">written {brief.when}</span>
+                )}
+              </div>
+              {away !== null && (
+                <p className="text-body text-ink">
+                  Welcome back. You were away {away} days. What Dash did today is below, and every
+                  run it made while you were gone is on Every run.
+                </p>
               )}
-            </div>
-          )}
-          <AskDash
-            goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
-            areas={areas}
-            defaultAreaId={errandAreaDefault(errands, areas)}
+              {summary && <p className="text-body text-ink">{summary}</p>}
+              {note && (
+                <div className="max-w-prose space-y-1">
+                  <FileBody markdown={note.lead} compact />
+                  {note.rest && (
+                    <Disclosure
+                      title="More"
+                      summaryClassName="text-small max-sm:min-h-11"
+                      bodyClassName="mt-1"
+                    >
+                      <FileBody markdown={note.rest} compact />
+                    </Disclosure>
+                  )}
+                </div>
+              )}
+              <AskDash
+                goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
+                areas={areas}
+                defaultAreaId={errandAreaDefault(errands, areas)}
+              />
+            </Card>
+          </section>
+
+          <AreaButtons buttons={areaButtons(areas, goals)} />
+
+          <GoalLanes
+            doNext={doNext}
+            inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
+            otherGoals={otherGoals}
+            todayOn={todayOn}
+            preparable={preparable}
+            dash={dash}
+            laterOn={laterOn}
+            working={working}
+            offers={offers}
+            canRun={canRun}
+            since={<FilesLine files={filesToRead} timeZone={timeZone} />}
           />
-        </Card>
-      </section>
-
-      <AreaButtons buttons={areaButtons(areas, goals)} />
-
-      <GoalLanes
-        doNext={doNext}
-        inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
-        otherGoals={otherGoals}
-        todayOn={todayOn}
-        preparable={preparable}
-        dash={dash}
-        laterOn={laterOn}
-        working={working}
-        offers={offers}
-        canRun={canRun}
-        since={
-          <>
-            <SinceLine done={done} timeZone={timeZone} open={away !== null} />
-            <FilesLine files={filesToRead} timeZone={timeZone} />
-          </>
-        }
-      />
-    </PageColumn>
+        </div>
+      }
+      rail={
+        <>
+          {dashToday}
+          <EveryRunLink />
+        </>
+      }
+    />
   );
 }
 
@@ -225,58 +237,18 @@ function AreaButtons({ buttons }: { buttons: AreaButton[] }) {
   );
 }
 
-/** "3 results, 1 change", from what Dash did; null when there was nothing. */
-function doneCounts(done: DoneSince): string | null {
-  const count = (kind: string) => done.items.filter((item) => item.kind === kind).length;
-  const results = count('result');
-  const changes = count('change') + done.more;
-  const failed = count('failed');
-  const parts = [
-    results > 0 ? `${results} ${results === 1 ? 'result' : 'results'}` : null,
-    changes > 0 ? `${changes} ${changes === 1 ? 'change' : 'changes'}` : null,
-    failed > 0 ? `${failed} failed ${failed === 1 ? 'run' : 'runs'}` : null,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : null;
-}
-
 /**
- * What Dash did since your last visit, as one line that opens to the list
- * with Read and Undo, and the link to every run.
+ * The way to every run Dash made, under the fold of what it did today. Runs
+ * left the tab bar: an audit log, read from here when wanted, so the link
+ * stays on a day the fold is absent.
  */
-function SinceLine({
-  done,
-  timeZone,
-  open,
-}: {
-  done: DoneSince | null;
-  timeZone: string;
-  open: boolean;
-}) {
-  const counts = done ? doneCounts(done) : null;
+function EveryRunLink() {
   return (
-    <FoldLine
-      title="Since your last visit"
-      meta={done ? (counts ?? 'nothing new') : 'could not be read just now'}
-      defaultOpen={open}
-    >
-      {done && done.items.length > 0 ? (
-        <DoneSinceList done={done} />
-      ) : (
-        <p className="px-1 text-small text-ink-muted">
-          {done ? 'Nothing new since your last visit.' : 'This could not be read just now.'}
-        </p>
-      )}
-      <p className="flex flex-wrap items-baseline justify-between gap-x-3 px-1 text-small text-ink-muted">
-        {done && <span>What Dash did since {formatInstant(done.since, timeZone)}</span>}
-        {/* Runs left the tab bar: an audit log, read from here when wanted. */}
-        <Link
-          href="/goals/runs"
-          className={cn(PRESS_AREA, linkVariants())}
-        >
-          Every run
-        </Link>
-      </p>
-    </FoldLine>
+    <p className="px-1 text-small text-ink-muted">
+      <Link href="/goals/runs" className={cn(PRESS_AREA, linkVariants())}>
+        Every run
+      </Link>
+    </p>
   );
 }
 
@@ -304,10 +276,7 @@ function FilesLine({ files, timeZone }: { files: FileListing[] | null; timeZone:
         }))}
       />
       <p className="px-1 text-small">
-        <Link
-          href="/goals/files"
-          className={cn(PRESS_AREA, linkVariants())}
-        >
+        <Link href="/goals/files" className={cn(PRESS_AREA, linkVariants())}>
           {files.length > shown.length ? `All ${files.length} on Files` : 'All files'}
         </Link>
       </p>

@@ -272,7 +272,7 @@ import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
-import { DashTodaySurface } from './dash-today-surfaces';
+import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
@@ -5550,6 +5550,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'wide',
     render: () => <DashTodaySurface />,
+  },
+  {
+    /* A workspace's Now carries the same fold, filtered to that workspace
+     * (plan #1964.4). Fixtures in dash-today-surfaces.tsx. */
+    id: 'now-dash-today',
+    label: 'Workspace Now · What Dash did today',
+    module: 'todo',
+    width: 'wide',
+    render: () => <NowDashTodaySurface />,
   },
   {
     /* The "What did you do?" box (plan #1740): Home's Done today with a line

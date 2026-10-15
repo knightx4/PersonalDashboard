@@ -215,6 +215,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'home-inbox': ['/home/inbox'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
+  'now-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
   'goals-suggestions': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],

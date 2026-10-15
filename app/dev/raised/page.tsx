@@ -27,6 +27,7 @@ import { AskBox } from './ask-box';
 import { NowStrip } from './now-strip';
 import { InboxRedirect } from './inbox-redirect';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const metadata = { title: 'Home' };
 
@@ -185,6 +186,7 @@ export default async function DevRaisedPage() {
       )}
       <DigestPanel digest={digest} />
       <CheckBacksPanel rows={comingBack} now={now} />
+      <NowDashToday workspace="dev" className="" />
       <ConversationsView conversations={conversations} titles={titles} now={now} />
     </PageColumn>
   );

@@ -93,6 +93,19 @@ describe('dayBounds', () => {
 });
 
 describe('loadDashToday', () => {
+  it('keeps one workspace’s changes when asked for it, for that workspace’s Now', async () => {
+    const { deps } = setup([action(1), ASK, CLOSE]);
+    const groups = await loadDashToday(deps.core, {
+      userId: ME,
+      today: TODAY,
+      timezone: ZONE,
+      workspace: 'todo',
+    });
+    expect(groups.map((group) => group.workspace)).toEqual(['todo']);
+    expect(groups[0].entries.map((entry) => entry.sentence)).toContain('Added the todo Buy stamps.');
+    expect(groups[0].entries.every((entry) => entry.workspace === 'todo')).toBe(true);
+  });
+
   it('groups today’s changes by workspace, newest group and newest row first', async () => {
     const { deps } = setup([action(1), ASK, CLOSE]);
     const groups = await load(deps);

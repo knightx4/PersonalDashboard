@@ -32,6 +32,7 @@ import { loadOpenBriefs } from '@/lib/learn/briefs/load';
 import type { BriefSummary } from '@/lib/learn/briefs/view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
@@ -191,6 +192,8 @@ export default async function NowPage({
       )}
 
       {strip}
+
+      <NowDashToday workspace="learn" className="mb-6" />
 
       <BriefsList briefs={briefs} />
 
