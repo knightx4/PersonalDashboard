@@ -84,9 +84,6 @@
   "news-quick-essay": {
     "targets": 1
   },
-  "news-quick-in-shell": {
-    "targets": 5
-  },
   "news-quick-page": {
     "targets": 5
   },
