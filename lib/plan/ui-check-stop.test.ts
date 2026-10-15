@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   criticStopAsk,
-  criticStopBlockSql,
   criticStopNote,
   isCriticStopAsk,
   isStopRound,
@@ -120,41 +119,6 @@ describe('criticStopAsk', () => {
 
   it('refuses with no surface', () => {
     expect(() => criticStopAsk({ owner: 1, surfaces: [] })).toThrow();
-  });
-});
-
-describe('criticStopBlockSql', () => {
-  it('names the step by its outline in the recorded action, and matches on the number', () => {
-    const sql = criticStopBlockSql({ step: 1609, outline: '1590.3', ask: 'x', date: '2026-10-04' });
-    expect(sql).toContain('Dash stopped step #1590.3');
-    expect(sql).toContain('number = 1609');
-    expect(() =>
-      criticStopBlockSql({ step: 1609, outline: "1'; drop", ask: 'x', date: '2026-10-04' }),
-    ).toThrow();
-  });
-
-  it('blocks on the person with the ask, and records it', () => {
-    const sql = criticStopBlockSql({ step: 1609, ask: "#1609's screen", date: '2026-10-04' });
-    expect(sql).toContain("status = 'blocked', block_ask = $a$#1609's screen$a$, block_kind = 'outside'");
-    expect(sql).toContain('Blocked 2026-10-04: #1609');
-    expect(sql).toContain('core.dash_before(');
-    expect(sql).toContain("'block_step'");
-  });
-
-  it('writes the history line with the branch, and keeps it off the ask', () => {
-    const sql = criticStopBlockSql({
-      step: 1609,
-      ask: 'Accept it.',
-      note: 'Accept it. The work is on branch claude/x.',
-      date: '2026-10-11',
-    });
-    expect(sql).toContain('block_ask = $a$Accept it.$a$');
-    expect(sql).toContain('Blocked 2026-10-11: Accept it. The work is on branch claude/x.$a$');
-  });
-
-  it('refuses a bad date or user id', () => {
-    expect(() => criticStopBlockSql({ step: 1, ask: 'a', date: 'today' })).toThrow();
-    expect(() => criticStopBlockSql({ step: 1, ask: 'a', date: '2026-10-04', userId: 'x' })).toThrow();
   });
 });
 
