@@ -37,6 +37,9 @@ export TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgresql://postgres@localhost:5
 export NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
 export NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}"
 export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+# The Typecheck lane checks types before its build, so the build skips its own
+# check (next.config.ts), as CI's does.
+export SKIP_BUILD_TYPECHECK=1
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
@@ -86,9 +89,7 @@ step "Apply migrations" scripts/db-reset.sh
 rm -rf .next/types
 
 start=$SECONDS
-# The Typecheck before it has checked types, so the build skips its own check
-# (next.config.ts), as CI's does.
-lane types "Typecheck" npm run -s typecheck -- "Build" env SKIP_BUILD_TYPECHECK=1 npm run -s build --"Phone checks" npm run -s check:phone &
+lane types "Typecheck" npm run -s typecheck -- "Build" npm run -s build -- "Phone checks" npm run -s check:phone &
 types=$!
 lane lint "Lint" npm run -s lint -- "Contrast" npm run -s check:contrast -- "UI laws" npm run -s check:ui -- "Spec counts" npm run -s check:specs &
 lint=$!
