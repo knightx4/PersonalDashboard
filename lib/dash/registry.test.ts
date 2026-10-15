@@ -6,6 +6,7 @@ import { ASK_DASH_TOOLS, DASH_TOOLS, captureDashTools, dashTool, dashToolsOf, th
 import { CAPTURE_TOOL_NAMES } from './capture-tools';
 import { DEV_THREAD_TABLES, GOAL_THREAD_TABLE, ROLE_THREAD_TABLE, THREAD_TOOL_NAMES } from './thread-tools';
 import { WRITE_TOOL_NAMES } from './writes';
+import { PAID_TOOLS } from './paid-tools';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
@@ -18,6 +19,8 @@ import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
+const PAID_NAMES = PAID_TOOLS.map((tool) => tool.name);
+
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
 describe('DASH_TOOLS', () => {
   it('lists every lookup, the writes, the thread tools, the capture moves, the watch proposal and the hand-off, in the order sent', () => {
@@ -28,8 +31,11 @@ describe('DASH_TOOLS', () => {
       ...CAPTURE_TOOL_NAMES,
       'propose_watch',
       'propose_build',
+      ...PAID_NAMES,
       HAND_OFF_TOOL_NAME,
     ]);
+    // A paid press is queued for an approval (plan #2228.1).
+    expect(dashToolsOf('paid').map((t) => t.name)).toEqual(['write_year_review']);
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
     // The other three proposals became writes (plan #1440); a watch acts outside
     // the app, and a build starts a session that cannot be undone (plan #2106.1).
@@ -98,15 +104,18 @@ describe('DASH_TOOLS', () => {
       ...WRITE_TOOL_NAMES,
       'propose_watch',
       'propose_build',
+      ...PAID_NAMES,
       HAND_OFF_TOOL_NAME,
     ]);
   });
 
-  it('offers each thread the lookups, the writes and its own row\'s tools, without the watch, the hand-off or the chart', () => {
+  it('offers each thread the lookups, the writes, the paid tools and its own row\'s tools, without the watch, the hand-off or the chart', () => {
     const own = (table: string) =>
       threadDashTools(table)
         .map((t) => t.name)
-        .filter((name) => !ASK_TOOL_NAMES.includes(name as never) && !WRITE_TOOL_NAMES.includes(name));
+        .filter(
+          (name) => !ASK_TOOL_NAMES.includes(name as never) && !WRITE_TOOL_NAMES.includes(name) && !PAID_NAMES.includes(name),
+        );
     const lookups = ASK_TOOL_NAMES.filter((name) => name !== 'show_chart');
     for (const table of [...Object.values(DEV_THREAD_TABLES), GOAL_THREAD_TABLE, ROLE_THREAD_TABLE]) {
       const names = threadDashTools(table).map((t) => t.name);
@@ -115,6 +124,7 @@ describe('DASH_TOOLS', () => {
       expect(names).not.toContain('propose_watch');
       expect(names).not.toContain('propose_build');
       expect(names).not.toContain(HAND_OFF_TOOL_NAME);
+      for (const name of PAID_NAMES) expect(names).toContain(name);
     }
     expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.raise)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'send_step', 'pass_to_session']);

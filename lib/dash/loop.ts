@@ -8,7 +8,7 @@ import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
-import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
+import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
 import { whenDate, whenWeekday } from '@/lib/core/when';
 
 /**
@@ -348,6 +348,16 @@ export type DashProposer = (name: string, input: unknown, seen: DashSeen) => Pro
  */
 export type DashWriter = (tool: DashWriteTool, input: unknown, seen: DashSeen) => Promise<AskToolResult>;
 
+/**
+ * Queues one paid press for an approval (plan #2228.1). Never throws. The
+ * surface checks and prices it (queuePaidPress in lib/dash/paid.ts), keeps
+ * it as a proposed row, and returns what to tell the model; nothing runs.
+ */
+export type DashQueuer = (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<AskToolResult>;
+
+/** Said to the model when a paid tool is called where nothing can be queued. */
+const NO_QUEUE = 'Nothing that costs money can be queued here. Answer in words, and say they can press the button on its page.';
+
 /** Said to the model when a proposal is made where none can be kept. */
 const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
 /** Said to the model when a write is called where none can be made. */
@@ -668,6 +678,8 @@ export type DashRun = {
   handOff?: (input: unknown, seen: DashSeen, tool: DashHandoffTool) => Promise<AskToolResult>;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /** Absent: every paid tool is refused, and nothing is queued (plan #2228.1). */
+  queue?: DashQueuer;
   /**
    * Marks the comment being answered as seen, in place of a reply (plan
    * #1649), or says why it will not. Absent, or on any surface but a
@@ -808,6 +820,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       if (!input.write) return Promise.resolve({ ok: false, error: NO_WRITES });
       return input.write(tool, args, seenOrShown);
     }
+    if (tool?.kind === 'paid') {
+      if (!input.queue) return Promise.resolve({ ok: false, error: NO_QUEUE });
+      return input.queue(tool, args, seenOrShown);
+    }
     if (tool?.kind === 'proposal' || (!tool && isProposal(name))) {
       if (!input.propose) return Promise.resolve({ ok: false, error: NO_PROPOSALS });
       return input.propose(name, args, seenByLookup);
@@ -895,8 +911,12 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       // Writes made in the same round as the answer are made first (plan
       // #1478): the answer says they are done, and capture files every move
       // and its answer in one round. Lookups beside an answer are not run,
-      // since nothing would read what they return.
-      const writes = uses.filter((use) => use !== answered && dashTool(use.name, voice.tools)?.kind === 'write');
+      // since nothing would read what they return. A paid press queued beside
+      // the answer is kept the same way (plan #2228.1).
+      const writes = uses.filter((use) => {
+        const kind = use === answered ? null : dashTool(use.name, voice.tools)?.kind;
+        return kind === 'write' || kind === 'paid';
+      });
       const made = await Promise.all(
         writes.map(async (use, i): Promise<AskToolResult> => {
           if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };

@@ -7,7 +7,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { currentYear, parseYear } from '@/lib/timeline/year-review';
 import { yearReviewPorts } from '@/lib/timeline/year-review-ports';
-import { writeYearReviewFor, type YearReviewResult } from '@/lib/timeline/year-review-run';
+import { writeYearReviewFor, yearReviewRefusal, type YearReviewResult } from '@/lib/timeline/year-review-run';
 
 /**
  * Mark one of the week's observations not useful (plan #1120). It is hidden
@@ -66,25 +66,8 @@ export async function writeYearReview(_previous: WriteYearState, form: FormData)
     return { status: 'failed', message: 'Dash could not write the review. Try again.' };
   }
 
-  switch (result.status) {
-    case 'written':
-      revalidatePath(`/timeline/year/${year}`);
-      return { status: 'written' };
-    case 'already-complete':
-      return { status: 'failed', message: `The review of ${year} was written after the year ended, so it stays as it is.` };
-    case 'too-few':
-      return {
-        status: 'failed',
-        message: `${year} has ${result.events === 1 ? '1 event' : `${result.events} events`} on the timeline, too few to write about.`,
-      };
-    case 'no-model':
-      return { status: 'failed', message: 'This deployment has no Anthropic API key set, so Dash cannot write.' };
-    case 'nothing-kept':
-      return {
-        status: 'failed',
-        message: 'Nothing Dash wrote could be checked against the numbers on this page, so none of it was kept. Try again.',
-      };
-    case 'not-yet':
-      return { status: 'failed', message: `${year} has not started.` };
-  }
+  const refusal = yearReviewRefusal(result, year);
+  if (refusal) return { status: 'failed', message: refusal };
+  revalidatePath(`/timeline/year/${year}`);
+  return { status: 'written' };
 }
