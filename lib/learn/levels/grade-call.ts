@@ -23,6 +23,7 @@ import type { GraderCell, RawVerdict } from '@/lib/learn/levels/grade';
  */
 
 export const LEVEL_GRADE_MODEL = MODELS.learnLevelGrade;
+export const LEVEL_GRADE_SECOND_MODEL = MODELS.learnLevelGradeSecond;
 const TOOL = 'report_grades';
 
 const SYSTEM = `You grade one written answer against several levels of understanding.
@@ -58,6 +59,7 @@ const gradeSchema = z.object({
       cell: z.string(),
       verdict: z.enum(['met', 'not_met', 'not_touched']),
       quote: z.string().nullish(),
+      reason: z.string().nullish(),
     }),
   ),
 });
@@ -110,13 +112,16 @@ export async function gradeCellAnswer(input: {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** The model to grade with; the first grader's unless set. */
+  model?: string;
 }): Promise<LevelGradeResult> {
+  const model = input.model ?? LEVEL_GRADE_MODEL;
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
   try {
     response = await client.messages.create({
-      model: LEVEL_GRADE_MODEL,
+      model,
       max_tokens: 400 + 200 * input.cells.length,
       system: SYSTEM,
       tools: [
@@ -137,6 +142,7 @@ export async function gradeCellAnswer(input: {
                       type: 'string',
                       description: 'On a met only: the words of the answer that meet it, copied exactly.',
                     },
+                    reason: { type: 'string', description: 'One short sentence on why this verdict.' },
                   },
                   required: ['cell', 'verdict'],
                 },
@@ -146,14 +152,14 @@ export async function gradeCellAnswer(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL, LEVEL_GRADE_MODEL),
+      tool_choice: forceTool(TOOL, model),
       messages: [{ role: 'user', content: gradePrompt(input) }],
     });
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : 'Grading failed.' };
   }
 
-  input.onSpend?.({ model: LEVEL_GRADE_MODEL, usage: usageFrom(response.usage) });
+  input.onSpend?.({ model, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
@@ -163,6 +169,6 @@ export async function gradeCellAnswer(input: {
 
   return {
     ok: true,
-    verdicts: parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null })),
+    verdicts: parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null })),
   };
 }

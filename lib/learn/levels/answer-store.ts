@@ -9,10 +9,11 @@ import {
   linkReviewsFor,
   whatMoved,
   type GradeEvidence,
+  type RawVerdict,
   type Moved,
 } from '@/lib/learn/levels/grade';
 import { writeLevelCase } from '@/lib/learn/levels/case-call';
-import { gradeCellAnswer, LEVEL_GRADE_MODEL } from '@/lib/learn/levels/grade-call';
+import { gradeCellAnswer, LEVEL_GRADE_MODEL, LEVEL_GRADE_SECOND_MODEL } from '@/lib/learn/levels/grade-call';
 import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { questionFormat, readCells } from '@/lib/learn/levels/model';
 
@@ -172,14 +173,20 @@ export async function answerCell(
   const cells = allCells && question.expected ? allCells.slice(0, 1) : allCells;
   if (!cells) return { ok: false, error: 'That level is on a topic that is not approved.' };
 
-  const grade = await gradeCellAnswer({
+  const gradeInput = {
     cells,
     question: question.question,
     expected: question.expected,
     answer: response,
     anthropicApiKey: input.anthropicApiKey,
     onSpend: input.onSpend,
-  });
+  };
+  // Two graders read every answer; only the first writes evidence. A second
+  // that fails leaves its columns null and costs the person nothing.
+  const [grade, second] = await Promise.all([
+    gradeCellAnswer(gradeInput),
+    gradeCellAnswer({ ...gradeInput, model: LEVEL_GRADE_SECOND_MODEL }),
+  ]);
   if (!grade.ok) {
     console.error('[learn levels] grading', grade.detail);
     return { ok: false, error: 'Dash could not grade this answer just now.' };
@@ -196,9 +203,9 @@ export async function answerCell(
       response,
       answered_at: now,
       model: LEVEL_GRADE_MODEL,
-      grade: grade.verdicts
-        .filter((v) => keyToCell.has(v.cell))
-        .map((v) => ({ cell_id: keyToCell.get(v.cell), verdict: v.verdict, quote: v.quote ?? null })),
+      grade: storedGrade(grade.verdicts, keyToCell),
+      grade_second: second.ok ? storedGrade(second.verdicts, keyToCell) : null,
+      model_second: second.ok ? LEVEL_GRADE_SECOND_MODEL : null,
     })
     .eq('user_id', userId)
     .eq('id', question.id)
@@ -266,4 +273,16 @@ export async function answerCell(
     ok: true,
     moved: whatMoved({ map, askedCellId: question.cell_id, before, after, written: write, reviews }),
   };
+}
+
+/** A grader's verdicts as kept on the row: by cell id, with quote and reason. */
+function storedGrade(verdicts: readonly RawVerdict[], keyToCell: ReadonlyMap<string, string>) {
+  return verdicts
+    .filter((v) => keyToCell.has(v.cell))
+    .map((v) => ({
+      cell_id: keyToCell.get(v.cell),
+      verdict: v.verdict,
+      quote: v.quote ?? null,
+      reason: v.reason ?? null,
+    }));
 }
