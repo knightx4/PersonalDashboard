@@ -33,6 +33,7 @@ export const SOURCE_IDS = [
   'drafts',
   'applications',
   'job_waiting',
+  'job_nudges',
   'plan_steps',
   'raised',
   'threads',

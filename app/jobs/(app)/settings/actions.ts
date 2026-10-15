@@ -79,6 +79,21 @@ export async function saveProfileField(
 }
 
 /**
+ * Whether the Jobs Inbox lists the nudges (plan #1937.14): a round to write
+ * up and a round with no prep. Saved on the press.
+ */
+// latency: optimistic -- the switch keeps its place, and a refused save puts it back with a toast
+export async function saveShowNudges(value: boolean): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from('profiles').update({ show_nudges: value }).eq('id', user.id);
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/settings');
+  revalidatePath('/jobs/inbox');
+  return {};
+}
+
+/**
  * Disconnect an inbox, revoking the Google grant on the way out.
  *
  * Deleting our row without revoking leaves a live grant on the user's Google

@@ -59,7 +59,7 @@ export default async function JobsSettingsPage({
       supabase
         .from('profiles')
         .select(
-          'search_started_on, timezone, ghost_threshold_days, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
+          'search_started_on, timezone, ghost_threshold_days, show_nudges, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
         )
         .eq('id', user.id)
         .single(),
@@ -121,6 +121,7 @@ export default async function JobsSettingsPage({
       profile={{
         searchStartedOn: (profile?.search_started_on as string) ?? '',
         ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
+        showNudges: profile?.show_nudges === true,
         preferences: readPreferences(profile as Record<string, unknown> | null),
         minFitScore: readMinFitScore(profile?.min_fit_score),
       }}

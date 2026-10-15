@@ -1006,6 +1006,7 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
+    showNudges: false,
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -1319,31 +1320,6 @@ const todayBoard: TodayBoard = {
       occurredAt: '2026-08-28T14:20:00.000Z',
     },
   ],
-  reminders: [
-    {
-      id: 'tr1',
-      kind: 'follow_up',
-      body: 'No reply to the take-home submission in nine days.',
-      dueAt: '2026-09-09T00:00:00.000Z',
-      applicationId: 'p4',
-      roleId: 'role-p4',
-      companyName: 'Kestrel Bank',
-      roleTitle: 'Platform Engineer',
-      followUpHref: 'https://mail.google.com/mail/?view=cm&to=&su=Following%20up',
-    },
-    {
-      id: 'tr2',
-      kind: 'manual',
-      body: 'Record a video interview',
-      dueAt: '2026-09-12T00:00:00.000Z',
-      applicationId: 'p1',
-      roleId: 'role-p1',
-      companyName: 'Larkspur Vane',
-      roleTitle: 'Quantitative Developer, Systematic Strategies',
-      followUpHref: null,
-    },
-  ],
-  debriefs: [],
 };
 
 /**
