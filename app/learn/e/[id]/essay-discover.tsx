@@ -205,7 +205,7 @@ function ReadbackNote({
         onBlur={(event) => {
           if (event.currentTarget.value.trim() !== reply.trim()) onReply(event.currentTarget.value);
         }}
-        className="-mx-1 text-ink"
+        className="min-h-11 lg:min-h-0 -mx-1 text-ink"
       />
     </li>
   );

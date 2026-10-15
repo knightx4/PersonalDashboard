@@ -232,7 +232,7 @@ function OutlineRow({
                 editedPoint(now, point.id, { role }),
               );
             }}
-            className="w-auto"
+            className="min-h-11 w-auto lg:min-h-0"
           >
             {ROLES.map((role) => (
               <option key={role} value={role}>
@@ -259,7 +259,7 @@ function OutlineRow({
               );
             }
           }}
-          className="-mx-1 mt-1 text-ui text-ink"
+          className="min-h-11 lg:min-h-0 -mx-1 mt-1 text-ui text-ink"
         />
         {point.guide && (
           <p className="text-small text-ink-muted">

@@ -114,7 +114,7 @@ export function PlanStage({
                 api.change({ kind: 'thesis', text }, (now) => withThesis(now, text));
               }
             }}
-            className="-mx-1 text-body text-ink"
+            className="min-h-11 lg:min-h-0 -mx-1 text-body text-ink"
           />
         </CardSection>
       </Card>
@@ -329,7 +329,7 @@ function PointRow({
               );
             }
           }}
-          className="-mx-1 text-ui text-ink"
+          className="min-h-11 lg:min-h-0 -mx-1 text-ui text-ink"
         />
         {point.guide && (
           <p className="text-small text-ink-muted">

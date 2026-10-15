@@ -571,7 +571,7 @@ function TakeLine({
         onBlur={() => {
           if (text.trim() !== value.trim()) onSave(text);
         }}
-        className="-mx-1 text-ink"
+        className="min-h-11 lg:min-h-0 -mx-1 text-ink"
       />
       {text.trim() && (
         <div>
