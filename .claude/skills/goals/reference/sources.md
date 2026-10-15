@@ -145,7 +145,7 @@ Topics they study, each with what it covers and how deep it goes, on a ladder of
 - Search: `name`, `scope`
 - Name a row by `name`; link it by `id`
 - Opens at `/learn/topics/<id>`
-- A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.
+- A topic with no user_id is on the shared map that every account reads; one with theirs is personal to them. Their evidence (cell_evidence) is always theirs. A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.
 
 ### `learn.lenses` (Learn)
 

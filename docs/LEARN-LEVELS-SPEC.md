@@ -52,8 +52,10 @@ Taken with the person on 9 October 2026:
 
 A topic is something you would name when saying what you know: Return, Beta,
 CAPM, DCF, WACC, Braess's paradox, single-stair buildings. There is one map of
-topics per account. A subject does not contain topics; it is a view over them
-(see "Lenses" below).
+topics, shared by every account, as the catalogue and the frame are (decided on
+plan #2138.9). What you know about a topic is yours; the topic is not. A topic
+written for one account alone is still possible and is marked personal. A
+subject does not contain topics; it is a view over them (see "Lenses" below).
 
 A topic carries:
 
@@ -65,6 +67,12 @@ A topic carries:
   return is" has nothing at level 10. CAPM does. Levels above the ceiling do
   not exist for that topic, and nothing counts them.
 - Ten `cells`, one per level up to the ceiling, described next.
+- A `source`, saying where it came from (a syllabus, a textbook, an exam
+  body's outcome list, the requirement lines of a role), and a
+  `canonicality`: canonical, practitioner, emerging or personal. Cells and
+  links carry the same two.
+- Optionally the frame topic it refines (`refines_article_id`, a row of
+  `area_check_articles` from LEARN-AREAS-SPEC).
 
 Topics form no hierarchy. There is no parent topic and no category tree, for
 the reason the map spec gives: a stored hierarchy has to be maintained and
@@ -420,22 +428,59 @@ so it waits for the person's go-ahead.
 
 ## Tables
 
-In `learn`, with RLS on every table and composite foreign keys carrying
-`user_id`, as in the rest of the schema.
+In `learn`, with RLS on every table.
+
+The territory is `topics`, `topic_cells` and `cell_links`. Their `user_id` may
+be null, and null means shared: every signed-in account reads a shared row,
+and only the service role writes one. A row with an owner is that account's,
+for reading and writing. A row keeps the owner it was written with.
+
+Everything else is per account, with `user_id` not null, and may point at a
+shared row of the territory or at a row of its own account. A shared row
+points only at shared rows, and a cell always has its topic's owner. Keys into
+the territory are on `id` alone, and a trigger (`territory_owner_check`) keeps
+that rule; other keys stay composite with `user_id`, as in the rest of the
+schema.
 
 | table | holds | source for Goals? |
 | --- | --- | --- |
-| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved | yes: what the person studies |
-| `topic_cells` | one row per topic and level: the descriptor, when it was rewritten by hand | no: part of the topic |
-| `cell_links` | requiring cell → required cell, the sentence why, acyclic | no: structure |
+| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved, source, canonicality, the frame topic it refines; shared or one account's | yes: what the person studies |
+| `topic_cells` | one row per topic and level: the descriptor, its version, when it was rewritten by hand, source, canonicality | no: part of the topic |
+| `cell_links` | requiring cell → required cell, the sentence why, source, canonicality, acyclic | no: structure |
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |
-| `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date | yes: what the person did |
+| `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date, the cell version it was given against | yes: what the person did |
 | `cell_questions` | a question asked about one cell, its format, the answer and every verdict the grader returned | no: read through `cell_evidence` |
 | `lenses` | a named set of targets, and whether it was a subject or a goal | yes: what the person wants |
 | `lens_targets` | lens, topic, target level | no: part of the lens |
 | `link_reviews` | a link in question, the two answers that put it there, and what the person decided | no: bookkeeping |
 
+**Versions.** A cell's `version` starts at 1 and rises by one each time its
+descriptor is reworded. Each evidence row records the version it was given
+against, stamped from the cell when the row is written, so evidence given
+against an earlier wording reads as such.
+
+**Source and canonicality** are null until a draft cites a row. The drafting
+call fills them, and a row with no source is shown as uncited.
+
+**The cycle check** walks shared links and the writer's own links, which is
+the map that writer reads.
+
 Statuses, levels, the fringe and lens progress are computed and never stored.
+
+### How counts are reported
+
+Anything above a cell (a topic, a lens, a frame topic with the topics that
+refine it) is reported as two numbers, never folded into one:
+
+- **breadth**: how many of its children are touched, out of how many. A
+  topic's children are its cells; a group's are its topics.
+- **depth**: the best level beneath it.
+
+Both are given per kind of evidence: tested (shown by a graded answer),
+inferred (implied by a cell that was) and declared. Every count keeps the
+three apart, and lens progress returns held-tested, held-inferred and declared
+separately. `topicReach`, `groupReach` and `lensProgress` in
+`lib/learn/levels/model.ts` compute them.
 
 ## Screens
 
@@ -512,9 +557,6 @@ Each slice is usable before the next starts.
   If the link reviews show distant implications failing more often than
   near ones, implication should stop after two links. That needs real data.
 - **Writing the level-10 objection.** Carried over from the graph spec.
-- **Topic definitions shared between accounts.** Descriptors for DCF are not
-  personal, and the catalogue already carries no `user_id`. Topics stay per
-  account until a second account exists to share with.
 - **Life goals as lenses.** A goal on `/goals` that needs knowledge, such as
   a job move into FP&A, could name a lens. Whether the goals routine should
   draft that lens itself is for the goals spec to decide.
