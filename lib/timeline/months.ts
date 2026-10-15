@@ -108,6 +108,25 @@ export function groupByMonth(
     }));
 }
 
+/**
+ * How many events each month of the window holds, oldest first, with the
+ * empty months kept at zero, for the chart above the listings (note
+ * 4968526a). `share` is the month's count as a part of the busiest month's.
+ */
+export function monthTotals(
+  months: readonly TimelineMonth[],
+  bounds: { first: MonthKey; last: MonthKey },
+): { key: MonthKey; count: number; share: number }[] {
+  const counts = new Map(months.map((month) => [month.key, month.events.length]));
+  const keys: MonthKey[] = [];
+  for (let key = bounds.first; key <= bounds.last; key = shiftMonth(key, 1)) keys.push(key);
+  const high = Math.max(0, ...keys.map((key) => counts.get(key) ?? 0));
+  return keys.map((key) => {
+    const count = counts.get(key) ?? 0;
+    return { key, count, share: high === 0 ? 0 : count / high };
+  });
+}
+
 /** How many of each kind, in TIMELINE_KINDS order, leaving out the zeros. */
 export function countKinds(events: readonly TimelineEvent[]): { kind: TimelineKind; count: number }[] {
   const tally = new Map<TimelineKind, number>();
