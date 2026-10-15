@@ -8,6 +8,8 @@
  * three words" or "at least 100 words" is not taken for one.
  */
 
+import { formatNumber } from '@/lib/money';
+
 export type LimitUnit = 'words' | 'characters';
 
 export type AnswerLimit = {
@@ -68,5 +70,5 @@ export function answerLimit(wordLimit: number | null | undefined, question: stri
 
 /** "200 words" / "1,000 characters", for a prompt or a label. */
 export function describeLimit(limit: AnswerLimit): string {
-  return `${limit.count.toLocaleString('en-US')} ${limit.unit}`;
+  return `${formatNumber(limit.count)} ${limit.unit}`;
 }

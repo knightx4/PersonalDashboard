@@ -4,6 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
+import { draftAndSaveCoverLetter } from '@/lib/jobs/drafting/draft-cover-letter';
+import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
+import { saveReplies } from '@/lib/jobs/drafting/store';
 
 /**
  * Notes attach to exactly one parent, enforced by a check constraint in the
@@ -108,6 +114,68 @@ export async function saveCoverLetter(input: {
   if (error) return { error: error.message };
 
   revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  return { error: null };
+}
+
+const repliesSchema = z.record(z.string().min(1), z.string().max(4_000, 'A reply is at most 4,000 characters.'));
+
+const draftLetterSchema = z.object({
+  applicationId: z.string().uuid(),
+  replies: repliesSchema.optional(),
+});
+
+/**
+ * Dash drafts a cover letter from everything on file for the application
+ * (plan #2135.1), using any replies to its earlier questions, which are
+ * saved first. The letter is kept in application_drafts beside the editor;
+ * nothing reaches applications.cover_letter until the person inserts it and
+ * saves with saveCoverLetter.
+ */
+// latency: pending
+export async function draftCoverLetter(input: {
+  applicationId: string;
+  /** Replies to earlier asks, by ask id. */
+  replies?: Record<string, string>;
+}): Promise<{ draft: CoverLetterDraftView | null; error: string | null }> {
+  const parsed = draftLetterSchema.safeParse(input);
+  if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
+
+  const user = await requireUser();
+  const [jobs, core] = await Promise.all([createClient(), createCoreClient()]);
+
+  const spend: SpendReport[] = [];
+  const result = await draftAndSaveCoverLetter(
+    { jobs, core, apiKey, onSpend: (report) => spend.push(report) },
+    { userId: user.id, applicationId: parsed.data.applicationId, replies: parsed.data.replies },
+  );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-cover-letter' }, spend);
+
+  if (!result.ok) return { draft: null, error: result.error };
+  return { draft: result.draft, error: null };
+}
+
+/**
+ * Keeps the person's replies to Dash's questions about the letter without
+ * redrafting, so what they typed survives a reload. An empty reply clears it.
+ */
+// latency: pending
+export async function saveCoverLetterReplies(input: {
+  applicationId: string;
+  replies: Record<string, string>;
+}): Promise<{ error: string | null }> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), replies: repliesSchema })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireUser();
+  const supabase = await createClient();
+  const { saved, error } = await saveReplies(supabase, parsed.data.applicationId, 'cover_letter', parsed.data.replies);
+  if (error) return { error };
+  if (!saved) return { error: 'There is no drafted letter to reply to.' };
   return { error: null };
 }
 

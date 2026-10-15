@@ -254,6 +254,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
   'app/api/cron/startup-discovery/route.ts#GET':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
+  'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter':
+    'Drafting a cover letter from everything on file (plan #2135.1), recorded as draft-cover-letter. Its Draft and Redraft buttons on the Application tab come with plan #2135.2, which moves this key to PAID_ACTIONS beside them.',
   'app/api/cron/startup-discovery/route.ts#POST':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/theme-placement/route.ts#GET':
