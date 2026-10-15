@@ -64,7 +64,7 @@ export function AssignmentRow({ review }: { review: MoveReview }) {
           value={String(level)}
           onChange={(e) => setLevel(Number(e.target.value))}
           aria-label={`Level of ${review.topicName ?? 'the topic'}`}
-          className="min-h-11"
+          className="[&_select]:min-h-11"
           icon={<Layers className="size-3.5" strokeWidth={1.75} />}
         >
           {Array.from({ length: ceiling }, (_, i) => i + 1).map((n) => (

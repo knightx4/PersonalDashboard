@@ -2,7 +2,6 @@ import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib
 
 /** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
 const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
-const TOPICS: Section = { href: '/learn/topics', label: 'Topics' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
@@ -271,7 +270,7 @@ export const learnSources: ModuleSources = {
       title: 'name',
       facts: ['status', 'ceiling'],
       href: (id) => `/learn/topics/${id}`,
-      section: TOPICS,
+      section: SUBJECTS,
       note: 'A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.',
     },
     {
