@@ -62,6 +62,7 @@ export async function searchTurn(
   prompt: string,
   onSpend?: SpendSink,
   model: string = RESEARCH_MODEL,
+  maxTokens: number = SEARCH_MAX_TOKENS,
 ): Promise<{ ok: true; content: unknown[] } | Failure> {
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
   const content: unknown[] = [];
@@ -70,7 +71,7 @@ export async function searchTurn(
     try {
       response = await client.messages.create({
         model,
-        max_tokens: SEARCH_MAX_TOKENS,
+        max_tokens: maxTokens,
         system,
         // The installed SDK predates the server tools' types.
         tools: tools as Anthropic.Tool[],

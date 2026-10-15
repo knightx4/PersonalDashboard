@@ -60,7 +60,21 @@ export type ResearchCitation = {
   stance?: Stance;
 };
 
-export type ResearchPosition = { title: string; summary: string; citations: ResearchCitation[] };
+/**
+ * What one finding is for, on research written up for the writer (research-map.ts):
+ * the state of the debate, evidence for their answer, evidence against it, or
+ * material they could use. Absent on older runs, whose findings are positions
+ * or parts of the question.
+ */
+export type FindingKind = 'debate' | 'for' | 'against' | 'use';
+export const FINDING_KINDS: readonly FindingKind[] = ['debate', 'for', 'against', 'use'];
+
+export type ResearchPosition = {
+  title: string;
+  summary: string;
+  citations: ResearchCitation[];
+  kind?: FindingKind;
+};
 
 export type ClaimVerdict = 'supported' | 'opposed' | 'mixed' | 'unsourced';
 
@@ -204,7 +218,7 @@ export function domainOf(url: string): string {
   }
 }
 
-function isWebUrl(url: string): boolean {
+export function isWebUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
@@ -224,7 +238,7 @@ export function searchQueries(content: unknown): string[] {
 }
 
 /** The sources a run cites, one per page, built up as the citations are read. */
-class SourceList {
+export class SourceList {
   readonly sources: ResearchSource[] = [];
   private readonly byUrl = new Map<string, number>();
 
@@ -242,7 +256,7 @@ class SourceList {
   }
 }
 
-function addCitation(list: ResearchCitation[], citation: ResearchCitation): void {
+export function addCitation(list: ResearchCitation[], citation: ResearchCitation): void {
   const quote = citation.quote.trim();
   if (!quote) return;
   if (list.some((c) => c.source === citation.source && c.quote === quote && c.stance === citation.stance)) return;
@@ -523,6 +537,7 @@ export function researchFromRow(row: ResearchRow): EssayResearch | null {
           title: str(f.title),
           summary: str(f.summary),
           citations: readCitations(f.citations, sources.length),
+          ...(FINDING_KINDS.includes(f.kind as FindingKind) ? { kind: f.kind as FindingKind } : {}),
         }))
       : [];
   const claims =

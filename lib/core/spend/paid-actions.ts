@@ -65,7 +65,7 @@ export const PAID_ACTIONS = {
   // Learn: research on an essay (plan #1863.9), one button per level. The
   // first pass searches the question; the deeper pass gathers pages and
   // marks the draft's claims against them.
-  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question', 'write-essay-research'],
+  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
   // Learn: the guided essay's stages (LEARN-ESSAYS-SPEC, "The stages").
   // Answering the interview's last question also has Dash read the brief.
   'app/learn/e/[id]/guide-actions.ts#readEssayBrief': ['read-essay-brief'],

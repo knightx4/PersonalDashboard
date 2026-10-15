@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { readFoundPoints, readReadback, readReview, readShapes, usableQuestion } from './guide';
-import { readAsks } from './research-map';
 import { EMPTY_PLAN, withPoint } from './plan';
 
 describe("Dash's read of the brief", () => {
@@ -73,15 +72,5 @@ describe('questions', () => {
   it('takes one question and refuses two', () => {
     expect(usableQuestion('Why is it true?')).toBe('Why is it true?');
     expect(usableQuestion('Why? And how?')).toBeNull();
-  });
-
-  it('reads the research map’s questions for the writer', () => {
-    const content = [
-      {
-        type: 'text',
-        text: '## Short answer\nThings.\n## Questions for you\n- Where do you stand on X?\n- Not a question\n2. And on Y?',
-      },
-    ];
-    expect(readAsks(content)).toEqual(['Where do you stand on X?', 'And on Y?']);
   });
 });

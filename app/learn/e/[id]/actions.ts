@@ -82,8 +82,8 @@ import {
 import { searchStudy, type StudySearch } from '@/lib/learn/essays/study-store';
 import { deeperProblem, type EssayResearch } from '@/lib/learn/essays/research';
 import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass } from '@/lib/learn/essays/research-model';
-import { mapBasis } from '@/lib/learn/essays/research-map';
-import { GUIDE_MODEL, MAP_SEARCH_MODEL, runResearchMap } from '@/lib/learn/essays/guide-model';
+import { mapPrompt } from '@/lib/learn/essays/research-map';
+import { GUIDE_MODEL, runResearchMap } from '@/lib/learn/essays/guide-model';
 import { insertEssayResearch } from '@/lib/learn/essays/research-store';
 import { costMicrosFor, totalMicros, type SpendReport } from '@/lib/core/spend/pricing';
 import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
@@ -1027,23 +1027,14 @@ export async function researchEssay(
     const spend = collectSpend();
 
     if (parsed.data.level === 'first') {
-      const basis = mapBasis(brief);
-      if (!basis)
+      const prompt = mapPrompt(brief);
+      if (!prompt)
         return {
           ok: false,
           error: 'Write the essay’s question first; the research searches with it.',
         };
-      const result = await runResearchMap({ basis, anthropicApiKey: apiKey, onSpend: spend.sink });
-      await recordLearnSpend(
-        user.id,
-        'research-essay-question',
-        spend.reports.filter((report) => report.model === MAP_SEARCH_MODEL),
-      );
-      await recordLearnSpend(
-        user.id,
-        'write-essay-research',
-        spend.reports.filter((report) => report.model !== MAP_SEARCH_MODEL),
-      );
+      const result = await runResearchMap({ prompt, anthropicApiKey: apiKey, onSpend: spend.sink });
+      await recordLearnSpend(user.id, 'research-essay-question', spend.reports);
       if (!result.ok) {
         console.error('[essay research] first', result.detail);
         return {
@@ -1056,9 +1047,9 @@ export async function researchEssay(
         question: brief.question,
         queries: result.queries,
         sources: result.sources,
-        findings: result.parts,
+        findings: result.findings,
         costMicros: runCost(spend.reports),
-        model: `${GUIDE_MODEL},${MAP_SEARCH_MODEL}`,
+        model: GUIDE_MODEL,
         summary: result.summary,
         asks: result.asks,
       });

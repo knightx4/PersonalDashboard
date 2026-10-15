@@ -1007,31 +1007,57 @@ const houseMap: EssayResearch = {
       domain: 'press.example.com',
       text: null,
     },
+    {
+      url: 'https://research.example.ac.uk/affordability',
+      title: 'Affordability and the monthly payment',
+      domain: 'research.example.ac.uk',
+      text: null,
+    },
   ],
   positions: [
     {
-      title: 'How does a change in the bank rate reach what a buyer pays each month?',
+      kind: 'debate',
+      title: '',
       summary:
-        'Lenders reprice new fixed-rate loans within weeks of a change in the bank rate. Because nearly every buyer needs a new loan, the change reaches the whole market quickly.',
+        'Economists agree rate changes reach house prices through the monthly cost of new mortgages. They split on how much: where homes are scarce and wages are rising, prices have kept climbing through rate rises.',
       citations: [
         {
           source: 0,
           quote: 'new fixed-rate mortgage pricing typically adjusts within four to six weeks',
         },
+        {
+          source: 2,
+          quote: 'a shortage of listings kept prices climbing even as mortgage costs rose',
+        },
       ],
     },
     {
-      title: 'Do cash buyers behave differently from buyers with a mortgage?',
+      kind: 'for',
+      title: 'Buyers bid up to a monthly payment, not a price',
       summary:
-        'Cash buyers are about a third of sales. They still bid against buyers with loans, so they pay the prices those buyers can afford.',
+        'A study of first-time buyers found most set their budget from the largest monthly payment a lender would approve.',
+      citations: [
+        {
+          source: 3,
+          quote:
+            'most first-time buyers fixed their budget at the largest monthly payment approved',
+        },
+      ],
+    },
+    {
+      kind: 'for',
+      title: 'Cash buyers follow the borrowers',
+      summary:
+        'Cash buyers are about a third of sales, and they bid against buyers with loans, so they pay what those buyers can afford.',
       citations: [
         { source: 1, quote: 'cash purchases accounted for 31 per cent of completed sales' },
       ],
     },
     {
-      title: 'When have house prices risen while rates rose?',
+      kind: 'against',
+      title: 'Scarcity can outweigh the rate',
       summary:
-        'Prices kept rising through some hiking cycles when wages rose fast and few homes came up for sale.',
+        'Prices rose through some hiking cycles when wages rose fast and few homes came up for sale.',
       citations: [
         {
           source: 2,
@@ -1039,10 +1065,22 @@ const houseMap: EssayResearch = {
         },
       ],
     },
+    {
+      kind: 'use',
+      title: 'Lenders reprice within six weeks',
+      summary:
+        'A central bank note puts the lag between a rate change and new mortgage pricing at four to six weeks.',
+      citations: [
+        {
+          source: 0,
+          quote: 'new fixed-rate mortgage pricing typically adjusts within four to six weeks',
+        },
+      ],
+    },
   ],
   claims: [],
   summary:
-    'The pages agree that rate changes reach house prices through the monthly cost of new mortgages, which lenders reprice within weeks. They disagree on how much: when homes are scarce and wages are rising, prices have kept climbing through rate rises.',
+    'Economists agree rate changes reach house prices through the monthly cost of new mortgages. They split on how much: where homes are scarce and wages are rising, prices have kept climbing through rate rises.',
   asks: [
     'If scarce listings can outweigh a rate rise, does your thesis hold in the town your sister is buying in?',
   ],

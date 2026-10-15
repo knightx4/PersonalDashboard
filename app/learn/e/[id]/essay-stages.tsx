@@ -141,9 +141,9 @@ export const STAGE_TIPS: Record<Stage, string[]> = {
     'Reply to Dash’s notes in a line or two, change your answers above if a note shows you should, then have Dash read it again.',
   ],
   research: [
-    'Read the short answer first, then the parts that bear on your answer.',
-    'Under each part, note what you make of it in your own words. The Plan step can turn those notes into points.',
-    'Spend longest on the part that disagrees with you. That is the objection your reader will raise.',
+    'Read where the debate stands, then what supports you and what pushes back.',
+    'Note your take on anything that matters to your answer. The Plan step can turn those notes into points.',
+    'Spend longest on what pushes back. That is the objection your reader will raise.',
   ],
   plan: [
     'Your thesis is your answer in one sentence that a reader could disagree with.',

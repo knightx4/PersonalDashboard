@@ -282,21 +282,29 @@ price before it runs. There are two levels.
 
 | | Research the question | Check the draft's claims |
 |---|---|---|
-| What it does | Sonnet splits the question into 3 to 5 parts a writer needs answered; Haiku runs up to 8 searches and reads 5 pages; Sonnet writes, from those pages, a short answer of about 110 words, an answer to each part, and up to three questions asking the writer where they stand | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
+| What it does | One Sonnet call with up to 8 web searches. It is told the question, the writer's answer so far, the reader and what would change their mind, and that the writer knows the field. It writes where the debate stands, then up to four items each of evidence for the answer, evidence against it, and material the writer could use (a framework, a figure, a case, a line to quote), then up to three questions for the writer | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
 | Typical cost | $0.25 to $0.45 | $0.15 to $0.60, shown as "up to $0.60" |
-| Model | Sonnet frames and writes, Haiku searches and reads | Haiku gathers, Sonnet judges |
+| Model | Sonnet, with the dynamic-filtering web search | Haiku gathers, Sonnet judges |
 
-The first level has its own step, Research, laid out to be read top to bottom:
-the short answer, then each part as a heading with its answer and, folded
-under it, the quoted words; then the questions for the writer; then the
-numbered sources. Under every part and question is a line for what the person
-makes of it, and Make it a point copies that line into the plan. The rail's
-research card in the Write step shows the same run compactly, with Insert
-footnote on each quote.
+The first level has its own step, Research. Where the debate stands comes
+first; then Supports your answer, Pushes back and You could use, each item a
+headline, a sentence or two, and its sources as site names that open the page
+at the quoted words; then the questions for the writer; then the numbered
+sources. Every item can take a note in the writer's words, and Make it a
+point copies that note into the plan. An item with no citation is dropped.
+The rail's research card in the Write step shows the same run compactly,
+with Insert footnote on each quote.
 
-Until 15 October 2026 the first level was one Haiku call listing positions
-with quotes, shown only in the rail. Runs from before then still show as
-positions.
+The writer's answer, reader and what would change their mind go to the model
+as context, and the model is told never to paste their words into a search.
+The origin answer, which often quotes the vault, is not sent.
+
+History: until 15 October 2026 the first level was one Haiku call listing
+positions. For one day it then framed the question into parts, read five
+pages and wrote only from them; on the owner's first essay it read three
+pages about one announcement and answered most parts with "the pages do not
+say", so it was replaced by the call above. Older runs still show in their
+own layout.
 
 **Haiku and web search** (checked 12 October 2026, plan #1863.9). Haiku
 takes the basic tools, `web_search_20250305` and `web_fetch_20250910`, but
@@ -320,8 +328,9 @@ have been measured.
 - The count of supporting and opposing sources says it counts sources and
   does not weigh them.
 - Vault text never goes into a web search query. The first pass sends the
-  brief's question and what would change your mind, and nothing else. The
-  deeper pass has to read the draft to know its claims, and is told to
+  brief's question, your answer, your reader and what would change your
+  mind, and is told to search in general terms and never paste your words.
+  The deeper pass has to read the draft to know its claims, and is told to
   search in general terms and never paste a sentence of it; your other
   notes, the pinned items and the origin answer are never sent.
 - Every run records its real cost from the API's usage, through the Learn

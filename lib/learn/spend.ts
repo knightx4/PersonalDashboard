@@ -333,7 +333,7 @@ export const LEARN_OPERATIONS = [
   // also finds the notes to compare with, under 'embed-note-match'.
   'check-essay-paragraph',
   // Research on an essay, at the level whose button was pressed (plan
-  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // #1863.9). The first is one Sonnet call with up to eight web searches.
   // The deeper pass is one Haiku call with up to eight searches and five
   // pages read, then one Sonnet call marking the draft's claims against the
   // pages; apart, so each model's share can be read.
@@ -369,11 +369,6 @@ export const LEARN_OPERATIONS = [
   'shape-essay-plan',
   'review-essay-plan',
   'word-point-question',
-  // The essay's research written up as a map (plan stage Research): the
-  // Sonnet calls framing the question and writing from the pages read. The
-  // Haiku search and reading in between records under
-  // 'research-essay-question'.
-  'write-essay-research',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

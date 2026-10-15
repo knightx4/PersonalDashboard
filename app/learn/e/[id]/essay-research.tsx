@@ -2,6 +2,7 @@
 
 import { useCallback, useId, useState, type RefObject } from 'react';
 import { Disclosure } from '@/components/ui/disclosure';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { InlineTextarea } from '@/components/ui/field';
 import { takeKey } from '@/lib/learn/essays/research-map';
 import { withPoint, withTake } from '@/lib/learn/essays/plan';
@@ -23,11 +24,12 @@ import {
   VERDICT_LABELS,
   type EssayResearch,
   type EssayResearchRuns,
+  type FindingKind,
   type ResearchCitation,
   type ResearchLevel,
   type ResearchSource,
 } from '@/lib/learn/essays/research';
-import { MAP_PAGES, MAP_SEARCHES } from '@/lib/learn/essays/research-map';
+import { MAP_SEARCHES } from '@/lib/learn/essays/research-map';
 import { researchEssay } from './actions';
 import { linkVariants } from '@/components/ui/link';
 
@@ -173,15 +175,17 @@ function FirstPass({
     <>
       {run.summary && <p className="mb-3 text-small text-ink">{run.summary}</p>}
       <ol className="flex flex-col divide-y divide-border">
-        {run.positions.map((position, i) => (
-          <li key={i} className="py-3 first:pt-0 last:pb-0">
-            <p className="text-ui font-medium text-ink">{position.title}</p>
-            {position.summary && (
-              <p className="mt-1 text-small text-ink-muted">{position.summary}</p>
-            )}
-            <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
-          </li>
-        ))}
+        {run.positions
+          .filter((position) => position.kind !== 'debate')
+          .map((position, i) => (
+            <li key={i} className="py-3 first:pt-0 last:pb-0">
+              <p className="text-ui font-medium text-ink">{position.title}</p>
+              {position.summary && (
+                <p className="mt-1 text-small text-ink-muted">{position.summary}</p>
+              )}
+              <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
+            </li>
+          ))}
       </ol>
     </>
   );
@@ -309,7 +313,7 @@ export function EssayResearchCard({ api, className }: { api: ResearchApi; classN
       <Level
         level="first"
         title="Research the question"
-        about={`Dash breaks your question down, searches up to ${MAP_SEARCHES} times, reads ${MAP_PAGES} pages and writes up what they say, quoting them. Nothing from your notes goes into a search. The Research step shows it in full.`}
+        about={`Dash searches up to ${MAP_SEARCHES} times for evidence for and against your answer and material you could use, with sources. Nothing from your notes goes into a search. The Research step shows it in full.`}
         run={api.runs.first}
         pending={api.pending.first}
         onRun={(level) => void api.run(level)}
@@ -330,7 +334,7 @@ export function EssayResearchCard({ api, className }: { api: ResearchApi; classN
 
 /** Where the research has got to while it runs, said once rather than as a spinner alone. */
 const RUNNING_LINE =
-  'Dash is breaking your question down, searching, reading up to five pages and writing up what they say. This takes a minute or two; you can stay on this page or go to another step.';
+  'Dash is searching for evidence for and against your answer and writing it up. This takes a minute or two; you can go to another step meanwhile.';
 
 /**
  * Research, as its own step (LEARN-ESSAYS-SPEC, "The stages"): the first pass
@@ -357,6 +361,9 @@ export function ResearchStage({
   const running = pending === 'running';
   const error = typeof pending === 'object' ? pending.error : null;
   const takes = plan.plan.takes;
+  // Runs from before the write-up for the writer have parts of the question instead.
+  const written = run?.positions.some((p) => p.kind !== undefined) ?? false;
+  const debate = run?.positions.find((p) => p.kind === 'debate');
   const points = new Set(plan.plan.points.map((p) => p.text.trim().toLowerCase()));
 
   const take = (key: string, text: string) =>
@@ -372,7 +379,7 @@ export function ResearchStage({
           hint={
             run
               ? `${ranLine(run)} · ${whenRan(run.createdAt)}`
-              : `Dash breaks the question into the parts a writer needs, searches up to ${MAP_SEARCHES} times, reads ${MAP_PAGES} pages in full, and writes up what they say, quoting them. Only your question and what would change your mind go into the searches.`
+              : `Dash reads your answer, searches up to ${MAP_SEARCHES} times, and comes back with where the debate stands, what supports you, what pushes back, and specific things you could use, each with its source. Your words are never pasted into a search.`
           }
           action={
             <span className="flex items-center gap-1">
@@ -410,8 +417,13 @@ export function ResearchStage({
           )}
           {run && run.summary && (
             <div className="mt-1">
-              <p className="text-small font-medium text-ink-muted">The short answer</p>
-              <p className="mt-1 text-body text-ink">{run.summary}</p>
+              <p className="text-small font-medium text-ink-muted">
+                {written ? 'Where the debate stands' : 'The short answer'}
+              </p>
+              <p className="mt-1 text-body text-ink">
+                {run.summary}{' '}
+                {debate && <SourceLinks citations={debate.citations} sources={run.sources} />}
+              </p>
             </div>
           )}
         </CardSection>
@@ -419,30 +431,63 @@ export function ResearchStage({
 
       {run && (
         <Card padding="none" aria-busy={running || undefined}>
-          {run.positions.map((part, i) => {
-            const key = takeKey(run.id, { part: i });
-            return (
-              <CardSection key={key} title={`${i + 1}. ${part.title}`}>
-                <p className="text-body text-ink">{part.summary}</p>
-                {part.citations.length > 0 && (
-                  <Disclosure
-                    title={`What the pages say (${part.citations.length})`}
-                    className="mt-2"
-                    summaryClassName="text-small"
-                  >
-                    <MapQuotes citations={part.citations} sources={run.sources} />
-                  </Disclosure>
-                )}
-                <TakeLine
-                  label="What you make of it"
-                  value={takes[key] ?? ''}
-                  onSave={(text) => take(key, text)}
-                  onPoint={toPoint}
-                  isPoint={points.has((takes[key] ?? '').trim().toLowerCase())}
-                />
-              </CardSection>
-            );
-          })}
+          {written
+            ? GROUPS.map((group) => {
+                const items = run.positions
+                  .map((finding, i) => ({ finding, i }))
+                  .filter(({ finding }) => finding.kind === group.kind);
+                if (items.length === 0) return null;
+                return (
+                  <CardSection key={group.kind} title={group.title} hint={group.hint}>
+                    <ul className="flex flex-col divide-y divide-border">
+                      {items.map(({ finding, i }) => {
+                        const key = takeKey(run.id, { part: i });
+                        return (
+                          <li key={key} className="py-3 first:pt-0 last:pb-0">
+                            {finding.title && (
+                              <p className="text-body font-medium text-ink">{finding.title}</p>
+                            )}
+                            <p className="mt-0.5 text-ui text-ink">
+                              {finding.summary}{' '}
+                              <SourceLinks citations={finding.citations} sources={run.sources} />
+                            </p>
+                            <ItemTake
+                              value={takes[key] ?? ''}
+                              onSave={(text) => take(key, text)}
+                              onPoint={toPoint}
+                              isPoint={points.has((takes[key] ?? '').trim().toLowerCase())}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </CardSection>
+                );
+              })
+            : run.positions.map((part, i) => {
+                const key = takeKey(run.id, { part: i });
+                return (
+                  <CardSection key={key} title={`${i + 1}. ${part.title}`}>
+                    <p className="text-body text-ink">{part.summary}</p>
+                    {part.citations.length > 0 && (
+                      <Disclosure
+                        title={`What the pages say (${part.citations.length})`}
+                        className="mt-2"
+                        summaryClassName="text-small"
+                      >
+                        <MapQuotes citations={part.citations} sources={run.sources} />
+                      </Disclosure>
+                    )}
+                    <TakeLine
+                      label="What you make of it"
+                      value={takes[key] ?? ''}
+                      onSave={(text) => take(key, text)}
+                      onPoint={toPoint}
+                      isPoint={points.has((takes[key] ?? '').trim().toLowerCase())}
+                    />
+                  </CardSection>
+                );
+              })}
           {run.asks.length > 0 && (
             <CardSection
               title="Questions for you"
@@ -590,5 +635,75 @@ function TakeLine({
         </div>
       )}
     </div>
+  );
+}
+
+/** The sections a write-up for the writer is shown in, in order. */
+const GROUPS: { kind: FindingKind; title: string; hint: string }[] = [
+  { kind: 'for', title: 'Supports your answer', hint: 'Evidence on your side, with who says it.' },
+  {
+    kind: 'against',
+    title: 'Pushes back',
+    hint: 'The case against your answer. Your reader may know it, so the essay should meet it.',
+  },
+  {
+    kind: 'use',
+    title: 'You could use',
+    hint: 'Frameworks, figures, cases and lines worth citing.',
+  },
+];
+
+/** Each page a finding rests on, as its site's name, opening at the quoted words. */
+function SourceLinks({
+  citations,
+  sources,
+}: {
+  citations: ResearchCitation[];
+  sources: ResearchSource[];
+}) {
+  const seen = new Set<number>();
+  const links = citations.filter(
+    (c) => !seen.has(c.source) && seen.add(c.source) && sources[c.source],
+  );
+  return (
+    <span className="whitespace-nowrap text-small">
+      {links.map((citation, n) => {
+        const source = sources[citation.source]!;
+        return (
+          <span key={citation.source}>
+            {n > 0 && <span className="text-ink-muted"> · </span>}
+            <a
+              href={textFragmentUrl(source.url, citation.quote)}
+              target="_blank"
+              rel="noreferrer"
+              title={`${source.title}: “${citation.quote}”`}
+              className={linkVariants()}
+            >
+              {source.domain || source.title}
+            </a>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** A note on one finding, opened when wanted so the list stays easy to read. */
+function ItemTake({
+  value,
+  onSave,
+  onPoint,
+  isPoint,
+}: {
+  value: string;
+  onSave: (text: string) => void;
+  onPoint: (text: string) => void;
+  isPoint: boolean;
+}) {
+  const [open, setOpen] = useState(Boolean(value.trim()));
+  if (!open)
+    return <AddTrigger label="Note your take" onClick={() => setOpen(true)} className="mt-1" />;
+  return (
+    <TakeLine label="Your take" value={value} onSave={onSave} onPoint={onPoint} isPoint={isPoint} />
   );
 }
