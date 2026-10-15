@@ -113,6 +113,25 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
   return (fn: string, args: Record<string, unknown>) => {
     calls.push({ fn, args });
     if (fn === 'is_owner' && owner) return Promise.resolve({ data: true, error: null });
+    if (fn === 'ask_table_columns') {
+      // What the database function returns for the names it is given; it also
+      // reports a table outside the list here, to show the lookup drops it.
+      return Promise.resolve({
+        data: {
+          columns: [
+            { table: 'job_search.applications', column: 'id', type: 'uuid', nullable: false },
+            { table: 'job_search.applications', column: 'role_id', type: 'uuid', nullable: false },
+            { table: 'job_search.cover_letters', column: 'id', type: 'uuid', nullable: false },
+          ],
+          links: [
+            { table: 'job_search.applications', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
+            { table: 'job_search.cover_letters', column: 'application_id', ref_table: 'job_search.applications', ref_column: 'id' },
+            { table: 'job_search.applications', column: 'owner', ref_table: 'auth.users', ref_column: 'id' },
+          ],
+        },
+        error: null,
+      });
+    }
     if (fn !== 'search_memory') return Promise.resolve({ data: null, error: { message: `no ${fn}` } });
     const sources = args.p_sources as string[] | null;
     const authors = args.p_authors as string[] | null;
@@ -921,6 +940,44 @@ describe('recall', () => {
     expect((await recall({})).result.ok).toBe(false);
     expect((await recall({ question: 'x' })).result.ok).toBe(false);
     expect((await recall({ question: 'land value tax', only_mine: 'yes' })).result.ok).toBe(false);
+  });
+});
+
+describe('table_info', () => {
+  it('lists every readable table with what it holds, and none outside the list', async () => {
+    const result = await executeAskTool('table_info', {}, context({}));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const tables = (result.totals as { tables: { table: string; holds: string }[] }).tables;
+    expect(tables.length).toBeGreaterThan(20);
+    expect(tables.map((t) => t.table)).toContain('learn.watch_list');
+    expect(tables.map((t) => t.table)).not.toContain('auth.users');
+    for (const t of tables) expect(t.holds.length).toBeGreaterThan(0);
+  });
+
+  it('gives one table its columns with types and the readable tables it links to and from', async () => {
+    const result = await executeAskTool('table_info', { table: 'job_search.applications' }, context({}));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const info = result.totals as { columns: unknown[]; linksTo: unknown[]; linkedFrom: unknown[] };
+    expect(info.columns).toEqual([
+      { column: 'id', type: 'uuid', nullable: false },
+      { column: 'role_id', type: 'uuid', nullable: false },
+    ]);
+    expect(info.linksTo).toEqual([{ column: 'role_id', table: 'job_search.roles', toColumn: 'id' }]);
+    expect(info.linkedFrom).toEqual([{ table: 'job_search.cover_letters', column: 'application_id', toColumn: 'id' }]);
+  });
+
+  it('refuses a table outside the list, and one in a workspace that is off', async () => {
+    const outside = await executeAskTool('table_info', { table: 'auth.users' }, context({}));
+    expect(outside).toEqual({ ok: false, error: expect.stringContaining('not a table Dash can read') });
+    const off = await executeAskTool('table_info', { table: 'learn.watch_list' }, context({}, { enabledModules: ['shopping'] }));
+    expect(off).toEqual({ ok: false, error: expect.stringContaining('switched off') });
+    const list = await executeAskTool('table_info', {}, context({}, { enabledModules: ['shopping'] }));
+    if (list.ok) {
+      const names = (list.totals as { tables: { table: string }[] }).tables.map((t) => t.table);
+      expect(names).not.toContain('learn.watch_list');
+    }
   });
 });
 
