@@ -26,6 +26,7 @@ import {
   type QuickCard,
 } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/lib/news/topic-hrefs';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { QuickReadView } from './quick/quick-view';
 
 export const metadata = { title: 'Quick read' };
@@ -161,6 +162,7 @@ export default async function QuickReadPage({
       hiddenCount={hidden.length}
       progress={progress}
       gotThrough={summary}
+      dashToday={<NowDashToday workspace="news" />}
       saved={saved}
       sent={card ? sentOf(card) : null}
       reaction={card ? reactionOf(card) : null}

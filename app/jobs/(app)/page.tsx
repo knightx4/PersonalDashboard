@@ -4,6 +4,7 @@ import { loadPipeline } from '@/lib/jobs/applications/load';
 import { summariseSearch, type SummaryInterview } from '@/lib/jobs/home/summary';
 import { loadSinceView } from '@/lib/jobs/home/since-load';
 import { loadToday } from '@/lib/jobs/today/load';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { TodayPage } from './_home/today-page';
 
 export const metadata = { title: 'Now' };
@@ -66,6 +67,7 @@ export default async function JobsToday() {
       summary={summariseSearch(pipeline, interviews, now)}
       since={since}
       timezone={timezone}
+      dashToday={<NowDashToday workspace="jobs" className="" />}
     />
   );
 }

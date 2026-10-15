@@ -173,7 +173,7 @@ export function groupDashToday(
 }
 
 /**
- * Today's changes, grouped. Reads through the person's core client, so row
+ * Today's changes, grouped, for one workspace when `workspace` is given. Reads through the person's core client, so row
  * level security keeps it to their own rows as well as the filter.
  */
 export async function loadDashToday(
@@ -183,6 +183,11 @@ export async function loadDashToday(
     today: string;
     timezone: string;
     shown?: (workspace: ModuleId) => boolean;
+    /**
+     * Only this workspace's changes, for its own Now (plan #1964.4). Left
+     * out, every workspace's, which is Home's list.
+     */
+    workspace?: ModuleId;
   },
 ): Promise<DashTodayGroup[]> {
   const { start, end } = dayBounds(input.today, input.timezone);
@@ -200,7 +205,7 @@ export async function loadDashToday(
   const threads = await threadSubjects(core, input.userId, rows);
   const entries = rows
     .map((row) => dashTodayEntry(row, input.today, threads))
-    .filter((entry): entry is DashTodayEntry => entry !== null);
+    .filter((entry): entry is DashTodayEntry => entry !== null && (!input.workspace || entry.workspace === input.workspace));
   return groupDashToday(entries, input.shown);
 }
 

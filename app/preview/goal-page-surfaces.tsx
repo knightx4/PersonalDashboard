@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
+import { WorkspaceDashTodayFixture } from './dash-today-surfaces';
 import { GoalsView } from '@/app/goals/goals-view';
 import { SONNET } from '@/lib/core/models';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
@@ -311,24 +312,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       hasSteps: true,
     },
   ],
-  done: {
-    since: '2026-09-24T19:30:00Z',
-    items: [
-      {
-        kind: 'result',
-        id: 'script',
-        title: 'Draft what to say on the call',
-        goalId: cards.id,
-        goalTitle: cards.title,
-        href: `/goals/${cards.id}/s/script`,
-        unread: true,
-        runId: 'run-1',
-        undo: null,
-        at: '2026-09-25T06:10:00Z',
-      },
-    ],
-    more: 0,
-  },
+  dashToday: <WorkspaceDashTodayFixture />,
   todayOn: TODAY,
   areas: [
     { id: 'a-money', name: 'Money' },
@@ -424,10 +408,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
 
 export function GoalsHomeSurface() {
   return (
-    <PageColumn>
-      <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" canRun />
-    </PageColumn>
+    <HomeView {...home} timeZone="Europe/London" canRun />
   );
 }
 

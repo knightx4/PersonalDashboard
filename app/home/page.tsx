@@ -66,9 +66,7 @@ import {
 } from './home-view';
 import { HomeFold } from './home-fold';
 import { loadDashToday, type DashTodayGroup } from '@/lib/shell/dash-today';
-import { changesLabel, dashTodayCount } from '@/lib/shell/dash-today-count';
-import { DashTodayGroups } from './dash-today';
-import { undoDashToday } from './actions';
+import { DashTodayFold } from '@/components/shell/dash-today-fold';
 import { DoneTodayBody, doneTodayCount } from './done-today';
 import { WatchingList } from './watching';
 
@@ -700,14 +698,7 @@ async function DashTodayBlock({
   groups: Promise<DashTodayGroup[]>;
   timezone: string;
 }) {
-  const shown = await groups;
-  const count = dashTodayCount(shown);
-  if (count === 0) return null;
-  return (
-    <HomeFold id="dash-today" title="What Dash did today" count={changesLabel(count)}>
-      <DashTodayGroups groups={shown} timezone={timezone} undo={undoDashToday} />
-    </HomeFold>
-  );
+  return <DashTodayFold groups={await groups} timezone={timezone} />;
 }
 
 /**

@@ -22,11 +22,14 @@ export function DashboardView({
   personId,
   people,
   data,
+  dashToday,
 }: {
   range: PresetRange;
   personId: string | null;
   people: Person[];
   data: DashboardData;
+  /** What Dash did today in Shopping, at the foot of the column (plan #1964.4). */
+  dashToday?: React.ReactNode;
 }) {
   const showPeople = people.length > 1;
 
@@ -106,6 +109,7 @@ export function DashboardView({
             <ReturnableList rows={data.returnable} />
           </div>
         )}
+        {dashToday}
       </div>
     </PageWide>
   );

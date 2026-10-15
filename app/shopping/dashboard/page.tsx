@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPeople, parsePersonFilter } from '@/lib/people/load';
 import { loadDashboard, parseDashboardRange } from '@/lib/dashboard/load';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { DashboardView } from './dashboard-view';
 
 export const metadata = { title: 'Spending' };
@@ -27,5 +28,13 @@ export default async function DashboardPage({
 
   const data = await loadDashboard(supabase, user.id, range, personId);
 
-  return <DashboardView range={range} personId={personId} people={people} data={data} />;
+  return (
+    <DashboardView
+      range={range}
+      personId={personId}
+      people={people}
+      data={data}
+      dashToday={<NowDashToday workspace="shopping" />}
+    />
+  );
 }
