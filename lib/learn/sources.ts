@@ -303,6 +303,8 @@ export const learnSources: ModuleSources = {
     { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
     { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
     { table: 'learn.cell_questions', reason: 'Questions asked about a level of a topic and the answers to them; what each answer showed is read through cell_evidence.' },
+    { table: 'learn.graph_moves', reason: 'Bookkeeping for moving each claims-graph subject onto topics: moved or failed, and the lens it became.' },
+    { table: 'learn.move_reviews', reason: 'Bookkeeping for the placements and edges the move from the claims graph left for them to settle.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     {

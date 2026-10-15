@@ -1,5 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { Network, Plus } from 'lucide-react';
+import { Layers, Network, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -213,6 +213,13 @@ export default async function KnowPage({
         description="One graph per subject, and it grows every time you use it."
         actions={
           <>
+            {/* The topics map (plan #2138.4), which the claims graph is
+                moving onto. A link here rather than a tab of its own, so
+                Learn's nav does not grow. */}
+            <Link href="/learn/topics" className={buttonVariants({ variant: 'secondary' })}>
+              <Layers className="size-4" strokeWidth={1.75} aria-hidden />
+              Topics
+            </Link>
             {!making && (
               <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
                 <Plus className="size-4" strokeWidth={1.75} aria-hidden />

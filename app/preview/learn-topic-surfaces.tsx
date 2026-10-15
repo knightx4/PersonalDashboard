@@ -68,7 +68,7 @@ const TOPICS: TopicRow[] = [
 const COMMENTS = new Map<string, number>([[DCF_ID, 2]]);
 
 export function LearnTopicsPreview() {
-  return <TopicsView topics={TOPICS} comments={COMMENTS} timezone={ZONE} now={NOW} />;
+  return <TopicsView topics={TOPICS} move={{ toMove: 9, toAnswer: 3 }} comments={COMMENTS} timezone={ZONE} now={NOW} />;
 }
 
 export function LearnTopicsLoadingPreview() {

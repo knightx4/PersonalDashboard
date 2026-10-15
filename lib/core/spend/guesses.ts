@@ -100,6 +100,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // embedded in the same press to find a duplicate.
   'draft-topic': run(SONNET, 5_000, 4_000),
   'embed-topic-scope': run(VOYAGE_LITE, 60, 0),
+  // Moving a subject from the claims graph (plan #2138.4): its claims and the
+  // map's topics go in, a topic and level per claim come out.
+  'assign-topics': run(SONNET, 4_000, 1_500),
   'write-probe': run(HAIKU, 2_000, 200),
   'write-probe-ahead': background(unit(HAIKU, 1_800, 170)),
   'name-misconception': run(HAIKU, 1_500, 200),

@@ -108,6 +108,8 @@ export const MODELS = {
   learnGraphGenerate: SONNET,
   /** lib/learn/levels/draft.ts; a topic's ten levels, drafted from a goal */
   learnTopicDraft: SONNET,
+  /** lib/learn/levels/move-call.ts; one call per subject moved from the claims graph */
+  learnTopicAssign: SONNET,
   /** lib/learn/graph/misconception.ts */
   learnMisconception: HAIKU,
   /** lib/learn/graph/opening-claims.ts */

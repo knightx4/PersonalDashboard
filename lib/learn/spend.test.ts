@@ -148,6 +148,7 @@ describe('the operation names', () => {
       'write-essay-research',
       'draft-topic',
       'embed-topic-scope',
+      'assign-topics',
     ]);
   });
 });
