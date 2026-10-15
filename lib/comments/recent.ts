@@ -115,6 +115,7 @@ const UNNAMED: Record<CommentTarget, string> = {
   spec: 'A spec section',
   takeaway: 'An inspiration takeaway',
   change: 'A spec change',
+  post: 'A post draft',
 };
 
 /** The target column the loader set on the row (one per turn). */
@@ -137,6 +138,7 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
   if (target === 'raise') return firstLine(parent.title) ?? UNNAMED.raise;
   if (target === 'takeaway') return firstLine(parent.title) ?? UNNAMED.takeaway;
   if (target === 'change') return firstLine(parent.title) ?? UNNAMED.change;
+  if (target === 'post') return firstLine(parent.angle) ?? UNNAMED.post;
 
   // The heading, which is what somebody was actually arguing with.
   if (target === 'spec') return firstLine(parent.heading) ?? UNNAMED.spec;
@@ -167,6 +169,8 @@ function hrefFor(target: CommentTarget, rowId: string, parent: Record<string, un
   if (target === 'change') return `${TARGET_PATH.change}#spec-change-${rowId}`;
   // The raise's own card in the inbox, the anchor search lands on too.
   if (target === 'raise') return `${TARGET_PATH.raise}#raise-${rowId}`;
+  // The draft's own row on the Posts tab.
+  if (target === 'post') return `${TARGET_PATH.post}#post-${rowId}`;
   return TARGET_PATH[target];
 }
 
@@ -247,6 +251,7 @@ const PARENT_READS: Record<CommentTarget, { table: string; columns: string }> = 
   spec: { table: 'spec_sections', columns: 'id, slug, heading' },
   takeaway: { table: 'inspiration_takeaways', columns: 'id, title' },
   change: { table: 'spec_changes', columns: 'id, title' },
+  post: { table: 'social_posts', columns: 'id, angle' },
 };
 
 /** Takes a client rather than building one, like everything else in lib/. */

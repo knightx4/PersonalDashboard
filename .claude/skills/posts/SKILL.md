@@ -24,6 +24,16 @@ line, the one step to write about, or when it came from the ask box on the
 Posts tab, what the person asked for. If no turn names a `user_id`, stop and say
 so rather than guessing the account.
 
+A run opened for one draft (the turn names a `social_posts` id) reads that
+draft's thread first, since the comments under it are what the person asked
+for (plan #2202.2). The thread is under the ref `public.social_posts:<id>`:
+
+```sql
+select author, body, created_at from core.thread_turns
+where user_id = '…' and ref = 'public.social_posts:<id>'
+order by created_at;
+```
+
 You change rows, not code, and no plan step is touched. The one commit a run
 makes is the screenshots of section 6, which are files under `public/posts/`
 and nothing else.

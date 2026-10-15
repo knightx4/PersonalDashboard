@@ -119,6 +119,9 @@ describe('DASH_TOOLS', () => {
     expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.raise)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'send_step', 'pass_to_session']);
     expect(own(DEV_THREAD_TABLES.change)).toEqual(['file_idea', 'file_note', 'reword', 'pass_to_session']);
+    // A post draft is rewritten with rewrite_post, an ordinary write (plan #2202.2).
+    expect(own(DEV_THREAD_TABLES.post)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'pass_to_session']);
+    expect(threadDashTools(DEV_THREAD_TABLES.post).map((t) => t.name)).toContain('rewrite_post');
     expect(own(GOAL_THREAD_TABLE)).toEqual([
       'file_goal_record',
       'schedule_goal_step',

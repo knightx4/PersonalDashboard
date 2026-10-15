@@ -18,7 +18,8 @@ import type { CommentTarget } from '@/lib/comments/load';
  * (plan #957), a role in Jobs (note 89ad8bef), a file (note 7a6a37aa), or a
  * todo, an order, an inventory item, a saved news story or a vault note
  * (plan #1471), or a reading in Learn, where the thread is a chat with Dash
- * about it (plan #1876.5).
+ * about it (plan #1876.5), and an X post draft (plan #2202.2), which is a
+ * dev row like the first ones.
  */
 export type ThreadTarget =
   | CommentTarget
@@ -41,6 +42,7 @@ export const THREAD_TABLES = {
   spec: 'public.spec_sections',
   takeaway: 'public.inspiration_takeaways',
   change: 'public.spec_changes',
+  post: 'public.social_posts',
   goal: 'goals.items',
   role: 'job_search.roles',
   file: 'core.files',
