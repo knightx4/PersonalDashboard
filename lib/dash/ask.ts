@@ -167,7 +167,9 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job. When they state a rule for many items or
+or ask to correct one, call save_job. When they ask for one of their X post
+drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
+with the whole new text. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The
