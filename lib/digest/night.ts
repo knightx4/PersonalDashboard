@@ -469,6 +469,24 @@ export function featureProgress(
   };
 }
 
+/** One step under a feature, named the way its row on the plan heads itself. */
+export type FeatureStep = { ref: string; title: string; status: PlanItem['status'] };
+
+/**
+ * Every step under a feature, in the order the plan page lists them, however
+ * deep, decisions and dropped steps left out. The runner card draws one
+ * segment for each and the run's lines fold under each.
+ */
+export function featureSteps(items: readonly PlanItem[], featureNumber: number): FeatureStep[] {
+  const feature = flattenSections(buildPlanTree({ items: [...items], dependencies: [] })).find(
+    (node) => node.number === featureNumber,
+  );
+  if (!feature) return [];
+  return flatten(feature.children)
+    .filter((node) => node.kind !== 'decision' && node.status !== 'dropped')
+    .map((node) => ({ ref: `#${node.outline}`, title: oneLine(node.title), status: node.status }));
+}
+
 /** A row a session is on now, as the plan page's "On" line names it. */
 export type OnNow = DigestNightRef & { at: string; step: DigestNightRef | null };
 
