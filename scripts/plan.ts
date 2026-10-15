@@ -55,9 +55,10 @@
  *                                # main: closes every step marked built under it,
  *                                # with the same checks done makes
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
- *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
- *                                [--on-steps]   # waiting on the steps it names,
- *                                # rather than on something only you can supply
+ *   npx tsx scripts/plan.ts block <n> --ask "what it needs" --on <m>[,<m>] [--note "the rest"]
+ *                                # waits on the steps it names: a decision, a
+ *                                # setup job (needs) or a ready step; never on
+ *                                # the person directly
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
@@ -134,7 +135,7 @@ import {
   parseDelay,
   type CheckBack,
 } from '../lib/plan/check-backs';
-import { blockAskRefusal } from '../lib/plan/block-ask';
+import { blockAskRefusal, blockTargetRefusal, BLOCK_ROUTES } from '../lib/plan/block-ask';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import {
   isPlanUpdateHealth,
@@ -1723,24 +1724,41 @@ async function main(): Promise<void> {
       const ask = command === 'block' ? arg('--ask')?.trim() : undefined;
       if (command === 'block' && !ask) {
         fail(
-          `block ${typed(item.number)} --ask "what it needs, in one sentence" [--on-steps] ` +
+          `block ${typed(item.number)} --ask "what it needs, in one sentence" --on <step>[,<step>] ` +
             `[--note "the rest"]. The ask is what Dash and the plan row show, and blocking ` +
-            `again replaces it; --note is the dated line, which is appended. --on-steps says ` +
-            `the block is waiting on the steps it names and should clear itself when they ` +
-            `close; without it the block waits for you.`,
+            `again replaces it; --note is the dated line, which is appended.\n${BLOCK_ROUTES}`,
         );
       }
-      // Which kind of block, which decides who clears it. A session parking
-      // its own step behind a question it may not answer says --on-steps and
-      // adds the dependency edge, so the step comes back on its own when the
-      // question is answered. Everything else -- a key, an account, a DNS
-      // record -- waits for the person, which is the default and the safe way
-      // to be wrong: #499 read as ready for a day because a block about a
-      // GitHub token cleared itself off unrelated steps closing.
-      const onSteps = command === 'block' && has('--on-steps');
+      // A block always waits on steps (the person's rule of 15 October 2026):
+      // a decision that asks them, a setup step that is a job of theirs, or a
+      // ready step a later run builds. #2126 reached their Inbox as a chore
+      // because a session blocked it on them over its own refused write. The
+      // steps it names become dependency rows, so the block clears when they
+      // close; --on may be left out only when the step already waits on an
+      // open one. The database refuses a session's block on the person (0245).
       if (command === 'block' && ask) {
-        const refusal = blockAskRefusal(ask, onSteps);
+        const refusal = blockAskRefusal(ask, true);
         if (refusal) fail(refusal);
+        const on = (arg('--on') ?? '')
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+        for (const written of on) {
+          const other = await byNumber(sql, userId, written);
+          if (other.id === item.id) fail(`${ref(item.number)} cannot wait on itself.`);
+          await sql`
+            insert into plan_dependencies (user_id, item_id, depends_on_id)
+            values (${userId}, ${item.id}, ${other.id})
+            on conflict (item_id, depends_on_id) do nothing`;
+        }
+        const [{ open }] = await sql<{ open: number }[]>`
+          select count(*)::int as open
+          from plan_dependencies d
+          join plan_items p on p.id = d.depends_on_id
+          where d.user_id = ${userId} and d.item_id = ${item.id}
+            and p.status not in ('done', 'dropped')`;
+        const target = blockTargetRefusal(open);
+        if (target) fail(target);
       }
       const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
@@ -1766,7 +1784,7 @@ async function main(): Promise<void> {
         set status = ${status}, comment = ${comment},
             commit_sha = coalesce(${commit}, commit_sha),
             block_ask = ${ask ?? null},
-            block_kind = ${blockPatch(status, onSteps ? 'steps' : null).block_kind}
+            block_kind = ${blockPatch(status, 'steps').block_kind}
         where id = ${item.id} and user_id = ${userId}`;
       console.log(
         `${ref(item.number)} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`,
@@ -1774,11 +1792,7 @@ async function main(): Promise<void> {
       if (ask && ask !== note) console.log(`Needs: ${ask}`);
       await checkRowWriting(sql, userId, item, ask && ask !== note ? { ask, note } : { note });
       if (status === 'blocked') {
-        console.log(
-          onSteps
-            ? 'Waiting on the steps it names: it clears itself when they close.'
-            : 'Waiting on you: it stays blocked until you say otherwise.',
-        );
+        console.log('Waiting on the steps it names: it clears itself when they close.');
       }
 
       if (command === 'done') {

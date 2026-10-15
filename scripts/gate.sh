@@ -37,6 +37,9 @@ export TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgresql://postgres@localhost:5
 export NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
 export NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}"
 export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+# The Typecheck lane checks types before its build, so the build skips its own
+# check (next.config.ts), as CI's does.
+export SKIP_BUILD_TYPECHECK=1
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
