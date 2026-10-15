@@ -25,7 +25,8 @@ import {
   saveDraftedAnswer,
   type DraftApplicationResult,
 } from '../actions';
-import { saveApplicationMarks, saveCoverLetter } from './actions';
+import { saveApplicationMarks } from './actions';
+import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
 import { DashQuestions } from './dash-questions';
 import { DraftPanel, LimitCount, countOf } from './draft-panel';
@@ -42,6 +43,8 @@ export function Answers({
   answerDrafts,
   dashAsks,
   draftRun,
+  coverLetterDraft,
+  coverLetterRun,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
   // as a record, but adding questions and drafting from the bank are folded
@@ -51,6 +54,9 @@ export function Answers({
   const [pasting, setPasting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Held here so saving an inserted letter can turn the Cover letter mark to
+  // Yes above it (plan #2135.2).
+  const [letterMark, setLetterMark] = useState(hasCoverLetter);
 
   // Dash's drafts and questions live here, above the cards, so one run can
   // fill every card and the questions panel at once (plan #2130.4). The run
@@ -119,7 +125,8 @@ export function Answers({
         roleId={roleId}
         closed={closed}
         initialReady={readyToApply}
-        initialCoverLetter={hasCoverLetter}
+        letter={letterMark}
+        onLetter={setLetterMark}
       />
       {/* The panel is the answers. Adding questions is something you do to it
           now and then, and it used to be a four-row textarea sitting above
@@ -282,16 +289,15 @@ export function Answers({
         applicationId={applicationId}
         roleId={roleId}
         initial={coverLetter}
+        closed={closed}
+        initialDraft={coverLetterDraft}
+        initialRun={coverLetterRun}
+        onMarkedYes={() => setLetterMark(true)}
       />
     </div>
   );
 }
 
-/**
- * The cover letter sent with this application (note b4cecf70), under the
- * answers because it is part of the same submission. Read as prose and edited
- * in place, as an answer is.
- */
 /**
  * Two marks you keep on the application: ready to apply, and whether it has a
  * cover letter (plan #2102.2). The cover letter answer is yours, separate from
@@ -303,16 +309,18 @@ function ApplicationMarks({
   roleId,
   closed,
   initialReady,
-  initialCoverLetter,
+  letter,
+  onLetter: setLetter,
 }: {
   applicationId: string;
   roleId: string;
   closed: boolean;
   initialReady: boolean;
-  initialCoverLetter: boolean | null;
+  /** The Cover letter mark, held by the tab so saving an inserted letter can set it. */
+  letter: boolean | null;
+  onLetter: (letter: boolean | null) => void;
 }) {
   const [ready, setReady] = useState(initialReady);
-  const [letter, setLetter] = useState(initialCoverLetter);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -394,77 +402,6 @@ function ApplicationMarks({
         </p>
       )}
     </Card>
-  );
-}
-
-function CoverLetter({
-  applicationId,
-  roleId,
-  initial,
-}: {
-  applicationId: string;
-  roleId: string;
-  initial: string;
-}) {
-  const [text, setText] = useState(initial);
-  const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  return (
-    <CardSection title="Cover letter">
-      {editing ? (
-        <Textarea
-          rows={12}
-          value={text}
-          autoFocus
-          aria-label="Cover letter"
-          onChange={(event) => setText(event.target.value)}
-        />
-      ) : (
-        <ProseAtRest
-          text={text}
-          onEdit={() => setEditing(true)}
-          title="Edit the cover letter"
-          empty="No cover letter yet."
-        />
-      )}
-      {(editing || saved) && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {editing && (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await saveCoverLetter({ applicationId, roleId, body: text });
-                    setSaved(result.error ?? 'Saved.');
-                    if (!result.error) setEditing(false);
-                  })
-                }
-              >
-                Save
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  setText(initial);
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </>
-          )}
-          {saved && <span className="text-small text-ink-muted">{saved}</span>}
-        </div>
-      )}
-    </CardSection>
   );
 }
 

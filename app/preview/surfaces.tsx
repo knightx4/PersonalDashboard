@@ -546,6 +546,7 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  coverLetterDraft: null,
   readyToApply: false,
   hasCoverLetter: null,
   timezone: 'Europe/London',
@@ -3502,6 +3503,39 @@ const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
   },
 };
 
+/**
+ * Dash's cover letter after Draft a cover letter (plan #2135.2): five
+ * paragraphs citing three items, one claim to check, and two questions back,
+ * the first already replied to.
+ */
+const draftedLetter: NonNullable<PanelProps['coverLetterDraft']> = {
+  letter: [
+    'Dear hiring team,',
+    'I am applying for the quantitative developer role on your systematic trading teams. For the last three years at Kestrel I have built the research tooling our desk runs on: the backtester, the tick store behind it, and the checks that stop a bad day of market data reaching a live strategy.',
+    'The part of your posting I keep coming back to is turning an idea into a backtest and a backtest into a live strategy. At Kestrel that path took two weeks when I joined. After I moved the backtester onto the same data path as production it took two days, and the strategies that went live behaved the way their backtests said they would.',
+    'I write Python every day and C++ where the hot path needs it, and I have run market data at the scale of every US equity tick. I would like to bring that to the team that owns the pipeline every desk reads from.',
+    'Thank you for reading. I would be glad to talk it through.',
+  ].join('\n\n'),
+  words: 178,
+  evidenceItemIds: ['ev-1', 'ev-2', 'ev-3'],
+  unsupportedClaims: ['the strategies that went live behaved the way their backtests said they would'],
+  bannedFound: [],
+  asks: [
+    {
+      id: 'letter-ask-1',
+      answer_id: null,
+      question: 'Who should the letter be addressed to? The posting names no hiring manager.',
+      reply: 'Dana Okafor, who ran the phone screen',
+    },
+    {
+      id: 'letter-ask-2',
+      answer_id: null,
+      question: 'Is the move from two weeks to two days something you can say publicly, or should it stay vaguer?',
+      reply: null,
+    },
+  ],
+};
+
 const draftedAsks: PanelProps['dashAsks'] = [
   {
     id: 'ask-1',
@@ -3660,6 +3694,55 @@ export const SURFACES: readonly Surface[] = [
         status="drafting"
         answers={draftedAnswers}
         draftRun={{ pending: false, error: 'Dash ran out of time before the answers were written. Nothing was saved; try again.' }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-draft',
+    label: "Role · Cover letter drafted, with Dash's questions",
+    module: 'jobs',
+    width: 'wide',
+    // After Draft a cover letter (plan #2135.2): the draft beside the empty
+    // letter, one claim to check, and Dash's two questions with Redraft.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterDraft={draftedLetter}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-drafting',
+    label: 'Role · Cover letter, drafting',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter mid-run: the button reads Drafting with a note under it.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-error',
+    label: 'Role · Cover letter, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{
+          pending: false,
+          error: 'Dash ran out of time before the letter was written. Nothing was saved; try again.',
+        }}
         defaultTab={defaultRoleTab('drafting')}
       />
     ),

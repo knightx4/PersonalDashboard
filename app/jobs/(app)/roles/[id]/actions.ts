@@ -9,7 +9,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { draftAndSaveCoverLetter } from '@/lib/jobs/drafting/draft-cover-letter';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
-import { saveReplies } from '@/lib/jobs/drafting/store';
+import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
 
 /**
  * Notes attach to exactly one parent, enforced by a check constraint in the
@@ -87,18 +87,24 @@ export async function addNote(input: {
  * The cover letter under the application's answers (note b4cecf70), in
  * applications.cover_letter. Not cover_letters.body, which is the shared case
  * page's statement and public once shared. Saving it empty clears it.
+ *
+ * `fromDraft` is the save after Insert put Dash's draft in the editor (plan
+ * #2135.2): the same write sets the Cover letter mark to Yes, and the draft
+ * leaves application_drafts so a reload does not offer it again.
  */
 // latency: pending
 export async function saveCoverLetter(input: {
   applicationId: string;
   roleId: string;
   body: string;
+  fromDraft?: boolean;
 }): Promise<{ error: string | null }> {
   const parsed = z
     .object({
       applicationId: z.string().uuid(),
       roleId: z.string().uuid(),
       body: z.string().trim().max(20_000, 'A cover letter is at most 20,000 characters.'),
+      fromDraft: z.boolean().optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -106,15 +112,40 @@ export async function saveCoverLetter(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
+  const marking = Boolean(parsed.data.fromDraft && parsed.data.body);
+  const patch: { cover_letter: string | null; has_cover_letter?: boolean } = {
+    cover_letter: parsed.data.body || null,
+  };
+  if (marking) patch.has_cover_letter = true;
+
   const { error } = await supabase
     .from('applications')
-    .update({ cover_letter: parsed.data.body || null })
+    .update(patch)
     .eq('id', parsed.data.applicationId)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
+  // Best effort: the letter is saved, and a draft left behind only offers
+  // itself again on the next visit.
+  if (parsed.data.fromDraft) await dropDraft(supabase, parsed.data.applicationId, 'cover_letter', LETTER_KEY);
+
   revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  if (marking) revalidatePath('/jobs');
   return { error: null };
+}
+
+/**
+ * Throws Dash's drafted letter away (plan #2135.2). The questions it asked
+ * and the replies stay on the row, for the next draft to use.
+ */
+// latency: pending
+export async function dropCoverLetterDraft(input: { applicationId: string }): Promise<{ error: string | null }> {
+  const parsed = z.object({ applicationId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireUser();
+  const supabase = await createClient();
+  return dropDraft(supabase, parsed.data.applicationId, 'cover_letter', LETTER_KEY);
 }
 
 const repliesSchema = z.record(z.string().min(1), z.string().max(4_000, 'A reply is at most 4,000 characters.'));
