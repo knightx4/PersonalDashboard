@@ -5673,6 +5673,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PracticeRunPreview state="end" />,
   },
   {
+    /* The end of a run with a lens offered for a vault theme no lens covers. */
+    id: 'learn-practice-run-end-offer',
+    label: 'Practice Flow · End of a run, lens offered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer" />,
+  },
+  {
+    /* The same offer with the longest names it has to hold. */
+    id: 'learn-practice-run-end-offer-long',
+    label: 'Practice Flow · End of a run, lens offered, long names',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer-long" />,
+  },
+  {
     /* A run ended before anything was answered. */
     id: 'learn-practice-run-end-empty',
     label: 'Practice Flow · End of a run, nothing answered',

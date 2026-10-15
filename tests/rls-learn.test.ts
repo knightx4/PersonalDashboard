@@ -138,6 +138,7 @@ describe('RLS coverage', () => {
       'idea_topic_parents',
       'imports',
       'learning_log',
+      'lens_offer_declines',
       'lens_targets',
       'lenses',
       'link_reviews',
