@@ -5,6 +5,7 @@ import { CheckCircle2, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CheckRow, Textarea } from '@/components/ui/field';
@@ -15,6 +16,7 @@ import {
   addQuestions,
   draftAnswerFromEvidence,
   promoteToCanonical,
+  removeAnswer,
   saveAnswer,
   saveDraftedAnswer,
 } from '../actions';
@@ -527,6 +529,20 @@ export function AnswerCard({
               {drafting ? 'Drafting…' : 'Draft an answer'}
             </DashAction>
           </>
+        )}
+        {!editing && (
+          <ConfirmStep
+            align="start"
+            prompt="Take this question off the application? It stays in your bank with its default answer."
+            confirmLabel="Remove"
+            pendingLabel="Removing…"
+            onConfirm={async () => {
+              const result = await removeAnswer(answer.id);
+              if (result.error) throw new Error(result.error);
+            }}
+          >
+            Remove
+          </ConfirmStep>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}
