@@ -365,7 +365,7 @@ function EmailRow({
               Open in Gmail
             </GmailAnchor>
           )}
-          <DismissEmailButton messageId={row.messageId} />
+          <DismissEmailButton messageId={row.messageId} subject={subject} />
           <ExcludeSenderButton
             messageId={row.messageId}
             fromAddress={row.fromAddress}

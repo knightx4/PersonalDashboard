@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
@@ -119,7 +120,7 @@ export function DashChangeRow({
       const reopen = presses.reopen;
       if (outcome.ok && which === 'decline' && reopen) {
         toast({
-          text: 'Declined',
+          text: closedToast('declined', words.what),
           undo: async () => {
             const back = await reopen(change.id);
             if (!back.ok) throw new Error(back.error);

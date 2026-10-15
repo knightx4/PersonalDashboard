@@ -7,6 +7,7 @@
  * components/jobs/pipeline/board.tsx plays them.
  */
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { isTerminal, statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 export type BoardMoment = 'forward' | 'offer' | 'rejection';
@@ -42,14 +43,13 @@ export function openApplications(rows: readonly { status: ApplicationStatus }[])
 }
 
 /**
- * The line a rejection leaves: how many applications are still
- * open and where the role went. Plain, so the news is neither hidden nor made
- * much of. The count comes first and the line is short, because it is said in
- * a toast one line wide on a phone, and a long company name should cut the
- * name rather than the count.
+ * The line a rejection leaves: the closing word with the role it closed, as
+ * every closing toast says it (plan #1957.8), then how many applications are
+ * still open, said short so it fits beside Undo on a phone. Plain, so the
+ * news is neither hidden nor made much of. A rejection is Declined
+ * (lib/core/lifecycle.ts).
  */
 export function stillOpenLine(company: string, open: number): string {
-  const count = open === 0 ? 'None still open' : `${open} still open`;
-  const filed = company.trim() ? `${company.trim()} is in Closed` : 'Moved to Closed';
-  return `${count} · ${filed}`;
+  const count = open === 0 ? 'none open' : `${open} open`;
+  return `${closedToast('declined', company.trim() || 'the role')} · ${count}`;
 }

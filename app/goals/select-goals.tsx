@@ -2,6 +2,9 @@
 
 import { createContext, useContext, useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -17,10 +20,11 @@ import {
 /**
  * Putting several goals away at once (plan #2097.2). Select on the list turns
  * a tick box on at the left of every goal that can still be put away; once
- * one is ticked a bar at the foot of the screen counts them and offers Park
- * and Archive. Each goal is written with the same action its own menu uses,
- * one after another, and the toast's one Undo brings back every goal that
- * went. Archiving more than five asks first, in the bar.
+ * one is ticked a bar at the foot of the screen counts them and offers Later
+ * (park) and Drop (archive), the closing words of plan #1957.8. Each goal is
+ * written with the same action its own menu uses, one after another, and the
+ * toast's one Undo brings back every goal that went. Dropping more than five
+ * asks first, in the bar.
  */
 
 /** Archiving more goals than this at once asks first. */
@@ -33,7 +37,7 @@ export function parkable(goals: readonly PutAwayGoal[]): PutAwayGoal[] {
 
 /** The bar's confirm before archiving more than five goals. */
 export function archiveManyConfirm(count: number): string {
-  return `Archive ${count} goals and their steps?`;
+  return `Drop ${count} goals and their steps?`;
 }
 
 type GoalSelect = {
@@ -130,8 +134,8 @@ export function GoalTick({ id, title }: { id: string; title: string }) {
 
 /**
  * The bar at the foot of the screen while goals are ticked: the count, then
- * Park and Archive. Park counts the open goals when some ticked are not open,
- * since only those can be parked. Archiving more than five turns the bar into
+ * Later and Drop. Later counts the open goals when some ticked are not open,
+ * since only those can be parked. Dropping more than five turns the bar into
  * its confirm. Fixed above the tab bar on a phone, as the toast is, and the
  * toast takes its place once the goals have gone.
  */
@@ -158,10 +162,11 @@ export function GoalSelectBar() {
       }
       setSelecting(false);
       const done = result.done;
+      const title = goals.find((goal) => goal.id === done[0])?.title;
       toast({
         text: result.error
-          ? `${putAwayText(done.length, how)} One refused.`
-          : putAwayText(done.length, how),
+          ? `${putAwayText(done.length, how, title)} One refused.`
+          : putAwayText(done.length, how, title),
         undo: () => bringBackGoals(done, how),
       });
     });
@@ -191,15 +196,12 @@ export function GoalSelectBar() {
               <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-              <Button
-                type="button"
-                size="sm"
+              <CloseButton
+                lifecycle="dropped"
                 variant="danger"
                 autoFocus
                 onClick={() => run('archive', ticked)}
-              >
-                Archive
-              </Button>
+              />
             </>
           ) : (
             <>
@@ -214,19 +216,19 @@ export function GoalSelectBar() {
                 pending={pending}
                 onClick={() => run('park', park)}
               >
-                {park.length === count || park.length === 0 ? 'Park' : `Park ${park.length}`}
+                <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
+                {park.length === count || park.length === 0
+                  ? LIFECYCLE_VERB.later
+                  : `${LIFECYCLE_VERB.later} (${park.length})`}
               </Button>
-              <Button
-                type="button"
-                size="sm"
+              <CloseButton
+                lifecycle="dropped"
                 variant="danger"
                 disabled={pending}
                 onClick={() =>
                   count > ARCHIVE_CONFIRM_OVER ? setConfirming(true) : run('archive', ticked)
                 }
-              >
-                Archive
-              </Button>
+              />
             </>
           )}
         </Card>

@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { parseHelpKindFields } from '@/lib/goals/help-kinds';
-import { setGoalHelpKinds, turnDownHelpProposal } from '@/lib/goals/help-kinds-store';
+import { restoreHelpProposal, setGoalHelpKinds, turnDownHelpProposal } from '@/lib/goals/help-kinds-store';
+import { HELP_KINDS, parseHelpKindFields, type HelpKindChoice } from '@/lib/goals/help-kinds';
 
 /**
  * Save the kinds of weekly help a goal asks for (plan #1027): the ticked
@@ -53,6 +53,31 @@ export async function turnDownHelpAction(
     if (!changed) return { error: 'That proposal is no longer waiting.' };
   } catch {
     return { error: 'The proposal could not be turned down. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now() };
+}
+
+const Proposal = z
+  .array(z.object({ kind: z.enum(HELP_KINDS), note: z.string().max(2000).nullable() }))
+  .min(1)
+  .max(HELP_KINDS.length);
+
+/** The Undo of declining the proposed help (plan #1957.8): it waits on the goal again. */
+// latency: pending
+export async function restoreHelpProposalAction(
+  goalId: string,
+  proposal: HelpKindChoice[],
+): Promise<HelpKindsActionState> {
+  await requireUser();
+  const id = Id.safeParse(goalId);
+  const parsed = Proposal.safeParse(proposal);
+  if (!id.success || !parsed.success) return { error: 'Could not tell which proposal that was.' };
+  try {
+    const changed = await restoreHelpProposal(await createGoalsClient(), id.data, parsed.data);
+    if (!changed) return { error: 'The help has been chosen since, so it was left as it is.' };
+  } catch {
+    return { error: 'The proposal could not be brought back. Try again.' };
   }
   revalidatePath('/goals', 'layout');
   return { done: Date.now() };

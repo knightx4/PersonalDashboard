@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useState } from 'react';
 import { Check } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -123,7 +124,7 @@ export function QuestionRow({
         const back = new FormData();
         back.set('id', node.id);
         back.set('status', node.status);
-        toast({ text: 'Dropped', undo: () => undoOrThrow(actions.setStatus, back) });
+        toast({ text: closedToast('dropped', node.title), undo: () => undoOrThrow(actions.setStatus, back) });
       }
       return next;
     },
@@ -136,7 +137,10 @@ export function QuestionRow({
         const back = new FormData();
         back.set('id', node.id);
         back.set('dismissed', '0');
-        toast({ text: 'Later', undo: () => undoOrThrow(actions.dismissQuestion, back) });
+        toast({
+          text: closedToast('later', node.title),
+          undo: () => undoOrThrow(actions.dismissQuestion, back),
+        });
       }
       return next;
     },

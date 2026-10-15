@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useState, useTransition } from 'react';
 import { CloseButton } from '@/components/inbox/close-button';
 import { useToast } from '@/components/ui/toast';
@@ -261,7 +262,7 @@ function RaiseCard({
       setDismissState(result);
       if (result.error) return;
       toast({
-        text: 'Declined',
+        text: closedToast('declined', row.title),
         undo: async () => {
           const back = await reopenRaise({}, form);
           if (back.error) throw new Error(back.error);

@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -153,7 +154,7 @@ function FeedOfferCard({
     // only means the theme may be offered again.
     void answerTrackOffer(form).catch(() => undefined);
     toast({
-      text: outcome === 'never' ? 'Declined' : 'Later',
+      text: closedToast(outcome === 'never' ? 'declined' : 'later', offer.name),
       undo: async () => {
         await takeBackOfferAnswer({ themeId: offer.themeId });
         onBack();
@@ -259,7 +260,7 @@ function RestingTrackCard({
       })
       .catch(() => onError('That was not kept. Check your connection.'));
     toast({
-      text: outcome === 'rested' ? 'Dropped' : 'Later',
+      text: closedToast(outcome === 'rested' ? 'dropped' : 'later', track.name),
       undo: async () => {
         await takeBackOfferAnswer({ subjectId: track.subjectId });
         onBack();

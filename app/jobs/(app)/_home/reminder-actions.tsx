@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useTransition } from 'react';
 import { CloseButton } from '@/components/inbox/close-button';
 import { useToast } from '@/components/ui/toast';
@@ -8,12 +9,13 @@ import { completeReminder, restoreReminder, snoozeReminder } from './actions';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
- * Two answers to a nudge: dealt with, or not now.
+ * Two answers to a nudge: dealt with, or not now. Each toast names the
+ * nudge it closed (plan #1957.8).
  *
  * There is deliberately no third. A nudge you can neither finish nor defer is
  * a nudge you learn to look past, which is how a list of them stops working.
  */
-export function ReminderActions({ id }: { id: string }) {
+export function ReminderActions({ id, title }: { id: string; title: string }) {
   const [busy, startTransition] = useTransition();
   const toast = useToast();
 
@@ -22,7 +24,7 @@ export function ReminderActions({ id }: { id: string }) {
       const result = await snoozeReminder(id);
       if (result.error) return toast({ text: result.error });
       toast({
-        text: `Later: back in ${SNOOZE_DAYS} days`,
+        text: `${closedToast('later', title)}, back in ${SNOOZE_DAYS} days`,
         undo: async () => void (await restoreReminder(id, result.dueAt ?? null)),
       });
     });
@@ -32,7 +34,7 @@ export function ReminderActions({ id }: { id: string }) {
     startTransition(async () => {
       const result = await completeReminder(id);
       if (result.error) return toast({ text: result.error });
-      toast({ text: 'Done', undo: async () => void (await restoreReminder(id, null)) });
+      toast({ text: closedToast('done', title), undo: async () => void (await restoreReminder(id, null)) });
     });
   }
 

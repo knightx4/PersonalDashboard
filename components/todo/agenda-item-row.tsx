@@ -12,7 +12,7 @@ import { putAway } from '@/components/motion/place';
 import { moduleById, moduleForPath } from '@/lib/modules';
 import { answerItem, completeItem, deferItem, dismissItem, restoreItem } from '@/app/todo/source-actions';
 import { useToast } from '@/components/ui/toast';
-import { LIFECYCLE_GLYPH, LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -59,7 +59,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       // Later and Drop say so, with the way back where the source has one
       // (plan #1957.3).
       if (change.state === 'deferred' || change.state === 'dismissed') {
-        const text = change.state === 'deferred' ? LIFECYCLE_VERB.later : LIFECYCLE_WORD.dropped;
+        const text = closedToast(change.state === 'deferred' ? 'later' : 'dropped', item.title);
         toast(
           item.restorable
             ? {

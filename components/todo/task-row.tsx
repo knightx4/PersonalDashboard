@@ -1,6 +1,6 @@
 'use client';
 
-import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { useOptimistic, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -303,7 +303,7 @@ export function TaskRow({
         return result;
       },
       toast: {
-        text: 'done',
+        text: closedToast('done', task.title),
         undo: undoWith(() => reopenTask(task.id, ticked)),
         undone: 'reopened',
       },
@@ -321,7 +321,7 @@ export function TaskRow({
       },
       // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
       toast: {
-        text: 'dropped',
+        text: closedToast('dropped', task.title),
         undo: undoWith(() => reopenTask(task.id)),
         undone: 'back on the list',
       },
@@ -340,7 +340,7 @@ export function TaskRow({
         return result;
       },
       toast: {
-        text: 'until later',
+        text: closedToast('later', task.title),
         undo: undoWith(() => bringBackTask(task.id)),
         undone: 'brought back',
       },
@@ -911,7 +911,7 @@ function TaskItems({
               }
               onDrop={() =>
                 write(item.id, 'dropped', () => dropTask(item.id), {
-                  text: 'dropped',
+                  text: closedToast('dropped', item.title),
                   undo: undoWith(() => reopenTask(item.id)),
                   undone: 'back on the list',
                 })

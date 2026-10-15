@@ -1,9 +1,11 @@
 'use client';
 
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
+import { closedToast } from '@/lib/core/lifecycle';
 import { useState, useTransition } from 'react';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Deck, type DeckItem } from '@/components/patterns/deck';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -44,6 +46,7 @@ export function QuickRead({
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [, startDismiss] = useTransition();
+  const toast = useToast();
   const briefHref = `/learn/b/${briefId}`;
   const left = cards.filter((card) => !dismissed.has(card.id));
 
@@ -63,9 +66,20 @@ export function QuickRead({
     );
   }
 
+  // Decline, with the toast naming the card and an Undo that puts it back
+  // in the deck, as the feed's Previous does (plan #1957.8).
   const dismiss = (card: FeedCard) => {
     setError(null);
     setDismissed((current) => new Set(current).add(card.id));
+    toast({
+      text: closedToast('declined', card.title),
+      undo: () =>
+        setDismissed((current) => {
+          const next = new Set(current);
+          next.delete(card.id);
+          return next;
+        }),
+    });
     startDismiss(async () => {
       const result = await actions.dismiss(card.id).catch(() => ({ error: 'Check your connection.' }));
       if (result.error) setError(`"${card.title}" was not dismissed: ${result.error}`);
@@ -76,10 +90,7 @@ export function QuickRead({
     key: card.id,
     body: <QuickReadCard card={card} onOpen={() => void actions.open(card.id)} />,
     actions: (
-      <Button type="button" variant="ghost" size="sm" onClick={() => dismiss(card)}>
-        <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Not interested
-      </Button>
+      <CloseButton lifecycle="declined" onClick={() => dismiss(card)} />
     ),
   }));
 

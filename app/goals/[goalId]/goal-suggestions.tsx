@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState, useTransition } from 'react';
 import { ExternalLink } from 'lucide-react';
@@ -110,7 +111,7 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
       setDeclined(result);
       if (result.error) return;
       toast({
-        text: 'Declined',
+        text: closedToast('declined', s.title),
         undo: async () => {
           const back = await undoDeclineAction(s.id);
           if (back.error) throw new Error(back.error);

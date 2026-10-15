@@ -16,6 +16,7 @@ import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/comp
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
@@ -43,6 +44,7 @@ import {
   answerQuestionAction,
   setQuestionAsideAction,
   settleProposalAction,
+  undoDeclineProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -50,7 +52,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
  * on a question, what Claude produced, a rhythm's past periods, the approve
- * and turn-down pair on a proposal, the composer that adds a step, and the
+ * and decline pair on a proposal, the composer that adds a step, and the
  * pieces that edit one where it is read.
  * The goal's row in goal-row.tsx puts these in the shared tree row's slots.
  */
@@ -98,7 +100,7 @@ export function Question({ node }: { node: StepNode }) {
       const result = await putAside(true);
       setAsideError(result.error ?? null);
       if (result.error) return;
-      toast({ text: 'Later', undo: async () => void (await putAside(false)) });
+      toast({ text: closedToast('later', node.title), undo: async () => void (await putAside(false)) });
     });
   }
   // The box is open when it was opened since the last answer was saved, so a
@@ -255,21 +257,62 @@ export function formatDate(isoDate: string): string {
   return formatDay(isoDate);
 }
 /**
- * Approve and Turn down beside a proposal's Needs line (plan #960), the same
+ * Decline a step Dash proposed, with the proposed steps beneath it, and say
+ * so in a toast that names it and offers Undo (plan #1957.8). The menu's
+ * Decline and the button beside the Needs line both come here.
+ */
+export function useDeclineProposal(node: { id: string; title: string }) {
+  const toast = useToast();
+  return async function decline() {
+    const form = new FormData();
+    form.set('id', node.id);
+    form.set('approve', '0');
+    const result = await settleProposalAction(answerInitial, form);
+    if (result.error) {
+      toast({ text: result.error });
+      return;
+    }
+    const declined = result.declined ?? [];
+    toast({
+      text: closedToast('declined', node.title),
+      undo:
+        declined.length > 0
+          ? async () => {
+              const back = await undoDeclineProposalAction(declined);
+              if (back.error) throw new Error(back.error);
+            }
+          : undefined,
+    });
+  };
+}
+
+/**
+ * Approve and Decline beside a proposal's Needs line (plan #960), the same
  * two moves its menu offers.
  */
 export function ProposalButtons({ node }: { node: StepNode }) {
   const [state, settle, settling] = useActionState(settleProposalAction, answerInitial);
+  const [declining, startDecline] = useTransition();
+  const decline = useDeclineProposal(node);
   const beneath = countProposed(node.children);
   const with_ = beneath > 0 ? `, with ${beneath} beneath` : '';
   return (
     <form action={settle} className="mt-1.5 flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={node.id} />
-      <Button type="submit" size="sm" name="approve" value="1" pending={settling}>
+      <Button type="submit" size="sm" name="approve" value="1" pending={settling} disabled={declining}>
         Approve{with_}
       </Button>
-      <Button type="submit" size="sm" variant="ghost" name="approve" value="0" disabled={settling}>
-        Turn down{with_}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={settling}
+        pending={declining}
+        onClick={() => startDecline(decline)}
+      >
+        <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
+        {LIFECYCLE_VERB.declined}
+        {with_}
       </Button>
       {state.error && (
         <p role="alert" className="text-small text-danger">

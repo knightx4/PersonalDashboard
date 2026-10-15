@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sprout } from 'lucide-react';
@@ -203,7 +204,7 @@ function TrackOfferCard({
     setHidden(true);
     await answerTrackOffer(formData);
     toast({
-      text: formData.get('outcome') === 'never' ? 'Declined' : 'Later',
+      text: closedToast(formData.get('outcome') === 'never' ? 'declined' : 'later', offer.name),
       undo: async () => {
         await takeBackOfferAnswer({ themeId: offer.themeId });
         setHidden(false);

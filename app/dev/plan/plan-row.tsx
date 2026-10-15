@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useCallback, useMemo, useState } from 'react';
 import { CircleUser, Pencil } from 'lucide-react';
 import {
@@ -743,7 +744,7 @@ export function usePlanRow({
       if (change.kind !== 'status' || !isClosed(change.status) || isClosed(served.status)) return;
       const back = served.status;
       toast({
-        text: change.status === 'done' ? 'Done' : 'Dropped',
+        text: closedToast(change.status === 'done' ? 'done' : 'dropped', served.title),
         undo: async () => {
           const result = await writeRowChange(served.id, { kind: 'status', status: back });
           const error = writeError(result);

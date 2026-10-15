@@ -54,3 +54,28 @@ export async function turnDownHelpProposal(
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }
+
+/**
+ * The Undo of declining the proposal (plan #1957.8): the kinds Dash proposed
+ * wait on the goal again, unsettled, as they did before. False when the goal
+ * is gone or archived, or something has been chosen since.
+ */
+export async function restoreHelpProposal(
+  client: GoalsSupabaseClient,
+  goalId: string,
+  proposal: HelpKindChoice[],
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({
+      proposed_help_kinds: proposal.map(({ kind, note }) => ({ kind, note })),
+      help_kinds_settled_at: null,
+    })
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .is('archived_at', null)
+    .eq('proposed_help_kinds', '[]')
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}

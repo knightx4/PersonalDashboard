@@ -113,8 +113,9 @@ export const TODAY_ACTIONS: Record<TodayKind, string> = {
   step: 'Done',
   suggestion: 'Going',
   plan: 'Review',
-  close: 'Close goal',
-  park: 'Park goal',
+  // The closing words (plan #1957.8): closing a goal is Done, parking it Later.
+  close: 'Done',
+  park: 'Later',
 };
 
 /**

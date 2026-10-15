@@ -84,6 +84,17 @@ export function lifecycleLabel(lifecycle: Lifecycle): {
   };
 }
 
+/**
+ * What the toast says once a row has closed (plan #1957.8): the ending, then
+ * the row it closed, as in "Dropped: Book the boiler service". The toast cuts
+ * a long name off at its edge, so the name goes in whole. With no name to
+ * hand the ending stands alone.
+ */
+export function closedToast(lifecycle: Lifecycle, name?: string | null): string {
+  const title = name?.replace(/\s+/g, ' ').trim();
+  return title ? `${LIFECYCLE_WORD[lifecycle]}: ${title}` : LIFECYCLE_WORD[lifecycle];
+}
+
 /** One status word's ending: a word of the four, or `null` while the row is still open. */
 export type Ending = Lifecycle | null;
 

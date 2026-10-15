@@ -190,7 +190,9 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
         )
       )}
 
-      {takeaway.status !== 'covered' && <TakeawayActions id={takeaway.id} status={takeaway.status} />}
+      {takeaway.status !== 'covered' && (
+        <TakeawayActions id={takeaway.id} title={takeaway.title} status={takeaway.status} />
+      )}
       <Thread
         subject={threadRef('takeaway', takeaway.id)}
         turns={takeaway.thread}

@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
 import {
@@ -110,7 +111,7 @@ export function SpecChangeCard({
       const id = String(formData.get('id') ?? '');
       if (next.message)
         toast({
-          text: 'Declined',
+          text: closedToast('declined', change.title),
           undo: async () => {
             const back = await undeclineSpecChange(id);
             if (back.error) throw new Error(back.error);
