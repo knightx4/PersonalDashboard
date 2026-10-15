@@ -16,6 +16,7 @@ import { PlacesView } from '@/app/you/places/places-view';
 import { PlaceView } from '@/app/you/places/place-view';
 import { PlaceForm } from '@/app/you/places/place-form';
 import type { Place } from '@/lib/you/places';
+import { drawPlaceMap, drawPlacesMap } from '@/lib/you/places-map-outlines';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -2661,6 +2662,8 @@ const youPlaces: Place[] = [
     movedIn: '2019-08',
     movedOut: null,
     note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-leeds',
@@ -2671,6 +2674,8 @@ const youPlaces: Place[] = [
     movedIn: '2015',
     movedOut: '2019-08',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-lisbon',
@@ -2681,6 +2686,8 @@ const youPlaces: Place[] = [
     movedIn: '2014-02',
     movedOut: '2014-09',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-childhood',
@@ -2691,8 +2698,21 @@ const youPlaces: Place[] = [
     movedIn: '1992',
     movedOut: '2014',
     note: null,
+    latitude: null,
+    longitude: null,
   },
 ];
+
+/** The same places with positions for the Map view (plan #2091.4); the childhood home has none. */
+const PLACE_POSITIONS: Record<string, [number, number]> = {
+  'place-york': [53.96, -1.08],
+  'place-leeds': [53.8, -1.55],
+  'place-lisbon': [38.72, -9.14],
+};
+const youPlacesOnMap: Place[] = youPlaces.map((place) => {
+  const at = PLACE_POSITIONS[place.id];
+  return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
+});
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
@@ -5908,6 +5928,34 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlacesView places={youPlaces} />,
   },
   {
+    /* The Map view (plan #2091.4): three homes on the map, two of them in
+     * neighbouring cities fanned apart, joined in move-in order, the home
+     * they live in now marked, and one with no position listed beneath. */
+    id: 'you-places-map',
+    label: 'You · Places on the map',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} />,
+  },
+  {
+    /* Hovering a dot names the place and its years. */
+    id: 'you-places-map-tooltip',
+    label: 'You · Places on the map, a dot hovered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} tipOpenFor="place-lisbon" />
+    ),
+  },
+  {
+    /* The Map view before any place has a position. */
+    id: 'you-places-map-empty',
+    label: 'You · Places on the map, before any has a position',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} view="map" map={drawPlacesMap(youPlaces)} />,
+  },
+  {
     id: 'you-places-empty',
     label: 'You · Places, before any are added',
     module: 'you',
@@ -5928,7 +5976,55 @@ export const SURFACES: readonly Surface[] = [
     label: 'You · One place, the home they live in now',
     module: 'you',
     width: 'page',
-    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+    render: () => (
+      <PlaceView place={youPlaces[0]} thisMonth="2026-10" map={drawPlaceMap(youPlaces[0], youPlaces)} />
+    ),
+  },
+  {
+    /* A place on the map (plan #2091.5): its region, its dot, Move and Clear. */
+    id: 'you-place-map',
+    label: 'You · One place, on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[0]}
+        thisMonth="2026-10"
+        map={drawPlaceMap(youPlacesOnMap[0], youPlacesOnMap)}
+      />
+    ),
+  },
+  {
+    /* Set on map pressed for a place with no position: the hint line, the
+     * map of the region their other places are in, and Cancel. */
+    id: 'you-place-map-placing',
+    label: 'You · One place, being set on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{ ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap), start: { placing: true } }}
+      />
+    ),
+  },
+  {
+    /* The same, after a press whose save did not go through. */
+    id: 'you-place-map-error',
+    label: 'You · One place, a position that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{
+          ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap),
+          start: { placing: true, error: 'The place was not put on the map. Try again.' },
+        }}
+      />
+    ),
   },
   {
     id: 'you-place-form',

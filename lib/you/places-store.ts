@@ -1,10 +1,13 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { PLACE_COLUMNS, placeFromRow, sortPlaces, type Place, type PlaceRow } from './places';
+import { positionForSave } from './place-position';
+import { PLACE_COLUMNS, placeFromRow, sortPlaces, type Place, type PlaceRow, type PlaceWrite } from './places';
 
 /**
  * Reading and writing you.places (plan #1991.5). Every call names the person
  * as well as relying on row level security, so the same functions serve a
- * service-role client.
+ * service-role client. Adding a place, or changing its city, region or
+ * country, also writes its map position from the bundled city list
+ * (plan #2091.3, lib/you/place-position.ts).
  */
 
 /** Their places, newest first, with the homes they live in now at the top. */
@@ -28,11 +31,11 @@ export async function getPlace(client: YouSupabaseClient, userId: string, id: st
 export async function insertPlace(
   client: YouSupabaseClient,
   userId: string,
-  row: Omit<PlaceRow, 'id'>,
+  row: PlaceWrite,
 ): Promise<Record<string, unknown>> {
   const { data, error } = await client
     .from('places')
-    .insert({ ...row, user_id: userId })
+    .insert({ ...row, ...positionForSave(null, row), user_id: userId })
     .select('*')
     .single();
   if (error || !data) throw new Error(`Adding the place failed: ${error?.message ?? 'no row'}`);
@@ -43,17 +46,53 @@ export async function updatePlace(
   client: YouSupabaseClient,
   userId: string,
   id: string,
-  patch: Partial<Omit<PlaceRow, 'id'>>,
+  patch: Partial<PlaceWrite>,
 ): Promise<Record<string, unknown> | null> {
+  let position = {};
+  if ('city' in patch || 'region' in patch || 'country' in patch) {
+    // The map position follows the city (plan #2091.3), so read what it was.
+    const { data: before, error: readError } = await client
+      .from('places')
+      .select('city, region, country, latitude, longitude')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (readError) throw new Error(`Reading the place failed: ${readError.message}`);
+    if (!before) return null;
+    const was = before as Pick<PlaceRow, 'city' | 'region' | 'country' | 'latitude' | 'longitude'>;
+    position = positionForSave(was, { ...was, ...patch });
+  }
   const { data, error } = await client
     .from('places')
-    .update(patch)
+    .update({ ...patch, ...position })
     .eq('id', id)
     .eq('user_id', userId)
     .select('*')
     .maybeSingle();
   if (error) throw new Error(`Changing the place failed: ${error.message}`);
   return (data as Record<string, unknown> | null) ?? null;
+}
+
+/**
+ * Puts a place on the map by hand, or takes it off with null (plan #2091.5).
+ * Written straight to the row rather than through positionForSave, which
+ * works from the city: a save that leaves the city alone keeps this
+ * position. False when there was none of theirs with that id.
+ */
+export async function setPlacePosition(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+  position: { latitude: number; longitude: number } | null,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('places')
+    .update({ latitude: position?.latitude ?? null, longitude: position?.longitude ?? null })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id');
+  if (error) throw new Error(`Changing where the place is failed: ${error.message}`);
+  return (data ?? []).length > 0;
 }
 
 /** Removes one of their places. False when there was none of theirs with that id. */

@@ -26,7 +26,7 @@ import type { FiledEntry } from '@/lib/goals/capture';
 import { findLink } from '@/lib/learn/tracks/link-meta';
 import { quizFromText, topicFromText, type QuizFromText, type TopicFromText } from '@/lib/capture/learn-text';
 import { roleFromText, type RoleFromText } from '@/lib/capture/role';
-import { checkPlace, placeFromLine, placeSpan, type PlaceRow } from '@/lib/you/places';
+import { checkPlace, placeFromLine, placeSpan, type PlaceWrite } from '@/lib/you/places';
 
 /** One row written, or the sentence saying why not. */
 export type CaptureRowWrite = { ok: true; id: string } | { ok: false; error: string };
@@ -74,7 +74,7 @@ export type CaptureWriters = {
   /** addManualReading: one thing to read, at the end of a track (plan #1950.6). */
   trackReading?: (trackId: string, title: string) => Promise<CaptureRowWrite>;
   /** insertPlace: a place they have lived, already checked (plan #1950.7). */
-  place?: (row: Omit<PlaceRow, 'id'>) => Promise<CaptureRowWrite>;
+  place?: (row: PlaceWrite) => Promise<CaptureRowWrite>;
   /** createTrack, with the readings pasted under the name. */
   topic?: (input: TopicFromText) => Promise<LearnTopicWritten>;
   /** createQuiz over pasted material and named notes. */
