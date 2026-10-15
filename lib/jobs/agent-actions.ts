@@ -106,6 +106,8 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/roles/[id]/actions.ts': {
     addNote: tool('add_role_note'),
     saveCoverLetter: tool('write_cover_letter'),
+    draftCoverLetter: none('spends'),
+    saveCoverLetterReplies: none('theirs'),
     renameRole: tool('change_role'),
     moveRoleToCompany: tool('change_role'),
     saveApplicationMarks: tool('change_application'),

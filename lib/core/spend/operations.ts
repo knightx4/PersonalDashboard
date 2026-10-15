@@ -24,6 +24,10 @@ export const SPEND_OPERATIONS = {
     // Drafting an answer to an application question from the evidence bank.
     // Opus.
     'draft-answer',
+    // Drafting a cover letter from everything on file for an application,
+    // from Draft and Redraft on its Application tab (plan #2135). Opus, one
+    // call, plus the embedding that finds the vault notes.
+    'draft-cover-letter',
     // Dash replying to a comment tagged @dash on a role, and writing the
     // cover letter when the comment asks for one (note 89ad8bef). Sonnet.
     'reply-to-role-comment',
