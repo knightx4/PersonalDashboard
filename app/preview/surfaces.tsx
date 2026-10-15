@@ -52,7 +52,7 @@ import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -6270,6 +6270,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendOverviewSurface />,
+  },
+  {
+    id: 'account-spend-by-module',
+    label: 'Account · Spend, where it goes, one fold per module',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface />,
+  },
+  {
+    id: 'account-spend-by-module-open',
+    label: 'Account · Spend, where it goes, a module opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface open="jobs" />,
   },
   {
     id: 'usage-day-bars-empty',

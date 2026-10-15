@@ -109,6 +109,7 @@ export function AimedCaptureForm({
   hint,
   attached,
   tools,
+  onPaste,
 }: {
   kind: CaptureKind;
   /** The role a note goes on, which the page aiming it already knew. */
@@ -136,7 +137,15 @@ export function AimedCaptureForm({
   attached?: React.ReactNode;
   /** The camera step's button, at the start of the foot (capture-camera.tsx). */
   tools?: React.ReactNode;
+  /**
+   * A paste into the field, for a kind that takes files: true when it held a
+   * picture and went in as a file, so the field keeps no text for it.
+   */
+  onPaste?: (data: DataTransfer) => boolean;
 }) {
+  const paste = (event: React.ClipboardEvent) => {
+    if (onPaste?.(event.clipboardData)) event.preventDefault();
+  };
   const field = 'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
   return (
@@ -155,6 +164,7 @@ export function AimedCaptureForm({
           ref={fieldRef}
           value={text}
           onChange={(event) => onText(event.target.value)}
+          onPaste={paste}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
               event.preventDefault();
@@ -174,6 +184,7 @@ export function AimedCaptureForm({
           ref={fieldRef}
           value={text}
           onChange={(event) => onText(event.target.value)}
+          onPaste={paste}
           placeholder={kind.placeholder}
           aria-label={kind.label}
           data-focus-ring="none"
