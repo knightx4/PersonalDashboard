@@ -52,7 +52,7 @@ import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -527,6 +527,8 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  readyToApply: false,
+  hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
@@ -661,6 +663,8 @@ const pipelineRow = (
   attempt: 1,
   excitement: 3,
   needsReview: false,
+  readyToApply: false,
+  hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -686,6 +690,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     excitement: 5,
+    readyToApply: true,
+    hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
     daysSinceActivity: 1,
@@ -699,6 +705,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Software Developer',
     status: 'in_process',
     excitement: 4,
+    readyToApply: true,
+    hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -3386,6 +3394,38 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-marked',
+    label: 'Role · Answers, marked ready',
+    module: 'jobs',
+    width: 'wide',
+    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        readyToApply
+        hasCoverLetter
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-closed',
+    label: 'Role · Answers, closed',
+    module: 'jobs',
+    width: 'wide',
+    // A closed application shows the marks without controls.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="rejected"
+        readyToApply
+        hasCoverLetter={false}
+        defaultTab="answers"
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
@@ -3474,6 +3514,19 @@ export const SURFACES: readonly Surface[] = [
           <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
         </PreviewShell>
       </AskDashSurface>
+    ),
+  },
+  {
+    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
+     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    id: 'jobs-pipeline-marks',
+    label: 'Pipeline · Ready and cover letter filters',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PreviewShell>
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+      </PreviewShell>
     ),
   },
   {
@@ -6276,6 +6329,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendOverviewSurface />,
+  },
+  {
+    id: 'account-spend-by-module',
+    label: 'Account · Spend, where it goes, one fold per module',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface />,
+  },
+  {
+    id: 'account-spend-by-module-open',
+    label: 'Account · Spend, where it goes, a module opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface open="jobs" />,
   },
   {
     id: 'usage-day-bars-empty',

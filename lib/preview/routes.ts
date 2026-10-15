@@ -31,6 +31,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
+  'jobs-role-answers-marked': ['/jobs/roles/[id]'],
+  'jobs-role-answers-closed': ['/jobs/roles/[id]'],
   'jobs-role-answer-draft': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
@@ -120,6 +122,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
   'jobs-pipeline-filtered': ['/jobs/pipeline'],
+  'jobs-pipeline-marks': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
   'jobs-today-clear': ['/jobs'],
   'jobs-insights': ['/jobs/analytics'],
@@ -263,6 +266,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
   'account-spend-overview': ['/account/spend'],
+  'account-spend-by-module': ['/account/spend'],
+  'account-spend-by-module-open': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
   // A component surface (COMPONENT_SURFACES); the pages it opens on have their own.

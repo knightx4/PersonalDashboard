@@ -1,3 +1,4 @@
+import { marksFromRow } from '@/lib/jobs/application-marks';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -117,7 +118,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, needs_review, created_by, cover_letter, referral_contact_id`,
+       excitement, needs_review, created_by, cover_letter, ready_to_apply, has_cover_letter, referral_contact_id`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -576,6 +577,7 @@ export default async function RoleDetailPage({
           }
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
+          {...marksFromRow(current)}
           timezone={timezone}
           defaultTab={defaultRoleTab(status)}
           focusInterviewId={focusInterviewId ?? null}
