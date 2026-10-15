@@ -171,7 +171,9 @@ export function restTransport(url: string, key: string): Transport {
 
 /** A client shaped like `postgres(url)` for what plan.ts uses. */
 export function httpsSql(transport: Transport) {
-  function sql(first: unknown, ...values: unknown[]): unknown {
+  function sql(strings: TemplateStringsArray, ...values: unknown[]): HttpsQuery;
+  function sql(value: unknown): Helper;
+  function sql(first: unknown, ...values: unknown[]): HttpsQuery | Helper {
     if (Array.isArray(first) && 'raw' in (first as object)) {
       const { text, words } = render(first as unknown as readonly string[], values);
       return new HttpsQuery(text, words, transport);
