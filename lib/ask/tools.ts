@@ -22,6 +22,7 @@ import { applicationAnswersLookup } from './answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { withParents } from './parents';
+import { tableInfoLookup } from './table-info';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
@@ -48,6 +49,7 @@ export const ASK_TOOL_NAMES = [
   'recall',
   'open_row',
   'list_rows',
+  'table_info',
   'spend_by_merchant',
   'job_applications',
   'application_answers',
@@ -158,6 +160,22 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         limit: { type: 'integer', minimum: 1, maximum: LIST_ROWS_MAX, description: `How many rows to return, up to ${LIST_ROWS_MAX}; 20 when left out.` },
       },
       required: ['table'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'table_info',
+    description:
+      "Ask what you are able to read. With no table it lists every table list_rows can read and what each holds. With a table it gives all that table's columns with their types, the tables it points to (linksTo) and the tables that point to it (linkedFrom). Use it before naming a table or column you are not sure of, and when asked what you can see.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: {
+          type: 'string',
+          enum: LISTABLE.map((s) => s.table),
+          description: 'One table, for its columns and links. Leave out to list them all.',
+        },
+      },
       additionalProperties: false,
     },
   },
@@ -440,6 +458,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   open_row: { run: openLookup, module: null },
   // Checks the workspace of the table it is given, below.
   list_rows: { run: listRowsLookup, module: null },
+  // Leaves out the tables of switched-off workspaces itself.
+  table_info: { run: tableInfoLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   application_answers: { run: applicationAnswersLookup, module: 'jobs' },
