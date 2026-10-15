@@ -35,7 +35,7 @@ import { Chip } from '@/components/ui/chip';
 import { LiveDot } from '@/components/ui/live-dot';
 import { SectionLabel } from '@/components/ui/section-heading';
 import Link, { linkVariants } from '@/components/ui/link';
-import { planRunHref } from '@/lib/plan/run-touched';
+import { runHref } from '@/lib/core/run-link';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import type { RunLinesState } from '@/components/runs/run-lines';
@@ -202,7 +202,7 @@ export function RunWork({
         <SectionLabel>Its run</SectionLabel>
         {/* The run's own page, listing every row it touched (plan #1964.2.4). */}
         {run.id && (
-          <Link href={planRunHref(run.id)} className={`press-area text-small ${linkVariants({ tone: 'quiet' })}`}>
+          <Link href={runHref('plan_runs', run.id)} className={`press-area text-small ${linkVariants({ tone: 'quiet' })}`}>
             Open the run
           </Link>
         )}

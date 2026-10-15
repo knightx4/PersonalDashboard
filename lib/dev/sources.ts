@@ -1,5 +1,6 @@
 import { planRefHref } from '@/lib/comments/refs';
-import { planRunHref, planRunTitle } from '@/lib/plan/run-touched';
+import { planRunTitle } from '@/lib/plan/run-touched';
+import { runHref } from '@/lib/core/run-link';
 import { parentBy, type ModuleSources, type Page, type Section } from '@/lib/sources/types';
 
 /**
@@ -28,7 +29,7 @@ const PAGES: Record<string, Page> = {
   // A run opens on its own page (plan #1964.2.4), under the step it was sent at.
   'public.plan_runs': {
     title: { reads: ['job'], of: (row) => planRunTitle(row.job) },
-    href: (row) => planRunHref(String(row.id)),
+    href: (row) => runHref('plan_runs', String(row.id)),
     section: { href: '/dev/plan', label: 'Plan' },
     parent: parentBy('plan_item_id', 'public.plan_items'),
   },

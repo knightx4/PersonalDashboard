@@ -16,11 +16,6 @@ import { linkParts, isAppPath } from '@/lib/goals/result-links';
 import { planRefHref, splitOnRefs, type RefReading } from '@/lib/comments/refs';
 import { RUN_JOB_LABEL, type RunJob } from './run-end';
 
-/** Where a plan run's own page is. */
-export function planRunHref(runId: string): string {
-  return `/dev/plan/runs/${runId}`;
-}
-
 /** "A step run" read as a name: "Step run". A job no label knows is "Run". */
 export function planRunTitle(job: unknown): string {
   const label = (RUN_JOB_LABEL[job as RunJob] ?? 'A run').replace(/^an? /i, '');

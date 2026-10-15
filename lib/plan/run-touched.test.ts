@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRunHref, runTouched, type TouchStep } from './run-touched';
+import { runTouched, type TouchStep } from './run-touched';
 
 function step(over: Partial<TouchStep> & Pick<TouchStep, 'id' | 'number'>): TouchStep {
   return { outline: null, parentId: null, title: `Step ${over.number}`, status: 'not_started', completedAt: null, ...over };
@@ -84,11 +84,5 @@ describe('runTouched', () => {
     });
     expect(rows.filter((row) => row.key === 's')).toHaveLength(1);
     expect(rows.find((row) => row.key === 'b')?.reason).toBe('closed');
-  });
-});
-
-describe('planRunHref', () => {
-  it('opens under the plan', () => {
-    expect(planRunHref('6f0c2a7e-1b7d-4c55-9a0e-2d8f3c1b9a01')).toBe('/dev/plan/runs/6f0c2a7e-1b7d-4c55-9a0e-2d8f3c1b9a01');
   });
 });
