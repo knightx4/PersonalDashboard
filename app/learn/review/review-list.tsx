@@ -132,7 +132,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
         {showPlan && (review.pieceId || review.trackName) && (
           <Link
             href={review.pieceId ? `/learn/s/${review.subjectId}/p/${review.pieceId}` : `/learn/s/${review.subjectId}`}
-            className={cn('text-small', linkVariants({ tone: 'quiet' }))}
+            className={cn('press-area text-small', linkVariants({ tone: 'quiet' }))}
           >
             {[review.trackName, review.pieceTitle].filter(Boolean).join(' · ')}
           </Link>
