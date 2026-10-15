@@ -23,6 +23,8 @@ export type JobsSettingsProps = {
   profile: {
     searchStartedOn: string;
     ghostThresholdDays: number;
+    /** Whether the Jobs Inbox lists the nudges (job_nudges source). */
+    showNudges: boolean;
     preferences: JobPreferences;
     /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
     minFitScore?: number;
@@ -74,6 +76,7 @@ export function JobsSettingsView({
             <SearchFields
               searchStartedOn={profile.searchStartedOn}
               ghostThresholdDays={profile.ghostThresholdDays}
+              showNudges={profile.showNudges}
             />
           ),
         },

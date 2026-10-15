@@ -14,11 +14,11 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
-import { disconnectInbox, savePreference, saveProfileField, type SettingsState } from './actions';
+import { disconnectInbox, savePreference, saveProfileField, saveShowNudges, type SettingsState } from './actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useCloseOnSuccess } from '@/lib/jobs/use-close-on-success';
-import { SettingText } from '@/components/patterns/settings-fields';
+import { SettingSwitch, SettingText } from '@/components/patterns/settings-fields';
 import {
   COMPANY_STAGE_LABELS,
   COMPANY_STAGES,
@@ -38,9 +38,11 @@ import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
 export function SearchFields({
   searchStartedOn,
   ghostThresholdDays,
+  showNudges,
 }: {
   searchStartedOn: string;
   ghostThresholdDays: number;
+  showNudges: boolean;
 }) {
   return (
     <div>
@@ -61,6 +63,12 @@ export function SearchFields({
         format={(days) => `${days} days of silence`}
         defaultValue={String(ghostThresholdDays)}
         save={saveProfileField.bind(null, 'ghostThresholdDays')}
+      />
+      <SettingSwitch
+        title="Nudges"
+        hint="List a round to write up and a round with no prep in your Inbox."
+        defaultChecked={showNudges}
+        save={saveShowNudges}
       />
       <p className="pt-2 text-small text-ink-muted">
         Your name and timezone are under{' '}

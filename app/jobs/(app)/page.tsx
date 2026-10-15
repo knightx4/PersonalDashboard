@@ -26,12 +26,11 @@ export default async function JobsToday() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, timezone')
+    .select('timezone')
     .eq('id', user.id)
     .maybeSingle();
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
-  const senderName = (profile?.display_name as string) ?? null;
 
   const [core, pipeline, interviewResult] = await Promise.all([
     createCoreClient(),
@@ -46,7 +45,7 @@ export default async function JobsToday() {
   ]);
 
   const now = new Date();
-  const board = await loadToday(supabase, user.id, { senderName, pipeline, now });
+  const board = await loadToday(supabase, user.id, { now });
   const since = await loadSinceView(supabase, core, {
     userId: user.id,
     timezone,

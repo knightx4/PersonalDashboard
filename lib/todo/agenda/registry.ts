@@ -11,6 +11,7 @@ import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
+import { jobNudgesSource } from '@/lib/todo/agenda/sources/job-nudges';
 import { jobWaitingSource } from '@/lib/todo/agenda/sources/job-waiting';
 import { planStepsSource } from '@/lib/todo/agenda/sources/plan-steps';
 import { raisedSource } from '@/lib/todo/agenda/sources/raised';
@@ -35,6 +36,7 @@ const SOURCES: AgendaSource[] = [
   draftsSource,
   applicationsSource,
   jobWaitingSource,
+  jobNudgesSource,
   planStepsSource,
   raisedSource,
   threadsSource,
