@@ -163,6 +163,7 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/s/[id]/actions.ts': {
     readAboutConcept: none('spends'),
+    proposeSubjectArticles: none('page', 'Reads Wikipedia for article names and changes nothing; pulling the kept ones is pullWikipediaArticles.'),
     pullWikipediaArticles: none('spends'),
     pullLectureCourse: none('spends'),
     findSubjectChannels: none('spends'),

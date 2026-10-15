@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import Link from '@/components/ui/link';
 import { DashChangeRow, type ChangePresses } from '@/components/talk/dash-changes';
+import { Segmented } from '@/components/ui/segmented';
 import { LookupList } from '@/components/talk/lookup-lines';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
 import { moduleById } from '@/lib/modules';
@@ -95,9 +96,28 @@ export function ChatUsed({
     setChanges(used.changes);
   }
   const shown = changes.filter((change) => change.status !== 'declined');
+  const waiting = shown.filter((change) => change.status === 'proposed').length;
+  const sourceCount = used.rows.length + used.lookups.length + used.files.length;
+  // Two views of one chat: what Dash read, and what he changed or wants to.
+  // A change waiting on a confirm opens the column on Changes, since that is
+  // the one thing in it the person has to act on.
+  const [view, setView] = useState<'sources' | 'changes'>(waiting > 0 ? 'changes' : 'sources');
 
   return (
     <div className="space-y-5">
+      <Segmented
+        label="What to show"
+        value={view}
+        onChange={setView}
+        className="flex w-full *:flex-1 *:justify-center"
+        options={[
+          { value: 'sources', label: `Sources ${sourceCount}` },
+          { value: 'changes', label: waiting > 0 ? `Changes ${waiting} waiting` : `Changes ${shown.length}` },
+        ]}
+      />
+
+      {view === 'sources' && (
+      <>
       <Part title="Rows Dash read" count={used.rows.length}>
         {used.rows.length === 0 ? (
           <None>Nothing read yet.</None>
@@ -112,6 +132,10 @@ export function ChatUsed({
         )}
       </Part>
 
+      </>
+      )}
+
+      {view === 'changes' && (
       <Part title="Changes" count={shown.length}>
         {shown.length === 0 ? (
           <None>No changes in this chat.</None>
@@ -130,7 +154,10 @@ export function ChatUsed({
           </ul>
         )}
       </Part>
+      )}
 
+      {view === 'sources' && (
+      <>
       <Part title="Lookups" count={used.lookups.length}>
         {used.lookups.length === 0 ? (
           <None>No lookups yet.</None>
@@ -155,6 +182,8 @@ export function ChatUsed({
           </ul>
         )}
       </Part>
+      </>
+      )}
 
       <Part title="Cost">
         <p className="flex items-baseline justify-between gap-2 text-ui text-ink">

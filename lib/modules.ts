@@ -127,9 +127,10 @@ export interface MarkKey {
   /** A third stop, mid-ramp. Only Dash's mark has one. */
   mid?: string;
   /**
-   * Iridescent glass: pearl over the white, and bright bands flowing across it
-   * that split blue and orange at their edges, like liquid chrome. Only Home's
-   * mark has it: a white pane is otherwise a grey one.
+   * Thick, very refractive glass: a deep band inside the edge, and the light
+   * split into cobalt, cyan, orange and magenta where that band meets the
+   * clear middle, strongest at the corners. Only Home's mark has it: a white
+   * pane is otherwise a grey one.
    */
   prism?: true;
 }
@@ -264,8 +265,9 @@ export const MODULES: readonly AppModule[] = [
  *
  * A glass house with its chimney behind, in white rather than a hue. Home is
  * not a workspace and has no colour of its own to claim, so it is the one mark
- * drawn without one. Its glass is iridescent instead, pearl with bright bands
- * flowing across it, which is what keeps a white pane from reading as a grey one.
+ * drawn without one. Its glass is thick and refractive instead, splitting light
+ * into colour round its rim, which is what keeps a white pane from reading as a
+ * grey one.
  */
 export const HOME_MARK = {
   label: 'Home',

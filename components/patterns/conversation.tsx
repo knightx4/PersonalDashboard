@@ -34,6 +34,13 @@ import { cn } from '@/lib/cn';
 /** Where the list's open or hidden state is kept, per device. */
 export const CONVERSATION_LIST_KEY = 'pt_conversation_list';
 
+/**
+ * A pane's height when the panes fill the window (`fill`): the window less the
+ * shell's top bar and the page's own padding, the same room the sticky list
+ * has always measured.
+ */
+const PANE_H = 'min-[720px]:h-[calc(100dvh-6rem)]';
+
 /** Where the glance column's open or folded state is kept, per device. */
 export const CONVERSATION_GLANCE_KEY = 'pt_conversation_glance';
 
@@ -60,6 +67,7 @@ export function Conversation({
   newChat,
   storageKey = CONVERSATION_LIST_KEY,
   initialListOpen,
+  fill = false,
   children,
 }: {
   /** What the list is called, as its heading and the name of its landmark. */
@@ -73,6 +81,11 @@ export function Conversation({
   storageKey?: string;
   /** For the gallery: start hidden or shown without reading storage. */
   initialListOpen?: boolean;
+  /**
+   * The list on a pane of its own, as tall as the window, scrolling inside
+   * it; pair with ConversationChat's `fill` (the Dash page).
+   */
+  fill?: boolean;
   /** The open chat, drawn by ConversationChat. */
   children: React.ReactNode;
 }) {
@@ -97,12 +110,16 @@ export function Conversation({
       className={cn(
         'grid grid-cols-1 min-[720px]:gap-x-6',
         listOpen ? 'min-[720px]:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)]' : 'min-[720px]:grid-cols-[2.75rem_minmax(0,1fr)]',
+        fill && 'min-[720px]:gap-x-3',
+        fill && listOpen && 'lg:grid-cols-[20rem_minmax(0,1fr)]',
       )}
     >
       <aside
         aria-label={label}
         className={cn(
           'min-w-0 min-[720px]:sticky min-[720px]:top-16 min-[720px]:max-h-[calc(100dvh-6rem)] min-[720px]:self-start min-[720px]:overflow-y-auto',
+          // A pane of its own, the height of the chat beside it.
+          fill && listOpen && cn('min-[720px]:sheet min-[720px]:rounded-card min-[720px]:bg-surface min-[720px]:p-3', PANE_H),
           open && 'max-[719px]:hidden',
         )}
       >
@@ -173,6 +190,7 @@ export function ConversationChat({
   storageKey = CONVERSATION_GLANCE_KEY,
   initialGlanceOpen,
   initialSheetOpen = false,
+  fill = false,
   children,
 }: {
   /** The chat's title. */
@@ -191,6 +209,12 @@ export function ConversationChat({
   initialGlanceOpen?: boolean;
   /** For the gallery: draw the sheet open. */
   initialSheetOpen?: boolean;
+  /**
+   * The chat as a pane the height of the window, its title fixed at the top
+   * and the thread scrolling under it, so a docked box sits at its foot; the
+   * column of what was used is a pane of the same height (the Dash page).
+   */
+  fill?: boolean;
   /** The thread. */
   children: React.ReactNode;
 }) {
@@ -262,10 +286,22 @@ export function ConversationChat({
   );
 
   return (
-    <div className={cn('grid grid-cols-1 gap-x-6', beside && '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_15rem]')}>
+    <div
+      className={cn(
+        'grid grid-cols-1',
+        fill ? 'gap-x-3' : 'gap-x-6',
+        beside && (fill ? '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_17rem]' : '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_15rem]'),
+      )}
+    >
       {/* The chat on one card, so neither side of it sits bare on the page. */}
-      <Card padding="standard" className="mx-auto w-full min-w-0 max-w-prose">
-        <div className="mb-4">
+      <Card
+        padding={fill ? 'none' : 'standard'}
+        className={cn(
+          'mx-auto w-full min-w-0',
+          fill ? cn('flex flex-col min-[720px]:sticky min-[720px]:top-16', PANE_H) : 'max-w-prose',
+        )}
+      >
+        <div className={cn(fill ? 'shrink-0 border-b border-border px-(--card-p) py-3 max-[719px]:pt-(--card-p)' : 'mb-4')}>
           <div className="mb-1 flex items-center justify-between gap-2 min-[720px]:hidden">
             <BackLink crumbs={crumbs ?? []} fallback={back} />
             {glanceButtons}
@@ -278,7 +314,14 @@ export function ConversationChat({
             <span className="hidden shrink-0 min-[720px]:flex">{glanceButtons}</span>
           </div>
         </div>
-        {children}
+        {fill ? (
+          // The thread scrolls here, under the title; the box docks at its foot.
+          <div className="min-h-0 flex-1 px-(--card-p) pt-5 [scrollbar-gutter:stable] min-[720px]:overflow-y-auto">
+            <div className="mx-auto flex min-h-full w-full max-w-prose flex-col">{children}</div>
+          </div>
+        ) : (
+          children
+        )}
       </Card>
 
       {beside && (
@@ -287,7 +330,7 @@ export function ConversationChat({
           className="hidden min-w-0 @min-[48rem]/chat:sticky @min-[48rem]/chat:top-16 @min-[48rem]/chat:block @min-[48rem]/chat:max-h-[calc(100dvh-6rem)] @min-[48rem]/chat:self-start @min-[48rem]/chat:overflow-y-auto"
         >
           {/* On a card of its own, as the chat is; its heading a label, so the chat's title is the one title. */}
-          <Card padding="standard">
+          <Card padding="standard" className={cn(fill && 'min-h-[calc(100dvh-6rem)]')}>
             <h2 className="text-ui font-semibold text-ink">{glance.label}</h2>
             <div className="mt-3">{glance.content}</div>
           </Card>
