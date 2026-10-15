@@ -653,22 +653,6 @@ export function AnswerCard({
             {text.trim() ? 'Edit' : 'Write an answer'}
           </Button>
         )}
-        {!editing && status === 'approved' && !answer.canonicalAnswer && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await promoteToCanonical(answer.questionId, text);
-                setSaved(result.error ?? 'This is now your default answer for this question.');
-              })
-            }
-          >
-            Make this my default answer
-          </Button>
-        )}
         {!closed && (
           <DashAction
             type="button"
@@ -695,6 +679,24 @@ export function AnswerCard({
           >
             {drafting ? 'Drafting…' : draft ? 'Draft again' : 'Draft an answer'}
           </DashAction>
+        )}
+        {/* Last, and a link with no padding, so on a phone where it wraps it
+            starts on the card's text edge (law 18). */}
+        {!editing && status === 'approved' && !answer.canonicalAnswer && (
+          <Button
+            type="button"
+            size="sm"
+            variant="link"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await promoteToCanonical(answer.questionId, text);
+                setSaved(result.error ?? 'This is now your default answer for this question.');
+              })
+            }
+          >
+            Make this my default answer
+          </Button>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}
