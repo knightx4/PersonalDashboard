@@ -53,8 +53,12 @@ export type FeatureLines = {
   hidden: number;
 };
 
-/** A plan ref: `#2124`, `#2124.2`, `#2124.2.1`. */
-const REF = /#(\d+(?:\.\d+)*)(?![\d\w])/g;
+/**
+ * A plan ref: `#2124`, `#2124.2`, `#2124.2.1`, or a step written without its
+ * hash, as in "build plan step 2124.1". A bare number with no dot is not
+ * read as one: it is a count or a year far more often.
+ */
+const REF = /#(\d+(?:\.\d+)*)(?![\d\w])|(?<![\w.#])(\d{3,}(?:\.\d+)+)(?![\d\w])/g;
 
 /**
  * Plan rows are numbered in the hundreds and thousands. A shorter `#4` is
@@ -94,7 +98,7 @@ export function featureLines(
   let current = 'start';
 
   for (const line of lines) {
-    const refs = [...line.body.matchAll(REF)].map((match) => match[1]);
+    const refs = [...line.body.matchAll(REF)].map((match) => match[1] ?? match[2]);
     const mine = refs.filter((ref) => ref.split('.')[0] === feature);
     const step = mine.map((ref) => stepFor(ref, known)).find((found) => found !== null) ?? null;
     if (step) {

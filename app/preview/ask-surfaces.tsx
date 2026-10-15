@@ -827,6 +827,7 @@ export function DashPageSurface({
       >
         <Conversation
           label="Chats"
+          fill
           open={opened}
           initialListOpen={listOpen}
           newChat={{ href: '/ask', label: 'New chat' }}
@@ -850,6 +851,7 @@ export function DashPageSurface({
             <ConversationChat
               title={open.title ?? 'A question'}
               back={CHATS_BACK}
+              fill
               initialGlanceOpen={usedOpen ?? true}
               initialSheetOpen={sheetOpen}
               glance={{
@@ -878,7 +880,7 @@ export function DashPageSurface({
                 changes={DASH_CHAT_CHANGES}
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
-                startWriting
+                dock
                 initialDraft={draft}
               />
             </ConversationChat>

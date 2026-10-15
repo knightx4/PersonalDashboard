@@ -13,6 +13,7 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Input, InlineInput } from '@/components/ui/field';
 import { iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
+import { ModuleMark } from '@/components/ui/module-mark';
 import { useToast } from '@/components/ui/toast';
 import { MadeChanges } from '@/components/talk/made-changes';
 import type { ChangePresses } from '@/components/talk/dash-changes';
@@ -280,10 +281,14 @@ function ChatRow({
         href={`/ask/${chat.ref}`}
         aria-current={on ? 'page' : undefined}
         className={cn(
-          'block min-h-11 rounded-control py-2 pl-2 pr-9 transition-colors duration-quick',
+          'flex min-h-11 items-start gap-2.5 rounded-control py-2 pl-2 pr-9 transition-colors duration-quick',
           on ? 'bg-accent-tint' : 'hover:bg-sunken',
         )}
       >
+        {/* The first workspace the chat used, or Dash's own mark for one
+            that used none, so a chat is found by its look before its name. */}
+        <ModuleMark module={chat.workspaces[0] ?? 'dash'} size="sm" className="mt-px" />
+        <span className="block min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className={cn('min-w-0 flex-1 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
             {name}
@@ -308,6 +313,7 @@ function ChatRow({
             ))}
           </span>
         )}
+        </span>
       </Link>
       <ActionMenu
         label={`More for ${name}`}

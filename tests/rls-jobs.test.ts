@@ -247,6 +247,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.discovery_runs = discovery.id;
 
+  // Dash's working draft of an application's answers (job_search 0054).
+  const [applicationDraft] = await admin<{ id: string }[]>`
+    insert into application_drafts (user_id, application_id, kind, drafts, asks)
+    values (${userId}, ${application.id}, 'answers',
+            ${admin.json({ [answer.id]: { answer: `${tag} draft`, evidence_item_ids: [evidence.id], unsupported_claims: [] } })},
+            ${admin.json([{ id: `${tag}-ask-1`, answer_id: answer.id, question: 'Which team?', reply: null }])})
+    returning id`;
+  ids.application_drafts = applicationDraft.id;
+
   return ids;
 }
 
