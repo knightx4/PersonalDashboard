@@ -28,7 +28,7 @@ const fetched = vi.fn(() => Promise.reject(new Error('fetched during a static re
 vi.stubGlobal('fetch', fetched);
 
 const { SearchBar, isSearchShortcut } = await import('@/components/shell/search-bar');
-const { CommandPalette } = await import('@/components/shell/command-palette');
+const { CommandPalette, typesOnTouch } = await import('@/components/shell/command-palette');
 const { CaptureProvider } = await import('@/components/shell/capture');
 const { SearchScopeChip } = await import('@/components/shell/search-scope-chip');
 const { SearchField } = await import('@/components/shell/search-field');
@@ -144,6 +144,20 @@ describe('the box it opens', () => {
       </CaptureProvider>,
     );
     expect(html).toMatch(/Searching (?!Everything)[^.]+\. Choose what to search/);
+  });
+
+  // Note 3a901719: on a phone, opening the box focused the field and the
+  // keyboard covered the list. The field is focused on open only where typing
+  // does not mean a keyboard on the screen.
+  it('leaves the field for a tap on a touch screen, and focuses it elsewhere', () => {
+    const media = (matches: boolean) =>
+      vi.fn((query: string) => ({ matches, media: query }) as unknown as MediaQueryList);
+    vi.stubGlobal('window', { matchMedia: media(true) });
+    expect(typesOnTouch()).toBe(true);
+    vi.stubGlobal('window', { matchMedia: media(false) });
+    expect(typesOnTouch()).toBe(false);
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', fetched);
   });
 });
 
