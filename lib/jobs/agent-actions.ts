@@ -21,6 +21,8 @@ export const jobsActions: ModuleActions = {
     snoozeReminder: tool('change_reminder'),
     completeWaiting: tool('change_waiting'),
     snoozeWaiting: tool('change_waiting'),
+    restoreReminder: none('theirs', 'Undo: takes back their own Done or Later.'),
+    restoreWaiting: none('theirs', 'Undo: takes back their own Done or Later.'),
   },
   'app/jobs/(app)/_home/prepare-actions.ts': {
     prepareWithDash: none('spends'),
@@ -86,6 +88,7 @@ export const jobsActions: ModuleActions = {
     suggestPeople: none('spends'),
     suggestOpenings: none('spends'),
     dismissSuggestion: none('theirs'),
+    reopenSuggestion: none('theirs', 'Undo: takes back their own decline.'),
     dismissOpening: none('theirs'),
     markSuggestionSent: tool('mark_suggestion_sent'),
     saveOpening: none('theirs'),

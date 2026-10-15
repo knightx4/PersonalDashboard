@@ -91,6 +91,7 @@ export const devActions: ModuleActions = {
   },
   'app/dev/raised/check-back-actions.ts': {
     dropCheckBack: none('theirs'),
+    restoreCheckBack: none('theirs', 'Undo: takes back their own drop.'),
   },
   'app/dev/specs/actions.ts': {
     saveModuleVision: none('theirs', "A vision is the person's and a session never edits one."),
@@ -98,6 +99,8 @@ export const devActions: ModuleActions = {
     dismissVisionEdit: none('theirs'),
     approveSpecChange: none('theirs'),
     declineSpecChange: none('theirs'),
+    reopenVisionEdit: none('theirs', 'Undo: takes back their own decline.'),
+    undeclineSpecChange: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/dev/specs/interview-actions.ts': {
     startInterview: none('spends'),
