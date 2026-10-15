@@ -335,7 +335,9 @@ describe('add_items', () => {
     // The expected days are written for 14 October; pin the clock so the test passes on any day.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const kept = await viaAsk('add_items', {
       items: [
         { kind: 'book', isbn: '0-441-17271-7' },
