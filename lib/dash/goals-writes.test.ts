@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, onTestFinished } from 'vitest';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
@@ -575,6 +575,10 @@ describe('the Goals writes', () => {
     }
 
     it('snoozes a step until the start of the day in their zone, and brings it back', async () => {
+      // The fixtures' today; the write reads the clock, which moves on (both failed on 15 October).
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
+      onTestFinished(() => vi.useRealTimers());
       const data = inboxTables();
       const snoozed = await made('change_goals_inbox', data, { change: 'snooze', row_ref: STEP, until: 'tomorrow' });
       const kept = data['core.inbox_snoozes']![0];
