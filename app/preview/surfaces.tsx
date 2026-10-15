@@ -159,6 +159,11 @@ import {
   LearnTopicsPreview,
 } from './learn-topic-surfaces';
 import {
+  LearnTopicsReviewEmptyPreview,
+  LearnTopicsReviewPreview,
+  LearnTopicsReviewRunningPreview,
+} from './learn-move-surfaces';
+import {
   LearnCourseCheckPreview,
   LearnCoursesEmptyPreview,
   LearnCoursesListPreview,
@@ -7539,6 +7544,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftCommentPreview />,
+  },
+  {
+    /* Moving the claims graph onto topics (plan #2138.4): what the move
+     * left for you, with a failed subject and a downward edge. */
+    id: 'learn-topics-review',
+    label: 'From the claims graph · What needs your answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewPreview />,
+  },
+  {
+    id: 'learn-topics-review-running',
+    label: 'From the claims graph · While subjects move',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewRunningPreview />,
+  },
+  {
+    id: 'learn-topics-review-empty',
+    label: 'From the claims graph · Before anything has moved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewEmptyPreview />,
   },
   {
     id: 'learn-concept',

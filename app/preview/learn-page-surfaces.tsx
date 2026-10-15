@@ -432,7 +432,7 @@ export function LearnOpeningSurface() {
           runs: 9,
           basis: 'measured',
           per: 'run',
-          models: [MODELS.learnOpeningClaims, MODELS.learnGraphGenerate],
+          models: [MODELS.learnTopicDraft],
         },
       }}
     >

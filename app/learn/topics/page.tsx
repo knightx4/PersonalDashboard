@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { listTopics } from '@/lib/learn/levels/store';
+import { loadMoveSummary } from '@/lib/learn/levels/move-store';
 import { THREAD_TABLES } from '@/lib/thread/subjects';
 import { loadTableThreads } from '@/lib/thread/store';
 import { TopicsView } from './topics-view';
@@ -17,8 +18,14 @@ export const metadata = { title: 'Topics' };
 export default async function TopicsPage() {
   const user = await requireUser();
   const [learn, core, settings] = await Promise.all([createLearnClient(), createClient(), loadAccountSettings(user.id)]);
-  const [topics, threads] = await Promise.all([
+  const [topics, move, threads] = await Promise.all([
     listTopics(learn),
+    // The line pointing at the move from the claims graph. A failed read
+    // leaves the line out rather than taking the page.
+    loadMoveSummary(learn).catch((error: unknown) => {
+      console.error('[learn topics] move summary', error instanceof Error ? error.message : error);
+      return null;
+    }),
     loadTableThreads(core, THREAD_TABLES.topic, { userId: user.id }).catch((error: unknown) => {
       console.error('[learn topics] comments', error instanceof Error ? error.message : error);
       return new Map();
@@ -28,5 +35,5 @@ export default async function TopicsPage() {
   const comments = new Map<string, number>();
   for (const [ref, turns] of threads) comments.set(ref.slice(ref.indexOf(':') + 1), turns.length);
 
-  return <TopicsView topics={topics} comments={comments} timezone={settings.timezone} now={new Date().getTime()} />;
+  return <TopicsView topics={topics} move={move} comments={comments} timezone={settings.timezone} now={new Date().getTime()} />;
 }

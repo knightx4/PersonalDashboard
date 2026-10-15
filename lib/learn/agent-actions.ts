@@ -25,6 +25,11 @@ export const learnActions: ModuleActions = {
     mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
     draftWantedTopic: none('spends'),
   },
+  'app/learn/topics/review/actions.ts': {
+    moveClaimsSubject: none('spends'),
+    refreshMoveReview: none('page', 'Reloads the review page once a run of moves ends; changes nothing.'),
+    answerMoveReview: none('theirs', 'Where an idea sits and whether a need between two ideas stands is the person’s call (LEARN-LEVELS-SPEC, "Migration from the claims graph").'),
+  },
   'app/learn/b/[id]/actions.ts': {
     saveShortAnswer: none('own'),
     setBriefWatch: none('setting'),
@@ -86,7 +91,6 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/know/actions.ts': {
     proposeGoal: none('spends'),
-    approveChain: none('theirs'),
     proposePrior: none('spends'),
     approvePrior: none('theirs'),
     proposeFromCourse: none('spends'),

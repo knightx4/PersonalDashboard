@@ -382,6 +382,10 @@ export const LEARN_OPERATIONS = [
   // Embedding a drafted topic's scope to find a topic it duplicates. Apart
   // from 'embed-claim' so the cost of deduplication can be read on its own.
   'embed-topic-scope',
+  // Moving the claims graph onto topics (plan #2138.4): one Sonnet call per
+  // subject placing its concepts on topics and levels. The topics it names
+  // that the map lacks are drafted under 'draft-topic'.
+  'assign-topics',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -144,6 +144,9 @@ describe('the operation names', () => {
       'review-essay-plan',
       'word-point-question',
       'write-essay-research',
+      'draft-topic',
+      'embed-topic-scope',
+      'assign-topics',
     ]);
   });
 });
