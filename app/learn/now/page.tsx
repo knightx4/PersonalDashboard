@@ -29,6 +29,8 @@ import { BriefsList } from './briefs-list';
 import { loadOpenBriefs } from '@/lib/learn/briefs/load';
 import type { BriefSummary } from '@/lib/learn/briefs/view';
 import { cn } from '@/lib/cn';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { openedFromPush } from '@/lib/day-brief/opens';
 import { PageColumn } from '@/components/shell/page-width';
 import { NowDashToday } from '@/components/shell/dash-today-fold';
 
@@ -94,6 +96,9 @@ export default async function NowPage({
     track?: string | string[];
     goal?: string | string[];
     only?: string | string[];
+    card?: string | string[];
+    brief?: string | string[];
+    from?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -165,10 +170,16 @@ export default async function NowPage({
     );
   }
 
+  // The morning notification opens here on its first card (plan #2164.7); the
+  // press also counts as the brief opened, as it does on Home (plan #1242).
+  const pinned = z.string().uuid().safeParse(firstParam(params.card));
+  const pushDay = openedFromPush(params, '');
+  if (pushDay) await createCoreClient().then((core) => core.rpc('open_day_brief', { p_day: pushDay })).catch(() => null);
+
   // The topics Dash researched for you (plan #2023.4); a list that cannot be
   // read is left off rather than failing the page.
   const [cards, ready, briefs] = await Promise.all([
-    loadFeedPage(supabase, []),
+    loadFeedPage(supabase, [], { cardId: pinned.success ? pinned.data : null }),
     countReadyCards(supabase),
     loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
   ]);

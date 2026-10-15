@@ -41,7 +41,13 @@ export const CARD_SELECT =
  * Which cards a page of the deck is dealt from: how many, as of when, and
  * only one subject's when `subjectId` is set (plan #1698).
  */
-export type FeedScope = { limit?: number; now?: number; subjectId?: string | null };
+export type FeedScope = {
+  limit?: number;
+  now?: number;
+  subjectId?: string | null;
+  /** A card to deal first (plan #2164.7: the morning notification's); skipped when it can no longer be dealt. */
+  cardId?: string | null;
+};
 
 /** The most card ids a request excludes. Past this, the oldest shown come back. */
 const MAX_EXCLUDED = 300;
@@ -78,9 +84,10 @@ function returnCutoff(status: 'review' | 'skipped', now: number): string {
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
   exclude: string[],
-  { limit = FEED_PAGE, now = Date.now(), subjectId = null }: FeedScope = {},
+  { limit = FEED_PAGE, now = Date.now(), subjectId = null, cardId = null }: FeedScope = {},
 ): Promise<FeedCard[]> {
-  const skip = exclude.slice(-MAX_EXCLUDED);
+  const pinned = cardId ? await readPinned(supabase, cardId) : null;
+  const skip = [...exclude.slice(-MAX_EXCLUDED), ...(pinned ? [pinned.id] : [])];
   // A goal's lessons are on its plan (plan #1143). A failed read deals them
   // rather than failing the deck.
   const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
@@ -136,11 +143,35 @@ export async function loadFeedPage(
     return card ? [{ card, ...spreadOf(row, card.article) }] : [];
   });
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
-  const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
+  const dealtPool = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
+  const pinnedCard = pinned ? toFeedCard(pinned) : null;
+  if (pinned && pinnedCard) rows.push(pinned);
+  const dealt = pinnedCard ? [pinnedCard, ...dealtPool.slice(0, limit - 1)] : dealtPool;
   const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
   const clipNoteOf = new Map(rows.flatMap((row) => clipNote(row)));
   const withIdeas = await withNotes(supabase, await withVideos(supabase, dealt, conceptOf, clipNoteOf), conceptOf);
   return withTeachEvery(supabase, await withConversations(supabase, withIdeas));
+}
+
+/**
+ * The one card the morning notification named (plan #2164.7), when it is
+ * still waiting: ready, or back for review or after a skip. A card answered
+ * since, or one that was never the person's, reads as nothing and the deck is
+ * dealt as usual. A failed read does the same.
+ */
+async function readPinned(supabase: LearnSupabaseClient, id: string): Promise<FeedCardRow | null> {
+  const { data, error } = await supabase
+    .from('feed_cards')
+    .select(CARD_SELECT)
+    .eq('id', id)
+    .in('status', ['ready', 'review', 'skipped'])
+    .not('hook', 'is', null)
+    .maybeSingle();
+  if (error) {
+    console.error('[learn now] the notification card', error.message);
+    return null;
+  }
+  return (data as unknown as FeedCardRow | null) ?? null;
 }
 
 /**
