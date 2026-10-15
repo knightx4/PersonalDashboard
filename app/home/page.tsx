@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import Link, { linkVariants } from '@/components/ui/link';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -12,7 +11,6 @@ import { Card } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { describeCount } from '@/lib/modules/counts';
 import { moduleEnabled } from '@/lib/core/account/settings';
 import type { Agenda } from '@/lib/todo/agenda/load';
 import { loadHomeAgenda, loadHomeInbox } from '@/lib/inbox/home-inbox';
@@ -55,23 +53,23 @@ import { BRIEF_ANCHOR, shownBrief, type ShownBrief } from '@/lib/day-brief/shown
 import { briefDaysOpened, openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
 import { DaySigil } from './arrival';
-import { WatchingSection } from './watching';
 import {
   BriefLine,
   HomeColumns,
   InboxLine,
   HomeHeader,
-  TodayCard,
-  UpdatesCard,
-  WeekCard,
-  WorkspaceList,
-  WorkspaceMarks,
+  TodayList,
+  UpdatesList,
+  WeekList,
   type WeekRow,
 } from './home-view';
+import { HomeFold } from './home-fold';
 import { loadDashToday, type DashTodayGroup } from '@/lib/shell/dash-today';
-import { DashTodaySection } from './dash-today';
+import { changesLabel, dashTodayCount } from '@/lib/shell/dash-today-count';
+import { DashTodayGroups } from './dash-today';
 import { undoDashToday } from './actions';
-import { DoneTodayCard } from './done-today';
+import { DoneTodayBody, doneTodayCount } from './done-today';
+import { WatchingList } from './watching';
 
 export const metadata = { title: 'Home' };
 
@@ -116,11 +114,16 @@ function greeting(timezone: string, now: Date): string {
  * and then what changed in the last three days: replies from companies, new
  * orders, newsletters that arrived.
  *
- * Since plan #1627 the page is main plus rail (components/patterns/main-rail.tsx).
- * Beside that column from laptop width, and under it on a phone, is what you
- * glance at: what Dash is watching, what it changed today with Undo on each,
- * the next seven days from the same agenda, and the workspaces with what is
- * waiting in each. Each card is left out when it has nothing in it.
+ * Since plan #1627 the page is main plus rail (components/patterns/main-rail.tsx),
+ * and since plan #1937.8 the main column is only what a phone's first screen
+ * holds: the greeting, the date, the day's brief, the workspace briefs and
+ * the Inbox count. Everything else is in the rail, each section a fold whose
+ * closed line carries its count (HomeFold): Today, Done today, Watching,
+ * what Dash did today, This week, Updates and the week's observations. From
+ * laptop width the rail stands beside the column and the folds are open; on
+ * a phone it falls under the Inbox count and they are shut. Each fold is
+ * left out when it has nothing in it. There is no workspace list: the
+ * switcher and the brief rows are the way into a workspace.
  *
  * A module switched off under Account is not listed anywhere here. That is
  * what the switch means.
@@ -146,7 +149,7 @@ export default async function HomePage({
 }
 
 async function homeContent(
-  { user, settings, owner, counts }: ShellFrame,
+  { user, settings, owner }: ShellFrame,
   searchParams: Promise<Record<string, string | string[] | undefined>>,
 ) {
   const [shopping, core, jobs, params, jar] = await Promise.all([
@@ -164,9 +167,8 @@ async function homeContent(
     day: '2-digit',
   }).format(now);
 
-  // The rail's list is the third list of workspaces, after the switcher and
-  // the account page, and it goes through the same rule: a workspace this account
-  // may not see is not a door with a locked room behind it, it is not a door.
+  // A workspace this account may not see is not a door with a locked room
+  // behind it, it is not a door: no brief, and nothing from it in the rail.
   const enabled = modulesFor(owner).filter((module) => moduleEnabled(settings, module.id));
   const on = (id: ModuleId) => enabled.some((module) => module.id === id);
 
@@ -293,12 +295,6 @@ async function homeContent(
     month: 'long',
     timeZone: settings.timezone,
   }).format(now);
-  const workspaces = enabled.map((module) => ({
-    id: module.id,
-    label: module.label,
-    href: module.home,
-    description: module.description,
-  }));
 
   return (
     <>
@@ -327,55 +323,53 @@ async function homeContent(
                 />
               </Suspense>
             }
-            brief={
-              // The fallback carries the brief's anchor, so the morning
-              // notification's #brief has somewhere to land before the
-              // brief itself does.
-              <Suspense
-                fallback={
-                  <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
-                    <Skeleton className="h-4 w-72 max-w-full" />
-                    <Skeleton className="h-3 w-56 max-w-full" />
-                  </div>
-                }
-              >
-                <DayBriefSection brief={dayBrief} opened={opened} day={today} />
-              </Suspense>
-            }
           />
+        }
+        brief={
+          // The fallback carries the brief's anchor, so the morning
+          // notification's #brief has somewhere to land before the brief
+          // itself does.
+          <Suspense
+            fallback={
+              <div id={BRIEF_ANCHOR} className="scroll-mt-bar space-y-2.5" aria-hidden>
+                <Skeleton className="h-4 w-72 max-w-full" />
+                <Skeleton className="h-3 w-56 max-w-full" />
+              </div>
+            }
+          >
+            <DayBriefSection brief={dayBrief} opened={opened} day={today} />
+          </Suspense>
         }
         main={
           <>
-            <WorkspaceMarks workspaces={workspaces} />
-
             <Suspense fallback={null}>
               <AgendaBanner agenda={agenda} />
             </Suspense>
 
             {/* One line per workspace, each landing when its own brief does. A
                 workspace with nothing to say takes its placeholder away. */}
-            <ul className="mt-2 divide-y divide-border">
+            <ul className="divide-y divide-border">
               {briefs.map(([module, brief]) => (
                 <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
                   <BriefRow module={module} brief={brief} />
                 </Suspense>
               ))}
             </ul>
-            {/* The bell's place (plan #1937.7): what is on you, as a line that
-                opens Home's Inbox. */}
-            <Suspense fallback={<Skeleton className="mt-5 h-5 w-64 max-w-full" />}>
-              <InboxCount count={inboxCount} />
-            </Suspense>
 
             <Suspense fallback={null}>
               <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
             </Suspense>
 
-            <Suspense fallback={<SectionSkeleton rows={2} className="mt-4" />}>
-              <ObservationsSection observations={observations} timezone={settings.timezone} />
+            {/* The bell's place (plan #1937.7): what is on you, as a line that
+                opens Home's Inbox. The last thing on a phone's first screen. */}
+            <Suspense fallback={<Skeleton className="mt-5 h-5 w-64 max-w-full" />}>
+              <InboxCount count={inboxCount} />
             </Suspense>
-
-            <Suspense fallback={<SectionSkeleton rows={3} className="mt-4" />}>
+          </>
+        }
+        rail={
+          <>
+            <Suspense fallback={<SectionSkeleton rows={3} />}>
               <TodaySection agenda={agenda} timezone={settings.timezone} />
             </Suspense>
 
@@ -383,17 +377,6 @@ async function homeContent(
               <DoneTodaySection done={doneList} logging={on('goals')} />
             </Suspense>
 
-            <Suspense fallback={<SectionSkeleton rows={4} className="mt-4" />}>
-              <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
-            </Suspense>
-
-            <Suspense fallback={null}>
-              <ReviewLinks observations={observations} />
-            </Suspense>
-          </>
-        }
-        rail={
-          <>
             {/* The fallback carries #watching, where every watch push opens. */}
             <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
               <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
@@ -407,12 +390,17 @@ async function homeContent(
               <WeekSection agenda={agenda} timezone={settings.timezone} />
             </Suspense>
 
-            <WorkspaceList
-              workspaces={workspaces.map((workspace) => ({
-                ...workspace,
-                stat: describeCount(counts[workspace.id]) || workspace.description,
-              }))}
-            />
+            <Suspense fallback={<SectionSkeleton rows={4} />}>
+              <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={null}>
+              <ObservationsSection observations={observations} timezone={settings.timezone} />
+            </Suspense>
+
+            <Suspense fallback={null}>
+              <ReviewLinks observations={observations} />
+            </Suspense>
           </>
         }
       />
@@ -475,7 +463,7 @@ async function InboxCount({ count }: { count: Promise<number | null> }) {
 /** The placeholder for one workspace's line: its mark is known already. */
 function BriefRowSkeleton({ module }: { module: ModuleId }) {
   return (
-    <li className="flex items-center gap-3 py-3.5" aria-hidden>
+    <li className="flex items-center gap-3 py-2.5" aria-hidden>
       <ModuleMark module={module} size="sm" />
       <Skeleton className="h-4 w-1/2" />
     </li>
@@ -545,26 +533,23 @@ async function ObservationsSection({
   const rows = await observations;
   if (rows.length === 0) return null;
   return (
-    <Card padding="standard" className="mt-4">
-      {/* The Sunday review (plan #1233) sits beside these rather than
-          repeating them. */}
-      <SectionHeading
-        title="What Dash noticed this week"
-        action={
-          <>
-            <Link href="/home/week" className={`text-small ${linkVariants()}`}>
-              Week in review
-            </Link>
-            <Link href="/timeline" className={`text-small ${linkVariants()}`}>
-              Timeline
-            </Link>
-          </>
-        }
-      />
-      <div className="mt-2">
-        <ObservationList observations={rows} timezone={timezone} />
-      </div>
-    </Card>
+    // The Sunday review (plan #1233) sits beside these rather than repeating
+    // them, as the fold's link.
+    <HomeFold
+      id="noticed"
+      title="Dash noticed"
+      count={rows.length}
+      action={
+        <Link href="/home/week" className={`press-area text-small ${linkVariants()}`}>
+          Week in review
+        </Link>
+      }
+    >
+      <ObservationList observations={rows} timezone={timezone} />
+      <Link href="/timeline" className={`press-area mt-2 inline-block text-small ${linkVariants()}`}>
+        Timeline
+      </Link>
+    </HomeFold>
   );
 }
 
@@ -588,7 +573,11 @@ async function DoneTodaySection({
 }) {
   const list = await done;
   if (!logging && list.lines.length === 0) return null;
-  return <DoneTodayCard done={list} logging={logging} />;
+  return (
+    <HomeFold id="done-today" title="Done today" count={doneTodayCount(list)}>
+      <DoneTodayBody done={list} logging={logging} />
+    </HomeFold>
+  );
 }
 
 async function TodaySection({
@@ -607,23 +596,39 @@ async function TodaySection({
 
   if (due.length === 0 && happening.length === 0) return null;
   return (
-    <TodayCard
-      timezone={timezone}
-      more={dueMore}
-      happening={happening.map((entry) => ({
-        key: entry.key,
-        at: entry.at,
-        label: entry.label,
-        detail: entry.detail,
-        href: entry.link?.href ?? null,
-      }))}
-      due={due.map(({ bucket, entry }) => ({
-        key: entry.key,
-        overdue: bucket === 'overdue',
-        title: entry.task?.title ?? entry.item?.title ?? '',
-        href: agendaHref(entry),
-      }))}
-    />
+    <HomeFold
+      id="today"
+      title="Today"
+      count={happening.length + due.length + dueMore}
+      action={<AgendaLink />}
+    >
+      <TodayList
+        timezone={timezone}
+        more={dueMore}
+        happening={happening.map((entry) => ({
+          key: entry.key,
+          at: entry.at,
+          label: entry.label,
+          detail: entry.detail,
+          href: entry.link?.href ?? null,
+        }))}
+        due={due.map(({ bucket, entry }) => ({
+          key: entry.key,
+          overdue: bucket === 'overdue',
+          title: entry.task?.title ?? entry.item?.title ?? '',
+          href: agendaHref(entry),
+        }))}
+      />
+    </HomeFold>
+  );
+}
+
+/** The way from a fold of the agenda's rows to the agenda itself. */
+function AgendaLink() {
+  return (
+    <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
+      The agenda
+    </Link>
   );
 }
 
@@ -666,7 +671,11 @@ async function WeekSection({
     .slice(0, 6);
 
   if (week.length === 0) return null;
-  return <WeekCard rows={week} timezone={timezone} />;
+  return (
+    <HomeFold id="week" title="This week" count={week.length} action={<AgendaLink />}>
+      <WeekList rows={week} timezone={timezone} />
+    </HomeFold>
+  );
 }
 
 type Watching = Awaited<ReturnType<typeof loadWatching>>;
@@ -686,7 +695,11 @@ async function WatchingBlock({
 }) {
   const { running } = await watching;
   if (running.length === 0) return null;
-  return <WatchingSection rows={running} now={now} timezone={timezone} />;
+  return (
+    <HomeFold id="watching" title="Watching" count={running.length}>
+      <WatchingList rows={running} now={now} timezone={timezone} />
+    </HomeFold>
+  );
 }
 
 /**
@@ -700,7 +713,14 @@ async function DashTodayBlock({
   groups: Promise<DashTodayGroup[]>;
   timezone: string;
 }) {
-  return <DashTodaySection groups={await groups} timezone={timezone} undo={undoDashToday} />;
+  const shown = await groups;
+  const count = dashTodayCount(shown);
+  if (count === 0) return null;
+  return (
+    <HomeFold id="dash-today" title="What Dash did today" count={changesLabel(count)}>
+      <DashTodayGroups groups={shown} timezone={timezone} undo={undoDashToday} />
+    </HomeFold>
+  );
 }
 
 /**
@@ -724,7 +744,11 @@ async function UpdatesSection({
   const [lines, watched] = await Promise.all([feed, watching]);
   const updates = mergeUpdates([lines, watched.ended]);
   if (updates.length === 0) return null;
-  return <UpdatesCard updates={updates} now={now} timezone={timezone} />;
+  return (
+    <HomeFold id="updates" title="Updates" count={updates.length}>
+      <UpdatesList updates={updates} now={now} timezone={timezone} />
+    </HomeFold>
+  );
 }
 
 /**
@@ -735,7 +759,7 @@ async function UpdatesSection({
 async function ReviewLinks({ observations }: { observations: Promise<ShownObservation[]> }) {
   if ((await observations).length > 0) return null;
   return (
-    <div className="mt-4 space-y-1 text-small text-ink-muted">
+    <div className="space-y-1 text-small text-ink-muted">
       <p>
         <Link href="/home/week" className={linkVariants()}>
           Week in review
