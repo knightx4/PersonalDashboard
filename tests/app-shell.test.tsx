@@ -51,7 +51,7 @@ function bar(html: string): string {
 describe('the bottom bar', () => {
   it('carries the switcher on a page with no sections at all', () => {
     const html = render([]);
-    expect(bar(html)).toContain('>Switch<');
+    expect(bar(html)).toContain('>Go to<');
     // And the landmark is named for what is in it, not for what is not: the
     // sidebar's own list of sections is the one called "Sections".
     expect(bar(html)).toContain('aria-label="Workspace"');
@@ -69,8 +69,8 @@ describe('the bottom bar', () => {
     );
     // Two sections, the switcher, then the rest -- dead centre of the five
     // slots once More is counted.
-    const order = [...bar(html).matchAll(/>(Agenda|Calendar|All|Switch|More)</g)].map((m) => m[1]);
-    expect(order).toEqual(['Agenda', 'Calendar', 'Switch', 'All', 'More']);
+    const order = [...bar(html).matchAll(/>(Agenda|Calendar|All|Go to|More)</g)].map((m) => m[1]);
+    expect(order).toEqual(['Agenda', 'Calendar', 'Go to', 'All', 'More']);
   });
 
   it('keeps the switcher in the middle when there are only three tabs beside it', () => {
@@ -87,8 +87,8 @@ describe('the bottom bar', () => {
     const slots = [...bar(html).matchAll(/<li( aria-hidden="true")?>/g)];
     expect(slots).toHaveLength(5);
     expect(slots[4][1]).toBeTruthy();
-    const order = [...bar(html).matchAll(/>(Areas|All|Switch|More)</g)].map((m) => m[1]);
-    expect(order).toEqual(['Areas', 'All', 'Switch', 'More']);
+    const order = [...bar(html).matchAll(/>(Areas|All|Go to|More)</g)].map((m) => m[1]);
+    expect(order).toEqual(['Areas', 'All', 'Go to', 'More']);
   });
 
   it('leaves room under the page for it, whether or not there are sections', () => {
@@ -295,14 +295,12 @@ describe('the search bar in the top bar', () => {
 });
 
 /**
- * The magnifier in the top row.
- *
- * Below lg there is no field in the bar, so search is a button beside the
- * account icons and it opens the box the shortcut opens (#701, #702, #704).
- * That the press opens the box needs a browser; what is asserted here is that
- * the button is drawn, where it is drawn and the width it stops at.
+ * Below lg there is no field in the bar, and no search button or switcher in
+ * it either: the dock's centre button is both (note 5f3ef44f), drawn with the
+ * ring and dot the search box uses (plan #1365). That a press opens the box on
+ * every workspace needs a browser; what is asserted here is where it is.
  */
-describe('the search button on a phone', () => {
+describe('search and switching on a phone', () => {
   function shell(module: ModuleId | null) {
     return renderToStaticMarkup(
       <AppShell
@@ -325,38 +323,21 @@ describe('the search button on a phone', () => {
     return html.slice(at, html.indexOf('</header>', at));
   }
 
-  // The button's name: its tip is a Tooltip now, drawn only on hover.
-  const SEARCH = '<span class="sr-only">Search</span>';
-
-  it('draws a search button in the top row', () => {
-    expect(header(shell('todo'))).toContain(SEARCH);
+  it('leaves the search button and the switcher out of the top row', () => {
+    for (const where of ['todo', null] as const) {
+      const top = header(shell(where));
+      expect(top).not.toContain('<span class="sr-only">Search</span>');
+      expect(top).not.toContain('data-capture-switcher');
+    }
   });
 
-  it('draws it below lg only, where the bar has no field', () => {
-    const bar = header(shell('todo'));
-    const at = bar.indexOf(SEARCH);
-    // The button's own classes, read from the tag the name sits in.
-    const start = bar.lastIndexOf('<button', at);
-    const tag = bar.slice(start, bar.indexOf('>', start));
-    expect(tag).toContain('lg:hidden');
-  });
-
-  it('puts it with the account icons rather than in the middle of the bar', () => {
-    const bar = header(shell('todo'));
-    expect(bar.indexOf(SEARCH)).toBeGreaterThan(bar.indexOf('aria-label="Search"'));
-    expect(bar.indexOf(SEARCH)).toBeLessThan(bar.indexOf('Capture something'));
-  });
-
-  it('draws it outside a workspace too', () => {
-    expect(header(shell(null))).toContain(SEARCH);
-  });
-
-  it('draws the ring and dot rather than the magnifier (plan #1365)', () => {
-    const bar = header(shell('todo'));
-    const at = bar.indexOf(SEARCH);
-    const button = bar.slice(bar.lastIndexOf('<button', at), at);
+  it("puts one button for both in the dock's centre, drawn as the ring and dot", () => {
+    const dock = bar(shell('todo'));
+    const at = dock.indexOf('>Go to<');
+    const button = dock.slice(dock.lastIndexOf('<button', at), at);
+    expect(button).toContain('data-capture-switcher');
     expect(button).toContain('data-mark="search"');
-    expect(button).not.toContain('lucide-search');
+    expect(button).toContain('aria-haspopup="dialog"');
   });
 });
 
