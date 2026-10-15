@@ -15,6 +15,7 @@
  */
 
 import type { EssayBrief, EssayInterview } from './model';
+import { NOTES_MAX, readNoteMap, type NoteMap } from './notebook';
 
 export const STAGES = ['discover', 'research', 'plan', 'structure', 'develop', 'write'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -151,7 +152,18 @@ export const POINT_EVIDENCE_MAX = 8;
 export type PlanNoteStatus = 'open' | 'done';
 export type PlanNote = { id: string; body: string; status: PlanNoteStatus };
 
+/** Evidence found for one cluster of the notes map, kept until it is added to the notes or dropped. */
+export type ClusterFind = { label: string; items: PointEvidence[] };
+
 export type EssayPlan = {
+  /** The notes page, in the person's words (LEARN-ESSAYS-SPEC, "Notes first"). Empty until first saved. */
+  notes: string;
+  /** Dash's map of the notes, from the last press of Update the map. */
+  noteMap: NoteMap | null;
+  /** Dash's model draft, shown beside the essay and never put into it. */
+  modelDraft: { text: string; at: string } | null;
+  /** Evidence found for clusters of the map. */
+  found: ClusterFind[];
   thesis: string;
   readback: Readback | null;
   /** What the person made of each part of the research, keyed `<run id>:<part>`. */
@@ -162,6 +174,10 @@ export type EssayPlan = {
 };
 
 export const EMPTY_PLAN: EssayPlan = {
+  notes: '',
+  noteMap: null,
+  modelDraft: null,
+  found: [],
   thesis: '',
   readback: null,
   takes: {},
@@ -288,7 +304,22 @@ export function readPlan(value: unknown): EssayPlan {
     points.push(point);
     if (points.length === POINTS_MAX) break;
   }
+  const draft = object(raw.modelDraft);
+  const found = list(raw.found)
+    .map((f) => ({
+      label: text(f.label, 120),
+      items: list(f.items)
+        .map(readEvidence)
+        .filter((e): e is PointEvidence => e !== null)
+        .slice(0, 6),
+    }))
+    .filter((f) => f.label && f.items.length)
+    .slice(0, 12);
   return {
+    notes: text(raw.notes, NOTES_MAX),
+    noteMap: readNoteMap(raw.noteMap),
+    modelDraft: text(draft.text, 40_000).trim() ? { text: text(draft.text, 40_000), at: text(draft.at, 40) } : null,
+    found,
     thesis: text(raw.thesis, THESIS_MAX),
     readback: readReadback(raw.readback),
     takes,
@@ -308,6 +339,10 @@ export function readPlan(value: unknown): EssayPlan {
 /** The plan as it is stored. Everything goes through readPlan first, so what is written is always clean. */
 export function planJson(plan: EssayPlan): Record<string, unknown> {
   return {
+    notes: plan.notes,
+    noteMap: plan.noteMap,
+    modelDraft: plan.modelDraft,
+    found: plan.found,
     thesis: plan.thesis,
     readback: plan.readback,
     takes: plan.takes,

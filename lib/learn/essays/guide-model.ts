@@ -9,6 +9,7 @@ import { searchTurn } from './research-model';
 import { MAP_SEARCHES, MAP_SYSTEM, readMap, type ResearchMap } from './research-map';
 import { EVIDENCE_SEARCHES, EVIDENCE_SYSTEM, readEvidence } from './evidence';
 import type { EvidenceKind, PointEvidence } from './plan';
+import { MAP_NOTES_SYSTEM, MODEL_DRAFT_SYSTEM } from './notebook';
 
 /**
  * The guided essay's calls (docs/LEARN-ESSAYS-SPEC.md, "The stages"). guide.ts
@@ -114,4 +115,38 @@ export async function runPointEvidence(input: {
     content: searched.content,
     queries: searchQueries(searched.content),
   };
+}
+
+/** Dash's map of the notes: one call, the reply's text, read by notebook.ts. */
+export async function runNotesMap(input: {
+  prompt: string;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}) {
+  return guideCall({
+    system: MAP_NOTES_SYSTEM,
+    prompt: input.prompt,
+    maxTokens: 6_000,
+    anthropicApiKey: input.anthropicApiKey,
+    client: input.client,
+    onSpend: input.onSpend,
+  });
+}
+
+/** Dash's model draft from the notes, shown beside the essay and never put into it. */
+export async function runModelDraft(input: {
+  prompt: string;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}) {
+  return guideCall({
+    system: MODEL_DRAFT_SYSTEM,
+    prompt: input.prompt,
+    maxTokens: 8_000,
+    anthropicApiKey: input.anthropicApiKey,
+    client: input.client,
+    onSpend: input.onSpend,
+  });
 }
