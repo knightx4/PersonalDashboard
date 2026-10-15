@@ -108,6 +108,7 @@ export const jobsActions: ModuleActions = {
     saveCoverLetter: tool('write_cover_letter'),
     renameRole: tool('change_role'),
     moveRoleToCompany: tool('change_role'),
+    saveApplicationMarks: tool('change_application'),
   },
   'app/jobs/(app)/roles/[id]/interview-actions.ts': {
     saveInterview: tool('change_interview'),
