@@ -129,6 +129,7 @@ export const PAID_ACTIONS = {
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
+  'app/learn/settings/external/actions.ts#answerExternal': ['grade-quiz-answer'],
 
   // Learn: reading lists
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],

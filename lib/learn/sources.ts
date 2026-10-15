@@ -263,6 +263,11 @@ export const learnSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'learn.external_checks',
+      reason:
+        'Published question sets the person sat once, kept with their score as an anchor for lens progress. The questions are not theirs and nothing on the map reads or changes because of a row.',
+    },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     {
