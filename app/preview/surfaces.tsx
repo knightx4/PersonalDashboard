@@ -3868,15 +3868,15 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
-     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    /* The Pipeline narrowed to the roles with all their questions added (plan
+     * #2196.2): the one chip set, the rest of the line unchanged. */
     id: 'jobs-pipeline-marks',
-    label: 'Pipeline · Ready, questions and cover letter filters',
+    label: 'Pipeline · All questions added filter',
     module: 'jobs',
     width: 'wide',
     render: () => (
       <PreviewShell>
-        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes', questions: 'yes' }} />
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', questions: 'yes' }} />
       </PreviewShell>
     ),
   },

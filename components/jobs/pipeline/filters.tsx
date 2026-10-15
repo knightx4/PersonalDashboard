@@ -174,9 +174,9 @@ export function PipelineFilters({
         value={state.questions === null ? '' : state.questions ? 'yes' : 'no'}
         onChange={(event) => go({ questions: event.currentTarget.value || undefined })}
       >
-        <option value="">Any questions status</option>
+        <option value="">Any questions</option>
         <option value="yes">All questions added · {marks.questions}</option>
-        <option value="no">Questions not all added · {marks.noQuestions}</option>
+        <option value="no">Not all added · {marks.noQuestions}</option>
       </PressChip>
       <PressChip
         className={tucked(state.letter !== null)}
