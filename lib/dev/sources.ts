@@ -1,4 +1,5 @@
 import { planRefHref } from '@/lib/comments/refs';
+import { planRunHref, planRunTitle } from '@/lib/plan/run-touched';
 import { parentBy, type ModuleSources, type Page, type Section } from '@/lib/sources/types';
 
 /**
@@ -23,6 +24,13 @@ const PAGES: Record<string, Page> = {
     section: { href: '/dev/plan', label: 'Plan' },
     // A step sits under its feature, and a sub-step under its step.
     parent: parentBy('parent_id', 'public.plan_items'),
+  },
+  // A run opens on its own page (plan #1964.2.4), under the step it was sent at.
+  'public.plan_runs': {
+    title: { reads: ['job'], of: (row) => planRunTitle(row.job) },
+    href: (row) => planRunHref(String(row.id)),
+    section: { href: '/dev/plan', label: 'Plan' },
+    parent: parentBy('plan_item_id', 'public.plan_items'),
   },
   'public.ideas': {
     title: 'body',
