@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
-import { AskInputError, isOpenableHref, type AskContext, type AskToolResult } from './db';
+import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
 import {
   APPLICATION_STATUSES,
@@ -21,6 +21,7 @@ import { agendaLookup } from './agenda';
 import { applicationAnswersLookup } from './answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
+import { withParents } from './parents';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
@@ -145,7 +146,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'list_rows',
-    description: `List the person's own rows in any table that holds what they wrote, saved, did or have, newest first, with each row's text, a ref and a link. It reaches tables no other lookup does, such as the videos on their watch list, Learn cards, saved stories, interview notes and personality results, so use it whenever the other lookups do not cover what they asked about, and before saying you cannot see something. Pass contains to keep only rows holding every one of those words. Use it to choose for them as well as to find: "give me a good video to watch" is list_rows on learn.watch_list, then a pick from what the rows say. Open one row in full with open_row where it takes the table. The tables: ${listableList()}.`,
+    description: `List the person's own rows in any table that holds what they wrote, saved, did or have, newest first, with each row's text, a ref and a link, and for a row that belongs to another (a cover letter to its application, an interview to its application, a note on an idea) that row's table, ref, title and link under parent. It reaches tables no other lookup does, such as the videos on their watch list, Learn cards, saved stories, interview notes and personality results, so use it whenever the other lookups do not cover what they asked about, and before saying you cannot see something. Pass contains to keep only rows holding every one of those words. Use it to choose for them as well as to find: "give me a good video to watch" is list_rows on learn.watch_list, then a pick from what the rows say. Open one row in full with open_row where it takes the table. The tables: ${listableList()}.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -489,6 +490,19 @@ const MODULE_LABELS: Record<ModuleId, string> = {
 };
 
 /**
+ * The rows with the row each belongs to (lib/ask/parents.ts). A parent that
+ * fails to read costs the rows their parents, not the lookup its answer.
+ */
+async function parentsOf(ctx: AskContext, rows: AskRow[]): Promise<AskRow[]> {
+  try {
+    return await withParents(ctx, rows);
+  } catch (error) {
+    console.error('ask tool parents failed', error);
+    return rows;
+  }
+}
+
+/**
  * Run one tool call the model made. Never throws: a bad input, a switched-off
  * workspace or a failed read comes back as `{ ok: false, error }`, which the
  * loop hands the model as an error tool_result so it can try another way.
@@ -521,7 +535,8 @@ export async function executeAskTool(
     if (!result.ok) return result;
     // The promise to the page: every row a tool gives back opens somewhere,
     // in the app or, for a message, in Gmail (isOpenableHref).
-    return { ...result, rows: result.rows.filter((row) => isOpenableHref(row.href)) };
+    const rows = result.rows.filter((row) => isOpenableHref(row.href));
+    return { ...result, rows: await parentsOf(ctx, rows) };
   } catch (error) {
     if (error instanceof AskInputError) return { ok: false, error: error.message };
     console.error(`ask tool ${name} failed`, error);

@@ -76,7 +76,16 @@ export type AskRow = {
   title: string;
   href: string;
   detail?: Record<string, string | number | boolean | null>;
+  /**
+   * The row this one belongs to, for a table whose catalogue entry declares
+   * a parent (Source.parent): a cover letter's application, a goal step's
+   * goal. Added to every lookup's rows by withParents (lib/ask/parents.ts).
+   */
+  parent?: AskParent;
 };
+
+/** The row another belongs to: its table, its id, what it is called and where it opens. */
+export type AskParent = { table: string; ref: string; title: string; href: string | null };
 
 export type AskToolResult =
   | {
