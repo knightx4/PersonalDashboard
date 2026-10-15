@@ -9,7 +9,7 @@
  * account's step" and "no such step" have to come out the same.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { asUser, closeDb, createUser, truncateAll } from './helpers/db';
+import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db';
 
 let alice: string;
 let bob: string;
@@ -343,5 +343,43 @@ describe('the newest block under a step', () => {
     const hers = await addStep(bob, 'Bob feature');
     await addStep(bob, 'Bob step', { parentId: hers.id, status: 'blocked' });
     expect(await blockedAt(hers.id)).toBeNull();
+  });
+});
+
+/**
+ * Who may block a step on the person (0245). The person, signed in, may; a
+ * session runs with no signed-in user, and its blocks wait on steps.
+ */
+describe('blocks on the person', () => {
+  async function kind(id: string) {
+    const [row] = await admin<{ block_kind: string | null }[]>`
+      select block_kind from plan_items where id = ${id}`;
+    return row.block_kind;
+  }
+
+  it('lets the person block a step on themselves', async () => {
+    const step = await addStep(alice, 'Mine to unblock');
+    await asUser(alice, (tx) => tx`update plan_items set status = 'blocked' where id = ${step.id}`);
+    expect(await kind(step.id)).toBe('outside');
+  });
+
+  it('makes a session block with no kind wait on steps', async () => {
+    const step = await addStep(alice, 'Session parked');
+    await admin`update plan_items set status = 'blocked' where id = ${step.id}`;
+    expect(await kind(step.id)).toBe('steps');
+  });
+
+  it('refuses a session that blocks a step on the person', async () => {
+    const step = await addStep(alice, 'Session dumped');
+    await expect(
+      admin`update plan_items set status = 'blocked', block_kind = 'outside' where id = ${step.id}`,
+    ).rejects.toThrow(/Only the person can block a plan step on themselves/);
+  });
+
+  it('lets a session edit a step the person blocked', async () => {
+    const step = await addStep(alice, 'Theirs, annotated');
+    await asUser(alice, (tx) => tx`update plan_items set status = 'blocked' where id = ${step.id}`);
+    await admin`update plan_items set comment = 'Looked at it.' where id = ${step.id}`;
+    expect(await kind(step.id)).toBe('outside');
   });
 });

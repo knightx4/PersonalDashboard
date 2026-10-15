@@ -29,13 +29,10 @@ npx tsx scripts/plan.ts show <n>               # the brief: destination, decisio
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
-npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
-              # the ask names what the person does; "nothing needed from you" is refused.
+npx tsx scripts/plan.ts block <n> --ask "…" --on <m>[,<m>] [--note "…"]
+              # cannot proceed: waits on the steps it names, and clears when they close.
+              # Never on the person directly (see "When a step cannot finish").
               # A step that waits on data, time or a run gets a check-back --from <n>, which holds it.
-                                               # cannot proceed; the ask is the one sentence
-                                               # saying what it needs, rewritten each time.
-                                               # --on-steps: it clears itself when the steps it
-                                               # names close; without it, it waits for you
 npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # something only the person can supply — a key,
                                                # an account. Writes a setup step of theirs under
@@ -298,10 +295,12 @@ thousand tokens, and gets to the end.
 
    **When the merge to main will not go through** — a conflict you cannot
    resolve from what you have read, or a check you cannot get passing — the
-   branch is already pushed. Block the step that broke it, `block <n> --ask
-   "…" --note "…"`, with the branch named in the note. The ask never names it:
-   the person cannot open branches, and `block` refuses an ask that names one.
-   Stop the batch there. Decisions #685 and #695 are why.
+   branch is already pushed. That is the system's to finish, not the person's:
+   add a ready step under the feature, "Merge <the feature> into main", with
+   the branch and what stopped the merge in its `--detail`, and block the step
+   that broke it on that one (`block <n> --ask "…" --on <the merge step>`).
+   The ask never names the branch: `block` refuses one that does. Stop the
+   batch there. Decisions #685 and #695 are why.
 
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
@@ -403,3 +402,23 @@ Beside the status, two columns say what a step is rather than where it stands.
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,
 build against the answer forever after.
+
+## When a step cannot finish
+
+A step a run cannot finish never lands on the person as a bare block (their
+rule of 15 October 2026, after #2126 reached their Inbox as a chore because a
+session was refused permission to write its own design-check rows). It goes
+to exactly one of three places:
+
+1. **Something for them to decide** is a question: a decision step
+   (`add "<the question>" --kind decision`), and the step blocks on it.
+2. **Something for them to do** is a setup step: `needs "<what to set>"
+   --for <n>`, which writes it and makes the step wait on it.
+3. **Anything the system can handle** is yours. A refused permission, a missing
+   connector, a failed write, a merge that will not go, a check to settle:
+   handle it in this run if you can, and if you cannot, `add` a ready step
+   naming what is left and block on that, so a later run does it.
+
+`block` refuses a step that names nothing to wait on, and the database refuses
+a session's block on the person outright (migration 0245). Only the person,
+signed in, can block a step on themselves.

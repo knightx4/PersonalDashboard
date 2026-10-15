@@ -3,8 +3,10 @@
  *
  * Since 12 October 2026 the builder no longer blocks on this: it settles the
  * screen itself (`uiSettleSql`, `npm run ui-guard -- <n> --settle`), and
- * `block` refuses the ask below. What follows still reads the steps blocked
- * this way before then, so their rows and the person's accepts keep working.
+ * `block` refuses the ask below. Since 15 October no session may block a step
+ * on the person at all (migration 0245), so the statement that wrote this
+ * block is gone. What follows still reads the steps blocked this way before
+ * then, so their rows and the person's accepts keep working.
  *
  * When a surface's round 3 still comes back `fix`, the builder runs no fourth
  * round. It records the round, pushes its branch, and blocks the step on the
@@ -151,50 +153,6 @@ export function criticStopNote(input: { ask: string; branch: string }): string {
 export function isCriticStopAsk(ask: string | null | undefined): boolean {
   if (!ask) return false;
   return ask.startsWith(STOP_ASK_OPENING) && ask.trimEnd().endsWith(STOP_ASK_ENDING);
-}
-
-/**
- * The connector statement that blocks a plan step with the ask, as offline.md
- * writes a block: waiting on the person, the ask on the row and a dated line
- * appended to its history, recorded for Home's undo. The dated line is `note`
- * when given (`criticStopNote`, which adds the branch), and the ask otherwise.
- * Both are dollar-quoted, so the apostrophe in them reaches the connector as
- * written.
- */
-export function criticStopBlockSql(input: {
-  step: number;
-  /** The step's outline ("1073.4"), which the recorded action names it by. */
-  outline?: string | null;
-  ask: string;
-  note?: string;
-  date: string;
-  /** The step's owner; read from the step itself when left out. */
-  userId?: string;
-}): string {
-  if (input.userId !== undefined && !/^[0-9a-f-]{36}$/i.test(input.userId)) {
-    throw new Error(`"${input.userId}" is not a user id.`);
-  }
-  if (!Number.isInteger(input.step) || input.step < 1) throw new Error(`"${input.step}" is not a step number.`);
-  if (input.outline && !/^\d+(?:\.\d+)*$/.test(input.outline)) {
-    throw new Error(`"${input.outline}" is not an outline.`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error(`"${input.date}" is not a date.`);
-  const note = input.note ?? input.ask;
-  if (input.ask.includes('$a$') || note.includes('$a$')) throw new Error('The ask cannot contain $a$.');
-  const user = input.userId
-    ? `'${input.userId}'`
-    : `(select user_id from plan_items where number = ${input.step} limit 1)`;
-  const match = `user_id = ${user} and number = ${input.step}`;
-  const ref = `'public.plan_items:' || (select id from plan_items where ${match})`;
-  return [
-    `select core.dash_before(${ref});`,
-    'update plan_items',
-    `set status = 'blocked', block_ask = $a$${input.ask}$a$, block_kind = 'outside',`,
-    `    comment = coalesce(comment || E'\\n\\n', '') || $a$Blocked ${input.date}: ${note}$a$`,
-    `where ${match};`,
-    `select core.record_dash_action(${user}, ${ref}, 'update', 'block_step',`,
-    `  $a$Dash stopped step #${input.outline || input.step} after the design critic's last round and handed the screen to you.$a$);`,
-  ].join('\n');
 }
 
 /**
