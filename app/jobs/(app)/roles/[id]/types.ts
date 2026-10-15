@@ -28,6 +28,10 @@ export interface PanelProps {
   bankSize: number;
   /** The cover letter for this application, private; empty when none is written. */
   coverLetter: string;
+  /** Marked ready to apply. */
+  readyToApply: boolean;
+  /** Your yes/no answer to "has a cover letter"; null until answered. */
+  hasCoverLetter: boolean | null;
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
   focusInterviewId?: string | null;
