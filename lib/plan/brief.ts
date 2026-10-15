@@ -305,7 +305,10 @@ function surfaceLines(ids: readonly string[]): string[] {
     '',
     '## Gallery surfaces',
     '',
-    'Draw and photograph these before wiring the screen to real data:',
+    // The one place a builder learns its step is a screen step, so the file
+    // with the gallery loop is named here and nowhere a plain step reads it.
+    'This step changes a screen: read .claude/skills/plan/reference/screen.md and follow it. ' +
+      'Draw and photograph these before wiring the screen to real data:',
     '',
     ...lines,
   ];

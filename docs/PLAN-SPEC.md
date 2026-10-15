@@ -988,12 +988,25 @@ and a leaf step, which has nothing beneath it to re-read.
 are Claude's, how a batch is run, and where each job is written down. The jobs
 themselves are one file each under `reference/` — building a step, shaping an
 idea, re-shaping a feature, answering an `@dash` comment, plus the wording
-rules and the SQL for when the CLI cannot run. A session reads the front door
-and the one file it was sent for, rather than all seven jobs to do one of them.
+rules and the SQL for when the CLI cannot run. A session reads the one file
+its turn names, rather than all seven jobs to do one of them. Only a batch,
+which has to orchestrate, reads the front door as well. The routine's standing
+prompt says so, and every turn the app fires names its file.
 
 `reference/building.md` is the per-step procedure: read the brief, check what
 it waits on, claim it, break it down if it is large, build to the done-when,
-verify, commit with `(plan #<outline>)` in the subject, close with a note.
+verify, commit with `(plan #<outline>)` in the subject, close with a note. A
+step fired on its own also merges to main and closes from there, under **When
+nobody sent you**. The gallery, photograph and critic loop is in
+`reference/screen.md`, which a builder reads only when its step changes a
+screen: the brief says so under its `## Gallery surfaces` section.
+
+Every turn ends with a note giving the SQL that marks that run over, by its
+own id (`runEndNote` in `lib/plan/auto-line.ts`). The sweep ends a build run
+when its step closes or blocks, and a shaping or notes run by the rows its job
+leaves, but a comment reply, a raise, a spec change or a CI fix leaves neither.
+Before the note, those were written back as failed at the two-hour cutoff
+whether or not they had done their work.
 
 A batch is not built by the session that receives it. More than one step means
 each step goes to its own subagent, which reads `reference/building.md`, builds

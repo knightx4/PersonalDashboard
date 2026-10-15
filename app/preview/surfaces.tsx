@@ -106,6 +106,15 @@ import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
 import { LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  GoalArchiveConfirmSurface,
+  GoalPutAwayMenuSurface,
+  GoalsAllPutAwayMenuSurface,
+  GoalsAllPutAwayToastSurface,
+  GoalsAllSelectConfirmSurface,
+  GoalsAllSelectSurface,
+  GoalsAllSelectToastSurface,
+} from './goal-put-away-surfaces';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -4103,6 +4112,62 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* A goal's row menu on All goals, open: Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-all-menu',
+    label: 'Goals · all goals, a goal’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayMenuSurface />,
+  },
+  {
+    /* Back on All goals after parking a goal: the toast with Undo (plan #2097.1). */
+    id: 'goals-all-toast',
+    label: 'Goals · all goals, parked with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayToastSurface />,
+  },
+  {
+    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    id: 'goals-all-select',
+    label: 'Goals · all goals, several selected',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectSurface />,
+  },
+  {
+    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    id: 'goals-all-select-confirm',
+    label: 'Goals · all goals, archiving six',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectConfirmSurface />,
+  },
+  {
+    /* Three goals parked together: one toast and one Undo (plan #2097.2). */
+    id: 'goals-all-select-toast',
+    label: 'Goals · all goals, parked three with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectToastSurface />,
+  },
+  {
+    /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-page-top-menu',
+    label: 'Goal · the heading menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPutAwayMenuSurface />,
+  },
+  {
+    /* Archive goal pressed: the confirm naming its steps (plan #2097.1). */
+    id: 'goals-page-top-archive',
+    label: 'Goal · archiving it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalArchiveConfirmSurface />,
   },
   {
     /* An area's own page (plan #1619): one area, its goals and proposals. */

@@ -23,6 +23,7 @@ import { latestQuestions, writeResponse } from '@/lib/core/run-questions-store';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { QUESTION_RULE, planBrief } from './brief';
 import { builderFor, projectPreamble } from './handover';
+import { jobFile } from './job-files';
 import { loadPlan } from './load';
 import { refFor, stepRef } from './ref';
 import type { RunJob } from './run-end';
@@ -121,7 +122,7 @@ async function fireContinuation(input: {
   const { supabase, userId, run, opening } = input;
   const job = run.job as RunJob;
   let routine = routineOf(run.routine_id);
-  let text = `${opening}\n\nCarry on the ${job} run following .claude/skills/plan/SKILL.md.`;
+  let text = `${opening}\n\nCarry on the ${job} run following ${jobFile(job)}.`;
 
   if (run.plan_item_id) {
     const sections = buildPlanTree(await loadPlan(supabase, userId));
@@ -131,10 +132,7 @@ async function fireContinuation(input: {
       if (!builder.ok) return { ok: false, error: builder.error };
       routine = builder.routine;
       const alone = flatten([node]).length === 1;
-      const how =
-        job === 'step' && alone
-          ? '.claude/skills/plan/reference/building.md'
-          : '.claude/skills/plan/SKILL.md';
+      const how = jobFile(job, alone);
       const visions = await loadVisionBodies(supabase, userId);
       text =
         (builder.project ? projectPreamble(builder.project) : '') +

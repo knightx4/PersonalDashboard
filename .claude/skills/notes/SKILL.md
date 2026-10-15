@@ -495,8 +495,8 @@ above. Name the law in the subject: `Make scrolled lists lists, not cards
 
 `check:ui` reads zero on plenty of surfaces that read badly, so a fix that
 touches a screen goes through the critic before it closes. This is the same
-loop the plan's building reference states under **Building a screen**
-(`.claude/skills/plan/reference/building.md`), which has the commands, and it
+loop the plan's screen reference states
+(`.claude/skills/plan/reference/screen.md`), which has the commands, and it
 applies to any note whose fix changes a surface, not only notes filed from the
 gallery:
 

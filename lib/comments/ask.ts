@@ -375,9 +375,10 @@ function sessionTurn(
   const opening = instruction
     ? `Carry out an instruction left on ${subject.label}, in the app. Read the code it is ` +
       'about, do what it asks inside the list below, and write into the thread on that row ' +
-      'what you did.'
+      'what you did, following .claude/skills/plan/reference/comments.md.'
     : `Answer a question asked on ${subject.label}, in the app. Read the code it is about, ` +
-      'write the answer into the thread on that row, and then stop.';
+      'write the answer into the thread on that row, and then stop, following ' +
+      '.claude/skills/plan/reference/comments.md.';
 
   return (
     `${opening}\n\n` +

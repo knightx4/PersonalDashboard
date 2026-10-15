@@ -151,7 +151,7 @@ export function uiCheckRefusal(input: {
     `(npm run ui-check -- ${input.step} ${first.surface} ${next}), then close it once it passes. ` +
     `A surface still failing after round 3, or one reached only through a shared file, ` +
     `is yours to settle: npm run ui-guard -- ${input.step} --settle "<why>". ` +
-    `building.md, "Building a screen", has the loop.`
+    `screen.md, beside building.md in the plan skill, has the loop.`
   );
 }
 
@@ -203,7 +203,7 @@ export function uiGuardSql(step: number, surfaces: readonly string[], userId?: s
  * than its last `Blocked` line: the person has to have answered the block
  * this is about, so a session cannot accept its own screens. Reading that
  * answer as an accept, rather than as what to change, is the session's call,
- * made by the rule in building.md.
+ * made by the rule in screen.md.
  */
 export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
   const check = uiGuardSql(step, surfaces);
