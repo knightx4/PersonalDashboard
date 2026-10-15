@@ -27,6 +27,8 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
 import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
+import { articleKey, proposeArticles, type ProposeReport } from '@/lib/learn/catalogue/propose';
+import { searchWikipediaTitle } from '@/lib/learn/providers/wikipedia-search';
 import {
   DEFAULT_COURSE_PROVIDER,
   sweepWikipediaArticle,
@@ -163,6 +165,65 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   // already there -- where Find sources already knows what to do with a
   // subject you wrote down and no source yet.
   redirect(`/learn/r/${readingId}`);
+}
+
+export type ProposeState = { report?: ProposeReport; error?: string };
+
+/**
+ * Proposing this subject's Wikipedia articles from the names of its ideas
+ * (plan #2157.1). Each idea name goes to Wikipedia's search and the top hit is
+ * proposed, minus repeats and articles the catalogue already holds. No model
+ * is asked and nothing is written; the person strikes the wrong ones and
+ * pulls the rest with pullWikipediaArticles.
+ */
+// latency: pending
+export async function proposeSubjectArticles(
+  _previous: ProposeState,
+  formData: FormData,
+): Promise<ProposeState> {
+  await requireUser();
+  const subjectId = String(formData.get('subjectId') ?? '');
+  if (!subjectId) return { error: 'No subject was named.' };
+
+  const supabase = await createLearnClient();
+  const graph = await loadGraph(supabase, subjectId).catch(() => null);
+  if (!graph) return { error: 'This subject could not be read.' };
+  if (graph.concepts.length === 0) return { error: 'This subject has no ideas to name articles from.' };
+
+  let sql;
+  try {
+    sql = catalogueSql();
+  } catch (error) {
+    return {
+      error: `The catalogue cannot be read from this deployment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  try {
+    const report = await proposeArticles(
+      {
+        search: (name) => searchWikipediaTitle(name),
+        held: async (titles) => {
+          const ids = titles.map((title) => title.trim().replace(/\s+/g, '_'));
+          const rows = await sql<{ external_id: string }[]>`
+            select i.external_id
+              from learn.catalogue_items i
+              join learn.catalogue_providers p on p.id = i.provider_id
+             where p.slug = 'wikipedia' and i.external_id in ${sql(ids)}`;
+          const stored = new Set(rows.map((row) => articleKey(row.external_id)));
+          return new Set(titles.filter((title) => stored.has(articleKey(title))));
+        },
+      },
+      graph.concepts.map((concept) => concept.name),
+    );
+    return { report };
+  } catch (error) {
+    return {
+      error: `Wikipedia did not answer (${error instanceof Error ? error.message : String(error)}). Find again in a minute.`,
+    };
+  }
 }
 
 export type PullState = { report?: PullReport; error?: string };
