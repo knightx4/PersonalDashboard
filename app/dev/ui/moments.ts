@@ -91,12 +91,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'home',
     name: 'The first visit of the day',
     trigger: 'Opening Home for the first time on a new day.',
-    sees: 'The greeting, the brief, Today and the rail beside it arrive one after another rather than all at once.',
+    sees: 'The greeting, the date, the panel holding the day’s brief, then the brief rows, the Inbox count and the rail arrive one after another rather than all at once.',
     reducedMotion: 'All of it is there at once.',
     state: {
       built: 'yes',
       where:
-        'HomeArrival in app/home/arrival.tsx round both columns on /home (the rail rises with Today, in HomeColumns), played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
+        'HomeArrival in app/home/arrival.tsx round both columns on /home (the greeting and date first, then the panel holding the brief, then its rows and the Inbox count with the rail, in HomeColumns), played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
     },
     demo: 'motion-home-arrival',
   },
