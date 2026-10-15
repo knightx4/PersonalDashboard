@@ -162,14 +162,15 @@ function MonthObservations({ observations, timezone }: { observations: ShownObse
   const weeks = [...new Set(observations.map((observation) => observation.week))];
   if (weeks.length === 0) return null;
   return (
-    <div className="mb-3 space-y-3">
+    // Dash's words on a panel of their own, apart from the rows under them
+    // and the page's ground (taste:no-bare-text): one panel for the month,
+    // a week to a section.
+    <Card padding="standard" className="mb-3 divide-y divide-border">
       {weeks.map((week) => (
-        // Dash's words on a panel of their own, apart from the rows under
-        // them and the page's ground (taste:no-bare-text).
-        <Card
+        <section
           key={week}
-          padding="standard"
           aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}
+          className="py-3 first:pt-0 last:pb-0"
         >
           <h3 className="mb-1.5 flex items-center gap-1.5 text-small font-medium text-ink-muted">
             <DashMark size="icon" tone="brand" decorative />
@@ -179,9 +180,9 @@ function MonthObservations({ observations, timezone }: { observations: ShownObse
             observations={observations.filter((observation) => observation.week === week)}
             timezone={timezone}
           />
-        </Card>
+        </section>
       ))}
-    </div>
+    </Card>
   );
 }
 
@@ -212,6 +213,7 @@ function MonthChart({ months, bounds }: { months: TimelineMonth[]; bounds: { fir
             <div key={month.key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
               {month.count > 0 && <span className="tabular text-small text-ink-muted">{month.count}</span>}
               {month.count === 0 ? (
+                /* ui-ok: hand-rolled-box -- an empty month's stub on the chart's baseline, as in DayBarChart, not a box */
                 <div className="h-1 w-full max-w-10 rounded-t-control border border-b-0 border-border-strong" />
               ) : (
                 <div
