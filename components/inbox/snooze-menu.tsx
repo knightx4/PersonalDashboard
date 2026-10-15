@@ -116,7 +116,7 @@ export function LaterMenu({
         ) : (
           <span className="inline-flex items-center gap-1">
             <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
-            <span className="max-sm:sr-only">{LATER}</span>
+            <span>{LATER}</span>
             <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
           </span>
         )

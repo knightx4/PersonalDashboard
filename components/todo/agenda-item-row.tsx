@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -16,6 +17,7 @@ import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecyc
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
 type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
@@ -82,6 +84,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
   });
 
   const acted = shown !== 'open';
+  const laterAt = useRef<HTMLSpanElement>(null);
 
   return (
     <div
@@ -216,20 +219,20 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        <Tooltip label={LIFECYCLE_VERB.later} align="end">
-          <IconButton
-            label={`${LIFECYCLE_VERB.later}: ${item.title}`}
-            onClick={(event) =>
+        {/* The one Later menu (plan #1957.9): the source puts it off to the day chosen. */}
+        <span ref={laterAt} className="flex">
+          <LaterMenu
+            compact
+            label={item.title}
+            onChoose={(choice) =>
               run({
                 state: 'deferred',
-                write: () => deferItem(item.source, item.key),
-                from: event.currentTarget.getBoundingClientRect(),
+                write: () => deferItem(item.source, item.key, choice),
+                from: laterAt.current?.getBoundingClientRect(),
               })
             }
-          >
-            <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
-          </IconButton>
-        </Tooltip>
+          />
+        </span>
         <Tooltip label={LIFECYCLE_VERB.dropped} align="end">
           <IconButton
             label={`${LIFECYCLE_VERB.dropped}: ${item.title}`}

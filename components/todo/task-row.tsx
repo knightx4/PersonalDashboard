@@ -40,7 +40,8 @@ import {
   rescheduleTaskAction,
   unpointTask,
 } from '@/app/todo/actions';
-import { openCount, SNOOZE_DAYS, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { openCount, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { laterUntil } from '@/lib/core/snooze-days';
 import { InlineTextarea } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
@@ -107,12 +108,13 @@ type RowWrite = {
   toast?: ToastInput;
 };
 
-/** What "later" does to the row until the server says when. Only the button
- * reads it: a snoozed task shows "Bring back" where an open one shows "Later".
+/** What "later" does to the row until the server says when: the start of the
+ * day chosen. Only the button reads it: a snoozed task shows "Bring back"
+ * where an open one shows "Later". A day the server will refuse still marks
+ * the row, and the refusal puts it back.
  */
-function snoozedFrom(): string {
-  const now = Date.now();
-  return new Date(now + SNOOZE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+function snoozedFrom(choice: string, timezone: string): string {
+  return (laterUntil(choice, timezone)?.until ?? new Date()).toISOString();
 }
 
 /**
@@ -333,7 +335,7 @@ export function TaskRow({
     setPickingLater(false);
     const away = sendAway('Open');
     run({
-      patch: { snoozedUntil: snoozedFrom() },
+      patch: { snoozedUntil: snoozedFrom(choice, timezone) },
       write: async () => {
         const result = await laterTask(task.id, choice);
         if (!result.error) away();

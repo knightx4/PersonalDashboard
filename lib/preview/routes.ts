@@ -304,6 +304,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'todo-agenda-header': ['/todo'],
+  'todo-agenda-rows': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
@@ -494,6 +495,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The four words that close a row (plan #1957.3), which every workspace's
   // closing buttons draw.
   'core-close-buttons': ['components/inbox/close-button.tsx'],
+  // The agenda's borrowed rows (plan #1957.9), with the one Later menu.
+  'todo-agenda-rows': ['components/todo/agenda-item-row.tsx'],
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],

@@ -3,14 +3,15 @@
 import { closedToast } from '@/lib/core/lifecycle';
 import { useTransition } from 'react';
 import { CloseButton } from '@/components/inbox/close-button';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 import { useToast } from '@/components/ui/toast';
-import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
 import { completeReminder, restoreReminder, snoozeReminder } from './actions';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Two answers to a nudge: dealt with, or not now. Each toast names the
- * nudge it closed (plan #1957.8).
+ * nudge it closed (plan #1957.8), and Later is the one Later menu, to the
+ * day chosen (plan #1957.9).
  *
  * There is deliberately no third. A nudge you can neither finish nor defer is
  * a nudge you learn to look past, which is how a list of them stops working.
@@ -19,12 +20,12 @@ export function ReminderActions({ id, title }: { id: string; title: string }) {
   const [busy, startTransition] = useTransition();
   const toast = useToast();
 
-  function later() {
+  function later(choice: string) {
     startTransition(async () => {
-      const result = await snoozeReminder(id);
+      const result = await snoozeReminder(id, choice);
       if (result.error) return toast({ text: result.error });
       toast({
-        text: `${closedToast('later', title)}, back in ${SNOOZE_DAYS} days`,
+        text: result.until ? `${closedToast('later', title)}, ${result.until}` : closedToast('later', title),
         undo: async () => void (await restoreReminder(id, result.dueAt ?? null)),
       });
     });
@@ -40,9 +41,7 @@ export function ReminderActions({ id, title }: { id: string; title: string }) {
 
   return (
     <span className="ml-auto flex shrink-0 items-center gap-2">
-      <Tooltip label={`Brings it back in ${SNOOZE_DAYS} days`} align="end">
-        <CloseButton lifecycle="later" pending={busy} onClick={later} />
-      </Tooltip>
+      <LaterMenu label={title} onChoose={later} />
       <Tooltip label="Marks the reminder done and takes it off this list" align="end">
         <CloseButton lifecycle="done" variant="secondary" pending={busy} onClick={done} />
       </Tooltip>

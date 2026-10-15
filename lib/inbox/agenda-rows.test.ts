@@ -56,7 +56,7 @@ describe('agendaInboxRow', () => {
     expect(row.section).toBe('actions');
     expect(row.line).toBe('Screwfix · due Thu 12 Mar');
     expect(row.verbs?.map((v) => [v.label, v.tone])).toEqual([['Open the order', 'primary']]);
-    expect(row.putOff?.fields).toEqual({ source: 'return_deadlines', key: 'return:o1' });
+    expect(row.later?.fields).toEqual({ source: 'return_deadlines', key: 'return:o1' });
     expect(row.decline?.fields).toEqual({ source: 'return_deadlines', key: 'return:o1' });
   });
 
@@ -89,7 +89,7 @@ describe('agendaInboxRow', () => {
     const row = agendaInboxRow(entry(item()), ACTIONS, {}, '2026-03-10')!;
     expect(row.verbs?.map((v) => v.label)).toEqual(['Open the order']);
     expect(row.decline).toBeUndefined();
-    expect(row.putOff).toBeUndefined();
+    expect(row.later).toBeUndefined();
   });
 
   it('answers a question with its options, under Questions', () => {

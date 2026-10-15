@@ -673,7 +673,7 @@ const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
   async run(ctx, input) {
     if (!ctx.db || !ctx.account) refuse();
     if (!ctx.account.enabledModules.includes('jobs')) throw new AskInputError(JOBS_OFF);
-    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db, ctx.account.timezone), input);
     if ('ok' in made) throw new AskInputError(made.error);
     if (!made.undo) {
       await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);

@@ -222,8 +222,11 @@ export interface AgendaSource {
    * Optional together, because a source that contributes only day context has
    * no items to act on: an interview is an appointment, and there is no honest
    * meaning for pushing one from a to-do list.
+   *
+   * `until` is the start of the day picked from the one Later menu
+   * (lib/core/snooze-days.ts `laterUntil`), when the item comes back.
    */
-  defer?(ctx: SourceContext, key: string): Promise<void>;
+  defer?(ctx: SourceContext, key: string, until: Date): Promise<void>;
   dismiss?(ctx: SourceContext, key: string): Promise<void>;
   /** Takes a Later or Drop back, for the toast's Undo (plan #1957.3). */
   restore?(ctx: SourceContext, key: string): Promise<void>;

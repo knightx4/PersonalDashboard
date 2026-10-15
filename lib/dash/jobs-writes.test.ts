@@ -302,10 +302,12 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
     expect(change.undo).toBeNull();
   });
 
-  it('puts one off a week, rewords and moves one, and links it to an email by its search_mail ref', async () => {
-    const off = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: true });
-    const days = (new Date(off.after.due_at as string).getTime() - Date.now()) / 86_400_000;
-    expect(Math.round(days)).toBe(7);
+  it('puts one off to a day, rewords and moves one, and links it to an email by its search_mail ref', async () => {
+    const off = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: '2099-01-15' });
+    expect(off.after.due_at).toBe('2099-01-15T00:00:00.000Z');
+    expect(off.summary).toContain('put off until Thu 15 Jan 2099');
+    const tomorrow = await made('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: 'tomorrow' });
+    expect(new Date(tomorrow.after.due_at as string).getTime()).toBeGreaterThan(Date.now());
 
     const edited = await made('change_reminder', withReminders(), {
       reminder_ref: REMINDER,
@@ -323,7 +325,8 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
       /not one the job search has read/,
     );
     expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER })).toMatch(/Nothing to change/);
-    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true, put_off: true })).toMatch(/not both/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, finish: true, put_off: 'tomorrow' })).toMatch(/not both/);
+    expect(await refused('change_reminder', withReminders(), { reminder_ref: REMINDER, put_off: 'someday' })).toMatch(/put_off must be tomorrow/);
   });
 
   it('marks a waiting row done with a new row, whose Undo takes it out', async () => {
@@ -338,10 +341,11 @@ describe('change_reminder and change_waiting (plan #1894.6.3)', () => {
   it('puts off a row already set aside in place, and refuses an event that asked nothing', async () => {
     const data = withReminders();
     data['job_search.waiting_dismissals'] = [{ id: DISMISSAL, user_id: ME, application_event_id: EVENT, dismissed_until: null }];
-    const change = await made('change_waiting', data, { event_ref: EVENT, verb: 'put_off' });
+    const change = await made('change_waiting', data, { event_ref: EVENT, verb: 'put_off', until: '2099-01-15' });
     expect(change.op).toBe('update');
     expect(change.subjectRef).toBe(`job_search.waiting_dismissals:${DISMISSAL}`);
-    expect(change.after.dismissed_until).toEqual(expect.any(String));
+    expect(change.after.dismissed_until).toBe('2099-01-15T00:00:00.000Z');
+    expect(await refused('change_waiting', data, { event_ref: EVENT, verb: 'put_off' })).toMatch(/until must be tomorrow/);
     expect(await refused('change_waiting', withReminders(), { event_ref: ANSWER_1, verb: 'finish' })).toMatch(/not one waiting on them/);
   });
 });

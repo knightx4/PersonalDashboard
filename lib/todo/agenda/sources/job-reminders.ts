@@ -8,7 +8,6 @@ import {
   gmailComposeUrl,
 } from '@/lib/jobs/followup/compose';
 import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 import { zoneDay } from '@/lib/core/when';
 
@@ -147,10 +146,7 @@ export const jobRemindersSource: AgendaSource = {
    * yet" has always meant on the job side, so pushing it is the one write both
    * pages read.
    */
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-
+  async defer(ctx, key, until) {
     const supabase = await (ctx.clients ?? sessionClients).jobs();
     await supabase
       .from('reminders')

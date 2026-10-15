@@ -6,7 +6,6 @@ import type { PageRow } from '@/lib/sources/types';
 import type { AnyClient } from '@/lib/thread/store';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -184,9 +183,7 @@ export const threadsSource: AgendaSource = {
     return threadItems(asking, titles);
   },
 
-  async defer(ctx, key) {
-    const until = new Date(ctx.now);
-    until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
+  async defer(ctx, key, until) {
     await dismiss(ctx.userId, 'thread', key, until, ctx.clients);
   },
 

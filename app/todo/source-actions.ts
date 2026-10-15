@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { LATER_REFUSED, laterUntil } from '@/lib/core/snooze-days';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { sourceById } from '@/lib/todo/agenda/registry';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
@@ -67,12 +68,23 @@ export async function completeItem(
   return { error: null };
 }
 
+/**
+ * Later, to one of the Later menu's days or a day picked (`choice`, as
+ * lib/core/snooze-days.ts reads it), in the account's zone.
+ */
 // latency: optimistic -- the agenda row fades at once
-export async function deferItem(sourceId: string, key: string): Promise<{ error: string | null }> {
+export async function deferItem(
+  sourceId: string,
+  key: string,
+  choice: string,
+): Promise<{ error: string | null }> {
   const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
   if (!source?.defer) return refuse(sourceId, 'put off');
 
-  await source.defer(await context(), key);
+  const ctx = await context();
+  const later = laterUntil(choice, ctx.timezone, ctx.now);
+  if (!later) return { error: LATER_REFUSED };
+  await source.defer(ctx, key, later.until);
   done();
   return { error: null };
 }

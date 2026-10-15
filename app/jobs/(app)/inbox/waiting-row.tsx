@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { CloseButton } from '@/components/inbox/close-button';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 import { buttonVariants } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { FieldError } from '@/components/ui/field';
@@ -12,7 +13,7 @@ import { prepareWithDash, type PrepareState } from '../_home/prepare-actions';
 
 /**
  * A request from a company in the Jobs Inbox (plan #1937.9): the shape's
- * title, line, Done and Later, with Prepare for this beside Done, which
+ * title, line, Done and the one Later menu, with Prepare for this beside Done, which
  * Today's "Waiting on you" had and the shape cannot draw, since it costs
  * and shows its $ hint.
  *
@@ -20,9 +21,9 @@ import { prepareWithDash, type PrepareState } from '../_home/prepare-actions';
  * request is answered on the agenda and here at once.
  */
 
-function formOf(write: InboxWrite): FormData {
+function formOf(write: InboxWrite, extra: Record<string, string> = {}): FormData {
   const form = new FormData();
-  for (const [key, value] of Object.entries(write.fields ?? {})) form.set(key, value);
+  for (const [key, value] of Object.entries({ ...write.fields, ...extra })) form.set(key, value);
   return form;
 }
 
@@ -41,10 +42,10 @@ export function WaitingInboxRow({
   const [prep, setPrep] = useState<PrepareState | null>(null);
   const [preparing, startPrep] = useTransition();
 
-  const run = (write: InboxWrite) =>
+  const run = (write: InboxWrite, extra?: Record<string, string>) =>
     start(async () => {
       try {
-        setSaid((await write.action(formOf(write))) ?? {});
+        setSaid((await write.action(formOf(write, extra))) ?? {});
       } catch {
         setSaid({ error: 'That did not go through. Try again.' });
       }
@@ -95,9 +96,9 @@ export function WaitingInboxRow({
               </DashAction>
             )
           )}
-          {row.putOff && (
+          {row.later && (
             <span className="ml-auto flex items-center gap-1">
-              <CloseButton lifecycle="later" pending={pending} onClick={() => run(row.putOff!)} />
+              <LaterMenu label={row.title} onChoose={(choice) => run(row.later!, { choice })} />
             </span>
           )}
         </div>
