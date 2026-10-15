@@ -374,6 +374,14 @@ export const LEARN_OPERATIONS = [
   // Haiku search and reading in between records under
   // 'research-essay-question'.
   'write-essay-research',
+  // Drafting a topic with its ten levels from a goal the person named
+  // (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"; plan #2138.2). One Sonnet
+  // call per draft. The first twenty are the measurement for the spec's
+  // missing cost line, so it stays apart from 'generate-chain'.
+  'draft-topic',
+  // Embedding a drafted topic's scope to find a topic it duplicates. Apart
+  // from 'embed-claim' so the cost of deduplication can be read on its own.
+  'embed-topic-scope',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

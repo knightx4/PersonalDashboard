@@ -17,6 +17,14 @@ export const learnActions: ModuleActions = {
     },
     addConceptNote: tool('add_concept_note'),
   },
+  'app/learn/topics/actions.ts': {
+    draftTopicFromGoal: none('spends'),
+  },
+  'app/learn/topics/[id]/actions.ts': {
+    approveTopicDraft: none('theirs'),
+    mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    draftWantedTopic: none('spends'),
+  },
   'app/learn/b/[id]/actions.ts': {
     saveShortAnswer: none('own'),
     setBriefWatch: none('setting'),
