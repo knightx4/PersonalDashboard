@@ -128,6 +128,8 @@ export const MODELS = {
   learnLevelGradeSecond: SONNET,
   /** lib/learn/levels/case-call.ts, a case written for a level 4 to 6 cell */
   learnLevelCase: HAIKU,
+  /** lib/learn/lessons/match-piece-cells.ts, the cells each piece of a unit teaches */
+  learnPieceCells: HAIKU,
   /** lib/learn/chat/subjects.ts */
   learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */

@@ -4,6 +4,8 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { scheduleIdeas } from './review-store';
 import { passedState, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
+import { checkCell, type PieceCellView } from './piece-cells';
+import { loadCellCheck, loadPieceCells } from './piece-cells-store';
 
 /**
  * The reads and writes behind a piece's page (plan #1141). Shared by the page
@@ -41,6 +43,11 @@ export type PiecePage = {
   /** Every piece of the unit, this one included, in the suggested order. */
   siblings: PieceSibling[];
   ideas: PieceIdea[];
+  /**
+   * The cells the piece teaches, with where you stand on each (plan
+   * #2138.13). Empty for a piece written before its goal had a territory.
+   */
+  cells: PieceCellView[];
   /** The latest question asked on the piece, or null before the first. */
   check: PieceCheck | null;
 };
@@ -52,6 +59,7 @@ type PieceRow = {
   ordinal: number;
   title: string;
   concept_ids: string[];
+  cell_ids: string[];
   passed_at: string | null;
 };
 
@@ -68,7 +76,7 @@ type LessonRow = {
   drop_reason: string | null;
 };
 
-const PIECE_COLUMNS = 'id, subject_id, unit_id, ordinal, title, concept_ids, passed_at';
+const PIECE_COLUMNS = 'id, subject_id, unit_id, ordinal, title, concept_ids, cell_ids, passed_at';
 
 /** The piece, when it is the person's and on this track. */
 export async function loadPieceRow(
@@ -189,7 +197,7 @@ export async function loadPiecePage(
   const piece = await loadPieceRow(learn, userId, subjectId, pieceId);
   if (!piece) return null;
 
-  const [subject, unit, siblings, ideas, lessons, check] = await Promise.all([
+  const [subject, unit, siblings, ideas, lessons, ownCheck, cells] = await Promise.all([
     learn.from('subjects').select('id, name').eq('id', subjectId).eq('user_id', userId).maybeSingle(),
     learn
       .from('curriculum_units')
@@ -206,7 +214,15 @@ export async function loadPiecePage(
     loadIdeas(learn, userId, piece.concept_ids),
     loadLessons(learn, userId, piece.concept_ids),
     loadLatestCheck(learn, userId, piece.id),
+    loadPieceCells(learn, userId, piece.cell_ids),
   ]);
+  // A piece with a cell it can ask about checks with a cell question; one
+  // without keeps its own written question (plan #2138.13).
+  const check = checkCell(cells)
+    ? await loadCellCheck(learn, userId, piece.id)
+    : ownCheck
+      ? toPieceCheck(ownCheck)
+      : null;
   if (subject.error) throw new Error(`Reading the subject failed: ${subject.error.message}`);
   if (unit.error) throw new Error(`Reading the unit failed: ${unit.error.message}`);
   if (siblings.error) throw new Error(`Reading the unit's pieces failed: ${siblings.error.message}`);
@@ -229,7 +245,8 @@ export async function loadPiecePage(
         dropped: lesson?.dropped ?? null,
       };
     }),
-    check: check ? toPieceCheck(check) : null,
+    cells,
+    check,
   };
 }
 
@@ -239,7 +256,7 @@ export async function loadPieceForCheck(
   userId: string,
   subjectId: string,
   pieceId: string,
-): Promise<{ piece: PieceForCheck; conceptIds: string[]; passedAt: string | null } | null> {
+): Promise<{ piece: PieceForCheck; conceptIds: string[]; cellIds: string[]; passedAt: string | null } | null> {
   const row = await loadPieceRow(learn, userId, subjectId, pieceId);
   if (!row) return null;
   const [subject, unit, ideas] = await Promise.all([
@@ -260,6 +277,7 @@ export async function loadPieceForCheck(
       ideas: ideas.map((idea) => ({ name: idea.name, claim: idea.claim })),
     },
     conceptIds: ideas.map((idea) => idea.id),
+    cellIds: row.cell_ids,
     passedAt: row.passed_at,
   };
 }
