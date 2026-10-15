@@ -22,16 +22,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How far ahead an interview is worth surfacing. */
 export const INTERVIEW_HORIZON_DAYS = 14;
 
-/**
- * How far "Later" pushes a nudge. Long enough that deferring is a decision
- * rather than a way of clearing the screen.
- *
- * Here rather than beside the action that uses it: a `'use server'` module may
- * only export async functions, so a constant shared with the client cannot
- * live there.
- */
-export const SNOOZE_DAYS = 7;
-
 export interface UpcomingInterview {
   id: string;
   applicationId: string;

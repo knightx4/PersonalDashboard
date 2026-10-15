@@ -7,7 +7,7 @@
  * the caller's.
  */
 
-import { zoneOffset } from '@/lib/core/when';
+import { whenDate, zoneDay, zoneOffset } from '@/lib/core/when';
 
 export const SNOOZE_CHOICES = ['tomorrow', 'weekend', 'next_week', 'next_month'] as const;
 export type SnoozeChoice = (typeof SNOOZE_CHOICES)[number];
@@ -61,3 +61,28 @@ export function dayStartIn(day: string, timeZone: string): Date {
   const first = midnightUtc - zoneOffset(midnightUtc, timeZone);
   return new Date(midnightUtc - zoneOffset(first, timeZone));
 }
+
+/**
+ * Later on a choice, read in the account's zone: the day it means and the
+ * instant that day begins there, when the thing comes back. Null for a picked
+ * day that is not after today.
+ */
+export function laterUntil(
+  choice: string,
+  timeZone: string,
+  now: Date = new Date(),
+): { day: string; until: Date } | null {
+  const day = snoozeDay(choice, zoneDay(now, timeZone));
+  return day ? { day, until: dayStartIn(day, timeZone) } : null;
+}
+
+/** When a thing put off comes back, in words: "until Sat 17 Oct". */
+export function untilWords(day: string, timeZone: string, now: Date = new Date()): string {
+  return `until ${whenDate(day, { timeZone, weekday: 'short', year: 'auto', now })}`;
+}
+
+/** What a Dash write tool says its Later field takes. */
+export const LATER_UNTIL_HELP = `${SNOOZE_CHOICES.join(', ')}, or a day after today as YYYY-MM-DD`;
+
+/** The refusal for a Later with no day the menu would give. */
+export const LATER_REFUSED = 'Pick a day after today.';

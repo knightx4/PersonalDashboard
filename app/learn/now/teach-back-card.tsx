@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { Thread } from '@/components/thread/thread';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -111,9 +112,7 @@ export function TeachBackCard({
             Next
           </Button>
         ) : (
-          <Button type="button" variant="secondary" onClick={onSkip}>
-            Skip
-          </Button>
+          <CloseButton lifecycle="declined" variant="secondary" onClick={onSkip} />
         )}
         <label className="ml-auto flex items-center gap-2 text-small text-ink-muted">
           Explain-back cards

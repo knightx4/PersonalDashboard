@@ -105,7 +105,7 @@ import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
-import { LaterMenuRows } from './later-menu-surface';
+import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
 import {
   GoalArchiveConfirmSurface,
@@ -3688,14 +3688,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Kestrel Bank is in Closed”.',
+        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “Declined: Kestrel Bank · 5 open” with Undo.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p4"
         to="rejected"
-        label="Reject Kestrel Bank"
+        label="Decline Kestrel Bank"
       />
     ),
   },
@@ -4221,7 +4221,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSurface />,
   },
   {
-    /* A goal's row menu on All goals, open: Park goal and Archive goal (plan #2097.1). */
+    /* A goal's row menu on All goals, open: Later and Drop (plans #2097.1, #1957.8). */
     id: 'goals-all-menu',
     label: 'Goals · all goals, a goal’s menu',
     module: 'goals',
@@ -4237,7 +4237,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllPutAwayToastSurface />,
   },
   {
-    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    /* Select on, three goals ticked: the bar with Later and Drop (plans #2097.2, #1957.8). */
     id: 'goals-all-select',
     label: 'Goals · all goals, several selected',
     module: 'goals',
@@ -4245,9 +4245,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSelectSurface />,
   },
   {
-    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    /* Drop pressed with six ticked: the bar asks first (plan #2097.2). */
     id: 'goals-all-select-confirm',
-    label: 'Goals · all goals, archiving six',
+    label: 'Goals · all goals, dropping six',
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSelectConfirmSurface />,
@@ -4261,7 +4261,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAllSelectToastSurface />,
   },
   {
-    /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
+    /* The goal page's heading menu, open, with Later and Drop (plans #2097.1, #1957.8). */
     id: 'goals-page-top-menu',
     label: 'Goal · the heading menu',
     module: 'goals',
@@ -4269,9 +4269,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPutAwayMenuSurface />,
   },
   {
-    /* Archive goal pressed: the confirm naming its steps (plan #2097.1). */
+    /* Drop pressed: the confirm naming its steps (plan #2097.1). */
     id: 'goals-page-top-archive',
-    label: 'Goal · archiving it',
+    label: 'Goal · dropping it',
     module: 'goals',
     width: 'page',
     render: () => <GoalArchiveConfirmSurface />,
@@ -6703,6 +6703,16 @@ export const SURFACES: readonly Surface[] = [
         />
       </div>
     ),
+  },
+  {
+    /* Rows the agenda borrows from other workspaces (plan #1957.9): one that
+     * can be ticked, one that is a date and cannot, each with the one Later
+     * menu as its clock and Drop beside it. */
+    id: 'todo-agenda-rows',
+    label: 'Todo · Agenda rows from elsewhere',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaRowsSurface />,
   },
   {
     /* The agenda opens with a button, not a box (plan #1950.6). */

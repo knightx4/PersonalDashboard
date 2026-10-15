@@ -31,7 +31,7 @@ export async function doneInboxItem(form: FormData): Promise<Said> {
 
 // latency: optimistic -- the row says it is put off at once
 export async function laterInboxItem(form: FormData): Promise<Said> {
-  return after(await deferItem(text(form, 'source'), text(form, 'key')), 'Put off for now.');
+  return after(await deferItem(text(form, 'source'), text(form, 'key'), text(form, 'choice')), 'Later.');
 }
 
 // latency: optimistic -- the row says Declined at once

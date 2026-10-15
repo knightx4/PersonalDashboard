@@ -103,10 +103,12 @@ export const goalsActions: ModuleActions = {
     answerQuestionAction: none('theirs'),
     setQuestionAsideAction: none('theirs'),
     settleProposalAction: none('theirs'),
+    undoDeclineProposalAction: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/goals/[goalId]/help-actions.ts': {
     setHelpKindsAction: none('setting'),
     turnDownHelpAction: none('theirs'),
+    restoreHelpProposalAction: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/goals/files/[fileId]/read-actions.ts': {
     markFileReadAction: none('own', 'Opening the file marks it read, which means the person read it.'),

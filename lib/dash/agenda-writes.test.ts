@@ -76,9 +76,9 @@ describe('change_agenda_row', () => {
 
   it('puts off a reminder by moving its own due date', async () => {
     const tables: FakeTables = { 'job_search.reminders': [{ id: REMINDER, user_id: ME, body: 'x', due_at: '2026-10-01T09:00:00Z', completed_at: null }] };
-    const change = await made(tables, { agenda_source: 'job_reminders', agenda_key: `job_reminders:${REMINDER}`, verb: 'put_off' });
+    const change = await made(tables, { agenda_source: 'job_reminders', agenda_key: `job_reminders:${REMINDER}`, verb: 'put_off', until: '2099-01-15' });
     expect(change.before).toMatchObject({ due_at: '2026-10-01T09:00:00Z' });
-    expect(change.after.due_at).not.toBe('2026-10-01T09:00:00Z');
+    expect(change.after.due_at).toBe(new Date('2099-01-15T00:00:00Z').toISOString());
   });
 
   it('closes a goal step on the step itself', async () => {
@@ -98,7 +98,7 @@ describe('change_agenda_row', () => {
     expect(first.after).toMatchObject({ user_id: ME, source: 'raised_item', source_key: `raised:${RAISE}`, dismissed_until: null });
     expect(first.summary).toBe('Dash dismissed "Keep the old export?" on the Todo agenda.');
 
-    const later = await made(tables, { ...input, verb: 'put_off' });
+    const later = await made(tables, { ...input, verb: 'put_off', until: 'next_week' });
     expect(later.op).toBe('update');
     expect(later.subjectRef).toBe(first.subjectRef);
     expect(later.before).toMatchObject({ dismissed_until: null });

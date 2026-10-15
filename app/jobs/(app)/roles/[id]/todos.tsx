@@ -9,7 +9,7 @@ import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { completeReminder, restoreReminder } from '@/app/jobs/(app)/_home/actions';
 import { useToast } from '@/components/ui/toast';
-import { LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { Tooltip } from '@/components/ui/tooltip';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
@@ -156,7 +156,7 @@ function TodoLine({
                   if (result.error) return setError(result.error);
                   // Done, with the way back (plan #1957.3).
                   toast({
-                    text: LIFECYCLE_WORD.done,
+                    text: closedToast('done', todo.body),
                     undo: async () => {
                       const back = await restoreReminder(todo.id, null);
                       if (back.error) throw new Error(back.error);
@@ -190,7 +190,7 @@ function TodoLine({
               Edit
             </Button>
             <span className="flex">
-              <ReminderActions id={todo.id} />
+              <ReminderActions id={todo.id} title={todo.body} />
             </span>
           </div>
         )}

@@ -1,8 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
+import { closedToast } from '@/lib/core/lifecycle';
 import { Card } from '@/components/ui/card';
 import { Checkbox, InlineInput } from '@/components/ui/field';
 import {
@@ -12,6 +15,7 @@ import {
   type HelpKindChoice,
 } from '@/lib/goals/help-kinds';
 import {
+  restoreHelpProposalAction,
   setHelpKindsAction,
   turnDownHelpAction,
   type HelpKindsActionState,
@@ -27,7 +31,7 @@ const initial: HelpKindsActionState = {};
  * of add lines and mounts this with `startEditing` from (plan #1038).
  *
  * Kinds Claude proposed when it mapped the goal (plan #1029) show in place of
- * the chosen ones, to approve as they stand, change or turn down. Claude only
+ * the chosen ones, to approve as they stand, change or decline. Claude only
  * proposes for a goal whose help has never been saved, so the two lists do not
  * meet.
  */
@@ -192,9 +196,10 @@ function HelpForm({
 }
 
 /**
- * Approve, Change and Turn down under a proposal (plan #1029). Approve saves
+ * Approve, Change and Decline under a proposal (plan #1029). Approve saves
  * the proposed kinds and notes through the same action as the form, so it
- * settles the goal's help the same way.
+ * settles the goal's help the same way. Decline leaves a toast whose Undo
+ * puts the proposal back (plan #1957.8).
  */
 function ProposalButtons({
   goalId,
@@ -206,9 +211,29 @@ function ProposalButtons({
   onChange: () => void;
 }) {
   const [approved, approve, approving] = useActionState(setHelpKindsAction, initial);
-  const [turned, turnDown, turning] = useActionState(turnDownHelpAction, initial);
+  const [turning, startDecline] = useTransition();
+  const toast = useToast();
   const busy = approving || turning;
-  const error = approved.error ?? turned.error;
+  const error = approved.error;
+
+  function decline() {
+    startDecline(async () => {
+      const form = new FormData();
+      form.set('goalId', goalId);
+      const result = await turnDownHelpAction(initial, form);
+      if (result.error) {
+        toast({ text: result.error });
+        return;
+      }
+      toast({
+        text: closedToast('declined', 'the help Dash proposed'),
+        undo: async () => {
+          const back = await restoreHelpProposalAction(goalId, proposal);
+          if (back.error) throw new Error(back.error);
+        },
+      });
+    });
+  }
   return (
     <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
       <form action={approve}>
@@ -226,12 +251,7 @@ function ProposalButtons({
       <Button type="button" size="sm" variant="ghost" onClick={onChange} disabled={busy}>
         Change
       </Button>
-      <form action={turnDown}>
-        <input type="hidden" name="goalId" value={goalId} />
-        <Button type="submit" size="sm" variant="ghost" pending={turning} disabled={busy}>
-          Turn down
-        </Button>
-      </form>
+      <CloseButton lifecycle="declined" pending={turning} disabled={busy} onClick={decline} />
       {error && (
         <p role="alert" className="text-small text-danger">
           {error}

@@ -7,7 +7,7 @@ import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { ToastProvider, useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
-import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 
 const nothing = () => undefined;
 
@@ -23,11 +23,15 @@ function Line({ title, meta, children }: { title: string; meta: string; children
   );
 }
 
-/** The toast a Drop leaves, held open for the shot. */
+/** The toast a Drop leaves, naming the row it closed (plan #1957.8), held open for the shot. */
 function DroppedToast() {
   const toast = useToast();
   useEffect(() => {
-    toast({ text: 'Dropped', undo: nothing, duration: 600_000 });
+    toast({
+      text: closedToast('dropped', 'Book the boiler service before the first cold week'),
+      undo: nothing,
+      duration: 600_000,
+    });
   }, [toast]);
   return null;
 }

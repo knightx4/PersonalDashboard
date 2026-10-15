@@ -99,7 +99,8 @@ function itemRow(
     href: item.link?.href,
     move: { state: 'on_you' },
     verbs,
-    putOff: can.defer ? { action: actions.later, fields } : undefined,
+    // The one Later menu, the same as a task's (plan #1957.9).
+    later: can.defer ? { action: actions.later, fields } : undefined,
     decline: can.dismiss ? { action: actions.decline, fields } : undefined,
   };
 }

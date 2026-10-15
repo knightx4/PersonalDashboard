@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -12,10 +13,11 @@ import { putAway } from '@/components/motion/place';
 import { moduleById, moduleForPath } from '@/lib/modules';
 import { answerItem, completeItem, deferItem, dismissItem, restoreItem } from '@/app/todo/source-actions';
 import { useToast } from '@/components/ui/toast';
-import { LIFECYCLE_GLYPH, LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
+import { LaterMenu } from '@/components/inbox/snooze-menu';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
 type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
@@ -59,7 +61,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       // Later and Drop say so, with the way back where the source has one
       // (plan #1957.3).
       if (change.state === 'deferred' || change.state === 'dismissed') {
-        const text = change.state === 'deferred' ? LIFECYCLE_VERB.later : LIFECYCLE_WORD.dropped;
+        const text = closedToast(change.state === 'deferred' ? 'later' : 'dropped', item.title);
         toast(
           item.restorable
             ? {
@@ -82,6 +84,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
   });
 
   const acted = shown !== 'open';
+  const laterAt = useRef<HTMLSpanElement>(null);
 
   return (
     <div
@@ -155,7 +158,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             <Link
               href={item.link.href}
               className={cn(
-                'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
+                'press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
                 shown === 'done' && 'line-through',
               )}
             >
@@ -182,9 +185,14 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               affordance anyone sees -- least of all on a phone, where there is
               no hover to reveal it. This matches a linked task's anchor, so
               "click through to the job" reads the same on both kinds of row. */}
+          {/* 44px to a finger on a phone (press-area); the label truncates
+              inside, so the link's own area is not clipped with it. */}
           {item.link && (
-            <Link href={item.link.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }))}>
-              {item.link.label}
+            <Link
+              href={item.link.href}
+              className={cn('press-area min-w-0 max-w-full text-small', linkVariants({ tone: 'quiet' }))}
+            >
+              <span className="block truncate">{item.link.label}</span>
             </Link>
           )}
 
@@ -193,7 +201,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className={cn('inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
+              className={cn('press-area inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
             >
               <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               {item.action.label}
@@ -216,20 +224,20 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        <Tooltip label={LIFECYCLE_VERB.later} align="end">
-          <IconButton
-            label={`${LIFECYCLE_VERB.later}: ${item.title}`}
-            onClick={(event) =>
+        {/* The one Later menu (plan #1957.9): the source puts it off to the day chosen. */}
+        <span ref={laterAt} className="flex">
+          <LaterMenu
+            compact
+            label={item.title}
+            onChoose={(choice) =>
               run({
                 state: 'deferred',
-                write: () => deferItem(item.source, item.key),
-                from: event.currentTarget.getBoundingClientRect(),
+                write: () => deferItem(item.source, item.key, choice),
+                from: laterAt.current?.getBoundingClientRect(),
               })
             }
-          >
-            <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
-          </IconButton>
-        </Tooltip>
+          />
+        </span>
         <Tooltip label={LIFECYCLE_VERB.dropped} align="end">
           <IconButton
             label={`${LIFECYCLE_VERB.dropped}: ${item.title}`}

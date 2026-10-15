@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkle } from 'lucide-react';
@@ -391,7 +392,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
                   setArchived(true);
                   // Drop, with Undo in the toast (plan #1957.3).
                   toast({
-                    text: 'Dropped',
+                    text: closedToast('dropped', brief.question),
                     undo: async () => {
                       const back = await setBriefArchived(brief.id, false);
                       if (back.error) throw new Error(back.error);

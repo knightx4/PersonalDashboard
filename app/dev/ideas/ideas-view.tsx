@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -227,7 +228,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
               setMenuError(result.error);
               if (result.error) return;
               toast({
-                text: 'Dropped',
+                text: closedToast('dropped', idea.body.split('\n')[0]),
                 undo: async () => {
                   const back = await restoreIdea({}, formData);
                   if (back.error) throw new Error(back.error);

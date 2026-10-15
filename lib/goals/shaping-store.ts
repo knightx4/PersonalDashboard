@@ -339,6 +339,64 @@ export async function markReviewed(client: GoalsSupabaseClient, id: string): Pro
  * beneath it. The goal's other proposals keep waiting. Null when it is not a
  * live proposed step of yours, otherwise how many rows it changed.
  */
+/** A row declining a proposal dropped, and the status the Undo puts back. */
+export type DeclinedRow = { id: string; status: 'proposed' | 'open' };
+
+/**
+ * The rows goals.settle_proposal (migrations-goals/0014) drops when a
+ * proposal is declined: the step and the live steps beneath it that are still
+ * proposals, and any unanswered question among them. Read before the decline,
+ * so the toast's Undo knows what to put back (plan #1957.8).
+ */
+export async function proposalDeclineRows(
+  client: GoalsSupabaseClient,
+  id: string,
+): Promise<DeclinedRow[]> {
+  const found: DeclinedRow[] = [];
+  const columns = 'id, status, kind, resolution';
+  type Row = { id: string; status: string; kind: string; resolution: string | null };
+  const first = await client.from('items').select(columns).eq('id', id).is('archived_at', null);
+  if (first.error) throw new Error(first.error.message);
+  let rows = (first.data ?? []) as Row[];
+  // A tree is a few levels deep; the cap only stops a cycle running on.
+  for (let depth = 0; rows.length > 0 && depth < 20; depth++) {
+    for (const row of rows) {
+      if (row.status === 'proposed') found.push({ id: row.id, status: 'proposed' });
+      else if (row.kind === 'decision' && row.status === 'open' && row.resolution === null) {
+        found.push({ id: row.id, status: 'open' });
+      }
+    }
+    const next = await client
+      .from('items')
+      .select(columns)
+      .in(
+        'parent_id',
+        rows.map((row) => row.id),
+      )
+      .is('archived_at', null);
+    if (next.error) throw new Error(next.error.message);
+    rows = (next.data ?? []) as Row[];
+  }
+  return found;
+}
+
+/** The Undo of a decline: each row the decline dropped goes back to what it was. */
+export async function restoreDeclinedProposal(
+  client: GoalsSupabaseClient,
+  rows: readonly DeclinedRow[],
+): Promise<void> {
+  for (const status of ['proposed', 'open'] as const) {
+    const ids = rows.filter((row) => row.status === status).map((row) => row.id);
+    if (ids.length === 0) continue;
+    const { error } = await client
+      .from('items')
+      .update({ status })
+      .in('id', ids)
+      .eq('status', 'dropped');
+    if (error) throw new Error(error.message);
+  }
+}
+
 export async function settleProposal(
   client: GoalsSupabaseClient,
   id: string,

@@ -12,7 +12,7 @@ import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requ
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CAREER_WRITES, companyHeld } from './career-writes';
 import { INTERVIEW_EDIT_WRITES } from './interview-edit-writes';
@@ -52,9 +52,9 @@ import { JobsRefused } from './jobs-refused';
  *
  * and, from Jobs Today and a role's timeline (plan #1894.6.3):
  *
- *   change_reminder     a reminder finished, put off a week, reworded, moved
+ *   change_reminder     a reminder finished, put off to a day, reworded, moved
  *                       to another day, or linked to the email behind it.
- *   change_waiting      a "Waiting on you" row done or put off a week.
+ *   change_waiting      a "Waiting on you" row done or put off to a day.
  *
  *
  * and, from Jobs review (plan #1894.6.4.1):
@@ -116,6 +116,8 @@ export type JobsWriteEnv = {
   todo: SchemaClient;
   /** For a role's thread, which a merge will not leave behind. */
   core: SchemaClient;
+  /** Their IANA zone, for the day a Later ends; UTC when absent. */
+  timezone?: string;
 };
 
 /** A Jobs change as made, before a surface keeps it. */
@@ -1310,10 +1312,17 @@ export async function undoRoleMerge(
 const REMINDERS = 'job_search.reminders';
 const WAITING = 'job_search.waiting_dismissals';
 const BODY_MAX = 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A week on, as Jobs Today's "Later" puts a reminder or a waiting row off. */
-const putOffUntil = () => new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString();
+/**
+ * The day a put-off ends, from the one Later menu's choices as Jobs Today's
+ * Later offers them (plan #1957.9), read in their zone.
+ */
+function putOffUntil(env: JobsWriteEnv, choice: unknown, field: string): { at: string; words: string } {
+  const zone = env.timezone ?? 'UTC';
+  const later = typeof choice === 'string' ? laterUntil(choice, zone) : null;
+  if (!later) throw new JobsRefused(`${field} must be ${LATER_UNTIL_HELP}.`);
+  return { at: later.until.toISOString(), words: untilWords(later.day, zone) };
+}
 
 /** The role an application is on, for the words a change is told in. */
 async function applicationRole(env: JobsWriteEnv, applicationId: unknown): Promise<{ id: string; name: string } | null> {
@@ -1370,16 +1379,17 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
   const update: Row = {};
   const changed: string[] = [];
 
-  if (args.finish === true && args.put_off === true) throw new JobsRefused('Finish it or put it off, not both.');
+  if (args.finish === true && given(args, 'put_off')) throw new JobsRefused('Finish it or put it off, not both.');
   if (args.finish === true) {
     if (before.completed_at) throw new JobsRefused('That reminder is finished already.');
     update.completed_at = new Date().toISOString();
     changed.push('finished');
   }
-  if (args.put_off === true) {
-    if (given(args, 'due')) throw new JobsRefused('Put it off a week, or give it a new due date, not both.');
-    update.due_at = putOffUntil();
-    changed.push(`put off for ${SNOOZE_DAYS} days`);
+  if (given(args, 'put_off')) {
+    if (given(args, 'due')) throw new JobsRefused('Put it off, or give it a new due date, not both.');
+    const until = putOffUntil(env, args.put_off, 'put_off');
+    update.due_at = until.at;
+    changed.push(`put off ${until.words}`);
   }
   if (given(args, 'body')) {
     const body = text(args, 'body');
@@ -1453,7 +1463,7 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
  * Jobs Today's "Waiting on you" rows are mail that asked something of them,
  * recomputed from the event log on every load, so finishing one or putting
  * it off writes a row of its own in job_search.waiting_dismissals, as the
- * page does: no date for done, a week on for later. The first time that row
+ * page does: no date for done, the day chosen for later. The first time that row
  * is new, and its Undo takes it out; after that it is changed in place.
  */
 async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
@@ -1476,7 +1486,8 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = (existing as Row | null) ?? null;
   if (verb === 'finish' && before && before.dismissed_until === null) throw new JobsRefused('That one is marked done already.');
 
-  const until = verb === 'finish' ? null : putOffUntil();
+  const later = verb === 'finish' ? null : putOffUntil(env, args.until, 'until');
+  const until = later?.at ?? null;
   const { data, error } = before
     ? await env.jobs
         .from('waiting_dismissals')
@@ -1495,7 +1506,7 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const after = data as Row;
   const role = await applicationRole(env, event.application_id);
   const what = quotedBody(event.summary, 'the email that asked them something');
-  const said = verb === 'finish' ? 'marked done' : `put off for ${SNOOZE_DAYS} days`;
+  const said = later ? `put off ${later.words}` : 'marked done';
   const href = role ? roleHref(role.id) : '/jobs';
   return {
     kind: 'change_waiting',
@@ -2962,13 +2973,13 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_reminder',
-    description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off ${SNOOZE_DAYS} days as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
+    description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off to a day as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
     input_schema: {
       type: 'object',
       properties: {
         reminder_ref: { type: 'string', description: 'The job_search.reminders ref list_rows or a lookup returned.' },
         finish: { type: 'boolean', description: 'True to tick it off.' },
-        put_off: { type: 'boolean', description: `True to put it off ${SNOOZE_DAYS} days from now.` },
+        put_off: { type: 'string', description: `To put it off, the day it comes back: ${LATER_UNTIL_HELP}.` },
         body: { type: 'string', description: 'The new wording.' },
         due: { type: 'string', description: 'The new due day, YYYY-MM-DD.' },
         email_ref: {
@@ -2983,12 +2994,13 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_waiting',
-    description: `Finish or put off (${SNOOZE_DAYS} days) a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
+    description: `Finish or put off to a day a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
     input_schema: {
       type: 'object',
       properties: {
         event_ref: { type: 'string', description: 'The job_search.application_events ref of the request.' },
         verb: { type: 'string', enum: ['finish', 'put_off'], description: 'finish when it is dealt with; put_off for later.' },
+        until: { type: 'string', description: `For put_off, the day it comes back: ${LATER_UNTIL_HELP}.` },
       },
       required: ['event_ref', 'verb'],
       additionalProperties: false,
@@ -3160,8 +3172,8 @@ export async function runJobsWrite(
 }
 
 /** The clients a Jobs write runs on, from a surface's clients per schema. */
-export async function jobsEnv(userId: string, db: AskDb): Promise<JobsWriteEnv> {
-  return { userId, jobs: await db('job_search'), todo: await db('todo'), core: await db('core') };
+export async function jobsEnv(userId: string, db: AskDb, timezone?: string): Promise<JobsWriteEnv> {
+  return { userId, jobs: await db('job_search'), todo: await db('todo'), core: await db('core'), timezone };
 }
 
 /** The sentence for a person with Jobs switched off. */
@@ -3177,7 +3189,7 @@ export const JOBS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = JOBS_
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('jobs')) return { ok: false, error: JOBS_OFF };
-    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db, ctx.timezone), input);
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown> };
   },

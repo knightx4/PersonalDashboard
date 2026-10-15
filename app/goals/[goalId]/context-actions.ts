@@ -9,12 +9,14 @@ import { setContextStatus } from '@/lib/goals/context-store';
 /**
  * Keep or dismiss what Claude found in another module for a goal
  * (lib/goals/context.ts). Returns a sentence to show rather than throwing.
+ * `proposed` is the Undo of a Decline (plan #1957.8): the row goes back to
+ * waiting on Keep or Decline.
  */
 
 export type ContextActionState = { error?: string; done?: number };
 
 const Id = z.string().uuid();
-const Status = z.enum(['kept', 'dismissed']);
+const Status = z.enum(['proposed', 'kept', 'dismissed']);
 
 // latency: pending
 export async function setContextStatusAction(

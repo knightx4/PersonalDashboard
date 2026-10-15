@@ -1,7 +1,9 @@
 'use client';
 
 import { StatusGlyph } from '@/components/ui/status-glyph';
-import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
+import { closedToast, LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
+import { CloseButton } from '@/components/inbox/close-button';
+import { useToast } from '@/components/ui/toast';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { ExternalLink, Plus, Search } from 'lucide-react';
@@ -44,7 +46,6 @@ import {
   confirmApplication,
   createRoleFromMessage,
   deleteInferredApplication,
-  dismissMessage,
   dismissMessages,
   excludeCompanyForApplication,
   linkMessage,
@@ -90,6 +91,7 @@ export function ReviewQueue({
 }) {
   const [busy, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const declineMessage = useDeclineMessage();
   const selectionRows = useMemo(() => rows.map((row) => ({ key: reviewRowKey(row) })), [rows]);
 
   const onKey = useCallback(
@@ -110,13 +112,15 @@ export function ReviewQueue({
 
       if (event.key === 'd') {
         event.preventDefault();
+        if (row.kind === 'message') {
+          startTransition(() => declineMessage(row));
+          return;
+        }
         startTransition(async () => {
           const result =
-            row.kind === 'message'
-              ? await dismissMessage(row.id)
-              : row.kind === 'event'
-                ? await acknowledgeEvent(row.id)
-                : await deleteInferredApplication(row.applicationId);
+            row.kind === 'event'
+              ? await acknowledgeEvent(row.id)
+              : await deleteInferredApplication(row.applicationId);
           setMessage(result.error ?? 'Done.');
         });
         return;
@@ -130,7 +134,7 @@ export function ReviewQueue({
         });
       }
     },
-    [rows],
+    [rows, declineMessage],
   );
 
   return (
@@ -256,6 +260,33 @@ function JobsBulkBar({ rows }: { rows: ReviewRow[] }) {
   );
 }
 
+/**
+ * Decline one message (plan #1957.8): it leaves the queue as not relevant,
+ * and the toast names it with an Undo that puts back everything the
+ * dismissal cleared, the way the bulk bar's does.
+ */
+function useDeclineMessage(): (row: Extract<ReviewRow, { kind: 'message' }>) => Promise<void> {
+  const toast = useToast();
+  return useCallback(
+    async (row) => {
+      const result = await dismissMessages([row.id]);
+      if (result.error) {
+        toast({ text: result.error });
+        return;
+      }
+      const restore = result.restore;
+      toast({
+        text: closedToast('declined', rowLabel(row)),
+        undo: async () => {
+          const back = await restoreDismissedMessages(restore);
+          if (back.error) throw new Error(back.error);
+        },
+      });
+    },
+    [toast],
+  );
+}
+
 /** What the row is, for the tick box's name. */
 function rowLabel(row: ReviewRow): string {
   if (row.kind === 'message') return row.subject?.trim() || 'message without a subject';
@@ -332,6 +363,7 @@ function MessageRow({
   onDone: (message: string) => void;
 }) {
   const [, startTransition] = useTransition();
+  const declineMessage = useDeclineMessage();
 
   return (
     <>
@@ -405,20 +437,11 @@ function MessageRow({
       <NewRoleForm row={row} companies={companies} onDone={onDone} />
 
       <footer className="mt-3 flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
+        <CloseButton
+          lifecycle="declined"
           disabled={busy}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await dismissMessage(row.id);
-              onDone(result.error ?? 'Dismissed, and the subject and sender were cleared.');
-            })
-          }
-        >
-          Not relevant
-        </Button>
+          onClick={() => startTransition(() => declineMessage(row))}
+        />
         {row.gmailHref && (
           <GmailAnchor
             href={row.gmailHref}

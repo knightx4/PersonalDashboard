@@ -75,8 +75,10 @@ import {
   StepText,
   StepTitleEditor,
   formatDate,
+  useDeclineProposal,
   useMenuAction,
 } from './step-parts';
+import { closedToast } from '@/lib/core/lifecycle';
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
@@ -494,6 +496,7 @@ export function GoalRow({
     {} as ShapingActionState,
   );
   const toast = useToast();
+  const declineProposal = useDeclineProposal(step);
   const menuAction = useMenuAction();
   const tree = (action: (prev: TreeActionState, form: FormData) => Promise<TreeActionState>) =>
     menuAction((form) => action({}, form));
@@ -516,7 +519,7 @@ export function GoalRow({
       return;
     }
     toast({
-      text: `Archived ${step.title}.`,
+      text: closedToast('dropped', step.title),
       undo: async () => {
         const restore = new FormData();
         restore.set('id', step.id);
@@ -528,7 +531,7 @@ export function GoalRow({
   }
 
   // The health word is the status control, as on the plan. A proposal's
-  // moves are to approve it or turn it down, each taking the proposed steps
+  // moves are to approve it or decline it, each taking the proposed steps
   // beneath it along; a question's first move is to answer it, and Done is
   // not offered on one. Blocked asks what the step needs before it blocks.
   const beneath = proposed ? countProposed(step.children) : 0;
@@ -543,9 +546,9 @@ export function GoalRow({
         },
         {
           id: 'reject',
-          label: beneath > 0 ? `Turn down, with ${beneath} beneath` : 'Turn down',
-          formAction: settle,
-          formFields: { id: step.id, approve: '0' },
+          label: beneath > 0 ? `Decline, with ${beneath} beneath` : 'Decline',
+          lifecycle: 'declined',
+          onSelect: () => void declineProposal(),
         },
       ]
     : [
@@ -674,12 +677,13 @@ export function GoalRow({
     {
       id: 'archive',
       label: 'Archive step',
+      lifecycle: 'dropped',
       destructive: true,
       formAction: archive,
       formFields: { id: step.id },
       confirm:
         step.children.length > 0
-          ? `Archive ${step.title} and the ${countSteps(step.children).total} under it?`
+          ? `Drop ${step.title} and the ${countSteps(step.children).total} under it?`
           : undefined,
     },
   ];

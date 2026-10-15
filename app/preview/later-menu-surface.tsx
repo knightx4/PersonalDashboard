@@ -5,6 +5,8 @@ import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { LATER_CHOICES, LaterDayField, LaterMenu } from '@/components/inbox/snooze-menu';
 import { cn } from '@/lib/cn';
 import { PICK_A_DAY } from '@/lib/core/snooze-days';
+import { AgendaItemRow } from '@/components/todo/agenda-item-row';
+import type { AgendaItem } from '@/lib/todo/agenda/sources';
 
 const TITLE = 'Book the boiler service before the first cold week of the winter';
 
@@ -50,6 +52,49 @@ export function LaterMenuRows() {
       <div className={cardVariants({ padding: 'standard' })}>
         <LaterDayField label={TITLE} onChoose={() => {}} onCancel={() => {}} />
       </div>
+    </div>
+  );
+}
+
+const AGENDA_ROWS: AgendaItem[] = [
+  {
+    key: 'job_reminders:r1',
+    source: 'job_reminders',
+    ref: 'job_search.reminders:r1',
+    title: 'Send the take-home exercise back to the hiring manager at Northwind Analytics',
+    day: '2026-10-15',
+    at: null,
+    link: { href: '/jobs/roles/r1', label: 'Senior data analyst at Northwind Analytics' },
+    action: null,
+    detail: null,
+    completable: true,
+    restorable: false,
+  },
+  {
+    key: 'return:o1',
+    source: 'return_deadlines',
+    ref: 'public.orders:o1',
+    title: 'Return window closes: Bosch cordless drill',
+    day: '2026-10-17',
+    at: null,
+    link: { href: '/shopping/orders/o1', label: 'Screwfix order' },
+    action: null,
+    detail: null,
+    completable: false,
+    restorable: true,
+  },
+];
+
+/**
+ * Rows the Todo agenda borrows from other workspaces (plan #1957.9), each
+ * with Later as the one menu's clock and Drop beside it.
+ */
+export function AgendaRowsSurface() {
+  return (
+    <div className={cn(cardVariants(), 'divide-y divide-border')}>
+      {AGENDA_ROWS.map((item) => (
+        <AgendaItemRow key={item.key} item={item} timezone="Europe/London" />
+      ))}
     </div>
   );
 }

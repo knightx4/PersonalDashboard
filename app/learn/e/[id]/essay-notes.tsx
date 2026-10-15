@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { CloseButton } from '@/components/inbox/close-button';
@@ -199,7 +200,7 @@ export function useEssayNotes(
       }
       apply(result);
       toast({
-        text: outcome === 'done' ? 'Done' : 'Declined',
+        text: closedToast(outcome === 'done' ? 'done' : 'declined', note.body),
         undo: async () => {
           const back = await reopenEssayNote(essayId, note.id);
           if (!back.ok) throw new Error(back.error);

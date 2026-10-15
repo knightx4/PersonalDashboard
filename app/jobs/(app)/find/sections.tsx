@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import Form from 'next/form';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
@@ -568,6 +569,12 @@ function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
   );
 }
 
+/** What a declined suggestion's toast calls it: the person to reach out to, or the role's headline. */
+function suggestionName(suggestion: OpenSuggestion): string {
+  if (suggestion.kind === 'reach_out' && suggestion.personName) return suggestion.personName;
+  return suggestion.headline;
+}
+
 function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
   const toast = useToast();
@@ -596,7 +603,7 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
       setError(result.error);
       if (!result.error)
         toast({
-          text: 'Declined',
+          text: closedToast('declined', suggestionName(suggestion)),
           undo: async () => void (await reopenSuggestion(suggestion.id)),
         });
     });
@@ -858,7 +865,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
       setError(result.error);
       if (!result.error)
         toast({
-          text: 'Declined',
+          text: closedToast('declined', suggestionName(suggestion)),
           undo: async () => void (await reopenSuggestion(suggestion.id)),
         });
     });
