@@ -7,6 +7,7 @@ import { MoveLabel } from '@/components/ui/move-label';
 import { Tooltip } from '@/components/ui/tooltip';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { ScoreCircles } from '@/components/jobs/ui/score-figures';
 import { applicationMove } from '@/lib/jobs/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { formatInterviewWhen, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
@@ -180,8 +181,8 @@ function FocusSection({
 }
 
 /**
- * One pursuit, one line: the role and company, what is next for it, and how
- * long since anything happened. The detail column drops below `sm`, where the
+ * One pursuit, one line: the role and company, what is next for it, its fit
+ * and chance of an interview in circles, and how long since anything happened. The detail column drops below `sm`, where the
  * title needs the width more.
  */
 function FocusLine({
@@ -257,6 +258,8 @@ function FocusLine({
         )}
 
         {move && <MoveLabel move={move.move} title={move.title} className="min-w-0" />}
+
+        <ScoreCircles note={row.scoreNote} />
 
         <Tooltip label="Time since the last thing that happened" align="end" className="w-10 shrink-0 justify-end">
           <span className={cn('tabular text-right text-micro', stale ? 'text-caution' : 'text-ink-muted')}>
