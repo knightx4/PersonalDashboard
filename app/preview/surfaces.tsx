@@ -3379,6 +3379,38 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-marked',
+    label: 'Role · Answers, marked ready',
+    module: 'jobs',
+    width: 'wide',
+    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        readyToApply
+        hasCoverLetter
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-closed',
+    label: 'Role · Answers, closed',
+    module: 'jobs',
+    width: 'wide',
+    // A closed application shows the marks without controls.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="rejected"
+        readyToApply
+        hasCoverLetter={false}
+        defaultTab="answers"
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
