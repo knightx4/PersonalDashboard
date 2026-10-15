@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
+import { jobBoardLookup } from './job-board';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -68,6 +69,7 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'search_mail',
   'read_mail',
+  'read_job_board',
   'show_chart',
 ] as const;
 
@@ -77,7 +79,7 @@ export const ASK_TOOL_NAMES = [
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'show_chart'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -517,6 +519,22 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'read_job_board',
+    description:
+      'Read the open roles on a company\'s job board, from its careers page or its website: "look at their job board and see if any roles look good for me". It finds the board the page links to (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee, Breezy, BambooHR or Rippling) and returns each open role\'s title, place and link, up to 80. It reads no other page text and cannot browse other sites. Judge the roles against the person\'s job settings and target titles, and give the link with any role you suggest.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The company\'s careers page or website, as the person gave it ("https://www.tenex.co/careers").',
+        },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+  },
   CHART_TOOL_DEFINITION,
 ];
 
@@ -552,6 +570,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
+  read_job_board: { run: jobBoardLookup, module: 'jobs' },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
 };

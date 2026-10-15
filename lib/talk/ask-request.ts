@@ -31,6 +31,7 @@ import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { fileVaultNote, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
+import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
@@ -272,6 +273,7 @@ function askContext(
     // Gmail as it is now, through the person's own mailboxes; nothing is kept.
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
     readMail: async (message) => readMail(await createCoreClient(), userId, message),
+    readJobBoard,
   };
 }
 
