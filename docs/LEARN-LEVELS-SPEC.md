@@ -390,6 +390,11 @@ enough to migrate in one pass, with the person reviewing the result.
 5. **Probes stay.** `probes` gains a `cell_id`, and every graded answer from
    now on also writes its `cell_evidence` rows.
 
+   A question written about a cell rather than a concept is not a probe. It
+   has no concept, and the claims graph's readers take every probe row as
+   one of theirs, so it goes in `cell_questions`, and its evidence names the
+   question instead of a probe.
+
 The old tables are kept read-only until the new screens have replaced every
 read of them. Then a later migration drops them. That drop is destructive,
 so it waits for the person's go-ahead.
@@ -405,7 +410,8 @@ In `learn`, with RLS on every table and composite foreign keys carrying
 | `topic_cells` | one row per topic and level: the descriptor, when it was rewritten by hand | no: part of the topic |
 | `cell_links` | requiring cell → required cell, the sentence why, acyclic | no: structure |
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |
-| `cell_evidence` | met, not met or declared, the probe it came from, the verified quote, the date | yes: what the person did |
+| `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date | yes: what the person did |
+| `cell_questions` | a question asked about one cell, its format, the answer and every verdict the grader returned | no: read through `cell_evidence` |
 | `lenses` | a named set of targets, and whether it was a subject or a goal | yes: what the person wants |
 | `lens_targets` | lens, topic, target level | no: part of the lens |
 | `link_reviews` | a link in question, the two answers that put it there, and what the person decided | no: bookkeeping |

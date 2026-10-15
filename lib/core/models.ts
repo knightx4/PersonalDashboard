@@ -110,6 +110,10 @@ export const MODELS = {
   learnGraphFromPrior: SONNET,
   /** lib/learn/graph/generate.ts */
   learnGraphGenerate: SONNET,
+  /** lib/learn/levels/draft.ts; a topic's ten levels, drafted from a goal */
+  learnTopicDraft: SONNET,
+  /** lib/learn/levels/move-call.ts; one call per subject moved from the claims graph */
+  learnTopicAssign: SONNET,
   /** lib/learn/graph/misconception.ts */
   learnMisconception: HAIKU,
   /** lib/learn/graph/opening-claims.ts */
@@ -118,6 +122,10 @@ export const MODELS = {
   learnOpeningProbe: HAIKU,
   /** lib/learn/graph/probe.ts */
   learnProbe: HAIKU,
+  /** lib/learn/levels/grade-call.ts, an explanation graded against several levels at once */
+  learnLevelGrade: HAIKU,
+  /** lib/learn/levels/case-call.ts, a case written for a level 4 to 6 cell */
+  learnLevelCase: HAIKU,
   /** lib/learn/chat/subjects.ts */
   learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */

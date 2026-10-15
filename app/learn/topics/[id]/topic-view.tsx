@@ -1,0 +1,127 @@
+import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
+import { Property } from '@/components/shell/detail-layout';
+import { PageHeader, type Subject } from '@/components/shell/page-header';
+import { Thread } from '@/components/thread/thread';
+import { Card } from '@/components/ui/card';
+import type { DevComment } from '@/lib/comments/load';
+import { whenDay } from '@/lib/core/when';
+import { ladderLevel } from '@/lib/learn/levels/ladder';
+import type { TopicStanding } from '@/lib/learn/levels/standing';
+import type { TopicDetail, TopicMatch } from '@/lib/learn/levels/store';
+import { threadRef } from '@/lib/thread/subjects';
+import { ApproveDraft, ApproveTopicButton, DraftMatch, WantedRow } from './draft-parts';
+import { LadderView, type LadderOpen } from './ladder-view';
+
+/**
+ * One topic (plan #2138.2). A draft is the approval screen: what it covers,
+ * any topic you already have that it looks like, then every level with its
+ * checks open to rewording, then the approve button. An approved topic shows
+ * the same levels to read.
+ *
+ * An approved topic shows the ladder (#2138.3): where you stand on each level
+ * and why, from the model's reading of the evidence, with each level's
+ * wording open to rewording.
+ *
+ * The page and the gallery both draw this, so it takes the rows and reads
+ * nothing itself.
+ */
+export function TopicView({
+  topic,
+  match,
+  comments,
+  path,
+  timezone,
+  now,
+  standing = null,
+  open,
+}: {
+  topic: TopicDetail;
+  /** The closest topic already on the map, shown beside a draft. */
+  match: TopicMatch | null;
+  comments: readonly DevComment[];
+  path: Subject;
+  timezone: string;
+  now: number;
+  /** Where you stand on each level; an approved topic has it, a draft does not. */
+  standing?: TopicStanding | null;
+  /** The gallery's way to draw a part that opens on a press. */
+  open?: LadderOpen;
+}) {
+  const draft = topic.status === 'draft';
+  const levels = topic.ceiling === 1 ? '1' : `1 to ${topic.ceiling}`;
+
+  return (
+    <DetailPage
+      header={<PageHeader subject={path} title={topic.name} actions={draft ? <ApproveTopicButton /> : undefined} />}
+      details={
+        <DetailFacts>
+          {standing && !draft ? (
+            <Property
+              label="Your level"
+              value={standing.level === 0 ? 'Not placed yet' : `${standing.level} of ${topic.ceiling}`}
+              hint={
+                standing.level === 0
+                  ? undefined
+                  : `${ladderLevel(standing.level).band}: you can ${ladderLevel(standing.level).can}`
+              }
+            />
+          ) : (
+            <Property label="Status" value={draft ? 'Draft' : 'Approved'} />
+          )}
+          <Property label="Levels" value={levels} />
+          <Property
+            label={draft ? 'Drafted' : 'Approved'}
+            value={whenDay((draft ? null : topic.approvedAt) ?? topic.createdAt, { timeZone: timezone, now })}
+          />
+          <Property
+            label="Fields"
+            value={topic.fieldNames.length > 0 ? topic.fieldNames.join(', ') : 'None'}
+            hint={topic.fieldNames.join(', ') || undefined}
+          />
+        </DetailFacts>
+      }
+      text={
+        <Card padding="dense" aria-label="What it covers" className="space-y-1">
+          <p className="text-body text-ink">{topic.scope}</p>
+          {topic.asked && topic.asked.toLowerCase() !== topic.name.toLowerCase() && (
+            <p className="text-small text-ink-muted">Drafted from what you asked: “{topic.asked}”</p>
+          )}
+        </Card>
+      }
+    >
+      {draft && match && <DraftMatch topicId={topic.id} match={match} />}
+
+      {draft ? (
+        <ApproveDraft topicId={topic.id} cells={topic.cells} links={topic.links} />
+      ) : (
+        standing && <LadderView topicId={topic.id} standing={standing} open={open} timezone={timezone} now={now} />
+      )}
+
+      {topic.wanted.length > 0 && (
+        <section aria-labelledby="wanted-heading">
+          <h2 id="wanted-heading" className="px-1 text-ui font-semibold text-ink">
+            Topics it needs that you do not have
+          </h2>
+          <p className="mb-2 px-1 text-small text-ink-muted">
+            Drafting one links it in at the level shown.
+          </p>
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {topic.wanted.map((wanted) => (
+                <WantedRow key={wanted.name} topicId={topic.id} wanted={wanted} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      <Card padding="dense" aria-label="Comments">
+        <Thread
+          subject={threadRef('topic', topic.id)}
+          turns={comments}
+          placeholder={draft ? 'What is wrong with this draft, or what it should cover.' : 'A note on this topic.'}
+        />
+      </Card>
+    </DetailPage>
+  );
+}
