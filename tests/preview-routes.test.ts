@@ -137,6 +137,7 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
       'jobs-pipeline-dense',
       'jobs-roles-table',
       'jobs-pipeline-filtered',
+      'jobs-pipeline-marks',
       'shell-display-options',
       'ask-dash-rows',
     ]);

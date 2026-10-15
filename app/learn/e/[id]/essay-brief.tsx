@@ -9,8 +9,19 @@ import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { askNumber, BRIEF_LABELS, nextField, PIN_LABELS } from '@/lib/learn/essays/interview';
-import { BRIEF_FIELDS, type BriefField, type EssayBrief, type EssayInterview } from '@/lib/learn/essays/model';
-import { briefSearchText, originLine, STUDY_KIND_LABELS, type StudyItem } from '@/lib/learn/essays/study';
+import {
+  BRIEF_FIELDS,
+  type BriefField,
+  type EssayBrief,
+  type EssayInterview,
+} from '@/lib/learn/essays/model';
+import type { EssayPlan } from '@/lib/learn/essays/plan';
+import {
+  briefSearchText,
+  originLine,
+  STUDY_KIND_LABELS,
+  type StudyItem,
+} from '@/lib/learn/essays/study';
 import {
   answerEssayInterview,
   findEssayStudy,
@@ -39,10 +50,13 @@ export function EssayInterviewCard({
   interview,
   brief,
   onChange,
+  onPlan,
   initialFound,
 }: {
   essayId: string;
   interview: Asking;
+  /** Dash's read of the brief, which the last answer brings back with it. */
+  onPlan?: (plan: EssayPlan) => void;
   /** The brief so far; "What made you think this?" searches your study with its question and answer. */
   brief: EssayBrief;
   onChange: (brief: EssayBrief, interview: EssayInterview | null) => void;
@@ -62,13 +76,16 @@ export function EssayInterviewCard({
   const answerWith = (text: string) => {
     setError(null);
     start(async () => {
-      const result = await answerEssayInterview(essayId, interview.field, text).catch(() => undefined);
+      const result = await answerEssayInterview(essayId, interview.field, text).catch(
+        () => undefined,
+      );
       const why = failed(result);
       if (why || !result?.ok) {
         setError(why);
         return;
       }
       setAnswer('');
+      if (result.plan) onPlan?.(result.plan);
       onChange(result.brief, result.interview);
     });
   };
@@ -97,7 +114,9 @@ export function EssayInterviewCard({
           if (!busy) answerWith(answer);
         }}
       >
-        <p className="text-small text-ink-muted tabular-nums">Before you write · {askNumber(interview.field)}</p>
+        <p className="text-small text-ink-muted tabular-nums">
+          Before you write · {askNumber(interview.field)}
+        </p>
         <p id={askId} className="text-body font-semibold text-ink" aria-live="polite">
           {interview.ask}
         </p>
@@ -124,29 +143,37 @@ export function EssayInterviewCard({
           <OriginOffers
             state={found}
             onUse={(item) =>
-              setAnswer((now) => (now.trim() ? `${now.trimEnd()}\n${originLine(item)}` : originLine(item)))
+              setAnswer((now) =>
+                now.trim() ? `${now.trimEnd()}\n${originLine(item)}` : originLine(item),
+              )
             }
           />
         )}
         <div className="flex flex-wrap items-center gap-2">
-          {last ? (
-            <Button type="submit" size="sm" variant="primary" pending={pending} disabled={busy || !answer.trim()}>
-              {pending ? 'Keeping it…' : 'Done'}
-            </Button>
-          ) : (
-            <DashAction
-              type="submit"
-              size="sm"
-              variant="primary"
-              pending={pending}
-              disabled={busy || !answer.trim()}
-              paid="app/learn/e/[id]/actions.ts#answerEssayInterview"
-              what="Cost of the next question"
-            >
-              {pending ? 'Keeping it…' : 'Ask the next question'}
-            </DashAction>
-          )}
-          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => answerWith('')}>
+          <DashAction
+            type="submit"
+            size="sm"
+            variant="primary"
+            pending={pending}
+            disabled={busy || !answer.trim()}
+            paid="app/learn/e/[id]/actions.ts#answerEssayInterview"
+            what={last ? 'Cost of Dash reading your answers' : 'Cost of the next question'}
+          >
+            {pending
+              ? last
+                ? 'Dash is reading your answers…'
+                : 'Keeping it…'
+              : last
+                ? 'Done'
+                : 'Next'}
+          </DashAction>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => answerWith('')}
+          >
             Skip this question
           </Button>
           <Button
@@ -192,7 +219,12 @@ function useOriginStudy(essayId: string, text: string, initial?: StudyState): St
         setAnswer({
           text,
           state: result.ok
-            ? { kind: 'found', items: result.items, searched: result.searched, indexed: result.indexed }
+            ? {
+                kind: 'found',
+                items: result.items,
+                searched: result.searched,
+                indexed: result.indexed,
+              }
             : { kind: 'failed', items: [], error: result.error },
         });
       });
@@ -220,7 +252,8 @@ function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: Study
       </div>
       {state.kind === 'found' && items.length === 0 && (
         <p className="text-small text-ink-muted">
-          Nothing you have studied is close to your question yet. Say what made you think it in your own words.
+          Nothing you have studied is close to your question yet. Say what made you think it in your
+          own words.
         </p>
       )}
       {state.kind === 'failed' && <p className="text-small text-ink-muted">{state.error}</p>}
@@ -232,7 +265,9 @@ function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: Study
                 <span className="text-ink-muted">{STUDY_KIND_LABELS[item.kind]}: </span>
                 <span className="font-medium">{item.title}</span>
                 {item.sentence && (
-                  <span className="mt-1 block border-l-2 border-border pl-3 text-ui text-ink">{item.sentence}</span>
+                  <span className="mt-1 block border-l-2 border-border pl-3 text-ui text-ink">
+                    {item.sentence}
+                  </span>
                 )}
               </p>
               <Button
@@ -254,7 +289,7 @@ function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: Study
 }
 
 /** One answer in the brief, typed over where it is read and saved when you leave it. */
-function BriefLine({
+export function BriefLine({
   essayId,
   field,
   value,
@@ -331,12 +366,24 @@ export function EssayBriefFold({
       <Disclosure
         title="Brief"
         defaultOpen={defaultOpen}
-        meta={question ? <span className="line-clamp-1">{question}</span> : `${answered} of ${BRIEF_FIELDS.length} answered`}
+        meta={
+          question ? (
+            <span className="line-clamp-1">{question}</span>
+          ) : (
+            `${answered} of ${BRIEF_FIELDS.length} answered`
+          )
+        }
         summaryClassName="min-h-11 lg:min-h-0"
       >
         <div className="flex flex-col gap-3 pb-1">
           {BRIEF_FIELDS.map((field) => (
-            <BriefLine key={field} essayId={essayId} field={field} value={brief[field]} onChange={onChange} />
+            <BriefLine
+              key={field}
+              essayId={essayId}
+              field={field}
+              value={brief[field]}
+              onChange={onChange}
+            />
           ))}
           {brief.pinned.length > 0 && (
             <div className="flex flex-col gap-0.5">

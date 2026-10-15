@@ -56,7 +56,9 @@ export function addLabel(notes: number, evidence: boolean): string {
 
 /** The line under the heading once the essay is finished, naming its stage when this press set it. */
 export function finishedLine(date: string, stage: EssayStage | null): string {
-  const saved = stage ? `Saved to your vault as ${stage === 'evergreen' ? 'an' : 'a'} ${stage}` : 'Saved to your vault';
+  const saved = stage
+    ? `Saved to your vault as ${stage === 'evergreen' ? 'an' : 'a'} ${stage}`
+    : 'Saved to your vault';
   return `Finished on ${date}. ${saved} and added to your learning log.`;
 }
 
@@ -73,7 +75,9 @@ function Offering({
   onSkip: () => void;
 }) {
   const fresh = offers.claims.filter((claim) => !claim.existing);
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set(fresh.map((claim) => claim.name)));
+  const [picked, setPicked] = useState<ReadonlySet<string>>(
+    () => new Set(fresh.map((claim) => claim.name)),
+  );
   const [evidence, setEvidence] = useState(!offers.inEvidenceBank);
   const toggle = (name: string) =>
     setPicked((now) => {
@@ -132,13 +136,17 @@ function Offering({
         })}
       </ul>
       {fresh.length > 0 && (
-        <p className="mt-2 text-small text-ink-muted">Ticked claims become short notes in your Inbox.</p>
+        <p className="mt-2 text-small text-ink-muted">
+          Ticked claims become short notes in your Inbox.
+        </p>
       )}
       <div className="mt-3 flex gap-2 border-t border-border pt-3">
         {offers.inEvidenceBank ? (
           <>
             <span aria-hidden className="mt-1 size-4 shrink-0" />
-            <p className="text-small text-ink-muted">This essay is already in your evidence bank.</p>
+            <p className="text-small text-ink-muted">
+              This essay is already in your evidence bank.
+            </p>
           </>
         ) : (
           <>

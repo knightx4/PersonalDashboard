@@ -9,6 +9,7 @@
 
 import { readDraftMarks, type AuthorMark } from './authorship';
 import { formatNumber } from '@/lib/money';
+import { readPlan, type EssayPlan } from './plan';
 
 /**
  * The brief, in the person's own words (spec, "Starting an essay"): the five
@@ -63,6 +64,8 @@ export type Essay = {
   brief: EssayBrief;
   /** The interview, or null once there is none to show. */
   interview: EssayInterview | null;
+  /** What the person worked out between the interview and the draft (LEARN-ESSAYS-SPEC, "The stages"). */
+  plan?: EssayPlan;
   /** The length aimed at, 200 to 2,000 words, or null for none. */
   wordTarget: number | null;
   publishedAt: string | null;
@@ -90,7 +93,7 @@ export type EssaySummary = {
 
 /** The columns both reads select. */
 export const ESSAY_COLUMNS =
-  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, word_target, published_at, first_published_at, slug, finished_at, evidence_item_id, updated_at';
+  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, plan, word_target, published_at, first_published_at, slug, finished_at, evidence_item_id, updated_at';
 
 export type EssayRow = {
   id: string;
@@ -101,6 +104,7 @@ export type EssayRow = {
   draft_authorship?: unknown;
   unsaved: boolean | null;
   brief: unknown;
+  plan?: unknown;
   word_target: number | null;
   published_at: string | null;
   first_published_at?: string | null;
@@ -174,6 +178,7 @@ export function toEssay(row: EssayRow): Essay {
     unsaved: row.unsaved ?? false,
     brief: readBrief(row.brief),
     interview: readInterview(row.brief),
+    plan: readPlan(row.plan),
     wordTarget: row.word_target,
     publishedAt: row.published_at,
     firstPublishedAt: row.first_published_at ?? null,

@@ -144,18 +144,44 @@ export type Section = { href: string; label: string };
 export type Parent = {
   reads: readonly string[];
   ref: (row: PageRow) => string | null;
+  /**
+   * The foreign keys `ref` follows, in the order it tries them: each column
+   * and the table whose `id` it names. Set by parentBy and parentByFirst, so
+   * a lookup can follow the link from either end without a row in hand (a
+   * cover letter to its application, or an application to its cover
+   * letters). Absent for a parent read from something other than a key,
+   * such as a ref column.
+   */
+  links?: readonly ParentLink[];
 };
+
+/** One foreign key a parent follows: `column` names a row of `table` by its id. */
+export type ParentLink = { column: string; table: string };
 
 /**
  * The usual parent: a foreign key column naming a row of `table` by its id,
  * as `parentBy('company_id', 'job_search.companies')` for a role.
  */
 export function parentBy(column: string, table: string): Parent {
+  return parentByFirst([column, table]);
+}
+
+/**
+ * A parent that is the first of several foreign keys set on the row, for a
+ * row that may hang off one of a few things: a job search note under its
+ * interview, else its application, else its role.
+ */
+export function parentByFirst(...keys: readonly (readonly [column: string, table: string])[]): Parent {
+  const links = keys.map(([column, table]) => ({ column, table }));
   return {
-    reads: [column],
+    reads: links.map((l) => l.column),
+    links,
     ref: (row) => {
-      const id = row[column];
-      return typeof id === 'string' && id ? `${table}:${id}` : null;
+      for (const { column, table } of links) {
+        const id = row[column];
+        if (typeof id === 'string' && id) return `${table}:${id}`;
+      }
+      return null;
     },
   };
 }

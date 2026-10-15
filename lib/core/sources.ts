@@ -1,4 +1,4 @@
-import type { ModuleSources, Section } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /**
  * The app's own pages that core rows open under. They belong to no
@@ -41,6 +41,7 @@ export const coreSources: ModuleSources = {
       weight: 'record',
       search: ['request'],
       title: 'request',
+      parent: parentBy('conversation_id', 'core.conversations'),
       facts: ['status', 'error', 'conversation_id', 'run_id'],
       note: "status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.",
     },
@@ -51,6 +52,7 @@ export const coreSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentBy('conversation_id', 'core.conversations'),
       note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.",
     },
     {

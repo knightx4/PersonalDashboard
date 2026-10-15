@@ -46,7 +46,24 @@ import {
 import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
-import { EssayResearchCard, useEssayResearch } from './essay-research';
+import { EssayResearchCard, ResearchStage, useEssayResearch } from './essay-research';
+import { NextStage, StageGuide, StageStepper, useEssayPlan } from './essay-stages';
+import { DiscoverStage } from './essay-discover';
+import { PlanStage } from './essay-plan';
+import { StructureStage } from './essay-structure';
+import { DevelopStage } from './essay-develop';
+import { EssayPlanCard } from './essay-plan-rail';
+import {
+  EMPTY_PLAN,
+  headingAbove,
+  openingStage,
+  outlineDraft,
+  pointAtHeading,
+  stageDone,
+  type EssayPlan,
+  type Shape,
+  type Stage,
+} from '@/lib/learn/essays/plan';
 import { EssayFinishCard, type FinishView } from './essay-finish';
 import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
@@ -209,7 +226,11 @@ function useEssaySave(
         browserTimeZone(),
       );
     } catch {
-      result = { ok: false, reason: 'error', error: 'The connection dropped, so the essay is not in your vault yet.' };
+      result = {
+        ok: false,
+        reason: 'error',
+        error: 'The connection dropped, so the essay is not in your vault yet.',
+      };
     }
     if (result.ok) {
       blobSha.current = result.blobSha;
@@ -277,7 +298,14 @@ function useEssaySave(
   const finish = useCallback(
     () =>
       vaultPress<FinishResult>(
-        (body) => finishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone()),
+        (body) =>
+          finishEssay(
+            essay.id,
+            body.text,
+            draftMarksJson(body.marks),
+            blobSha.current,
+            browserTimeZone(),
+          ),
         'Write something first; there is nothing to finish yet.',
         'The connection dropped, so the essay is not finished yet.',
       ),
@@ -287,7 +315,14 @@ function useEssaySave(
   const publish = useCallback(
     () =>
       vaultPress<PublishResult>(
-        (body) => publishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone()),
+        (body) =>
+          publishEssay(
+            essay.id,
+            body.text,
+            draftMarksJson(body.marks),
+            blobSha.current,
+            browserTimeZone(),
+          ),
         'Write something first; there is nothing to publish yet.',
         'The connection dropped, so the essay is not published yet.',
       ),
@@ -412,7 +447,10 @@ function VaultSaveError({
       {(vault.reason === 'read-only' || vault.reason === 'reconnect') && (
         <Link
           href={SETTINGS_HREF}
-          className={cn('inline-flex min-h-11 items-center gap-1 text-ui font-medium', linkVariants())}
+          className={cn(
+            'inline-flex min-h-11 items-center gap-1 text-ui font-medium',
+            linkVariants(),
+          )}
         >
           Open vault settings
           <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -437,7 +475,15 @@ function NotePath({ path }: { path: string }) {
 }
 
 /** The length you are aiming at, in the rail. */
-function TargetForm({ id, target, onSet }: { id: string; target: number | null; onSet: (t: number | null) => void }) {
+function TargetForm({
+  id,
+  target,
+  onSet,
+}: {
+  id: string;
+  target: number | null;
+  onSet: (t: number | null) => void;
+}) {
   const [state, action, pending] = useActionState(async (prev: TargetState, form: FormData) => {
     const next = await setEssayWordTarget(prev, form);
     if (!next.error && next.target !== undefined) onSet(next.target);
@@ -538,6 +584,9 @@ export function EssayView({
   finishStage,
   publishView,
   path: subject,
+  initialStage,
+  planFrozen = false,
+  initialShapes,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -563,13 +612,21 @@ export function EssayView({
   path?: PageSubject;
   /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
   publishView?: PublishView;
+  /** The stage to open on: from the page's `?stage=`, or the gallery's. Worked out from the essay otherwise. */
+  initialStage?: Stage | null;
+  /** The plan drawn and never saved, for the gallery. */
+  planFrozen?: boolean;
+  /** Shapes drawn as offered on the Structure step, for the gallery. */
+  initialShapes?: Shape[];
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
   const [share, setShare] = useState(() => yourWords(essay.draftBody, essay.marks).percent);
   const [askMarks, setAskMarks] = useState(initialAskMarks);
   const [selected, setSelected] = useState(false);
-  const [rephrase, setRephrase] = useState<{ kind: 'idle' } | { kind: 'asking' } | { kind: 'failed'; error: string }>({
+  const [rephrase, setRephrase] = useState<
+    { kind: 'idle' } | { kind: 'asking' } | { kind: 'failed'; error: string }
+  >({
     kind: 'idle',
   });
   const editor = useRef<MarkdownEditorHandle>(null);
@@ -601,10 +658,61 @@ export function EssayView({
     setInterview(nextInterview);
   }, []);
   const asking = interview?.status === 'asking' ? interview : null;
+  const planApi = useEssayPlan(essay.id, essay.plan ?? EMPTY_PLAN, planFrozen);
+  const plan = planApi.plan;
+  const done = stageDone({
+    brief,
+    interview,
+    plan,
+    researched: research.first !== null || researchApi.runs.first !== null,
+    words,
+  });
+  const [stage, setStageState] = useState<Stage>(
+    () =>
+      initialStage ??
+      openingStage(done, essay.interview?.status === 'asking', countWords(essay.draftBody)),
+  );
+  // What the editor last held, so coming back to Write opens it on the newest text.
+  const latestDoc = useRef<{ text: string; marks: AuthorMark[] }>({
+    text: essay.draftBody,
+    marks: essay.marks,
+  });
+  const setStage = useCallback(
+    (next: Stage) => {
+      if (next === 'write' && stage !== 'write') {
+        setDoc((now) => ({ ...latestDoc.current, version: now.version + 1 }));
+      }
+      setStageState(next);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('stage', next);
+        window.history.replaceState(window.history.state, '', url);
+      } catch {
+        // The address is a convenience; the stage still changes without it.
+      }
+      window.scrollTo({ top: 0 });
+    },
+    [stage],
+  );
+  const planRef = useRef<EssayPlan>(plan);
+  useEffect(() => {
+    planRef.current = plan;
+  }, [plan]);
+  const [currentPoint, setCurrentPoint] = useState<string | null>(null);
+  const studyCaret = studyApi.onCaret;
+  const onCaret = useCallback(
+    (pos: number) => {
+      studyCaret(pos);
+      const text = editor.current?.doc() ?? '';
+      setCurrentPoint(pointAtHeading(planRef.current, headingAbove(text, pos))?.id ?? null);
+    },
+    [studyCaret],
+  );
 
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
     (next: Draft, ask: boolean) => {
+      latestDoc.current = next;
       setDoc((now) => ({ text: next.text, marks: next.marks, version: now.version + 1 }));
       setWords(countWords(next.text));
       setShare(yourWords(next.text, next.marks).percent);
@@ -613,14 +721,12 @@ export function EssayView({
     },
     [essay.path],
   );
-  const { draft, vault, path, reloadError, change, saveToVault, reload, finish, publish } = useEssaySave(
-    essay,
-    initialVault,
-    onReloaded,
-  );
+  const { draft, vault, path, reloadError, change, saveToVault, reload, finish, publish } =
+    useEssaySave(essay, initialVault, onReloaded);
 
   const onChange = useCallback(
     (text: string, marks: AuthorMark[]) => {
+      latestDoc.current = { text, marks };
       setWords(countWords(text));
       setParagraphs(essayParagraphs(text).length);
       setShare(yourWords(text, marks).percent);
@@ -655,7 +761,10 @@ export function EssayView({
     setRephrase(
       shown
         ? { kind: 'idle' }
-        : { kind: 'failed', error: 'That text changed while Dash was rewording it. Select it again and ask again.' },
+        : {
+            kind: 'failed',
+            error: 'That text changed while Dash was rewording it. Select it again and ask again.',
+          },
     );
   }, [essay.id]);
 
@@ -687,6 +796,12 @@ export function EssayView({
     };
   }, [typing]);
 
+  const writing = stage === 'write';
+  const putOutline = useCallback(() => {
+    const text = outlineDraft(planRef.current, brief.question);
+    setDoc((now) => ({ text, marks: [], version: now.version + 1 }));
+    onChange(text, []);
+  }, [brief.question, onChange]);
   const quiet = cn(
     'transition-opacity duration-quick focus-within:opacity-100',
     typing && 'pointer-events-none opacity-0 focus-within:pointer-events-auto',
@@ -706,7 +821,7 @@ export function EssayView({
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-1">
+        <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
           <DashAction
             paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
             what="Cost of a rephrase"
@@ -735,84 +850,165 @@ export function EssayView({
           </Button>
         </div>
       </div>
-      {askMarks && (
-        <Card padding="standard" role="alert" className="mb-3 flex flex-col items-start gap-3">
-          <p className="text-ui text-ink">
-            This note was edited outside Dash after the marks saying who wrote what were saved, so they may not
-            line up any more. Keep them, moved to where the same words are now, or clear them and count every
-            word as yours.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={() => setAskMarks(false)}>
-              Keep the marks
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={clearMarks}>
-              Clear the marks
-            </Button>
+      <StageStepper
+        stage={stage}
+        done={done}
+        onStage={setStage}
+        className={writing ? quiet : undefined}
+      />
+      {stage === 'discover' &&
+        (asking ? (
+          <EssayInterviewCard
+            essayId={essay.id}
+            interview={asking}
+            brief={brief}
+            onChange={onBrief}
+            onPlan={planApi.setPlan}
+            initialFound={originStudy}
+          />
+        ) : (
+          <DiscoverStage
+            essayId={essay.id}
+            brief={brief}
+            onBrief={onBrief}
+            api={planApi}
+            onStage={setStage}
+            done={done.discover}
+          />
+        ))}
+      {stage === 'research' && (
+        <ResearchStage
+          api={researchApi}
+          plan={planApi}
+          hasQuestion={Boolean(brief.question.trim())}
+          footer={
+            <NextStage
+              stage="research"
+              onStage={setStage}
+              ready={done.research}
+              hint="You can skip research if you know the subject, and come back to it any time."
+            />
+          }
+        />
+      )}
+      {stage === 'plan' && (
+        <PlanStage
+          essayId={essay.id}
+          brief={brief}
+          api={planApi}
+          onStage={setStage}
+          done={done.plan}
+        />
+      )}
+      {stage === 'structure' && (
+        <StructureStage
+          essayId={essay.id}
+          api={planApi}
+          onStage={setStage}
+          done={done.structure}
+          initialShapes={initialShapes}
+        />
+      )}
+      {stage === 'develop' && (
+        <DevelopStage essayId={essay.id} api={planApi} onStage={setStage} done={done.develop} />
+      )}
+      {writing && (
+        <>
+          {askMarks && (
+            <Card padding="standard" role="alert" className="mb-3 flex flex-col items-start gap-3">
+              <p className="text-ui text-ink">
+                This note was edited outside Dash after the marks saying who wrote what were saved,
+                so they may not line up any more. Keep them, moved to where the same words are now,
+                or clear them and count every word as yours.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setAskMarks(false)}
+                >
+                  Keep the marks
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={clearMarks}>
+                  Clear the marks
+                </Button>
+              </div>
+            </Card>
+          )}
+          <EssayBriefFold
+            essayId={essay.id}
+            brief={brief}
+            onChange={onBrief}
+            defaultOpen={briefOpen}
+            className={quiet}
+          />
+          <Card padding="standard">
+            <MarkdownEditor
+              key={doc.version}
+              handle={editor}
+              initialDoc={doc.text}
+              initialMarks={doc.marks}
+              initialSuggestion={doc.version === 0 ? initialSuggestion : null}
+              initialNotes={initialNotes}
+              onOpenNote={noteApi.open}
+              label={`Essay: ${title}`}
+              placeholder="Start with a title, like # Why money is the odd good out"
+              focusMode={focusMode}
+              autoFocus={doc.version > 0 || (essay.draftBody === '' && !asking)}
+              onChange={onChange}
+              onTyping={onTyping}
+              onSaveNow={onSaveNow}
+              onSelect={onSelect}
+              onCaret={onCaret}
+            />
+          </Card>
+          {rephrase.kind === 'failed' && (
+            <p role="alert" className="mt-2 px-1 text-small text-danger">
+              {rephrase.error}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-small text-ink-muted">
+            <span className="tabular-nums">{countLabel}</span>
+            <span role="status" className={cn(draft.kind === 'failed' && 'text-danger')}>
+              {saveLine(draft, vault)}
+            </span>
           </div>
-        </Card>
+          <VaultSaveError vault={vault} reloadError={reloadError} onReload={reload} />
+        </>
       )}
-      {asking ? (
-        <EssayInterviewCard
-          essayId={essay.id}
-          interview={asking}
-          brief={brief}
-          onChange={onBrief}
-          initialFound={originStudy}
-        />
-      ) : (
-        <EssayBriefFold
-          essayId={essay.id}
-          brief={brief}
-          onChange={onBrief}
-          defaultOpen={briefOpen}
-          className={quiet}
-        />
-      )}
-      <Card padding="standard">
-        <MarkdownEditor
-          key={doc.version}
-          handle={editor}
-          initialDoc={doc.text}
-          initialMarks={doc.marks}
-          initialSuggestion={doc.version === 0 ? initialSuggestion : null}
-          initialNotes={initialNotes}
-          onOpenNote={noteApi.open}
-          label={`Essay: ${title}`}
-          placeholder="Start with a title, like # Why money is the odd good out"
-          focusMode={focusMode}
-          autoFocus={essay.draftBody === '' && !asking}
-          onChange={onChange}
-          onTyping={onTyping}
-          onSaveNow={onSaveNow}
-          onSelect={onSelect}
-          onCaret={studyApi.onCaret}
-        />
-      </Card>
-      {rephrase.kind === 'failed' && (
-        <p role="alert" className="mt-2 px-1 text-small text-danger">
-          {rephrase.error}
-        </p>
-      )}
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-small text-ink-muted">
-        <span className="tabular-nums">{countLabel}</span>
-        <span role="status" className={cn(draft.kind === 'failed' && 'text-danger')}>
-          {saveLine(draft, vault)}
-        </span>
-      </div>
-      <VaultSaveError vault={vault} reloadError={reloadError} onReload={reload} />
     </div>
   );
 
-  const rail = (
+  const rail = !writing ? (
+    <div className="flex flex-col gap-4">
+      <StageGuide stage={stage} brief={brief} plan={plan} />
+    </div>
+  ) : (
     <div className={cn('flex flex-col gap-4', quiet)}>
+      <EssayPlanCard
+        plan={plan}
+        current={currentPoint}
+        canOutline={words === 0}
+        onOutline={putOutline}
+        onEdit={() => setStage(plan.points.length ? 'structure' : 'plan')}
+      />
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
-      <EssayStudyCard state={studyApi.state} onInsert={onInsert} onHide={(key) => void onHideStudy(key)} />
+      <EssayStudyCard
+        state={studyApi.state}
+        onInsert={onInsert}
+        onHide={(key) => void onHideStudy(key)}
+      />
       <EssayResearchCard api={researchApi} />
       <Card padding="none">
         <CardSection title="Length">
           {target !== null && (
-            <Meter value={Math.min(words, target)} max={target} label={countLabel} className="mb-3" />
+            <Meter
+              value={Math.min(words, target)}
+              max={target}
+              label={countLabel}
+              className="mb-3"
+            />
           )}
           <TargetForm id={essay.id} target={target} onSet={setTarget} />
           {/* One row like Target; the counting rule is on the figure, for a pointer and a screen reader. */}

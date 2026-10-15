@@ -359,6 +359,21 @@ export const LEARN_OPERATIONS = [
   // by whatever started the run; the weekly check for new sources on a brief
   // (plan #2023.6) records here too.
   'research-topic',
+  // The guided essay (LEARN-ESSAYS-SPEC, "The stages"), one Sonnet call per
+  // press unless said: Dash's read of the brief, once when the interview
+  // ends and on each Read again; the points found word for word in what the
+  // person wrote; the shapes the essay could take; Dash's notes on the plan;
+  // and the next question about one point.
+  'read-essay-brief',
+  'find-essay-points',
+  'shape-essay-plan',
+  'review-essay-plan',
+  'word-point-question',
+  // The essay's research written up as a map (plan stage Research): the
+  // Sonnet calls framing the question and writing from the pages read. The
+  // Haiku search and reading in between records under
+  // 'research-essay-question'.
+  'write-essay-research',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

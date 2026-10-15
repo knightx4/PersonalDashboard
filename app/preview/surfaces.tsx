@@ -1,5 +1,11 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
+import {
+  GoalMetricsEmptySurface,
+  GoalMetricsErrorSurface,
+  GoalMetricsSurface,
+  GoalMetricsTooltipSurface,
+} from './goal-metrics-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -10,6 +16,7 @@ import { PlacesView } from '@/app/you/places/places-view';
 import { PlaceView } from '@/app/you/places/place-view';
 import { PlaceForm } from '@/app/you/places/place-form';
 import type { Place } from '@/lib/you/places';
+import { drawPlaceMap, drawPlacesMap } from '@/lib/you/places-map-outlines';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -46,7 +53,7 @@ import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -100,6 +107,15 @@ import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
 import { LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  GoalArchiveConfirmSurface,
+  GoalPutAwayMenuSurface,
+  GoalsAllPutAwayMenuSurface,
+  GoalsAllPutAwayToastSurface,
+  GoalsAllSelectConfirmSurface,
+  GoalsAllSelectSurface,
+  GoalsAllSelectToastSurface,
+} from './goal-put-away-surfaces';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -169,6 +185,12 @@ import {
   LearnEssayPublishSurface,
   LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
+  LearnEssayDiscoverSurface,
+  LearnEssayResearchMapSurface,
+  LearnEssayPlanSurface,
+  LearnEssayStructureSurface,
+  LearnEssayDevelopSurface,
+  LearnEssayWritePlanSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectConversationsSurface,
@@ -266,6 +288,7 @@ import { NoteListRow } from '@/components/vault/note-list-row';
 import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
+  AskBuildSurface,
   AskChangesSurface,
   AskDashSurface,
   AskMadeChangesSurface,
@@ -280,6 +303,14 @@ import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
+import {
+  GoalMetricPropsEmptySurface,
+  GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormSurface,
+  GoalMetricPropsMenuSurface,
+  GoalMetricPropsPendingSurface,
+  GoalMetricPropsSurface,
+} from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -510,6 +541,8 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  readyToApply: false,
+  hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
@@ -644,6 +677,8 @@ const pipelineRow = (
   attempt: 1,
   excitement: 3,
   needsReview: false,
+  readyToApply: false,
+  hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -669,6 +704,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     excitement: 5,
+    readyToApply: true,
+    hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
     daysSinceActivity: 1,
@@ -682,6 +719,8 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Software Developer',
     status: 'in_process',
     excitement: 4,
+    readyToApply: true,
+    hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -2670,6 +2709,8 @@ const youPlaces: Place[] = [
     movedIn: '2019-08',
     movedOut: null,
     note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-leeds',
@@ -2680,6 +2721,8 @@ const youPlaces: Place[] = [
     movedIn: '2015',
     movedOut: '2019-08',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-lisbon',
@@ -2690,6 +2733,8 @@ const youPlaces: Place[] = [
     movedIn: '2014-02',
     movedOut: '2014-09',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-childhood',
@@ -2700,8 +2745,21 @@ const youPlaces: Place[] = [
     movedIn: '1992',
     movedOut: '2014',
     note: null,
+    latitude: null,
+    longitude: null,
   },
 ];
+
+/** The same places with positions for the Map view (plan #2091.4); the childhood home has none. */
+const PLACE_POSITIONS: Record<string, [number, number]> = {
+  'place-york': [53.96, -1.08],
+  'place-leeds': [53.8, -1.55],
+  'place-lisbon': [38.72, -9.14],
+};
+const youPlacesOnMap: Place[] = youPlaces.map((place) => {
+  const at = PLACE_POSITIONS[place.id];
+  return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
+});
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
@@ -3425,6 +3483,38 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-marked',
+    label: 'Role · Answers, marked ready',
+    module: 'jobs',
+    width: 'wide',
+    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        readyToApply
+        hasCoverLetter
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-closed',
+    label: 'Role · Answers, closed',
+    module: 'jobs',
+    width: 'wide',
+    // A closed application shows the marks without controls.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="rejected"
+        readyToApply
+        hasCoverLetter={false}
+        defaultTab="answers"
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
@@ -3513,6 +3603,19 @@ export const SURFACES: readonly Surface[] = [
           <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
         </PreviewShell>
       </AskDashSurface>
+    ),
+  },
+  {
+    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
+     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    id: 'jobs-pipeline-marks',
+    label: 'Pipeline · Ready and cover letter filters',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PreviewShell>
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+      </PreviewShell>
     ),
   },
   {
@@ -3845,6 +3948,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <BurnUpSurface />,
   },
   {
+    /* A goal's metrics on its Overview (plan #2084.2): twelve weeks with a
+     * target, five months with none and a target above every count. Its
+     * hidden parts follow: a bar's tooltip, a metric with nothing counted
+     * yet, and the section's message when the read fails. */
+    id: 'goals-metrics',
+    label: 'Goals · Metrics as bar charts',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsSurface />,
+  },
+  {
+    id: 'goals-metrics-tooltip',
+    label: 'Goals · Metrics, a bar hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsTooltipSurface />,
+  },
+  {
+    id: 'goals-metrics-empty',
+    label: 'Goals · Metrics, nothing counted yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsEmptySurface />,
+  },
+  {
+    id: 'goals-metrics-error',
+    label: 'Goals · Metrics, the read failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsErrorSurface />,
+  },
+  {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
      * Dash's latest update (plan #1666), the detail, a question, what it
      * waits on and the thread, and the properties column. */
@@ -4083,6 +4218,62 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* A goal's row menu on All goals, open: Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-all-menu',
+    label: 'Goals · all goals, a goal’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayMenuSurface />,
+  },
+  {
+    /* Back on All goals after parking a goal: the toast with Undo (plan #2097.1). */
+    id: 'goals-all-toast',
+    label: 'Goals · all goals, parked with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayToastSurface />,
+  },
+  {
+    /* Select on, three goals ticked: the bar with Park and Archive (plan #2097.2). */
+    id: 'goals-all-select',
+    label: 'Goals · all goals, several selected',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectSurface />,
+  },
+  {
+    /* Archive pressed with six ticked: the bar asks first (plan #2097.2). */
+    id: 'goals-all-select-confirm',
+    label: 'Goals · all goals, archiving six',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectConfirmSurface />,
+  },
+  {
+    /* Three goals parked together: one toast and one Undo (plan #2097.2). */
+    id: 'goals-all-select-toast',
+    label: 'Goals · all goals, parked three with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectToastSurface />,
+  },
+  {
+    /* The goal page's heading menu, open, with Park goal and Archive goal (plan #2097.1). */
+    id: 'goals-page-top-menu',
+    label: 'Goal · the heading menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPutAwayMenuSurface />,
+  },
+  {
+    /* Archive goal pressed: the confirm naming its steps (plan #2097.1). */
+    id: 'goals-page-top-archive',
+    label: 'Goal · archiving it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalArchiveConfirmSurface />,
   },
   {
     /* An area's own page (plan #1619): one area, its goals and proposals. */
@@ -5314,6 +5505,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskChangesSurface />,
   },
   {
+    /* Ask Dash asked to build plan steps (plan #2106.1): a card naming the
+     * step with Confirm and Decline, one whose last run has gone quiet, and
+     * a step that cannot be built, refused in words with no card. */
+    id: 'ask-dash-build',
+    label: 'Ask Dash · Start a build',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface />,
+  },
+  {
+    /* The build card after a Confirm the server refused, the reason under it. */
+    id: 'ask-dash-build-refused',
+    label: 'Ask Dash · Start a build, refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface refused />,
+  },
+  {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind
      * newest first, one undone, Undo on the step refused with its reason. */
     id: 'ask-made-changes',
@@ -5716,6 +5925,57 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalSuggestionsSurface />,
   },
   {
+    /* A goal's metrics in its properties column (plan #2084.3): two metrics,
+     * one with the longest name, and the line that adds another. The column
+     * is drawn as a phone's opened fold and the laptop's rail. Fixtures in
+     * goal-metric-props-surfaces.tsx, as are the parts below. */
+    id: 'goals-metrics-props',
+    label: 'Goal · Metrics in the properties',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsSurface />,
+  },
+  {
+    /* The add line pressed: the form open in place. */
+    id: 'goals-metrics-props-form',
+    label: 'Goal · Metrics, adding one',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormSurface />,
+  },
+  {
+    /* A metric's row pointed at, its Change and Remove menu showing. */
+    id: 'goals-metrics-props-menu',
+    label: 'Goal · Metrics, a row’s menu',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsMenuSurface />,
+  },
+  {
+    /* No list on the goal has a date to count by. */
+    id: 'goals-metrics-props-empty',
+    label: 'Goal · Metrics, nothing to count',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsEmptySurface />,
+  },
+  {
+    /* A new metric mid-save: the button's pending state. */
+    id: 'goals-metrics-props-pending',
+    label: 'Goal · Metrics, saving',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsPendingSurface />,
+  },
+  {
+    /* A change refused, its message beside the field. */
+    id: 'goals-metrics-props-error',
+    label: 'Goal · Metrics, a change refused',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsErrorSurface />,
+  },
+  {
     /* The timeline (plan #1118): the months newest first, the newest open,
      * each with its count per kind on the line that folds it. Fixtures in
      * timeline-surfaces.tsx. */
@@ -5846,6 +6106,34 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlacesView places={youPlaces} />,
   },
   {
+    /* The Map view (plan #2091.4): three homes on the map, two of them in
+     * neighbouring cities fanned apart, joined in move-in order, the home
+     * they live in now marked, and one with no position listed beneath. */
+    id: 'you-places-map',
+    label: 'You · Places on the map',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} />,
+  },
+  {
+    /* Hovering a dot names the place and its years. */
+    id: 'you-places-map-tooltip',
+    label: 'You · Places on the map, a dot hovered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} tipOpenFor="place-lisbon" />
+    ),
+  },
+  {
+    /* The Map view before any place has a position. */
+    id: 'you-places-map-empty',
+    label: 'You · Places on the map, before any has a position',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} view="map" map={drawPlacesMap(youPlaces)} />,
+  },
+  {
     id: 'you-places-empty',
     label: 'You · Places, before any are added',
     module: 'you',
@@ -5866,7 +6154,55 @@ export const SURFACES: readonly Surface[] = [
     label: 'You · One place, the home they live in now',
     module: 'you',
     width: 'page',
-    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+    render: () => (
+      <PlaceView place={youPlaces[0]} thisMonth="2026-10" map={drawPlaceMap(youPlaces[0], youPlaces)} />
+    ),
+  },
+  {
+    /* A place on the map (plan #2091.5): its region, its dot, Move and Clear. */
+    id: 'you-place-map',
+    label: 'You · One place, on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[0]}
+        thisMonth="2026-10"
+        map={drawPlaceMap(youPlacesOnMap[0], youPlacesOnMap)}
+      />
+    ),
+  },
+  {
+    /* Set on map pressed for a place with no position: the hint line, the
+     * map of the region their other places are in, and Cancel. */
+    id: 'you-place-map-placing',
+    label: 'You · One place, being set on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{ ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap), start: { placing: true } }}
+      />
+    ),
+  },
+  {
+    /* The same, after a press whose save did not go through. */
+    id: 'you-place-map-error',
+    label: 'You · One place, a position that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{
+          ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap),
+          start: { placing: true, error: 'The place was not put on the map. Try again.' },
+        }}
+      />
+    ),
   },
   {
     id: 'you-place-form',
@@ -6292,6 +6628,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendOverviewSurface />,
+  },
+  {
+    id: 'account-spend-by-module',
+    label: 'Account · Spend, where it goes, one fold per module',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface />,
+  },
+  {
+    id: 'account-spend-by-module-open',
+    label: 'Account · Spend, where it goes, a module opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface open="jobs" />,
   },
   {
     id: 'usage-day-bars-empty',
@@ -7148,6 +7498,48 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayInterviewLaterSurface />,
+  },
+  {
+    id: 'learn-essay-discover',
+    label: 'Essay · Discover, with Dash’s read of the brief',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayDiscoverSurface />,
+  },
+  {
+    id: 'learn-essay-research-map',
+    label: 'Essay · Research step, the question mapped',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayResearchMapSurface />,
+  },
+  {
+    id: 'learn-essay-plan',
+    label: 'Essay · Plan, thesis and points',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayPlanSurface />,
+  },
+  {
+    id: 'learn-essay-structure',
+    label: 'Essay · Structure, shapes offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayStructureSurface />,
+  },
+  {
+    id: 'learn-essay-develop',
+    label: 'Essay · Develop, a question about one point',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayDevelopSurface />,
+  },
+  {
+    id: 'learn-essay-write-plan',
+    label: 'Essay · Write, with the plan beside an empty draft',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayWritePlanSurface />,
   },
   {
     id: 'learn-plan-finished',

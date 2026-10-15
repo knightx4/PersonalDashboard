@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { checkPlace, placeHref, type PlaceDraft } from '@/lib/you/places';
-import { deletePlace, updatePlace } from '@/lib/you/places-store';
+import { checkPosition, type PlacesMapDrawing } from '@/lib/you/places-map';
+import { drawWorldMap } from '@/lib/you/places-map-outlines';
+import { deletePlace, setPlacePosition, updatePlace } from '@/lib/you/places-store';
 
 /** What the place form shows after a save that did not go through. */
 export type PlaceFormState = {
@@ -59,6 +61,36 @@ export async function savePlace(_prev: PlaceFormState, form: FormData): Promise<
   revalidatePath('/you/places');
   revalidatePath(placeHref(id));
   redirect(placeHref(id));
+}
+
+/**
+ * Put a place on the map where it was pressed, or take it off with null
+ * (plan #2091.5). The place's page and the map are drawn again with it.
+ */
+// latency: pending
+export async function placeOnMap(id: string, position: unknown): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (!UUID.test(id)) return { error: 'That place could not be found.' };
+  const checked = position === null ? null : checkPosition(position);
+  if (position !== null && !checked) return { error: 'That is not a spot on the map.' };
+
+  try {
+    const found = await setPlacePosition(await createYouClient(), user.id, id, checked);
+    if (!found) return { error: 'That place is not there any more.' };
+  } catch {
+    return { error: checked ? 'The place was not put on the map. Try again.' : 'The place was not taken off the map. Try again.' };
+  }
+
+  revalidatePath('/you/places');
+  revalidatePath(placeHref(id));
+  return {};
+}
+
+/** The whole world, drawn on the server, for placing a place outside the region the page shows. */
+// latency: pending
+export async function worldMap(): Promise<PlacesMapDrawing> {
+  await requireUser();
+  return drawWorldMap();
 }
 
 /** Remove a place for good, then go back to the list. */

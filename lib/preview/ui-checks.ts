@@ -112,7 +112,7 @@ export function parseRound(value: string): number {
   return round;
 }
 
-/** `.preview-shots/checks/<owner>--<surface>--r<round>.json`, as building.md names it. */
+/** `.preview-shots/checks/<owner>--<surface>--r<round>.json`, as the plan skill's screen.md names it. */
 export function verdictFile(owner: CheckOwner, surface: string, round: number): string {
   return `.preview-shots/checks/${ownerKey(owner)}--${surface}--r${round}.json`;
 }

@@ -50,6 +50,25 @@ describe('the You writes', () => {
     expect(tables['you.places']).toHaveLength(1);
   });
 
+  it('puts a place it adds on the map from its city, and changes the position with the city', async () => {
+    const tables: FakeTables = { 'you.places': [] };
+    const added = await runYouWrite(write('add_place'), env(tables), {
+      name: '12 Elm Street',
+      city: 'Waco',
+      region: 'TX',
+      moved_in: '2016',
+    });
+    if ('ok' in added) throw new Error(added.error);
+    expect(added.after).toMatchObject({ latitude: 31.55, longitude: -97.15 });
+
+    const moved = await runYouWrite(write('change_place'), env(tables), {
+      place_ref: String(added.after.id),
+      city: 'Nowhere In Particular',
+    });
+    if ('ok' in moved) throw new Error(moved.error);
+    expect(moved.after).toMatchObject({ latitude: null, longitude: null });
+  });
+
   it('refuses a date it cannot read, naming the argument', async () => {
     const result = await runYouWrite(write('add_place'), env({ 'you.places': [] }), { name: 'York', moved_in: 'ages ago' });
     expect(result).toEqual({ ok: false, error: expect.stringMatching(/^moved_in: /) });

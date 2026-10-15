@@ -7,7 +7,7 @@ import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Textarea } from '@/components/ui/field';
+import { CheckRow, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
@@ -18,7 +18,7 @@ import {
   saveAnswer,
   saveDraftedAnswer,
 } from '../actions';
-import { saveCoverLetter } from './actions';
+import { saveApplicationMarks, saveCoverLetter } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
 import { roleStage } from '@/lib/jobs/role-stage';
 import type { PanelProps } from './types';
@@ -28,6 +28,8 @@ export function Answers({
   applicationId,
   roleId,
   coverLetter,
+  readyToApply,
+  hasCoverLetter,
   status,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
@@ -41,6 +43,13 @@ export function Answers({
 
   return (
     <div className="space-y-4">
+      <ApplicationMarks
+        applicationId={applicationId}
+        roleId={roleId}
+        closed={closed}
+        initialReady={readyToApply}
+        initialCoverLetter={hasCoverLetter}
+      />
       {/* The panel is the answers. Adding questions is something you do to it
           now and then, and it used to be a four-row textarea sitting above
           them on every visit -- the first thing on a page you came to read.
@@ -147,6 +156,111 @@ export function Answers({
  * answers because it is part of the same submission. Read as prose and edited
  * in place, as an answer is.
  */
+/**
+ * Two marks you keep on the application: ready to apply, and whether it has a
+ * cover letter (plan #2102.2). The cover letter answer is yours, separate from
+ * the text below it. Pressing the pressed answer again clears it. Each press
+ * saves at once; a closed application shows them without the controls.
+ */
+function ApplicationMarks({
+  applicationId,
+  roleId,
+  closed,
+  initialReady,
+  initialCoverLetter,
+}: {
+  applicationId: string;
+  roleId: string;
+  closed: boolean;
+  initialReady: boolean;
+  initialCoverLetter: boolean | null;
+}) {
+  const [ready, setReady] = useState(initialReady);
+  const [letter, setLetter] = useState(initialCoverLetter);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function save(
+    marks: { readyToApply?: boolean; hasCoverLetter?: boolean | null },
+    revert: () => void,
+  ) {
+    setError(null);
+    startTransition(async () => {
+      const result = await saveApplicationMarks({ applicationId, roleId, ...marks });
+      if (result.error) {
+        revert();
+        setError(result.error);
+      }
+    });
+  }
+
+  function pressLetter(answer: boolean) {
+    const before = letter;
+    const next = before === answer ? null : answer;
+    setLetter(next);
+    save({ hasCoverLetter: next }, () => setLetter(before));
+  }
+
+  if (closed) {
+    return (
+      <Card padding="dense">
+      <p className="text-ui text-ink-muted">
+        {ready ? 'Marked ready to apply' : 'Not marked ready to apply'}
+        {' · '}
+        {letter === null ? 'Cover letter not answered' : letter ? 'Has a cover letter' : 'No cover letter'}
+      </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card padding="dense">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+        <CheckRow
+          title="Ready to apply"
+          className="items-center"
+          checked={ready}
+          disabled={pending}
+          onChange={(event) => {
+            const before = ready;
+            const next = event.target.checked;
+            setReady(next);
+            save({ readyToApply: next }, () => setReady(before));
+          }}
+        />
+        <div role="group" aria-label="Has a cover letter" className="flex items-center gap-2">
+          <span className="text-ui text-ink">Cover letter</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === true}
+            disabled={pending}
+            onClick={() => pressLetter(true)}
+          >
+            Yes
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === false}
+            disabled={pending}
+            onClick={() => pressLetter(false)}
+          >
+            No
+          </Button>
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {error}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function CoverLetter({
   applicationId,
   roleId,

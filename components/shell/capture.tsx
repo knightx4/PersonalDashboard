@@ -47,11 +47,7 @@ import { useRouter } from 'next/navigation';
 import { todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
 import { goalsPlaceName } from '@/lib/capture/destination';
-import {
-  filedModule,
-  offeredCapturePlaces,
-  type FiledCapture,
-} from '@/lib/capture/place';
+import { filedModule, offeredCapturePlaces, type FiledCapture } from '@/lib/capture/place';
 import { type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
@@ -390,9 +386,10 @@ function usePanelChrome(onClose: () => void, panelRef: React.RefObject<HTMLFormE
 }
 
 /** The paid press the panel's File it button makes, where there is one. */
-const PAID_PRESS: Partial<Record<CaptureActionId, 'app/goals/capture-actions.ts#fileGoalCapture'>> = {
-  goals: 'app/goals/capture-actions.ts#fileGoalCapture',
-};
+const PAID_PRESS: Partial<Record<CaptureActionId, 'app/goals/capture-actions.ts#fileGoalCapture'>> =
+  {
+    goals: 'app/goals/capture-actions.ts#fileGoalCapture',
+  };
 
 function CapturePanel({
   session,
@@ -506,12 +503,7 @@ function CapturePanel({
 
   return (
     <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className={scrim}
-      />
+      <button type="button" aria-label="Close" onClick={onClose} className={scrim} />
       <form
         ref={panelRef}
         onSubmit={(event) => {
@@ -587,7 +579,14 @@ function CapturePanel({
             </span>
             {paid ? (
               <PaidCostsProvider costs={costs}>
-                <DashAction type="submit" size="sm" pending={pending} paid={paid} what="Cost of filing it" align="end">
+                <DashAction
+                  type="submit"
+                  size="sm"
+                  pending={pending}
+                  paid={paid}
+                  what="Cost of filing it"
+                  align="end"
+                >
                   {pending ? 'Filing…' : 'File it'}
                 </DashAction>
               </PaidCostsProvider>
@@ -696,7 +695,11 @@ function AnythingPanel({
       return;
     }
     start(async () => {
-      const result = await fileCaptureBox(text, { sort: sort?.sure ? sort : null, picked }, uploads);
+      const result = await fileCaptureBox(
+        text,
+        { sort: sort?.sure ? sort : null, picked },
+        uploads,
+      );
       if (result.error) {
         setError(result.error);
         return;
@@ -723,7 +726,8 @@ function AnythingPanel({
       fieldRef.current?.focus();
       // The box files only into places, so every row it filed has a workspace.
       const workspace = filedModule(first);
-      if (workspace) showLanding(from, { module: workspace, href: first.href, name: first.where }, text);
+      if (workspace)
+        showLanding(from, { module: workspace, href: first.href, name: first.where }, text);
     });
   }
 
@@ -751,7 +755,9 @@ function AnythingPanel({
         return;
       }
       setFiled((list) =>
-        list.map((other) => (other.actionId === id ? { ...other, undoneAt: result.undoneAt } : other)),
+        list.map((other) =>
+          other.actionId === id ? { ...other, undoneAt: result.undoneAt } : other,
+        ),
       );
     });
   }
@@ -849,7 +855,10 @@ function AnythingPanel({
  * answer is never shown against a different sentence and going back to one
  * already asked about does not ask again.
  */
-function usePlaceGuess(text: string): { guess: PlaceGuess; places: readonly CapturePlace[] | null } {
+function usePlaceGuess(text: string): {
+  guess: PlaceGuess;
+  places: readonly CapturePlace[] | null;
+} {
   const [answers, setAnswers] = useState<ReadonlyMap<string, CaptureSort | null>>(new Map());
   /** The places the server offered with its latest answer. */
   const [places, setPlaces] = useState<readonly CapturePlace[] | null>(null);
@@ -946,7 +955,9 @@ function MoveGuess({
           <span className="tabular"> · {Math.round(guess.confidence * 100)}% sure</span>
         </span>
       ) : (
-        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is not sure what this does. Which is it?</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">
+          Dash is not sure what this does. Which is it?
+        </span>
       )}
       {(asking || picked) &&
         CAPTURE_MOVES.map((move) => {
@@ -958,7 +969,13 @@ function MoveGuess({
           );
         })}
       {guess?.sure && !picked && (
-        <Button type="button" variant="ghost" size="xs" onClick={() => onPick(guess.move)} className="ml-auto">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => onPick(guess.move)}
+          className="ml-auto"
+        >
           Change
         </Button>
       )}
@@ -1130,7 +1147,10 @@ const AIMED_PRESS: Partial<Record<CaptureKindId, { action: PaidAction; what: str
     action: 'app/capture-actions.ts#makeAimedCapture:goal',
     what: 'Cost of placing a goal in the Learn area and writing its plan',
   },
-  'dev-note': { action: 'app/capture-actions.ts#makeAimedCapture:dev-note', what: 'Cost of sorting the note' },
+  'dev-note': {
+    action: 'app/capture-actions.ts#makeAimedCapture:dev-note',
+    what: 'Cost of sorting the note',
+  },
 };
 
 /** An order's press once a receipt photo is taken in the panel (plan #1950.3.2). */
@@ -1154,6 +1174,7 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
   const router = useRouter();
   const toast = useToast();
   const [text, setText] = useState(aim.seed ?? '');
+  const adder = useRef<AddFileHandle>(null);
   const [day, setDay] = useState<CaptureDay>('today');
   const [error, setError] = useState<string | null>(aimProblem(aim));
   const [pending, start] = useTransition();
@@ -1235,7 +1256,12 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
           : {}),
       };
       onClose();
-      void sendToPlace({ from, to: landingTarget(kind.section), label: made.text, name: made.where });
+      void sendToPlace({
+        from,
+        to: landingTarget(kind.section),
+        label: made.text,
+        name: made.where,
+      });
       toast(notice);
       if (page) {
         carryToast(notice);
@@ -1270,9 +1296,17 @@ function AimedPanel({ aim, onClose }: { aim: CaptureAim; onClose: () => void }) 
             page={aim.page}
             files={
               kind.files ? (
-                <AddFile value={uploads} onChange={setUploads} disabled={pending} onUploadingChange={setUploading} />
+                <AddFile
+                  ref={adder}
+                  value={uploads}
+                  onChange={setUploads}
+                  disabled={pending}
+                  onUploadingChange={setUploading}
+                />
               ) : undefined
             }
+            // A picture pasted into the field goes in as a file (note 90153e80).
+            onPaste={kind.files ? (data) => adder.current?.paste(data) ?? false : undefined}
             text={text}
             onText={(value) => {
               setText(value);

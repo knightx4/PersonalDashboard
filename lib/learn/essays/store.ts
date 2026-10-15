@@ -256,3 +256,29 @@ export async function adoptNoteVersion(
     .eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+/** What the guided essay's actions read: the brief and the plan (LEARN-ESSAYS-SPEC, "The stages"). */
+export async function loadPlanContext(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<{ brief: unknown; plan: unknown } | null> {
+  const { data, error } = await supabase.from('essays').select('brief, plan').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  return data ? (data as { brief: unknown; plan: unknown }) : null;
+}
+
+/** The plan as the person now has it. */
+export async function savePlanJson(
+  supabase: LearnSupabaseClient,
+  id: string,
+  plan: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('essays')
+    .update({ plan, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('That essay is not there any more.');
+}

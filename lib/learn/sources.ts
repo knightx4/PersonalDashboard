@@ -1,12 +1,10 @@
-import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
 const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
-/** Briefs are listed on Now (app/learn/now/briefs-list.tsx). */
-const NOW: Section = { href: '/learn/now', label: 'Now' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
 const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
 
@@ -46,6 +44,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['asked'],
       title: 'asked',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects'], ['concept_id', 'learn.concepts']),
     },
     {
       table: 'learn.tracks',
@@ -75,6 +74,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['topic', 'question', 'summary'],
       title: 'topic',
+      parent: parentByFirst(['subject_id', 'learn.subjects'], ['essay_id', 'learn.essays']),
       note: 'Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.',
     },
     {
@@ -103,6 +103,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title', 'covers', 'outcome'],
       title: 'title',
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.plan_pieces',
@@ -111,6 +112,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title'],
       title: 'title',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects']),
     },
     {
       table: 'learn.piece_checks',
@@ -119,6 +121,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('piece_id', 'learn.plan_pieces'),
     },
     {
       table: 'learn.review_questions',
@@ -127,6 +130,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('concept_id', 'learn.concepts'),
       note: 'concept_id is the idea in learn.concepts; its next due date is review_due_on in learn.concept_state.',
     },
     {
@@ -164,6 +168,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['raw_text', 'source_hint'],
       title: 'source_hint',
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.card_notes',
@@ -172,6 +177,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentByFirst(['concept_id', 'learn.concepts'], ['card_id', 'learn.feed_cards']),
       note: 'concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.',
     },
     {
@@ -181,6 +187,7 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['phrase', 'explanation'],
       title: 'phrase',
+      parent: parentBy('card_id', 'learn.feed_cards'),
       note: 'card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.',
     },
     {
@@ -190,6 +197,12 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['summary', 'takeaway', 'why', 'theme_name', 'aim_name'],
       title: 'summary',
+      parent: parentByFirst(
+        ['subject_id', 'learn.subjects'],
+        ['aim_id', 'learn.aims'],
+        ['concept_id', 'learn.concepts'],
+        ['reading_id', 'learn.readings'],
+      ),
       note: 'status says what they did with a card; saved and tested cards say more than drawn ones.',
     },
     {
@@ -204,6 +217,7 @@ export const learnSources: ModuleSources = {
       ref: 'video_id',
       href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
       newest: 'added_at',
+      parent: parentBy('subject_id', 'learn.subjects'),
       // The title is on catalogue_items, which a ref's page cannot join to.
       page: {
         title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
