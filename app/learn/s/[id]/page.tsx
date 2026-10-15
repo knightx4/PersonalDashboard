@@ -504,7 +504,7 @@ export default async function SubjectPage({
 
       {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
 
-      <PullArticles />
+      <PullArticles subjectId={id} ideaCount={graph.concepts.length} />
       <PullCourse />
     </PageColumn>
   );
