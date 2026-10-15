@@ -99,6 +99,7 @@ export const jobsActions: ModuleActions = {
     addQuestions: tool('add_application_questions'),
     saveAnswer: tool('save_answer'),
     promoteToCanonical: tool('set_default_answer'),
+    removeAnswer: none('deletes'),
     lookUpJobDescription: none('page'),
     draftAnswerFromEvidence: none('spends'),
     saveDraftedAnswer: tool('save_answer'),

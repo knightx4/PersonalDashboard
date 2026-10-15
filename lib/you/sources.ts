@@ -4,6 +4,7 @@ import { jobHref } from '@/lib/you/work-history';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
+const DETAILS: Section = { href: '/you/details', label: 'Details' };
 const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 
@@ -51,6 +52,22 @@ export const youSources: ModuleSources = {
       href: () => '/you/personality',
       section: PERSONALITY,
       note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
+    },
+    {
+      table: 'you.details',
+      module: 'You',
+      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.',
+      weight: 'record',
+      search: ['title', 'phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
+      title: 'title',
+      newest: 'updated_at',
+      ref: 'user_id',
+      owner: 'user_id',
+      href: () => '/you/details',
+      section: DETAILS,
+      // One row per person, with no id to name it by.
+      page: null,
+      note: 'A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
     },
     {
       table: 'you.places',
