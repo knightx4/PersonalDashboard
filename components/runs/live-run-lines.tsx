@@ -11,6 +11,7 @@ import {
   type RunTable,
 } from '@/lib/core/run-activities';
 import { RunLinesView, type RunLinesConnection, type RunLinesState } from './run-lines';
+import type { FeatureStep } from '@/lib/digest/night';
 import type { AnswerRunAction } from './run-answer';
 
 /** Where each runs table lives, for a Realtime subscription to its rows. */
@@ -41,6 +42,7 @@ export function LiveRunLines({
   initial,
   acknowledge,
   answer,
+  feature,
   className,
 }: {
   runTable: RunTable;
@@ -50,6 +52,8 @@ export function LiveRunLines({
   acknowledge?: React.ReactNode;
   /** Answers the question the run is waiting on, from its lines (plan #1824). */
   answer?: AnswerRunAction;
+  /** A feature session's feature and steps, to fold its lines by step (run-lines.tsx). */
+  feature?: { ref: string; steps: readonly FeatureStep[] };
   className?: string;
 }) {
   const router = useRouter();
@@ -134,6 +138,7 @@ export function LiveRunLines({
       acknowledge={acknowledge}
       answer={answer}
       arrived={arrived}
+      feature={feature}
       className={className}
     />
   );

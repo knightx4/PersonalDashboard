@@ -1185,11 +1185,17 @@ export function DevRunnerCrewSurface() {
             endedAt: null,
             step: {
               number: 1700,
-              ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own visor',
+              ref: '#1700',
+              title: 'Four Dashes on the runner card, one for each thing it can run at once',
             },
             module: 'Dev',
             doing: null,
+            steps: [
+              { ref: '#1700.1', title: 'Slots for the four sessions', status: 'done' },
+              { ref: '#1700.2', title: 'A visor shape for each Dash', status: 'done' },
+              { ref: '#1700.3', title: 'Pose from the newest line', status: 'done' },
+              { ref: '#1700.4', title: 'Show the four Dashes on the runner card, each in its own visor', status: 'in_progress' },
+            ],
           },
           {
             id: 's2',
