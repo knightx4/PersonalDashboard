@@ -1,7 +1,7 @@
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of the job search's nav its rows sit under (app/jobs/(app)/layout.tsx). */
-const TODAY: Section = { href: '/jobs', label: 'Today' };
+const INBOX: Section = { href: '/jobs/inbox', label: 'Inbox' };
 const PIPELINE: Section = { href: '/jobs/pipeline', label: 'Pipeline' };
 const COMPANIES: Section = { href: '/jobs/companies', label: 'Companies' };
 const CONTACTS: Section = { href: '/jobs/contacts', label: 'Contacts' };
@@ -178,8 +178,8 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
-      href: () => '/jobs',
-      section: TODAY,
+      href: () => '/jobs/inbox',
+      section: INBOX,
     },
   ],
   notSources: [

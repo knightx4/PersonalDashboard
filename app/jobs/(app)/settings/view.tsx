@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { whenDate } from '@/lib/core/when';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { chipVariants, ToggleChip } from '@/components/ui/chip';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -87,14 +88,8 @@ export function SearchFields({
 
 /** A day as the jobs pages write one, "6 Jul 2026", from its ISO form. */
 function formatDay(iso: string): string {
-  const day = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(day.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(day);
+  if (Number.isNaN(new Date(`${iso}T00:00:00Z`).getTime())) return iso;
+  return whenDate(iso, { timeZone: 'UTC' });
 }
 
 /** What you want from the next job, each edited where it is read. */

@@ -58,6 +58,7 @@ export const jobsActions: ModuleActions = {
     saveProfileField: none('setting'),
     disconnectInbox: none('account'),
     savePreference: none('setting'),
+    saveShowNudges: none('setting'),
   },
   'app/jobs/(app)/settings/sender-actions.ts': {
     addExcludedSender: none('setting'),

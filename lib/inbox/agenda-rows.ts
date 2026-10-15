@@ -2,6 +2,7 @@ import type { InboxRow, InboxSectionKey, InboxVerb, InboxWrite } from '@/compone
 import type { AgendaEntry } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, SourceId } from '@/lib/todo/agenda/sources';
 import { entryRef } from '@/lib/todo/agenda/workspace';
+import { whenDate } from '@/lib/core/when';
 
 /**
  * A workspace Inbox's rows, from the agenda's entries (plan #1937.5).
@@ -36,17 +37,10 @@ export type SourceAbilities = Partial<
   Record<SourceId, { complete: boolean; defer: boolean; dismiss: boolean; answer: boolean }>
 >;
 
-const SHORT_DAY = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'UTC',
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
-
 /** A calendar day as a row's line says it: "today", "Fri 17 Oct". */
 export function shortDay(day: string, today: string): string {
   if (day === today) return 'today';
-  return SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
+  return whenDate(day, { timeZone: 'UTC', weekday: 'short', year: 'never' });
 }
 
 /** When it is due, in words, or null for a row with no day. */
