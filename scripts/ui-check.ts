@@ -81,7 +81,10 @@ function keepShots(owner: CheckOwner, surface: string, round: number): KeptShot[
 }
 
 function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Cloud sessions have the service key but not the public URL, and without
+  // this fallback every round they recorded went in with no shots, so the plan
+  // row had no pictures to send back from. scripts/plan.ts falls back the same way.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key || url.includes('placeholder')) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
