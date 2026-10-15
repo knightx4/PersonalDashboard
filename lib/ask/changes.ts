@@ -10,8 +10,8 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
-import { undoInterviewRows } from '@/lib/dash/interview-edit-writes';
 import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { handStepToClaude } from '@/lib/plan/handover';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
 import {
@@ -162,6 +162,8 @@ export function changePaths(change: DashChange): string[] {
     }
     case 'add_quick_note':
       return ['/vault', '/vault/triage'];
+    case 'start_build':
+      return ['/dev/plan', `/dev/plan/${change.input.number}`];
   }
 }
 
@@ -188,6 +190,7 @@ const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null>
   move_roles: { module: 'jobs', label: 'Jobs' },
   set_goal_done_when: { module: 'goals', label: 'Goals' },
   add_quick_note: { module: 'vault', label: 'Vault' },
+  start_build: { module: 'dev', label: 'Dev' },
 };
 
 const WRITTEN_TABLE: Record<WrittenKind, string> = {
@@ -206,6 +209,8 @@ const WRITTEN_TABLE: Record<WrittenKind, string> = {
   move_roles: 'job_search.applications',
   set_goal_done_when: 'goals.items',
   add_quick_note: 'obsidian.notes',
+  // The run the confirm starts (plan #2106.2).
+  start_build: 'public.plan_runs',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -225,6 +230,7 @@ const WRITTEN_OP: Record<WrittenKind, 'insert' | 'update'> = {
   move_roles: 'update',
   set_goal_done_when: 'update',
   add_quick_note: 'insert',
+  start_build: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -288,8 +294,12 @@ function notConfirmed(status: DashChangeStatus): string {
 type ProposalChange = Extract<DashChange, { kind: 'add_todo' | 'add_goal_step' | 'mark_returned' | 'start_watch' }>;
 
 function isProposalKind(change: DashChange): change is ProposalChange {
-  return PROPOSAL_KINDS.includes(change.kind);
+  // A started build is a proposal too, but it has no writer or undo here.
+  return change.kind !== 'start_build' && PROPOSAL_KINDS.includes(change.kind);
 }
+
+/** Why a started build has no Undo. */
+export const BUILD_NO_UNDO = 'A build that has started cannot be undone.';
 
 type Written = { ref: string; undo: Record<string, unknown> | null };
 
@@ -609,6 +619,62 @@ function refusedOrThrow(error: unknown, change: DashChange | null): ChangeOutcom
 }
 
 /**
+ * Start the session a build card proposed (plan #2106.2).
+ *
+ * The step is checked again by handStepToClaude, so a step that was sent, closed
+ * or blocked since the card was made is refused here with the plan page's own
+ * sentence and nothing starts. The quiet run is written off only when the card
+ * said the run was quiet. The change is marked done against the run the send
+ * started; there is no undo, because a started session cannot be recalled.
+ */
+async function confirmBuild(deps: ChangeDeps, change: Extract<DashChange, { kind: 'start_build' }>): Promise<ChangeOutcome> {
+  const client = await deps.db('public');
+  const sent = await handStepToClaude({
+    supabase: client as never,
+    userId: deps.userId,
+    id: change.input.stepId,
+    confirmQuiet: change.input.quiet ? true : undefined,
+  });
+  if (!sent.ok) return { ok: false, error: sent.error, change };
+
+  // startRoutineRun does not return the run it recorded, so the newest run on
+  // the step is the one this press started.
+  const { data: run } = await client
+    .from('plan_runs')
+    .select('id')
+    .eq('user_id', deps.userId)
+    .eq('plan_item_id', change.input.stepId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const runId = (run as { id?: string } | null)?.id;
+  const subjectRef = runId ? toRef('public.plan_runs', runId) : null;
+
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({
+      status: 'done',
+      done_at: now(deps),
+      ...(subjectRef ? { subject_ref: subjectRef } : {}),
+      op: 'insert',
+      undo: null,
+    })
+    .eq('id', change.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'proposed')
+    .select(DASH_CHANGE_SELECT);
+  const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+  if (error || rows.length === 0) {
+    // The session is already running and cannot be recalled; say so rather than
+    // leave the card offering to start it again.
+    if (error) throw new Error(`The build started but marking the card done failed: ${error.message}`);
+    const current = await loadOne(deps, change.id);
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+  return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
  * Write a proposed change and mark it done. Refused, with the change as
  * it stands, when it is not a proposal any more, its answer is still being
  * written, its workspace is off, or what it points at can no longer take it.
@@ -620,11 +686,12 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
   if (!change.turnId) {
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
-  if (!isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
+  if (change.kind !== 'start_build' && !isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
   const workspace = WORKSPACE[change.kind];
   if (workspace && !deps.enabledModules.includes(workspace.module)) {
     return { ok: false, error: `The ${workspace.label} workspace is switched off, so this cannot be written.`, change };
   }
+  if (change.kind === 'start_build') return confirmBuild(deps, change);
 
   // An update records the row as it was, read before the write; an insert
   // has no row before it.
@@ -739,6 +806,7 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
+  if (change.kind === 'start_build') return { ok: false, error: BUILD_NO_UNDO, change };
   if (!isProposalKind(change)) return undoWrite(deps, change, surface);
 
   try {

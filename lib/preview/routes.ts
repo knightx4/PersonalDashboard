@@ -183,6 +183,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
+  'ask-dash-build': ['/ask', '/ask/[ref]'],
+  'ask-dash-build-refused': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'ask-dash-thread': ['/ask/[ref]'],
   'ask-dash-files': ['/ask', '/ask/[ref]'],

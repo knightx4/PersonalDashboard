@@ -164,6 +164,15 @@ export function DashChangeRow({
         </p>
       )}
 
+      {change.kind === 'start_build' && change.status === 'proposed' && (
+        <p className="text-small text-ink-muted">
+          {change.input.quiet
+            ? 'Confirm writes off its quiet last run and starts a new session now.'
+            : 'Confirm starts a session on this step now.'}{' '}
+          It cannot be undone.
+        </p>
+      )}
+
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -173,7 +182,7 @@ export function DashChangeRow({
             disabled={pressing !== null}
             onClick={() => press('confirm')}
           >
-            {pressing === 'confirm' ? 'Writing…' : 'Confirm'}
+            {pressing === 'confirm' ? (change.kind === 'start_build' ? 'Starting…' : 'Writing…') : 'Confirm'}
           </Button>
           <CloseButton
             lifecycle="declined"
@@ -194,18 +203,21 @@ export function DashChangeRow({
           >
             {changeWhere(change)}
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="-ml-1"
-            pending={pressing === 'undo'}
-            disabled={pressing !== null}
-            onClick={() => press('undo')}
-          >
-            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {pressing === 'undo' ? 'Undoing…' : 'Undo'}
-          </Button>
+          {/* A started build cannot be taken back (plan #2106.1). */}
+          {change.kind !== 'start_build' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="-ml-1"
+              pending={pressing === 'undo'}
+              disabled={pressing !== null}
+              onClick={() => press('undo')}
+            >
+              <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pressing === 'undo' ? 'Undoing…' : 'Undo'}
+            </Button>
+          )}
         </div>
       )}
 

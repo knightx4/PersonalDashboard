@@ -283,6 +283,7 @@ import { BoardMomentDemo } from './jobs-moment-demos';
 import { DashSeenDemo } from './dash-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
+  AskBuildSurface,
   AskChangesSurface,
   AskDashSurface,
   AskMadeChangesSurface,
@@ -5369,6 +5370,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskChangesSurface />,
+  },
+  {
+    /* Ask Dash asked to build plan steps (plan #2106.1): a card naming the
+     * step with Confirm and Decline, one whose last run has gone quiet, and
+     * a step that cannot be built, refused in words with no card. */
+    id: 'ask-dash-build',
+    label: 'Ask Dash · Start a build',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface />,
+  },
+  {
+    /* The build card after a Confirm the server refused, the reason under it. */
+    id: 'ask-dash-build-refused',
+    label: 'Ask Dash · Start a build, refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface refused />,
   },
   {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind
