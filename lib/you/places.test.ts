@@ -5,6 +5,7 @@ import {
   formatRoughDate,
   livedInYear,
   placeFromLine,
+  placeFromRow,
   placeSpan,
   readRoughDate,
   sortPlaces,
@@ -23,7 +24,37 @@ const place = (fields: Partial<Place>): Place => ({
   movedIn: '2000',
   movedOut: null,
   note: null,
+  latitude: null,
+  longitude: null,
   ...fields,
+});
+
+describe('map position', () => {
+  const row = {
+    id: 'a',
+    name: 'Leeds',
+    city: null,
+    region: null,
+    country: null,
+    moved_in: '2019',
+    moved_out: null,
+    note: null,
+  };
+
+  it('is empty on a place that has none', () => {
+    expect(placeFromRow({ ...row, latitude: null, longitude: null })).toMatchObject({ latitude: null, longitude: null });
+  });
+
+  it('is carried onto the place when the row has one', () => {
+    expect(placeFromRow({ ...row, latitude: 53.8, longitude: -1.55 })).toMatchObject({ latitude: 53.8, longitude: -1.55 });
+  });
+
+  it('is left out of what a save writes, so a save never touches it', () => {
+    const checked = checkPlace(draftOf(place({ name: 'Leeds', movedIn: '2019', latitude: 53.8, longitude: -1.55 })));
+    if (!checked.ok) throw new Error('expected a valid place');
+    expect(checked.row).not.toHaveProperty('latitude');
+    expect(checked.row).not.toHaveProperty('longitude');
+  });
 });
 
 describe('rough dates', () => {

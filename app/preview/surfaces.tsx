@@ -2725,6 +2725,8 @@ const youPlaces: Place[] = [
     movedIn: '2019-08',
     movedOut: null,
     note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-leeds',
@@ -2735,6 +2737,8 @@ const youPlaces: Place[] = [
     movedIn: '2015',
     movedOut: '2019-08',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-lisbon',
@@ -2745,6 +2749,8 @@ const youPlaces: Place[] = [
     movedIn: '2014-02',
     movedOut: '2014-09',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-childhood',
@@ -2755,6 +2761,8 @@ const youPlaces: Place[] = [
     movedIn: '1992',
     movedOut: '2014',
     note: null,
+    latitude: null,
+    longitude: null,
   },
 ];
 
