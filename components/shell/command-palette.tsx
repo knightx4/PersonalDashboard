@@ -221,7 +221,16 @@ export function CommandPalette({
           <Kbd always>esc</Kbd>
         </div>
 
-        <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
+        {/* Opened on every workspace, the list takes the room it needs, up to
+            most of the screen, so the last workspace is never cut off at the
+            edge (note 5f3ef44f). */}
+        <div
+          ref={listRef}
+          className={cn(
+            'overflow-y-auto p-1',
+            shows === 'workspaces' && !query.trim() ? 'max-h-[70dvh]' : 'max-h-80',
+          )}
+        >
           {rows.length === 0 ? (
             <p className="px-3 py-6 text-center text-ui text-ink-muted">
               {/* Only once looking has finished. "Nothing matches" while a
