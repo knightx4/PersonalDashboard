@@ -158,7 +158,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             <Link
               href={item.link.href}
               className={cn(
-                'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
+                'press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
                 shown === 'done' && 'line-through',
               )}
             >
@@ -185,9 +185,14 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               affordance anyone sees -- least of all on a phone, where there is
               no hover to reveal it. This matches a linked task's anchor, so
               "click through to the job" reads the same on both kinds of row. */}
+          {/* 44px to a finger on a phone (press-area); the label truncates
+              inside, so the link's own area is not clipped with it. */}
           {item.link && (
-            <Link href={item.link.href} className={cn('truncate text-small', linkVariants({ tone: 'quiet' }))}>
-              {item.link.label}
+            <Link
+              href={item.link.href}
+              className={cn('press-area min-w-0 max-w-full text-small', linkVariants({ tone: 'quiet' }))}
+            >
+              <span className="block truncate">{item.link.label}</span>
             </Link>
           )}
 
@@ -196,7 +201,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className={cn('inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
+              className={cn('press-area inline-flex items-center gap-1 text-small font-medium', linkVariants({ tone: 'inline' }))}
             >
               <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               {item.action.label}
