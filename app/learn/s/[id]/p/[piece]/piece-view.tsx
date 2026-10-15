@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import type { PieceCheck } from '@/lib/learn/lessons/piece-check';
@@ -293,12 +292,16 @@ function PracticeCard({
           {writing ? (
             <p className="text-small text-ink-muted">Dash is writing the task…</p>
           ) : (
-            <span className="inline-flex items-center gap-1">
-              <Button type="button" variant="primary" onClick={write} pending={writing}>
-                Write the task
-              </Button>
-              <PaidHint action="app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice" what="Cost of writing the task" />
-            </span>
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={write}
+              pending={writing}
+              paid="app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice"
+              what="Cost of writing the task"
+            >
+              Write the task
+            </DashAction>
           )}
         </div>
       )}
@@ -375,12 +378,17 @@ function PracticeCard({
                   disabled={marking}
                 />
               </Field>
-              <span className="inline-flex items-center gap-1">
-                <Button type="button" variant="primary" onClick={handIn} pending={marking} disabled={!typedSomething}>
-                  {marking ? 'Marking…' : 'Hand it in'}
-                </Button>
-                <PaidHint action="app/learn/s/[id]/p/[piece]/actions.ts#handInPractice" what="Cost of marking what you hand in" />
-              </span>
+              <DashAction
+                type="button"
+                variant="primary"
+                onClick={handIn}
+                pending={marking}
+                disabled={!typedSomething}
+                paid="app/learn/s/[id]/p/[piece]/actions.ts#handInPractice"
+                what="Cost of marking what you hand in"
+              >
+                {marking ? 'Marking…' : 'Hand it in'}
+              </DashAction>
             </div>
           )}
 
@@ -521,12 +529,18 @@ function PieceCheckCard({
               disabled={marking}
             />
           </Field>
-          <span className="mt-3 inline-flex items-center gap-1">
-            <Button type="button" variant="primary" onClick={answer} pending={marking} disabled={response.trim() === ''}>
-              {marking ? 'Marking…' : 'Check my answer'}
-            </Button>
-            <PaidHint action="app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck" what="Cost of marking the answer" />
-          </span>
+          <DashAction
+            type="button"
+            variant="primary"
+            onClick={answer}
+            pending={marking}
+            disabled={response.trim() === ''}
+            paid="app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck"
+            what="Cost of marking the answer"
+            wrapperClassName="mt-3"
+          >
+            {marking ? 'Marking…' : 'Check my answer'}
+          </DashAction>
         </>
       )}
 
@@ -553,12 +567,17 @@ function PieceCheckCard({
       )}
 
       {canAsk && (
-        <span className="mt-3 inline-flex items-center gap-1">
-          <Button type="button" variant={check ? 'secondary' : 'primary'} onClick={ask} pending={asking}>
-            {asking ? 'Writing a question…' : check ? 'Try another question' : 'Ask me the question'}
-          </Button>
-          <PaidHint action="app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck" what="Cost of writing the question" />
-        </span>
+        <DashAction
+          type="button"
+          variant={check ? 'secondary' : 'primary'}
+          onClick={ask}
+          pending={asking}
+          paid="app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck"
+          what="Cost of writing the question"
+          wrapperClassName="mt-3"
+        >
+          {asking ? 'Writing a question…' : check ? 'Try another question' : 'Ask me the question'}
+        </DashAction>
       )}
 
       {error && <p className="mt-2 text-small text-danger">{error}</p>}

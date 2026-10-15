@@ -6,7 +6,7 @@ import { useState, useTransition } from 'react';
 import { Moon, Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import type { TrackOffer } from '@/lib/learn/flow/offer';
 import { weeksResting, type RestingOffer } from '@/lib/learn/lessons/resting';
@@ -182,15 +182,16 @@ function FeedOfferCard({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1">
-          <Button type="button" variant="primary" onClick={start} pending={starting}>
-            {starting ? 'Writing the subject…' : 'Start'}
-          </Button>
-          <PaidHint
-            action="app/learn/now/actions.ts#startTrackOffer"
-            what="Cost of starting the subject"
-          />
-        </span>
+        <DashAction
+          type="button"
+          variant="primary"
+          onClick={start}
+          pending={starting}
+          paid="app/learn/now/actions.ts#startTrackOffer"
+          what="Cost of starting the subject"
+        >
+          {starting ? 'Writing the subject…' : 'Start this subject'}
+        </DashAction>
         <CloseButton
           lifecycle="later"
           variant="secondary"

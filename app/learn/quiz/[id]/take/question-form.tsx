@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -31,9 +31,14 @@ const MARK = {
 function AnswerButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
-      {pending ? 'Marking…' : 'Answer'}
-    </Button>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/quiz/[id]/take/actions.ts#answerQuiz"
+      what="Cost of marking the answer"
+    >
+      {pending ? 'Marking…' : 'Check my answer'}
+    </DashAction>
   );
 }
 
@@ -128,10 +133,6 @@ export function QuestionForm({
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <AnswerButton />
             <SkipButton formAction={skip} />
-            <PaidHint
-              action="app/learn/quiz/[id]/take/actions.ts#answerQuiz"
-              what="Cost of marking the answer"
-            />
             {(state.error || passed.error) && (
               <span className="text-ui text-danger">{state.error ?? passed.error}</span>
             )}

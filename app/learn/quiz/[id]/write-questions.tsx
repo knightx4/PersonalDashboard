@@ -2,9 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { writeQuestions, type WriteQuestionsState } from './actions';
 
 /**
@@ -18,10 +16,14 @@ import { writeQuestions, type WriteQuestionsState } from './actions';
 function WriteButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/quiz/[id]/actions.ts#writeQuestions"
+      what="Cost of writing the questions"
+    >
       {pending ? 'Reading the material…' : `Write ${count} questions`}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -34,10 +36,6 @@ export function WriteQuestions({ quizId, count }: { quizId: string; count: numbe
 
       <div className="flex flex-wrap items-center gap-3">
         <WriteButton count={count} />
-        <PaidHint
-          action="app/learn/quiz/[id]/actions.ts#writeQuestions"
-          what="Cost of writing the questions"
-        />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
         {/* Not an error: material with nothing answerable in it is a normal
             thing to have picked, and the sentence says which piece it was. */}

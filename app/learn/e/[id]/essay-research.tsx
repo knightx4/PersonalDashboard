@@ -3,7 +3,7 @@
 import { useCallback, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { cn } from '@/lib/cn';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
@@ -230,7 +230,7 @@ function Level({
 }) {
   const running = pending === 'running';
   const error = typeof pending === 'object' ? pending.error : null;
-  const label = running ? 'Searching…' : run ? 'Run again' : 'Run';
+  const label = running ? 'Searching…' : run ? 'Search again' : 'Search';
   return (
     <CardSection title={title}>
       {run ? (
@@ -239,18 +239,7 @@ function Level({
         <p className="text-small text-ink-muted">{about}</p>
       )}
       <div className="mt-2 flex items-center justify-end gap-1">
-        {level === 'first' ? (
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#researchEssay:first"
-            what="Cost of a first pass"
-          />
-        ) : (
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#researchEssay:deeper"
-            what="Cost of a deeper pass"
-          />
-        )}
-        <Button
+        <DashAction
           type="button"
           variant="secondary"
           size="sm"
@@ -258,9 +247,16 @@ function Level({
           pending={running}
           onClick={() => onRun(level)}
           aria-label={`${label}: ${title}`}
+          paid={
+            level === 'first'
+              ? 'app/learn/e/[id]/actions.ts#researchEssay:first'
+              : 'app/learn/e/[id]/actions.ts#researchEssay:deeper'
+          }
+          what={level === 'first' ? 'Cost of a first pass' : 'Cost of a deeper pass'}
+          hintFirst
         >
           {label}
-        </Button>
+        </DashAction>
       </div>
       {run && (
         <div aria-busy={running || undefined} className="mt-3">

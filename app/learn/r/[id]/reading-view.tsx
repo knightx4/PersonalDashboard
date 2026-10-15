@@ -1,11 +1,11 @@
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 import Link, { linkVariants } from '@/components/ui/link';
-import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
+import { BadgeCheck, AlertTriangle, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { READING_TABS, type ReadingTab } from '@/lib/learn/tracks/reading-tabs';
@@ -279,11 +279,15 @@ function ReadingTabBody({
             {url ? (
               <form action={openReading} className="flex flex-wrap items-center gap-1">
                 <input type="hidden" name="readingId" value={reading.id} />
-                <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
-                  Open
-                </Button>
-                <PaidHint action="app/learn/r/[id]/actions.ts#openReading" what="Cost of finding the passage" />
+                <DashAction
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  paid="app/learn/r/[id]/actions.ts#openReading"
+                  what="Cost of finding the passage"
+                >
+                  Open at the passage
+                </DashAction>
                 {!verified && (
                   <span className="ml-2 text-small text-ink-muted">Finds the passage on the way, the first time.</span>
                 )}

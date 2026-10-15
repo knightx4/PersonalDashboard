@@ -14,7 +14,6 @@ import {
   GraduationCap,
   Play,
   Sparkle,
-  Sprout,
   Weight,
   X,
 } from 'lucide-react';
@@ -22,6 +21,7 @@ import { CardNotes } from '@/components/learn/card-notes';
 import { TalkThread } from '@/components/talk/talk-thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
@@ -946,47 +946,48 @@ function DeckCard({
                 {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </Button>
             )}
-            {card.kind !== 'research' && (
+            {/* A lesson's track already exists, so testing on it opens the
+                questions written already and costs nothing; a section's
+                starts a subject, which Dash writes. */}
+            {card.kind === 'lesson' && (
               <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
                 <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
-                {testing
-                  ? card.kind === 'lesson'
-                    ? 'Opening the questions…'
-                    : 'Starting a subject…'
-                  : 'Test me on this'}
+                {testing ? 'Opening the questions…' : 'Test me on this'}
               </Button>
             )}
-            {/* A lesson's track already exists, so testing on it costs nothing. */}
             {card.kind === 'section' && (
-              <PaidHint
-                action="app/learn/now/actions.ts#testMeOnCard"
+              <DashAction
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={testMe}
+                pending={testing}
+                paid="app/learn/now/actions.ts#testMeOnCard"
                 what="Cost of starting a subject from this card"
-              />
+              >
+                {testing ? 'Starting a subject…' : 'Test me on this'}
+              </DashAction>
             )}
             {canMakeTrack(card) && (
-              <span className="inline-flex items-center gap-1">
-                <Button
+              made ? (
+                <Button type="button" variant="ghost" size="sm" disabled>
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Subject made
+                </Button>
+              ) : (
+                <DashAction
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={makeTrack}
                   pending={making}
-                  disabled={made !== null || testing}
+                  disabled={testing}
+                  paid="app/learn/now/actions.ts#makeTrackOfCard"
+                  what="Cost of making a subject from this card"
                 >
-                  {made ? (
-                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  )}
-                  {made ? 'Subject made' : making ? 'Making a subject…' : 'Make this a subject'}
-                </Button>
-                {!made && (
-                  <PaidHint
-                    action="app/learn/now/actions.ts#makeTrackOfCard"
-                    what="Cost of making a subject from this card"
-                  />
-                )}
-              </span>
+                  {making ? 'Making a subject…' : 'Make this a subject'}
+                </DashAction>
+              )
             )}
             {/* Decline (plan #1957.3: a card is Dash's pick, so turning it
                 down is Decline) and the two ratings stay on one line, the
@@ -1167,18 +1168,17 @@ function UnitCheckCard({
             />
           </Field>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1">
-              <Button
-                type="button"
-                variant="primary"
-                onClick={check}
-                pending={marking}
-                disabled={response.trim() === ''}
-              >
-                {marking ? 'Marking…' : 'Check my answer'}
-              </Button>
-              <PaidHint action="app/learn/now/actions.ts#answerUnitCheck" what="Cost of marking the answer" />
-            </span>
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={check}
+              pending={marking}
+              disabled={response.trim() === ''}
+              paid="app/learn/now/actions.ts#answerUnitCheck"
+              what="Cost of marking the answer"
+            >
+              {marking ? 'Marking…' : 'Check my answer'}
+            </DashAction>
             <Button type="button" variant="secondary" onClick={onSkip} disabled={marking}>
               Skip
             </Button>
