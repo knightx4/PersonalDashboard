@@ -9,6 +9,7 @@ import { checksFromText } from '@/lib/learn/levels/draft-payload';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { MAX_LEVEL } from '@/lib/learn/levels/model';
 import { approveDraft, mergeDraftInto, settleWanted } from '@/lib/learn/levels/store';
+import { rewriteCell } from '@/lib/learn/levels/store-page';
 
 /**
  * What a draft topic's page does (plan #2138.2): approve it with the checks
@@ -119,4 +120,34 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
   revalidatePath('/learn/topics');
   revalidatePath(`/learn/topics/${input.data.topicId}`);
   redirect(`/learn/topics/${id}`);
+}
+
+export type RewordState = { error?: string; saved?: boolean };
+
+/**
+ * Reword one level of an approved topic by hand (idea b4bb9641). The drafted
+ * wording is kept beside the new one and the level is stamped as reworded;
+ * evidence written before stays, and the page shows it as given before.
+ */
+// latency: pending
+export async function rewordLevel(_prev: RewordState, formData: FormData): Promise<RewordState> {
+  await requireUser();
+  const cellId = Id.safeParse(formData.get('cellId'));
+  const topicId = Id.safeParse(formData.get('topicId'));
+  const text = formData.get('checks');
+  if (!cellId.success || !topicId.success || typeof text !== 'string') {
+    return { error: 'Could not work out which level this was.' };
+  }
+  const read = checksFromText(text);
+  if (!read.ok) return { error: `This level ${read.detail}.` };
+
+  const supabase = await createLearnClient();
+  try {
+    await rewriteCell(supabase, cellId.data, read.checks);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Rewording the level failed.' };
+  }
+
+  revalidatePath(`/learn/topics/${topicId.data}`);
+  return { saved: true };
 }

@@ -5,6 +5,7 @@ import { CheckCircle2, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CheckRow, Textarea } from '@/components/ui/field';
@@ -15,6 +16,7 @@ import {
   addQuestions,
   draftAnswerFromEvidence,
   promoteToCanonical,
+  removeAnswer,
   saveAnswer,
   saveDraftedAnswer,
 } from '../actions';
@@ -370,15 +372,32 @@ export function AnswerCard({
             {answer.timesSeen > 1 && ` · asked ${answer.timesSeen} times`}
           </p>
         </div>
-        {/* Positive rather than the offer hue: an approved answer is a thing
-            done, not a pipeline stage. */}
-        {status === 'approved' && (
-          <CheckCircle2
-            className="size-4 shrink-0 text-positive"
-            strokeWidth={1.75}
-            aria-label="Approved"
-          />
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Positive rather than the offer hue: an approved answer is a thing
+              done, not a pipeline stage. */}
+          {status === 'approved' && (
+            <CheckCircle2
+              className="size-4 shrink-0 text-positive"
+              strokeWidth={1.75}
+              aria-label="Approved"
+            />
+          )}
+          {/* Up here, opposite the question it removes, rather than at the end
+              of the action row, where on a phone it wrapped onto a line alone. */}
+          {!editing && (
+            <ConfirmStep
+              prompt="Take this question off the application? It stays in your bank with its default answer."
+              confirmLabel="Remove"
+              pendingLabel="Removing…"
+              onConfirm={async () => {
+                const result = await removeAnswer(answer.id);
+                if (result.error) throw new Error(result.error);
+              }}
+            >
+              Remove
+            </ConfirmStep>
+          )}
+        </div>
       </div>
 
       {usingCanonical && (

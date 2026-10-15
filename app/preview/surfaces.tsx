@@ -14,6 +14,8 @@ import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouTabEmpty } from '@/app/you/you-tabs';
 import { PlacesView } from '@/app/you/places/places-view';
+import { DetailsView } from '@/app/you/details/details-view';
+import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
 import { PlaceView } from '@/app/you/places/place-view';
 import { PlaceForm } from '@/app/you/places/place-form';
 import type { Place } from '@/lib/you/places';
@@ -156,6 +158,11 @@ import {
   LearnTopicsErrorPreview,
   LearnTopicsLoadingPreview,
   LearnTopicsPreview,
+  LearnTopicPreview,
+  LearnTopicEmptyPreview,
+  LearnTopicQuotesPreview,
+  LearnTopicEditPreview,
+  LearnTopicLoadingPreview,
 } from './learn-topic-surfaces';
 import {
   LearnCourseCheckPreview,
@@ -2775,9 +2782,20 @@ const youPlacesOnMap: Place[] = youPlaces.map((place) => {
   return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
 });
 
+/** Six details filled in, LinkedIn typed without its scheme (plan #2124.2). */
+const youDetails: Details = {
+  phone: '+1 (415) 555-0142',
+  linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+  citizenship: 'United States and Ireland',
+  race: 'White',
+  gender: 'Man',
+  sexuality: 'Straight',
+};
+
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
   { href: '/you/personality', label: 'Personality', icon: 'personality' },
+  { href: '/you/details', label: 'Details', icon: 'details' },
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
@@ -6346,6 +6364,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouTabEmpty tab="insights" />,
   },
   {
+    /* Details (plan #2124.2): the six facts a form asks for, read as a
+     * list, LinkedIn as a link, with the count in the rail. */
+    id: 'you-details',
+    label: 'You · Details, all six set',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} />,
+  },
+  {
+    id: 'you-details-empty',
+    label: 'You · Details, before any are given',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={EMPTY_DETAILS} />,
+  },
+  {
+    /* Edit details turns the list into its six fields in place. Two not set. */
+    id: 'you-details-edit',
+    label: 'You · Details, being edited',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={{ ...youDetails, race: null, sexuality: null }} editing />,
+  },
+  {
+    /* A save that did not go through keeps what was typed and says why. */
+    id: 'you-details-error',
+    label: 'You · Details, a save that did not go through',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <DetailsView
+        details={youDetails}
+        editing
+        state={{
+          error: 'The connection dropped before your details saved. What you typed is still here: press Save to try again.',
+          values: {
+            phone: '+353 87 555 0199',
+            linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+            citizenship: 'United States and Ireland',
+            race: 'White',
+            gender: 'Man',
+            sexuality: '',
+          },
+        }}
+      />
+    ),
+  },
+  {
     /* Places they have lived, newest first, the home they live in now marked (plan #1991.5). */
     id: 'you-places',
     label: 'You · Places, four homes',
@@ -7521,6 +7587,42 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftCommentPreview />,
+  },
+  {
+    /* An approved topic: where you stand on each level (plan #2138.3). */
+    id: 'learn-topic',
+    label: 'Topic · Where you stand on each level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicPreview />,
+  },
+  {
+    id: 'learn-topic-empty',
+    label: 'Topic · Nothing shown yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEmptyPreview />,
+  },
+  {
+    id: 'learn-topic-quotes',
+    label: 'Topic · The answers behind a level, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicQuotesPreview />,
+  },
+  {
+    id: 'learn-topic-edit',
+    label: 'Topic · Rewording a level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEditPreview />,
+  },
+  {
+    id: 'learn-topic-loading',
+    label: 'Topic · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicLoadingPreview />,
   },
   {
     id: 'learn-concept',

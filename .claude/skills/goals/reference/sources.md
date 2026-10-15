@@ -526,6 +526,16 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 - Opens at `/you/personality`
 - kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
 
+### `you.details` (You)
+
+Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.
+
+- Search: `title`, `phone`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
+- Name a row by `title`; link it by `user_id`
+- Scoped to the person by `user_id`, not user_id
+- Opens at `/you/details`
+- A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).
+
 ### `you.places` (You)
 
 The places they have lived, with when they moved in and out.
