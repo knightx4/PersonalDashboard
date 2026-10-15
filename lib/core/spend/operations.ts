@@ -22,8 +22,15 @@ export const SPEND_OPERATIONS = {
     // Matching a posting's requirements against the evidence bank. Opus.
     'match-evidence',
     // Drafting an answer to an application question from the evidence bank.
-    // Opus.
+    // Opus. No longer made since plan #2130.3 sent the per-question Draft
+    // through draft-application; kept so the spend it recorded keeps its name.
     'draft-answer',
+    // Drafting every unanswered question on an application, or the named
+    // ones, from everything on file (plan #2130.3), from Draft all and the
+    // per-question Draft on the Application tab. Opus, one call and at most
+    // one corrective retry for answers over their limit, plus the vault
+    // question's embedding.
+    'draft-application',
     // Dash replying to a comment tagged @dash on a role, and writing the
     // cover letter when the comment asks for one (note 89ad8bef). Sonnet.
     'reply-to-role-comment',

@@ -131,6 +131,28 @@ describe('reading the stored jsonb', () => {
     expect(parseAsks({})).toEqual([]);
   });
 
+  it('keeps the banned constructions and the limit overrun when a draft has them', () => {
+    expect(
+      parseDrafts({
+        a: {
+          answer: 'ok',
+          banned_found: ['leverage'],
+          over_limit: { count: 12, limit: 10, unit: 'words' },
+        },
+        b: { answer: 'ok', banned_found: [], over_limit: { count: 'x', limit: 10, unit: 'words' } },
+      }),
+    ).toEqual({
+      a: {
+        answer: 'ok',
+        evidence_item_ids: [],
+        unsupported_claims: [],
+        banned_found: ['leverage'],
+        over_limit: { count: 12, limit: 10, unit: 'words' },
+      },
+      b: { answer: 'ok', evidence_item_ids: [], unsupported_claims: [] },
+    });
+  });
+
   it('sets, trims and clears replies by ask id', () => {
     const replied = withReplies(ASKS, { a1: '  Finance  ' });
     expect(replied[0].reply).toBe('Finance');

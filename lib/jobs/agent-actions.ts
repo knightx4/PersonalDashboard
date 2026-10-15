@@ -101,6 +101,7 @@ export const jobsActions: ModuleActions = {
     promoteToCanonical: tool('set_default_answer'),
     lookUpJobDescription: none('page'),
     draftAnswerFromEvidence: none('spends'),
+    draftApplication: none('spends'),
     saveDraftedAnswer: tool('save_answer'),
   },
   'app/jobs/(app)/roles/[id]/actions.ts': {
