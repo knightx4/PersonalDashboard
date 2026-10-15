@@ -246,7 +246,7 @@ export const learnSources: ModuleSources = {
       search: ['basis'],
       title: 'basis',
       newest: 'found_at',
-      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with a link that has no held_reason is unlocked (a name match the text is not about is kept with a reason and does not count), and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
     },
     {
       table: 'learn.briefs',
