@@ -18,7 +18,9 @@ import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult 
  * back. An answered row stays on the page until it is next opened.
  *
  * Given `remember`, the list folds away under its heading and stays folded in
- * this browser (note 9b011a39), with the count on the closed line.
+ * this browser (note 9b011a39), with the count on the closed line. A folding
+ * list leaves out `description`, which pushed the first row three lines down
+ * on a phone (law 15).
  */
 export function ReviewList({
   reviews,
@@ -26,6 +28,7 @@ export function ReviewList({
   description,
   showPlan,
   remember,
+  defaultOpen = true,
 }: {
   reviews: readonly DueReview[];
   title: string;
@@ -34,6 +37,8 @@ export function ReviewList({
   showPlan: boolean;
   /** Fold the list under its heading, kept in this browser under this key. */
   remember?: string;
+  /** Open to begin with, for a folding list. The gallery draws it shut. */
+  defaultOpen?: boolean;
 }) {
   if (reviews.length === 0) return null;
   const list = (
@@ -60,7 +65,7 @@ export function ReviewList({
 
   return (
     <Card padding="none" className="mb-4">
-      <FoldDetails remember={remember} defaultOpen className="group/review">
+      <FoldDetails remember={remember} defaultOpen={defaultOpen} className="group/review">
         <summary
           className={cn(
             'press card-pad-x block cursor-pointer list-none py-(--card-p) group-open/review:pb-0',
@@ -77,7 +82,6 @@ export function ReviewList({
             {title}
             <span className="tabular font-normal text-ink-muted">({reviews.length})</span>
           </h2>
-          <p className="mt-1 ml-5.5 hidden text-small text-ink-muted group-open/review:block">{description}</p>
         </summary>
         {list}
       </FoldDetails>

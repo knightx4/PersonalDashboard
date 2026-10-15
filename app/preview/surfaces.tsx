@@ -5162,6 +5162,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReviewListSurface />,
   },
   {
+    /* The same list folded shut: one line, the chevron, Due for review and
+     * the count (note 9b011a39). */
+    id: 'learn-review-list-folded',
+    label: 'Now · Due for review, folded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface folded />,
+  },
+  {
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',

@@ -53,9 +53,10 @@ const REVIEWS: DueReview[] = [
   },
 ];
 
-export function LearnReviewListSurface() {
+export function LearnReviewListSurface({ folded = false }: { folded?: boolean }) {
   return (
     <ReviewList
+      defaultOpen={!folded}
       reviews={REVIEWS}
       title="Due for review"
       remember="preview.learn.fold.reviews"
