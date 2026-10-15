@@ -4014,6 +4014,17 @@ form[data-auto-submit] [data-fallback-submit] {
   backdrop-filter: blur(18px) saturate(1.6);
 }
 
+/* The blur makes every sheet a stacking context, so a popover hanging out of
+ * one (the $ beside "Draft an answer") was painted under the next card down
+ * however high its own z-index (note c2a9f8ee). A sheet holding an open
+ * popover is lifted above its siblings for as long as the popover is open.
+ * A sheet that is already positioned keeps its own position and layer. */
+[data-theme='aurora'] .sheet:has(.popover-panel):not([class*='fixed'], [class*='absolute'], [class*='sticky']),
+[data-theme='dawn'] .sheet:has(.popover-panel):not([class*='fixed'], [class*='absolute'], [class*='sticky']) {
+  position: relative;
+  z-index: var(--z-menu);
+}
+
 /* A sheet inside a sheet is already behind one blur; a second only greys it. */
 [data-theme='aurora'] .sheet .sheet,
 [data-theme='dawn'] .sheet .sheet {
