@@ -63,6 +63,15 @@ export function surveyShare(fields: readonly SurveyField[]): number {
 }
 
 /**
+ * The survey's share with the goals-only setting applied (plan #2164.1): none
+ * while `learn.settings.goals_only` is on, so no question is about a vault
+ * subject, and `surveyShare` otherwise.
+ */
+export function surveyShareFor(fields: readonly SurveyField[], goalsOnly: boolean): number {
+  return goalsOnly ? 0 : surveyShare(fields);
+}
+
+/**
  * Which of the next `wanted` questions are survey questions, in order.
  *
  * `recent` says, newest first, whether each of the flow's latest questions was

@@ -11,6 +11,7 @@ import {
   SURVEY_MOST,
   fieldsWrittenAbout,
   surveyShare,
+  surveyShareFor,
   surveySlots,
   type SurveyField,
 } from './rate';
@@ -41,6 +42,19 @@ describe('surveyShare', () => {
     expect(surveyShare([field(1), field(1)])).toBeCloseTo(SURVEY_MOST);
     expect(surveyShare([field(1), field(FEW)])).toBeCloseTo(0.35);
     expect(surveyShare([field(FEW), field(FEW + 4)])).toBeCloseTo(SURVEY_LEAST);
+  });
+});
+
+describe('surveyShareFor', () => {
+  it('is zero with goals only on, so no flow question is about a vault subject (plan #2164.1)', () => {
+    expect(surveyShareFor([field(0)], true)).toBe(0);
+    expect(flowSlots([], { goal: GOAL_SHARE, survey: surveyShareFor([field(0)], true) }, 9)).not.toContain(
+      'survey',
+    );
+  });
+
+  it('is the survey share with it off', () => {
+    expect(surveyShareFor([field(0)], false)).toBe(SURVEY_MOST);
   });
 });
 

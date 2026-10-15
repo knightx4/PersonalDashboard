@@ -248,6 +248,13 @@ describe('takeWaiting for Goals only and one goal', () => {
     expect(taken).toEqual(['p1']);
   });
 
+  it('passes over a waiting survey question with the goals-only setting on (plan #2164.1)', async () => {
+    const { client, taken } = fakeClient([row('p3', 's3'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null, noSurvey: true });
+    expect(question?.probeId).toBe('p2');
+    expect(taken).toEqual(['p2']);
+  });
+
   it('finds nothing for Goals only when only other questions wait', async () => {
     const { client, taken } = fakeClient([row('p2', 'c2'), row('p3', 's3')], homes);
     expect(await takeWaiting(client, { resume: false, track: null, goalsOnly: true })).toBeNull();
