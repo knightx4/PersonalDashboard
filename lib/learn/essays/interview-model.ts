@@ -80,5 +80,7 @@ export async function askNextQuestion(input: {
     .map((part) => (part.type === 'text' ? part.text : ''))
     .join(' ');
   const ask = usableAsk(text);
-  return ask ? { ok: true, ask } : { ok: false, detail: 'The question came back in a form the interview does not use.' };
+  return ask
+    ? { ok: true, ask }
+    : { ok: false, detail: 'The question came back in a form the interview does not use.' };
 }

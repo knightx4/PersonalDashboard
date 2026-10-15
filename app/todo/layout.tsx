@@ -1,5 +1,6 @@
 import { loadTodoBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Shell for the todo workspace.
@@ -23,13 +24,7 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
      * what is finished. Anything another section would answer is probably a
      * filter on one of these.
      */
-    sections: [
-      { href: '/todo', label: 'Now', icon: 'agenda', exact: true },
-      { href: '/todo/inbox', label: 'Inbox', icon: 'inbox' },
-      { href: '/todo/waiting', label: 'Waiting', icon: 'waiting' },
-      { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
-      { href: '/todo/all', label: 'All', icon: 'tasks' },
-    ],
+    sections: ({ owner }) => tabsFor('todo', owner),
     settingsHref: '/todo/settings',
     settingsLabel: 'Todo settings',
     brief: ({ user, settings }) => loadTodoBrief(user.id, settings.timezone),

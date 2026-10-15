@@ -17,7 +17,8 @@ import { useCapture } from '@/components/shell/capture';
 import { useAskDash } from '@/components/shell/ask-dash';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
-import { MODULES, type ModuleId } from '@/lib/modules';
+import { MODULES, switchableModules, type ModuleId } from '@/lib/modules';
+import { tabsFor, type TabWorkspace } from '@/lib/shell/tabs';
 import { rememberedPath, visibleModules } from '@/components/shell/workspace-switcher';
 import {
   COLOURWAYS,
@@ -330,6 +331,7 @@ export function useSearchRows({
   scope,
   sections,
   enabledModules,
+  isOwner = false,
   theme,
   query,
   active,
@@ -351,6 +353,13 @@ export function useSearchRows({
   scope: SearchScope;
   sections: readonly NavSection[];
   enabledModules?: readonly ModuleId[];
+  /**
+   * Whether this is the app's owner, which decides whose tabs the list may
+   * offer from other workspaces: Dev's, and Learn's Videos, are the owner's
+   * alone. Omitted means not the owner, which offers a tab too few rather
+   * than one that refuses you.
+   */
+  isOwner?: boolean;
   /** What is on screen now, so a colour can be applied to the mode you are in. */
   theme: Theme;
   /** What has been typed. Trimmed here, so a caller passes the field as it is. */
@@ -426,6 +435,39 @@ export function useSearchRows({
     // everything leaves the list as it was.
     return commandsInScope(all, scope);
   }, [sections, module, enabledModules, router, theme, scope]);
+
+  /**
+   * Every other workspace's tabs, for a list somebody has typed into (plan
+   * #2208.4).
+   *
+   * From lib/shell/tabs.ts, so typing "ideas" from Jobs finds Dev's Ideas tab
+   * and Enter opens it. Home's tabs and those of every workspace switched on
+   * for this account, Dev's only for the owner, and each row marked with the
+   * workspace that owns it so the scope chip narrows it like any other row.
+   *
+   * After the rest of the commands, so on equal points a tab of the workspace
+   * you are standing in, which `sections` already lists, comes first. A tab
+   * `sections` already lists is not listed again. Left out of the opening
+   * list, which stays where you can go from here.
+   */
+  const elsewhere = useMemo<SearchCommand[]>(() => {
+    const here = new Set(sections.map((section) => section.href));
+    const owners: TabWorkspace[] = ['home', ...switchableModules(enabledModules, isOwner)];
+    const all = owners.flatMap((workspace) =>
+      tabsFor(workspace, isOwner)
+        .filter((tab) => !here.has(tab.href))
+        .map((tab) => ({
+          id: `section:${tab.href}`,
+          label: tab.label,
+          // The mark says whose tab it is. Naming the workspace in the hint
+          // as well would make typing a workspace's name list all its tabs.
+          hint: 'Go to',
+          module: workspace === 'home' ? null : workspace,
+          run: () => router.push(tab.href),
+        })),
+    );
+    return commandsInScope(all, scope);
+  }, [sections, enabledModules, isOwner, router, scope]);
 
   /**
    * The things you can make, when what you typed names one.
@@ -528,8 +570,8 @@ export function useSearchRows({
         .slice(0, 8)
         .map((command) => ({ command, points: Number.POSITIVE_INFINITY }));
     }
-    return rankCommands({ commands, captures, query: query.trim() });
-  }, [captures, commands, query, startable, emptyShows, workspaces]);
+    return rankCommands({ commands: [...commands, ...elsewhere], captures, query: query.trim() });
+  }, [captures, commands, elsewhere, query, startable, emptyShows, workspaces]);
 
   const needle = query.trim();
   const { hits, looking, reset } = useSearchHits({ account, scope, query, active });

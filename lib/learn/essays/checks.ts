@@ -110,7 +110,7 @@ export const ESSAY_CHECKS: readonly EssayCheck[] = [
     scope: 'each',
     blurb: 'Where the essay repeats or contradicts your own notes.',
     instruction:
-      'Compare this paragraph with the writer\'s own notes given below it. Raise a problem only if the paragraph ' +
+      "Compare this paragraph with the writer's own notes given below it. Raise a problem only if the paragraph " +
       'contradicts something a note says, or repeats a note so closely that the writer should link to it or ' +
       'build on it. Name the note by its number. Quote the sentence concerned.',
   },
@@ -300,10 +300,13 @@ export type NoteState = {
 };
 
 /** Checks the person has dismissed twice in this essay, which do not run on it again. */
-export function stoppedChecks(notes: readonly Pick<NoteState, 'checkName' | 'status'>[]): Set<string> {
+export function stoppedChecks(
+  notes: readonly Pick<NoteState, 'checkName' | 'status'>[],
+): Set<string> {
   const counts = new Map<string, number>();
   for (const note of notes) {
-    if (note.status === 'dismissed') counts.set(note.checkName, (counts.get(note.checkName) ?? 0) + 1);
+    if (note.status === 'dismissed')
+      counts.set(note.checkName, (counts.get(note.checkName) ?? 0) + 1);
   }
   return new Set([...counts].filter(([, n]) => n >= DISMISSALS_TO_STOP).map(([id]) => id));
 }
@@ -313,8 +316,14 @@ export function stoppedChecks(notes: readonly Pick<NoteState, 'checkName' | 'sta
  * has already raised a note on, whatever became of it, so a run repeated
  * after a dismissal does not raise the same note again.
  */
-export function freshFindings(check: string, found: readonly Finding[], notes: readonly NoteState[]): Finding[] {
-  const seen = new Set(notes.filter((note) => note.checkName === check).map((note) => note.quote.trim()));
+export function freshFindings(
+  check: string,
+  found: readonly Finding[],
+  notes: readonly NoteState[],
+): Finding[] {
+  const seen = new Set(
+    notes.filter((note) => note.checkName === check).map((note) => note.quote.trim()),
+  );
   const out: Finding[] = [];
   for (const finding of found) {
     const key = finding.anchor.quote.trim();
@@ -355,4 +364,3 @@ export function bodyAt(ladder: readonly string[], rung: number): string {
 export function nextRung(rung: number): number | null {
   return rung < 3 ? rung + 1 : null;
 }
-

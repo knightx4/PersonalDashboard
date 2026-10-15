@@ -1,4 +1,10 @@
-import { BRIEF_FIELDS, type BriefField, type EssayBrief, type EssayPin, type PinKind } from './model';
+import {
+  BRIEF_FIELDS,
+  type BriefField,
+  type EssayBrief,
+  type EssayPin,
+  type PinKind,
+} from './model';
 
 /**
  * The short interview a new essay opens with (plan #1867;
@@ -120,7 +126,9 @@ export function askNumber(field: BriefField): string {
 }
 
 function stored(raw: unknown): Record<string, unknown> {
-  return raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
+  return raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? { ...(raw as Record<string, unknown>) }
+    : {};
 }
 
 /** An answer as it is kept: trimmed, and cut at the limit. */
@@ -142,7 +150,9 @@ export function answeredBrief(
   const brief = stored(raw);
   const kept = cleanAnswer(answer);
   if (kept) brief[field] = kept;
-  brief.interview = next ? { status: 'asking', field: next.field, ask: next.ask } : { status: 'done' };
+  brief.interview = next
+    ? { status: 'asking', field: next.field, ask: next.ask }
+    : { status: 'done' };
   return brief;
 }
 
@@ -152,7 +162,11 @@ export function skippedBrief(raw: unknown): Record<string, unknown> {
 }
 
 /** The brief after one field is edited in place. */
-export function editedBrief(raw: unknown, field: BriefField, value: string): Record<string, unknown> {
+export function editedBrief(
+  raw: unknown,
+  field: BriefField,
+  value: string,
+): Record<string, unknown> {
   return { ...stored(raw), [field]: cleanAnswer(value) };
 }
 

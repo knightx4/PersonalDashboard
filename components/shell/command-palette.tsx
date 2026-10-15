@@ -46,6 +46,7 @@ export function CommandPalette({
   module,
   sections,
   enabledModules,
+  isOwner = false,
   theme,
   open,
   opensOn = 'everything',
@@ -57,6 +58,8 @@ export function CommandPalette({
   module: ModuleId | null;
   sections: readonly NavSection[];
   enabledModules?: readonly ModuleId[];
+  /** Whether this is the app's owner, for which other workspaces' tabs it lists. */
+  isOwner?: boolean;
   /** What is on screen now, so a colour can be applied to the mode you are in. */
   theme: Theme;
   /** Whether the box is up. Held by the shell, which holds every way in. */
@@ -108,6 +111,7 @@ export function CommandPalette({
     scope,
     sections,
     enabledModules,
+    isOwner,
     theme,
     query,
     active: open,

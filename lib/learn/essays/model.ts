@@ -127,7 +127,9 @@ function text(value: unknown): string {
 }
 
 function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function readPins(value: unknown): EssayPin[] {
@@ -159,10 +161,12 @@ export function readBrief(value: unknown): EssayBrief {
 /** The interview from the brief's jsonb; null when there is none or it is not one this code wrote. */
 export function readInterview(value: unknown): EssayInterview | null {
   const interview = object(object(value).interview);
-  if (interview.status === 'done' || interview.status === 'skipped') return { status: interview.status };
+  if (interview.status === 'done' || interview.status === 'skipped')
+    return { status: interview.status };
   if (interview.status !== 'asking') return null;
   const field = interview.field;
-  if (typeof field !== 'string' || !(BRIEF_FIELDS as readonly string[]).includes(field)) return null;
+  if (typeof field !== 'string' || !(BRIEF_FIELDS as readonly string[]).includes(field))
+    return null;
   if (!text(interview.ask).trim()) return null;
   return { status: 'asking', field: field as BriefField, ask: text(interview.ask) };
 }
@@ -269,7 +273,9 @@ export function parseWordTarget(input: string): { target: number | null } | { er
   if (!/^\d+$/.test(trimmed)) return { error: 'Write the target as a number of words.' };
   const target = Number(trimmed);
   if (target < WORD_TARGET_MIN || target > WORD_TARGET_MAX) {
-    return { error: `A target is between ${WORD_TARGET_MIN} and ${formatNumber(WORD_TARGET_MAX)} words.` };
+    return {
+      error: `A target is between ${WORD_TARGET_MIN} and ${formatNumber(WORD_TARGET_MAX)} words.`,
+    };
   }
   return { target };
 }

@@ -1,4 +1,5 @@
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Shell for the You workspace (plan #1991): what is true about you.
@@ -11,13 +12,7 @@ import { shellFor } from '@/lib/shell/shell-for';
 export default async function YouLayout({ children }: { children: React.ReactNode }) {
   return shellFor({
     module: 'you',
-    sections: [
-      { href: '/you/personality', label: 'Personality', icon: 'personality' },
-      { href: '/you/details', label: 'Details', icon: 'details' },
-      { href: '/you/places', label: 'Places', icon: 'places' },
-      { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
-      { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-    ],
+    sections: ({ owner }) => tabsFor('you', owner),
     children,
   });
 }

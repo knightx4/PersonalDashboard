@@ -15,7 +15,7 @@
  */
 
 /** Which row a comment is about. */
-export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec', 'takeaway', 'change'] as const;
+export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec', 'takeaway', 'change', 'post'] as const;
 export type CommentTarget = (typeof COMMENT_TARGETS)[number];
 
 export function isCommentTarget(value: string): value is CommentTarget {
@@ -35,6 +35,7 @@ export const TARGET_COLUMN: Record<
   | 'spec_section_id'
   | 'inspiration_takeaway_id'
   | 'spec_change_id'
+  | 'social_post_id'
 > = {
   idea: 'idea_id',
   step: 'plan_item_id',
@@ -45,6 +46,9 @@ export const TARGET_COLUMN: Record<
   takeaway: 'inspiration_takeaway_id',
   // A proposed change to a spec (plan #1507, migration 0156).
   change: 'spec_change_id',
+  // An X post draft (plan #2202.2). Its thread began in the shared store, so
+  // dev_comments never had this column: it is only the key the fold reads.
+  post: 'social_post_id',
 };
 
 /** The page each target is read on, which is what a write has to revalidate. */
@@ -60,6 +64,7 @@ export const TARGET_PATH: Record<CommentTarget, string> = {
   spec: '/dev/specs',
   takeaway: '/dev/inspiration',
   change: '/dev/specs',
+  post: '/dev/posts',
 };
 
 /**

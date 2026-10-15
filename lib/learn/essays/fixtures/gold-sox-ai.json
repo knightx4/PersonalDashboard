@@ -1,0 +1,69 @@
+{
+  "question": "How to think about applying a SOX ICFR control mindset to practical AI usage within an organization, such as a Finance function",
+  "built": "2026-10-15",
+  "sources": [
+    {
+      "id": "coso-genai-2026",
+      "name": "COSO, Achieving Effective Internal Control Over Generative AI (Feb 2026)",
+      "why": "The standard-setter's own answer to the question: adapts the 17 COSO principles to generative AI instead of a separate framework, treats AI output as assertions needing evidence, and asks for preventive, detective and corrective controls.",
+      "match": [["coso.org", "generative"], ["coso.org", "719ba0_ef4dbc255331406e95faf46e7a9e3a1c"], ["achieving effective internal control over generative ai"]]
+    },
+    {
+      "id": "pcaob-genai-spotlight",
+      "name": "PCAOB staff Spotlight on generative AI (Jul 2024)",
+      "why": "The only regulator view on how preparers and auditors use GenAI: augment not replace, same diligence in review, black-box and inconsistent output limit reperformance.",
+      "match": [["pcaobus.org", "generative"], ["pcaobus.org", "-ai"], ["pcaob", "spotlight", "ai"]]
+    },
+    {
+      "id": "nist-ai-rmf",
+      "name": "NIST AI RMF 1.0 (AI 100-1) and Generative AI Profile (AI 600-1)",
+      "why": "The main AI-specific framework, the writer's own 'better framework' objection; defines automation bias and warns that confabulated citations mislead reviewers.",
+      "match": [["nist", "ai.100-1"], ["nist", "ai.600-1"], ["nist.gov", "ai-risk-management"], ["nist", "ai rmf"], ["nist", "artificial intelligence risk management framework"]]
+    },
+    {
+      "id": "automation-bias",
+      "name": "Peer-reviewed research on automation bias (e.g. Parasuraman & Manzey 2010)",
+      "why": "Evidence that a human in the loop can rubber-stamp automated output, which tests the writer's human-in-the-loop point head on.",
+      "match": [["0018720810376055"], ["parasuraman"], ["automation bias", "doi.org"], ["automation bias", "journal"]]
+    },
+    {
+      "id": "sr-26-2",
+      "name": "Fed/OCC/FDIC SR 26-2 on model risk management (Apr 2026)",
+      "why": "Replaced SR 11-7 and says generative and agentic AI are outside its scope, which bears directly on whether model-risk practice covers GenAI in finance.",
+      "match": [["federalreserve.gov", "sr2602"], ["sr 26-2"], ["sr26-2"]]
+    },
+    {
+      "id": "caq-ac-genai",
+      "name": "CAQ, Audit Committee Oversight in the Age of GenAI (2024)",
+      "why": "What the audit committee, the CFO office's overseer, is told to ask about GenAI in financial reporting.",
+      "match": [["thecaq.org", "genai"], ["thecaq.org", "-ai"], ["center for audit quality", "genai"]]
+    },
+    {
+      "id": "coso-ai-2021",
+      "name": "COSO, Realize the Full Potential of Artificial Intelligence (2021)",
+      "why": "COSO's enterprise-risk view of AI, which covers the operational decisions the writer wants in scope beyond financial reporting.",
+      "match": [["coso.org", "3059fc_e17fdcd298924d4ca4df1a4b453b4135"], ["realize the full potential of artificial intelligence"]]
+    },
+    {
+      "id": "iia-ai-framework",
+      "name": "IIA Artificial Intelligence Auditing Framework (2024)",
+      "why": "Internal audit's view; useful on SDLC, change management and segregation of duties, but generic for a CFO-office reader.",
+      "match": [["theiia.org", "ai-auditing-framework"], ["theiia.org", "artificial-intelligence"]],
+      "optional": true
+    },
+    {
+      "id": "reason-swiss-cheese",
+      "name": "Reason, Human error: models and management (BMJ 2000)",
+      "why": "The origin of the Swiss cheese model the writer uses for preventive and detective layers.",
+      "match": [["pmc1117770"], ["human error: models and management"]],
+      "optional": true
+    },
+    {
+      "id": "sr-11-7",
+      "name": "SR 11-7 Supervisory Guidance on Model Risk Management (2011), rescinded Apr 2026",
+      "why": "Rescinded and replaced by SR 26-2; citing it as current guidance is an error.",
+      "match": [["sr1107"], ["sr 11-7"], ["sr11-7"], ["fil17022"]],
+      "stale": true
+    }
+  ]
+}

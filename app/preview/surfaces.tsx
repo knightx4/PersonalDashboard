@@ -220,14 +220,9 @@ import {
   LearnEssayResearchSurface,
   LearnEssayFinishSurface,
   LearnEssayPublishSurface,
-  LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
-  LearnEssayDiscoverSurface,
-  LearnEssayResearchMapSurface,
-  LearnEssayPlanSurface,
-  LearnEssayStructureSurface,
-  LearnEssayDevelopSurface,
-  LearnEssayWritePlanSurface,
+  LearnEssayNotesMapSurface,
+  LearnEssayDraftFromNotesSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectConversationsSurface,
@@ -367,11 +362,13 @@ import {
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
 import {
+  PostsCommentSurface,
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
   PostsSendSurface,
   PostsSurface,
+  PostsThreadSurface,
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
@@ -6504,6 +6501,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsSendSurface />,
   },
   {
+    /* Comments on a draft (plan #2202.2): a waiting draft Dash shortened
+     * when tagged, with an untagged note under it, and a posted one whose
+     * tagged comment Dash marked seen. */
+    id: 'dev-posts-thread',
+    label: 'Dev · Posts, comments on a draft',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsThreadSurface />,
+  },
+  {
+    /* Add a comment pressed on a draft with no thread: the box open. */
+    id: 'dev-posts-comment',
+    label: 'Dev · Posts, writing a comment',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsCommentSurface />,
+  },
+  {
     /* Home's Inbox (plan #1937.7), which took the bell's place: every
      * workspace's on-you rows, grouped under each workspace's mark. Fixtures
      * in home-inbox-surfaces.tsx. */
@@ -8402,59 +8417,24 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'learn-essay-interview',
-    label: 'Essay · Interview opening on a finished goal',
+    label: 'Essay · A new essay on an empty notes page',
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayInterviewSurface />,
   },
   {
-    id: 'learn-essay-interview-later',
-    label: 'Essay · Interview, fourth question',
+    id: 'learn-essay-notes-map',
+    label: 'Essay · Notes with Dash’s map beside them',
     module: 'learn',
     width: 'page',
-    render: () => <LearnEssayInterviewLaterSurface />,
+    render: () => <LearnEssayNotesMapSurface />,
   },
   {
-    id: 'learn-essay-discover',
-    label: 'Essay · Discover, with Dash’s read of the brief',
+    id: 'learn-essay-draft-from-notes',
+    label: 'Essay · Draft view with Assemble and the model draft',
     module: 'learn',
     width: 'page',
-    render: () => <LearnEssayDiscoverSurface />,
-  },
-  {
-    id: 'learn-essay-research-map',
-    label: 'Essay · Research step, the question mapped',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayResearchMapSurface />,
-  },
-  {
-    id: 'learn-essay-plan',
-    label: 'Essay · Plan, thesis and points',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayPlanSurface />,
-  },
-  {
-    id: 'learn-essay-structure',
-    label: 'Essay · Structure, shapes offered',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayStructureSurface />,
-  },
-  {
-    id: 'learn-essay-develop',
-    label: 'Essay · Develop, a question about one point',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayDevelopSurface />,
-  },
-  {
-    id: 'learn-essay-write-plan',
-    label: 'Essay · Write, with the plan beside an empty draft',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayWritePlanSurface />,
+    render: () => <LearnEssayDraftFromNotesSurface />,
   },
   {
     id: 'learn-plan-finished',

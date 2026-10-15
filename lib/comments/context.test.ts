@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askMessage, ideaContext, noteContext, raiseContext, specChangeContext, threadText } from './context';
+import { askMessage, ideaContext, noteContext, postContext, raiseContext, specChangeContext, threadText } from './context';
 import type { DevComment } from './load';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
@@ -176,5 +176,30 @@ describe('specChangeContext', () => {
     const text = specChangeContext({ ...change, sections: [{ heading: 'Long', body }] });
     expect(text.length).toBeLessThan(14000);
     expect(text).toContain('left out for length');
+  });
+});
+
+describe('postContext', () => {
+  it('numbers a thread and shows the first draft only once the text has changed', () => {
+    const text = postContext({
+      angle: 'The gate keeps main green',
+      status: 'suggested',
+      body: ['One.', 'Two.'],
+      draft: ['One, longer.', 'Two.'],
+      images: 1,
+      onX: 0,
+    });
+    expect(text).toContain('# An X post draft — The gate keeps main green');
+    expect(text).toContain('Status: suggested');
+    expect(text).toContain('Pictures: 1');
+    expect(text).toContain('1/2: One.');
+    expect(text).toContain('## As Dash first drafted it');
+    expect(text).toContain('1/2: One, longer.');
+  });
+
+  it('leaves the first draft out when it is the text', () => {
+    const text = postContext({ angle: 'A', status: 'posted', body: ['Same.'], draft: ['Same.'], images: 0, onX: 0 });
+    expect(text).not.toContain('As Dash first drafted it');
+    expect(text).toContain('\nSame.\n');
   });
 });

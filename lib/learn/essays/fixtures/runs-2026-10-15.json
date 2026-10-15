@@ -1,0 +1,27 @@
+{
+  "note": "The sources of the two real research runs on the test essay, as stored in learn.essay_research on 15 October 2026. Raw responses were not kept before migration learn 0133.",
+  "runs": [
+    {
+      "at": "2026-10-15T05:36",
+      "design": "one Haiku call, positions",
+      "sources": [
+        { "url": "https://pitechsol.com/blog/ai-finance-sox-controls-auditability/", "title": "AI in finance: SOX controls and auditability" },
+        { "url": "https://www.finrep.ai/blog/sox-and-ai-controls-the-governance-framework-for-2026", "title": "SOX and AI controls: the governance framework for 2026" },
+        { "url": "https://airia.com/blog/what-is-an-ai-risk-framework/", "title": "What is an AI risk framework" },
+        { "url": "https://cyberriskinstitute.org/artificial-intelligence-risk-management/", "title": "Financial Services AI Risk Management Framework" },
+        { "url": "https://home.treasury.gov/news/press-releases/sb0401", "title": "Treasury press release" },
+        { "url": "https://pluvo.io/blog/ai-sox-compliance-controlled-processes", "title": "AI SOX compliance in controlled processes" },
+        { "url": "https://weaver.com/resources/second-line-ready-how-to-use-ai-in-sox-compliance-without-over-complicating-it/", "title": "Second line ready: how to use AI in SOX compliance" }
+      ]
+    },
+    {
+      "at": "2026-10-15T14:02",
+      "design": "frame, read five pages, write",
+      "sources": [
+        { "url": "https://dart.deloitte.com/USDART/home/publications/deloitte/heads-up/2026/coso-internal-controls-generative-ai", "title": "Heads Up: COSO internal controls for generative AI" },
+        { "url": "https://link.springer.com/article/10.1007/s43681-026-01147-7", "title": "Meaningful human oversight of AI" },
+        { "url": "https://www.journalofaccountancy.com/news/2026/feb/coso-creates-audit-ready-guidance-for-governing-generative-ai/", "title": "COSO creates audit-ready guidance for governing generative AI" }
+      ]
+    }
+  ]
+}

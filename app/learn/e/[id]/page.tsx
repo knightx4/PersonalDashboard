@@ -5,7 +5,6 @@ import { loadEssay } from '@/lib/learn/essays/store';
 import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
 import { loadEssayResearch } from '@/lib/learn/essays/research-store';
 import { EssayView } from './essay-view';
-import { readStage } from '@/lib/learn/essays/plan';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 
@@ -38,10 +37,11 @@ export default async function EssayPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stage?: string | string[] }>;
+  searchParams: Promise<{ view?: string | string[] }>;
 }) {
   const essay = await read((await params).id);
-  const asked = (await searchParams).stage;
+  const asked = (await searchParams).view;
+  const view = Array.isArray(asked) ? asked[0] : asked;
   if (!essay) notFound();
   const [notes, research] = await Promise.all([
     readNotes(essay.id, essay.draftBody),
@@ -52,7 +52,7 @@ export default async function EssayPage({
       essay={essay}
       notes={notes}
       research={research}
-      initialStage={readStage(Array.isArray(asked) ? asked[0] : asked)}
+      initialView={view === 'notes' || view === 'draft' ? view : null}
       path={await rowSubject(toRef('learn.essays', essay.id))}
     />
   );

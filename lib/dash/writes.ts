@@ -31,6 +31,7 @@ import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 import { VAULT_WRITE_TOOLS } from './vault-writes';
 import { JOBS_WRITE_TOOLS } from './jobs-writes';
 import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
+import { POST_WRITE_TOOLS } from './post-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -100,6 +101,8 @@ import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
  *                    an email in Jobs review (plan #1894.6.4.3).
  *   add_interview_round  a round on a role, with its first interview
  *                    (lib/dash/interview-writes.ts, plan #2044.1).
+ *   rewrite_post     the text of a post draft on the Posts tab in Dev
+ *                    rewritten (lib/dash/post-writes.ts, plan #2202.1).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1185,6 +1188,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...JOBS_WRITE_TOOLS,
   // A round on a role (plan #2044.1).
   ...INTERVIEW_WRITE_TOOLS,
+  // A post draft's text (plan #2202.1).
+  ...POST_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */
