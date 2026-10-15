@@ -1,6 +1,7 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loggableContent } from './evidence';
-import type { Stage } from './plan';
+/** Where an event happened: the notes or the draft, or one of the six stages on older rows. */
+export type EssayView = 'notes' | 'draft';
 
 /**
  * Writes on `learn.essay_log` (migration learn 0133): the stages opened, for
@@ -13,7 +14,7 @@ export async function logEssayStageVisit(
   supabase: LearnSupabaseClient,
   userId: string,
   essayId: string,
-  stage: Stage,
+  stage: EssayView,
 ): Promise<void> {
   const { error } = await supabase
     .from('essay_log')
@@ -26,7 +27,7 @@ export async function logEssayCall(
   userId: string,
   essayId: string,
   call: {
-    stage: Stage;
+    stage: EssayView;
     action: string;
     model: string;
     prompt: string;

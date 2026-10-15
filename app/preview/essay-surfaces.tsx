@@ -8,7 +8,8 @@ import { PlanSection } from '@/app/learn/s/[id]/plan';
 import { ChatLearningSection } from '@/app/learn/s/[id]/chat-learning';
 import { openingAsk } from '@/lib/learn/essays/interview';
 import type { Essay, EssayPin, EssaySummary } from '@/lib/learn/essays/model';
-import type { EssayPlan, Shape } from '@/lib/learn/essays/plan';
+import { EMPTY_PLAN } from '@/lib/learn/essays/plan';
+import type { NoteMap } from '@/lib/learn/essays/notebook';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
@@ -278,7 +279,7 @@ export function LearnEssaySurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={essay}
         study={STUDY_FOUND}
         path={sectionSubject('/learn/essays', 'Essays', {
@@ -461,7 +462,7 @@ export function LearnEssayResearchSurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={essay}
         study={STUDY_WAITING}
         research={{ first: firstPass, deeper: deeperPass }}
@@ -478,7 +479,7 @@ export function LearnEssayStudyEmptySurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={{ ...essay, brief: { ...essay.brief, pinned: [] } }}
         study={{ kind: 'found', items: [], searched: true, indexed: false }}
       />
@@ -495,7 +496,7 @@ export function LearnEssayFinishSurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={{ ...essay, finishedAt: '2026-10-12T15:00:00Z', unsaved: false }}
         study={STUDY_WAITING}
         finishStage="seedling"
@@ -539,7 +540,7 @@ export function LearnEssayPublishSurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={{
           ...essay,
           finishedAt: '2026-10-12T15:00:00Z',
@@ -558,7 +559,7 @@ export function LearnEssayPublishSurface() {
 export function LearnEssayChangedSurface() {
   return (
     <EssayView
-      initialStage="write"
+      initialView="draft"
       essay={essay}
       initialVault={{ kind: 'failed', reason: 'changed', error: ESSAY_VAULT_ERRORS.changed }}
       study={STUDY_WAITING}
@@ -568,7 +569,7 @@ export function LearnEssayChangedSurface() {
 
 /** The brief unfolded above the draft (plan #1867), with an answer long enough to wrap. */
 export function LearnEssayBriefSurface() {
-  return <EssayView initialStage="write" essay={essay} briefOpen study={STUDY_WAITING} />;
+  return <EssayView initialView="draft" essay={essay} briefOpen study={STUDY_WAITING} />;
 }
 
 // The first paragraph, so the suggestion is inside a phone's first screen,
@@ -582,7 +583,7 @@ export function LearnEssayRephraseSurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={essay}
         initialSuggestion={{
           from: objectionAt,
@@ -678,7 +679,7 @@ export function LearnEssayNotesSurface() {
   return (
     <WithCosts>
       <EssayView
-        initialStage="write"
+        initialView="draft"
         essay={essay}
         notes={essayNotes}
         initialNoteOpen={COUNTERPOINT_ID}
@@ -692,7 +693,7 @@ export function LearnEssayNotesSurface() {
 export function LearnEssayMarksSurface() {
   return (
     <WithCosts>
-      <EssayView initialStage="write" essay={essay} initialAskMarks study={STUDY_WAITING} />
+      <EssayView initialView="draft" essay={essay} initialAskMarks study={STUDY_WAITING} />
     </WithCosts>
   );
 }
@@ -720,64 +721,10 @@ const blank: Essay = {
   updatedAt: '2026-10-12T15:00:00Z',
 };
 
-/** "Write about this" on a finished goal: the interview opens naming it (plan #1867). */
+/** "Write about this" on a finished goal: a new essay opens on an empty notes page. */
 export function LearnEssayInterviewSurface() {
-  return <EssayView essay={blank} study={STUDY_WAITING} />;
+  return <EssayView essay={blank} initialView="notes" planFrozen study={STUDY_WAITING} />;
 }
-
-/** Three answers in, on the fourth question as Dash worded it. */
-export function LearnEssayInterviewLaterSurface() {
-  return (
-    <WithCosts>
-      <EssayView
-        essay={{
-          ...blank,
-          brief: {
-            ...blank.brief,
-            question:
-              'Why does a quarter-point rate rise move house prices more than it moves anything else?',
-            claim:
-              'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment.',
-            reader: 'My sister, who is buying her first flat next spring',
-          },
-          interview: {
-            status: 'asking',
-            field: 'origin',
-            ask: 'What did you see that made you think of a house price as a monthly payment rather than a price?',
-          },
-        }}
-        study={STUDY_WAITING}
-        originStudy={{ kind: 'found', items: originItems, searched: true, indexed: true }}
-      />
-    </WithCosts>
-  );
-}
-
-/** What Dash offers for "What made you think this?" (spec, question 4): two finds from the person's study. */
-const originItems: StudyItem[] = [
-  {
-    key: 'passage:00000000-0000-4000-8000-0000000000f1:Mortgage maths',
-    kind: 'passage',
-    title: 'Buying a flat',
-    context: 'Mortgage maths',
-    sentence:
-      'The agent never asked what we could pay for the flat, only what we could pay each month.',
-    href: '/vault/notes/Home/Buying%20a%20flat.md',
-    link: 'Buying a flat',
-    pinned: false,
-  },
-  {
-    key: 'log:00000000-0000-4000-8000-0000000000f2',
-    kind: 'log',
-    title: 'How the Bank of England sets Bank Rate',
-    context: null,
-    sentence:
-      'A quarter point on a 25-year mortgage changes the payment more than a year of wage growth does.',
-    href: null,
-    link: null,
-    pinned: false,
-  },
-];
 
 const finishedUnits: PlanUnit[] = [
   {
@@ -866,368 +813,135 @@ export function LearnSubjectConversationsSurface() {
 }
 
 // ---------------------------------------------------------------------------
-// The guided stages (LEARN-ESSAYS-SPEC, "The stages")
+// Notes first (LEARN-ESSAYS-SPEC, "Notes first")
 // ---------------------------------------------------------------------------
 
-const guidedBrief = {
-  question:
-    'Why does a quarter-point rate rise move house prices more than it moves anything else?',
-  claim:
-    'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment. Buyers and agents talk about what they can afford each month, and a rate rise changes that number for everyone at once.',
-  reader: 'My sister, who is buying her first flat next spring',
-  origin:
-    'The agent never asked what we could pay for the flat, only what we could pay each month.',
-  change:
-    'House prices that kept rising through a run of rate rises, in a market where most buyers borrow.',
-  pinned: [goalPin],
-};
+const houseNotes = `Rate rises move house prices more than anything else because a house is bought almost entirely with borrowed money.
 
-const guidedPlan: EssayPlan = {
-  thesis:
-    'A house price is a monthly payment in disguise, so the rate on the loan sets it more than the house does.',
-  readback: {
-    notes: [
-      {
-        body: 'Your answer says “a house is bought almost entirely with borrowed money”, but a cash buyer pays the same price. What makes them pay it?',
-        reply: 'They are bidding against borrowers, so the borrowers set the price.',
-      },
-      {
-        body: 'Your sister is buying next spring. Is the essay telling her what will happen to prices, or how to think about the price she pays?',
-        reply: '',
-      },
-    ],
-    sharper: [
-      'Why does the mortgage rate set a house’s price more than the house does?',
-      'Should a first-time buyer judge a flat by its price or by its monthly payment?',
-    ],
-    at: '2026-10-12T15:10:00Z',
-  },
-  takes: {
-    '00000000-0000-4000-8000-0000000000e1:p0':
-      'This is my point exactly: the payment is what is fixed, the price follows.',
-  },
-  points: [
+The agent never asked what we could pay for the flat, only what we could pay each month.
+
+So the price is really a monthly payment. Buyers and agents talk about what they can afford each month, and a rate rise changes that number for everyone at once.
+
+Every lender reprices new loans within weeks, and everyone buying is a new loan.
+
+But cash buyers pay the same price. Maybe because they are bidding against borrowers?
+
+Prices kept rising in 2021 even as rates went up, at least where we live. Not sure how that fits.
+
+Who is this for: my sister, buying her first flat next spring. She should look at the payment, not the asking price.`;
+
+const houseMap: NoteMap = {
+  at: '2026-10-12T15:10:00Z',
+  claims: [
+    'So the price is really a monthly payment.',
+    'Rate rises move house prices more than anything else because a house is bought almost entirely with borrowed money.',
+  ],
+  clusters: [
     {
-      id: 'p1',
-      text: 'Buyers and agents talk about what they can afford each month.',
-      role: 'opening',
-      guide: 'Starts from what your sister will hear at viewings.',
-      notes: [
-        {
-          ask: 'Where did you hear the monthly figure come up first, before any price was mentioned?',
-          answer:
-            'At the first viewing. The agent asked about our mortgage in principle before showing the kitchen.',
-          kind: 'example',
-        },
+      id: 'c1',
+      label: 'Buyers think in monthly payments',
+      quotes: [
+        'The agent never asked what we could pay for the flat, only what we could pay each month.',
+        'Buyers and agents talk about what they can afford each month',
       ],
-      asking: null,
-      ready: false,
-      evidence: [],
+      support: 'thin',
+      gap: 'One anecdote; nothing shows this is how most buyers set a budget.',
     },
     {
-      id: 'p2',
-      text: 'A rate rise changes that number for everyone at once.',
-      role: 'point',
-      guide: 'Shows the mechanism, with numbers.',
-      notes: [
-        {
-          ask: 'Why does a rate rise reach every buyer at once rather than some first?',
-          answer:
-            'Every lender reprices new loans within weeks, and everyone buying is a new loan.',
-          kind: 'why',
-        },
-      ],
-      asking: {
-        kind: 'example',
-        ask: 'What would a quarter-point rise do to the monthly payment on the flat your sister is looking at?',
-      },
-      ready: false,
-      evidence: [
-        {
-          id: 'e1',
-          kind: 'rule',
-          sourceType: 'regulator',
-          title: 'Lenders must test affordability at a higher rate',
-          summary:
-            'The regulator’s mortgage rules require lenders to check a borrower could still pay if rates rose.',
-          quote:
-            'assess whether the borrower could afford the payments if interest rates were to rise',
-          url: 'https://regulator.example.gov/mortgage-rules',
-          sourceTitle: 'Mortgage conduct rules',
-          domain: 'regulator.example.gov',
-          take: 'This is why the monthly figure moves the price: the test is on the payment, not the house.',
-        },
-        {
-          id: 'e2',
-          kind: 'against',
-          sourceType: 'research',
-          title: 'Scarcity outweighed rates in two recent cycles',
-          summary:
-            'A housing study found prices kept rising through rate rises where few homes were listed.',
-          quote: 'a shortage of listings kept prices climbing even as mortgage costs rose',
-          url: 'https://research.example.ac.uk/scarcity',
-          sourceTitle: 'Listings and prices',
-          domain: 'research.example.ac.uk',
-          take: '',
-        },
-      ],
+      id: 'c2',
+      label: 'A rate rise hits every buyer at once',
+      quotes: ['Every lender reprices new loans within weeks, and everyone buying is a new loan.'],
+      support: 'none',
+      gap: 'No figure for how fast lenders reprice, or by how much.',
     },
     {
-      id: 'p3',
-      text: 'Cash buyers pay the same price because they are bidding against borrowers.',
-      role: 'point',
-      guide: 'Answers the obvious gap in the argument.',
-      notes: [],
-      asking: null,
-      ready: false,
-      evidence: [],
+      id: 'c3',
+      label: 'Cash buyers follow the borrowers',
+      quotes: [
+        'But cash buyers pay the same price. Maybe because they are bidding against borrowers?',
+      ],
+      support: 'none',
+      gap: 'Still a question in your notes.',
     },
     {
-      id: 'p4',
-      text: '',
-      role: 'objection',
-      guide: 'Prices that rose through rate rises, and why.',
-      notes: [],
-      asking: null,
-      ready: false,
-      evidence: [],
+      id: 'c4',
+      label: 'What your sister should do',
+      quotes: ['She should look at the payment, not the asking price.'],
+      support: 'ok',
+      gap: '',
     },
   ],
-  shape: 'Problem, mechanism, objection',
-  review: [
+  tensions: [
     {
-      id: 'r1',
-      body: 'Point 3 answers an objection before point 2 has finished the mechanism. Would your sister follow it better after the numbers?',
-      status: 'open',
+      a: 'a rate rise changes that number for everyone at once.',
+      b: 'Prices kept rising in 2021 even as rates went up, at least where we live.',
+      note: 'If rates set the price, rising prices through rate rises need explaining.',
     },
   ],
+  questions: [
+    'What happened in 2021 that kept prices rising where you live while rates went up?',
+    'Is the essay telling your sister what prices will do, or how to judge the price she pays?',
+  ],
+  ordered: true,
 };
 
-const guided: Essay = {
+const notesEssay: Essay = {
   ...blank,
   id: '00000000-0000-4000-8000-000000000005',
-  brief: guidedBrief,
-  interview: { status: 'done' },
-  plan: guidedPlan,
-};
-
-const houseMap: EssayResearch = {
-  id: '00000000-0000-4000-8000-0000000000e1',
-  level: 'first',
-  question: guidedBrief.question,
-  queries: [
-    'mortgage rates house prices effect',
-    'cash buyers share housing market',
-    'house prices during rate rises',
-  ],
-  sources: [
-    {
-      url: 'https://bank.example.org/rates-and-housing',
-      title: 'How interest rates reach the housing market',
-      domain: 'bank.example.org',
-      text: null,
-    },
-    {
-      url: 'https://stats.example.gov/cash-buyers',
-      title: 'Cash buyers as a share of sales',
-      domain: 'stats.example.gov',
-      text: null,
-    },
-    {
-      url: 'https://press.example.com/prices-rose-anyway',
-      title: 'Why prices rose through the hiking cycle',
-      domain: 'press.example.com',
-      text: null,
-    },
-    {
-      url: 'https://research.example.ac.uk/affordability',
-      title: 'Affordability and the monthly payment',
-      domain: 'research.example.ac.uk',
-      text: null,
-    },
-  ],
-  positions: [
-    {
-      kind: 'debate',
-      title: '',
-      summary:
-        'Economists agree rate changes reach house prices through the monthly cost of new mortgages. They split on how much: where homes are scarce and wages are rising, prices have kept climbing through rate rises.',
-      citations: [
-        {
-          source: 0,
-          quote: 'new fixed-rate mortgage pricing typically adjusts within four to six weeks',
-        },
-        {
-          source: 2,
-          quote: 'a shortage of listings kept prices climbing even as mortgage costs rose',
-        },
-      ],
-    },
-    {
-      kind: 'for',
-      title: 'Buyers bid up to a monthly payment, not a price',
-      summary:
-        'A study of first-time buyers found most set their budget from the largest monthly payment a lender would approve.',
-      citations: [
-        {
-          source: 3,
-          quote:
-            'most first-time buyers fixed their budget at the largest monthly payment approved',
-        },
-      ],
-    },
-    {
-      kind: 'for',
-      title: 'Cash buyers follow the borrowers',
-      summary:
-        'Cash buyers are about a third of sales, and they bid against buyers with loans, so they pay what those buyers can afford.',
-      citations: [
-        { source: 1, quote: 'cash purchases accounted for 31 per cent of completed sales' },
-      ],
-    },
-    {
-      kind: 'against',
-      title: 'Scarcity can outweigh the rate',
-      summary:
-        'Prices rose through some hiking cycles when wages rose fast and few homes came up for sale.',
-      citations: [
-        {
-          source: 2,
-          quote: 'a shortage of listings kept prices climbing even as mortgage costs rose',
-        },
-      ],
-    },
-    {
-      kind: 'use',
-      title: 'Lenders reprice within six weeks',
-      summary:
-        'A central bank note puts the lag between a rate change and new mortgage pricing at four to six weeks.',
-      citations: [
-        {
-          source: 0,
-          quote: 'new fixed-rate mortgage pricing typically adjusts within four to six weeks',
-        },
-      ],
-    },
-  ],
-  claims: [],
-  summary:
-    'Economists agree rate changes reach house prices through the monthly cost of new mortgages. They split on how much: where homes are scarce and wages are rising, prices have kept climbing through rate rises.',
-  asks: [
-    'If scarce listings can outweigh a rate rise, does your thesis hold in the town your sister is buying in?',
-  ],
-  costMicros: 310_000,
-  createdAt: '2026-10-12T15:20:00Z',
-};
-
-const guidedShapes: Shape[] = [
-  {
-    name: 'Problem, mechanism, objection',
-    why: 'Starts where your sister is, explains why, then meets the case against it.',
-    parts: [
-      {
-        role: 'opening',
-        guide: 'Starts from what your sister will hear at viewings.',
-        points: ['p1'],
-      },
-      { role: 'point', guide: 'Shows the mechanism, with numbers.', points: ['p2', 'p3'] },
-      { role: 'objection', guide: 'Prices that rose through rate rises, and why.', points: [] },
-      {
-        role: 'closing',
-        guide: 'What she should look at instead of the asking price.',
-        points: [],
-      },
-    ],
+  brief: {
+    ...blank.brief,
+    question:
+      'Why does a quarter-point rate rise move house prices more than it moves anything else?',
+    reader: 'My sister, who is buying her first flat next spring',
   },
-  {
-    name: 'One flat, followed through',
-    why: 'Keeps a single example in view so every point has a number your sister can check.',
-    parts: [
-      { role: 'opening', guide: 'The flat and its asking price.', points: [] },
+  interview: { status: 'skipped' },
+  wordTarget: 800,
+  plan: {
+    ...EMPTY_PLAN,
+    notes: houseNotes,
+    noteMap: houseMap,
+    found: [
       {
-        role: 'point',
-        guide: 'What the payment is, and what a rise does to it.',
-        points: ['p1', 'p2'],
-      },
-      { role: 'point', guide: 'Who else is bidding for it.', points: ['p3'] },
-      { role: 'closing', guide: 'What the price would be if the rate fell back.', points: [] },
-    ],
-  },
-];
-
-/** Discover after the interview: the brief open, and Dash's read of it with one reply written. */
-export function LearnEssayDiscoverSurface() {
-  return (
-    <WithCosts>
-      <EssayView essay={guided} initialStage="discover" planFrozen study={STUDY_WAITING} />
-    </WithCosts>
-  );
-}
-
-/** Research as its own step: the short answer, each part with a line for your take, a question for you. */
-export function LearnEssayResearchMapSurface() {
-  return (
-    <WithCosts>
-      <EssayView
-        essay={guided}
-        initialStage="research"
-        planFrozen
-        study={STUDY_WAITING}
-        research={{ first: houseMap, deeper: null }}
-      />
-    </WithCosts>
-  );
-}
-
-/** Plan: the thesis, four points (one an empty part from the shape), and a note from Dash on the plan. */
-export function LearnEssayPlanSurface() {
-  return (
-    <WithCosts>
-      <EssayView essay={guided} initialStage="plan" planFrozen study={STUDY_WAITING} />
-    </WithCosts>
-  );
-}
-
-/** Structure: two shapes offered around the person's points, and the outline below. */
-export function LearnEssayStructureSurface() {
-  return (
-    <WithCosts>
-      <EssayView
-        essay={guided}
-        initialStage="structure"
-        planFrozen
-        initialShapes={guidedShapes}
-        study={STUDY_WAITING}
-      />
-    </WithCosts>
-  );
-}
-
-/** Develop: the second point, one answer in, and Dash's next question waiting. */
-export function LearnEssayDevelopSurface() {
-  return (
-    <WithCosts>
-      <EssayView
-        essay={{
-          ...guided,
-          plan: {
-            ...guidedPlan,
-            points: [guidedPlan.points[1]!, ...guidedPlan.points.filter((p) => p.id !== 'p2')],
+        label: 'A rate rise hits every buyer at once',
+        items: [
+          {
+            id: 'f1',
+            kind: 'rule',
+            sourceType: 'regulator',
+            title: 'Lenders must test affordability at a higher rate',
+            summary:
+              'The regulator’s mortgage rules require lenders to check a borrower could still pay if rates rose.',
+            quote:
+              'assess whether the borrower could afford the payments if interest rates were to rise',
+            url: 'https://regulator.example.gov/mortgage-rules',
+            sourceTitle: 'Mortgage conduct rules',
+            domain: 'regulator.example.gov',
+            take: '',
           },
-        }}
-        initialStage="develop"
-        planFrozen
-        study={STUDY_WAITING}
-      />
+        ],
+      },
+    ],
+    modelDraft: {
+      text: `My sister will hear one number at every viewing, and it is not the price.\n\nAgents ask what buyers can pay each month, because almost every buyer borrows. That makes the monthly payment the real price of a home, and the rate on the loan sets it. [gap: how fast lenders pass on a rate rise]\n\nCash buyers might seem to break this, but they bid against borrowers, so they pay what borrowers can afford.`,
+      at: '2026-10-12T15:30:00Z',
+    },
+  },
+};
+
+/** The notes page with Dash’s map beside it: claims, threads with their gaps, a tension, two questions, a source found. */
+export function LearnEssayNotesMapSurface() {
+  return (
+    <WithCosts>
+      <EssayView essay={notesEssay} initialView="notes" planFrozen study={STUDY_WAITING} />
     </WithCosts>
   );
 }
 
-/** Write with an empty draft: the plan beside it, ready to be put in as headings. */
-export function LearnEssayWritePlanSurface() {
+/** The draft view of the same essay, empty, with Assemble and the model draft beside it. */
+export function LearnEssayDraftFromNotesSurface() {
   return (
     <WithCosts>
-      <EssayView essay={guided} initialStage="write" planFrozen study={STUDY_WAITING} />
+      <EssayView essay={notesEssay} initialView="draft" planFrozen study={STUDY_WAITING} />
     </WithCosts>
   );
 }

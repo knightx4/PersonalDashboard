@@ -144,6 +144,8 @@ describe('the operation names', () => {
       'review-essay-plan',
       'word-point-question',
       'find-point-evidence',
+      'map-essay-notes',
+      'draft-essay-model',
     ]);
   });
 });

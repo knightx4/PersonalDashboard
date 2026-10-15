@@ -66,10 +66,15 @@ function text(value: unknown, max = 4_000): string {
   return typeof value === 'string' ? value.slice(0, max) : '';
 }
 function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 function strings(value: unknown, max: number, each = 600): string[] {
-  return (Array.isArray(value) ? value : []).map((v) => text(v, each).trim()).filter(Boolean).slice(0, max);
+  return (Array.isArray(value) ? value : [])
+    .map((v) => text(v, each).trim())
+    .filter(Boolean)
+    .slice(0, max);
 }
 
 /** The map from its jsonb, with anything malformed dropped. */
@@ -80,7 +85,15 @@ export function readNoteMap(value: unknown): NoteMap | null {
     const label = text(c.label, 120).trim();
     if (!label) return [];
     const support = c.support === 'none' || c.support === 'thin' ? c.support : 'ok';
-    return [{ id: text(c.id, 32) || `c${i + 1}`, label, quotes: strings(c.quotes, 8), support, gap: text(c.gap, 300) } as MapCluster];
+    return [
+      {
+        id: text(c.id, 32) || `c${i + 1}`,
+        label,
+        quotes: strings(c.quotes, 8),
+        support,
+        gap: text(c.gap, 300),
+      } as MapCluster,
+    ];
   });
   return {
     at: text(raw.at, 40),
@@ -118,7 +131,8 @@ export function seedNotes(brief: EssayBrief, plan: EssayPlan): string {
     if (note.reply.trim()) add(`Dash asked: ${note.body}`, note.reply);
   }
   const points = plan.points.filter((p) => p.text.trim());
-  if (points.length) parts.push(`## Points\n\n${points.map((p) => `- ${p.text.trim()}`).join('\n')}`);
+  if (points.length)
+    parts.push(`## Points\n\n${points.map((p) => `- ${p.text.trim()}`).join('\n')}`);
   for (const p of points) {
     for (const n of p.notes) if (n.answer.trim()) add(`Dash asked: ${n.ask}`, n.answer);
   }
@@ -131,21 +145,20 @@ export function notesOf(brief: EssayBrief, plan: EssayPlan): string {
   return plan.notes?.trim() ? plan.notes : seedNotes(brief, plan);
 }
 
-/** An answer to one of Dash's questions, appended to the notes in the person's words. */
-export function withAnswer(notes: string, question: string, answer: string): string {
-  const kept = answer.trim();
-  if (!kept) return notes;
-  return `${notes.replace(/\s+$/, '')}\n\n## Dash asked: ${squash(question)}\n\n${kept}\n`.slice(0, NOTES_MAX);
+/** An answer to one of Dash's questions, as it is added to the end of the notes. */
+export function answerBlock(question: string, answer: string): string {
+  return `\n\n## Dash asked: ${squash(question)}\n\n${answer.trim()}\n`;
 }
 
-/** A source added to the notes: the quoted words and where they come from. */
-export function withSource(
-  notes: string,
-  source: { quote: string; title: string; domain: string; url: string; summary: string },
-): string {
+/** A source as it is added to the end of the notes: the quoted words and where they come from. */
+export function sourceBlock(source: {
+  quote: string;
+  sourceTitle: string;
+  domain: string;
+  url: string;
+}): string {
   const quote = squash(source.quote).replace(/"/g, '”');
-  const line = `> “${quote}”\n> ${source.title || source.domain} · ${source.url}`;
-  return `${notes.replace(/\s+$/, '')}\n\n${line}\n`.slice(0, NOTES_MAX);
+  return `\n\n> “${quote}”\n> ${source.sourceTitle || source.domain} · ${source.url}\n`;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +217,11 @@ export function mapNotesPrompt(input: {
     `Reader: ${input.reader.trim() || 'not said'}`,
   ];
   if (input.previous?.clusters.length) {
-    lines.push('', 'Previous map labels, to keep where they still fit:', ...input.previous.clusters.map((c) => `- ${c.label}`));
+    lines.push(
+      '',
+      'Previous map labels, to keep where they still fit:',
+      ...input.previous.clusters.map((c) => `- ${c.label}`),
+    );
   }
   lines.push('', '<notes>', input.notes.trim(), '</notes>');
   return lines.join('\n');
@@ -230,26 +247,49 @@ export function readMapReply(reply: string, notes: string, at: string): NoteMap 
   const raw = object(jsonIn(reply));
   if (!raw.clusters && !raw.claims) return null;
   const sources = [{ text: notes }];
-  const own = (passages: unknown, max: number) => strings(passages, max).filter((p) => isOwnWords(p, sources));
+  const own = (passages: unknown, max: number) =>
+    strings(passages, max).filter((p) => isOwnWords(p, sources));
   const clusters: MapCluster[] = [];
   for (const c of (Array.isArray(raw.clusters) ? raw.clusters : []).map(object)) {
     const label = squash(text(c.label, 120));
     const quotes = own(c.quotes, 5);
     if (!label || quotes.length === 0) continue;
     const support = c.support === 'none' || c.support === 'thin' ? c.support : 'ok';
-    clusters.push({ id: `c${clusters.length + 1}`, label, quotes, support, gap: support === 'ok' ? '' : squash(text(c.gap, 300)) });
+    clusters.push({
+      id: `c${clusters.length + 1}`,
+      label,
+      quotes,
+      support,
+      gap: support === 'ok' ? '' : squash(text(c.gap, 300)),
+    });
     if (clusters.length === CLUSTERS_MAX) break;
   }
   const tensions = (Array.isArray(raw.tensions) ? raw.tensions : [])
     .map(object)
-    .map((t) => ({ a: text(t.a, 600).trim(), b: text(t.b, 600).trim(), note: squash(text(t.note, 300)) }))
+    .map((t) => ({
+      a: text(t.a, 600).trim(),
+      b: text(t.b, 600).trim(),
+      note: squash(text(t.note, 300)),
+    }))
     .filter((t) => isOwnWords(t.a, sources) && isOwnWords(t.b, sources))
     .slice(0, 3);
   const questions = strings(raw.questions, QUESTIONS_MAX * 2, 300)
-    .filter((q) => q.endsWith('?') && (q.match(/\?/g) ?? []).length === 1 && !/\b(great|interesting|nice)\b/i.test(q))
+    .filter(
+      (q) =>
+        q.endsWith('?') &&
+        (q.match(/\?/g) ?? []).length === 1 &&
+        !/\b(great|interesting|nice)\b/i.test(q),
+    )
     .slice(0, QUESTIONS_MAX);
   if (clusters.length === 0) return null;
-  return { at, claims: own(raw.claims, 3), clusters, tensions, questions, ordered: raw.ordered !== false };
+  return {
+    at,
+    claims: own(raw.claims, 3),
+    clusters,
+    tensions,
+    questions,
+    ordered: raw.ordered !== false,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +303,11 @@ export function readMapReply(reply: string, notes: string, at: string): NoteMap 
  * gap lines are Dash's and carry Dash's mark, so "Your words" stays honest;
  * every other word is the person's.
  */
-export function assembleDraft(map: NoteMap, title: string, model: string): { text: string; marks: AuthorMark[] } {
+export function assembleDraft(
+  map: NoteMap,
+  title: string,
+  model: string,
+): { text: string; marks: AuthorMark[] } {
   let out = '';
   const marks: AuthorMark[] = [];
   const dash = (s: string) => {
@@ -300,7 +344,12 @@ nothing their notes do not support. Where the notes leave a gap, write
 Plain English, short sentences, no headings unless the essay needs them, no
 preamble. Aim for the length you are given.`;
 
-export function modelDraftPrompt(input: { question: string; reader: string; target: number | null; notes: string }): string {
+export function modelDraftPrompt(input: {
+  question: string;
+  reader: string;
+  target: number | null;
+  notes: string;
+}): string {
   return [
     `The essay's question: ${input.question.trim() || '(not written yet)'}`,
     `Reader: ${input.reader.trim() || 'a general reader'}`,

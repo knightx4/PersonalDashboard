@@ -7,15 +7,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import {
-  answeredBrief,
-  ANSWER_MAX,
-  editedBrief,
-  nextField,
-  PLAIN_ASKS,
-  skippedBrief,
-} from '@/lib/learn/essays/interview';
-import { askNextQuestion } from '@/lib/learn/essays/interview-model';
+import { ANSWER_MAX, editedBrief } from '@/lib/learn/essays/interview';
 import {
   DEFAULT_SELF_NAME,
   MARK_AUTHORS,
@@ -56,13 +48,11 @@ import {
   parseWordTarget,
   readBrief,
   readInterview,
-  type BriefField,
   type EssayBrief,
   type EssayInterview,
 } from '@/lib/learn/essays/model';
 import { essayDay, type EssayStage } from '@/lib/learn/essays/note';
-import { planJson, readPlan, type EssayPlan } from '@/lib/learn/essays/plan';
-import { readbackPlan } from '@/lib/learn/essays/guide-run';
+import type { EssayPlan } from '@/lib/learn/essays/plan';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
@@ -73,8 +63,6 @@ import {
   loadVaultEssay,
   recordEssayNote,
   saveBriefJson,
-  loadPlanContext,
-  savePlanJson,
   saveDraft,
   saveWordTarget,
   takenEssaySlugs,
@@ -427,106 +415,6 @@ const BriefInput = z.object({
 
 function briefResult(json: unknown): BriefResult {
   return { ok: true, brief: readBrief(json), interview: readInterview(json) };
-}
-
-/**
- * One answer in the interview a new essay opens with (plan #1867). The
- * answer goes into the brief as typed, and Dash words the next question from
- * what has been said so far, one Sonnet call; without a key, or when the
- * call fails or its question breaks the rules, the spec's own question is
- * asked instead, so the interview always moves on. A blank answer skips the
- * question. An answer to a question the essay is no longer asking (another
- * tab got there first) changes nothing and returns where it is.
- */
-// latency: pending
-export async function answerEssayInterview(
-  id: string,
-  field: string,
-  answer: string,
-): Promise<BriefResult> {
-  const user = await requireUser();
-  const parsed = BriefInput.safeParse({ id, field, value: answer });
-  if (!parsed.success)
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that answer.' };
-  const supabase = await createLearnClient();
-  try {
-    const row = await loadBriefJson(supabase, parsed.data.id);
-    if (!row) return { ok: false, error: 'That essay is not there any more.' };
-    const interview = readInterview(row.brief);
-    if (interview?.status !== 'asking' || interview.field !== parsed.data.field)
-      return briefResult(row.brief);
-
-    const following = nextField(parsed.data.field);
-    let next: { field: BriefField; ask: string } | null = null;
-    if (following) {
-      next = { field: following, ask: PLAIN_ASKS[following] };
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey) {
-        const sofar = readBrief(
-          answeredBrief(row.brief, parsed.data.field, parsed.data.value, null),
-        );
-        const spend = collectSpend();
-        const asked = await askNextQuestion({
-          brief: sofar,
-          field: following,
-          anthropicApiKey: apiKey,
-          onSpend: spend.sink,
-        });
-        await recordLearnSpend(user.id, 'word-essay-question', spend.reports);
-        if (asked.ok) next = { field: following, ask: asked.ask };
-        else console.error('[essay interview]', asked.detail);
-      }
-    }
-    const brief = answeredBrief(row.brief, parsed.data.field, parsed.data.value, next);
-    await saveBriefJson(supabase, parsed.data.id, brief);
-    revalidatePath('/learn/essays');
-    // The last answer: Dash reads the whole brief back, so the interview ends
-    // on what to tighten next rather than on an empty page.
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!following && apiKey) {
-      const context = await loadPlanContext(supabase, parsed.data.id);
-      const spend = collectSpend();
-      const read = await readbackPlan({
-        brief: readBrief(brief),
-        plan: readPlan(context?.plan),
-        anthropicApiKey: apiKey,
-        onSpend: spend.sink,
-      });
-      await recordLearnSpend(user.id, 'read-essay-brief', spend.reports);
-      if (read.ok) {
-        await savePlanJson(supabase, parsed.data.id, planJson(read.plan));
-        return { ...briefResult(brief), plan: read.plan } as BriefResult;
-      }
-      console.error('[essay readback]', read.detail);
-    }
-    return briefResult(brief);
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Could not keep that answer.',
-    };
-  }
-}
-
-/** Skip the rest of the interview; what was answered stays in the brief. */
-// latency: pending
-export async function skipEssayInterview(id: string): Promise<BriefResult> {
-  await requireUser();
-  if (!z.string().uuid().safeParse(id).success)
-    return { ok: false, error: 'Could not find that essay.' };
-  const supabase = await createLearnClient();
-  try {
-    const row = await loadBriefJson(supabase, id);
-    if (!row) return { ok: false, error: 'That essay is not there any more.' };
-    const brief = skippedBrief(row.brief);
-    await saveBriefJson(supabase, id, brief);
-    return briefResult(brief);
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Could not skip the interview.',
-    };
-  }
 }
 
 /** One line of the brief, edited where it is read. */
@@ -1038,7 +926,7 @@ export async function researchEssay(
       await recordLearnSpend(user.id, 'research-essay-question', spend.reports);
       if (result.ok) {
         await logEssayCall(supabase, user.id, parsed.data.id, {
-          stage: 'research',
+          stage: 'notes',
           action: 'research-essay-question',
           model: GUIDE_MODEL,
           prompt,

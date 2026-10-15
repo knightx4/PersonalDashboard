@@ -372,6 +372,11 @@ export const LEARN_OPERATIONS = [
   // Evidence of one kind for one point of an essay (LEARN-ESSAYS-SPEC,
   // "Evidence on a point"): one Sonnet call with up to four web searches.
   'find-point-evidence',
+  // The notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): one Sonnet
+  // call reading the whole notes page into a map, on each press of Update
+  // the map, and one writing a model draft from the notes.
+  'map-essay-notes',
+  'draft-essay-model',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

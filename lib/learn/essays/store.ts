@@ -317,3 +317,17 @@ export async function savePlanJson(
   if (error) throw new Error(error.message);
   if (!data) throw new Error('That essay is not there any more.');
 }
+
+/** The length the person is aiming at, for the model draft. */
+export async function loadEssayDraftTarget(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('word_target')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  return (data as { word_target: number | null } | null)?.word_target ?? null;
+}

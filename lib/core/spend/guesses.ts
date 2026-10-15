@@ -244,6 +244,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'word-point-question': run(SONNET, 1_500, 60),
   // A narrow search for one point: up to four searches, three short items out.
   'find-point-evidence': searching(run(SONNET, 40_000, 1_200), 3),
+  // The rules and a notes page of a few thousand words in; a JSON map out.
+  'map-essay-notes': run(SONNET, 6_000, 1_500),
+  // The rules and the notes in; an essay of about 800 words out.
+  'draft-essay-model': run(SONNET, 6_000, 1_400),
   // The deeper pass gathering: up to eight searches and five pages of about
   // 6,000 tokens each, all read again on each round.
   'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),

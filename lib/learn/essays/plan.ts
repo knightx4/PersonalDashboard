@@ -318,7 +318,9 @@ export function readPlan(value: unknown): EssayPlan {
   return {
     notes: text(raw.notes, NOTES_MAX),
     noteMap: readNoteMap(raw.noteMap),
-    modelDraft: text(draft.text, 40_000).trim() ? { text: text(draft.text, 40_000), at: text(draft.at, 40) } : null,
+    modelDraft: text(draft.text, 40_000).trim()
+      ? { text: text(draft.text, 40_000), at: text(draft.at, 40) }
+      : null,
     found,
     thesis: text(raw.thesis, THESIS_MAX),
     readback: readReadback(raw.readback),
