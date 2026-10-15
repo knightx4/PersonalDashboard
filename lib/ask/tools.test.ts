@@ -370,6 +370,62 @@ describe('spend_by_merchant', () => {
   });
 });
 
+describe('application_answers', () => {
+  const tables: Tables = {
+    'job_search.roles': [
+      { id: 'r1', user_id: ME },
+      { id: 'r2', user_id: ME },
+      { id: 'r4', user_id: THEM },
+    ],
+    'job_search.applications': [
+      { id: 'a1-old', user_id: ME, role_id: 'r1', attempt: 1 },
+      { id: 'a1', user_id: ME, role_id: 'r1', attempt: 2 },
+      { id: 'a2', user_id: ME, role_id: 'r2', attempt: 1 },
+      { id: 'a4', user_id: THEM, role_id: 'r4', attempt: 1 },
+    ],
+    'job_search.questions': [
+      { id: 'q1', user_id: ME, text: 'Why do you want to work here?' },
+      { id: 'q2', user_id: ME, text: 'Describe a hard deadline.' },
+      { id: 'q3', user_id: ME, text: 'Salary expectations?' },
+      { id: 'q4', user_id: THEM, text: 'Their question' },
+    ],
+    'job_search.application_answers': [
+      { id: 'n1', user_id: ME, application_id: 'a1', question_id: 'q1', answer: 'Because the work matters. '.repeat(20), status: 'draft', word_limit: 150, created_at: '2026-09-01T10:00:00Z' },
+      { id: 'n2', user_id: ME, application_id: 'a1', question_id: 'q2', answer: null, status: 'approved', word_limit: null, created_at: '2026-09-01T11:00:00Z' },
+      { id: 'n0', user_id: ME, application_id: 'a1-old', question_id: 'q3', answer: 'Old attempt', status: 'submitted', word_limit: null, created_at: '2026-08-01T10:00:00Z' },
+      { id: 'n3', user_id: ME, application_id: 'a2', question_id: 'q3', answer: 'Negotiable', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
+      { id: 'n4', user_id: THEM, application_id: 'a4', question_id: 'q4', answer: 'Theirs', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
+    ],
+  };
+
+  it("lists only the role's latest application's answers, each with its question and ref", async () => {
+    const result = await executeAskTool('application_answers', { role_ref: 'r1' }, context(tables));
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.ref)).toEqual(['n1', 'n2']);
+    expect(rows.map((r) => r.title)).toEqual(['Why do you want to work here?', 'Describe a hard deadline.']);
+    expect(rows[0]).toMatchObject({ table: 'job_search.application_answers', href: '/jobs/roles/r1' });
+    expect(rows[0].detail).toMatchObject({ status: 'draft', word_limit: 150 });
+    expect(String(rows[0].detail?.opening).length).toBeLessThanOrEqual(160);
+    expect(rows[1].detail).toMatchObject({ status: 'approved', opening: null });
+  });
+
+  it('reads one application by its ref, with the table prefix accepted', async () => {
+    const result = await executeAskTool('application_answers', { application_ref: 'job_search.applications:a2' }, context(tables));
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['n3']);
+  });
+
+  it("refuses another person's role and application, and a call that names neither", async () => {
+    expect((await executeAskTool('application_answers', { role_ref: 'r4' }, context(tables))).ok).toBe(false);
+    expect((await executeAskTool('application_answers', { application_ref: 'a4' }, context(tables))).ok).toBe(false);
+    expect((await executeAskTool('application_answers', {}, context(tables))).ok).toBe(false);
+  });
+
+  it('is off with the Job search workspace', async () => {
+    const off = await executeAskTool('application_answers', { role_ref: 'r1' }, context(tables, { enabledModules: ['todo'] }));
+    expect(off.ok).toBe(false);
+  });
+});
+
 describe('job_applications', () => {
   const app = (id: string, userId: string, role: string, status: string, submitted: string, extra: Row = {}) => ({
     id,

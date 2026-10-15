@@ -12,8 +12,9 @@ and not marked `done` because you are running out of room.
 
 ## The commands you need
 
-`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment. If
-it is missing, read `offline.md` in this directory instead of guessing.
+`scripts/plan.ts` needs `DATABASE_URL` (service role), or in a cloud session
+`SUPABASE_SERVICE_ROLE_KEY`. If neither is set, or it cannot reach the
+database, read `offline.md` in this directory instead of guessing.
 
 ```
 npx tsx scripts/plan.ts show <n>               # the brief: destination, decisions, done-when, waits
