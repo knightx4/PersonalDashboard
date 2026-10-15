@@ -427,6 +427,12 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     changed.push(args.ready_to_apply ? 'marked it ready to apply' : 'marked it not ready to apply');
   }
 
+  if (given(args, 'all_questions_added')) {
+    if (typeof args.all_questions_added !== 'boolean') throw new JobsRefused('all_questions_added is true or false.');
+    update.all_questions_added = args.all_questions_added;
+    changed.push(args.all_questions_added ? 'marked that all its questions are added' : 'marked that not all its questions are added');
+  }
+
   if (given(args, 'has_cover_letter')) {
     const value = args.has_cover_letter;
     if (value !== null && typeof value !== 'boolean') {
@@ -443,7 +449,7 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
   }
 
   if (Object.keys(update).length === 0) {
-    throw new JobsRefused('Nothing to change: give excitement, channel, ready_to_apply or has_cover_letter.');
+    throw new JobsRefused('Nothing to change: give excitement, channel, ready_to_apply, all_questions_added or has_cover_letter.');
   }
 
   const { data, error } = await env.jobs
@@ -2858,7 +2864,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_application',
     description:
-      'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
+      'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, whether all its questions are added, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
     input_schema: {
       type: 'object',
       properties: {
@@ -2868,6 +2874,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         channel: { type: 'string', enum: [...APPLICATION_SOURCES], description: 'How they applied.' },
         referral_contact_ref: { type: 'string', description: 'With channel referral: the job_search.contacts ref of who referred them.' },
         ready_to_apply: { type: 'boolean', description: 'True when the application is ready to send, false when it is not.' },
+        all_questions_added: { type: 'boolean', description: 'True when every question the application asks has been added to it, false when not.' },
         has_cover_letter: {
           type: ['boolean', 'null'],
           description: 'Whether the application has a cover letter: true yes, false no, null clears the answer.',

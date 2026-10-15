@@ -29,10 +29,13 @@ export function closedSummary(input: {
   everSubmitted: boolean;
   closedOn: string | null;
   interviewCount: number;
+  /** Marked as having every question from the form added. */
+  allQuestionsAdded?: boolean;
 }): string {
   const ended = statusLabel(input.status, input.everSubmitted);
   const when = input.closedOn ? ` on ${input.closedOn}` : '';
-  return `${ended}${when}, ${howFar(input)}.`;
+  const marked = input.allQuestionsAdded ? ' All its questions were added.' : '';
+  return `${ended}${when}, ${howFar(input)}.${marked}`;
 }
 
 function howFar({

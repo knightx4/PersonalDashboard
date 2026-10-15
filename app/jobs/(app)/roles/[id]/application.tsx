@@ -40,6 +40,7 @@ export function Answers({
   roleId,
   coverLetter,
   readyToApply,
+  allQuestionsAdded,
   hasCoverLetter,
   status,
   answerDrafts,
@@ -85,10 +86,14 @@ export function Answers({
     setAsks(stored.asks);
     const parts = [`Drafted ${countOf(result.drafted.length, 'answer', 'answers')}.`];
     if (result.flagged.length > 0) {
-      parts.push(`${result.flagged.length === 1 ? 'One is' : `${result.flagged.length} are`} still over the limit.`);
+      parts.push(
+        `${result.flagged.length === 1 ? 'One is' : `${result.flagged.length} are`} still over the limit.`,
+      );
     }
     if (result.missing.length > 0) {
-      parts.push(`No draft came back for ${countOf(result.missing.length, 'question', 'questions')}.`);
+      parts.push(
+        `No draft came back for ${countOf(result.missing.length, 'question', 'questions')}.`,
+      );
     }
     setRunNote(parts.join(' '));
     return null;
@@ -127,6 +132,7 @@ export function Answers({
         roleId={roleId}
         closed={closed}
         initialReady={readyToApply}
+        initialAllQuestions={allQuestionsAdded}
         letter={letterMark}
         onLetter={setLetterMark}
       />
@@ -201,7 +207,8 @@ export function Answers({
             </div>
             {running ? (
               <Note role="status" className="mt-2 px-3 py-2 text-small text-ink-muted">
-                Dash is drafting each answer, which takes a minute or two. You can keep working below.
+                Dash is drafting each answer, which takes a minute or two. You can keep working
+                below.
               </Note>
             ) : runError ? (
               <p role="alert" className="mt-1.5 text-small text-danger">
@@ -311,6 +318,7 @@ function ApplicationMarks({
   roleId,
   closed,
   initialReady,
+  initialAllQuestions,
   letter,
   onLetter: setLetter,
 }: {
@@ -318,16 +326,18 @@ function ApplicationMarks({
   roleId: string;
   closed: boolean;
   initialReady: boolean;
+  initialAllQuestions: boolean;
   /** The Cover letter mark, held by the tab so saving an inserted letter can set it. */
   letter: boolean | null;
   onLetter: (letter: boolean | null) => void;
 }) {
   const [ready, setReady] = useState(initialReady);
+  const [allQuestions, setAllQuestions] = useState(initialAllQuestions);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function save(
-    marks: { readyToApply?: boolean; hasCoverLetter?: boolean | null },
+    marks: { readyToApply?: boolean; allQuestionsAdded?: boolean; hasCoverLetter?: boolean | null },
     revert: () => void,
   ) {
     setError(null);
@@ -350,11 +360,21 @@ function ApplicationMarks({
   if (closed) {
     return (
       <Card padding="dense">
-      <p className="text-ui text-ink-muted">
-        {ready ? 'Marked ready to apply' : 'Not marked ready to apply'}
-        {' · '}
-        {letter === null ? 'Cover letter not answered' : letter ? 'Has a cover letter' : 'No cover letter'}
-      </p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-ui text-ink-muted">
+          <span className="whitespace-nowrap">
+            {ready ? 'Marked ready to apply' : 'Not marked ready to apply'}
+          </span>
+          <span className="whitespace-nowrap">
+            {allQuestions ? 'All questions added' : 'Not all questions added'}
+          </span>
+          <span className="whitespace-nowrap">
+            {letter === null
+              ? 'Cover letter not answered'
+              : letter
+                ? 'Has a cover letter'
+                : 'No cover letter'}
+          </span>
+        </p>
       </Card>
     );
   }
@@ -372,6 +392,18 @@ function ApplicationMarks({
             const next = event.target.checked;
             setReady(next);
             save({ readyToApply: next }, () => setReady(before));
+          }}
+        />
+        <CheckRow
+          title="All questions added"
+          className="items-center"
+          checked={allQuestions}
+          disabled={pending}
+          onChange={(event) => {
+            const before = allQuestions;
+            const next = event.target.checked;
+            setAllQuestions(next);
+            save({ allQuestionsAdded: next }, () => setAllQuestions(before));
           }}
         />
         <div role="group" aria-label="Has a cover letter" className="flex items-center gap-2">
@@ -510,7 +542,11 @@ export function AnswerCard({
         live only in the session that generated it.
       */}
       {!draft && answer.unsupportedClaims.length > 0 && (
-        <Note tone="caution" className="mt-2" title="This answer states things your bank does not carry:">
+        <Note
+          tone="caution"
+          className="mt-2"
+          title="This answer states things your bank does not carry:"
+        >
           <ul className="list-disc pl-4 text-small text-ink">
             {answer.unsupportedClaims.map((claim) => (
               <li key={claim}>{claim}</li>

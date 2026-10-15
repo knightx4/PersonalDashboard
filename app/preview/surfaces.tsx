@@ -588,6 +588,7 @@ const rolePanels: PanelProps = {
   coverLetter: '',
   coverLetterDraft: null,
   readyToApply: false,
+  allQuestionsAdded: false,
   hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
@@ -727,6 +728,7 @@ const pipelineRow = (
   excitement: 3,
   needsReview: false,
   readyToApply: false,
+  allQuestionsAdded: false,
   hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
@@ -754,6 +756,7 @@ const pipelineRows: PipelineRow[] = [
     status: 'in_process',
     excitement: 5,
     readyToApply: true,
+    allQuestionsAdded: false,
     hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
@@ -769,6 +772,7 @@ const pipelineRows: PipelineRow[] = [
     status: 'in_process',
     excitement: 4,
     readyToApply: true,
+    allQuestionsAdded: true,
     hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
@@ -3625,6 +3629,7 @@ export const SURFACES: readonly Surface[] = [
             everSubmitted: true,
             closedOn: '8 Sep',
             interviewCount: 1,
+            allQuestionsAdded: true,
           })}
         />
         <RoleTodos
@@ -3671,12 +3676,13 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers, marked ready',
     module: 'jobs',
     width: 'wide',
-    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
         status="drafting"
         readyToApply
+        allQuestionsAdded
         hasCoverLetter
         defaultTab={defaultRoleTab('drafting')}
       />
@@ -3693,6 +3699,7 @@ export const SURFACES: readonly Surface[] = [
         {...rolePanels}
         status="rejected"
         readyToApply
+        allQuestionsAdded
         hasCoverLetter={false}
         defaultTab="answers"
       />
@@ -3891,15 +3898,15 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
-     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    /* The Pipeline narrowed to the roles with all their questions added (plan
+     * #2196.2): the one chip set, the rest of the line unchanged. */
     id: 'jobs-pipeline-marks',
-    label: 'Pipeline · Ready and cover letter filters',
+    label: 'Pipeline · All questions added filter',
     module: 'jobs',
     width: 'wide',
     render: () => (
       <PreviewShell>
-        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', questions: 'yes' }} />
       </PreviewShell>
     ),
   },
