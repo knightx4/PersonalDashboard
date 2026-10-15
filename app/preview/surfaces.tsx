@@ -151,6 +151,7 @@ import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import { FlowExplainPreview } from './learn-flow-explain-surfaces';
+import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
   LearnCourseCheckPreview,
   LearnCoursesEmptyPreview,
@@ -5658,6 +5659,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowExplainPreview stage="grading" />,
+  },
+  {
+    /* What a session moved (plan #2164.6): the card that ends a Practice Flow
+     * run, with the ideas shown and missed quoted and what came onto the fringe. */
+    id: 'learn-flow-summary',
+    label: 'Practice Flow · What moved',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowSummaryPreview />,
   },
   {
     /* Marking failed: the explanation stays in its box, with the reason under the card. */

@@ -15,7 +15,7 @@ import {
   type ExplainMarks,
 } from '@/lib/learn/flow/explain';
 import { stateLine } from '@/lib/learn/feed/teach-back';
-import { AskButton, DontKnowButton, NotNowButton } from './buttons';
+import { AskButton, DontKnowButton, EndHereButton, NotNowButton } from './buttons';
 import type { FlowState } from './state';
 
 /**
@@ -40,12 +40,15 @@ export function ExplainCard({
   step,
   fields,
   grading,
+  onEnd,
 }: {
   live: FlowState;
   step: (formData: FormData) => void;
   /** The flow's focus fields, carried by every form. */
   fields: React.ReactNode;
   grading?: 'explain' | 'follow-up';
+  /** End here (plan #2164.6): shows what moved. Unset draws no such press. */
+  onEnd?: () => void;
 }) {
   const explained = live.explained;
   const followedUp = live.followedUp;
@@ -189,7 +192,10 @@ export function ExplainCard({
                 <AskButton label="Next" variant="secondary" named />
               </>
             ) : (
-              <AskButton label="Next" />
+              <>
+                <AskButton label="Next" />
+                {onEnd && finished && <EndHereButton onEnd={onEnd} />}
+              </>
             )}
           </ForwardRow>
         </div>

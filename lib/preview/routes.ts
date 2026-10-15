@@ -181,6 +181,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-flow-explain-done': ['/learn/now', '/learn/flow'],
   'learn-flow-explain-grading': ['/learn/now', '/learn/flow'],
   'learn-flow-explain-error': ['/learn/now', '/learn/flow'],
+  'learn-flow-summary': ['/learn/now', '/learn/flow'],
   'learn-subject-chain': ['/learn/s/[id]'],
   'learn-subject-articles': ['/learn/s/[id]'],
   'learn-subject-articles-loading': ['/learn/s/[id]'],

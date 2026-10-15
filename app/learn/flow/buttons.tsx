@@ -2,6 +2,7 @@
 
 import { useFormStatus } from 'react-dom';
 import { CloseButton } from '@/components/inbox/close-button';
+import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 
 /**
@@ -80,5 +81,17 @@ export function NotNowButton() {
       value="1"
       pending={pending}
     />
+  );
+}
+
+/**
+ * End here (plan #2164.6): stops the run and shows what it moved. Reads the
+ * stored answers and calls no model, so it is a plain button.
+ */
+export function EndHereButton({ onEnd }: { onEnd: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" onClick={onEnd}>
+      End here
+    </Button>
   );
 }

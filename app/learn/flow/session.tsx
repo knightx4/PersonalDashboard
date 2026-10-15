@@ -12,7 +12,9 @@ import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
 import { practiceHref } from '@/lib/learn/flow/href';
-import { AskButton, DontKnowButton, NotNowButton } from './buttons';
+import { AskButton, DontKnowButton, EndHereButton, NotNowButton } from './buttons';
+import { RunSummaryPanel } from './summary-card';
+import { Button } from '@/components/ui/button';
 import { ExplainCard } from './explain-card';
 import {
   answerTrackOffer,
@@ -224,12 +226,28 @@ export function FlowSession({
   const trackId = track?.id ?? null;
   const goalId = goal?.id ?? null;
   const aboutGoals = goal !== null || (track === null && only === 'goals');
+  // End here (plan #2164.6) swaps the card for what the last hour moved.
+  const [ended, setEnded] = useState(false);
 
   // Once per visit: the queue may have run down while you were away, and
   // filling it now means the question after this one is ready in time.
   useEffect(() => {
     void fillFlowQueue({ track: trackId, only, goal: goalId });
   }, [trackId, only, goalId]);
+
+  if (ended) {
+    return (
+      <div className="space-y-4">
+        <RunSummaryPanel
+          foot={
+            <Button type="button" size="lg" onClick={() => setEnded(false)}>
+              Keep going
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   if (!live.question || !live.options) {
     // Nothing left to ask, and a theme from your notes to start on: the offer
@@ -256,24 +274,28 @@ export function FlowSession({
           : NOTHING_TO_ASK[live.nothing]
       : null;
     return (
-      <form action={step}>
-        <input type="hidden" name="intent" value="ask" />
-        <TrackField track={track} only={only} goal={goal} />
-        <EmptyState
-          size="box"
-          title={nothingText ?? live.error ?? ''}
-          action={
-            live.nothing && track
-              ? { label: 'Ask across all subjects', href: practiceHref() }
-              : live.nothing && aboutGoals
-                ? { label: 'Ask about everything', href: practiceHref() }
-                : undefined
-          }
-        >
-          {live.error && <AskButton label="Try again" />}
-          {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
-        </EmptyState>
-      </form>
+      <div className="space-y-4">
+        <form action={step}>
+          <input type="hidden" name="intent" value="ask" />
+          <TrackField track={track} only={only} goal={goal} />
+          <EmptyState
+            size="box"
+            title={nothingText ?? live.error ?? ''}
+            action={
+              live.nothing && track
+                ? { label: 'Ask across all subjects', href: practiceHref() }
+                : live.nothing && aboutGoals
+                  ? { label: 'Ask about everything', href: practiceHref() }
+                  : undefined
+            }
+          >
+            {live.error && <AskButton label="Try again" />}
+            {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
+          </EmptyState>
+        </form>
+        {/* Nothing left to ask ends the run: say what it moved. */}
+        {live.nothing && <RunSummaryPanel />}
+      </div>
     );
   }
 
@@ -285,6 +307,7 @@ export function FlowSession({
         live={live}
         step={step}
         fields={<TrackField track={track} only={only} goal={goal} />}
+        onEnd={() => setEnded(true)}
       />
     );
   }
@@ -311,9 +334,7 @@ export function FlowSession({
       )}
       {/* A goal question (plan #1385) is named after the goal above, which is
           not in your list of tracks either, so where it comes from is said. */}
-      {live.goal && (
-        <p className="mt-0.5 text-small text-ink-muted">From your learning goals.</p>
-      )}
+      {live.goal && <p className="mt-0.5 text-small text-ink-muted">From your learning goals.</p>}
       {/* Said before the question rather than after the answer: being asked
           about something you settled months ago looks like the app having lost
           track until you know it is deliberate. Which of the two settled it is
@@ -372,9 +393,7 @@ export function FlowSession({
 
           {/* Keyed by the question, so each answer mounts a new bar that starts
               at the old width instead of reusing the last one's. */}
-          {live.track && (
-            <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />
-          )}
+          {live.track && <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />}
 
           {live.offer && (
             <TrackOfferCard
@@ -390,7 +409,10 @@ export function FlowSession({
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />
             <TrackField track={track} only={only} goal={goal} />
-            <AskButton label="Next" />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <AskButton label="Next" />
+              <EndHereButton onEnd={() => setEnded(true)} />
+            </div>
           </form>
         </div>
       )}

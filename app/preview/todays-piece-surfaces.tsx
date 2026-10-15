@@ -4,6 +4,8 @@ import { MODELS } from '@/lib/core/models';
 import type { PieceIdea } from '@/lib/learn/lessons/piece-store';
 import type { TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
 import { PieceFirst } from '@/app/learn/now/todays-piece';
+import { SummaryView } from '@/app/learn/flow/summary-card';
+import { RUN_SUMMARY } from './learn-flow-summary-surfaces';
 
 /**
  * Today's piece at the top of Now (plan #2164.4): its lessons one at a time,
@@ -137,7 +139,11 @@ export function TodaysPieceCheckSurface() {
 export function TodaysPieceDoneSurface() {
   return (
     <Costs>
-      <PieceFirst piece={piece({ check: true })} lessonsPassed={ideas.length}>
+      <PieceFirst
+        piece={piece({ check: true })}
+        lessonsPassed={ideas.length}
+        summary={<SummaryView summary={RUN_SUMMARY} />}
+      >
         {null}
       </PieceFirst>
     </Costs>

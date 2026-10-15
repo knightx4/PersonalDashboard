@@ -11,6 +11,7 @@ import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { cn } from '@/lib/cn';
 import type { PieceCheck } from '@/lib/learn/lessons/piece-check';
 import type { TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
+import { RunSummaryPanel } from '@/app/learn/flow/summary-card';
 import { LessonCard, useWrittenLessons } from '@/app/learn/s/[id]/p/[piece]/piece-view';
 import { answerPieceCheck, askPieceCheck, type AnswerResult, type AskResult } from '@/app/learn/s/[id]/p/[piece]/actions';
 
@@ -46,7 +47,10 @@ export function PieceFirst({
   children,
   lessonsPassed = 0,
   write = true,
+  summary,
 }: {
+  /** Drawn in place of the summary's read, for the gallery. */
+  summary?: ReactNode;
   piece: TodaysPiece | null;
   /** The cards, drawn once the piece is finished or set aside. */
   children: ReactNode;
@@ -79,15 +83,17 @@ export function PieceFirst({
       </>
     );
   }
-  return <PieceDeck piece={piece} lessonsPassed={lessonsPassed} write={write} onCards={() => setCards(true)} />;
+  return <PieceDeck piece={piece} lessonsPassed={lessonsPassed} write={write} summary={summary} onCards={() => setCards(true)} />;
 }
 
 function PieceDeck({
   piece,
   lessonsPassed,
   write,
+  summary,
   onCards,
 }: {
+  summary?: ReactNode;
   piece: Extract<TodaysPiece, { kind: 'piece' }>;
   lessonsPassed: number;
   write: boolean;
@@ -133,6 +139,7 @@ function PieceDeck({
             pieceId={page.piece.id}
             pieceHref={pieceHref}
             initial={page.check}
+            summary={summary}
             onCards={onCards}
           />
         }
@@ -152,7 +159,10 @@ function PieceCheckStep({
   pieceHref,
   initial,
   onCards,
+  summary,
 }: {
+  /** Drawn in place of the stored-answers read, for the gallery. */
+  summary?: ReactNode;
   subjectId: string;
   pieceId: string;
   pieceHref: string;
@@ -228,6 +238,7 @@ function PieceCheckStep({
     <div>
       <div className={ITEM_HEIGHT} data-deck-item>
         {finished && check ? (
+          <>
           <Card padding="standard" aria-live="polite">
             <h2 className="flex items-center gap-1.5 font-display text-title tracking-tight text-ink">
               <Check className="size-5 text-accent" strokeWidth={1.75} aria-hidden />
@@ -249,6 +260,9 @@ function PieceCheckStep({
               </div>
             </details>
           </Card>
+          {/* What this session moved (plan #2164.6), read from the stored answers. */}
+          <div className="mt-4">{summary ?? <RunSummaryPanel />}</div>
+          </>
         ) : (
           <Card padding="standard">
             <h2 className="font-display text-title tracking-tight text-ink">Check</h2>
