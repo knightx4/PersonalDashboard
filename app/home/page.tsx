@@ -331,13 +331,15 @@ async function homeContent(
 
             {/* One line per workspace, each landing when its own brief does. A
                 workspace with nothing to say takes its placeholder away. */}
-            <ul className="mt-2 divide-y divide-border">
+            <Card padding="dense" className="mt-2 hidden has-[li]:block">
+<ul className="divide-y divide-border">
               {briefs.map(([module, brief]) => (
                 <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
                   <BriefRow module={module} brief={brief} />
                 </Suspense>
               ))}
             </ul>
+</Card>
             <Suspense fallback={null}>
               <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
             </Suspense>
