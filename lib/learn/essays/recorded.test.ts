@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import gold from './fixtures/gold-sox-ai.json';
@@ -29,7 +29,8 @@ type Recorded = {
 };
 
 const DIR = join(__dirname, 'fixtures', 'recorded');
-const FILES = readdirSync(DIR).filter((f) => f.endsWith('.json'));
+// Git keeps no empty folder, so there is none until the first recording is added.
+const FILES = existsSync(DIR) ? readdirSync(DIR).filter((f) => f.endsWith('.json')) : [];
 const load = (file: string) => JSON.parse(readFileSync(join(DIR, file), 'utf8')) as Recorded;
 
 describe('recorded responses', () => {
