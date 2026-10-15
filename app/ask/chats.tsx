@@ -1,5 +1,6 @@
 'use client';
 
+import { whenDate } from '@/lib/core/when';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname } from 'next/navigation';
 import { Search, SquarePen, X } from 'lucide-react';
@@ -64,9 +65,7 @@ export function WorkspaceDot({ id, className }: { id: ModuleId; className?: stri
 
 /** A day as "2 Oct", for chats older than a week; the day is the server's, so both renders agree. */
 export function shortDay(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(
-    new Date(`${day}T12:00:00Z`),
-  );
+  return whenDate(day, { timeZone: 'UTC', year: 'never' });
 }
 
 /** The ref of the chat open at this address, or null on /ask itself. */

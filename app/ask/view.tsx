@@ -7,6 +7,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { usePathname, useRouter } from 'next/navigation';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import type { AskChat } from '@/lib/talk/ask-chats';
+import type { Crumb } from '@/components/shell/breadcrumb';
 import { AskChats, openChatRef, type ChatEdits } from './chats';
 import { ChatUsed, type ChatUsedData } from './used';
 import {
@@ -93,8 +94,11 @@ export function AskConversation({
   openHandoffs,
   used,
   archived = false,
+  crumbs,
 }: {
   title: string;
+  /** The chat's path, from the catalogue (plan #1931.2). */
+  crumbs?: readonly Crumb[];
   conversationRef: string;
   /** Archived out of the list (plan #1899.6): said above the thread, with the way back. */
   archived?: boolean;
@@ -108,6 +112,7 @@ export function AskConversation({
     <ConversationChat
       title={title}
       back={CHATS_BACK}
+      crumbs={crumbs}
       glance={{
         label: USED_LABEL,
         short: USED_SHORT,

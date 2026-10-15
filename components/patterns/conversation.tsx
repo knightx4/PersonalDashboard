@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRight, PanelRightClose, PanelRightOpen, SquarePen, X } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRight, PanelRightClose, PanelRightOpen, SquarePen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { scrim } from '@/components/ui/popover';
 import Link from '@/components/ui/link';
@@ -9,6 +9,8 @@ import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { PageWide } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
+import { BackLink } from '@/components/shell/back-link';
+import { Breadcrumb, type Crumb } from '@/components/shell/breadcrumb';
 import { cn } from '@/lib/cn';
 
 /**
@@ -166,6 +168,7 @@ export function Conversation({
 export function ConversationChat({
   title,
   back,
+  crumbs,
   glance,
   storageKey = CONVERSATION_GLANCE_KEY,
   initialGlanceOpen,
@@ -176,6 +179,11 @@ export function ConversationChat({
   title: string;
   /** On a phone, the way back to the list the chat is drawn over. */
   back: { href: string; label: string };
+  /**
+   * The chat's path (plan #1931.2), drawn above its title from 720 pixels
+   * wide; on a phone the back link names where `from` or `back` goes.
+   */
+  crumbs?: readonly Crumb[];
   /** The column of what was used, with its name and its short name for the button. */
   glance?: { label: string; short: string; content: React.ReactNode };
   storageKey?: string;
@@ -259,15 +267,10 @@ export function ConversationChat({
       <Card padding="standard" className="mx-auto w-full min-w-0 max-w-prose">
         <div className="mb-4">
           <div className="mb-1 flex items-center justify-between gap-2 min-[720px]:hidden">
-            <Link
-              href={back.href}
-              className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-            >
-              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-              {back.label}
-            </Link>
+            <BackLink crumbs={crumbs ?? []} fallback={back} />
             {glanceButtons}
           </div>
+          {crumbs && crumbs.length > 0 && <Breadcrumb crumbs={crumbs} className="mb-1 hidden min-[720px]:flex" />}
           <div className="flex items-start gap-2">
             <h1 className="font-display line-clamp-2 min-w-0 flex-1 break-words text-title font-semibold tracking-tight text-ink">
               {title}

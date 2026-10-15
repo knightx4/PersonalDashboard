@@ -1,4 +1,5 @@
 import { moduleForPath, MODULES, type ModuleId } from '@/lib/modules';
+import { zoneDay } from '@/lib/core/when';
 import type { TalkCitation, TalkToolCall } from './talk';
 
 /**
@@ -75,12 +76,7 @@ function daysBefore(day: string, today: string): number {
 
 /** The day an instant falls on in the person's timezone, as YYYY-MM-DD. */
 export function dayIn(at: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(at));
+  return zoneDay(at, timezone);
 }
 
 /** Which day group a chat last added to on `day` sits in, seen on `today`. */

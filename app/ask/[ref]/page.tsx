@@ -9,6 +9,8 @@ import {
 } from '@/lib/talk/ask-request';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import { AskConversation } from '../view';
+import { rowSubject } from '@/lib/core/subject';
+import { toRef } from '@/lib/core/refs';
 
 export const metadata = { title: 'Dash' };
 
@@ -38,12 +40,16 @@ export default async function AskConversationPage({
   // Not there, or not theirs: RLS answers both with nothing.
   if (turns.length === 0) notFound();
   const first = turns.find((turn) => turn.role === 'user') ?? turns[0];
-  const costMicros = await loadAskChatCost(turns);
+  const [costMicros, subject] = await Promise.all([
+    loadAskChatCost(turns),
+    rowSubject(toRef('core.conversations', ref)),
+  ]);
 
   return (
     <AskConversation
       title={meta?.title?.trim() || askTitle(first.body)}
       archived={Boolean(meta?.archivedAt)}
+      crumbs={subject.path}
       conversationRef={ref}
       turns={turns}
       changes={changes}
