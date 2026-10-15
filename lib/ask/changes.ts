@@ -162,6 +162,8 @@ export function changePaths(change: DashChange): string[] {
     }
     case 'add_quick_note':
       return ['/vault', '/vault/triage'];
+    case 'start_build':
+      return ['/dev/plan', `/dev/plan/${change.input.number}`];
   }
 }
 
@@ -188,6 +190,7 @@ const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null>
   move_roles: { module: 'jobs', label: 'Jobs' },
   set_goal_done_when: { module: 'goals', label: 'Goals' },
   add_quick_note: { module: 'vault', label: 'Vault' },
+  start_build: { module: 'dev', label: 'Dev' },
 };
 
 const WRITTEN_TABLE: Record<WrittenKind, string> = {
@@ -206,6 +209,8 @@ const WRITTEN_TABLE: Record<WrittenKind, string> = {
   move_roles: 'job_search.applications',
   set_goal_done_when: 'goals.items',
   add_quick_note: 'obsidian.notes',
+  // The run the confirm starts (plan #2106.2).
+  start_build: 'public.plan_runs',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -225,6 +230,7 @@ const WRITTEN_OP: Record<WrittenKind, 'insert' | 'update'> = {
   move_roles: 'update',
   set_goal_done_when: 'update',
   add_quick_note: 'insert',
+  start_build: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -288,8 +294,16 @@ function notConfirmed(status: DashChangeStatus): string {
 type ProposalChange = Extract<DashChange, { kind: 'add_todo' | 'add_goal_step' | 'mark_returned' | 'start_watch' }>;
 
 function isProposalKind(change: DashChange): change is ProposalChange {
-  return PROPOSAL_KINDS.includes(change.kind);
+  // A started build is a proposal too, but it has no writer or undo here.
+  return change.kind !== 'start_build' && PROPOSAL_KINDS.includes(change.kind);
 }
+
+/** What a press on a build card says until Confirm starts the session (plan #2106.2). */
+export const BUILD_NOT_STARTED =
+  'Dash cannot start a build from here yet. Send the step from its row on the plan page.';
+
+/** Why a started build has no Undo. */
+export const BUILD_NO_UNDO = 'A build that has started cannot be undone.';
 
 type Written = { ref: string; undo: Record<string, unknown> | null };
 
@@ -620,6 +634,7 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
   if (!change.turnId) {
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
+  if (change.kind === 'start_build') return { ok: false, error: BUILD_NOT_STARTED, change };
   if (!isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
   const workspace = WORKSPACE[change.kind];
   if (workspace && !deps.enabledModules.includes(workspace.module)) {
@@ -739,6 +754,7 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
+  if (change.kind === 'start_build') return { ok: false, error: BUILD_NO_UNDO, change };
   if (!isProposalKind(change)) return undoWrite(deps, change, surface);
 
   try {

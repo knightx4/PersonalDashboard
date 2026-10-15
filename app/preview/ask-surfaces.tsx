@@ -439,3 +439,91 @@ export function AskMadeChangesSurface() {
     </PageColumn>
   );
 }
+
+const BUILD_TITLE = 'Show a Confirm card when Ask Dash is asked to build a step';
+const BUILD_ASKED = 'I can start this one.';
+
+/**
+ * Asking Ask Dash to build plan steps (plan #2106.1): a card naming the step
+ * with Confirm and Decline, one whose last run has gone quiet, and a step
+ * that cannot be built, refused in words with no card. `refused` draws the
+ * card after a Confirm the server turned down, with the reason under it.
+ */
+export function AskBuildSurface({ refused = false }: { refused?: boolean }) {
+  // Fixed times, so the server's render and the browser's agree.
+  const at = (minute: number) => `2026-10-15T09:${String(minute).padStart(2, '0')}:00Z`;
+  const build = (turnId: string, number: number, outline: string, title: string, quiet: boolean): DashChange => ({
+    ...CHANGE_BASE,
+    id: `${turnId}-build`,
+    turnId,
+    status: 'proposed',
+    kind: 'start_build',
+    createdAt: at(1),
+    input: { stepId: `${turnId}-step`, number, outline, title, quiet },
+  });
+  const first = build('ra', 2110, '2106.1', BUILD_TITLE, false);
+  const asked: TalkTurn[] = [
+    { id: 'pa', role: 'user', body: 'Build #2106.1', createdAt: at(0) },
+    { id: 'ra', role: 'assistant', body: BUILD_ASKED, createdAt: at(1) },
+  ];
+  const turns: TalkTurn[] = refused
+    ? asked
+    : [
+        ...asked,
+        { id: 'pb', role: 'user', body: 'Restart #1894.6.9, it looks stuck', createdAt: at(2) },
+        {
+          id: 'rb',
+          role: 'assistant',
+          body: 'Its last run has pushed nothing for 40 minutes.',
+          createdAt: at(3),
+        },
+        { id: 'pc', role: 'user', body: 'And build #2106.2 too', createdAt: at(4) },
+        {
+          id: 'rc',
+          role: 'assistant',
+          body: 'I cannot start #2106.2 yet. #2106.1 under the same feature is already underway, and a feature takes one session at a time. Ask again once that step is closed.',
+          createdAt: at(5),
+        },
+      ];
+  const changes = refused
+    ? [first]
+    : [first, build('rb', 2045, '1894.6.9', 'Let Ask Dash edit the interviews on a role', true)];
+  const source: AskSource = refused
+    ? {
+        ...FIXTURES,
+        confirm: async () => ({
+          ok: false,
+          error:
+            '#2106.2 under the same feature was claimed four minutes ago, and a feature takes one session at a time. Wait for it to finish, or put it back to not started.',
+          change: first,
+        }),
+      }
+    : FIXTURES;
+  return (
+    <AskDashProvider source={source}>
+      <PageColumn className="py-4">
+        {refused && <PressOnArrival label="Confirm" />}
+        <AskThread
+          id="ask-build-preview"
+          conversationRef="00000000-0000-4000-8000-000000000019"
+          turns={turns}
+          changes={changes}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+        />
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+/** Presses the first button reading `label` once the page has arrived: a state only a press reaches. */
+function PressOnArrival({ label }: { label: string }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === label);
+      button?.click();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [label]);
+  return null;
+}
