@@ -9,7 +9,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-3xl items-center px-6">
           <Link href="/" className={cn(PRESS_AREA, 'flex items-center gap-2')}>
-            <ModuleMark module={null} size="sm" />
+            <ModuleMark module="dash" size="sm" />
             <span className="text-body font-semibold tracking-tight">
               Dash
             </span>

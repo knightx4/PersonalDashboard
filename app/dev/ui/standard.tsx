@@ -1699,12 +1699,13 @@ export function UiStandard({
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a deep shape in the workspace's hue behind a pane in its own colour, solid so it reads on any ground, with a sheen and a lit edge to make it glass. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for Home, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a deep shape in the workspace's hue behind a pane in its own colour, solid so it reads on any ground, with a sheen and a lit edge to make it glass. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">
             <li className="card-pad-x row-pad flex flex-wrap items-center gap-3">
               <ModuleMark module={null} />
+              <ModuleMark module="dash" />
               {MODULES.map((m) => (
                 <ModuleMark key={m.id} module={m.id} />
               ))}
