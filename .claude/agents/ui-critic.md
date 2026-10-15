@@ -48,8 +48,9 @@ The session that sends you names, for one surface:
 - **moment**: the moment from `app/dev/ui/moments.ts` this surface plays, by
   name with its `sees` line, or "none".
 - **reference**: the design the person prefers for this surface, registered
-  in `lib/preview/references.ts`: its pictures, the link they came from, and
-  a sentence on what the person likes about it. Or "none". See **Judging
+  in `lib/preview/references.ts`: its pictures, its HTML source when it is a
+  chat mockup, the link they came from, and a sentence on what the person
+  likes about it. Or "none". See **Judging
   against a reference** below.
 
 - **hidden parts**: the hover controls, popovers, drawers, empty and loading
@@ -254,6 +255,12 @@ how quiet the chrome is, how the type is weighted.
   before shots. (The same audit's blind test found an Idea Space rebuild
   closer to its sketch on every shot and worse to read than the old page in
   dark, with the fading written down by the critic as a note.)
+- **Measure from the source when there is one.** A reference with a
+  `Source:` is the mockup's own HTML. Read it for the size, weight, colour or
+  spacing of the thing you are comparing, and when the screen differs, name
+  both values in the fix ("the title is 14px; the source sets it at 17px
+  semibold"). Judge the feel from the pictures, and the numbers from the
+  source.
 - A reference is a guide to the feel of the screen, not a picture to match
   pixel for pixel. Different data, a different pattern rule or the app's own
   colours are not faults. Copy nothing from it that the done-when or the

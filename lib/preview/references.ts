@@ -28,6 +28,13 @@ export type Reference = {
   pictures: readonly string[];
   /** The page the design came from, or null when it was only ever pictures. */
   link: string | null;
+  /**
+   * The design's own HTML, saved beside its pictures, for a mockup made in a
+   * chat (a claude.ai artifact). The builder and the critic read exact sizes,
+   * colours and spacing from it instead of estimating them from pixels; the
+   * builder still builds from the app's own parts and never pastes it in.
+   */
+  source?: string;
   /** What the person prefers about it, in a sentence, for the critic. */
   why: string;
   /** The step that registered it, by outline, such as "1891.2". */
@@ -42,18 +49,21 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
   'ask-page': {
     pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
     link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
+    source: 'docs/references/ask-page/mockup.html',
     why: 'The mockup the person looked at for decision #1899.1: chats grouped by day on the left with the workspaces each used, the open chat at reading width beside them, and on a phone the list as the page with a chat opening over it.',
     from: '1899.2',
   },
   'ask-page-at-work': {
     pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
     link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
+    source: 'docs/references/ask-page/mockup.html',
     why: 'The same mockup, for the open chat while Dash answers: the chat at reading width with the box at its foot, the answer appearing in the chat as it is written.',
     from: '1899.8',
   },
   'ask-page-used': {
     pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
     link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
+    source: 'docs/references/ask-page/mockup.html',
     why: 'The same mockup, for its right-hand column: under "Used in this chat", the rows Dash read with their workspace, the changes, the lookups, the files and what the chat cost, each part headed with its count.',
     from: '1899.4',
   },
@@ -92,10 +102,16 @@ export function referenceNamed(text: string): ReferenceLine | null {
   return { pictures, links };
 }
 
+/** A mockup made in a chat, whose HTML can be read and saved: a claude.ai artifact link. */
+export function isChatMockup(link: string): boolean {
+  return /^https:\/\/claude\.ai\/(?:code\/)?artifact\//.test(link);
+}
+
 /**
  * What is wrong with a set of references: a surface the gallery does not
- * have, a reference with neither pictures nor a link, or a picture that is
- * not in the repository. Empty when nothing is.
+ * have, a reference with neither pictures nor a link, a picture or source
+ * that is not in the repository, or a chat mockup registered without its
+ * source. Empty when nothing is.
  */
 export function referenceProblems(
   references: Readonly<Record<string, Reference>>,
@@ -112,6 +128,12 @@ export function referenceProblems(
     for (const picture of reference.pictures) {
       if (!exists(picture)) problems.push(`${surface}: ${picture} is not in the repository`);
     }
+    if (reference.source && !exists(reference.source)) {
+      problems.push(`${surface}: ${reference.source} is not in the repository`);
+    }
+    if (!reference.source && reference.link && isChatMockup(reference.link)) {
+      problems.push(`${surface}: a chat mockup with no source; save its HTML beside its pictures`);
+    }
   }
   return problems;
 }
@@ -124,6 +146,11 @@ export function referenceProblems(
 export function referenceForCritic(surface: string, reference: Reference): string {
   const parts = [`${surface}, registered by #${reference.from}: ${reference.why}`];
   if (reference.pictures.length > 0) parts.push(`Pictures: ${reference.pictures.join(', ')}.`);
+  if (reference.source) {
+    parts.push(
+      `Source: ${reference.source}. Read sizes, colours and spacing from it rather than estimating them from the pictures.`,
+    );
+  }
   if (reference.link) {
     parts.push(
       reference.pictures.length > 0

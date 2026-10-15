@@ -451,13 +451,13 @@ function referenceLines(
   if (named) {
     const listed = [...named.pictures, ...named.links].join(', ');
     lines.push(
-      `The step names a reference design: ${listed}. Register it in lib/preview/references.ts under the surface it is for, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link the first time), before round 1.`,
+      `The step names a reference design: ${listed}. Register it in lib/preview/references.ts under the surface it is for, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link the first time, and save a chat mockup's HTML there as its source), before round 1.`,
     );
   }
   if (mockups.length > 0) {
     if (named) lines.push('');
     lines.push(
-      `Mockups approved for this work. Register each in lib/preview/references.ts under the surface it draws, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link at 390 and 1280; save a drawing's SVG from plan_item_pictures), before round 1, so the critic judges every round against it:`,
+      `Mockups approved for this work. Register each in lib/preview/references.ts under the surface it draws, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link at 390 and 1280 and save a chat mockup's HTML there as its source; save a drawing's SVG from plan_item_pictures), before round 1, so the critic judges every round against it:`,
       '',
       ...mockups,
     );
