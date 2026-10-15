@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, onTestFinished } from 'vitest';
 import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import { changeSentence } from '@/lib/ask/change-view';
 import type { AskSchema } from '@/lib/ask/db';
@@ -332,6 +332,10 @@ describe('add_items', () => {
   const added = () => tables['public.inventory_items'].filter((r) => ![CATAN, CATAN_TWO, DUNE, THEIRS].includes(r.id as string));
 
   it('adds a book by its ISBN, a game and a plain item, as the add pages save them, and Undo takes them away', async () => {
+    // The expected days are written for 14 October; pin the clock so the test passes on any day.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
+    onTestFinished(() => vi.useRealTimers());
     const kept = await viaAsk('add_items', {
       items: [
         { kind: 'book', isbn: '0-441-17271-7' },
