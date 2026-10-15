@@ -25,8 +25,8 @@ import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
  * corner. A new mark that breaks one of these will look like it came from a
  * different set.
  *
- * module={null} is Home: a glass house in iridescent white, pearl and liquid
- * chrome where the other marks have a hue. module="dash" is Dash, and the
+ * module={null} is Home: a house of thick, clear glass that splits light into
+ * colour round its rim, where the other marks have a hue. module="dash" is Dash, and the
  * app itself: Dash at rest on a dark plate, the same drawing as app/icon.svg.
  */
 
@@ -58,6 +58,13 @@ type Drawing = {
   dots?: React.ReactNode;
   /** Drawn on the colour layer itself, in white. */
   onBack?: React.ReactNode;
+  /**
+   * For a prism mark only: the corners where thick glass bends light most, as
+   * [x, y, radius], so the spectrum in the rim gathers there; and the light
+   * caught on the glass, in white.
+   */
+  bends?: readonly (readonly [number, number, number])[];
+  glints?: React.ReactNode;
 };
 
 const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
@@ -142,6 +149,22 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
     front:
       'M10.47 4.59Q12 3.3 13.53 4.59L19.98 10.07Q21.2 11.1 21.2 12.7V18A3.2 3.2 0 0 1 18 21.2H6A3.2 3.2 0 0 1 2.8 18V12.7Q2.8 11.1 4.02 10.07Z',
     lines: <path d="M9.9 20.4V17.3a2.1 2.1 0 0 1 4.2 0v3.1" />,
+    // The peak, the two eaves and the two foot corners.
+    bends: [
+      [12, 4.2, 4.2],
+      [3.6, 11.6, 3.4],
+      [20.4, 11.6, 3.4],
+      [4.6, 19.4, 3.6],
+      [19.4, 19.4, 3.6],
+    ],
+    // A streak along the lit slope of the roof, and a point of light at the peak.
+    glints: (
+      <>
+        <path d="M4.9 11.3 10.5 6.5" stroke="#fff" strokeWidth={0.9} strokeLinecap="round" />
+        <circle cx={12} cy={5.3} r={0.5} fill="#fff" />
+        <path d="M6.4 19.9h3M15.2 19.9h2.4" stroke="#fff" strokeWidth={0.6} strokeLinecap="round" strokeOpacity={0.8} />
+      </>
+    ),
   },
   person: {
     // A bust: the head is the colour, sitting into a pair of glass shoulders,
@@ -167,29 +190,26 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
 };
 
 /**
- * The prism pane's pearl: ice, lavender, blush, champagne and mint, pale
- * enough that the pane still reads white, the way a holographic film does
- * between its bright bands.
+ * The colours a prism mark's glass splits light into: deep cobalt and electric
+ * cyan, a little lime, then amber, orange and magenta into violet, the
+ * saturated dispersion of very refractive glass rather than a flat rainbow.
+ * It runs corner to corner across the mark, so each part of the rim takes a
+ * different colour, as the edge of a thick piece of glass does.
  */
-const PEARL = [
-  { offset: 0, colour: '#d4eaff' },
-  { offset: 0.3, colour: '#ece0ff' },
-  { offset: 0.52, colour: '#ffdfeb' },
-  { offset: 0.74, colour: '#fff1d2' },
-  { offset: 1, colour: '#d6f6ef' },
+const SPECTRUM = [
+  { offset: 0, colour: '#1d3cff' },
+  { offset: 0.16, colour: '#2f9bff' },
+  { offset: 0.3, colour: '#3fe6ff' },
+  { offset: 0.4, colour: '#cfff4a' },
+  { offset: 0.5, colour: '#ffb21e' },
+  { offset: 0.62, colour: '#ff5a14' },
+  { offset: 0.76, colour: '#ff2e8a' },
+  { offset: 0.9, colour: '#7a2cff' },
+  { offset: 1, colour: '#1d3cff' },
 ] as const;
 
-/**
- * The bright bands that flow across the pearl, each split into a cool edge,
- * a white core and a warm edge, as light disperses through a curved lens.
- */
-const BANDS = [
-  { d: 'M1 17.2C5.5 10.6 9.8 15.6 14.4 10.1S20 4.4 23.4 4.8', cool: '#3d7bff', warm: '#ff7a2e' },
-  { d: 'M2.4 23.4C7.6 18.6 11.6 21.6 15.8 17.4S21 13.8 23.6 13.9', cool: '#8a5cff', warm: '#ff4f9a' },
-] as const;
-
-/** Between the two bands. */
-const STREAK = 'M1.2 20.6C6.4 14.4 10.6 18.6 15 13.8S20.6 9 23.6 9.4';
+/** The rim's spectrum away from the bends: there, but faint. */
+const RIM_FLOOR = 0.32;
 
 function GlassObject({
   id,
@@ -226,9 +246,8 @@ function GlassObject({
       <defs>
         <linearGradient id={`${id}-ramp`} gradientUnits="userSpaceOnUse" x1={4} y1={2} x2={20} y2={22}>
           <stop offset="0" stopColor={from} />
-          {/* A pearl pane's colour layer is pearl too, a little deeper than the pane. */}
-          {prism && <stop offset="0.45" stopColor="#dfe5f2" />}
-          <stop offset="1" stopColor={prism ? '#aeb8cf' : to} />
+          {/* A prism mark's colour layer is silver, paler than its ink. */}
+          <stop offset="1" stopColor={prism ? '#9aa4b8' : to} />
         </linearGradient>
         <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={1.25} />
@@ -249,24 +268,81 @@ function GlassObject({
         </linearGradient>
         {prism && (
           <>
-            <linearGradient id={`${id}-pearl`} gradientUnits="userSpaceOnUse" x1={3} y1={20} x2={21} y2={4}>
-              {PEARL.map((stop) => (
+            {/* Corner to corner, and the same the other way for the inner rim. */}
+            <linearGradient id={`${id}-spectrum`} gradientUnits="userSpaceOnUse" x1={3} y1={3} x2={21} y2={21}>
+              {SPECTRUM.map((stop) => (
+                <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+              ))}
+            </linearGradient>
+            <linearGradient id={`${id}-reverse`} gradientUnits="userSpaceOnUse" x1={21} y1={21} x2={3} y2={3}>
+              {SPECTRUM.map((stop) => (
+                <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+              ))}
+            </linearGradient>
+            <linearGradient id={`${id}-caustic`} gradientUnits="userSpaceOnUse" x1={3} y1={0} x2={21} y2={0}>
+              {SPECTRUM.map((stop) => (
                 <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
               ))}
             </linearGradient>
             <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
-              <feGaussianBlur stdDeviation={0.38} />
+              <feGaussianBlur stdDeviation={0.55} />
             </filter>
+            <filter id={`${id}-fine`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={0.22} />
+            </filter>
+            <filter id={`${id}-wide`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={1.1} />
+            </filter>
+            {/* The dark a thick edge refracts in from round the object: cobalt
+                under the lit top, deepening to navy at the foot. */}
+            <linearGradient id={`${id}-depth`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+              <stop offset="0" stopColor="#2a3fd0" stopOpacity={0.45} />
+              <stop offset="1" stopColor="#0a0f45" stopOpacity={0.9} />
+            </linearGradient>
+            <clipPath id={`${id}-back-clip`}>{back}</clipPath>
+            {/* Where the rim's spectrum shows: faintly everywhere, fully at the bends. */}
+            {drawing.bends?.map(([cx, cy, r], i) => (
+              <radialGradient key={i} id={`${id}-bend-${i}`} gradientUnits="userSpaceOnUse" cx={cx} cy={cy} r={r}>
+                <stop offset="0" stopColor="#fff" />
+                <stop offset="1" stopColor="#fff" stopOpacity={0} />
+              </radialGradient>
+            ))}
+            <mask id={`${id}-bends`} maskUnits="userSpaceOnUse" x={0} y={0} width={24} height={24}>
+              <rect width={24} height={24} fill="#fff" fillOpacity={RIM_FLOOR} />
+              {drawing.bends?.map(([cx, cy, r], i) => (
+                <circle key={i} cx={cx} cy={cy} r={r} fill={`url(#${id}-bend-${i})`} />
+              ))}
+            </mask>
           </>
         )}
       </defs>
 
+      {/* Light the glass has split, thrown on the ground beneath it. */}
+      {prism && (
+        <ellipse
+          cx={12}
+          cy={22.6}
+          rx={8.4}
+          ry={1.1}
+          fill={`url(#${id}-caustic)`}
+          opacity={0.3}
+          filter={`url(#${id}-wide)`}
+        />
+      )}
       {/* A soft shadow in the hue, under the whole object. */}
       <g opacity={0.4} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill={to}>
         {back}
         {pane({ opacity: 0.35 })}
       </g>
       <g fill={`url(#${id}-ramp)`}>{back}</g>
+      {prism && (
+        // The colour layer is glass too, with a thin rim of its own.
+        <g clipPath={`url(#${id}-back-clip)`}>
+          <g filter={`url(#${id}-fine)`} fill="none" stroke={`url(#${id}-reverse)`} strokeWidth={1.1} opacity={0.55}>
+            {back}
+          </g>
+        </g>
+      )}
       {onBack && (
         <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
           {onBack}
@@ -282,25 +358,30 @@ function GlassObject({
       {pane({ fill: `url(#${id}-sheen)` })}
       {prism && (
         <>
-          {/* Pearl over the white, then the bright bands flowing across it,
-              each parted into cool and warm either side of a white core, and
-              the rim parted the same way a hair apart, as a lens does. */}
-          {pane({ fill: `url(#${id}-pearl)`, opacity: 0.55 })}
+          {/* Thick glass seen the way it refracts: a deep band inside the edge,
+              where the glass bends in the dark around it; the spectrum caught
+              in the rim over that dark, gathered at the corners where it bends
+              light most; a sharper fringe where the band meets the clear
+              middle; a faint rim inside that running the other way, as light
+              reflected back through the glass does; and the light caught on
+              the glass. */}
           <g clipPath={`url(#${id}-clip)`}>
-            <g filter={`url(#${id}-soft)`} fill="none" strokeLinecap="round">
-              {/* A steel streak between the bands, the dark that makes chrome read as chrome. */}
-              <path d={STREAK} stroke="#4c5a78" strokeWidth={2.6} strokeOpacity={0.32} />
-              {BANDS.map((band) => (
-                <g key={band.d}>
-                  <path d={band.d} transform="translate(0 -.85)" stroke={band.cool} strokeWidth={0.9} strokeOpacity={0.75} />
-                  <path d={band.d} transform="translate(0 .85)" stroke={band.warm} strokeWidth={0.9} strokeOpacity={0.7} />
-                  <path d={band.d} stroke="#fff" strokeWidth={1.1} />
-                </g>
-              ))}
+            {pane({ stroke: `url(#${id}-depth)`, strokeWidth: 4.2, filter: `url(#${id}-soft)` })}
+          </g>
+          <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-bends)`}>
+            {pane({ stroke: `url(#${id}-spectrum)`, strokeWidth: 2.2, opacity: 0.65, filter: `url(#${id}-soft)` })}
+            <g transform="translate(12 12.6) scale(.88) translate(-12 -12.6)">
+              {pane({ stroke: `url(#${id}-spectrum)`, strokeWidth: 0.75, filter: `url(#${id}-fine)` })}
             </g>
           </g>
-          <g transform="translate(.35 -.3)">{pane({ stroke: BANDS[0].warm, strokeOpacity: 0.4, strokeWidth: 0.5 })}</g>
-          <g transform="translate(-.35 .3)">{pane({ stroke: BANDS[0].cool, strokeOpacity: 0.4, strokeWidth: 0.5 })}</g>
+          <g clipPath={`url(#${id}-clip)`} filter={`url(#${id}-fine)`}>
+            {/* The edge face itself, catching the light. */}
+            {pane({ stroke: '#fff', strokeWidth: 1, strokeOpacity: 0.8 })}
+            <g transform="translate(12 12.6) scale(.8) translate(-12 -12.6)">
+              {pane({ stroke: `url(#${id}-reverse)`, strokeWidth: 0.4, opacity: 0.45 })}
+            </g>
+            {drawing.glints}
+          </g>
         </>
       )}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
