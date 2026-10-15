@@ -249,6 +249,7 @@ import {
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
   PlanTreeSurface,
+  PlanAssigneeTipSurface,
   PlanTableSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
@@ -257,6 +258,8 @@ import {
   GoalStepSurface,
   GoalSubStepSurface,
   GoalTreeSurface,
+  GoalAssigneeTipSurface,
+  GoalEmptySurface,
 } from './goal-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
@@ -3826,6 +3829,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanTreeSurface />,
   },
   {
+    /* The Assignee column's tooltip held open (plan #2069.1): who a row is
+     * on, and on a split feature how many steps each holds. */
+    id: 'dev-plan-tree-assignee-tip',
+    label: 'Plan · who a row is on, tooltip open',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanAssigneeTipSurface />,
+  },
+  {
     /* The plan's Table view (plan #1669): one row per open feature, grouped
      * by module, each opening the feature's page. */
     id: 'dev-plan-table',
@@ -3937,6 +3949,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalTreeSurface />,
+  },
+  {
+    /* The Assignee tooltip held open on a stage split between you and Dash
+     * (plan #2069.2). */
+    id: 'goals-steps-tree-assignee-tip',
+    label: 'Goal · who a step is on, tooltip open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalAssigneeTipSurface />,
+  },
+  {
+    /* A goal with no steps yet: the empty state and Add a step. */
+    id: 'goals-steps-tree-empty',
+    label: 'Goal · no steps yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalEmptySurface />,
   },
   {
     /* The same goal with every step opened: detail, Needs, questions, what

@@ -32,6 +32,8 @@ import { Note } from '@/components/ui/note';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
 import { checkWaitName } from '@/lib/plan/check-backs';
 import {
+  assigneeOf,
+  assigneeTitle,
   flatten,
   healthOf as planHealthOf,
   moveOf as planMoveOf,
@@ -74,6 +76,7 @@ import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
+import { AssigneeCell } from '@/components/plan-tree/assignee-cell';
 import { MoveLabel } from '@/components/ui/move-label';
 import { MOVE_TONE, waitingOnName, type Move } from '@/lib/core/move';
 import { StateLabel } from '@/components/dev/state-label';
@@ -493,6 +496,31 @@ function moveFor(node: PlanNode, context?: MoveContext) {
   return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
+/**
+ * What a waiting row needs before it can move, for the Needs line under its
+ * title (plan #2069.1): the step it waits on by outline, or the day of the
+ * check it waits for. Only on a row whose own state is the wait, the way the
+ * move column used to name it.
+ */
+function waitNeed(node: PlanNode, context?: MoveContext): string | null {
+  if (ownMoveWord(node, context) !== 'waiting') return null;
+  if (node.waitingOn.length > 0) {
+    const names = node.waitingOn.map((ref) => stepRef(ref));
+    const list =
+      names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    return `${list} to close first`;
+  }
+  if (node.waitsUntil.length > 0) return `the check on ${checkWaitName(node.waitsUntil)}`;
+  return null;
+}
+
+/** The steps at or beneath this row that a session is working now, by outline. */
+function workedNow(node: PlanNode, context?: MoveContext): string[] {
+  return flatten([node])
+    .filter((row) => !isClosed(row.status) && (context?.working?.has(row.id) ?? false))
+    .map((row) => stepRef(row));
+}
+
 /** What this row alone would say, to tell a rollup from a row's own state. */
 function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
   return planMoveOf({ ...node, children: [] }, context);
@@ -815,7 +843,7 @@ export function usePlanRow({
   );
   // The same outlines by number, for stored text that names a step `#1084`.
   const outlines = useMemo(() => outlinesOf(refTitles), [refTitles]);
-  const health = healthOf(node, liveness, outlines);
+  const ownHealth = healthOf(node, liveness, outlines);
   const claim = liveness[node.id];
   // The run behind this row, where there is one to account for. Typed as
   // possibly missing because most rows have no run at all -- the index
@@ -846,6 +874,20 @@ export function usePlanRow({
         title: 'The overhaul routine is working this now.',
       }
     : moveFor(node, resolving);
+  // Who the row is on (plan #2069.1). An overhaul's routine is a session
+  // working the row, so its mark moves too.
+  const assigneeFacts = assigneeOf(node, resolving);
+  const assignee = overhaulRunning ? { ...assigneeFacts, working: true } : assigneeFacts;
+  // "Working now" is said in the Status tooltip, by the steps it is true of,
+  // where the row's own word does not already say a session is on it.
+  const working = workedNow(node, resolving);
+  const health =
+    working.length > 0 && ownHealth.name !== 'working'
+      ? {
+          ...ownHealth,
+          title: `${ownHealth.title ?? ''} Dash is working on ${working.join(', ')} now.`.trim(),
+        }
+      : ownHealth;
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
   // child's buttons that should be shut, not this one's.
@@ -1404,6 +1446,14 @@ export function usePlanRow({
     batchAction,
     node: criticStop ? { ...node, blockAsk: criticStopNeeds() } : node,
     health,
+    need: waitNeed(node, resolving),
+    assignee: (
+      <AssigneeCell
+        who={assignee.who}
+        working={assignee.working}
+        title={assigneeTitle(assignee)}
+      />
+    ),
     move: move.move ? (
       moveAfter && afterWord(move.move) ? (
         // Waiting on one step, the words link to it (on this page, its row).
@@ -1481,7 +1531,8 @@ export function PlanRow(props: PlanRowProps) {
       trail={trail}
       row={parts.row}
       health={parts.health}
-      move={parts.move}
+      assignee={parts.assignee}
+      need={parts.need}
       statusMenu={parts.statusMenu}
       menu={parts.menu}
       actions={PLAN_TREE_ACTIONS}

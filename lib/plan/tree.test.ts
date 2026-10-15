@@ -17,6 +17,8 @@ import {
   leavesOf,
   healthOf,
   moveOf,
+  assigneeOf,
+  assigneeTitle,
   needsThePerson,
   planBands,
   planLiveness,
@@ -1850,6 +1852,53 @@ describe('moveOf', () => {
       const step = findNode([sections], 's1')!;
       expect(moveOf(step, whileResolving)).toBe('none');
     });
+  });
+});
+
+// plan #2069.1: the Assignee column, which replaced the move column's words.
+describe('assigneeOf', () => {
+  const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
+
+  it('puts an approved step on Dash and one you kept on you', () => {
+    expect(assigneeOf(only([at('not_started', 'a')])).who).toBe('dash');
+    expect(assigneeOf(only([at('in_progress', 'a', { assignee: 'me' })])).who).toBe('you');
+  });
+
+  it('puts a question, a setup job and a proposal on you', () => {
+    expect(assigneeOf(only([at('not_started', 'a', { kind: 'decision' })])).reason).toBe('question');
+    expect(assigneeOf(only([at('not_started', 'a', { kind: 'setup' })])).reason).toBe('setup');
+    expect(assigneeOf(only([at('proposed', 'a')])).reason).toBe('proposed');
+  });
+
+  it('is both on a feature whose open steps are split, and says how many each', () => {
+    const feature = only([
+      at('not_started', 'f'),
+      at('not_started', 'a', { parentId: 'f' }),
+      at('not_started', 'b', { parentId: 'f' }),
+      at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+      at('done', 'c', { parentId: 'f', assignee: 'me' }),
+    ]);
+    const assignee = assigneeOf(feature);
+    expect(assignee).toMatchObject({ who: 'both', yours: 1, dashs: 2 });
+    expect(assigneeTitle(assignee)).toBe("Split: 1 step yours, 2 steps Dash's.");
+  });
+
+  it('reads a finished feature from the steps that were not dropped', () => {
+    const feature = only([
+      at('done', 'f'),
+      at('done', 'a', { parentId: 'f', assignee: 'me' }),
+      at('dropped', 'b', { parentId: 'f' }),
+    ]);
+    expect(assigneeOf(feature).who).toBe('you');
+  });
+
+  it('is being worked while a session works the row or a step beneath it', () => {
+    const feature = only([at('not_started', 'f'), at('in_progress', 'a', { parentId: 'f' })]);
+    expect(assigneeOf(feature).working).toBe(false);
+    expect(assigneeOf(feature, { working: new Set(['a']) }).working).toBe(true);
+    expect(assigneeTitle(assigneeOf(feature, { working: new Set(['a']) }))).toBe(
+      "Its 1 step is Dash's. A session is working on it now.",
+    );
   });
 });
 

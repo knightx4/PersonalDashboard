@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { tabFrom } from '@/lib/tabs';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { loadYourInitial } from '@/lib/core/account/your-initial';
+import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
@@ -536,16 +538,19 @@ export default async function GoalMapPage({
     >
       {tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
-          <StepTree
-            map={map}
-            stages={stages}
-            todoOn={moduleEnabled(account, 'todo')}
-            runs={stepRunLines(stepRuns)}
-            files={filesOf}
-            progress={stepProgress}
-            arrivals={arrivals}
-            canRun={owner}
-          />
+          {/* Your initial, for the Assignee column (plan #2069.2). */}
+          <YourInitialProvider initial={await loadYourInitial(user)}>
+            <StepTree
+              map={map}
+              stages={stages}
+              todoOn={moduleEnabled(account, 'todo')}
+              runs={stepRunLines(stepRuns)}
+              files={filesOf}
+              progress={stepProgress}
+              arrivals={arrivals}
+              canRun={owner}
+            />
+          </YourInitialProvider>
         </GoalStepsFold>
       ) : tab === 'activity' ? (
         <GoalActivity
