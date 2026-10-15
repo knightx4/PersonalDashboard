@@ -259,7 +259,7 @@ function pageRowLine(page: PageContext): string {
  * sent once; a second refusal stands.
  */
 export const LOOK_FIRST =
-  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, query_rows filters and counts one (table_info names its columns), search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
+  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, query_rows filters and counts one, including by whether rows of another table are linked to each (table_info names its columns and links), search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';

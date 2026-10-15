@@ -244,8 +244,15 @@ their types and the keys between them, from `public.ask_table_columns`.
 about one table in a single call: it takes conditions (equals, not equals,
 greater, less, one of, contains, empty, not empty), the columns to return and
 an order, and lists up to 200 rows, counts them, or counts them by one
-column. A column the table does not have is refused before anything is sent.
-The query is built with the client's filter methods, never from SQL text, and
+column. Its linked conditions keep the rows that have, or have none of, a row
+of another readable table linked by a key in either direction, so "which
+to-apply applications have no answers and no cover letter" is one call where
+it used to be one lookup per application. A key this table holds is tested as
+set or not; a key the other table holds is followed by embedding that table,
+filtered to the person, and testing the embed for null. PostgREST embeds only
+within one schema, so a link of that second kind from another schema is
+refused. A column or link the table does not have is refused before anything
+is sent, with the ones it does have. The query is built with the client's filter methods, never from SQL text, and
 always carries the owner filter. Every lookup ends its note with how many rows
 matched and how many it shows.
 

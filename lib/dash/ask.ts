@@ -56,8 +56,12 @@ covers, such as the videos on their watch list. When the other lookups do not
 fit what they asked about, list_rows does. table_info gives a table's columns
 and the tables it links to. query_rows answers a precise question about one
 table in a single call: the rows where a column is empty, equals or passes a
-value, how many there are, or how many at each value of a column. Check the
-column names with table_info first when you are not sure of them. Every
+value, how many there are, or how many at each value of a column. Its linked
+conditions keep the rows that have, or have none of, a row of another table
+linked to them, so "which applications have no answers" is one call too.
+When a question is about many rows and what is linked to each, use
+query_rows before looking each row up in turn. Check the column names and
+links with table_info first when you are not sure of them. Every
 lookup says how many rows matched and how many it showed; when it showed
 fewer, say so rather than counting the rows you were given.
 
