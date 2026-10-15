@@ -2,6 +2,8 @@ import { DayBarChart } from '@/components/ui/day-bar-chart';
 import type { DayMeasure, DayValue } from '@/lib/usage/day-bars';
 import { periodDays } from '@/lib/usage/day-bars';
 import { SpendOverview } from '@/app/account/spend/spend-overview';
+import { SpendByModule } from '@/app/account/spend/spend-by-module';
+import { byModule, type FunctionTotal } from '@/lib/core/spend/summary';
 import { spendTotal } from '@/lib/usage/per-day';
 
 /**
@@ -91,4 +93,22 @@ export function SpendOverviewSurface() {
       allTime={{ calls: 2_311, micros: 41_920_000, unpriced: 12 }}
     />
   );
+}
+
+const SPEND_FUNCTIONS: FunctionTotal[] = [
+  { module: 'jobs', operation: 'score-application', calls: 9_412, micros: 31_204_000, unpriced: 0 },
+  { module: 'jobs', operation: 'discover-shortlist', calls: 1_208, micros: 9_870_000, unpriced: 0 },
+  { module: 'jobs', operation: 'enrich-company-from-careers-page-and-press', calls: 311, micros: 2_105_000, unpriced: 4 },
+  { module: 'learn', operation: 'plan-topic', calls: 88, micros: 6_420_000, unpriced: 0 },
+  { module: 'learn', operation: 'lesson', calls: 412, micros: 5_980_000, unpriced: 0 },
+  { module: 'core', operation: 'dash-ask', calls: 2_034, micros: 12_440_000, unpriced: 0 },
+  { module: 'goals', operation: 'daily', calls: 1, micros: 410_000, unpriced: 0 },
+];
+
+/**
+ * Where it goes on the Account Spend page (note 7b696ccd): one fold per
+ * module with its total on the closed line, the dearest open.
+ */
+export function SpendByModuleSurface({ open = null }: { open?: string | null }) {
+  return <SpendByModule groups={byModule(SPEND_FUNCTIONS)} open={open} />;
 }

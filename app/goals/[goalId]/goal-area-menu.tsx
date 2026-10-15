@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { ChipInput } from '@/components/ui/field';
@@ -10,6 +11,7 @@ import { formatDue, type DuePrecision } from '@/lib/goals/due-precision';
 import type { GoalStatus } from '@/lib/goals/tree';
 import { editGoal, settleGoalAction } from '../actions';
 import { useMoveToItems, type Place } from '../move-goal';
+import { usePutAwayItems } from '../put-away';
 
 /**
  * The goal's own menu beside its heading: move it to another area
@@ -17,11 +19,14 @@ import { useMoveToItems, type Place } from '../move-goal';
  * always has a date it is due by, so turning a goal with no due date into
  * one asks for the date first, in a line beside the menu. An open goal can
  * be closed from here, and a closed or parked one taken back up (plan #1341),
- * with the same move Today and All goals use.
+ * with the same move Today and All goals use. Park goal and Archive goal put
+ * it away (plan #2097.1) and go back to All goals, where the toast offers the
+ * undo.
  */
 export function GoalAreaMenu({
   goal,
   places,
+  steps,
 }: {
   goal: {
     id: string;
@@ -31,11 +36,16 @@ export function GoalAreaMenu({
     dueOn: string | null;
     duePrecision?: DuePrecision;
     status: GoalStatus;
+    archivedAt?: string | null;
   };
   places: Place[];
+  /** How many steps the goal holds, for Archive's confirm. */
+  steps: number;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const moves = useMoveToItems(goal, places);
+  const putAway = usePutAwayItems(goal, steps, () => router.push('/goals/all'));
   const [asking, setAsking] = useState(false);
   const [due, setDue] = useState(goal.dueOn ?? '');
   const [pending, startTransition] = useTransition();
@@ -111,7 +121,7 @@ export function GoalAreaMenu({
           </Button>
         </form>
       )}
-      <ActionMenu label={`${goal.title} actions`} items={[...moves, errandItem, ...settleItems]} />
+      <ActionMenu label={`${goal.title} actions`} items={[...moves, errandItem, ...settleItems, ...putAway]} />
     </span>
   );
 }

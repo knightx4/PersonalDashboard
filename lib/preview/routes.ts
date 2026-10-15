@@ -83,6 +83,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-inbox': ['/learn/inbox'],
   'news-inbox': ['/news/inbox'],
   'goals-all': ['/goals/all'],
+  'goals-all-menu': ['/goals/all'],
+  'goals-all-toast': ['/goals/all'],
+  'goals-all-select': ['/goals/all', '/goals/area/[areaId]'],
+  'goals-all-select-confirm': ['/goals/all'],
+  'goals-all-select-toast': ['/goals/all'],
+  'goals-page-top-menu': ['/goals/[goalId]'],
+  'goals-page-top-archive': ['/goals/[goalId]'],
   'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
   'goals-page-steps': ['/goals/[goalId]'],
@@ -259,6 +266,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
   'account-spend-overview': ['/account/spend'],
+  'account-spend-by-module': ['/account/spend'],
+  'account-spend-by-module-open': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
   // A component surface (COMPONENT_SURFACES); the pages it opens on have their own.
