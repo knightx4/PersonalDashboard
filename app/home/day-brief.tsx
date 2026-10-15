@@ -1,4 +1,3 @@
-import { Card } from '@/components/ui/card';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { AGENDA_HREF } from '@/lib/day-brief/picks';
@@ -20,40 +19,38 @@ import { PickLink } from './pick-link';
  */
 export function DayBrief({ brief, day }: { brief: ShownBrief; day: string }) {
   return (
-    <section id={BRIEF_ANCHOR} aria-label="This morning's brief" className="mt-4 scroll-mt-bar">
-      <Card padding="standard">
-        {brief.kind === 'body' && <p className="max-w-prose text-body text-ink">{brief.body}</p>}
+    <section id={BRIEF_ANCHOR} aria-label="This morning's brief" className="scroll-mt-bar">
+      {brief.kind === 'body' && <p className="max-w-prose text-body text-ink">{brief.body}</p>}
 
-        {brief.kind === 'picks' && (
-          <ol className="space-y-2.5">
-            {brief.picks.map((pick) => (
-              <li key={pick.key} data-pick={pick.key} className="max-w-prose">
-                <PickLink
-                  day={day}
-                  pickKey={pick.key}
-                  href={pick.href}
-                  className={cn('text-body font-semibold', linkVariants({ tone: 'quiet' }), 'text-ink hover:text-accent')}
-                >
-                  {pick.title}
-                </PickLink>
-                {pick.reason && <p className="mt-0.5 text-small text-ink-muted">{pick.reason}</p>}
-              </li>
-            ))}
-          </ol>
-        )}
+      {brief.kind === 'picks' && (
+        <ol className="space-y-2.5">
+          {brief.picks.map((pick) => (
+            <li key={pick.key} data-pick={pick.key} className="max-w-prose">
+              <PickLink
+                day={day}
+                pickKey={pick.key}
+                href={pick.href}
+                className={cn('text-body font-semibold', linkVariants({ tone: 'quiet' }), 'text-ink hover:text-accent')}
+              >
+                {pick.title}
+              </PickLink>
+              {pick.reason && <p className="mt-0.5 text-small text-ink-muted">{pick.reason}</p>}
+            </li>
+          ))}
+        </ol>
+      )}
 
-        {brief.kind === 'none' && <p className="text-body text-ink">Nothing stands out today.</p>}
+      {brief.kind === 'none' && <p className="text-body text-ink">Nothing stands out today.</p>}
 
-        {brief.kind !== 'body' && (
-          <p className="mt-3 text-small text-ink-muted">
-            {brief.kind === 'picks' ? 'Everything else is on the ' : 'Your to-dos are on the '}
-            <Link href={AGENDA_HREF} className={linkVariants()}>
-              Agenda
-            </Link>
-            .
-          </p>
-        )}
-      </Card>
+      {brief.kind !== 'body' && (
+        <p className="mt-3 text-small text-ink-muted">
+          {brief.kind === 'picks' ? 'Everything else is on the ' : 'Your to-dos are on the '}
+          <Link href={AGENDA_HREF} className={linkVariants()}>
+            Agenda
+          </Link>
+          .
+        </p>
+      )}
     </section>
   );
 }

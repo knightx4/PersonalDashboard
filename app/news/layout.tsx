@@ -16,14 +16,16 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
   return shellFor({
     module: 'news',
     /**
-     * Quick read first, because it is where News opens (#848). Reading an issue
+     * Now and Inbox first, as in every workspace (plan #1937.6). Now is Quick
+     * read, because it is where News opens (#848). Reading an issue
      * is a deeper view of the list rather than a place of its own, so it lights
      * the Newsletters tab instead of growing one. Saved comes last (#870): it
      * is where you go back to, after reading. Daily review sits beside Quick
      * read (plan #1616): the evening's review of the same stories.
      */
     sections: [
-      { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+      { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
+      { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
       { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
       {
         href: '/news/all',

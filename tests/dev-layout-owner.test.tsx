@@ -37,8 +37,8 @@ vi.mock('@/lib/plan/load', () => ({
   },
 }));
 
-vi.mock('@/lib/raised/notifications', () => ({
-  loadRaisedNotifications: async () => {
+vi.mock('@/lib/raised/open-raises', () => ({
+  loadOpenRaises: async () => {
     state.loaded.push('raised');
     return [];
   },

@@ -1,23 +1,20 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadPeople } from '@/lib/people/load';
 import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { ShoppingSettingsView } from './settings-view';
 
-export const metadata = { title: 'Settings' };
+export const metadata = { title: 'Shopping settings' };
 
-export default async function SettingsPage({
+export default async function ShoppingSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ inbox?: string }>;
+  searchParams: Promise<{ inbox?: string; tab?: string | string[] }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
   const core = await createCoreClient();
   const params = await searchParams;
-
-  const settings = await loadAccountSettings(user.id);
 
   const { data: accounts } = await core
     .from('email_accounts')
@@ -111,8 +108,6 @@ export default async function SettingsPage({
 
   return (
     <ShoppingSettingsView
-      email={user.email}
-      settings={settings}
       people={people}
       accounts={accounts ?? []}
       bannerCode={params.inbox}
@@ -125,6 +120,7 @@ export default async function SettingsPage({
       itemTags={itemTags ?? []}
       lists={lists ?? []}
       returnPolicies={returnPolicies}
+      tab={params.tab}
     />
   );
 }

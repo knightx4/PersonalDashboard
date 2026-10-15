@@ -32,12 +32,32 @@ export function WatchingSection({
   return (
     <Card id="watching" padding="standard" className="scroll-mt-bar">
       <SectionHeading title="Watching" />
-      <ul className="mt-2 divide-y divide-border">
-        {rows.map((row) => (
-          <WatchRow key={row.id} row={row} now={now} timezone={timezone} />
-        ))}
-      </ul>
+      <WatchingList rows={rows} now={now} timezone={timezone} className="mt-2" />
     </Card>
+  );
+}
+
+/**
+ * The watches without the card round them: Home draws them inside its rail's
+ * fold (plan #1937.8), which carries the heading, the count and #watching.
+ */
+export function WatchingList({
+  rows,
+  now,
+  timezone,
+  className,
+}: {
+  rows: readonly WatchingRow[];
+  now: Date;
+  timezone: string;
+  className?: string;
+}) {
+  return (
+    <ul className={cn('divide-y divide-border', className)}>
+      {rows.map((row) => (
+        <WatchRow key={row.id} row={row} now={now} timezone={timezone} />
+      ))}
+    </ul>
   );
 }
 

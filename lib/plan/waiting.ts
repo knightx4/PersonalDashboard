@@ -228,7 +228,8 @@ export type WaitingGroup = {
 const GROUP_TITLE: Record<WaitingGroupKey, string> = {
   actions: 'Your actions',
   questions: 'Questions for you',
-  approve: 'To approve',
+  // The Inbox page's own word for the section (components/inbox/inbox-page.tsx).
+  approve: 'To review',
 };
 
 /** Which group a plan row finishes in. */

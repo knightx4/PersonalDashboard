@@ -80,5 +80,7 @@ export const goalsSources: ModuleSources = {
     'goals.document_kinds',
     'goals.progress_entries',
     'goals.metrics',
+    // Whether the morning and weekly runs start (/goals/settings).
+    'goals.settings',
   ].map((table) => ({ table, reason: OWN, page: PAGES[table] })),
 };

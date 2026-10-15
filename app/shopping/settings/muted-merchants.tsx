@@ -1,4 +1,3 @@
-import { Ban } from 'lucide-react';
 import { restoreMerchantExclusion } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 
@@ -49,14 +48,5 @@ export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchan
         </ul>
       )}
     </div>
-  );
-}
-
-export function MutedMerchantsTitle() {
-  return (
-    <span className="flex items-center gap-2">
-      <Ban className="size-4 text-ink-muted" strokeWidth={1.75} />
-      Muted merchants
-    </span>
   );
 }

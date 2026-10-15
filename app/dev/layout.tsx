@@ -3,7 +3,7 @@ import { createClient, getUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { NoPermission } from '@/components/shell/no-permission';
 import type { NavSection } from '@/components/shell/app-shell';
-import type { Notification } from '@/components/shell/notifications-button';
+import { loadOpenRaises, type OpenRaise } from '@/lib/raised/open-raises';
 import { loadDevBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
@@ -23,8 +23,8 @@ import { countProposedSpecChanges } from '@/lib/specs/changes';
  * workspace that had nothing to do with it. It is its own place now, with the
  * ideas list beside it.
  *
- * No onboarding gate and no settings of its own: nothing here needs a mailbox
- * connected, and there is nothing about this workspace to configure.
+ * No onboarding gate: nothing here needs a mailbox connected. Its settings
+ * page holds the routines that work the repository (plan #1937.10).
  */
 export default async function DevLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -55,6 +55,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
 
   // Started here, beside the shell's own reads, and awaited by the Inbox tab.
   const inboxReads = Promise.all([
+    // The open raises, which the shell read for the bell until plan #1937.7.
+    loadOpenRaises(user.id),
     loadPlanForRequest(user.id),
     // Changes to specs waiting on a yes, which Home lists under To approve
     // (plan #1506).
@@ -73,14 +75,17 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   return shellFor({
     module: 'dev',
     user,
-    sections: async ({ raised }) => devSections(raised, ...(await inboxReads)),
-    brief: async ({ raised }) => loadDevBrief(devWaiting(raised, ...(await inboxReads))),
+    sections: async () => devSections(...(await inboxReads)),
+    brief: async () => loadDevBrief(devWaiting(...(await inboxReads))),
+    // The routines that work the repository, moved off Home (plan #1937.10).
+    settingsHref: '/dev/settings',
+    settingsLabel: 'Dev settings',
     children,
   });
 }
 
 function devWaiting(
-  raised: Notification[],
+  raised: OpenRaise[],
   plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
   specChanges: number,
   runQuestions: number,
@@ -106,7 +111,7 @@ function devWaiting(
 }
 
 function devSections(
-  raised: Notification[],
+  raised: OpenRaise[],
   plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
   specChanges: number,
   runQuestions: number,
@@ -115,7 +120,7 @@ function devSections(
   const waiting = devWaiting(raised, plan, specChanges, runQuestions, snoozes);
 
   /**
-   * Home is first because it is the page the day starts on: what is running,
+   * Now (Home until plan #1937.6) is first because it is the page the day starts on: what is running,
    * the summary of the last 24 hours, and every conversation you have had with
    * Dash. The Inbox beside it holds the questions a session needs answered
    * before it can carry on. A question nobody reads is a session that guessed.
@@ -146,7 +151,8 @@ function devSections(
   return [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
-    { href: '/dev/raised', label: 'Home', icon: 'devHome' },
+    // Named Now, as every workspace's first section is (plan #1937.6).
+    { href: '/dev/raised', label: 'Now', icon: 'devHome' },
     // Everything waiting on you, the way an inbox holds what is addressed to
     // you. Home carried it until the summary and the conversations pushed it
     // down the page; the badge is the length of this list.

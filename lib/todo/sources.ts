@@ -1,7 +1,7 @@
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of Todo's nav its rows sit under (app/todo/layout.tsx). */
-const AGENDA: Section = { href: '/todo', label: 'Agenda' };
+const AGENDA: Section = { href: '/todo', label: 'Now' };
 const CALENDAR: Section = { href: '/todo/calendar', label: 'Calendar' };
 const ALL: Section = { href: '/todo/all', label: 'All' };
 

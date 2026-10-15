@@ -9,7 +9,6 @@ import { CasePageView, type CasePage } from '@/components/jobs/case-page';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
 import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
-import { ThoughtList } from '@/app/jobs/(app)/settings/career-goals';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
 import { WelcomeForm } from '@/app/jobs/(onboarding)/onboarding/forms';
 import type { Activity, ActivityEntry } from '@/lib/jobs/activity/load';
@@ -435,30 +434,6 @@ export function JobsAnswersSurface() {
         <AnswerBank questions={QUESTIONS} />
       </div>
     </>
-  );
-}
-
-// ---- Career goals -----------------------------------------------------------
-
-export function JobsThoughtsSurface() {
-  // The career goals section as Settings draws it.
-  return (
-    <ThoughtList
-      thoughts={[
-        {
-          id: 'th1',
-          body: 'I want a strategic finance role at a company between 200 and 1,000 people, where the planning model is the thing the leadership team argues over. Not another reporting job. I am strongest at building the model and weakest at presenting it, so a role with a CFO who lets me present would be worth a smaller title.',
-          written: 'Oct 2, 2026',
-          edited: 'Oct 4, 2026',
-        },
-        {
-          id: 'th2',
-          body: 'Starting the search. Open to FP&A or strategic finance, fintech or developer tools, New York or remote.',
-          written: 'Jul 1, 2026',
-          edited: null,
-        },
-      ]}
-    />
   );
 }
 

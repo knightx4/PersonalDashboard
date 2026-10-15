@@ -55,9 +55,10 @@ export const jobsActions: ModuleActions = {
     markTouchAnswered: tool('change_touch'),
   },
   'app/jobs/(app)/settings/actions.ts': {
-    updateProfile: none('setting'),
+    saveProfileField: none('setting'),
     disconnectInbox: none('account'),
     savePreference: none('setting'),
+    saveShowNudges: none('setting'),
   },
   'app/jobs/(app)/settings/sender-actions.ts': {
     addExcludedSender: none('setting'),

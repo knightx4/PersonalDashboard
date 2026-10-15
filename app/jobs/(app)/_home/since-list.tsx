@@ -90,9 +90,9 @@ export function SinceList({ since, timezone }: { since: SinceView; timezone: str
                 return (
                   <li
                     key={entry.id}
-                    className="row-pad flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+                    className="row-pad flex flex-col gap-y-0.5"
                   >
-                    <span className="inline-flex shrink-0 items-center gap-1 self-center text-small text-ink-muted first-letter:uppercase">
+                    <span className="inline-flex items-center gap-1 text-small text-ink-muted">
                       <Icon className="size-3.5 text-ink" strokeWidth={1.75} aria-hidden />
                       <span className="first-letter:uppercase">{entry.label}</span>
                     </span>
@@ -107,7 +107,7 @@ export function SinceList({ since, timezone }: { since: SinceView; timezone: str
                       ) : (
                         <span className="text-ui text-ink">{entry.subject}</span>
                       ))}
-                    <span className="text-small text-ink-muted sm:ml-auto">
+                    <span className="tabular text-small text-ink-muted">
                       {formatDateTime(entry.at, timezone)}
                     </span>
                   </li>

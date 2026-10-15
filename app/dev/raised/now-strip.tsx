@@ -62,8 +62,8 @@ function mainChip(check: MainCheck | null): Chip {
  * The top of Home: what is running and what is waiting, one chip each, every
  * chip a link to the page that holds the detail. The first question of the
  * morning is "is anything going, and is anything broken", and it used to take
- * the whole Status card to answer. The controls are still on that card,
- * folded under this strip.
+ * the whole Status card to answer. The controls that were on that card are
+ * on Dev settings now (plan #1937.10).
  *
  * The chips wrap rather than scroll at phone width, so all four are read
  * without a swipe.
