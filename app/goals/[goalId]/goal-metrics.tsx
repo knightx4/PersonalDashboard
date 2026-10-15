@@ -154,7 +154,7 @@ function MetricChartCard({ metric, held }: { metric: MetricView; held?: number }
             {chart.targetShare !== null && (
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-ink-muted"
+                className="pointer-events-none absolute inset-x-0 z-over-link border-t border-dashed border-ink-muted"
                 style={{ bottom: pct(chart.targetShare) }}
               />
             )}
