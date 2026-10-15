@@ -185,11 +185,12 @@ describe('fringe', () => {
     expect(rows[0].unlocks).toBeGreaterThanOrEqual(rows[rows.length - 1].unlocks);
   });
 
-  it('includes a missed cell that is ready, and puts a lens below its target first', () => {
+  it('puts a missed cell that is ready first, then a lens below its target', () => {
     const m = map([ev('return1', 'met'), ev('return2', 'not_met')]);
     const rows = fringe(m, readCells(m), { lensTargets: new Map([['rf', 3]]) });
-    expect(rows.find((r) => r.cellId === 'return2')?.status).toBe('missed');
-    expect(rows[0]).toMatchObject({ cellId: 'rf1', inLens: true });
+    // The miss comes back before anything untouched, the lens included.
+    expect(rows[0]).toMatchObject({ cellId: 'return2', status: 'missed' });
+    expect(rows[1]).toMatchObject({ cellId: 'rf1', inLens: true });
   });
 
   it('leaves out draft topics', () => {

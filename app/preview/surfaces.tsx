@@ -1,6 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
-import { CellAnswerPreview } from './cell-answer-surface';
+import { CellAnswerPreview, PracticeRunPreview } from './cell-answer-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -5630,6 +5630,63 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
+    /* A question Practice Flow picked (plan #2138.6), with the reason it was
+     * chosen opened, and End run beside the forward action. */
+    id: 'learn-practice-why',
+    label: 'Practice Flow · Why this question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" openWhy />,
+  },
+  {
+    /* The end of a run: every level that moved while it lasted. */
+    id: 'learn-practice-run-end',
+    label: 'Practice Flow · End of a run',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end" />,
+  },
+  {
+    /* A run ended before anything was answered. */
+    id: 'learn-practice-run-end-empty',
+    label: 'Practice Flow · End of a run, nothing answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-empty" />,
+  },
+  {
+    /* A run that ended because nothing was left to ask. */
+    id: 'learn-practice-run-end-nothing-left',
+    label: 'Practice Flow · End of a run, nothing left',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-nothing-left" />,
+  },
+  {
+    /* The next question while it is chosen and written. */
+    id: 'learn-practice-loading',
+    label: 'Practice Flow · Choosing the next question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="loading" />,
+  },
+  {
+    /* No approved topic to place you on. */
+    id: 'learn-practice-no-topic',
+    label: 'Practice Flow · No topic yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="no-topic" />,
+  },
+  {
+    /* The next question could not be chosen. */
+    id: 'learn-practice-error',
+    label: 'Practice Flow · Choosing failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="error" />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything

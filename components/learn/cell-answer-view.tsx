@@ -8,6 +8,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import Link from '@/components/ui/link';
 import { DashAction } from '@/components/ui/dash-action';
 import { Textarea } from '@/components/ui/field';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
@@ -38,6 +39,8 @@ export type AskedCellView = {
   question: string;
   /** A case (levels 4 to 6) is worked and typed; an explanation is written out. Absent means explain. */
   format?: 'explain' | 'case';
+  /** Why Practice Flow chose this level, opened on tap (plan #2138.6). */
+  why?: string;
 };
 
 export type CellAnswerState = {
@@ -155,14 +158,39 @@ function SendButton({ pending: drawnPending }: { pending?: boolean }) {
  */
 const UNDER_DOCK = 'pb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:pb-0';
 
-function ForwardRow({ children }: { children: React.ReactNode }) {
+function ForwardRow({ children, endHref }: { children: React.ReactNode; endHref?: string }) {
   return (
     <Card
       padding="none"
       className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center justify-end gap-2 px-3 py-2 lg:static"
     >
+      {endHref && (
+        <Link href={endHref} className={cn(buttonVariants({ variant: 'ghost', size: 'lg' }), 'mr-auto')}>
+          End run
+        </Link>
+      )}
       {children}
     </Card>
+  );
+}
+
+/**
+ * The question while it is chosen and, for a case, written: the card's shape
+ * with the forward row where it will be, so nothing moves when it lands.
+ */
+export function CellQuestionSkeleton() {
+  return (
+    <div className={UNDER_DOCK} aria-busy>
+      <Card padding="standard">
+        <p className="text-small text-ink-muted">Choosing your next question…</p>
+        <Skeleton className="mt-2 h-4 w-full" />
+        <Skeleton className="mt-2 h-4 w-3/4" />
+        <Skeleton className="mt-4 h-36 w-full" />
+      </Card>
+      <ForwardRow>
+        <Skeleton className="h-(--control-h) w-36" />
+      </ForwardRow>
+    </div>
   );
 }
 
@@ -171,8 +199,10 @@ export function CellAnswerView({
   state,
   action,
   nextHref,
+  endHref,
   pending,
   openFirstQuote,
+  openWhy,
 }: {
   asked: AskedCellView;
   state: CellAnswerState;
@@ -180,17 +210,33 @@ export function CellAnswerView({
   action?: (formData: FormData) => void;
   /** Where Next goes once the answer is graded. */
   nextHref: string;
+  /** Where End run goes: the run's summary. Absent outside a run. */
+  endHref?: string;
   /** Drawn mid-grade by the gallery; the live screen reads it from the form. */
   pending?: boolean;
   /** Draws the first quote open, for the gallery. */
   openFirstQuote?: boolean;
+  /** Draws the reason open, for the gallery. */
+  openWhy?: boolean;
 }) {
   const head = (
     <>
       <p className="text-small text-ink-muted">
         {asked.topicName} · Level {asked.level} · {asked.format === 'case' ? 'Work this case' : 'Explain in your own words'}
       </p>
-      <p className="mt-1 text-body text-ink">{asked.question}</p>
+      {/* The heaviest text on the card: the question is what the screen is for. */}
+      <p className="mt-1 text-title leading-snug text-ink">{asked.question}</p>
+      {asked.why && (
+        <Disclosure
+          title="Why this question"
+          defaultOpen={openWhy}
+          className="mt-3"
+          summaryClassName="text-small font-normal text-ink-muted"
+          bodyClassName="pt-1 pl-5 text-small text-ink-muted"
+        >
+          {asked.why}
+        </Disclosure>
+      )}
     </>
   );
 
@@ -218,7 +264,7 @@ export function CellAnswerView({
             </ul>
           </Card>
         )}
-        <ForwardRow>
+        <ForwardRow endHref={endHref}>
           <Link href={nextHref} className={buttonVariants({ size: 'lg' })} data-deck-next>
             Next
             <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
@@ -249,7 +295,7 @@ export function CellAnswerView({
               ? 'Show your working and say what you chose. Finish with your answer.'
               : 'Write it as you would explain it to a colleague.'
           }
-          className={cn('mt-4 max-h-none min-h-36', pending && 'text-ink-muted')}
+          className={cn('mt-4 max-h-none min-h-36 placeholder:text-body', pending && 'text-ink-muted')}
           aria-describedby={state.error ? `answer-error-${asked.questionId}` : undefined}
           required
         />
@@ -259,7 +305,7 @@ export function CellAnswerView({
           </p>
         )}
       </Card>
-      <ForwardRow>
+      <ForwardRow endHref={endHref}>
         <SendButton pending={pending} />
       </ForwardRow>
     </form>

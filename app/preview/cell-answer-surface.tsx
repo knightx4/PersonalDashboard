@@ -2,9 +2,13 @@
 
 import {
   CellAnswerView,
+  CellQuestionSkeleton,
   type AskedCellView,
   type CellAnswerState,
 } from '@/components/learn/cell-answer-view';
+import { NoTopicToPlace, PracticeError } from '@/components/learn/practice-states';
+import { RunSummaryView } from '@/components/learn/run-summary-view';
+import type { RunSummary } from '@/lib/learn/levels/run';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ANSWER_CELL_PAID } from '@/components/learn/cell-answer-view';
 import { HAIKU } from '@/lib/core/models';
@@ -155,15 +159,65 @@ const caseMoved: Moved = {
 };
 
 const NEXT = '/learn/now?practice=1';
+const RUN = '2026-10-15T09:00:00.000Z';
+const END = `/learn/now?practice=1&end=${encodeURIComponent(RUN)}`;
+
+/** The reason Practice Flow gives for a placement question (plan #2138.6). */
+const placementWhy =
+  'Finding your level on CAPM. You hold it to level 2, and this splits what is still unknown above that in half.';
+
+/** A run's end: what moved over five answers, with a link put in question. */
+const runEnded: RunSummary = {
+  answered: 5,
+  shown: [
+    { cellId: 'capm3', topicName: 'CAPM', level: 3 },
+    { cellId: 'dcf4', topicName: 'Discounted cash flow', level: 4 },
+    { cellId: 'sys2', topicName: 'Systematic and idiosyncratic risk', level: 2 },
+  ],
+  implied: [
+    { cellId: 'beta1', topicName: 'Beta', level: 1 },
+    { cellId: 'beta2', topicName: 'Beta', level: 2 },
+    { cellId: 'dcf3', topicName: 'Discounted cash flow', level: 3 },
+    { cellId: 'rf1', topicName: 'Risk-free rate of return on government debt', level: 1 },
+  ],
+  missed: [{ cellId: 'capm5', topicName: 'CAPM', level: 5 }],
+  doubted: [{ from: { topicName: 'CAPM', level: 3 }, to: { topicName: 'Return', level: 2 } }],
+};
+
+/** The end of a practice run, the question skeleton, and the states with no question (plan #2138.6). */
+export function PracticeRunPreview({ state }: { state: 'end' | 'end-empty' | 'end-nothing-left' | 'loading' | 'no-topic' | 'error' }) {
+  switch (state) {
+    case 'end':
+      return <RunSummaryView summary={runEnded} againHref={NEXT} />;
+    case 'end-empty':
+      return (
+        <RunSummaryView
+          summary={{ answered: 0, shown: [], implied: [], missed: [], doubted: [] }}
+          againHref={NEXT}
+        />
+      );
+    case 'end-nothing-left':
+      return <RunSummaryView summary={{ ...runEnded, doubted: [] }} againHref={NEXT} nothingLeft />;
+    case 'loading':
+      return <CellQuestionSkeleton />;
+    case 'no-topic':
+      return <NoTopicToPlace />;
+    case 'error':
+      return <PracticeError message="Reading your topic map failed: the connection timed out." retryHref={NEXT} />;
+  }
+}
 
 export function CellAnswerPreview({
   state,
   pending,
   openFirstQuote,
+  openWhy,
 }: {
   state: 'asked' | 'loading' | 'error' | 'reached' | 'quote' | 'case' | 'case-reached';
   pending?: boolean;
   openFirstQuote?: boolean;
+  /** Draws the question as Practice Flow picks it, with its reason opened. */
+  openWhy?: boolean;
 }) {
   const isCase = state === 'case' || state === 'case-reached';
   const drawn: CellAnswerState =
@@ -185,9 +239,11 @@ export function CellAnswerPreview({
   return (
     <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>
       <CellAnswerView
-        asked={isCase ? caseAsked : asked}
+        asked={isCase ? caseAsked : openWhy ? { ...asked, why: placementWhy } : asked}
         state={drawn}
         nextHref={NEXT}
+        endHref={openWhy ? END : undefined}
+        openWhy={openWhy}
         pending={pending ?? state === 'loading'}
         openFirstQuote={openFirstQuote ?? state === 'quote'}
       />

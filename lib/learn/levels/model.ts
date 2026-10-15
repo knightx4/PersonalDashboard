@@ -293,8 +293,9 @@ export type FringeOptions = {
 
 /**
  * Every open or missed cell whose level below is held and whose required
- * cells are all held, ranked: inside a lens below its target first, then by
- * interest weight, then by how many cells holding it would unlock.
+ * cells are all held, ranked: misses first, then inside a lens below its
+ * target, then by interest weight, then by how many cells holding it would
+ * unlock.
  */
 export function fringe(map: TopicMap, readings: Readings, options: FringeOptions = {}): FringeRow[] {
   const ix = index(map);
@@ -326,9 +327,13 @@ export function fringe(map: TopicMap, readings: Readings, options: FringeOptions
     });
   }
 
+  // A miss comes back before a cell nothing has touched (idea eacdd0c9):
+  // counting a miss as settled would let the part you got wrong drift out of
+  // reach behind new material. Cells already held are not on the fringe.
   const weight = options.weight ?? (() => 0);
   return rows.sort(
     (a, b) =>
+      Number(b.status === 'missed') - Number(a.status === 'missed') ||
       Number(b.inLens) - Number(a.inLens) ||
       weight(b.topicId) - weight(a.topicId) ||
       b.unlocks - a.unlocks ||
