@@ -159,6 +159,30 @@ describe('the box it opens', () => {
     vi.unstubAllGlobals();
     vi.stubGlobal('fetch', fetched);
   });
+
+  // Every workspace's tabs join the list once something is typed (plan
+  // #2208.4; tests/search-opening-list.test.tsx). Before that, the owner's
+  // box opened narrowed in Jobs still lists only Jobs's own pages.
+  it("opens on this workspace's pages, with no other workspace's tabs", () => {
+    const html = renderToStaticMarkup(
+      <CaptureProvider>
+        <CommandPalette
+          account="11111111-1111-4111-8111-111111111111"
+          module="jobs"
+          sections={sections}
+          enabledModules={['jobs', 'dev', 'learn']}
+          isOwner
+          theme={SYSTEM_THEME}
+          open
+          opensOn="jobs"
+          onOpenChange={() => {}}
+        />
+      </CaptureProvider>,
+    );
+    expect(html).toContain('Pipeline');
+    expect(html).not.toContain('Ideas');
+    expect(html).not.toContain('Reading lists');
+  });
 });
 
 /**
