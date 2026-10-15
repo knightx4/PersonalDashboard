@@ -1,4 +1,6 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { loadYourInitial } from '@/lib/core/account/your-initial';
+import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { featureTable } from '@/lib/plan/feature-table';
 import { updateOverdueDays } from '@/lib/plan/updates';
 import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
@@ -260,8 +262,11 @@ export async function renderPlanPage({
   // "New feature" is a link to this page with the surface open (plan #1670),
   // keeping the view it was pressed from.
   const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
+  // Your initial, for the Assignee cells (plan #2069.1).
+  const initial = await loadYourInitial(user);
 
   return (
+    <YourInitialProvider initial={initial}>
     <PageColumn className="space-y-6">
       <PageHeader
         subject={
@@ -326,5 +331,6 @@ export async function renderPlanPage({
         canSend={canSend}
       />
     </PageColumn>
+    </YourInitialProvider>
   );
 }

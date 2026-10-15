@@ -632,7 +632,7 @@ function FeatureSteps({
               'divide-y divide-border overflow-hidden [&>li]:opacity-100',
             )}
           >
-            <ColumnHeader status={MOVE_LABEL} priority="Size" />
+            <ColumnHeader priority="Size" />
             {view === 'tree' && !held
               ? steps.map((step) => row(step))
               : groups.map((group) => (

@@ -59,7 +59,15 @@ vi.mock('@/app/dev/plan/actions', () => {
   };
 });
 
+// A goal's page reads the router; outside the app there is no path, as here before.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => null,
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+const { StepTree } = await import('@/app/goals/[goalId]/step-tree');
 const { withSessionDrop } = await import('@/app/dev/plan/plan-row');
 type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
@@ -480,11 +488,9 @@ describe('PlanView', () => {
     // only while the row is under the pointer, which is what keeps the
     // resting column to Next and Someday. The rule is the class now.
     expect(html).toContain('opacity-0 group-hover:opacity-100');
-    // Not who has it: the Who column was dropped deliberately -- it was a
-    // column of dashes with the occasional "Dash" in it. Who has a step is on
-    // the open step, in the "Dash's" view, and in the menu that sets it, and
-    // the next two assertions are the ones that cover those.
-    expect(html).not.toContain('>Dash<');
+    // Who has it is the Assignee column now (plan #2069.1), marks with the
+    // word beside them, and the "Dash's" view still lists Dash's steps.
+    expect(html).toContain('>Dash<');
     expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
     // Named by where it sits, as its row reads: #3 is the feature's second step.
@@ -498,7 +504,7 @@ describe('PlanView', () => {
 
   it('lays every depth out on the same columns, with the tree drawn in the name cell', () => {
     const html = render('open');
-    expect(html).toContain('>Health<');
+    expect(html).toContain('>Status<');
     expect(html).toContain('>Steps<');
     // The sub-steps carry a guide line; the feature at the top does not.
     expect((html.match(/bg-border-strong/g) ?? []).length).toBeGreaterThan(0);
@@ -750,27 +756,27 @@ describe('PlanView', () => {
 });
 
 /**
- * The Status column, which is the whole point of there being two.
+ * The Status and Assignee columns (plan #2069.1).
  *
- * Health and status had been one word, so the page could not say "a session is
- * on this" and "three of its seven steps are done" at the same time. These
- * assert the page draws both, and that the words come out of the fixture the
- * way the rules say they should.
+ * Status is the row's health; Assignee is who the row is on, as your initial,
+ * Dash's mark or both. What a row waits on is in the Status tooltip and the
+ * Needs line, and no column says "Dash is on it", "With Dash" or "Waiting on".
  */
-describe('health and status, as two columns', () => {
-  it('heads both columns', () => {
+describe('the Status and Assignee columns', () => {
+  it('heads the columns Step, Status, Assignee, Priority, Steps', () => {
     const html = render('all');
-    expect(html).toContain('>Health<');
-    expect(html).toContain('>Status<');
+    const heads = ['Step', 'Status', 'Assignee', 'Priority', 'Steps'].map((word) =>
+      html.indexOf(`>${word}<`),
+    );
+    expect(heads.every((at) => at > -1)).toBe(true);
+    expect([...heads].sort((a, b) => a - b)).toEqual(heads);
+    expect(html).not.toContain('>Health<');
   });
 
-  // The complaint the note was filed about: a feature whose first step is done
-  // used to go on saying "Not started", with a progress bar beside it saying
-  // otherwise on the same line.
+  // A feature whose first step is done used to go on saying "Not started",
+  // with a progress bar beside it saying otherwise on the same line.
   it('calls a feature with a finished step in progress, not not-started', () => {
     const html = render('all');
-    // The row's own two cells: the health menu carries the row's name in its
-    // label, and the health word and the status word follow it in order.
     const from = html.indexOf('Status of #1 Share links');
     expect(from).toBeGreaterThan(-1);
     const row = html.slice(from, from + 1200);
@@ -778,42 +784,26 @@ describe('health and status, as two columns', () => {
     expect(row).not.toContain('Not started');
   });
 
-  // The words are lib/core/move.ts's. "On you" is a view chip too, so the
-  // tooltip is what places the word in a row's Status cell.
-  it('says a blocked step and a proposal are on you', () => {
+  it('names the step a waiting row waits on in its Status tooltip and Needs line', () => {
     const html = render('all');
-    expect(html).toContain('On you');
-    expect(html).toContain('Stopped on you');
+    expect(html).toContain('Waits on #1.2');
+    expect(html).toContain('#1.2 to close first');
   });
 
-  it('says a step held up by another is waiting', () => {
+  it('says none of the move words in any column', () => {
     const html = render('all');
-    expect(html).toContain('Waiting');
-    expect(html).toContain('Waiting on another step that has not closed.');
+    for (const word of ['Dash is on it', 'With Dash', 'Waiting on #']) {
+      expect(html).not.toContain(word);
+    }
   });
 
-  // #694. The runner takes anything approved that is not yours, so "handed
-  // over" is no longer a state a row can be in and the word for it is gone
-  // from the page in both places it was written.
-  it('says nothing about an approved step waiting its turn', () => {
-    const html = render('all');
-    expect(html).not.toContain('For Dash');
-    expect(html).not.toContain('Handed to Dash');
-  });
-
-  it('says On you for a step you marked, underway or not', () => {
+  it('puts a question, a proposal and a step you kept on you, and the rest on Dash', () => {
     const marked = buildPlanTree({
       items: [
-        item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
-        item({
-          id: 'going',
-          title: 'Account deletion',
-          assignee: 'me',
-          status: 'in_progress',
-          startedAt: '2026-02-01T09:30:00Z',
-        }),
-        // The runner's own step, in the same render, saying nothing.
+        item({ id: 'kept', title: 'Outlook ingestion', assignee: 'me' }),
         item({ id: 'queued', title: 'Receipts by photo' }),
+        item({ id: 'asked', title: 'Which bank?', kind: 'decision' }),
+        item({ id: 'idea', title: 'Plan a week', status: 'proposed' }),
       ],
       dependencies: [],
     });
@@ -831,26 +821,50 @@ describe('health and status, as two columns', () => {
         unfolded
       />,
     );
-    // Both marked rows say it, and the underway one is not read as a
-    // session's: marking a step is what holds the runner off it, whoever
-    // started it. The word is the shared On you (lib/core/move.ts); the
-    // tooltip is what tells a kept step from one stopped on you.
-    expect((html.match(/You kept this one, so the runner will not take it\./g) ?? []).length).toBe(2);
-    expect(html).not.toContain('With Dash');
+    expect(html).toContain('Yours. You kept it, so the runner leaves it for you.');
+    expect(html).toContain('Yours to answer.');
+    expect(html).toContain('Yours to approve. Dash builds it once you do.');
+    expect(html).toContain("Dash&#x27;s. The runner takes it when it is ready.");
   });
 
-  it('says With Dash for an underway step you did not mark', () => {
-    const running = buildPlanTree({
+  it('draws both on a feature whose open steps are split, with the counts', () => {
+    const split = buildPlanTree({
       items: [
-        item({
-          id: 'session',
-          title: 'Outlook ingestion',
-          status: 'in_progress',
-          startedAt: '2026-02-01T09:30:00Z',
-        }),
+        item({ id: 'f', title: 'Share links' }),
+        item({ id: 'a', title: 'Schema', parentId: 'f' }),
+        item({ id: 'b', title: 'The page', parentId: 'f' }),
+        item({ id: 'c', title: 'Copy', parentId: 'f', assignee: 'me' }),
       ],
       dependencies: [],
     });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(split, 'open')}
+        finished={[]}
+        summary={summarize(split)}
+        view="open"
+        catalog={catalogOf(split)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('>Both<');
+    expect(html).toContain('Split: 1 step yours, 2 steps Dash&#x27;s.');
+  });
+
+  it('moves Dash’s mark only while a session works the row', () => {
+    const NOW = Date.parse('2026-09-17T12:00:00Z');
+    const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+    const items = [
+      item({ id: 'fresh', title: 'Outlook ingestion', status: 'in_progress', startedAt: ago(10) }),
+      item({ id: 'gone', title: 'Account deletion', status: 'in_progress', startedAt: ago(300) }),
+      item({ id: 'resting', title: 'Receipts by photo' }),
+    ];
+    const liveness = planLiveness(items, {}, NOW);
+    const running = buildPlanTree({ items, dependencies: [] }, liveness);
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(running, 'open')}
@@ -861,13 +875,18 @@ describe('health and status, as two columns', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        liveness={liveness}
         commitChecks={{}}
         unfolded
       />,
     );
-    expect(html).toContain('With Dash');
-    expect(html).not.toContain('>Yours<');
+    // The fresh claim is the one a session is on; the abandoned one and the
+    // step nobody has claimed keep a still mark. Each row draws its cell twice,
+    // once for the phone's line and once for the column.
+    expect((html.match(/data-dash-state="working"/g) ?? []).length).toBe(2);
+    expect(html).toContain('A session is working on it now.');
   });
+
 });
 
 /**
@@ -1282,5 +1301,80 @@ describe('a step a session added under an approved feature', () => {
       expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest)).toBe(rest);
       expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest)).toBe(rest);
     });
+  });
+});
+
+/**
+ * One header for the plan and a goal (plan #2069.2).
+ *
+ * The goal page moved off the plan's columns once without anybody asking
+ * (commit 713202da), so this fails if the two stop drawing the same header.
+ * The one difference is the fourth column, which a goal heads When.
+ */
+describe('the header a goal page shares with the plan', () => {
+  /** The labels of the first column header in the markup, in order. */
+  function headerOf(html: string): string[] {
+    const at = html.search(/<li aria-hidden="true" class="[^"]*uppercase tracking-wide/);
+    expect(at).toBeGreaterThan(-1);
+    const header = html.slice(at, html.indexOf('</li>', at));
+    return [...header.matchAll(/<span[^>]*>([^<]*)<\/span>/g)]
+      .map((m) => m[1]!)
+      .filter((label) => label.length > 0);
+  }
+
+  it('draws Step, Status, Assignee, When, Steps over a goal, with Priority for When on the plan', () => {
+    const goal = renderToStaticMarkup(
+      <StepTree
+        map={{
+          goal: {
+            id: 'goal-role',
+            areaId: 'career',
+            title: 'Land your next role',
+            acceptance: null,
+            status: 'open',
+            position: 10,
+            unit: null,
+            target: null,
+          },
+          areaName: 'Career',
+          steps: [
+            {
+              id: 'list',
+              parentId: 'goal-role',
+              kind: 'mine',
+              status: 'open',
+              title: 'List the roles to aim for',
+              detail: null,
+              acceptance: null,
+              resolution: null,
+              dismissedAt: null,
+              dueOn: null,
+              position: 10,
+              rhythmCount: null,
+              rhythmPeriod: null,
+              onTodo: false,
+              result: null,
+              resultUrl: null,
+              reviewedAt: null,
+              children: [],
+            },
+          ],
+          linked: [],
+          otherGoals: [],
+          linksOf: {},
+          rhythms: {},
+          information: {},
+          answers: {},
+          threads: {},
+        }}
+        todoOn={false}
+        stages={null}
+      />,
+    );
+    const goalHeader = headerOf(goal);
+    const planHeader = headerOf(render('all'));
+    expect(goalHeader).toEqual(['Step', 'Status', 'Assignee', 'When', 'Steps']);
+    expect(planHeader).toEqual(['Step', 'Status', 'Assignee', 'Priority', 'Steps']);
+    expect(goalHeader.map((label) => (label === 'When' ? 'Priority' : label))).toEqual(planHeader);
   });
 });
