@@ -1,6 +1,10 @@
 'use client';
 
-import { AskThread } from '@/components/shell/ask-dash';
+import { AskThread, useAskDash } from '@/components/shell/ask-dash';
+import { ModuleMark } from '@/components/ui/module-mark';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
+import type { ModuleId } from '@/lib/modules';
 import type { ChangePresses } from '@/components/talk/dash-changes';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
@@ -60,6 +64,7 @@ export function DashChatsFrame({
   return (
     <Conversation
       label="Chats"
+      fill
       open={openChatRef(pathname) !== null}
       newChat={{ href: '/ask', label: 'New chat' }}
       list={
@@ -113,6 +118,7 @@ export function AskConversation({
       title={title}
       back={CHATS_BACK}
       crumbs={crumbs}
+      fill
       glance={{
         label: USED_LABEL,
         short: USED_SHORT,
@@ -129,7 +135,7 @@ export function AskConversation({
       onAnswered={() => router.refresh()}
       label="Ask a follow-up"
       placeholder="Ask more about this"
-      startWriting
+      dock
     />
     </ConversationChat>
   );
@@ -168,34 +174,98 @@ export function ArchivedNote({
 /** On a phone, the way from an open chat back to the list it is drawn over. */
 export const CHATS_BACK = { href: '/ask', label: 'Chats' };
 
-const NEW_CHAT_OPENING =
-  'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.';
+/** Under the heading of a new chat: what Dash reads and what he will not do unasked. */
+const NEW_CHAT_LINE =
+  'I look things up in your own orders, applications, todos, goals, notes and email, and link every row I used. Nothing is changed until you confirm it.';
 
 /**
- * A new chat on the page (plan #1899.2): Dash's opening line and the box,
- * open. Once the first answer lands the chat has an address, and the page
- * moves to it so the list shows it and a reload keeps it.
+ * Questions a new chat offers to start from, one per workspace, shown for the
+ * workspaces the account has on. Each is a question Dash can answer from
+ * lookups alone, so a press costs one answer and changes nothing.
+ */
+export const STARTERS: readonly { workspace: ModuleId; question: string }[] = [
+  { workspace: 'jobs', question: 'Which applications have not heard back in two weeks?' },
+  { workspace: 'shopping', question: 'What did I spend this month, by shop?' },
+  { workspace: 'todo', question: 'What is overdue on my todo list?' },
+  { workspace: 'goals', question: 'Which goal have I left alone the longest?' },
+  { workspace: 'learn', question: 'What is left on my reading list?' },
+  { workspace: 'vault', question: 'What have I written about my job search?' },
+];
+
+/** The starters for these workspaces, or all of them when the list is not known. */
+export function startersFor(workspaces: readonly ModuleId[] | undefined) {
+  return workspaces ? STARTERS.filter((starter) => workspaces.includes(starter.workspace)) : STARTERS;
+}
+
+/**
+ * A new chat on the page (plan #1899.2): Dash's mark, what he can do, the box
+ * open in the middle of the pane and questions to start from under it. Once
+ * the first answer lands the chat has an address, and the page moves to it
+ * so the list shows it and a reload keeps it.
  */
 export function NewDashChat() {
   const router = useRouter();
+  const workspaces = useAskDash()?.workspaces;
   const [asked, setAsked] = useState(false);
+  // A starter pressed: the thread is drawn again with it as its question.
+  const [starter, setStarter] = useState<string | null>(null);
+  const starters = startersFor(workspaces);
   return (
-    <ConversationChat title="New chat" back={CHATS_BACK}>
-      <AskThread
-        id="ask-new"
-        conversationRef={null}
-        turns={[]}
-        onConversation={(ref) => {
-          router.replace(`/ask/${ref}`);
-          router.refresh();
-        }}
-        onSend={() => setAsked(true)}
-        label="Ask a question"
-        placeholder="What did I spend on eBay this month?"
-        startWriting
-        // Dash's opening line, drawn as his first turn until the first question goes.
-        opening={asked ? undefined : NEW_CHAT_OPENING}
-      />
+    <ConversationChat title="New chat" back={CHATS_BACK} fill>
+      <div
+        className={
+          asked
+            ? 'flex flex-1 flex-col'
+            : 'flex flex-col justify-center gap-6 py-6 min-[720px]:min-h-[calc(100dvh-14rem)]'
+        }
+      >
+        {!asked && (
+          <div className="flex flex-col items-center text-center">
+            <ModuleMark module="dash" size="lg" />
+            <h2 className="font-display mt-4 text-balance text-title font-semibold tracking-tight text-ink">
+              What should we look up?
+            </h2>
+            <p className="mt-1.5 max-w-md text-pretty text-body text-ink-muted">{NEW_CHAT_LINE}</p>
+          </div>
+        )}
+        {/* Grows to the pane's foot once a question is out, so the box docks there. */}
+        <div className={asked ? 'flex flex-1 flex-col' : undefined}>
+        <AskThread
+          key={starter ?? 'new'}
+          id="ask-new"
+          conversationRef={null}
+          turns={[]}
+          ask={starter ?? undefined}
+          onConversation={(ref) => {
+            router.replace(`/ask/${ref}`);
+            router.refresh();
+          }}
+          onSend={() => setAsked(true)}
+          label="Ask a question"
+          placeholder="Ask about your money, jobs, todos or notes"
+          dock
+        />
+        </div>
+        {!asked && starters.length > 0 && (
+          <ul aria-label="Questions to start from" className="flex flex-wrap justify-center gap-2">
+            {starters.map(({ workspace, question }) => (
+              <li key={workspace}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAsked(true);
+                    setStarter(question);
+                  }}
+                  className={cn(buttonVariants({ variant: 'secondary' }), 'h-auto min-h-11 text-left font-normal sm:min-h-9')}
+                >
+                  <ModuleMark module={workspace} size="xs" />
+                  {question}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </ConversationChat>
   );
 }

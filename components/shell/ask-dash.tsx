@@ -446,6 +446,8 @@ export function AskThread({
   /** Just above the question box: the page Dash will be told (plan #1272). */
   above?: React.ReactNode;
   startWriting?: boolean;
+  /** The box always open at the foot of the pane, as on the Dash page. */
+  dock?: boolean;
   ask?: string;
   /** For the preview gallery: the box opens with these words in it. */
   initialDraft?: string;
