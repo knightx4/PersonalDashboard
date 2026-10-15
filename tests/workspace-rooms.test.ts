@@ -6,13 +6,15 @@
  *
  * The section lists are built inside server layouts that read the database,
  * so this reads the layouts' source instead: every object literal with both
- * an `href` and a `label` is a section, in the order it is written.
+ * an `href` and a `label` is a section, in the order it is written. A layout
+ * that builds its bar with `tabsFor` is read through lib/shell/tabs.ts.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { MODULES } from '@/lib/modules';
+import { WORKSPACE_TABS, type TabWorkspace } from '@/lib/shell/tabs';
 
 const ROOT = join(__dirname, '..');
 
@@ -69,16 +71,42 @@ function read(file: string): { sections: Section[]; settings: boolean } {
   );
   const sections: Section[] = [];
   let settings = false;
+  // A layout that builds its bar from lib/shell/tabs.ts (plan #2208.2) names
+  // the workspace in `tabsFor('<id>', …)` and its badges by href, as the
+  // string keys of the object it hands `withBadges`.
+  let listed: TabWorkspace | null = null;
+  const badged = new Set<string>();
   const visit = (node: ts.Node) => {
     if (ts.isObjectLiteralExpression(node)) {
       const href = stringProp(node, 'href');
       const label = stringProp(node, 'label');
-      if (href !== null && label !== null) sections.push({ href, label, badge: hasProp(node, 'badge') });
+      if (href !== null && label !== null)
+        sections.push({ href, label, badge: hasProp(node, 'badge') });
       if (stringProp(node, 'settingsHref') !== null) settings = true;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const [first, second] = node.arguments;
+      if (node.expression.text === 'tabsFor' && first && ts.isStringLiteral(first)) {
+        listed = first.text as TabWorkspace;
+      }
+      if (node.expression.text === 'withBadges' && second && ts.isObjectLiteralExpression(second)) {
+        for (const prop of second.properties) {
+          if (ts.isPropertyAssignment(prop) && ts.isStringLiteral(prop.name))
+            badged.add(prop.name.text);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
+  if (listed !== null) {
+    const tabs = WORKSPACE_TABS[listed as TabWorkspace].map(({ href, label }) => ({
+      href,
+      label,
+      badge: badged.has(href),
+    }));
+    return { sections: [...tabs, ...sections], settings };
+  }
   return { sections, settings };
 }
 
