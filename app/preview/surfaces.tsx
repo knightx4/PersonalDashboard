@@ -149,6 +149,14 @@ import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import {
+  LearnTopicDraftCommentPreview,
+  LearnTopicDraftMatchPreview,
+  LearnTopicDraftPreview,
+  LearnTopicsErrorPreview,
+  LearnTopicsLoadingPreview,
+  LearnTopicsPreview,
+} from './learn-topic-surfaces';
+import {
   LearnCourseCheckPreview,
   LearnCoursesEmptyPreview,
   LearnCoursesListPreview,
@@ -7427,6 +7435,50 @@ export const SURFACES: readonly Surface[] = [
 
   /* The Learn pages that had no picture (plan #1602). Fixtures in
    * learn-page-surfaces.tsx. */
+  {
+    /* Learn's topics (plan #2138.2): drafts first, then the map. */
+    id: 'learn-topics',
+    label: 'Topics · Name a goal, and the topics you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsPreview />,
+  },
+  {
+    id: 'learn-topics-loading',
+    label: 'Topics · While a draft is written',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsLoadingPreview />,
+  },
+  {
+    id: 'learn-topics-error',
+    label: 'Topics · When drafting fails',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsErrorPreview />,
+  },
+  {
+    /* A draft topic to read, reword and approve (plan #2138.2). */
+    id: 'learn-topic-draft',
+    label: 'Topic · A draft to approve',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftPreview />,
+  },
+  {
+    id: 'learn-topic-draft-match',
+    label: 'Topic · A draft close to a topic you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    id: 'learn-topic-draft-comment',
+    label: 'Topic · A draft with comments',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftCommentPreview />,
+  },
   {
     id: 'learn-concept',
     label: 'Idea · One idea, partly known',
