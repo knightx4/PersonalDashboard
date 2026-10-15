@@ -17,6 +17,7 @@
  */
 import { STALLED_AFTER_MINUTES, elapsedSince } from './elapsed';
 import type { RunWaitingStatus } from '@/lib/core/run-activities';
+import type { RunRef } from '@/lib/core/run-going';
 
 /** What a run ends as. `started` is the third state, and the one it begins in. */
 export type RunEnd = 'finished' | 'failed';
@@ -183,6 +184,19 @@ export type LastRun = {
    */
   lastLineAt?: string | null;
 };
+
+/**
+ * The run a press on the row started, while it goes (plan #1964.2.1): the
+ * row's last run when it was started by `job` and is still being worked, for
+ * the button to keep Dash's mark working. Null for a run that asked you
+ * something, one that stopped writing, one gone quiet (`quiet`), and one an
+ * older fixture gives no id.
+ */
+export function goingRunRef(run: LastRun | undefined, job: RunJob, quiet = false): RunRef | null {
+  if (!run || quiet || !run.id || run.job !== job) return null;
+  if (run.status !== 'started' || run.waiting) return null;
+  return { table: 'plan_runs', id: run.id, going: true };
+}
 
 /** The five columns a stored reading is spread across. */
 export type RunReadingColumns = {

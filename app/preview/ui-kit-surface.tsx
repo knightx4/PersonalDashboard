@@ -156,6 +156,14 @@ export function UiKit() {
           <DashAction type="button" size="sm" variant="secondary" pending estimate={GUESSED}>
             Looking it up…
           </DashAction>
+          <DashAction
+            type="button"
+            size="sm"
+            variant="secondary"
+            run={{ table: 'plan_runs', id: 'ui-kit-run', going: true }}
+          >
+            Send to Dash
+          </DashAction>
           <DashAction type="button" variant="link" estimate={GUESSED} what="Cost of the search">
             Find a reading on this idea
           </DashAction>

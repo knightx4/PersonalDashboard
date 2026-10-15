@@ -81,6 +81,7 @@ export function AreaPlanner({
               variant={hasGoals ? 'ghost' : 'secondary'}
               pending={starting}
               disabled={running !== null}
+              run={running !== null && run ? { table: 'goals.runs', id: run.runId, going: true } : null}
               estimate={cost}
               what="Cost of planning this area"
               align="end"

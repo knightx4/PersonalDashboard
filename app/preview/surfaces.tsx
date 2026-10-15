@@ -258,7 +258,7 @@ import {
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
-import { DashSeenDemo } from './dash-moment-demos';
+import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
@@ -3633,6 +3633,30 @@ export const SURFACES: readonly Surface[] = [
               acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
+        />
+      </div>
+    ),
+  },
+  {
+    /* "Dash at work" on the button that started a run (plan #1964.2.1): the
+     * press hands the area to Dash and the button's working mark stands in
+     * place of its label while the run goes. */
+    id: 'dash-action-run',
+    label: 'Dash action · a run going',
+    module: 'goals',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-run"]',
+      shows:
+        'Pressing “Plan this area” turns its mark to working beside the label, then the label gives way to the working mark alone, pulsing in the middle of a button that keeps its width, as the line beside it says Dash is planning the area.',
+    },
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">Health</p>
+        <DashRunButtonDemo
+          label="Plan this area"
+          line="Dash is planning this area · Reading your notes"
         />
       </div>
     ),
