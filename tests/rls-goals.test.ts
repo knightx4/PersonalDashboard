@@ -2301,6 +2301,7 @@ describe('RLS coverage', () => {
       'item_goals',
       'items',
       'links',
+      'metrics',
       'periods',
       'progress_entries',
       'readings',
@@ -2609,5 +2610,79 @@ describe('errands (plan #1261)', () => {
         insert into items (user_id, level, parent_id, kind, title, errand, due_on)
         values (${userA}, 'step', ${goalA}, 'mine', 'Wrap it', true, '2026-10-12')`,
     ).rejects.toThrow(/items_errand_level_ck/);
+  });
+});
+
+describe('metrics on a goal (plan #2084.1)', () => {
+  const applications = [
+    { key: 'company', label: 'Company', type: 'text' },
+    { key: 'applied', label: 'Applied', type: 'date' },
+    { key: 'old_date', label: 'Old date', type: 'date', removed: true },
+  ];
+  let list = '';
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into collections (user_id, name, fields)
+      values (${userA}, 'Applications for metrics', ${JSON.stringify(applications)}::text::jsonb)
+      returning id`;
+    list = row.id;
+  });
+
+  it('saves a metric on a goal and reads it back, with history and its owner only', async () => {
+    const [metric] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into metrics (user_id, goal_id, name, collection_id, date_field, period, target)
+      values (${userA}, ${goalA}, 'Applications', ${list}, 'applied', 'week', 5) returning id`);
+
+    const [back] = await asUser(userA, (tx) => tx<{ name: string; period: string; target: number }[]>`
+      select name, period, target from metrics where id = ${metric.id}`);
+    expect(back).toEqual({ name: 'Applications', period: 'week', target: 5 });
+
+    await asUser(userA, (tx) => tx`update metrics set archived_at = now() where id = ${metric.id}`);
+    const rows = await historyOf(metric.id);
+    expect(rows.map((r) => [r.table_name, r.action, r.actor])).toEqual([
+      ['metrics', 'insert', 'me'],
+      ['metrics', 'archive', 'me'],
+    ]);
+
+    const seen = await asUser(userB, (tx) => tx`select id from metrics where id = ${metric.id}`);
+    expect(seen).toHaveLength(0);
+    const changed = await asUser(userB, (tx) => tx`
+      update metrics set name = 'Mine now' where id = ${metric.id} returning id`);
+    expect(changed).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into metrics (user_id, goal_id, name, collection_id, date_field)
+        values (${userA}, ${goalA}, 'Not mine', ${list}, 'applied')`),
+    ).rejects.toThrow();
+  });
+
+  it('counts by a live date field of the list, on a goal only', async () => {
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Apply to three roles') returning id`;
+    await expect(
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field)
+            values (${userA}, ${goalA}, 'By company', ${list}, 'company')`,
+    ).rejects.toMatchObject({ constraint_name: 'metrics_date_field', detail: 'date_field' });
+    await expect(
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field)
+            values (${userA}, ${goalA}, 'Gone', ${list}, 'old_date')`,
+    ).rejects.toThrow(/has no field old_date/);
+    await expect(
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field)
+            values (${userA}, ${step.id}, 'On a step', ${list}, 'applied')`,
+    ).rejects.toThrow(/is not a goal/);
+
+    for (const bad of [
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field)
+            values (${userA}, ${goalA}, '  ', ${list}, 'applied')`,
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field, period)
+            values (${userA}, ${goalA}, 'Daily', ${list}, 'applied', 'day')`,
+      admin`insert into metrics (user_id, goal_id, name, collection_id, date_field, target)
+            values (${userA}, ${goalA}, 'None', ${list}, 'applied', 0)`,
+    ]) {
+      await expect(bad).rejects.toThrow(/metrics_/);
+    }
   });
 });

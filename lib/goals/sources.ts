@@ -79,5 +79,6 @@ export const goalsSources: ModuleSources = {
     'goals.answers',
     'goals.document_kinds',
     'goals.progress_entries',
+    'goals.metrics',
   ].map((table) => ({ table, reason: OWN, page: PAGES[table] })),
 };
