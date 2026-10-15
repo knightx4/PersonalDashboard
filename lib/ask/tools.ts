@@ -183,7 +183,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'query_rows',
-    description: `Ask one table of the person's own rows a precise question: the rows where a column equals, differs from, is above or below a value, is one of a list, contains some text, or is empty or not. List them (up to ${QUERY_ROWS_MAX}, in any order), count them (count_only), or count them by the values of one column (group_by). Use it for "how many applications at each status" (group_by status), "which applications have no cover letter" (a condition with op empty) or "videos added since March" (greater on the date column), in one call; use list_rows to read the newest rows or find rows by words. Column names must be the table's own: check them with table_info first when unsure. Every result says how many rows matched and how many it lists. The tables are the ones list_rows reads.`,
+    description: `Ask one table of the person's own rows a precise question: the rows where a column equals, differs from, is above or below a value, is one of a list, contains some text, or is empty or not. List them (up to ${QUERY_ROWS_MAX}, in any order), count them (count_only), or count them by the values of one column (group_by). Use it for "how many applications at each status" (group_by status), "which applications have no cover letter" (a condition with op empty) or "videos added since March" (greater on the date column), in one call; use list_rows to read the newest rows or find rows by words. linked keeps the rows that have, or have none of, a row of another table linked to them: "which to-apply applications have no answers to application questions and no cover letter" is one call on job_search.applications, with status one_of lead and drafting, cover_letter empty, and linked [{table: job_search.application_answers, present: false}]. Use it instead of looking up each row's linked rows one by one. Column names and links must be the table's own: check them with table_info (columns, linksTo, linkedFrom) first when unsure. Every result says how many rows matched and how many it lists, and names each row's parent. The tables are the ones list_rows reads.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -206,6 +206,25 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
               },
             },
             required: ['column', 'op'],
+            additionalProperties: false,
+          },
+        },
+        linked: {
+          type: 'array',
+          maxItems: 5,
+          description:
+            'Conditions on linked rows: each keeps the rows that have (present true) or have none of (present false) a row of another table linked to them by a key, either way round. The tables are those table_info lists under linksTo and linkedFrom.',
+          items: {
+            type: 'object',
+            properties: {
+              table: { type: 'string', description: 'The linked table, such as job_search.cover_letters.' },
+              present: { type: 'boolean', description: 'true for rows with at least one linked row, false for rows with none.' },
+              via: {
+                type: 'string',
+                description: 'The key column to follow, needed only where the two tables are linked more than one way.',
+              },
+            },
+            required: ['table', 'present'],
             additionalProperties: false,
           },
         },

@@ -29,12 +29,21 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
   private window: [number, number] | null = null;
   private counted = false;
   private head = false;
+  /** PostgREST embeds, `alias:table!key(column)`: the rows of `table` whose `key` is this row's id. */
+  private embeds: { alias: string; table: string; key: string; filters: Filter[] }[] = [];
 
-  constructor(private readonly rows: Row[]) {}
+  constructor(
+    private readonly rows: Row[],
+    private readonly tables: Tables = {},
+    private readonly schema = 'public',
+  ) {}
 
-  select(_columns?: string, options?: { count?: string; head?: boolean }) {
+  select(columns?: string, options?: { count?: string; head?: boolean }) {
     this.counted = options?.count === 'exact';
     this.head = options?.head === true;
+    for (const [, alias, table, key] of (columns ?? '').matchAll(/(linked_\d+):(\w+)!(\w+)\(\w+\)/g)) {
+      this.embeds.push({ alias, table, key, filters: [] });
+    }
     return this;
   }
   neq(column: string, value: unknown) {
@@ -74,7 +83,11 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
     return this;
   }
   eq(column: string, value: unknown) {
-    this.filters.push((row) => row[column] === value);
+    const [alias, inner] = column.split('.');
+    const embed = inner ? this.embeds.find((e) => e.alias === alias) : undefined;
+    if (inner && !embed) throw new Error(`fake eq: no embed ${alias}`);
+    if (embed) embed.filters.push((row) => row[inner] === value);
+    else this.filters.push((row) => row[column] === value);
     return this;
   }
   in(column: string, values: unknown[]) {
@@ -122,7 +135,19 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
     onFulfilled?: ((value: { data: Row[]; error: null; count: number | null }) => A | PromiseLike<A>) | null,
     onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
   ): PromiseLike<A | B> {
-    let out = this.rows.filter((row) => this.filters.every((f) => f(row)));
+    // An embed with no rows left after its filters reads as null, which is
+    // what PostgREST's is.null and not.is.null on an embed test.
+    const embedded = this.rows.map((row) => {
+      const out = { ...row };
+      for (const e of this.embeds) {
+        const linked = (this.tables[`${this.schema}.${e.table}`] ?? []).filter(
+          (child) => child[e.key] === row.id && e.filters.every((f) => f(child)),
+        );
+        out[e.alias] = linked.length ? linked.map((child) => ({ [e.key]: child[e.key] })) : null;
+      }
+      return out;
+    });
+    let out = embedded.filter((row) => this.filters.every((f) => f(row)));
     for (const { column, ascending } of [...this.sorts].reverse()) {
       out = [...out].sort((a, b) => {
         const x = String(a[column] ?? '');
@@ -172,10 +197,15 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
             { table: 'job_search.applications', column: 'role_id', type: 'uuid', nullable: false },
             ...APPLICATION_COLUMNS,
             { table: 'job_search.cover_letters', column: 'id', type: 'uuid', nullable: false },
+            { table: 'job_search.roles', column: 'id', type: 'uuid', nullable: false },
           ],
           links: [
             { table: 'job_search.applications', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
             { table: 'job_search.cover_letters', column: 'application_id', ref_table: 'job_search.applications', ref_column: 'id' },
+            { table: 'job_search.applications', column: 'cover_letter_id', ref_table: 'job_search.cover_letters', ref_column: 'id' },
+            { table: 'job_search.application_answers', column: 'application_id', ref_table: 'job_search.applications', ref_column: 'id' },
+            // Not a real key: a link held in another schema, which a query cannot embed.
+            { table: 'learn.watch_list', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
             { table: 'job_search.applications', column: 'owner', ref_table: 'auth.users', ref_column: 'id' },
           ],
         },
@@ -199,7 +229,7 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
 function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
   return async (schema: AskSchema) =>
     ({
-      from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? []),
+      from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? [], tables, schema),
       rpc: fakeRpc(tables, calls, owner),
     }) as unknown as SchemaClient;
 }
@@ -1015,8 +1045,14 @@ describe('table_info', () => {
       { column: 'role_id', type: 'uuid', nullable: false },
       { column: 'user_id', type: 'uuid', nullable: false },
     ]);
-    expect(info.linksTo).toEqual([{ column: 'role_id', table: 'job_search.roles', toColumn: 'id' }]);
-    expect(info.linkedFrom).toEqual([{ table: 'job_search.cover_letters', column: 'application_id', toColumn: 'id' }]);
+    expect(info.linksTo).toEqual([
+      { column: 'role_id', table: 'job_search.roles', toColumn: 'id' },
+      { column: 'cover_letter_id', table: 'job_search.cover_letters', toColumn: 'id' },
+    ]);
+    expect(info.linkedFrom).toEqual([
+      { table: 'job_search.cover_letters', column: 'application_id', toColumn: 'id' },
+      { table: 'job_search.application_answers', column: 'application_id', toColumn: 'id' },
+    ]);
   });
 
   it('refuses a table outside the list, and one in a workspace that is off', async () => {
@@ -1248,5 +1284,93 @@ describe('query_rows (plan #2109.4)', () => {
     expect(
       await executeAskTool('query_rows', { table: 'job_search.applications' }, context(tables, { enabledModules: ['shopping'] })),
     ).toEqual({ ok: false, error: expect.stringContaining('Job search workspace is switched off') });
+  });
+});
+
+describe('query_rows with linked rows (plan #2109.5)', () => {
+  const ROLE = '00000000-0000-4000-8000-0000000000c1';
+  const LETTER = '00000000-0000-4000-8000-0000000000d1';
+  const id = (n: number) => `00000000-0000-4000-8000-0000000002${String(n).padStart(2, '0')}`;
+  const app = (n: number, userId: string, status: string, extra: Row = {}): Row => ({
+    id: id(n),
+    user_id: userId,
+    role_id: ROLE,
+    status,
+    excitement: n,
+    next_action: `Next ${n}`,
+    cover_letter: null,
+    cover_letter_id: null,
+    created_at: `2026-10-${String(n).padStart(2, '0')}`,
+    ...extra,
+  });
+  const answer = (n: number, userId: string): Row => ({ id: `answer-${n}-${userId}`, user_id: userId, application_id: id(n), answer: 'Because' });
+  const tables: Tables = {
+    'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Designer at Acme' }],
+    'job_search.applications': [
+      app(1, ME, 'lead'), // nothing yet: the one the question is after
+      app(2, ME, 'lead', { cover_letter: 'Dear Acme' }), // has a cover letter
+      app(3, ME, 'drafting'), // has an answer to an application question
+      app(4, ME, 'drafting', { cover_letter: '' }), // empty letter, and only another person's answer
+      app(5, ME, 'submitted'), // sent: not to apply
+      app(6, ME, 'lead', { cover_letter_id: LETTER }), // a cover letters row it points at
+    ],
+    'job_search.application_answers': [answer(3, ME), answer(4, THEM), answer(5, ME)],
+    'job_search.cover_letters': [{ id: LETTER, user_id: ME, application_id: id(6), body: 'Dear Beta' }],
+  };
+  const run = (input: Record<string, unknown>) =>
+    executeAskTool('query_rows', { table: 'job_search.applications', ...input }, context(tables));
+
+  it('answers "which of my to-apply jobs have no application questions or cover letter" in one call', async () => {
+    const result = await run({
+      where: [
+        { column: 'status', op: 'one_of', value: ['lead', 'drafting'] },
+        { column: 'cover_letter', op: 'empty' },
+      ],
+      linked: [
+        { table: 'job_search.application_answers', present: false },
+        { table: 'job_search.cover_letters', via: 'application_id', present: false },
+      ],
+      order: { column: 'excitement', ascending: true },
+    });
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.ref)).toEqual([id(1), id(4)]);
+    expect(rows.map((r) => r.parent?.title)).toEqual(['Designer at Acme', 'Designer at Acme']);
+    expect(result.ok && result.totals).toEqual({ matched: 2, shown: 2 });
+    expect(result.ok && result.note).toContain('no job_search.application_answers row is linked');
+  });
+
+  it('keeps the rows that have a linked row, whichever table holds the key, and counts them', async () => {
+    const answered = await run({ linked: [{ table: 'job_search.application_answers', present: true }], count_only: true });
+    expect(answered.ok && answered.totals).toEqual({ matched: 2, shown: 0 });
+
+    const pointing = await run({ linked: [{ table: 'job_search.cover_letters', via: 'cover_letter_id', present: true }] });
+    expect(expectLinkedRows(pointing).map((r) => r.ref)).toEqual([id(6)]);
+
+    const grouped = await run({ linked: [{ table: 'job_search.application_answers', present: false }], group_by: 'status' });
+    expect(grouped.ok && grouped.totals).toMatchObject({ matched: 4, groups: [{ value: 'lead', count: 3 }, { value: 'drafting', count: 1 }] });
+  });
+
+  it('refuses a link the table does not have, and asks which way when there are two', async () => {
+    expect(await run({ linked: [{ table: 'job_search.contacts', present: false }] })).toEqual({
+      ok: false,
+      error: expect.stringContaining(
+        'not linked to job_search.contacts. Its links: job_search.roles via role_id, job_search.cover_letters via cover_letter_id, job_search.cover_letters via application_id, job_search.application_answers via application_id.',
+      ),
+    });
+    expect(await run({ linked: [{ table: 'job_search.cover_letters', present: false }] })).toEqual({
+      ok: false,
+      error: expect.stringContaining('more than one way; give via, one of: cover_letter_id, application_id'),
+    });
+    expect(await run({ linked: [{ table: 'job_search.application_answers' }] })).toEqual({
+      ok: false,
+      error: expect.stringContaining('needs present'),
+    });
+    expect(
+      await executeAskTool(
+        'query_rows',
+        { table: 'job_search.roles', linked: [{ table: 'learn.watch_list', present: true }] },
+        context(tables),
+      ),
+    ).toEqual({ ok: false, error: expect.stringContaining('learn.watch_list is in another schema') });
   });
 });

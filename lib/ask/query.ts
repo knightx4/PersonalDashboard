@@ -1,7 +1,7 @@
 import type { Source } from '@/lib/sources/types';
 import { AskInputError, clip, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
-import { asText, fallbackHref, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
-import { listableShapes, type TableColumn } from './table-info';
+import { asText, fallbackHref, LISTABLE, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
+import { listableShapes, type TableColumn, type TableShape } from './table-info';
 
 /**
  * query_rows: the person's rows in one table that meet a list of conditions
@@ -17,9 +17,18 @@ import { listableShapes, type TableColumn } from './table-info';
  * supabase-js filter methods, never from SQL text, and always carries the
  * owner filter as well as row level security.
  *
- * A condition is parsed into a `Condition`, a union with one kind today:
- * `column`. Plan #2109.5 adds a kind for rows with or without linked rows in
- * another table, applied in `applyCondition` beside it.
+ * A condition is parsed into a `Condition` of one of two kinds. `column`
+ * compares one of the table's own columns. `linked` (plan #2109.5) keeps the
+ * rows that have, or lack, a row of another table linked to them by a foreign
+ * key, so "which applications have no answers" is one call:
+ *
+ * - When this table holds the key (applications.role_id), the condition is
+ *   the key column being set or not.
+ * - When the other table holds it (application_answers.application_id), the
+ *   other table is embedded under an alias, its rows filtered to the person,
+ *   and the alias is tested for null: PostgREST's anti-join, and with
+ *   `not.is.null` its semi-join. PostgREST embeds only within one schema, so a
+ *   link of this kind from another schema is refused with the ones that work.
  */
 
 /** The most rows listed by one call. */
@@ -38,8 +47,11 @@ export type QueryOp = (typeof QUERY_OPS)[number];
 
 type Scalar = string | number | boolean;
 
-/** One condition a row must meet. */
-export type Condition = {
+/** The most linked conditions one call takes. */
+const LINKED_MAX = 5;
+
+/** A row's own column compared with a value. */
+export type ColumnCondition = {
   kind: 'column';
   column: string;
   op: QueryOp;
@@ -47,6 +59,26 @@ export type Condition = {
   value: Scalar | Scalar[] | null;
   type: string;
 };
+
+/**
+ * The row has (present) or lacks a row of `table` linked to it. `holder` says
+ * which side holds the key: 'this' when it is this table's column `via`, and
+ * 'other' when it is `via` on the other table, which is then embedded as
+ * `alias` and filtered to `owner` = `userId`.
+ */
+export type LinkedCondition = {
+  kind: 'linked';
+  table: string;
+  present: boolean;
+  holder: 'this' | 'other';
+  via: string;
+  alias: string;
+  owner: string;
+  userId: string;
+};
+
+/** One condition a row must meet. */
+export type Condition = ColumnCondition | LinkedCondition;
 
 /** How a column's type is treated: as text, as a list, or as anything else. */
 function typeKind(type: string): 'text' | 'array' | 'other' {
@@ -79,10 +111,10 @@ function columnOf(columns: Map<string, TableColumn>, table: string, name: unknow
 }
 
 /** The conditions as given, checked against the table's columns. */
-export function parseConditions(raw: unknown, table: string, columns: Map<string, TableColumn>): Condition[] {
+export function parseConditions(raw: unknown, table: string, columns: Map<string, TableColumn>): ColumnCondition[] {
   if (raw === undefined || raw === null) return [];
   if (!Array.isArray(raw)) throw new AskInputError('where must be a list of conditions.');
-  return raw.map((item, i): Condition => {
+  return raw.map((item, i): ColumnCondition => {
     if (!item || typeof item !== 'object') throw new AskInputError(`Condition ${i + 1} must be an object.`);
     const c = item as Record<string, unknown>;
     const column = columnOf(columns, table, c.column, `Condition ${i + 1}`);
@@ -107,6 +139,99 @@ export function parseConditions(raw: unknown, table: string, columns: Map<string
   });
 }
 
+/** One way a row of `table` can be linked to a row of another. */
+type Link = { other: string; holder: 'this' | 'other'; via: string };
+
+/**
+ * Every link between `table` and the readable tables in `open`: the keys this
+ * table holds, then the keys other tables hold that point at it. A table that
+ * points at itself (a parent_id) is listed once, as the other side, since
+ * "has a parent" is already the key column being set.
+ */
+function linksOf(table: string, shapes: Map<string, TableShape>, open: ReadonlySet<string>): Link[] {
+  const holds: Link[] = (shapes.get(table)?.links ?? [])
+    .filter((l) => open.has(l.table) && l.table !== table)
+    .map((l) => ({ other: l.table, holder: 'this', via: l.column }));
+  const heldBy: Link[] = [...shapes]
+    .filter(([name]) => open.has(name))
+    .flatMap(([name, s]) =>
+      s.links.filter((l) => l.table === table).map((l) => ({ other: name, holder: 'other' as const, via: l.column })),
+    );
+  return [...holds, ...heldBy];
+}
+
+function linkWords(links: readonly Link[]): string {
+  if (links.length === 0) return 'none';
+  return links.map((l) => `${l.other} via ${l.via}`).join(', ');
+}
+
+/**
+ * The linked conditions as given: each names a readable table linked to this
+ * one, whether a linked row must be there, and, where the two tables are
+ * linked more than one way, the key column to follow.
+ */
+export function parseLinked(
+  raw: unknown,
+  table: string,
+  shapes: Map<string, TableShape>,
+  open: ReadonlySet<string>,
+  userId: string,
+): LinkedCondition[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new AskInputError('linked must be a list of conditions.');
+  if (raw.length > LINKED_MAX) throw new AskInputError(`Give at most ${LINKED_MAX} linked conditions.`);
+  const links = linksOf(table, shapes, open);
+  const schema = table.split('.')[0];
+  return raw.map((item, i): LinkedCondition => {
+    if (!item || typeof item !== 'object') throw new AskInputError(`Linked condition ${i + 1} must be an object.`);
+    const c = item as Record<string, unknown>;
+    const other = typeof c.table === 'string' ? c.table.trim() : '';
+    if (typeof c.present !== 'boolean') {
+      throw new AskInputError(
+        `Linked condition ${i + 1} needs present: true for rows that have a linked row, false for rows that have none.`,
+      );
+    }
+    const via = typeof c.via === 'string' && c.via.trim() ? c.via.trim() : null;
+    const found = links.filter((l) => l.other === other && (!via || l.via === via));
+    if (found.length === 0) {
+      const what = other
+        ? `${table} is not linked to ${other}${via ? ` via ${via}` : ''}.`
+        : `Linked condition ${i + 1} needs a table.`;
+      throw new AskInputError(`${what} Its links: ${linkWords(links)}.`);
+    }
+    if (found.length > 1) {
+      throw new AskInputError(
+        `${table} is linked to ${other} more than one way; give via, one of: ${found.map((l) => l.via).join(', ')}.`,
+      );
+    }
+    const link = found[0];
+    if (link.holder === 'other' && other.split('.')[0] !== schema) {
+      const usable = links.filter((l) => l.holder === 'this' || l.other.split('.')[0] === schema);
+      throw new AskInputError(
+        `${other} is in another schema, and a query can only follow its link to ${table} within one. Query ${other} instead, or use one of: ${linkWords(usable)}.`,
+      );
+    }
+    const source = listableSource(other);
+    return {
+      kind: 'linked',
+      table: other,
+      present: c.present,
+      holder: link.holder,
+      via: link.via,
+      alias: `linked_${i}`,
+      owner: (source && ownerColumn(source)) ?? 'user_id',
+      userId,
+    };
+  });
+}
+
+/** The embeds that linked conditions on keys held by other tables add to a select. */
+export function linkedEmbeds(conditions: readonly Condition[]): string[] {
+  return conditions
+    .filter((c): c is LinkedCondition => c.kind === 'linked' && c.holder === 'other')
+    .map((c) => `${c.alias}:${c.table.split('.')[1]}!${c.via}(${c.via})`);
+}
+
 /**
  * The supabase-js filter methods a condition uses. Typed loosely, since the
  * builder's own types follow a schema this code does not have.
@@ -125,6 +250,12 @@ type Filterable<Q> = {
 };
 
 export function applyCondition<Q extends Filterable<Q>>(query: Q, c: Condition): Q {
+  if (c.kind === 'linked') {
+    if (c.holder === 'this') return c.present ? query.not(c.via, 'is', null) : query.is(c.via, null);
+    // Only the person's own linked rows count, as row level security also says.
+    const own = query.eq(`${c.alias}.${c.owner}`, c.userId);
+    return c.present ? own.not(c.alias, 'is', null) : own.is(c.alias, null);
+  }
   const kind = typeKind(c.type);
   const col = c.column;
   switch (c.op) {
@@ -180,7 +311,11 @@ function describe(conditions: Condition[]): string {
     not_empty: 'is not empty',
   };
   return `rows where ${conditions
-    .map((c) => [c.column, words[c.op], c.value === null ? null : JSON.stringify(c.value)].filter(Boolean).join(' '))
+    .map((c) =>
+      c.kind === 'linked'
+        ? `${c.present ? 'a' : 'no'} ${c.table} row is linked (via ${c.via})`
+        : [c.column, words[c.op], c.value === null ? null : JSON.stringify(c.value)].filter(Boolean).join(' '),
+    )
     .join(' and ')}`;
 }
 
@@ -194,11 +329,21 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
     throw new AskInputError(`${table} is in a workspace that is switched off, so it cannot be read.`);
   }
 
-  const shape = (await listableShapes(ctx)).get(table);
-  const columns = new Map((shape?.columns ?? []).map((c) => [c.column, c]));
+  const shapes = await listableShapes(ctx);
+  const columns = new Map((shapes.get(table)?.columns ?? []).map((c) => [c.column, c]));
   if (columns.size === 0) throw new Error(`${table}: no columns came back from ask_table_columns`);
 
-  const conditions = parseConditions(input.where, table, columns);
+  const open = new Set(
+    LISTABLE.filter((s) => {
+      const w = sourceWorkspace(s);
+      return !w || ctx.enabledModules.includes(w);
+    }).map((s) => s.table),
+  );
+  const conditions: Condition[] = [
+    ...parseConditions(input.where, table, columns),
+    ...parseLinked(input.linked, table, shapes, open, ctx.userId),
+  ];
+  const embeds = linkedEmbeds(conditions);
   const groupBy = input.group_by === undefined || input.group_by === null ? null : columnOf(columns, table, input.group_by, 'group_by');
   const countOnly = input.count_only === true;
   if (groupBy && countOnly) throw new AskInputError('Give group_by or count_only, not both: group_by already counts.');
@@ -207,7 +352,7 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
   const owner = ownerColumn(source) as string;
   const client = await ctx.db(schema);
   const scoped = (select: string, options?: { count: 'exact'; head?: boolean }) => {
-    let query = client.from(name).select(select, options).eq(owner, ctx.userId);
+    let query = client.from(name).select([select, ...embeds].join(', '), options).eq(owner, ctx.userId);
     for (const c of conditions) query = applyCondition(query, c);
     return query;
   };
