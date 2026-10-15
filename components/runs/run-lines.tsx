@@ -262,7 +262,7 @@ function StepLines({
   return (
     <div className="space-y-2">
       {newest && (
-        <div className="rounded-control border border-accent/40 bg-accent-tint px-3 py-2">
+        <div className="rounded-control bg-accent-tint px-3 py-2">
           <p className="flex flex-wrap items-baseline gap-x-2 text-small">
             <span className="font-medium text-accent">Now</span>
             {newest.bucket.ref && <span className="tabular text-ink-ghost">{newest.bucket.ref}</span>}
@@ -279,7 +279,7 @@ function StepLines({
       <div
         ref={box}
         onScroll={onScroll}
-        className="max-h-80 overflow-y-auto overscroll-contain rounded-control border border-border bg-sunken p-1.5"
+        className="max-h-80 overflow-y-auto overscroll-contain rounded-control bg-sunken p-1.5"
       >
         <ol className="space-y-1">
           {buckets.map((bucket) => {
@@ -338,7 +338,7 @@ function StepFold({
   const meta = [bucket.status ? STEP_STATE[bucket.status] : null, said].filter(Boolean).join(' · ');
   const body = `step-lines-${bucket.key.replace(/\W/g, '-')}`;
   return (
-    <div className={cn('rounded-control border bg-surface', live ? 'border-accent/50' : 'border-border')}>
+    <div className="rounded-control bg-surface">
       <button
         type="button"
         aria-expanded={isOpen}
@@ -351,7 +351,9 @@ function StepFold({
           strokeWidth={1.75}
           className={cn('size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick', isOpen && 'rotate-90')}
         />
-        {bucket.ref && <span className="tabular shrink-0 text-ink-ghost">{bucket.ref}</span>}
+        {bucket.ref && (
+          <span className={cn('tabular shrink-0', live ? 'text-accent' : 'text-ink-ghost')}>{bucket.ref}</span>
+        )}
         <span className="min-w-0 flex-1 truncate font-medium text-ink">{bucket.title}</span>
         <span className="flex shrink-0 items-center gap-1.5 text-small text-ink-muted">
           {bucket.status && <StatusGlyph glyph={STEP_GLYPH[bucket.status]} size={12} />}
