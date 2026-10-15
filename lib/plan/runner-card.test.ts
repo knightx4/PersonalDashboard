@@ -70,7 +70,12 @@ const busy = item({ id: 'busy', title: 'Busy feature' });
 const items = [
   busy,
   item({ id: 'b1', parentId: 'busy', status: 'done' }),
-  item({ id: 'b2', parentId: 'busy', status: 'in_progress' }),
+  item({
+    id: 'b2',
+    parentId: 'busy',
+    status: 'in_progress',
+    startedAt: '2026-09-17T23:06:00.000Z',
+  }),
   item({ id: 'waiting', title: 'Waiting feature' }),
   item({ id: 'w1', parentId: 'waiting' }),
 ];
@@ -100,6 +105,21 @@ describe('runnerCard', () => {
   it('leaves out a run the sweep would write off as quiet', () => {
     const card = read({ now: Date.parse('2026-09-18T03:00:00.000Z') });
     expect(card.on).toEqual([]);
+  });
+
+  it('keeps a run past the clock on its Dash while its feature shows work', () => {
+    // Four hours in, the claim long gone stale, but a step under the feature
+    // changed ten minutes ago: the tick counts the session as working.
+    const touched = items.map((row) =>
+      row.id === 'b1' ? { ...row, updatedAt: '2026-09-18T02:50:00.000Z' } : row,
+    );
+    const card = read({
+      items: touched,
+      sections: buildPlanTree({ items: touched, dependencies: [] }),
+      now: Date.parse('2026-09-18T03:00:00.000Z'),
+    });
+    expect(card.on.map((line) => line.ref)).toEqual([`#${busy.number}`]);
+    expect(card.next.map((feature) => feature.title)).toEqual(['Waiting feature']);
   });
 
   it('keeps a quiet run on its Dash while the tick still counts it', () => {

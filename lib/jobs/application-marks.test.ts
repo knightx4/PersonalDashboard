@@ -31,17 +31,27 @@ const APP = '11111111-1111-4111-8111-111111111111';
 const ROLE = '22222222-2222-4222-8222-222222222222';
 
 describe('marksFromRow', () => {
-  it('reads both marks', () => {
-    expect(marksFromRow({ ready_to_apply: true, has_cover_letter: false })).toEqual({
+  it('reads all three marks', () => {
+    expect(
+      marksFromRow({ ready_to_apply: true, all_questions_added: true, has_cover_letter: false }),
+    ).toEqual({
       readyToApply: true,
+      allQuestionsAdded: true,
       hasCoverLetter: false,
     });
   });
 
   it('defaults what the row lacks', () => {
-    expect(marksFromRow({})).toEqual({ readyToApply: false, hasCoverLetter: null });
-    expect(marksFromRow({ ready_to_apply: null, has_cover_letter: null })).toEqual({
+    expect(marksFromRow({})).toEqual({
       readyToApply: false,
+      allQuestionsAdded: false,
+      hasCoverLetter: null,
+    });
+    expect(
+      marksFromRow({ ready_to_apply: null, all_questions_added: null, has_cover_letter: null }),
+    ).toEqual({
+      readyToApply: false,
+      allQuestionsAdded: false,
       hasCoverLetter: null,
     });
   });
@@ -65,6 +75,20 @@ describe('saveApplicationMarks', () => {
     ]);
   });
 
+  it('saves all questions added alone, and with another mark', async () => {
+    const { saveApplicationMarks } = await import('@/app/jobs/(app)/roles/[id]/actions');
+    await saveApplicationMarks({ applicationId: APP, roleId: ROLE, allQuestionsAdded: true });
+    expect(state.patch).toEqual({ all_questions_added: true });
+    state.filters = [];
+    await saveApplicationMarks({
+      applicationId: APP,
+      roleId: ROLE,
+      readyToApply: true,
+      allQuestionsAdded: false,
+    });
+    expect(state.patch).toEqual({ ready_to_apply: true, all_questions_added: false });
+  });
+
   it('saves yes, no and a cleared cover letter answer', async () => {
     const { saveApplicationMarks } = await import('@/app/jobs/(app)/roles/[id]/actions');
     await saveApplicationMarks({ applicationId: APP, roleId: ROLE, hasCoverLetter: false });
@@ -78,7 +102,11 @@ describe('saveApplicationMarks', () => {
     const { saveApplicationMarks } = await import('@/app/jobs/(app)/roles/[id]/actions');
     const empty = await saveApplicationMarks({ applicationId: APP, roleId: ROLE });
     expect(empty.error).toBe('Nothing to save.');
-    const bad = await saveApplicationMarks({ applicationId: 'x', roleId: ROLE, readyToApply: true });
+    const bad = await saveApplicationMarks({
+      applicationId: 'x',
+      roleId: ROLE,
+      readyToApply: true,
+    });
     expect(bad.error).toBeTruthy();
     expect(state.patch).toBeNull();
   });

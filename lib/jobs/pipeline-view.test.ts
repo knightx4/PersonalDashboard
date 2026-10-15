@@ -90,6 +90,23 @@ describe('ready and cover letter filters', () => {
     expect(shown({ ready: 'yes' }).every((r) => r.readyToApply)).toBe(true);
   });
 
+  it('filters by the all-questions-added mark, yes, no and either', () => {
+    const marked = [
+      row('lead', { allQuestionsAdded: true }),
+      row('submitted', { allQuestionsAdded: false }),
+      row('drafting', { allQuestionsAdded: true }),
+    ];
+    const by = (params: Parameters<typeof parsePipeline>[0]) =>
+      filterPipeline(marked, parsePipeline(params)).filtered;
+    expect(parsePipeline({ questions: 'yes' }).questions).toBe(true);
+    expect(parsePipeline({ questions: 'no' }).questions).toBe(false);
+    expect(parsePipeline({ questions: 'x' }).questions).toBeNull();
+    expect(by({ questions: 'yes' }).every((r) => r.allQuestionsAdded)).toBe(true);
+    expect(by({ questions: 'yes' })).toHaveLength(2);
+    expect(by({ questions: 'no' })).toHaveLength(1);
+    expect(by({})).toHaveLength(3);
+  });
+
   it('puts a role with no cover letter answer under neither yes nor no', () => {
     expect(shown({ letter: 'yes' })).toHaveLength(1);
     expect(shown({ letter: 'no' })).toHaveLength(1);

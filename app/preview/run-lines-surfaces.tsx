@@ -117,6 +117,11 @@ const FEATURE_LINES: RunActivity[] = [
   line('f9', 'thought', '15:06', '#2124.2 is ready and touches different files from the rest, so it goes to a builder now.'),
   line('f10', 'action', '15:06', 'Claimed #2124.2'),
   line('f11', 'thought', '15:14', 'The #2124.2 builder has edits to the You layout and the nav icons, but no commit yet.'),
+  line('f12', 'thought', '15:15', 'Still waiting on the #2124.2 builder: 8 changed files in its worktree, no commit yet.'),
+  line('f13', 'thought', '15:16', 'The untracked files are the builder worktrees, which stay uncommitted.'),
+  line('f14', 'thought', '15:17', 'The #2124.2 builder committed. Merging its branch and running the fast checks.'),
+  line('f15', 'thought', '15:18', 'Type check and lint pass on the merged branch.'),
+  line('f16', 'thought', '15:19', 'Marking #2124.2 built and pushing.'),
 ];
 
 const FEATURE_STEPS = [

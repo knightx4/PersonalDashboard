@@ -187,6 +187,28 @@ Nothing runs this over the whole catalogue against the whole graph. It runs for
 one concept when something asks for material about that concept, and the result
 is stored, so the second ask is free.
 
+### Retrieval or rooting
+
+Two ways of finding material describe you differently, and each surface uses
+one of them (settled in plan #2138.6, from idea 8e8c2e0c):
+
+- **Retrieval** answers a question about one thing: the material for one claim
+  or one level of a topic. The query is that claim, or the cell's descriptor in
+  its place (LEARN-LEVELS-SPEC, "What to learn next: the fringe"), and the
+  stages above run unchanged. Nothing about the rest of what you know goes in.
+- **Rooting** (`lib/learn/graph/rooting.ts`) answers an open question where a
+  model chooses the sources: what to read on a subject, which channels to
+  follow, whether a video suits you. The model is told in prose what you hold
+  and where you could go next, capped at thirty and eight lines, because it is
+  choosing for the whole of you rather than for one claim.
+
+So a surface that asks for one claim's or one cell's material retrieves, and
+one where a model searches or judges for a subject roots. When this was
+written every surface already followed the split: reading research
+(`app/learn/r/[id]/actions.ts`), channel search and judging, video judging
+and import suggestions root, and the catalogue retrieves. A new surface picks
+by the same question: is it one thing's material, or a model choosing?
+
 ---
 
 ## Courses are the part worth taking
