@@ -69,6 +69,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   vault: [
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
     { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
+    // The quick notes waiting in the Inbox folder, on a tab of their own (note
+    // aee95195). The Inbox also lists them as one row that opens this page.
     { href: '/vault/triage', label: 'Triage', icon: 'triage' },
     { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
     { href: '/vault/maya', label: 'Maya', icon: 'maya' },
@@ -124,6 +126,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   ],
   goals: [
     { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },
+    // Everything on you across the goals. Its count is put on by the layout.
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
   ],
