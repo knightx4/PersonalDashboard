@@ -102,6 +102,8 @@ export const jobsActions: ModuleActions = {
     lookUpJobDescription: none('page'),
     draftAnswerFromEvidence: none('spends'),
     draftApplication: none('spends'),
+    saveAnswerReplies: none('theirs'),
+    dropAnswerDraft: none('theirs'),
     saveDraftedAnswer: tool('save_answer'),
   },
   'app/jobs/(app)/roles/[id]/actions.ts': {

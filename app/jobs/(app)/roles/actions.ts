@@ -14,7 +14,7 @@ import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import { runApplicationDraft } from '@/lib/jobs/drafting/draft-application';
 import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
 import { VAULT_SOURCES } from '@/lib/jobs/drafting/gather';
-import type { ApplicationDrafts } from '@/lib/jobs/drafting/store';
+import { dropDraft, saveReplies, type ApplicationDrafts, type StoredAsk } from '@/lib/jobs/drafting/store';
 
 // latency: pending
 export async function updateRole(
@@ -313,7 +313,12 @@ const draftSchema = z.object({ answerId: z.string().uuid() });
 // latency: pending
 export async function draftAnswerFromEvidence(
   input: z.input<typeof draftSchema>,
-): Promise<{ draft: AnswerDraft | null; error: string | null }> {
+): Promise<{
+  draft: AnswerDraft | null;
+  /** Dash's questions on the application after this run, so the tab can show a new one (plan #2130.4). */
+  asks?: StoredAsk[];
+  error: string | null;
+}> {
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
 
@@ -342,7 +347,7 @@ export async function draftAnswerFromEvidence(
   if (!stored || !result.drafted.includes(parsed.data.answerId)) {
     return { draft: null, error: 'No draft came back.' };
   }
-  return { draft: fromStoredDraft(stored), error: null };
+  return { draft: fromStoredDraft(stored), asks: result.drafts.asks, error: null };
 }
 
 /**
@@ -419,6 +424,59 @@ export async function draftApplication(
 
   const user = await requireUser();
   return draftApplicationAs(user.id, apiKey, parsed.data);
+}
+
+const answerRepliesSchema = z.object({
+  applicationId: z.string().uuid(),
+  replies: z.record(z.string(), z.string().max(4_000)),
+});
+
+/**
+ * Keeps the person's replies to Dash's questions about the answers without
+ * redrafting (plan #2130.4), so a reply typed and left survives a reload and
+ * the next run uses it. An empty reply clears it.
+ */
+// latency: pending
+export async function saveAnswerReplies(
+  input: z.input<typeof answerRepliesSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = answerRepliesSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireUser();
+  const supabase = await createClient();
+  const { saved, error } = await saveReplies(supabase, parsed.data.applicationId, 'answers', parsed.data.replies);
+  if (error) return { error };
+  if (!saved) return { error: 'There are no drafts to reply to.' };
+  return { error: null };
+}
+
+const dropAnswerDraftSchema = z.object({ answerId: z.string().uuid() });
+
+/**
+ * Takes an answer's draft out of the application's stored drafts once it has
+ * been inserted or discarded (plan #2130.4), so a reload does not offer it
+ * again. Dash's questions and their replies stay.
+ */
+// latency: pending
+export async function dropAnswerDraft(
+  input: z.input<typeof dropAnswerDraftSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = dropAnswerDraftSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data: row, error: rowError } = await supabase
+    .from('application_answers')
+    .select('application_id')
+    .eq('id', parsed.data.answerId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (rowError) return { error: rowError.message };
+  if (!row) return { error: 'That question is not yours.' };
+
+  return dropDraft(supabase, row.application_id as string, 'answers', parsed.data.answerId);
 }
 
 const acceptDraftSchema = z.object({

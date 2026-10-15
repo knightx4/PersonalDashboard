@@ -192,6 +192,36 @@ export async function saveReplies(
   return { saved: !updateError, error: updateError ? updateError.message : null };
 }
 
+/** The drafts without the one under `key`; the same map when it holds none. */
+export function withoutDraft(drafts: DraftMap, key: string): DraftMap {
+  if (!(key in drafts)) return drafts;
+  const rest = { ...drafts };
+  delete rest[key];
+  return rest;
+}
+
+/**
+ * Takes one draft out of the stored row, for when the person inserts it or
+ * throws it away (plan #2130.4), so a reload does not offer it again. The asks
+ * stay: a reply is a fact about the person whatever happened to the draft.
+ */
+export async function dropDraft(
+  supabase: AppSupabaseClient,
+  applicationId: string,
+  kind: DraftKind,
+  key: string,
+): Promise<{ error: string | null }> {
+  const { drafts, error } = await loadDrafts(supabase, applicationId, kind);
+  if (error) return { error };
+  if (!drafts || !(key in drafts.drafts)) return { error: null };
+  const { error: updateError } = await supabase
+    .from(TABLE)
+    .update({ drafts: withoutDraft(drafts.drafts, key) })
+    .eq('application_id', applicationId)
+    .eq('kind', kind);
+  return { error: updateError ? updateError.message : null };
+}
+
 /** Removes the draft, for when the person discards it. */
 export async function clearDrafts(
   supabase: AppSupabaseClient,

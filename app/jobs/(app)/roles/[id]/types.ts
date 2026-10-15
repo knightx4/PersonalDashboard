@@ -3,6 +3,8 @@ import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 import type { DevComment } from '@/lib/comments/load';
+import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import type { StoredAsk } from '@/lib/jobs/drafting/store';
 
 /** Everything the role page hands its tabs, loaded once by page.tsx. */
 export interface PanelProps {
@@ -95,7 +97,15 @@ export interface PanelProps {
     /** What a previous draft cited, and what it could not ground. */
     evidenceItemIds: string[];
     unsupportedClaims: string[];
+    /** application_answers.word_limit; the question's own wording can set a limit too. */
+    wordLimit: number | null;
   }>;
+  /** Dash's drafts waiting beside the answers, by answer id, from application_drafts (plan #2130.4). */
+  answerDrafts: Record<string, AnswerDraft>;
+  /** The questions Dash asked back while drafting the answers, with any replies. */
+  dashAsks: StoredAsk[];
+  /** For the preview gallery: Draft all answers drawn mid-run, or failed. */
+  draftRun?: { pending: boolean; error: string | null };
   /** The comment thread on the role, oldest first: your notes and Dash's replies. */
   thread: DevComment[];
   /** The rounds of the process. Every interview is inside one of these. */
