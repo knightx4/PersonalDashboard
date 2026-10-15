@@ -218,13 +218,28 @@ export const FAILING_QUESTION = 'How much did I spend on flights this year?';
  */
 export const WRITING_QUESTION = 'What did I spend on eBay flips this quarter, and what is still unsold?';
 
+/**
+ * The question the at-work strips send (plan #1899.8). Its fixture answers at
+ * the pace the recorder can show in a second: two lookups one after the
+ * other, then a short answer written out, so the strip runs from the press
+ * to the mark at rest.
+ */
+export const AT_WORK_QUESTION = 'How much did I spend on eBay this quarter?';
+
+const AT_WORK_ANSWER = 'You spent $412.60 on eBay this quarter, across three orders.';
+
 /** Hands `body` to `onText` a few words at a time, as the route's text lines arrive. */
-async function writeOut(body: string, onText: ((piece: string) => void) | undefined, wait: (ms: number) => Promise<unknown>) {
+async function writeOut(
+  body: string,
+  onText: ((piece: string) => void) | undefined,
+  wait: (ms: number) => Promise<unknown>,
+  every = 40,
+) {
   if (!onText) return;
   const pieces = body.match(/\S+\s*/g) ?? [];
   for (let i = 0; i < pieces.length; i += 3) {
     onText(pieces.slice(i, i + 3).join(''));
-    await wait(40);
+    await wait(every);
   }
 }
 
@@ -251,17 +266,45 @@ const FIXTURES: AskSource = {
   ask: async (question, _ref, _page, onLookup, _files, _list, onText, more) => {
     // The lookups appear one by one, then the answer as it is written (plans #1438, #1902).
     const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    // The recorder's strip runs timers four times faster than its own clock, so
+    // the at-work fixture is paced to be read at that speed (plan #1899.8).
+    const pace = question === AT_WORK_QUESTION ? 500 : 300;
     const search = { id: 'l1', index: 0, name: 'search', input: { query: question.slice(0, 40) } };
     onLookup?.({ phase: 'started', ...search });
-    await wait(300);
+    await wait(pace);
     onLookup?.({ phase: 'finished', ...search, ok: true, found: 2 });
-    await wait(300);
+    await wait(question === AT_WORK_QUESTION ? 0 : 300);
     const conversation = { ref: '00000000-0000-4000-8000-000000000009', title: question };
     if (question === FAILING_QUESTION) {
       return {
         conversation,
         turns: [{ id: 'fq', role: 'user', body: question, createdAt: new Date().toISOString() }],
         error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.',
+      };
+    }
+    if (question === AT_WORK_QUESTION) {
+      const spend = { id: 'l2', index: 1, name: 'spend_by_merchant', input: { merchant: 'eBay' } };
+      onLookup?.({ phase: 'started', ...spend });
+      await wait(500);
+      onLookup?.({ phase: 'finished', ...spend, ok: true, found: 3 });
+      await writeOut(AT_WORK_ANSWER, onText, wait, 160);
+      const at = new Date().toISOString();
+      return {
+        conversation,
+        turns: [
+          { id: 'tq', role: 'user', body: question, createdAt: at },
+          {
+            id: 'ta',
+            role: 'assistant',
+            body: AT_WORK_ANSWER,
+            createdAt: at,
+            toolCalls: [
+              { name: 'search', input: { query: question.slice(0, 40) }, result: { ok: true, rows: [] } },
+              { name: 'spend_by_merchant', input: { merchant: 'eBay' }, result: { ok: true, rows: [] } },
+            ],
+          },
+        ],
+        stop: 'answered',
       };
     }
     if (question === WRITING_QUESTION) {
@@ -339,12 +382,15 @@ function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }
 export function AskDashSurface({
   open = false,
   question,
+  draft,
   rows,
   page = '/jobs',
   children,
 }: {
   open?: boolean;
   question?: string;
+  /** Words in the sheet's box, unsent, for a strip that presses Send (plan #1899.8). */
+  draft?: string;
   /** A filtered list sent with the question (plan #1658). */
   rows?: AskRows;
   /** The page the sheet opens over; the gallery's own address says nothing. */
@@ -352,7 +398,7 @@ export function AskDashSurface({
   children: React.ReactNode;
 }) {
   return (
-    <AskDashProvider source={FIXTURES} page={page} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+    <AskDashProvider source={FIXTURES} page={page} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS} draft={draft}>
       {children}
       {open && <OpenOnArrival question={question} rows={rows} />}
     </AskDashProvider>
@@ -738,8 +784,11 @@ export function DashPageSurface({
   usedOpen,
   sheetOpen = false,
   list,
+  draft,
 }: {
   chat?: 'open' | 'new' | 'archived';
+  /** Words in the open chat's box, unsent, for a strip that presses Send (plan #1899.8). */
+  draft?: string;
   /** The list's hidden parts (plan #1899.6): a search, a menu, a rename or Archived open. */
   list?: 'search' | 'menu' | 'rename' | 'archived';
   listOpen?: boolean;
@@ -830,6 +879,7 @@ export function DashPageSurface({
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 startWriting
+                initialDraft={draft}
               />
             </ConversationChat>
           ) : (

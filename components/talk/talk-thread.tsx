@@ -290,6 +290,7 @@ export function TalkThread({
   withFiles = false,
   sendHint,
   initialDraft = '',
+  onSubmit,
   initialFiles = [],
   onStop,
   onTrigger,
@@ -313,6 +314,8 @@ export function TalkThread({
    * after three replies (plan #1060). Left out, the thread never closes.
    */
   closed?: (turns: readonly TalkTurn[]) => string | null;
+  /** Heard as each question is sent, before the transition that waits for its answer starts. */
+  onSubmit?: () => void;
   /** Beside the button that opens the box: the $ hint for what a reply costs. */
   hint?: React.ReactNode;
   /** Just above the box, or the button that opens it: what goes with a question. */
@@ -416,6 +419,25 @@ export function TalkThread({
   const [landed, setLanded] = useState<string | null>(null);
   const [sending, startSend] = useTransition();
   const form = useRef<HTMLFormElement>(null);
+  // Keep the box, and with it Stop, in view while the answer is written
+  // beneath the question: a phone's screen is shorter than the lookups and
+  // the words that follow, with room under it for the dock (plan #1899.8).
+  // Watching the thread's size catches each line as it lands; nothing moves
+  // when the box is already in view.
+  useEffect(() => {
+    const box = form.current;
+    if (!sending || !box) return;
+    const keep = () => box.scrollIntoView({ block: 'nearest' });
+    keep();
+    // Again once the question and the working line have been laid out.
+    const frame = requestAnimationFrame(() => requestAnimationFrame(keep));
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(keep);
+    if (box.parentElement) watch?.observe(box.parentElement);
+    return () => {
+      cancelAnimationFrame(frame);
+      watch?.disconnect();
+    };
+  }, [sending]);
   const adder = useRef<AddFileHandle>(null);
   // What the words at the caret ask the menu for (plan #1899.5), and which
   // of its items is lit. A menu closed with Escape stays closed until the
@@ -499,6 +521,7 @@ export function TalkThread({
       if (!onStop) setWriting(false);
     }
     setTurns((current) => [...current, question]);
+    onSubmit?.();
     startSend(async () => {
       const result = await send(checked.body, sentFiles.length > 0 ? sentFiles : undefined).catch(() => ({
         turns: undefined,
@@ -635,7 +658,7 @@ export function TalkThread({
       ) : (
         <form
           ref={form}
-          className="relative"
+          className="relative scroll-mb-28"
           onSubmit={(event) => {
             event.preventDefault();
             if (sending && onStop) return;
@@ -765,7 +788,7 @@ export function TalkThread({
                     <Button
                       type="button"
                       size="sm"
-                      className="size-7 shrink-0 px-0"
+                      className="size-7 shrink-0 px-0 active:brightness-90"
                       aria-label="Stop"
                       onClick={onStop}
                     >
@@ -776,7 +799,7 @@ export function TalkThread({
                   <Button
                     type="submit"
                     size="sm"
-                    className="size-7 shrink-0 px-0"
+                    className="size-7 shrink-0 px-0 active:brightness-90"
                     disabled={!draft.trim() || sending || uploading}
                     title="Send"
                   >
