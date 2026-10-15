@@ -233,46 +233,70 @@ function StepLines({
 
   const [toggled, setToggled] = useState<Readonly<Record<string, boolean>>>({});
 
+  // What is going on now comes first: the steps a builder is on, and the
+  // heading holding the newest line. Everything else, done or not started,
+  // sits below them, quieter.
+  const active = buckets.filter(
+    (bucket) => bucket.status === 'in_progress' || bucket.status === 'blocked' || bucket === newest?.bucket,
+  );
+  const rest = buckets.filter((bucket) => !active.includes(bucket));
+  const fold = (bucket: StepBucket, quiet: boolean) => {
+    // Only the step holding the newest line opens by itself, or one with a
+    // question waiting on you; the other steps being built show their last
+    // line on the closed row.
+    const auto = bucket.groups.some((group) => group.line.id === open?.id || group.lastId === newestId);
+    const isOpen = toggled[bucket.key] ?? auto;
+    return (
+      <li key={bucket.key}>
+        <StepFold
+          bucket={bucket}
+          lines={lines}
+          now={now}
+          arrived={arrived}
+          open={open}
+          isOpen={isOpen}
+          live={bucket === newest?.bucket}
+          quiet={quiet}
+          onToggle={() => setToggled((was) => ({ ...was, [bucket.key]: !isOpen }))}
+        />
+      </li>
+    );
+  };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {newest && (
-        <div className="rounded-control bg-accent-tint px-3 py-2">
-          <p className="flex flex-wrap items-baseline gap-x-2 text-small">
-            <span className="font-medium text-accent">Now</span>
-            {newest.bucket.ref && <span className="tabular text-ink-ghost">{newest.bucket.ref}</span>}
-            <span className="min-w-0 truncate text-ink-muted">{newest.bucket.title}</span>
-            <time dateTime={newest.group.at} className="tabular ml-auto text-ink-ghost">
-              {shortWhen(newest.group.at, now)}
-            </time>
-          </p>
-          <p className="text-ui break-words text-ink">
-            {newest.group.summary ?? <LinkedText text={newest.group.line.body} />}
-          </p>
+        <div className="flex gap-3 rounded-card bg-accent-tint px-3.5 py-3">
+          <DashMark size="sm" decorative {...runPose(newest.group.line)} />
+          <div className="min-w-0 flex-1">
+            <p className="flex min-w-0 items-baseline gap-x-2 text-small">
+              <span className="font-medium text-accent">Now</span>
+              {newest.bucket.ref && <span className="tabular shrink-0 text-ink-muted">{newest.bucket.ref}</span>}
+              <span className="min-w-0 truncate text-ink-muted">{newest.bucket.title}</span>
+              <time dateTime={newest.group.at} className="tabular ml-auto shrink-0 text-ink-muted">
+                {shortWhen(newest.group.at, now)}
+              </time>
+            </p>
+            <p className="mt-0.5 line-clamp-3 text-body font-medium break-words text-ink">
+              {newest.group.summary ?? <LinkedText text={newest.group.line.body} />}
+            </p>
+          </div>
         </div>
       )}
-      <ol className="space-y-1">
-          {buckets.map((bucket) => {
-            const auto =
-              bucket.status === 'in_progress' ||
-              bucket.status === 'blocked' ||
-              bucket.groups.some((group) => group.line.id === open?.id || group.lastId === newestId);
-            const isOpen = toggled[bucket.key] ?? auto;
-            return (
-              <li key={bucket.key}>
-                <StepFold
-                  bucket={bucket}
-                  lines={lines}
-                  now={now}
-                  arrived={arrived}
-                  open={open}
-                  isOpen={isOpen}
-                  live={bucket === newest?.bucket}
-                  onToggle={() => setToggled((was) => ({ ...was, [bucket.key]: !isOpen }))}
-                />
-              </li>
-            );
-          })}
-      </ol>
+      {active.length > 0 && (
+        <section className="space-y-1">
+          <h3 className="text-small font-medium text-ink-muted">
+            {active.length === 1 ? 'Being built' : `Being built · ${active.length} at once`}
+          </h3>
+          <ol className="space-y-1">{active.map((bucket) => fold(bucket, false))}</ol>
+        </section>
+      )}
+      {rest.length > 0 && (
+        <section className="space-y-0.5">
+          <h3 className="text-small font-medium text-ink-muted">The other steps</h3>
+          <ol>{rest.map((bucket) => fold(bucket, true))}</ol>
+        </section>
+      )}
       {hidden > 0 && (
         <p className="text-small text-ink-ghost">
           {hidden} {hidden === 1 ? 'line' : 'lines'} about other features left out
@@ -290,6 +314,7 @@ function StepFold({
   open,
   isOpen,
   live,
+  quiet,
   onToggle,
 }: {
   bucket: StepBucket;
@@ -300,29 +325,52 @@ function StepFold({
   isOpen: boolean;
   /** Holds the newest line. */
   live: boolean;
+  /** A step not being built: drawn as a plain row, not a panel. */
+  quiet: boolean;
   onToggle: () => void;
 }) {
+  const last = bucket.groups[bucket.groups.length - 1] ?? null;
   const said = bucket.count === 0 ? null : bucket.count === 1 ? '1 line' : `${bucket.count} lines`;
   const meta = [bucket.status ? STEP_STATE[bucket.status] : null, said].filter(Boolean).join(' · ');
   const body = `step-lines-${bucket.key.replace(/\W/g, '-')}`;
   return (
-    <div className="rounded-control bg-surface">
+    <div className={cn('rounded-control', !quiet && 'bg-surface')}>
       <button
         type="button"
         aria-expanded={isOpen}
         aria-controls={body}
         onClick={onToggle}
-        className="press flex w-full min-w-0 items-center gap-2 px-2.5 py-2 text-left text-ui"
+        className={cn(
+          'press flex w-full min-w-0 items-start gap-2 text-left',
+          quiet ? 'px-2.5 py-1 text-small' : 'px-2.5 py-2 text-ui',
+        )}
       >
         <ChevronRight
           aria-hidden
           strokeWidth={1.75}
-          className={cn('size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick', isOpen && 'rotate-90')}
+          className={cn(
+            'mt-0.5 size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick',
+            isOpen && 'rotate-90',
+          )}
         />
-        {bucket.ref && (
-          <span className={cn('tabular shrink-0', live ? 'text-accent' : 'text-ink-ghost')}>{bucket.ref}</span>
-        )}
-        <span className="min-w-0 flex-1 truncate font-medium text-ink">{bucket.title}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            {bucket.ref && (
+              <span className={cn('tabular shrink-0', live ? 'text-accent' : 'text-ink-ghost')}>{bucket.ref}</span>
+            )}
+            <span className={cn('min-w-0 flex-1 truncate', quiet ? 'text-ink-muted' : 'font-medium text-ink')}>
+              {bucket.title}
+            </span>
+          </span>
+          {/* A step being built shows its last line while closed, so each
+              builder says what it is doing without being opened. */}
+          {!quiet && !isOpen && last && (
+            <span className="mt-0.5 flex min-w-0 items-baseline gap-2 text-small text-ink-muted">
+              <span className="min-w-0 flex-1 truncate">{last.summary ?? last.line.body}</span>
+              <span className="tabular shrink-0 text-ink-ghost">{shortWhen(last.at, now)}</span>
+            </span>
+          )}
+        </span>
         <span className="flex shrink-0 items-center gap-1.5 text-small text-ink-muted">
           {bucket.status && <StatusGlyph glyph={STEP_GLYPH[bucket.status]} size={12} />}
           <span className="max-sm:sr-only">{meta}</span>
@@ -396,9 +444,16 @@ const STEP_GLYPH: Record<FeatureStep['status'], GlyphName> = {
   dropped: 'empty',
 };
 
+/** Past this many characters a line is cut at two lines until pressed. */
+const LONG_LINE = 180;
+
 /** One line under a step, on one row: what kind, what it said, and when. */
 function CompactLine({ group, now, arrived }: { group: LineGroup; now: number; arrived: boolean }) {
   const { line } = group;
+  const [whole, setWhole] = useState(false);
+  // A paragraph-long line is cut at two lines so one report does not push
+  // the rest out of the box; pressing it shows the whole of it.
+  const long = !group.summary && line.body.length > LONG_LINE;
   return (
     <li
       data-line={group.lastId}
@@ -418,7 +473,19 @@ function CompactLine({ group, now, arrived }: { group: LineGroup; now: number; a
         {group.repeats > 1 && <span className="tabular"> &times;{group.repeats}</span>}
       </span>
       <span className="min-w-0 text-ui break-words text-ink">
-        {group.summary ?? <LinkedText text={line.body} />}
+        {long ? (
+          <button
+            type="button"
+            aria-expanded={whole}
+            onClick={() => setWhole((was) => !was)}
+            className={cn('block w-full text-left', !whole && 'line-clamp-2')}
+            title={whole ? undefined : 'Show the whole line'}
+          >
+            {line.body}
+          </button>
+        ) : (
+          (group.summary ?? <LinkedText text={line.body} />)
+        )}
         {group.files.length > 0 && (
           <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             {group.files.map((file) => (

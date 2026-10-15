@@ -117,6 +117,8 @@ const FEATURE_LINES: RunActivity[] = [
   line('f9', 'thought', '15:06', '#2124.2 is ready and touches different files from the rest, so it goes to a builder now.'),
   line('f10', 'action', '15:06', 'Claimed #2124.2'),
   line('f11', 'thought', '15:14', 'The #2124.2 builder has edits to the You layout and the nav icons, but no commit yet.'),
+  line('f11b', 'action', '15:14', 'Claimed #2124.4'),
+  line('f11c', 'thought', '15:14', 'I passed this screen on round 3. The earlier fix is done: while Dash marks the answer, the row under the explanation box holds one press on a single line at 390 in both light and dark. Nothing is cut off at 390, and the dark theme keeps its contrast. The pending state is clear in every shot, so this surface does draw its hidden part.'),
   line('f12', 'thought', '15:15', 'Still waiting on the #2124.2 builder: 8 changed files in its worktree, no commit yet.'),
   line('f13', 'thought', '15:16', 'The untracked files are the builder worktrees, which stay uncommitted.'),
   line('f14', 'thought', '15:17', 'The #2124.2 builder committed. Merging its branch and running the fast checks.'),
@@ -128,7 +130,7 @@ const FEATURE_STEPS = [
   { ref: '#2124.1', title: 'Store the details: table, store and tests', status: 'done' as const },
   { ref: '#2124.2', title: 'A Details tab on the You page', status: 'in_progress' as const },
   { ref: '#2124.3', title: 'Edit a detail in place', status: 'not_started' as const },
-  { ref: '#2124.4', title: 'Fill the details from the note you wrote', status: 'not_started' as const },
+  { ref: '#2124.4', title: 'Fill the details from the note you wrote', status: 'in_progress' as const },
 ];
 
 export function RunLinesSurface() {
