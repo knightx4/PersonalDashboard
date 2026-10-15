@@ -46,26 +46,29 @@ export type Reference = {
  * surface in the gallery (tests/preview-routes.test.ts).
  */
 export const REFERENCES: Readonly<Record<string, Reference>> = {
+  // The "Dash Chat Workspace" mockup the person chose on 15 October 2026 ("go
+  // with B"), replacing the one from decision #1899.1. Its saved copy names
+  // made-up people and companies, since the repository is public.
   'ask-page': {
-    pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
-    link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
-    source: 'docs/references/ask-page/mockup.html',
-    why: 'The mockup the person looked at for decision #1899.1: chats grouped by day on the left with the workspaces each used, the open chat at reading width beside them, and on a phone the list as the page with a chat opening over it.',
-    from: '1899.2',
+    pictures: ['docs/references/ask-page/workspace-laptop.png', 'docs/references/ask-page/workspace-phone.png'],
+    link: 'https://claude.ai/artifact/D6FHNYY3HdyaWCXt2U2yQU',
+    source: 'docs/references/ask-page/workspace.html',
+    why: 'Glass panes over a moving glow: the chats on their own pane with search and area chips, the open chat at reading width with the question in a filled bubble on the right, and a Context pane of the sources behind each answer and the changes waiting for approval. The person asked for no Ask and Do switch (Dash tells which on its own) and said their chats do not carry charts like the mockup\'s, so the chart is not something to copy.',
+    from: '2215.9',
   },
   'ask-page-at-work': {
-    pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
-    link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
-    source: 'docs/references/ask-page/mockup.html',
-    why: 'The same mockup, for the open chat while Dash answers: the chat at reading width with the box at its foot, the answer appearing in the chat as it is written.',
-    from: '1899.8',
+    pictures: ['docs/references/ask-page/workspace-laptop.png', 'docs/references/ask-page/workspace-phone.png'],
+    link: 'https://claude.ai/artifact/D6FHNYY3HdyaWCXt2U2yQU',
+    source: 'docs/references/ask-page/workspace.html',
+    why: 'The same mockup, for the open chat while Dash answers: the question in its bubble, Dash\'s answer under its mark with a fold for what it searched, and the box docked at the foot of the chat. No Ask and Do switch.',
+    from: '2215.9',
   },
   'ask-page-used': {
-    pictures: ['docs/references/ask-page/mockup-laptop.png', 'docs/references/ask-page/mockup-phone.png'],
-    link: 'https://claude.ai/artifact/8qfLoeSK8MATLKCaWRrv2r',
-    source: 'docs/references/ask-page/mockup.html',
-    why: 'The same mockup, for its right-hand column: under "Used in this chat", the rows Dash read with their workspace, the changes, the lookups, the files and what the chat cost, each part headed with its count.',
-    from: '1899.4',
+    pictures: ['docs/references/ask-page/workspace-laptop.png', 'docs/references/ask-page/workspace-phone.png'],
+    link: 'https://claude.ai/artifact/D6FHNYY3HdyaWCXt2U2yQU',
+    source: 'docs/references/ask-page/workspace.html',
+    why: 'The same mockup, for its Context pane: Sources and Changes as two tabs with counts, each source numbered to match the marks in the answer, and a change waiting for approval shown as what it adds.',
+    from: '2215.9',
   },
 };
 
