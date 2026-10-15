@@ -203,13 +203,11 @@ const STEP_STATE: Record<FeatureStep['status'], string> = {
 };
 
 /**
- * A feature session's lines, in a box of fixed height that keeps the newest
- * line in view, with that line pinned above it under "Now" so what Dash is
- * doing reads first. Inside the box there is one fold for each step: the one
+ * A feature session's lines, with the newest pinned on top under "Now" so
+ * what Dash is doing reads first, then one fold for each step. The fold
  * holding the newest line, a question waiting on you or a step being built
  * opens by itself, and the rest fold to their state and how many lines they
- * hold. Scrolling up through older lines stops the box following the newest
- * one until it is scrolled back down.
+ * hold. An open step's lines scroll in their own box (StepBody).
  */
 function StepLines({
   lines,
@@ -233,31 +231,7 @@ function StepLines({
   }
   const newestId = newest?.group.lastId ?? null;
 
-  const box = useRef<HTMLDivElement>(null);
-  const follow = useRef(true);
-  const moving = useRef(false);
   const [toggled, setToggled] = useState<Readonly<Record<string, boolean>>>({});
-
-  // Keep the newest line at the foot of the box while following.
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el || !follow.current || !newestId) return;
-    const target = el.querySelector<HTMLElement>(`[data-line="${CSS.escape(newestId)}"]`);
-    if (!target) return;
-    moving.current = true;
-    el.scrollTop = Math.max(0, target.offsetTop + target.offsetHeight - el.clientHeight + 12);
-    requestAnimationFrame(() => {
-      moving.current = false;
-    });
-  }, [newestId, toggled]);
-
-  const onScroll = () => {
-    const el = box.current;
-    if (!el || moving.current || !newestId) return;
-    const target = el.querySelector<HTMLElement>(`[data-line="${CSS.escape(newestId)}"]`);
-    // Following again once the newest line is back in view.
-    follow.current = !target || target.offsetTop + target.offsetHeight <= el.scrollTop + el.clientHeight + 24;
-  };
 
   return (
     <div className="space-y-2">
@@ -276,12 +250,7 @@ function StepLines({
           </p>
         </div>
       )}
-      <div
-        ref={box}
-        onScroll={onScroll}
-        className="max-h-80 overflow-y-auto overscroll-contain rounded-control bg-sunken p-1.5"
-      >
-        <ol className="space-y-1">
+      <ol className="space-y-1">
           {buckets.map((bucket) => {
             const auto =
               bucket.status === 'in_progress' ||
@@ -303,8 +272,7 @@ function StepLines({
               </li>
             );
           })}
-        </ol>
-      </div>
+      </ol>
       {hidden > 0 && (
         <p className="text-small text-ink-ghost">
           {hidden} {hidden === 1 ? 'line' : 'lines'} about other features left out
@@ -361,7 +329,7 @@ function StepFold({
         </span>
       </button>
       {isOpen && (
-        <div id={body} className="px-2.5 pb-2">
+        <StepBody id={body} lastId={bucket.groups[bucket.groups.length - 1]?.lastId ?? null}>
           {bucket.groups.length === 0 ? (
             <p className="pl-5.5 text-small text-ink-muted">Nothing written about this step yet.</p>
           ) : (
@@ -383,8 +351,37 @@ function StepFold({
               )}
             </ol>
           )}
-        </div>
+        </StepBody>
       )}
+    </div>
+  );
+}
+
+/**
+ * A step's lines in a box of fixed height that scrolls on its own, opened at
+ * its newest line and kept there as lines arrive. Scrolling up to read older
+ * lines stops it following until it is scrolled back to the foot.
+ */
+function StepBody({ id, lastId, children }: { id: string; lastId: string | null; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && follow.current) el.scrollTop = el.scrollHeight;
+  }, [lastId]);
+
+  return (
+    <div
+      id={id}
+      ref={box}
+      onScroll={(event) => {
+        const el = event.currentTarget;
+        follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
+      className="mx-2.5 mb-2 max-h-64 overflow-y-auto overscroll-contain"
+    >
+      {children}
     </div>
   );
 }
