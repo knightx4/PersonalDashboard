@@ -133,10 +133,12 @@ describe('a goal step handed to Dash from Ask Dash', () => {
     expect(row).toContain('Dash is on it');
     expect(row).toContain('on Reading the loan statements');
     expect(row).toContain('/goals/runs/run-draft');
-    // Dash's mark stays: whose the step is is a different fact.
-    expect(row).toContain('aria-label="Dash&#x27;s"');
+    // Dash's mark in the Assignee column moves while the run is going (plan #2069.2).
+    expect(row).toContain('ml-0.5">Dash<');
+    expect(row).toContain('data-dash-state="working" data-dash-tone="brand"');
     // Only the step the run is on.
     expect(rowOf(html, 'other', null)).not.toContain('Dash is on it');
+    expect(rowOf(html, 'other', null)).not.toContain('data-dash-state="working" data-dash-tone="brand"');
   });
 
   it('stops once the run ends', async () => {

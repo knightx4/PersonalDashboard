@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn';
 // that a comparison across the row.
 export const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_2rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
+  'sm:grid-cols-[minmax(0,1fr)_8.25rem_5.5rem_7rem_5rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 export const LEVEL = 'w-5';
@@ -34,13 +34,15 @@ export const LEVEL = 'w-5';
 export function ColumnHeader({
   priority = 'Priority',
   assignee = 'Assignee',
-}: { priority?: string; assignee?: string } = {}) {
+  className,
+}: { priority?: string; assignee?: string; className?: string } = {}) {
   return (
     <li
       aria-hidden
       className={cn(
         ROW_GRID,
         'px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-ghost',
+        className,
       )}
     >
       <span>Step</span>

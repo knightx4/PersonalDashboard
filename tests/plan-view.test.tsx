@@ -59,7 +59,15 @@ vi.mock('@/app/dev/plan/actions', () => {
   };
 });
 
+// A goal's page reads the router; outside the app there is no path, as here before.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => null,
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+const { StepTree } = await import('@/app/goals/[goalId]/step-tree');
 const { withSessionDrop } = await import('@/app/dev/plan/plan-row');
 type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
@@ -1293,5 +1301,80 @@ describe('a step a session added under an approved feature', () => {
       expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest)).toBe(rest);
       expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest)).toBe(rest);
     });
+  });
+});
+
+/**
+ * One header for the plan and a goal (plan #2069.2).
+ *
+ * The goal page moved off the plan's columns once without anybody asking
+ * (commit 713202da), so this fails if the two stop drawing the same header.
+ * The one difference is the fourth column, which a goal heads When.
+ */
+describe('the header a goal page shares with the plan', () => {
+  /** The labels of the first column header in the markup, in order. */
+  function headerOf(html: string): string[] {
+    const at = html.search(/<li aria-hidden="true" class="[^"]*uppercase tracking-wide/);
+    expect(at).toBeGreaterThan(-1);
+    const header = html.slice(at, html.indexOf('</li>', at));
+    return [...header.matchAll(/<span[^>]*>([^<]*)<\/span>/g)]
+      .map((m) => m[1]!)
+      .filter((label) => label.length > 0);
+  }
+
+  it('draws Step, Status, Assignee, When, Steps over a goal, with Priority for When on the plan', () => {
+    const goal = renderToStaticMarkup(
+      <StepTree
+        map={{
+          goal: {
+            id: 'goal-role',
+            areaId: 'career',
+            title: 'Land your next role',
+            acceptance: null,
+            status: 'open',
+            position: 10,
+            unit: null,
+            target: null,
+          },
+          areaName: 'Career',
+          steps: [
+            {
+              id: 'list',
+              parentId: 'goal-role',
+              kind: 'mine',
+              status: 'open',
+              title: 'List the roles to aim for',
+              detail: null,
+              acceptance: null,
+              resolution: null,
+              dismissedAt: null,
+              dueOn: null,
+              position: 10,
+              rhythmCount: null,
+              rhythmPeriod: null,
+              onTodo: false,
+              result: null,
+              resultUrl: null,
+              reviewedAt: null,
+              children: [],
+            },
+          ],
+          linked: [],
+          otherGoals: [],
+          linksOf: {},
+          rhythms: {},
+          information: {},
+          answers: {},
+          threads: {},
+        }}
+        todoOn={false}
+        stages={null}
+      />,
+    );
+    const goalHeader = headerOf(goal);
+    const planHeader = headerOf(render('all'));
+    expect(goalHeader).toEqual(['Step', 'Status', 'Assignee', 'When', 'Steps']);
+    expect(planHeader).toEqual(['Step', 'Status', 'Assignee', 'Priority', 'Steps']);
+    expect(goalHeader.map((label) => (label === 'When' ? 'Priority' : label))).toEqual(planHeader);
   });
 });

@@ -60,6 +60,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
   'dev-plan-feature-edit': ['/dev/plan/[number]'],
   'goals-steps-tree': ['/goals/[goalId]'],
+  'goals-steps-tree-assignee-tip': ['/goals/[goalId]'],
+  'goals-steps-tree-empty': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
   'goals-substep': ['/goals/[goalId]/s/[stepId]'],
