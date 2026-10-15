@@ -171,8 +171,9 @@ function FocusSection({
   return (
     // Each section is one surface over the canvas, its rows hairlined inside
     // it (law 13), as lists are elsewhere. The rows' own inset is taken back
-    // so their text lines up with the heading.
-    <CardSection title={label} meta={count}>
+    // so their text lines up with the heading. Each folds by its heading,
+    // kept on the device (note 91770592).
+    <CardSection title={label} meta={count} fold={`jobs.fold.Pipeline ${label}`}>
       <ul className="-mx-2 divide-y divide-border">{children}</ul>
     </CardSection>
   );
