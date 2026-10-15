@@ -138,6 +138,7 @@ export function UiKit() {
             <ModuleMark module="jobs" />
             <ModuleMark module="learn" />
             <ModuleMark module={null} />
+            <ModuleMark module="dash" />
           </div>
         </div>
       </Group>

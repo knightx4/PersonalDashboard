@@ -10,7 +10,6 @@ import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 import { Tooltip } from '@/components/ui/tooltip';
-import { DashMark } from '@/components/ui/dash-mark';
 import { isAskPath } from '@/lib/ask/page-name';
 
 export type WorkspaceId = ModuleId;
@@ -19,27 +18,6 @@ export type WorkspaceId = ModuleId;
 export type SwitcherCounts = Partial<Record<ModuleId, string>>;
 
 const LAST_PATH_KEY = 'pt_last_path';
-
-/**
- * Dash's own mark for the switcher (plan #1899.2): Dash on a plate of its
- * own indigo, the app's accent. Dash is not a workspace, since it holds no
- * rows of its own and reads across all of them, so it takes no workspace's
- * colour and sits with Home above them.
- */
-export function DashPlate({ size = 'sm', className }: { size?: 'sm' | 'md'; className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-control bg-accent text-fill-ink',
-        size === 'md' ? 'size-8' : 'size-6',
-        className,
-      )}
-    >
-      <DashMark size={size === 'md' ? 'xs' : 'icon'} decorative still />
-    </span>
-  );
-}
 
 /** One row of the switcher: Home, Dash, or a workspace. */
 type SwitcherRow = {
@@ -290,7 +268,7 @@ export function WorkspaceSwitcher({
                 : 'hover:bg-sunken',
           )}
         >
-          {onDash ? <DashPlate size="md" /> : <ModuleMark module={current} size="md" />}
+          <ModuleMark module={onDash ? 'dash' : current} size="md" />
           <span
             className={cn(
               'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
@@ -384,7 +362,7 @@ function WorkspaceRowBody({
 }) {
   return (
     <>
-      {dash ? <DashPlate className="mt-0.5" /> : <ModuleMark module={id} size="sm" className="mt-0.5" />}
+      <ModuleMark module={dash ? 'dash' : id} size="sm" className="mt-0.5" />
       <span className="min-w-0 flex-1">
         <span className={cn('block text-ui font-medium', isCurrent ? 'text-accent' : 'text-ink')}>
           {label}

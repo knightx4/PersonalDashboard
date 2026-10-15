@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
-import { HOME_MARK, moduleById, type MarkShape, type ModuleId } from '@/lib/modules';
+import { DASH_MARK, HOME_MARK, moduleById, type MarkKey, type MarkShape, type ModuleId } from '@/lib/modules';
 import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
 
 /**
@@ -25,8 +25,9 @@ import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
  * corner. A new mark that breaks one of these will look like it came from a
  * different set.
  *
- * module={null} is the app itself: Dash at rest on a dark plate, the same
- * drawing as app/icon.svg.
+ * module={null} is Home: a glass house in white, with a glint of spectrum on
+ * the glass where the other marks have a hue. module="dash" is Dash, and the
+ * app itself: Dash at rest on a dark plate, the same drawing as app/icon.svg.
  */
 
 const SIZES = {
@@ -135,6 +136,13 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       <path d="M10.2 3.3c1.15-.65 2.2.45 3.5-.1a.3.3 0 0 1 .42.28v2.35a.4.4 0 0 1-.24.37c-1.3.55-2.35-.55-3.68.1Z" />
     ),
   },
+  house: {
+    // A glass house with its chimney behind, and the arch of a door.
+    back: <rect x={15} y={2.6} width={4} height={8} rx={1.6} />,
+    front:
+      'M10.47 4.59Q12 3.3 13.53 4.59L19.98 10.07Q21.2 11.1 21.2 12.7V18A3.2 3.2 0 0 1 18 21.2H6A3.2 3.2 0 0 1 2.8 18V12.7Q2.8 11.1 4.02 10.07Z',
+    lines: <path d="M9.9 20.4V17.3a2.1 2.1 0 0 1 4.2 0v3.1" />,
+  },
   person: {
     // A bust: the head is the colour, sitting into a pair of glass shoulders,
     // and the V of a collar is what makes the pane shoulders rather than a hill.
@@ -158,11 +166,37 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawing; from: string; to: string; px: number }) {
+/** The spectrum the prism glint runs through, red at the outer edge of the band. */
+const SPECTRUM = ['#ff3d6e', '#ff9f1c', '#ffe14d', '#3ee69a', '#2fb8ff', '#7a5cff'] as const;
+const SPECTRUM_OFFSETS = [0, 0.2, 0.4, 0.6, 0.8, 1] as const;
+
+function GlassObject({
+  id,
+  drawing,
+  from,
+  to,
+  px,
+  prism = false,
+}: {
+  id: string;
+  drawing: Drawing;
+  from: string;
+  to: string;
+  px: number;
+  prism?: boolean;
+}) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   // White on dark, the deep hue on light, where white would not hold against the tint.
-  const ink = `light-dark(${to}, #fff)`;
+  // A white pane takes its deep end on both, since white lines would vanish on it.
+  const ink = prism ? to : `light-dark(${to}, #fff)`;
+  // A white pane is close to opaque, or the dark ground turns it grey.
+  const tintTop = prism
+    ? `color-mix(in srgb, ${from} 86%, transparent)`
+    : `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)`;
+  const tintBottom = prism
+    ? `color-mix(in srgb, color-mix(in srgb, ${from} 72%, ${to}) 80%, transparent)`
+    : `color-mix(in srgb, ${to} ${TINT}%, transparent)`;
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
 
@@ -187,9 +221,22 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
         </linearGradient>
         {/* The glass itself in the hue, from the middle of the ramp down to the deep end. */}
         <linearGradient id={`${id}-tint`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <stop offset="0" style={{ stopColor: `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)` }} />
-          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} ${TINT}%, transparent)` }} />
+          <stop offset="0" style={{ stopColor: tintTop }} />
+          <stop offset="1" style={{ stopColor: tintBottom }} />
         </linearGradient>
+        {prism && (
+          <>
+            {/* Across the band that runs corner to corner, top right to bottom left. */}
+            <linearGradient id={`${id}-spectrum`} gradientUnits="userSpaceOnUse" x1={7.6} y1={7.6} x2={9.9} y2={9.9}>
+              {SPECTRUM.map((colour, i) => (
+                <stop key={colour} offset={SPECTRUM_OFFSETS[i]} stopColor={colour} />
+              ))}
+            </linearGradient>
+            <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={0.3} />
+            </filter>
+          </>
+        )}
       </defs>
 
       {/* A soft shadow in the hue, under the whole object. */}
@@ -211,6 +258,18 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
       </g>
       {pane({ fill: `url(#${id}-tint)` })}
       {pane({ fill: `url(#${id}-sheen)` })}
+      {prism && (
+        <>
+          {/* Light split by the glass: a band of spectrum with a white glint
+              beside it, and the edge parted into warm and cool a hair apart,
+              as a lens does at its rim. */}
+          <g clipPath={`url(#${id}-clip)`} filter={`url(#${id}-soft)`}>
+            <path d="M0 15.2 15.2 0h4.6L0 19.8Z" fill={`url(#${id}-spectrum)`} opacity={0.55} />
+          </g>
+          <g transform="translate(.4 -.35)">{pane({ stroke: SPECTRUM[0], strokeOpacity: 0.55, strokeWidth: 0.55 })}</g>
+          <g transform="translate(-.4 .35)">{pane({ stroke: SPECTRUM[4], strokeOpacity: 0.55, strokeWidth: 0.55 })}</g>
+        </>
+      )}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
       {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55 })}
       <g
@@ -227,8 +286,8 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
   );
 }
 
-/** The app's own mark: Dash at rest on a dark plate. */
-function HomePlate({ id }: { id: string }) {
+/** Dash's mark, and the app's: Dash at rest on a dark plate. */
+function DashPlate({ id }: { id: string }) {
   const plate = 'M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z';
   return (
     <>
@@ -258,23 +317,30 @@ export function ModuleMark({
   size = 'md',
   className,
 }: {
-  /** null means the app itself. */
-  module: ModuleId | null;
+  /** null means Home, and 'dash' means Dash, which is also the app's own mark. */
+  module: ModuleId | null | 'dash';
   size?: keyof typeof SIZES;
   className?: string;
 }) {
-  const entry = moduleById(module);
   const sizing = SIZES[size];
   const id = `mark-${useId().replace(/:/g, '')}`;
-  const key = entry?.key ?? HOME_MARK.key;
+  const key: MarkKey =
+    module === 'dash' ? DASH_MARK.key : (moduleById(module)?.key ?? HOME_MARK.key);
 
   return (
     <span className={cn('flex shrink-0 items-center justify-center', sizing.box, className)} aria-hidden>
       <svg width={sizing.px} height={sizing.px} viewBox="0 0 24 24" fill="none" overflow="visible">
         {key.shape === 'dash' ? (
-          <HomePlate id={id} />
+          <DashPlate id={id} />
         ) : (
-          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} />
+          <GlassObject
+            id={id}
+            drawing={DRAWINGS[key.shape]}
+            from={key.from}
+            to={key.to}
+            px={sizing.px}
+            prism={key.prism}
+          />
         )}
       </svg>
     </span>
