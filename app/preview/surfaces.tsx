@@ -196,6 +196,8 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { StatusLine } from '@/components/shell/status-line';
+import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
@@ -3304,6 +3306,21 @@ function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   );
 }
 
+/** The foot of a page with the status line under it, the run as given. */
+function StatusRunSurface({ going }: { going: GoingRunLine }) {
+  return (
+    <div className="flex min-h-48 flex-col justify-between overflow-hidden rounded-card bg-sunken">
+      <div className="p-4 text-small text-ink-muted">Today</div>
+      <StatusLine
+        lines={[{ text: 'mail: 14 new', at: null }]}
+        brief={{ text: '3 roles waiting on you', tone: 'caution', href: '/jobs' }}
+        main={null}
+        going={going}
+      />
+    </div>
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -5659,6 +5676,42 @@ export const SURFACES: readonly Surface[] = [
         <TodayLists board={todayBoard} timezone="Europe/London" />
       </AppShell>
     ),
+  },
+
+  {
+    /* The status line while Dash is on a run (plan #1964.2.3): its mark, working,
+     * and the run's newest line in the run's own words, linking to the run. The
+     * line is drawn from lg up only, as everywhere, so the phone shots are the
+     * page without it by design. The longest line a run writes, beside the
+     * workspace summary and the main dot, is the fixture. */
+    id: 'shell-status-run',
+    label: 'The shell · Status line while Dash is on a run',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <StatusRunSurface
+        going={{
+          href: '/goals/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+          line: {
+            id: 'line-1',
+            user_id: 'u',
+            run_table: 'goals.runs',
+            run_id: '6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+            kind: 'action',
+            body: 'Reading the three most recent statements from Gmail to fill in what the mortgage step still needs before the end of the month',
+            options: null,
+            created_at: '2026-10-15T10:00:00Z',
+          },
+        }}
+      />
+    ),
+  },
+  {
+    id: 'shell-status-run-new',
+    label: 'The shell · Status line, run started and no line written yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <StatusRunSurface going={{ href: '/dev/plan/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03', line: null }} />,
   },
 
   {
