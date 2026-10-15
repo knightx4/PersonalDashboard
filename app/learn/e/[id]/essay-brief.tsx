@@ -215,6 +215,7 @@ function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: Study
         <p className="text-small text-ink-muted">
           {state.kind === 'searching' ? 'Looking in your study…' : 'From your study'}
         </p>
+        {/* dash-action-ok: searches run on their own as you type, so no button carries this cost. */}
         <PaidHint action={STUDY_ACTION} what="Cost of searching your study" />
       </div>
       {state.kind === 'found' && items.length === 0 && (

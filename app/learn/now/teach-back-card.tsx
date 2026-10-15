@@ -88,6 +88,7 @@ export function TeachBackCard({
           activity="reading"
           closed={() => (done ? 'Marked. That is the end of this one.' : null)}
           hint={
+            // dash-action-ok: the hint sits on the thread composer, which has no button of its own.
             <PaidHint action="app/learn/now/actions.ts#explainBack" what="Cost of marking the answer" />
           }
         />

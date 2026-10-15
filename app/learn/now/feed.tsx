@@ -872,6 +872,7 @@ function DeckCard({
               placeholder="What would you like to know?"
               activity="writing"
               hint={
+                // dash-action-ok: the hint sits on the thread composer, which has no button of its own.
                 <PaidHint
                   action="app/learn/now/actions.ts#askAboutCard"
                   what="Cost of an answer"

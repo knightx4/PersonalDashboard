@@ -227,6 +227,7 @@ export function ProbeSession({
                   <ProbeOptions options={live.options} answered={live.answered ?? null} />
                   {!live.answered && (
                     <div className="flex justify-end">
+                      {/* dash-action-ok: the hint sits under the answer options, which are not a button for this cost. */}
                       <PaidHint
                         action="app/learn/s/[id]/probe/actions.ts#answerQuestion"
                         what="Cost of answering"

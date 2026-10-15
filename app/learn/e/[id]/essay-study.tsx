@@ -248,7 +248,10 @@ export function EssayStudyCard({
     <Card padding="none" className={cn('hidden lg:block', className)}>
       <CardSection
         title="From your study"
-        action={<PaidHint action={STUDY_ACTION} what="Cost of searching with a new paragraph" />}
+        action={
+          // dash-action-ok: searches run on their own as you type, so no button carries this cost.
+          <PaidHint action={STUDY_ACTION} what="Cost of searching with a new paragraph" />
+        }
         meta={state.kind === 'searching' ? 'Searching…' : undefined}
       >
         {items.length > 0 && (

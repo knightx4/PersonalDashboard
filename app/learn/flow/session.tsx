@@ -384,6 +384,7 @@ export function FlowSession({
             <DontKnowButton />
             <span className="inline-flex items-center gap-1">
               <NotNowButton />
+              {/* dash-action-ok: the hint sits beside the Later close button, which does not run the model. */}
               <PaidHint
                 action="app/learn/flow/actions.ts#flowStep:ask"
                 what="Cost of the next question"
