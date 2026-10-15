@@ -169,6 +169,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-cell-answer-error': ['/learn/now'],
   'learn-cell-answer-reached': ['/learn/now'],
   'learn-cell-answer-quote': ['/learn/now'],
+  'learn-cell-answer-case': ['/learn/now'],
+  'learn-cell-answer-case-reached': ['/learn/now'],
   'learn-subject-chain': ['/learn/s/[id]'],
   'learn-topics': ['/learn/topics'],
   'learn-topics-loading': ['/learn/topics'],

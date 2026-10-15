@@ -5376,6 +5376,23 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CellAnswerPreview state="quote" />,
   },
   {
+    /* A case at level 4: numbers to work and a box to show the working in
+     * (plan #2138.8). */
+    id: 'learn-cell-answer-case',
+    label: 'Practice Flow · Work a case',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case" />,
+  },
+  {
+    /* The same case graded on the asked level alone. */
+    id: 'learn-cell-answer-case-reached',
+    label: 'Practice Flow · Work a case, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
     /* The chain a subject reads as: the doors it turns on, then everything
      * downstream of them. The size difference is the surface. */
     id: 'learn-subject-chain',

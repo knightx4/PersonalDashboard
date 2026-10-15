@@ -71,6 +71,7 @@ export function gradePrompt(input: {
   cells: readonly GraderCell[];
   question: string;
   answer: string;
+  expected?: string | null;
 }): string {
   const lines: string[] = ['The cells:', ''];
   for (const cell of input.cells) {
@@ -84,7 +85,18 @@ export function gradePrompt(input: {
     for (const check of cell.descriptor) lines.push(`  - ${check}`);
     lines.push('');
   }
-  lines.push(`Question asked: ${input.question}`, '', 'Their answer:', input.answer, '', `Call ${TOOL}.`);
+  lines.push(`Question asked: ${input.question}`, '');
+  if (input.expected) {
+    lines.push(
+      'The question is a case, and only C1 is graded. The answer it expects, which the person has not seen:',
+      input.expected,
+      '',
+      'Grade C1 met when their answer reaches the same result by sound working, whatever the wording or the route.',
+      'A different result, or the right result with no working shown, is not_met. Quote the working that meets it.',
+      '',
+    );
+  }
+  lines.push('Their answer:', input.answer, '', `Call ${TOOL}.`);
   return lines.join('\n');
 }
 
@@ -93,6 +105,8 @@ export async function gradeCellAnswer(input: {
   cells: readonly GraderCell[];
   question: string;
   answer: string;
+  /** The answer a case expects; set for a case, which is graded on the asked cell alone. */
+  expected?: string | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

@@ -16,6 +16,7 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
 import { askCell } from '@/lib/learn/levels/answer-store';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { CellAnswer } from '@/components/learn/cell-answer';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
@@ -80,7 +81,14 @@ export async function PracticeFlow({
     const cellId = typeof cellParam === 'string' && UUID.test(cellParam) ? cellParam : null;
     if (!cellId) redirect(practiceHref());
     const user = await requireUser();
-    const asked = await askCell(await createLearnClient(), user.id, cellId);
+    const spend = collectSpend();
+    const asked = await askCell(
+      await createLearnClient(),
+      user.id,
+      cellId,
+      process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+    );
+    await recordLearnSpend(user.id, 'write-cell-case', spend.reports);
     return (
       <div className="mt-6">
         {asked.ok ? (

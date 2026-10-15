@@ -1,6 +1,10 @@
 'use client';
 
-import { CellAnswerView, type AskedCellView, type CellAnswerState } from '@/components/learn/cell-answer-view';
+import {
+  CellAnswerView,
+  type AskedCellView,
+  type CellAnswerState,
+} from '@/components/learn/cell-answer-view';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ANSWER_CELL_PAID } from '@/components/learn/cell-answer-view';
 import { HAIKU } from '@/lib/core/models';
@@ -47,7 +51,8 @@ const reached: ReachedCell[] = [
     level: 3,
     how: 'shown',
     asked: true,
-    quote: 'That premium is beta times the market risk premium: beta measures how much the stock moves with the market, and the market premium is what investors demand for holding the market at all.',
+    quote:
+      'That premium is beta times the market risk premium: beta measures how much the stock moves with the market, and the market premium is what investors demand for holding the market at all.',
     via: null,
     descriptor: check(
       'Can say what each of the risk-free rate, beta and the market premium stands for',
@@ -61,9 +66,13 @@ const reached: ReachedCell[] = [
     level: 2,
     how: 'shown',
     asked: false,
-    quote: 'Only systematic risk is paid for, because anything specific to one company washes out in a diversified portfolio.',
+    quote:
+      'Only systematic risk is paid for, because anything specific to one company washes out in a diversified portfolio.',
     via: null,
-    descriptor: check('Can define systematic risk', 'Can say why diversification removes idiosyncratic risk'),
+    descriptor: check(
+      'Can define systematic risk',
+      'Can say why diversification removes idiosyncratic risk',
+    ),
   },
   {
     cellId: 'capm1',
@@ -112,6 +121,39 @@ const moved: Moved = {
   doubted: [{ from: { topicName: 'CAPM', level: 3 }, to: { topicName: 'Return', level: 2 } }],
 };
 
+const caseAsked: AskedCellView = {
+  questionId: '00000000-0000-4000-8000-000000002139',
+  topicName: 'Discounted cash flow',
+  level: 4,
+  format: 'case',
+  question:
+    'A company expects free cash flow of $120m next year, growing 5% a year for five years and then 2% for ever. ' +
+    'Its cost of capital is 9%. It has $200m of net debt and 50m shares. Value one share, and show the steps you took.',
+};
+
+const caseAnswer =
+  'Discount each of the five years at 9%, then add a terminal value of year-five cash flow times 1.02 over 0.07, discounted back five years. ' +
+  'Enterprise value comes to about $1.9bn. Take off $200m of net debt and divide by 50m shares, which gives about $34 a share.';
+
+const caseMoved: Moved = {
+  reached: [
+    {
+      cellId: 'dcf4',
+      topicName: 'Discounted cash flow',
+      level: 4,
+      how: 'shown',
+      asked: true,
+      quote: 'Take off $200m of net debt and divide by 50m shares, which gives about $34 a share.',
+      via: null,
+      descriptor: check(
+        'Can build a DCF from given projections',
+        'Can move from enterprise value to a value per share',
+      ),
+    },
+  ],
+  doubted: [],
+};
+
 const NEXT = '/learn/now?practice=1';
 
 export function CellAnswerPreview({
@@ -119,27 +161,36 @@ export function CellAnswerPreview({
   pending,
   openFirstQuote,
 }: {
-  state: 'asked' | 'loading' | 'error' | 'reached' | 'quote';
+  state: 'asked' | 'loading' | 'error' | 'reached' | 'quote' | 'case' | 'case-reached';
   pending?: boolean;
   openFirstQuote?: boolean;
 }) {
+  const isCase = state === 'case' || state === 'case-reached';
   const drawn: CellAnswerState =
-    state === 'asked'
+    state === 'case'
       ? { moved: null, error: null }
-      : state === 'loading'
-        ? { moved: null, error: null, response: answer }
-        : state === 'error'
-          ? { moved: null, error: 'Dash could not grade this answer just now.', response: answer }
-          : { moved, error: null };
+      : state === 'case-reached'
+        ? { moved: caseMoved, error: null, response: caseAnswer }
+        : state === 'asked'
+          ? { moved: null, error: null }
+          : state === 'loading'
+            ? { moved: null, error: null, response: answer }
+            : state === 'error'
+              ? {
+                  moved: null,
+                  error: 'Dash could not grade this answer just now.',
+                  response: answer,
+                }
+              : { moved, error: null };
   return (
     <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>
-    <CellAnswerView
-      asked={asked}
-      state={drawn}
-      nextHref={NEXT}
-      pending={pending ?? state === 'loading'}
-      openFirstQuote={openFirstQuote ?? state === 'quote'}
-    />
+      <CellAnswerView
+        asked={isCase ? caseAsked : asked}
+        state={drawn}
+        nextHref={NEXT}
+        pending={pending ?? state === 'loading'}
+        openFirstQuote={openFirstQuote ?? state === 'quote'}
+      />
     </PaidCostsProvider>
   );
 }

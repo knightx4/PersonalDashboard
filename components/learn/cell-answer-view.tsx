@@ -36,6 +36,8 @@ export type AskedCellView = {
   topicName: string;
   level: number;
   question: string;
+  /** A case (levels 4 to 6) is worked and typed; an explanation is written out. Absent means explain. */
+  format?: 'explain' | 'case';
 };
 
 export type CellAnswerState = {
@@ -186,7 +188,7 @@ export function CellAnswerView({
   const head = (
     <>
       <p className="text-small text-ink-muted">
-        {asked.topicName} · Level {asked.level} · Explain in your own words
+        {asked.topicName} · Level {asked.level} · {asked.format === 'case' ? 'Work this case' : 'Explain in your own words'}
       </p>
       <p className="mt-1 text-body text-ink">{asked.question}</p>
     </>
@@ -242,7 +244,11 @@ export function CellAnswerView({
           defaultValue={state.response ?? ''}
           readOnly={pending}
           rows={6}
-          placeholder="Write it as you would explain it to a colleague."
+          placeholder={
+            asked.format === 'case'
+              ? 'Show your working and say what you chose. Finish with your answer.'
+              : 'Write it as you would explain it to a colleague.'
+          }
           className={cn('mt-4 max-h-none min-h-36', pending && 'text-ink-muted')}
           aria-describedby={state.error ? `answer-error-${asked.questionId}` : undefined}
           required
