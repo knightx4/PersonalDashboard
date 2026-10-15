@@ -68,7 +68,7 @@ export const devActions: ModuleActions = {
   'app/dev/posts/actions.ts': {
     suggestPosts: none('spends'),
     suggestPostAbout: none('spends'),
-    editPostBody: none('own', "A post goes out under the person's name, so its words are theirs; the posts skill drafts them."),
+    editPostBody: tool('rewrite_post'),
     markPostPosted: none('theirs', 'Says the person posted it; Dash never posts.'),
     dropPost: none('theirs'),
     restorePost: none('theirs'),
