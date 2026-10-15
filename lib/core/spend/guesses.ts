@@ -299,6 +299,13 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'classify-job-email': background(unit(HAIKU, 1_500, 100)),
   'match-evidence': run(OPUS, 10_000, 3_000),
   'draft-answer': run(OPUS, 6_000, 800),
+  // Everything gathered for the application (up to about 28,000 tokens,
+  // usually far less) in; a letter of about 300 words, its citations and a
+  // few questions out, with the thinking before it.
+  'draft-cover-letter': run(OPUS, 15_000, 2_500),
+  // The gathered material (up to about 28,000 tokens, cached) and the
+  // questions in; several answers and their asks out.
+  'draft-application': run(OPUS, 25_000, 4_000),
   // The bank, the description and the thread in; a few sentences out, or a
   // whole cover letter when one is asked for.
   'reply-to-role-comment': run(SONNET, 10_000, 1_000),
