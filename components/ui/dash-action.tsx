@@ -4,7 +4,10 @@ import { Button, type ButtonProps } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
 import { DashMark } from '@/components/ui/dash-mark';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { useRunGoing } from '@/components/runs/use-run-going';
 import { cn } from '@/lib/cn';
+import { MOVE_TITLE, MOVE_WORD } from '@/lib/core/move';
+import type { RunRef } from '@/lib/core/run-going';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 
@@ -26,6 +29,12 @@ import type { PaidAction } from '@/lib/core/spend/paid-actions';
  *
  * While `pending`, the mark turns to working, so the press shows Dash on it
  * as well as the label saying so.
+ *
+ * A press that hands work to a run passes the run as `run` (plan #1964.2.1).
+ * For as long as that run goes, the working mark stands in place of the
+ * label and the button is shut, so the button says what the row and the
+ * status line say: Dash is on it. The label keeps its room, invisibly, so
+ * nothing beside the button moves when the run starts or ends.
  *
  * Everything else is the Button's own: variant, size, type, form props.
  * `hintFirst` puts the $ before the button, for a button at a row's right
@@ -50,6 +59,8 @@ export type DashActionProps = ButtonProps & {
   hintFirst?: boolean;
   /** Classes for the span holding the button and its hint. */
   wrapperClassName?: string;
+  /** The run this press started, followed until it ends. */
+  run?: RunRef | null;
 };
 
 const SMALL = new Set(['xs', 'sm']);
@@ -67,10 +78,16 @@ export function DashAction({
   pending,
   variant,
   size,
+  run,
+  disabled,
   children,
   ...props
 }: DashActionProps) {
   const small = variant === 'link' || SMALL.has(size ?? 'md');
+  const going = useRunGoing(run);
+  const mark = (state: 'working' | 'idle') => (
+    <DashMark size={small ? '2xs' : 'icon'} tone="brand" state={state} decorative />
+  );
 
   let hint: React.ReactNode = null;
   if (paid) {
@@ -90,15 +107,43 @@ export function DashAction({
   return (
     <span className={cn('inline-flex items-center gap-1', wrapperClassName)} data-dash-action="">
       {hintFirst && hint}
-      <Button variant={variant} size={size} pending={pending} {...props}>
-        <DashMark
-          size={small ? '2xs' : 'icon'}
-          tone="brand"
-          state={pending ? 'working' : 'idle'}
-          decorative
-        />
-        {children}
-      </Button>
+      {going ? (
+        <Button
+          variant={variant}
+          size={size}
+          {...props}
+          // Shut, but at full strength: the button is where Dash is at work,
+          // not a control turned off, and a half-faded mark would read as idle.
+          className={cn(props.className, 'disabled:opacity-100')}
+          pending
+          aria-label={MOVE_WORD.dash_working}
+          title={MOVE_TITLE.dash_working}
+          data-run-going=""
+        >
+          <span className="relative inline-flex items-center gap-1.5">
+            <span className="invisible inline-flex items-center gap-1.5" aria-hidden>
+              {mark('idle')}
+              {children}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center">{mark('working')}</span>
+          </span>
+        </Button>
+      ) : (
+        <Button
+          variant={variant}
+          size={size}
+          pending={pending}
+          disabled={disabled}
+          {...props}
+          // A press on its way keeps full strength too: the working mark says
+          // Dash has it, and a faded button between the press and the run
+          // reads as a flash of off.
+          className={cn(props.className, pending && 'disabled:opacity-100')}
+        >
+          {mark(pending ? 'working' : 'idle')}
+          {children}
+        </Button>
+      )}
       {!hintFirst && hint}
     </span>
   );

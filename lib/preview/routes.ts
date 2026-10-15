@@ -257,6 +257,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
+  // The button that started a run, while the run goes (plan #1964.2.1).
+  'dash-action-run': ['/dev/ui', '/goals', '/dev/plan'],
   'ui-kit': ['/dev/ui'],
   // A ref link's preview held open (plan #1931.4): in comments, Dash's
   // replies and plan details.
@@ -490,6 +492,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/ui/chip.tsx',
     'components/ui/confirm-step.tsx',
     'components/ui/cost-hint.tsx',
+    'components/ui/dash-action.tsx',
     'components/ui/disclosure.tsx',
     'components/ui/editable-prose.tsx',
     'components/ui/empty-state.tsx',
