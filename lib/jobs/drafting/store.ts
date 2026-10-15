@@ -12,6 +12,7 @@
  * tested directly. The functions that touch the database take the client.
  */
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import type { LimitOverrun } from './limits';
 
 export type DraftKind = 'answers' | 'cover_letter';
 
@@ -23,6 +24,10 @@ export interface StoredDraft {
   answer: string;
   evidence_item_ids: string[];
   unsupported_claims: string[];
+  /** Banned constructions found in the answer (plan #2130.3); absent on older rows. */
+  banned_found?: string[];
+  /** Set when the answer is still over its limit after the corrective retry (plan #2130.3). */
+  over_limit?: LimitOverrun;
 }
 
 /**
@@ -69,13 +74,26 @@ export function parseDrafts(value: unknown): DraftMap {
     if (!raw || typeof raw !== 'object') continue;
     const entry = raw as Record<string, unknown>;
     if (typeof entry.answer !== 'string') continue;
-    out[key] = {
+    const draft: StoredDraft = {
       answer: entry.answer,
       evidence_item_ids: strings(entry.evidence_item_ids),
       unsupported_claims: strings(entry.unsupported_claims),
     };
+    const banned = strings(entry.banned_found);
+    if (banned.length > 0) draft.banned_found = banned;
+    const overrun = parseOverrun(entry.over_limit);
+    if (overrun) draft.over_limit = overrun;
+    out[key] = draft;
   }
   return out;
+}
+
+function parseOverrun(value: unknown): LimitOverrun | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.count !== 'number' || typeof raw.limit !== 'number') return null;
+  if (raw.unit !== 'words' && raw.unit !== 'characters') return null;
+  return { count: raw.count, limit: raw.limit, unit: raw.unit };
 }
 
 /** Reads the asks jsonb, dropping any entry that lacks an id or a question. */

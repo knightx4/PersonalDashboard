@@ -303,6 +303,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // usually far less) in; a letter of about 300 words, its citations and a
   // few questions out, with the thinking before it.
   'draft-cover-letter': run(OPUS, 15_000, 2_500),
+  // The gathered material (up to about 28,000 tokens, cached) and the
+  // questions in; several answers and their asks out.
+  'draft-application': run(OPUS, 25_000, 4_000),
   // The bank, the description and the thread in; a few sentences out, or a
   // whole cover letter when one is asked for.
   'reply-to-role-comment': run(SONNET, 10_000, 1_000),

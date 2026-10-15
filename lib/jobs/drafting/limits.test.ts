@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { answerLimit, describeLimit, limitFromQuestion } from './limits';
+import {
+  answerLimit,
+  countCharacters,
+  countWords,
+  describeLimit,
+  describeOverrun,
+  limitFromQuestion,
+  overLimit,
+} from './limits';
 
 describe('limitFromQuestion', () => {
   it.each([
@@ -43,5 +51,34 @@ describe('answerLimit', () => {
 
   it('describes a limit for a prompt', () => {
     expect(describeLimit({ count: 1000, unit: 'characters', from: 'question' })).toBe('1,000 characters');
+  });
+});
+
+describe('measuring an answer', () => {
+  it('counts words as runs of non-space', () => {
+    expect(countWords('  I rebuilt   the close.\nTwice. ')).toBe(5);
+    expect(countWords('   ')).toBe(0);
+  });
+
+  it('counts characters with spaces, by code point', () => {
+    expect(countCharacters('Café ok')).toBe(7);
+    expect(countCharacters('  👍 ')).toBe(1);
+  });
+
+  it('flags only what runs past the limit', () => {
+    const words = { count: 3, unit: 'words' as const, from: 'set' as const };
+    expect(overLimit('one two three', words)).toBeNull();
+    expect(overLimit('one two three four', words)).toEqual({ count: 4, limit: 3, unit: 'words' });
+    const chars = { count: 10, unit: 'characters' as const, from: 'question' as const };
+    expect(overLimit('ten chars!', chars)).toBeNull();
+    expect(overLimit('eleven char', chars)).toEqual({ count: 11, limit: 10, unit: 'characters' });
+    expect(overLimit('anything at all', null)).toBeNull();
+  });
+
+  it('says how far over an answer is', () => {
+    expect(describeOverrun({ count: 163, limit: 150, unit: 'words' })).toBe('163 words, over the 150-word limit');
+    expect(describeOverrun({ count: 1200, limit: 1000, unit: 'characters' })).toBe(
+      '1,200 characters, over the 1,000-character limit',
+    );
   });
 });

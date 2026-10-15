@@ -147,7 +147,7 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   // Asks on the role's thread, as a comment tagged @dash does.
   'app/jobs/(app)/_home/prepare-actions.ts#prepareWithDash': ['reply-to-role-comment'],
-  'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
+  'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-application'],
   'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestPeople': ['suggest-outreach'],
@@ -234,6 +234,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/jobs/(app)/roles/actions.ts#draftApplication':
+    'Drafting every answer on an application in one call (plan #2130.3). Its Draft all button on the Application tab comes with plan #2130.4, which moves this key into PAID_ACTIONS as draft-application with a PaidHint beside the button. The per-question Draft reaches the same path through draftAnswerFromEvidence, which is priced.',
   'app/api/cron/daily/route.ts#GET':
     'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':

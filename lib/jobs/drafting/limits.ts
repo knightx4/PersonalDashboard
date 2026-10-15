@@ -72,3 +72,42 @@ export function answerLimit(wordLimit: number | null | undefined, question: stri
 export function describeLimit(limit: AnswerLimit): string {
   return `${formatNumber(limit.count)} ${limit.unit}`;
 }
+
+/** Words in a text: runs of non-space, as a form's word counter counts them. */
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/u).length : 0;
+}
+
+/**
+ * Characters in a text, spaces and line breaks included, counted by code
+ * point so an accented letter or an emoji is one, as a form's counter shows.
+ */
+export function countCharacters(text: string): number {
+  return [...text.trim()].length;
+}
+
+/** The text's length in the limit's unit. */
+export function measure(text: string, unit: LimitUnit): number {
+  return unit === 'words' ? countWords(text) : countCharacters(text);
+}
+
+/** How far a text runs past its limit. */
+export type LimitOverrun = { count: number; limit: number; unit: LimitUnit };
+
+/**
+ * The overrun when the text is longer than its limit, or null when it fits or
+ * has no limit. Checked in code rather than left to the model, which counts
+ * words loosely and characters hardly at all (plan #2130.3).
+ */
+export function overLimit(text: string, limit: AnswerLimit | null | undefined): LimitOverrun | null {
+  if (!limit) return null;
+  const count = measure(text, limit.unit);
+  return count > limit.count ? { count, limit: limit.count, unit: limit.unit } : null;
+}
+
+/** "163 words, over the 150-word limit", for a prompt or a flag. */
+export function describeOverrun(overrun: LimitOverrun): string {
+  const singular = overrun.unit === 'words' ? 'word' : 'character';
+  return `${formatNumber(overrun.count)} ${overrun.unit}, over the ${formatNumber(overrun.limit)}-${singular} limit`;
+}

@@ -62,6 +62,11 @@ import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Role' };
 
+// Drafting a whole application (draftApplication in ../actions.ts) runs one
+// Opus call over everything on file, and a second to shorten any answer over
+// its limit, in this page's server actions.
+export const maxDuration = 300;
+
 /**
  * The page you actually live in: the posting, the requirement map, the
  * timeline, the answers, the interviews, the notes, and every email that has

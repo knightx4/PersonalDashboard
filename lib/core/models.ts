@@ -60,6 +60,8 @@ export const MODELS = {
   jobsEvidenceDraft: OPUS,
   /** lib/jobs/drafting/draft-cover-letter.ts */
   jobsCoverLetterDraft: OPUS,
+  /** lib/jobs/drafting/draft-application.ts, every answer on an application in one call */
+  jobsApplicationDraft: OPUS,
   /** lib/jobs/evidence/match.ts */
   jobsEvidenceMatch: OPUS,
   /** lib/jobs/evidence/propose.ts */
