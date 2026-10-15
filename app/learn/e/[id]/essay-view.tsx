@@ -1,9 +1,11 @@
 'use client';
 
+import { ChangeSet } from '@codemirror/state';
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
+import { PageColumn } from '@/components/shell/page-width';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import { cn } from '@/lib/cn';
 import {
   countWords,
   essayTitle,
+  retitleEssay,
   wordCountLabel,
   type Essay,
   type EssayBrief,
@@ -24,6 +27,7 @@ import { essayParagraphs } from '@/lib/learn/essays/checks';
 import type { EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
   draftMarksJson,
+  mapMarks,
   yourWords,
   YOUR_WORDS_RULE,
   type AuthorMark,
@@ -805,6 +809,33 @@ export function EssayView({
   }, [typing]);
 
   const writing = stage === 'write';
+  const [renaming, setRenaming] = useState(false);
+  // Renaming rewrites the draft's title line (note 1c956878). While writing,
+  // the change goes through the editor, which hands the text up as typing
+  // does; on the other stages it is made to the text the editor last held.
+  const rename = useCallback(
+    (next: string) => {
+      setRenaming(false);
+      if (!next.trim() || next.trim() === title) return;
+      const open = writing ? editor.current : null;
+      const text = open ? open.doc() : latestDoc.current.text;
+      const change = retitleEssay(text, next);
+      if (open) {
+        open.replace(change);
+        return;
+      }
+      const set = ChangeSet.of(change, text.length);
+      onChange(
+        text.slice(0, change.from) + change.insert + text.slice(change.to),
+        mapMarks(latestDoc.current.marks, set),
+      );
+    },
+    [onChange, title, writing],
+  );
+  // The path ends in the essay's name as it is now, not as the page was served.
+  const crumbs = subject?.path.map((crumb, i, all) =>
+    i === all.length - 1 ? { ...crumb, label: title } : crumb,
+  );
   const putOutline = useCallback(() => {
     const text = outlineDraft(planRef.current, brief.question);
     setDoc((now) => ({ text, marks: [], version: now.version + 1 }));
@@ -824,38 +855,63 @@ export function EssayView({
       <div className={cn('mb-6 flex min-h-11 items-center justify-between gap-3', quiet)}>
         {/* The path, workspace › Essays › this essay, and the one back link
             (plans #1931.2, #1931.3). */}
-        {subject ? (
-          <PathLine crumbs={subject.path} fallback={parentCrumb(subject.path)} />
+        {renaming ? (
+          <InlineInput
+            autoFocus
+            defaultValue={title}
+            aria-label="Essay name"
+            onBlur={(event) => rename(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                rename(event.currentTarget.value);
+              } else if (event.key === 'Escape') {
+                // Put the name back first, so the blur as it closes changes nothing.
+                event.currentTarget.value = title;
+                setRenaming(false);
+              }
+            }}
+            className="min-h-11 min-w-0 flex-1 lg:min-h-0"
+          />
+        ) : subject && crumbs ? (
+          <PathLine crumbs={crumbs} fallback={parentCrumb(subject.path)} />
         ) : (
           <span />
         )}
-        <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
-          <DashAction
-            paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
-            what="Cost of a rephrase"
-            hintFirst
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!selected || rephrase.kind === 'asking'}
-            pending={rephrase.kind === 'asking'}
-            // Keeps the editor's selection showing while the button is pressed.
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => void askRephrase()}
-            title={selected ? undefined : 'Select some text to have Dash reword it'}
-          >
-            {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
-          </DashAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-pressed={focusMode}
-            onClick={() => setFocusMode((on) => !on)}
-            className="hidden lg:inline-flex"
-          >
-            {focusMode ? 'Focus on' : 'Focus'}
-          </Button>
+        <div className="flex items-center gap-1">
+          {!renaming && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+              Rename
+            </Button>
+          )}
+          <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
+            <DashAction
+              paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
+              what="Cost of a rephrase"
+              hintFirst
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!selected || rephrase.kind === 'asking'}
+              pending={rephrase.kind === 'asking'}
+              // Keeps the editor's selection showing while the button is pressed.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void askRephrase()}
+              title={selected ? undefined : 'Select some text to have Dash reword it'}
+            >
+              {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
+            </DashAction>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={focusMode}
+              onClick={() => setFocusMode((on) => !on)}
+              className="hidden lg:inline-flex"
+            >
+              {focusMode ? 'Focus on' : 'Focus'}
+            </Button>
+          </div>
         </div>
       </div>
       <StageStepper
@@ -1078,5 +1134,13 @@ export function EssayView({
     </div>
   );
 
-  return <MainRail main={main} rail={rail} />;
+  // The essay keeps its reading measure (max-w-2xl), so the pair is held to
+  // a one-column page's width (PageColumn, about the essay, the gap and the
+  // 18rem rail) and centred, rather than leaving the shell's spare width as a
+  // gap between the essay and its rail (note 740f8532).
+  return (
+    <PageColumn>
+      <MainRail main={main} rail={rail} />
+    </PageColumn>
+  );
 }

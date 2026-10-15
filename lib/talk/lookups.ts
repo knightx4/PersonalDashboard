@@ -183,6 +183,8 @@ export function lookupLabel(name: string, input: unknown): string {
     }
     case 'read_mail':
       return 'Reading an email';
+    case 'read_job_board':
+      return 'Reading a job board';
     default:
       return 'Looking something up';
   }
@@ -198,6 +200,7 @@ export function foundCount(result: unknown): number | null {
   if (Array.isArray(r.rows)) return r.rows.length;
   if (typeof r.matched === 'number') return r.matched;
   if (typeof r.opened === 'number') return r.opened;
+  if (typeof r.open_roles === 'number') return r.open_roles;
   return null;
 }
 

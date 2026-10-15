@@ -37,6 +37,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # The type check alone needs about 5 GB, over Node's default heap, and
+      # ran Typecheck and Build out of memory in October 2026. The runner has
+      # 16 GB. Idea c871cb65 is to make the types lighter instead.
+      NODE_OPTIONS: --max-old-space-size=8192
 
     steps:
       - uses: actions/checkout@v4
@@ -71,8 +75,21 @@ jobs:
       - name: Test
         run: scripts/ci-step.sh Test npm test
 
+      # Kept between runs so a build recompiles only what changed.
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.css') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      # The Typecheck step above has already checked types, so the build skips
+      # its own check (next.config.ts) rather than holding a second copy of
+      # the program in memory beside the bundle.
       - name: Build
         run: scripts/ci-step.sh Build npm run build
+        env:
+          SKIP_BUILD_TYPECHECK: '1'
 
   # The design checks read source files and need neither a database nor a
   # build, so they run beside the check job rather than inside it. A design

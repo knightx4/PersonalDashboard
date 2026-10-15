@@ -38,6 +38,32 @@ describe('normalizeQuestion', () => {
   });
 });
 
+describe('leading list markers', () => {
+  const plain = "What is the most impressive thing you've built or accomplished?";
+
+  it('gives a numbered question the fingerprint of the bare one', () => {
+    expect(questionFingerprint(`1. ${plain}`)).toBe(questionFingerprint(plain));
+  });
+
+  it.each(['2) ', '(3) ', 'Q4: ', 'Question 5 - ', '- ', '* ', '• ', '  12. '])(
+    'ignores the prefix %j',
+    (prefix) => {
+      expect(questionFingerprint(`${prefix}${plain}`)).toBe(questionFingerprint(plain));
+    },
+  );
+
+  it('keeps a digit inside the question', () => {
+    expect(normalizeQuestion('List your top 5 skills')).toContain('5');
+    expect(questionFingerprint('List your top 5 skills')).not.toBe(
+      questionFingerprint('List your top skills'),
+    );
+  });
+
+  it('keeps a leading number that is not a marker', () => {
+    expect(normalizeQuestion('5 years of experience with SQL?')).toContain('5');
+  });
+});
+
 describe('splitQuestionBlock', () => {
   it('splits a numbered list', () => {
     expect(

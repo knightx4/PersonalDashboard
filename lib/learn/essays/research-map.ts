@@ -56,6 +56,11 @@ cite is still in force: if it has been rescinded, superseded or deferred, say
 so. Look on purpose for the strongest case against their answer, and for
 whatever they said would change their mind.
 
+Where a sentence names a document, report, rule or study that a search
+result is, or links to, make the words that name it a markdown link to that
+address exactly as the result gives it: "it released [guidance](https://...)".
+Link only addresses that appear in the results; never make one up.
+
 Then write exactly these five sections, in this order, with these headings.
 Every sentence outside "Questions for you" must rest on a search result, so
 that it carries a citation. Leave out anything you cannot source; an empty
@@ -242,12 +247,29 @@ export function readMap(content: unknown): ResearchMap {
   return {
     findings: kept.map((f) => ({
       ...f,
+      summary: keepPageLinks(f.summary, list.sources),
       citations: f.citations.map((c) => ({ ...c, source: renumber.get(c.source)! })),
     })),
-    summary: kept[0]?.kind === 'debate' ? kept[0].summary : '',
+    summary: kept[0]?.kind === 'debate' ? keepPageLinks(kept[0].summary, list.sources) : '',
     asks,
     sources: used.map((i) => list.sources[i]!),
   };
+}
+
+const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+/**
+ * The write-up's links, kept only where the address is one of the pages read
+ * or appears in one of them (note 179b2256). Any other is a guessed address,
+ * and its words stay as plain text.
+ */
+export function keepPageLinks(text: string, pages: readonly ResearchSource[]): string {
+  const bare = (url: string) => url.replace(/\/$/, '');
+  const known = (url: string) =>
+    pages.some((page) => bare(page.url) === bare(url) || (page.text ?? '').includes(url));
+  return text.replace(MARKDOWN_LINK, (whole, words: string, url: string) =>
+    known(url) ? whole : words,
+  );
 }
 
 /** The key a take on one finding of a run is kept under: the run, and the finding or the question. */

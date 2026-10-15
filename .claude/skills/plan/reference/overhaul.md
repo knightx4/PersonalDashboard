@@ -107,7 +107,7 @@ it. Hand the design step to the try-it step instead: turn the dependency
 round, so the try-it step no longer waits on the design step
 (`undepend <try-it> --on <design>`) and the design step waits on the try-it
 step (`depends <design> --on <try-it>`), and block the design step with
-`--on-steps` and the ask `Try the design at <link> and accept it on
+`--on <try-it>` and the ask `Try the design at <link> and accept it on
 #<try-it step>.` When they close the try-it step the block clears itself.
 
 If they comment on the try-it step that something is wrong, rework the same
@@ -184,9 +184,11 @@ A removal step closes only when its count has reached its target. Before
 closing it, run `npm run check:specs` and read the counter's value with
 `npm run check:specs -- --list`. When the value is at the target, commit the
 lowered `scripts/spec-baseline.json` with the step. When it is still above,
-the step stays open: block it with what is left in the ask, such as `4
-tables still link through one column per target: job_search.attachments,
-job_search.notes, public.dev_comments, todo.task_links.`
+the step stays open. What is left is work a run can do, so `add` a ready step
+under the overhaul naming it, such as `4 tables still link through one column
+per target: job_search.attachments, job_search.notes, public.dev_comments,
+todo.task_links.`, and block the removal step on that one (`block <n> --ask
+"…" --on <it>`).
 
 The overhaul itself closes only when every phase is done and every rule on
 its `Rules:` line is at its target. Never close an overhaul whose counts

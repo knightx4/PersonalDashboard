@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapPrompt, readMap, splitItem } from './research-map';
+import { keepPageLinks, mapPrompt, readMap, splitItem } from './research-map';
+import type { ResearchSource } from './research';
 
 const cite = (url: string, cited_text: string, title = 'A page') => ({
   type: 'web_search_result_location',
@@ -96,5 +97,34 @@ describe('the research written up for the writer', () => {
     });
     expect(prompt).toContain('My answer.');
     expect(mapPrompt({ question: ' ', claim: 'x', reader: '', change: '' })).toBeNull();
+  });
+});
+
+/** Links in the essay's research write-up (note 179b2256). */
+
+const PDF = 'https://example.org/ugd/coso-genai.pdf';
+const pages: ResearchSource[] = [
+  {
+    url: 'https://dart.example.com/heads-up/coso-ai',
+    title: 'COSO releases guidance',
+    domain: 'dart.example.com',
+    text: `The publication, [*Achieving Effective Internal Control Over Generative AI*](${PDF}), applies the five components.`,
+  },
+];
+
+describe('keepPageLinks', () => {
+  it('keeps a link to a page read, or to an address a page gives', () => {
+    expect(keepPageLinks(`In 2026 COSO released [guidance](${PDF}).`, pages)).toBe(
+      `In 2026 COSO released [guidance](${PDF}).`,
+    );
+    expect(
+      keepPageLinks('See [the summary](https://dart.example.com/heads-up/coso-ai/).', pages),
+    ).toBe('See [the summary](https://dart.example.com/heads-up/coso-ai/).');
+  });
+
+  it('turns a link to an address no page gives back into its words', () => {
+    expect(keepPageLinks('COSO released [guidance](https://made-up.example.com/x).', pages)).toBe(
+      'COSO released guidance.',
+    );
   });
 });

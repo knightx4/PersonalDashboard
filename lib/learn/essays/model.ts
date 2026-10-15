@@ -223,6 +223,28 @@ export function essayTitle(body: string, path: string): string {
 }
 
 /**
+ * The change that renames an essay (note 1c956878): its title is its first
+ * top-level heading, so renaming rewrites that line. Failing a heading, a
+ * first line written `#Title` without the space, which markdown does not read
+ * as a heading but was meant as one, is taken as the title line. Failing
+ * both, the heading goes in ahead of the text, after any frontmatter.
+ */
+export function retitleEssay(body: string, title: string): { from: number; to: number; insert: string } {
+  const line = `# ${title.replace(/\s+/g, ' ').trim()}`;
+  const start = body.match(FRONTMATTER)?.[0].length ?? 0;
+  const rest = body.slice(start);
+  const heading = rest.match(/^#[ \t]+(.+?)[ \t#]*$/m);
+  const lead = rest.match(/^\s*/)![0].length;
+  const unspaced = rest.slice(lead).match(/^#(?![#\s])[^\r\n]*/);
+  const found = heading && heading[1]!.trim() ? heading : unspaced;
+  if (found) {
+    const at = start + (found === unspaced ? lead : found.index!);
+    return { from: at, to: at + found[0].length, insert: line };
+  }
+  return { from: start, to: start, insert: rest.trim() ? `${line}\n\n` : `${line}\n` };
+}
+
+/**
  * The words in a draft: runs of text holding at least one letter or digit,
  * so markdown symbols on their own (`#`, `-`, `>`, `---`, `**`) are not
  * counted, and frontmatter is left out.

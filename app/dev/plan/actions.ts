@@ -520,9 +520,9 @@ export async function setPlanItemStatus(
   // database will not take a blocked row without one. It is `outside` — the
   // default in lib/plan/load.ts — and that is what this control has always
   // meant: the step needs something outside the repo, so nothing a session
-  // does will move it. A block that really is waiting on other steps is a row
-  // in plan_dependencies, or `plan.ts block --on-steps` from a session parking
-  // its own step behind a question.
+  // does will move it. Only the person may block that way (migration 0245):
+  // a session's block always waits on rows in plan_dependencies, written by
+  // `plan.ts block --on`.
   //
   // Moving a step off blocked drops both: the sentence saying what it needed
   // and the word saying who could supply it. Both are claims about work that

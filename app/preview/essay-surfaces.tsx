@@ -371,7 +371,7 @@ const firstPass: EssayResearch = {
   ],
   claims: [],
   summary:
-    'Most writers on money say its value is a shared expectation: a coin is worth what the next person will give for it. Others put the weight on scarcity, and point to central banks and the fixed stock of gold. Gold itself is the awkward case, since it kept its value for centuries without being used to buy everyday goods.',
+    'Most writers on money say its value is a shared expectation: a coin is worth what the next person will give for it. Others put the weight on scarcity, and point to central banks and the fixed stock of gold. A [price series for gold](https://goldreview.example.net/centuries) is the awkward case, since gold kept its value for centuries without being used to buy everyday goods.',
   asks: [
     'If money is only a shared expectation, what is the difference between it and gold in your essay?',
     'Which of the Weimar examples would your reader find most convincing, and why?',
