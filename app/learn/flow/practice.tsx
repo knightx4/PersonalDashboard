@@ -15,6 +15,9 @@ import { loadOfferSubjects } from '@/lib/learn/offer-setting';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
+import { askCell } from '@/lib/learn/levels/answer-store';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { CellAnswer } from '@/components/learn/cell-answer';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
 
@@ -64,11 +67,44 @@ export async function PracticeFlow({
   track: trackParam,
   only,
   goal: goalParam,
+  cell: cellParam,
 }: {
   track?: string | string[];
   only?: string | string[];
   goal?: string | string[];
+  cell?: string | string[];
 }) {
+  // `?cell=<id>` asks an explain question about one level of a topic (plan
+  // #2138.5), graded against that level and the ones around it. Placement
+  // and the fringe (#2138.6) will choose the cell; until then it is named.
+  if (cellParam !== undefined) {
+    const cellId = typeof cellParam === 'string' && UUID.test(cellParam) ? cellParam : null;
+    if (!cellId) redirect(practiceHref());
+    const user = await requireUser();
+    const spend = collectSpend();
+    const asked = await askCell(
+      await createLearnClient(),
+      user.id,
+      cellId,
+      process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+    );
+    await recordLearnSpend(user.id, 'write-cell-case', spend.reports);
+    return (
+      <div className="mt-6">
+        {asked.ok ? (
+          <CellAnswer key={asked.asked.questionId} asked={asked.asked} nextHref={practiceHref()} />
+        ) : (
+          <EmptyState
+            icon={Target}
+            title="That level cannot be asked"
+            description={asked.error}
+            action={{ label: 'Practice', href: practiceHref() }}
+          />
+        )}
+      </div>
+    );
+  }
+
   const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
   if (trackParam !== undefined && trackId === null) redirect(practiceHref());
   const goalId =

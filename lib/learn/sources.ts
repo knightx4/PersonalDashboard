@@ -2,6 +2,7 @@ import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib
 
 /** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
 const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
+const TOPICS: Section = { href: '/learn/topics', label: 'Topics' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
@@ -261,8 +262,49 @@ export const learnSources: ModuleSources = {
       parent: parentBy('track_id', 'learn.tracks'),
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
+    {
+      table: 'learn.topics',
+      module: 'Learn',
+      holds: 'Topics they study, each with what it covers and how deep it goes, on a ladder of ten levels.',
+      weight: 'intent',
+      search: ['name', 'scope'],
+      title: 'name',
+      facts: ['status', 'ceiling'],
+      href: (id) => `/learn/topics/${id}`,
+      section: TOPICS,
+      note: 'A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.',
+    },
+    {
+      table: 'learn.cell_evidence',
+      module: 'Learn',
+      holds: 'What their answers showed about one level of a topic: met, not met, or said they already knew it.',
+      weight: 'record',
+      search: ['quote'],
+      title: 'verdict',
+      facts: ['verdict', 'observed_at'],
+      newest: 'observed_at',
+      note: 'One row per verdict on a cell (learn.topic_cells, one level of a topic); the latest row for a cell is the one that counts. The quote is the part of their answer that met the level.',
+    },
+    {
+      table: 'learn.lenses',
+      module: 'Learn',
+      holds: 'Named sets of topics they are working towards, each topic with a target level.',
+      weight: 'intent',
+      search: ['name'],
+      title: 'name',
+      facts: ['origin'],
+      note: 'The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
+    },
   ],
   notSources: [
+    { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
+    { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
+    { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
+    { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
+    { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
+    { table: 'learn.cell_questions', reason: 'Questions asked about a level of a topic and the answers to them; what each answer showed is read through cell_evidence.' },
+    { table: 'learn.graph_moves', reason: 'Bookkeeping for moving each claims-graph subject onto topics: moved or failed, and the lens it became.' },
+    { table: 'learn.move_reviews', reason: 'Bookkeeping for the placements and edges the move from the claims graph left for them to settle.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     {
