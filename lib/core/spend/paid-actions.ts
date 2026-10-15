@@ -105,6 +105,12 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
+  'app/learn/now/piece-talk-actions.ts#talkPiece': [
+    'mark-teach-back',
+    'reply-about-card',
+    'write-piece-check',
+    'mark-piece-check',
+  ],
 
   // Learn: questions
   'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],

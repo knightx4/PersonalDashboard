@@ -1,19 +1,33 @@
 import type { ReactNode } from 'react';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
+import type { ExplanationMarking, Marking } from '@/lib/learn/feed/teach-back';
 import type { PieceIdea } from '@/lib/learn/lessons/piece-store';
+import {
+  checkedTurn,
+  checkTurn,
+  explainedTurn,
+  explainTurn,
+  followedUpTurn,
+  type PieceTalkState,
+} from '@/lib/learn/lessons/piece-talk';
 import type { TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
+import type { TalkTurn } from '@/lib/talk/talk';
 import { PieceFirst } from '@/app/learn/now/todays-piece';
 import { SummaryView } from '@/app/learn/flow/summary-card';
-import { RUN_SUMMARY } from './learn-flow-summary-surfaces';
+import type { RunSummary } from '@/lib/learn/flow/summary';
 
 /**
- * Today's piece at the top of Now (plan #2164.4): its lessons one at a time,
- * the check after the last, the finished state, a lesson still being written,
- * one Dash could not write, and a goal with no pieces yet.
+ * Today's piece at the top of Now (plan #2164.4), worked as a conversation
+ * with Dash (plan #2164.5): an idea explained back and marked, the check as
+ * the last turn, the finished thread, an answer being marked, one whose
+ * marking failed, and a goal with no pieces yet. The thread's words are
+ * written by the same functions the server uses.
  */
 
 const SUBJECT_ID = '5e000000-0000-4000-8000-000000000021';
+const PIECE_ID = '5d000000-0000-4000-8000-000000000201';
+const OPENED_AT = '2026-10-15T08:00:00.000Z';
 
 const ideas: PieceIdea[] = [
   {
@@ -66,29 +80,151 @@ const ideas: PieceIdea[] = [
   },
 ];
 
-function piece(over: { ideas?: PieceIdea[]; check?: boolean } = {}): TodaysPiece {
+const CHECK = {
+  id: '5d000000-0000-4000-8000-000000000401',
+  question:
+    'A business keeps 92% of last year’s revenue before upgrades, and its net retention is 112%. What do the two numbers together tell you about its customers?',
+  expected: 'Few customers leave or downgrade, and those who stay spend noticeably more: upgrades add about 20 points.',
+  response: 'Hardly anyone leaves, and the ones who stay pay a lot more, about a fifth more from upgrades.',
+  why: 'Right: you read gross retention as what was lost and the gap to net as what upgrades added.',
+};
+
+/** A turn of the fixture thread, a minute after the one before. */
+function turn(index: number, role: TalkTurn['role'], body: string): TalkTurn {
+  return {
+    id: `5f000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    role,
+    body,
+    createdAt: new Date(Date.parse(OPENED_AT) + index * 60_000).toISOString(),
+  };
+}
+
+const MARKED_FIRST: ExplanationMarking = {
+  holds: true,
+  right: [
+    'Net retention compares the same customers’ revenue now with a year ago.',
+    'Upgrades can outweigh what leaves, which is how it passes 100%.',
+  ],
+  missing: ['Downgrades count against it as well as cancellations.'],
+  why: 'Holds: the comparison and the reason it can pass 100% are both there.',
+  ownExample: true,
+};
+
+const MARKED_FOLLOW: Marking = {
+  holds: true,
+  right: ['Price rises on the same plan count as expansion.'],
+  missing: [],
+  why: 'Right.',
+};
+
+/** The thread's words, as the server writes them, up to and including `upTo`. */
+function thread(upTo: 'follow-up' | 'check' | 'done'): TalkTurn[] {
+  const words: [TalkTurn['role'], string][] = [
+    ['assistant', explainTurn(ideas[0]!, 0, ideas.length)],
+    [
+      'user',
+      'It is what the customers you had a year ago pay you now, divided by what they paid then. It goes over 100% when the ones who stay upgrade by more than the ones who leave took with them. Say we had £100k, lost £10k to churn but upgrades added £20k: that is 110%.',
+    ],
+    [
+      'assistant',
+      explainedTurn(
+        MARKED_FIRST,
+        'If a business raises its prices by 10% for everyone and nobody leaves, what happens to its net retention, and why?',
+      ),
+    ],
+  ];
+  if (upTo !== 'follow-up') {
+    words.push(
+      ['user', 'It goes to about 110%, because the same customers now pay more and that counts as expansion.'],
+      ['assistant', followedUpTurn(MARKED_FOLLOW, ideas[0]!.name, 'sharp')],
+      ['assistant', explainTurn(ideas[1]!, 1, ideas.length)],
+      [
+        'user',
+        'Gross retention is only what you kept of last year’s revenue, ignoring upgrades, so it can’t go over 100%. If you lose £11k of £100k it is 89%.',
+      ],
+      [
+        'assistant',
+        explainedTurn(
+          { ...MARKED_FIRST, right: ['Leaves upgrades out, so it tops out at 100%.'], missing: [] },
+          'Why would an investor want both numbers rather than net retention alone?',
+        ),
+      ],
+      ['user', 'Net can hide heavy churn if a few big customers upgrade a lot; gross shows the leak on its own.'],
+      [
+        'assistant',
+        followedUpTurn(
+          { holds: true, right: ['Net can hide churn that gross shows on its own.'], missing: [], why: 'Right.' },
+          ideas[1]!.name,
+          'sharp',
+        ),
+      ],
+      ['assistant', explainTurn(ideas[2]!, 2, ideas.length)],
+      [
+        'user',
+        'A cohort is everyone who started in the same month, and you follow what that group pays over time, so you can tell if newer customers stay better than older ones.',
+      ],
+      [
+        'assistant',
+        explainedTurn(
+          { ...MARKED_FIRST, right: ['Groups customers by start month and follows them.'], missing: [], ownExample: false },
+          'What would it tell you if each new cohort’s revenue curve sat above the last?',
+        ),
+      ],
+      ['user', 'That newer customers stay and expand more than older ones did, so the product or the fit is getting better.'],
+      [
+        'assistant',
+        followedUpTurn(
+          {
+            holds: true,
+            right: ['Newer cohorts sitting higher means customers are staying and expanding more.'],
+            missing: ['That it could also be a price rise rather than better fit.'],
+            why: 'Holds.',
+          },
+          ideas[2]!.name,
+          'known',
+        ),
+      ],
+      ['assistant', checkTurn(CHECK.question)],
+    );
+  }
+  if (upTo === 'done') {
+    words.push(
+      ['user', CHECK.response],
+      ['assistant', checkedTurn({ correct: true, why: CHECK.why, expected: CHECK.expected }, null)],
+    );
+  }
+  return words.map(([role, body], index) => turn(index, role, body));
+}
+
+/** What moved in this session: the piece's three ideas, in the person's own words from the thread. */
+const PIECE_SUMMARY: RunSummary = {
+  answers: 7,
+  shown: [
+    {
+      name: ideas[0]!.name,
+      quote: 'It goes over 100% when the ones who stay upgrade by more than the ones who leave took with them.',
+    },
+    { name: ideas[1]!.name, quote: 'Net can hide heavy churn if a few big customers upgrade a lot.' },
+    { name: ideas[2]!.name, quote: 'Newer customers stay and expand more than older ones did.' },
+  ],
+  missed: [],
+  fringe: ['Expansion revenue', 'Logo churn'],
+  more: { shown: 0, missed: 0, fringe: 0 },
+};
+
+function piece(over: { turns?: TalkTurn[]; state?: PieceTalkState | null } = {}): TodaysPiece {
   return {
     kind: 'piece',
     goalName: 'SaaS and subscription business metrics',
     page: {
-      piece: { id: '5d000000-0000-4000-8000-000000000201', ordinal: 3, title: 'Retention: who stays and what they pay', passedAt: null },
+      piece: { id: PIECE_ID, ordinal: 3, title: 'Retention: who stays and what they pay', passedAt: null },
       subject: { id: SUBJECT_ID, name: 'SaaS and subscription business metrics' },
       unit: { id: '5d000000-0000-4000-8000-000000000301', ordinal: 2, title: 'Keeping customers', outcome: null },
       siblings: [],
-      ideas: over.ideas ?? ideas,
-      check: over.check
-        ? {
-            id: '5d000000-0000-4000-8000-000000000401',
-            question:
-              'A business keeps 92% of last year’s revenue before upgrades, and its net retention is 112%. What do the two numbers together tell you about its customers?',
-            expected: 'Few customers leave or downgrade, and those who stay spend noticeably more: upgrades add about 20 points.',
-            response:
-              'Hardly anyone leaves, and the ones who stay pay a lot more, about a fifth more from upgrades.',
-            correct: true,
-            why: 'Right: you read gross retention as what was lost and the gap to net as what upgrades added.',
-          }
-        : null,
+      ideas,
+      check: null,
     },
+    talk: { turns: over.turns ?? [], state: over.state ?? null, openedAt: OPENED_AT },
   };
 }
 
@@ -104,77 +240,77 @@ const RUN = {
 
 function Costs({ children }: { children: ReactNode }) {
   return (
-    <PaidCostsProvider
-      costs={{
-        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': RUN,
-        'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': RUN,
-      }}
-    >
-      {children}
-    </PaidCostsProvider>
+    <PaidCostsProvider costs={{ 'app/learn/now/piece-talk-actions.ts#talkPiece': RUN }}>{children}</PaidCostsProvider>
   );
 }
 
-/** The piece on its first lesson, as Now opens. */
+/** The first idea explained back and marked, with its follow-up waiting. */
 export function TodaysPieceSurface() {
-  return (
-    <Costs>
-      <PieceFirst piece={piece()}>{null}</PieceFirst>
-    </Costs>
-  );
-}
-
-/** Every lesson read: the check, not yet asked. */
-export function TodaysPieceCheckSurface() {
-  return (
-    <Costs>
-      <PieceFirst piece={piece()} lessonsPassed={ideas.length}>
-        {null}
-      </PieceFirst>
-    </Costs>
-  );
-}
-
-/** The check answered right: the finished state. */
-export function TodaysPieceDoneSurface() {
-  return (
-    <Costs>
-      <PieceFirst
-        piece={piece({ check: true })}
-        lessonsPassed={ideas.length}
-        summary={<SummaryView summary={RUN_SUMMARY} />}
-      >
-        {null}
-      </PieceFirst>
-    </Costs>
-  );
-}
-
-/** The first lesson still being written. */
-export function TodaysPieceLoadingSurface() {
-  return (
-    <Costs>
-      <PieceFirst
-        piece={piece({ ideas: ideas.map((idea, index) => (index < 2 ? { ...idea, lesson: null } : idea)) })}
-        write={false}
-      >
-        {null}
-      </PieceFirst>
-    </Costs>
-  );
-}
-
-/** A lesson Dash could not write. */
-export function TodaysPieceErrorSurface() {
   return (
     <Costs>
       <PieceFirst
         piece={piece({
-          ideas: [
-            { ...ideas[0]!, lesson: null, dropped: 'the idea’s sources disagree on how upgrades are counted.' },
-            ...ideas.slice(1),
-          ],
+          turns: thread('follow-up'),
+          state: {
+            stage: 'follow_up',
+            conceptId: ideas[0]!.conceptId,
+            probeId: '5d000000-0000-4000-8000-000000000501',
+            followUpId: '5d000000-0000-4000-8000-000000000502',
+          },
         })}
+      >
+        {null}
+      </PieceFirst>
+    </Costs>
+  );
+}
+
+/** Every idea worked through: the check is the last turn. */
+export function TodaysPieceCheckSurface() {
+  return (
+    <Costs>
+      <PieceFirst piece={piece({ turns: thread('check'), state: { stage: 'check', checkId: CHECK.id } })}>
+        {null}
+      </PieceFirst>
+    </Costs>
+  );
+}
+
+/** The check answered right: the thread closes and what moved shows under it. */
+export function TodaysPieceDoneSurface() {
+  return (
+    <Costs>
+      <PieceFirst
+        piece={piece({ turns: thread('done'), state: { stage: 'done' } })}
+        summary={<SummaryView summary={PIECE_SUMMARY} />}
+      >
+        {null}
+      </PieceFirst>
+    </Costs>
+  );
+}
+
+const FIRST_ANSWER =
+  'It is what the customers you had a year ago pay you now, divided by what they paid then, so upgrades can take it past 100%.';
+
+/** The first answer sent, while Dash reads and marks it. */
+export function TodaysPieceLoadingSurface() {
+  return (
+    <Costs>
+      <PieceFirst piece={piece()} sent={{ body: FIRST_ANSWER }}>
+        {null}
+      </PieceFirst>
+    </Costs>
+  );
+}
+
+/** The first answer kept, and marking it failed. */
+export function TodaysPieceErrorSurface() {
+  return (
+    <Costs>
+      <PieceFirst
+        piece={piece()}
+        sent={{ body: FIRST_ANSWER, error: 'Marking failed: Dash did not answer in time. Your answer is kept; send it again.' }}
       >
         {null}
       </PieceFirst>

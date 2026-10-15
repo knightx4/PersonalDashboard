@@ -1,6 +1,10 @@
 import 'server-only';
 
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { rowSubject, type TalkTurn } from '@/lib/talk/talk';
+import { loadConversation } from '@/lib/talk/store';
+import { parsePieceTalk, type PieceTalkState } from './piece-talk';
 import { loadPiecePage, type PiecePage } from './piece-store';
 import { goalsWithTracks } from './plan-store';
 import { chooseTodaysPiece, type TodaysPieceGoal } from './todays-piece';
@@ -14,8 +18,37 @@ import { chooseTodaysPiece, type TodaysPieceGoal } from './todays-piece';
 
 /** What Now draws first: a piece to work through, or a goal with none written yet. */
 export type TodaysPiece =
-  | { kind: 'piece'; goalName: string; page: PiecePage }
+  | { kind: 'piece'; goalName: string; page: PiecePage; talk: PieceTalk }
   | { kind: 'no-pieces'; goalName: string; subjectId: string };
+
+/** The piece's conversation with Dash (plan #2164.5): its turns, and where it has got to. */
+export type PieceTalk = {
+  turns: TalkTurn[];
+  state: PieceTalkState | null;
+  /** When the page was read: the time on Dash's first turn before it is kept. */
+  openedAt: string;
+};
+
+/** The thread a piece is worked in, under the piece's own row. */
+export function pieceTalkSubject(pieceId: string, title: string) {
+  return rowSubject('learn.plan_pieces', pieceId, title);
+}
+
+/** Where the piece's thread has got to, from the piece's row. */
+export async function loadPieceTalkState(
+  learn: LearnSupabaseClient,
+  userId: string,
+  pieceId: string,
+): Promise<PieceTalkState | null> {
+  const { data, error } = await learn
+    .from('plan_pieces')
+    .select('talk')
+    .eq('id', pieceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the piece's conversation failed: ${error.message}`);
+  return parsePieceTalk((data as { talk: unknown } | null)?.talk ?? null);
+}
 
 type UnitRow = { id: string; subject_id: string; ordinal: number };
 type PieceRow = { id: string; unit_id: string; ordinal: number; passed_at: string | null };
@@ -25,6 +58,8 @@ export async function loadTodaysPiece(
   learn: LearnSupabaseClient,
   userId: string,
   pinned: string | null = null,
+  /** Reads the piece's conversation; left out, the thread opens empty. */
+  core?: CoreSupabaseClient,
 ): Promise<TodaysPiece | null> {
   const aims = await goalsWithTracks(learn, userId);
   if (aims.length === 0) return null;
@@ -86,5 +121,9 @@ export async function loadTodaysPiece(
   const page = await loadPiecePage(learn, userId, choice.subjectId, choice.pieceId);
   // A piece whose ideas have all left the subject has nothing to work through.
   if (!page || page.ideas.length === 0) return null;
-  return { kind: 'piece', goalName: choice.goalName, page };
+  const [state, turns] = await Promise.all([
+    loadPieceTalkState(learn, userId, page.piece.id),
+    core ? loadConversation(core, pieceTalkSubject(page.piece.id, page.piece.title)) : Promise.resolve([]),
+  ]);
+  return { kind: 'piece', goalName: choice.goalName, page, talk: { turns, state, openedAt: new Date().toISOString() } };
 }

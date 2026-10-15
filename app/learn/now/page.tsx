@@ -196,7 +196,9 @@ export default async function NowPage({
     loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
     pinned.success
       ? null
-      : loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null).catch(
+      : createCoreClient()
+          .then((core) => loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null, core))
+          .catch(
           (error: unknown): TodaysPiece | null => {
             console.error('[learn] today’s piece', error instanceof Error ? error.message : error);
             return null;

@@ -5451,19 +5451,20 @@ export const SURFACES: readonly Surface[] = [
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
     ),
   },
-  /* Today's piece, which leads the deck (plan #2164.4), and its hidden parts:
-   * the check after the last lesson, the finished state, a lesson being
-   * written, one that could not be, and a goal with no pieces yet. */
+  /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
+   * (plan #2164.5), and its hidden parts: the check as the last turn, the
+   * finished thread, an answer being marked, a mark that failed, and a goal
+   * with no pieces yet. */
   {
     id: 'learn-now-deck-piece',
-    label: 'Now · Today’s piece, first lesson',
+    label: 'Now · Today’s piece, an idea marked',
     module: 'learn',
     width: 'narrow',
     render: () => <TodaysPieceSurface />,
   },
   {
     id: 'learn-now-deck-piece-check',
-    label: 'Now · Today’s piece, its check',
+    label: 'Now · Today’s piece, the check as the last turn',
     module: 'learn',
     width: 'narrow',
     render: () => <TodaysPieceCheckSurface />,
@@ -5477,14 +5478,14 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'learn-now-deck-piece-loading',
-    label: 'Now · Today’s piece, a lesson being written',
+    label: 'Now · Today’s piece, an answer being marked',
     module: 'learn',
     width: 'narrow',
     render: () => <TodaysPieceLoadingSurface />,
   },
   {
     id: 'learn-now-deck-piece-error',
-    label: 'Now · Today’s piece, a lesson not written',
+    label: 'Now · Today’s piece, a mark that failed',
     module: 'learn',
     width: 'narrow',
     render: () => <TodaysPieceErrorSurface />,

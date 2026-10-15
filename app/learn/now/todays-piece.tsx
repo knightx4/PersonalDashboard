@@ -1,63 +1,72 @@
 'use client';
 
-import { useState, useTransition, type ReactNode } from 'react';
-import { ArrowRight, Check, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ArrowRight } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { DashAction } from '@/components/ui/dash-action';
-import { Field, Textarea } from '@/components/ui/field';
-import { Deck, type DeckItem } from '@/components/patterns/deck';
+import { Thread, ThreadTurn, type TalkSend } from '@/components/thread/thread';
+import { CommentBody } from '@/components/dev/comment-body';
+import { Disclosure } from '@/components/ui/disclosure';
+import { LinkedText } from '@/components/ui/linked-text';
+import { useClockNow } from '@/lib/use-clock-now';
+import { ThreadPanel } from '@/components/patterns/thread';
 import { cn } from '@/lib/cn';
-import type { PieceCheck } from '@/lib/learn/lessons/piece-check';
+import {
+  explainTurn,
+  FINISHED_LINE,
+  talkLabel,
+  talkMeta,
+  talkSections,
+  talkView,
+  type PieceTalkView,
+  type TalkSection,
+} from '@/lib/learn/lessons/piece-talk';
 import type { TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
+import type { TalkTurn } from '@/lib/talk/talk';
 import { RunSummaryPanel } from '@/app/learn/flow/summary-card';
-import { LessonCard, useWrittenLessons } from '@/app/learn/s/[id]/p/[piece]/piece-view';
-import { answerPieceCheck, askPieceCheck, type AnswerResult, type AskResult } from '@/app/learn/s/[id]/p/[piece]/actions';
+import { useWrittenLessons } from '@/app/learn/s/[id]/p/[piece]/piece-view';
+import { talkPiece, type PieceTalkResult } from './piece-talk-actions';
 
 /**
- * Today's piece, the deck's first entry on Now (plan #2164.4,
- * `lib/learn/lessons/todays-piece.ts`): the piece's lessons one at a time,
- * then its check, then a finished state that hands on to the cards. A right
- * answer to the check is what finishes it, so the next visit opens on the
- * next piece. Its practice task stays on the piece's own page.
+ * Today's piece, first on Now (plan #2164.4), worked as a conversation with
+ * Dash (plan #2164.5, `lib/learn/lessons/piece-talk.ts`). The piece is one
+ * thread: Dash explains an idea from its lesson and asks you to explain it
+ * back, marks what you wrote and asks one follow-up built on it, marks that
+ * and goes on to the next idea, and after the last asks the piece's check. A
+ * right answer to the check finishes the piece, and what the session moved
+ * (plan #2164.6) shows under it. Every answer is marked and kept as evidence
+ * on its idea; the marks are Dash's reply.
  *
- * The check and the finished state keep the deck's foot row, with the
- * forward press where Next was: Ask me the question, Check my answer, then Go
- * on to cards. Cards instead, on every lesson and on the check, goes straight
- * to the cards for this visit and leaves the piece where it was.
+ * Cards instead goes straight to the cards for this visit and leaves the
+ * piece where it was; the thread opens there again next time.
  *
  * A goal with no pieces written yet draws a short card pointing at its
  * outline, above the cards rather than in their place.
  */
 
-/**
- * Tall enough on a phone that the page always scrolls past the foot row, so
- * the row is held by its sticky bottom at the same height under a short item
- * (the check, a lesson being written) as under a long lesson.
- */
-const ITEM_HEIGHT = 'max-lg:min-h-[calc(100dvh-var(--dock-h)-env(safe-area-inset-bottom)-5rem)]';
-
-/** The deck's own foot row (components/patterns/deck.tsx), for the check and the finished state. */
-const FOOT_ROW =
-  'sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center gap-2 px-3 py-2 lg:static';
+/** An answer the gallery sends as the thread appears. */
+export type SentForGallery = { body: string; error?: string };
 
 export function PieceFirst({
   piece,
   children,
-  lessonsPassed = 0,
   write = true,
   summary,
+  sent,
 }: {
-  /** Drawn in place of the summary's read, for the gallery. */
-  summary?: ReactNode;
   piece: TodaysPiece | null;
   /** The cards, drawn once the piece is finished or set aside. */
   children: ReactNode;
-  /** Lessons to start with as read; the gallery draws the check with it. */
-  lessonsPassed?: number;
   /** False writes no missing lesson; the gallery draws one being written with it. */
   write?: boolean;
+  /** Drawn in place of the summary's read, for the gallery. */
+  summary?: ReactNode;
+  /**
+   * For the gallery: an answer sent as the thread appears and never sent to
+   * the server, left being marked, or failing with `error`.
+   */
+  sent?: SentForGallery;
 }) {
   const [cards, setCards] = useState(false);
 
@@ -83,239 +92,157 @@ export function PieceFirst({
       </>
     );
   }
-  return <PieceDeck piece={piece} lessonsPassed={lessonsPassed} write={write} summary={summary} onCards={() => setCards(true)} />;
+  return (
+    <PieceThread piece={piece} write={write} summary={summary} sent={sent} onCards={() => setCards(true)} />
+  );
 }
 
-function PieceDeck({
+function PieceThread({
   piece,
-  lessonsPassed,
   write,
   summary,
+  sent,
   onCards,
 }: {
-  summary?: ReactNode;
   piece: Extract<TodaysPiece, { kind: 'piece' }>;
-  lessonsPassed: number;
   write: boolean;
+  summary?: ReactNode;
+  sent?: SentForGallery;
   onCards: () => void;
 }) {
-  const { page, goalName } = piece;
+  const { page, goalName, talk } = piece;
   const { ideas, writing } = useWrittenLessons(page.subject.id, page.piece.id, page.ideas, write);
+  const [view, setView] = useState<PieceTalkView>(() => talkView(talk.state, page.ideas));
   const pieceHref = `/learn/s/${page.subject.id}/p/${page.piece.id}`;
+  const finished = view.stage === 'done';
 
-  const items: DeckItem[] = ideas.map((idea, index) => ({
-    key: idea.conceptId,
-    body: (
-      <div className={ITEM_HEIGHT}>
-        <LessonCard idea={idea} number={index + 1} writing={writing[idea.conceptId] ?? null} />
-      </div>
-    ),
-    actions: (
-      <Button type="button" variant="ghost" size="sm" onClick={onCards}>
-        Cards instead
-      </Button>
-    ),
-  }));
+  // Before the first answer nothing is kept: Dash's first turn is drawn from
+  // the first idea's lesson, once it is written (or could not be), and the
+  // server keeps the same words ahead of the answer.
+  const first = ideas[0]!;
+  const firstWriting = writing[first.conceptId];
+  const started = talk.turns.length > 0;
+  const ready = started || first.lesson !== null || first.dropped !== null || firstWriting?.state === 'failed';
+  // On return, the ideas already worked through fold to a line each and the
+  // thread opens on the part still going; turns added on this visit stay open.
+  const [sections] = useState(() => talkSections(talk.turns));
+  const earlier = sections.slice(0, -1);
+  const turns: TalkTurn[] = started
+    ? (sections[sections.length - 1]?.turns ?? [])
+    : [{ id: 'piece-opening', role: 'assistant', body: explainTurn(first, 0, ideas.length), createdAt: talk.openedAt }];
+
+  const sendTurn: TalkSend = async (body) => {
+    const result: PieceTalkResult = sent
+      ? sent.error
+        ? { turns: [{ id: 'gallery-answer', role: 'user', body, createdAt: talk.openedAt }], error: sent.error }
+        : await new Promise<PieceTalkResult>(() => {})
+      : await talkPiece(page.subject.id, page.piece.id, body);
+    if (result.view) setView(result.view);
+    return result;
+  };
 
   return (
-    <section aria-labelledby="todays-piece" className="mb-6">
-      <p className="text-small font-medium text-accent">Today&rsquo;s piece · {goalName}</p>
-      <h2 id="todays-piece" className="mt-0.5 font-display text-title tracking-tight break-words text-ink">
-        <Link href={pieceHref} className="press-area hover:underline">
-          {page.piece.title}
-        </Link>
-      </h2>
-      <p className="mt-0.5 mb-3 text-ui text-ink-muted">
-        Unit {page.unit.ordinal}, {page.unit.title} · {ideas.length} {ideas.length === 1 ? 'lesson' : 'lessons'},
-        then one question
-      </p>
-      <Deck
-        items={items}
-        forward="Next"
-        alreadyPassed={ideas.slice(0, lessonsPassed).map((idea) => idea.conceptId)}
-        done={
-          <PieceCheckStep
-            subjectId={page.subject.id}
-            pieceId={page.piece.id}
-            pieceHref={pieceHref}
-            initial={page.check}
-            summary={summary}
-            onCards={onCards}
+    <section aria-label="Today’s piece" className="mb-6">
+      <p className="mb-1.5 text-small font-medium text-accent">Today&rsquo;s piece · {goalName}</p>
+      <ThreadPanel
+        title={page.piece.title}
+        href={pieceHref}
+        heading
+        meta={`Unit ${page.unit.ordinal}, ${page.unit.title} · ${talkMeta(view, ideas.length)}`}
+      >
+        {earlier.length > 0 && (
+          <div className="space-y-1">
+            {earlier.map((section, index) => (
+              <FoldedSection key={section.turns[0]?.id ?? index} section={section} />
+            ))}
+          </div>
+        )}
+        {ready ? (
+          <Thread
+            id={`piece-${page.piece.id}`}
+            turns={turns}
+            send={sendTurn}
+            label={talkLabel(view)}
+            placeholder={view.stage === 'check' ? 'A sentence or two, from memory' : 'A few sentences, as if to a friend'}
+            waiting="Dash is reading your answer…"
+            activity="reading"
+            closed={() => (finished ? FINISHED_LINE : null)}
+            cost={{ action: 'app/learn/now/piece-talk-actions.ts#talkPiece', what: 'Cost of marking the answer' }}
+            ask={sent?.body}
           />
-        }
-      />
+        ) : (
+          <p className="voice-dash -mx-2 px-2 py-1.5 text-ui text-ink-muted" aria-live="polite">
+            Dash is writing the lesson for {first.name}…
+          </p>
+        )}
+      </ThreadPanel>
+      {finished && <div className="mt-4">{summary ?? <RunSummaryPanel />}</div>}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        {finished ? (
+          <>
+            <Link href={pieceHref} className={cn('press-area px-2 text-ui', linkVariants({ tone: 'quiet' }))}>
+              Open the piece
+            </Link>
+            <Button type="button" onClick={onCards}>
+              Go on to cards
+              <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+            </Button>
+          </>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" onClick={onCards}>
+            Cards instead
+          </Button>
+        )}
+      </div>
     </section>
   );
 }
 
-/**
- * The piece's check as the deck's last step, and the finished state once it
- * is answered right. The question is written on the press, as on the piece's
- * page, and an unanswered one already asked is shown again.
- */
-function PieceCheckStep({
-  subjectId,
-  pieceId,
-  pieceHref,
-  initial,
-  onCards,
-  summary,
-}: {
-  /** Drawn in place of the stored-answers read, for the gallery. */
-  summary?: ReactNode;
-  subjectId: string;
-  pieceId: string;
-  pieceHref: string;
-  initial: PieceCheck | null;
-  onCards: () => void;
-}) {
-  const [check, setCheck] = useState(initial);
-  const [response, setResponse] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [asking, startAsking] = useTransition();
-  const [marking, startMarking] = useTransition();
-  const finished = check?.correct === true;
-  const open = check !== null && check.correct === null;
+const STATE_WORDS = { shaky: 'marked shaky', known: 'marked known', sharp: 'marked sharp' } as const;
 
-  const ask = () =>
-    startAsking(async () => {
-      setError(null);
-      const result: AskResult = await askPieceCheck(subjectId, pieceId).catch(() => ({
-        error: 'Could not write a question. Check your connection.',
-      }));
-      if (result.check) {
-        setCheck(result.check);
-        setResponse('');
-      } else setError(result.error ?? 'Could not write a question.');
-    });
-
-  const answer = () =>
-    startMarking(async () => {
-      if (!check) return;
-      setError(null);
-      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, response).catch(() => ({
-        error: 'Could not mark that. Check your connection.',
-      }));
-      if (result.check) setCheck(result.check);
-      else setError(result.error ?? 'Could not mark that.');
-    });
-
-  const forward = finished ? (
-    <Button size="lg" type="button" onClick={onCards} data-deck-next>
-      Go on to cards
-      <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
-    </Button>
-  ) : open ? (
-    <DashAction
-      size="lg"
-      type="button"
-      onClick={answer}
-      pending={marking}
-      disabled={response.trim() === ''}
-      paid="app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck"
-      what="Cost of marking the answer"
-      hintFirst
-      data-deck-next
-    >
-      {marking ? 'Marking…' : 'Check my answer'}
-    </DashAction>
-  ) : (
-    <DashAction
-      size="lg"
-      type="button"
-      onClick={ask}
-      pending={asking}
-      paid="app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck"
-      what="Cost of writing the question"
-      hintFirst
-      data-deck-next
-    >
-      {asking ? 'Writing a question…' : check ? 'Try another question' : 'Ask me the question'}
-    </DashAction>
+/** An idea already worked through, folded to its name and where it ended; open, its turns. */
+function FoldedSection({ section }: { section: TalkSection }) {
+  const now = useClockNow();
+  const name = section.kind === 'idea' ? `Idea ${section.number} of ${section.total} · ${section.name}` : 'Earlier';
+  const mark = section.kind === 'idea' && section.state ? STATE_WORDS[section.state] : `${section.turns.length} turns`;
+  // The mark runs on after the name, held to its last word, so a wrap moves
+  // them down together and no line starts with the mark.
+  const space = name.lastIndexOf(' ');
+  const title = (
+    <>
+      {name.slice(0, space + 1)}
+      <span className="whitespace-nowrap">
+        {name.slice(space + 1)} <span className="text-small font-normal text-ink-muted">· {mark}</span>
+      </span>
+    </>
   );
-
   return (
-    <div>
-      <div className={ITEM_HEIGHT} data-deck-item>
-        {finished && check ? (
-          <>
-          <Card padding="standard" aria-live="polite">
-            <h2 className="flex items-center gap-1.5 font-display text-title tracking-tight text-ink">
-              <Check className="size-5 text-accent" strokeWidth={1.75} aria-hidden />
-              Today&rsquo;s piece is finished
-            </h2>
-            <p className="mt-1 text-body text-ink">
-              Next time, Now opens on the piece after it. Its practice task is on the piece&rsquo;s page
-              whenever you want it.
-            </p>
-            <details className="group mt-4">
-              <summary className="press inline-flex cursor-pointer list-none items-center gap-1.5 rounded-control text-ui font-medium text-accent [&::-webkit-details-marker]:hidden">
-                Check · Right
-                <span className="text-ink-muted group-open:hidden">· show</span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                <p className="text-ui text-ink">{check.question}</p>
-                {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
-                {check.why && <p className="text-ui text-ink">{check.why}</p>}
-              </div>
-            </details>
-          </Card>
-          {/* What this session moved (plan #2164.6), read from the stored answers. */}
-          <div className="mt-4">{summary ?? <RunSummaryPanel />}</div>
-          </>
-        ) : (
-          <Card padding="standard">
-            <h2 className="font-display text-title tracking-tight text-ink">Check</h2>
-            <p className="mt-0.5 text-small text-ink-muted">One question · a right answer finishes the piece</p>
-            {check && (
-              <p className="mt-3 text-body text-ink" aria-live="polite">
-                {check.question}
-              </p>
-            )}
-            {open && check && (
-              <Field label="Your answer" id={`now-piece-check-${check.id}`} hint="A sentence or two, from memory.">
-                <Textarea
-                  id={`now-piece-check-${check.id}`}
-                  rows={4}
-                  maxLength={2000}
-                  value={response}
-                  onChange={(event) => setResponse(event.target.value)}
-                  disabled={marking}
-                />
-              </Field>
-            )}
-            {check && check.correct === false && (
-              <div className="mt-3 space-y-2" aria-live="polite">
-                {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
-                <p className="flex items-start gap-1.5 text-ui text-ink">
-                  <X className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                  {check.why ?? 'Not yet.'}
+    <Disclosure title={title}>
+      <ul className="space-y-2.5">
+        {section.turns.map((turn, index) => {
+          const mine = turn.role === 'user';
+          const grouped = index > 0 && section.turns[index - 1]!.role === turn.role;
+          return (
+            <ThreadTurn
+              key={turn.id}
+              voice={mine ? 'you' : 'dash'}
+              name={grouped ? undefined : mine ? 'You' : 'Dash'}
+              at={turn.createdAt}
+              now={now}
+            >
+              {mine ? (
+                <p className="text-body whitespace-pre-wrap">
+                  <LinkedText text={turn.body} />
                 </p>
-                {check.expected && <p className="text-ui text-ink-muted">Expected: {check.expected}</p>}
-              </div>
-            )}
-            {error && (
-              <p className="mt-2 text-small text-danger" role="alert">
-                {error}
-              </p>
-            )}
-          </Card>
-        )}
-      </div>
-      <Card padding="none" className={FOOT_ROW}>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {finished ? (
-            <Link href={pieceHref} className={cn('press-area px-2 text-ui', linkVariants({ tone: 'quiet' }))}>
-              Open the piece
-            </Link>
-          ) : (
-            <Button type="button" variant="ghost" size="sm" onClick={onCards}>
-              Cards instead
-            </Button>
-          )}
-        </div>
-        {forward}
-      </Card>
-    </div>
+              ) : (
+                <div className="text-body">
+                  <CommentBody body={turn.body} refs="outlines" />
+                </div>
+              )}
+            </ThreadTurn>
+          );
+        })}
+      </ul>
+    </Disclosure>
   );
 }

@@ -1253,7 +1253,10 @@ function TalkThread({
   useEffect(() => {
     if (!ask || asked.current) return;
     asked.current = true;
-    submit(ask);
+    // Off the effect, as a press would send it: sent from the effect itself,
+    // the question was held back with the reply's transition and the thread
+    // showed the waiting line under nothing.
+    setTimeout(() => submit(ask), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sent once, on arrival
   }, []);
 
