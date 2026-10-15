@@ -9,9 +9,11 @@
 # script decides whether the call is worth a line (lib/plan/auto-line.ts) and
 # writes it onto the run named in the session's brief.
 #
-# Only in a cloud session with the database to hand. A local session, or one
-# with no DATABASE_URL, has no run to write to.
-if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ] || [ -z "${DATABASE_URL:-}" ]; then
+# Only in a cloud session with a way to the database. A cloud session needs
+# SUPABASE_SERVICE_ROLE_KEY, since its proxy carries HTTPS and not Postgres;
+# DATABASE_URL is the way in where Postgres can be reached directly.
+if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ] ||
+  { [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && [ -z "${DATABASE_URL:-}" ]; }; then
   exit 0
 fi
 

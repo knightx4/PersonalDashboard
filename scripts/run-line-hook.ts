@@ -14,7 +14,10 @@
  *
  *   npx tsx scripts/run-line-hook.ts <hook-json-file>
  *
- * Needs DATABASE_URL (service role), the same as scripts/plan.ts.
+ * Writes through the REST API when SUPABASE_SERVICE_ROLE_KEY is set, calling
+ * public.write_run_lines (migration 0240). A cloud session has to: its proxy
+ * carries HTTPS and nothing else, so DATABASE_URL cannot reach Postgres from
+ * there. Without the key it connects with DATABASE_URL, which works locally.
  */
 import {
   closeSync,
@@ -104,9 +107,62 @@ function loadState(path: string): AutoLineState {
   }
 }
 
+/** The project's REST endpoint, when the environment does not name one. */
+const PROJECT_URL = 'https://asjztutnqxbecruvyrbj.supabase.co';
+
+/** What writing a run's lines came to: written, or the run takes no more. */
+type Written = 'written' | 'over' | 'missing';
+
+async function writeOverHttps(key: string, runId: string, lines: AutoLine[]): Promise<Written> {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || PROJECT_URL).replace(/\/$/, '');
+  const response = await fetch(`${base}/rest/v1/rpc/write_run_lines`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_run_id: runId,
+      p_lines: lines.map(({ kind, body }) => ({ kind, body })),
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`write_run_lines answered ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as Written;
+}
+
+async function writeOverPostgres(url: string, runId: string, lines: AutoLine[]): Promise<Written> {
+  const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
+  try {
+    const [run] = await sql<{ id: string; user_id: string; status: string }[]>`
+      select id, user_id, status from plan_runs where id = ${runId}`;
+    if (!run) return 'missing';
+    if (run.status === 'finished' || run.status === 'failed') return 'over';
+    for (const line of lines) {
+      await sql`
+        insert into core.run_activities (user_id, run_table, run_id, kind, body)
+        values (${run.user_id}, 'plan_runs', ${run.id}, ${line.kind}, ${line.body})`;
+    }
+    // A line means the run is alive again, so a stale mark comes off. A wait
+    // on the person's answer stays: a session keeps working while it waits,
+    // and an automatic line is not the answer.
+    if (run.status === 'stale') {
+      await sql`update plan_runs set status = 'started' where id = ${run.id} and status = 'stale'`;
+    }
+    return 'written';
+  } finally {
+    await sql.end({ timeout: 2 });
+  }
+}
+
 async function main(): Promise<void> {
   const file = process.argv[2];
-  if (!file || !process.env.DATABASE_URL) return;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.DATABASE_URL;
+  if (!file || (!key && !url)) return;
   let input: HookInput;
   try {
     input = JSON.parse(readFileSync(file, 'utf8')) as HookInput;
@@ -128,10 +184,12 @@ async function main(): Promise<void> {
 
   const now = Date.now();
   const lines: AutoLine[] = [];
-  // Dash's words come before the call they led to.
+  // Dash's words come before the call they led to. They count as sent only
+  // once a write succeeds, so a failed one tries them again next call.
   const thought = newestThought(slice(input.transcript_path, true));
+  let thoughtId: string | null = null;
   if (thought && thought.id !== state.lastThoughtId) {
-    state.lastThoughtId = thought.id;
+    thoughtId = thought.id;
     const line = lineForThought(thought.words);
     if (line) lines.push(line);
   }
@@ -146,35 +204,25 @@ async function main(): Promise<void> {
   }
   const keep = lines.filter((line) => worthWriting(line, state, now));
   if (keep.length === 0) {
+    if (thoughtId) state.lastThoughtId = thoughtId;
     writeFileSync(where, JSON.stringify(state));
     return;
   }
 
-  const sql = postgres(process.env.DATABASE_URL, { max: 1, prepare: false, onnotice: () => {} });
   try {
-    const [run] = await sql<{ id: string; user_id: string; status: string }[]>`
-      select id, user_id, status from plan_runs where id = ${state.runId}`;
-    // A run already written back as over takes no more lines.
-    if (!run || run.status === 'finished' || run.status === 'failed') {
-      state.runId = null;
-      return;
-    }
-    for (const line of keep) {
-      await sql`
-        insert into core.run_activities (user_id, run_table, run_id, kind, body)
-        values (${run.user_id}, 'plan_runs', ${run.id}, ${line.kind}, ${line.body})`;
-      state.lastBody = line.body;
+    const written = key
+      ? await writeOverHttps(key, state.runId, keep)
+      : await writeOverPostgres(url!, state.runId, keep);
+    if (thoughtId) state.lastThoughtId = thoughtId;
+    if (written === 'written') {
+      state.lastBody = keep[keep.length - 1].body;
       state.lastAt = now;
-    }
-    // A line means the run is alive again, so a stale mark comes off. A wait
-    // on the person's answer stays: a session keeps working while it waits,
-    // and an automatic line is not the answer.
-    if (run.status === 'stale') {
-      await sql`update plan_runs set status = 'started' where id = ${run.id} and status = 'stale'`;
+    } else {
+      // A run already written back as over, or gone, takes no more lines.
+      state.runId = null;
     }
   } finally {
     writeFileSync(where, JSON.stringify(state));
-    await sql.end({ timeout: 2 });
   }
 }
 
