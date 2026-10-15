@@ -130,8 +130,11 @@ export function CommandPalette({
     setActive(0);
   }, [module]);
 
+  // On a phone the field waits for a tap (note 3a901719): focusing it on open
+  // raised the keyboard over half the list, which is mostly what you opened
+  // the box to pick from. With a keyboard of your own it is focused at once.
   useEffect(() => {
-    if (!open) return;
+    if (!open || typesOnTouch()) return;
     inputRef.current?.focus();
   }, [open]);
 
@@ -153,8 +156,9 @@ export function CommandPalette({
     setActive(0);
     reset();
     // The cursor goes back where it was: switching what is being searched is
-    // something you do in the middle of typing, not instead of typing.
-    inputRef.current?.focus();
+    // something you do in the middle of typing, not instead of typing. Not on
+    // a phone, where it would raise the keyboard the opening kept down.
+    if (!typesOnTouch()) inputRef.current?.focus();
   }
 
   if (!open) return null;
@@ -259,4 +263,12 @@ export function CommandPalette({
       </div>
     </div>
   );
+}
+
+/**
+ * Whether typing here means a keyboard on the screen: a touch screen with no
+ * pointer that hovers, which is a phone or a tablet without a trackpad.
+ */
+export function typesOnTouch(): boolean {
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 }
