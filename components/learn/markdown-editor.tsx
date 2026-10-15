@@ -66,6 +66,8 @@ export type MarkdownEditorHandle = {
    * are marked as quoted from the source, so neither counts as your words.
    */
   footnote(ref: string, definition: string | null, source: { name: string }): void;
+  /** Replace a range with the person's own text, such as a renamed title (note 1c956878). */
+  replace(change: { from: number; to: number; insert: string }): void;
 };
 
 /** From laptop width the essay page is the calm one; below it a plain editor. */
@@ -243,6 +245,9 @@ export function MarkdownEditor({
       },
       showNote(id) {
         view.current?.dispatch({ effects: setActiveNote.of(id) });
+      },
+      replace(change) {
+        view.current?.dispatch({ changes: change });
       },
       insert(text, quote) {
         const editor = view.current;

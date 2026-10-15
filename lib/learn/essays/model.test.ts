@@ -6,6 +6,7 @@ import {
   parseWordTarget,
   readBrief,
   readInterview,
+  retitleEssay,
   toSummary,
   wordCountLabel,
 } from './model';
@@ -23,6 +24,40 @@ describe('essayTitle', () => {
   it('falls back to Untitled essay', () => {
     expect(essayTitle('', '')).toBe('Untitled essay');
     expect(essayTitle('#   \n', 'Essays/Untitled essay.md')).toBe('Untitled essay');
+  });
+});
+
+describe('retitleEssay', () => {
+  const apply = (body: string, title: string) => {
+    const { from, to, insert } = retitleEssay(body, title);
+    return body.slice(0, from) + insert + body.slice(to);
+  };
+
+  it('rewrites the first heading, wherever it is', () => {
+    expect(apply('# Old name\n\nText.', 'New name')).toBe('# New name\n\nText.');
+    expect(apply('Intro.\n\n# Old\n\nMore.', 'New')).toBe('Intro.\n\n# New\n\nMore.');
+  });
+
+  it('takes a first line written without the space as the title line', () => {
+    const body = '#Taking a Control Mindset to AI \nTest \n';
+    const next = apply(body, 'Controls for AI');
+    expect(next).toBe('# Controls for AI\nTest \n');
+    expect(essayTitle(next, 'Essays/Untitled essay.md')).toBe('Controls for AI');
+  });
+
+  it('puts a heading in ahead of the text when there is none, after frontmatter', () => {
+    expect(apply('Just text.', 'Named')).toBe('# Named\n\nJust text.');
+    expect(apply('', 'Named')).toBe('# Named\n');
+    expect(apply('---\nstage: draft\n---\nText.', 'Named')).toBe('---\nstage: draft\n---\n# Named\n\nText.');
+  });
+
+  it('leaves second-level headings and later #lines alone', () => {
+    expect(apply('## Part one\n\nText.', 'Named')).toBe('# Named\n\n## Part one\n\nText.');
+    expect(apply('Text.\n#tag', 'Named')).toBe('# Named\n\nText.\n#tag');
+  });
+
+  it('keeps the title to one line', () => {
+    expect(apply('', '  Two\nlines  ')).toBe('# Two lines\n');
   });
 });
 

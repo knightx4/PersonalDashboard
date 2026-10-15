@@ -5,6 +5,37 @@ import { listAskChatsInRequest, loadAskMadeChanges } from '@/lib/talk/ask-reques
 import type { AskChat } from '@/lib/talk/ask-chats';
 import type { MadeChange } from '@/lib/talk/changes';
 import { DashChatsFrame } from './view';
+import { switchableModules, moduleById, type ModuleId } from '@/lib/modules';
+import type { NavSection } from '@/components/shell/app-shell';
+import type { NavIconName } from '@/components/shell/nav-icons';
+
+/** Each workspace's front page in the column, by the icon its own column uses for it. */
+const WORKSPACE_ICONS: Record<ModuleId, NavIconName> = {
+  shopping: 'orders',
+  jobs: 'jobsHome',
+  todo: 'agenda',
+  vault: 'notes',
+  learn: 'readNow',
+  news: 'newsletters',
+  goals: 'goalsHome',
+  you: 'personality',
+  dev: 'devHome',
+};
+
+/**
+ * The shell's column on Dash's page: Home and every workspace the account
+ * has on, since Dash reads all of them and a chat often ends with going to
+ * one. Without it the column stood empty beside the chats.
+ */
+function workspaceSections(enabled: readonly ModuleId[] | undefined, owner: boolean): NavSection[] {
+  return [
+    { href: '/home', label: 'Home', icon: 'home', exact: true },
+    ...switchableModules(enabled, owner).flatMap((id): NavSection[] => {
+      const workspace = moduleById(id);
+      return workspace ? [{ href: workspace.home, label: workspace.label, icon: WORKSPACE_ICONS[id] }] : [];
+    }),
+  ];
+}
 
 /**
  * Dash's page (plans #1090, #1899.2), in the account's chrome rather than a
@@ -19,6 +50,7 @@ export default async function AskLayout({ children }: { children: React.ReactNod
   return shellFor({
     module: null,
     narrow: false,
+    sections: ({ settings, owner }) => workspaceSections(settings.enabledModules, owner),
     // The box on a chat is a paid press.
     paidActions: paidActionsUnder('app/ask/'),
     children: async ({ settings }) => {

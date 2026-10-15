@@ -208,6 +208,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-topic-draft': ['/learn/topics/[id]'],
   'learn-topic-draft-match': ['/learn/topics/[id]'],
   'learn-topic-draft-comment': ['/learn/topics/[id]'],
+  'learn-subject-articles': ['/learn/s/[id]'],
+  'learn-subject-articles-loading': ['/learn/s/[id]'],
+  'learn-subject-articles-empty': ['/learn/s/[id]'],
+  'learn-subject-articles-error': ['/learn/s/[id]'],
   'jobs-interviews': ['/jobs/interviews'],
   'shell-display-options': [
     '/jobs/pipeline',

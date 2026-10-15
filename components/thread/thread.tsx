@@ -1033,6 +1033,12 @@ type TalkThreadProps = {
   boxStart?: React.ReactNode;
   /** The rows added with @, drawn on the question as it is sent. */
   questionCitations?: readonly TalkCitation[];
+  /**
+   * The box is always open and held at the foot of the scrolling pane the
+   * thread sits in, as a chat app's is: the Dash page (plan #1899.2). Left
+   * out, the box folds back to its opener when emptied and left.
+   */
+  dock?: boolean;
 };
 
 /**
@@ -1071,10 +1077,11 @@ function TalkThread({
   attached,
   boxStart,
   questionCitations,
+  dock = false,
 }: TalkThreadProps) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   const turns = useMemo(() => withIncoming(own, incoming), [own, incoming]);
-  const [writing, setWriting] = useState(startWriting && !ask);
+  const [writing, setWriting] = useState(dock || (startWriting && !ask));
   const [draft, setDraft] = useState(initialDraft);
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
@@ -1102,6 +1109,10 @@ function TalkThread({
       watch?.disconnect();
     };
   }, [sending]);
+  // A docked thread opens on its latest turn, the way a chat app does.
+  useEffect(() => {
+    if (dock) form.current?.scrollIntoView({ block: 'end' });
+  }, [dock]);
   const adder = useRef<AddFileHandle>(null);
   // What the words at the caret ask the menu for (plan #1899.5), and which
   // of its items is lit. A menu closed with Escape stays closed until the
@@ -1183,7 +1194,7 @@ function TalkThread({
       setTrigger(null);
       onTrigger?.(null);
       // With Stop to offer, the box stays where Stop is (plan #1899.5).
-      if (!onStop) setWriting(false);
+      if (!onStop && !dock) setWriting(false);
     }
     setTurns((current) => [...current, question]);
     onSubmit?.();
@@ -1253,7 +1264,7 @@ function TalkThread({
   );
 
   return (
-    <div className="space-y-2">
+    <div className={dock ? 'flex flex-1 flex-col gap-2' : 'space-y-2'}>
       {(turns.length > 0 || failed || opening) && (
         <ul className="space-y-2.5">
           {opening && (
@@ -1319,7 +1330,7 @@ function TalkThread({
 
       {ended ? (
         <p className="text-ui text-ink-muted">{ended}</p>
-      ) : !writing ? (
+      ) : !writing && !dock ? (
         <div className="flex items-center gap-1">
           <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
           {stopping ? (
@@ -1334,13 +1345,23 @@ function TalkThread({
       ) : (
         <Composer
           formRef={form}
-          className="relative scroll-mb-28"
+          className={cn(
+            'relative scroll-mb-28',
+            // Held at the foot of the pane, after the turns however few:
+            // the box is where it is in every chat app, and turns scroll
+            // away above it.
+            // A phone keeps its own dock at the foot of the screen, so there
+            // the box stays in the flow and is scrolled to as before.
+            dock && 'mt-auto pb-1 pt-3 min-[720px]:sticky min-[720px]:bottom-0 min-[720px]:z-over-link',
+          )}
           onSubmit={(event) => {
             event.preventDefault();
             if (stopping) return;
             submit();
           }}
-          onClose={() => setWriting(false)}
+          onClose={() => {
+            if (!dock) setWriting(false);
+          }}
           holdSend={stopping}
           attached={attached}
           onCaret={onTrigger ? noteCaret : undefined}
