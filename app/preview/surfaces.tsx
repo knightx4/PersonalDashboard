@@ -1,5 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
+import { CellAnswerPreview } from './cell-answer-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -5316,6 +5317,48 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowScopePreview />,
+  },
+  {
+    /* An explain question about one level of a topic, before an answer
+     * (plan #2138.5). The forward row holds Check my answer. */
+    id: 'learn-cell-answer',
+    label: 'Practice Flow · Explain a level',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" />,
+  },
+  {
+    /* The same question while the answer is graded. */
+    id: 'learn-cell-answer-loading',
+    label: 'Practice Flow · Explain a level, grading',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="loading" />,
+  },
+  {
+    /* Grading failed: the answer stays in the box to send again. */
+    id: 'learn-cell-answer-error',
+    label: 'Practice Flow · Explain a level, grading failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="error" />,
+  },
+  {
+    /* The answer screen: every level the answer reached, shown or implied,
+     * and a link put up for review. */
+    id: 'learn-cell-answer-reached',
+    label: 'Practice Flow · What an answer reached',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="reached" />,
+  },
+  {
+    /* The same list with the quote behind the first shown level opened. */
+    id: 'learn-cell-answer-quote',
+    label: 'Practice Flow · What an answer reached, quote open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="quote" />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything

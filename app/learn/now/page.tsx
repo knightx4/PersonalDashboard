@@ -94,6 +94,7 @@ export default async function NowPage({
     track?: string | string[];
     goal?: string | string[];
     only?: string | string[];
+    cell?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -160,7 +161,7 @@ export default async function NowPage({
       <PageColumn>
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
         {strip}
-        <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
+        <PracticeFlow track={params.track} goal={params.goal} only={params.only} cell={params.cell} />
       </PageColumn>
     );
   }

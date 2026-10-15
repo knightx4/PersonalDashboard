@@ -302,6 +302,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
     { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
     { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
+    { table: 'learn.cell_questions', reason: 'Questions asked about a level of a topic and the answers to them; what each answer showed is read through cell_evidence.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     {
