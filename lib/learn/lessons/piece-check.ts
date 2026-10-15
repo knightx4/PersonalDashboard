@@ -71,6 +71,13 @@ export type PieceCheck = {
   correct: boolean | null;
   /** The marker's sentence on what the answer had or was missing. */
   why: string | null;
+  /**
+   * The cell the question asks about, when the piece names cells (plan
+   * #2138.13): the question is then a cell question, graded against that
+   * level and written as evidence on the topic ladder. Null on a piece
+   * written before its goal had a territory, whose check is its own question.
+   */
+  cell: { topicId: string; topicName: string; level: number } | null;
 };
 
 /** The row as stored in learn.piece_checks. */
@@ -96,5 +103,43 @@ export function toPieceCheck(row: PieceCheckRow): PieceCheck {
     response: row.response,
     correct: row.correct,
     why: row.marked_why,
+    cell: null,
+  };
+}
+
+/** A piece's check asked as a cell question, as stored in learn.cell_questions. */
+export type CellCheckRow = {
+  id: string;
+  cell_id: string;
+  question: string;
+  response: string | null;
+  answered_at: string | null;
+  /** The first grader's verdicts, [{cell_id, verdict, quote, reason}]. */
+  grade: unknown;
+};
+
+/**
+ * A cell question as the piece's page shows it. Right means the answer wrote
+ * a met on the asked cell (`met`), which is what the topic ladder reads; the
+ * sentence is the grader's reason on that cell. A case's expected answer is
+ * shown to the grader only, so it is never handed to the page.
+ */
+export function toCellPieceCheck(
+  row: CellCheckRow,
+  cell: { topicId: string; topicName: string; level: number },
+  met: boolean,
+): PieceCheck {
+  const answered = row.answered_at !== null;
+  const verdicts = Array.isArray(row.grade) ? (row.grade as { cell_id?: unknown; reason?: unknown }[]) : [];
+  const own = verdicts.find((v) => v.cell_id === row.cell_id);
+  const reason = typeof own?.reason === 'string' && own.reason.trim() !== '' ? own.reason.trim() : null;
+  return {
+    id: row.id,
+    question: row.question,
+    expected: null,
+    response: row.response,
+    correct: answered ? met : null,
+    why: answered ? reason : null,
+    cell,
   };
 }

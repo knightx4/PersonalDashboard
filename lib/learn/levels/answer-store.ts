@@ -52,6 +52,8 @@ export async function askCell(
   userId: string,
   cellId: string,
   writer?: { anthropicApiKey: string; onSpend?: SpendSink },
+  /** The piece of a plan whose check this question is (plan #2138.13). */
+  pieceId?: string,
 ): Promise<AskCellResult> {
   const { data: cell, error } = await learn
     .from('topic_cells')
@@ -71,13 +73,14 @@ export async function askCell(
   const format = questionFormat(row.level);
   if (format === 'defend') return { ok: false, error: `Level ${row.level} is asked as a defence, which is not built yet.` };
 
-  const { data: open } = await learn
+  const openQuery = learn
     .from('cell_questions')
     .select('id, question')
     .eq('user_id', userId)
     .eq('cell_id', cellId)
     .eq('format', format)
-    .is('answered_at', null)
+    .is('answered_at', null);
+  const { data: open } = await (pieceId ? openQuery.eq('piece_id', pieceId) : openQuery.is('piece_id', null))
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -122,7 +125,7 @@ export async function askCell(
 
   const { data: inserted, error: insertError } = await learn
     .from('cell_questions')
-    .insert({ user_id: userId, cell_id: cellId, format, question: text, expected })
+    .insert({ user_id: userId, cell_id: cellId, format, question: text, expected, piece_id: pieceId ?? null })
     .select('id')
     .single();
   if (insertError || !inserted) {

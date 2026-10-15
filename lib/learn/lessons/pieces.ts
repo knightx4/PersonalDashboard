@@ -9,6 +9,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import { loadGoalTracks } from './aim-tracks';
 import { numberIdeas, unitIdeas } from './pieces-payload';
 import { PIECES_MODEL, writePieces } from './write-pieces';
+import { fillDuePieceCells, matchUnitPieces } from './piece-cells-store';
 
 /**
  * Writing and finding a goal track's pieces (plan #1140, LEARN-LESSONS-SPEC
@@ -146,6 +147,26 @@ export async function writeUnitPieces(
     });
     if (!result.ok) return { outcome: 'failed', detail: result.detail };
 
+    // The cells each piece teaches, from the goal's territory (plan #2138.13).
+    // With no territory yet, or a failed call, the pieces go in with empty
+    // lists and `fillDuePieceCells` matches them on a later pass.
+    const match = await matchUnitPieces(
+      learn,
+      userId,
+      {
+        subjectId: due.subjectId,
+        trackName,
+        unitTitle: unit.title,
+        pieces: result.pieces.map((piece) => ({
+          title: piece.title,
+          ideas: piece.ideas.map((number) => ({ name: ideas[number - 1]!.name, claim: ideas[number - 1]!.claim })),
+        })),
+      },
+      apiKey,
+      onSpend,
+    );
+    const matchedAt = match.matched ? new Date().toISOString() : null;
+
     const { error } = await learn.from('plan_pieces').insert(
       result.pieces.map((piece, index) => ({
         user_id: userId,
@@ -154,6 +175,8 @@ export async function writeUnitPieces(
         ordinal: index + 1,
         title: piece.title,
         concept_ids: piece.ideas.map((number) => ideas[number - 1]!.id),
+        cell_ids: match.matched ? (match.cells[index] ?? []) : [],
+        cells_matched_at: matchedAt,
         write_model: PIECES_MODEL,
       })),
     );
@@ -214,5 +237,14 @@ export async function writeDuePieces(
   } catch (error) {
     summary.failed.push(error instanceof Error ? error.message : 'Finding units without pieces failed.');
   }
+
+  // Pieces written before their goal had a territory get their cells now
+  // (plan #2138.13). The spend is the pieces' own, recorded under it.
+  const spend: SpendReport[] = [];
+  const cells = await fillDuePieceCells(learn, userId, apiKey, (report) => spend.push(report));
+  for (const report of spend) {
+    await recordSpend(core, userId, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
+  }
+  summary.failed.push(...cells.failed);
   return summary;
 }
