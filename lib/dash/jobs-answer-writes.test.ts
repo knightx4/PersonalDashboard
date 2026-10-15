@@ -178,3 +178,31 @@ describe('set_default_answer', () => {
     expect(await refused('set_default_answer', withAnswer(), { answer_ref: ANSWER })).toMatch(/empty/);
   });
 });
+
+describe('save_answer in one turn', () => {
+  it('saves two answers on one application by ref, both as drafts, and names both', async () => {
+    const SECOND_ANSWER = '99999999-9999-4999-8999-999999999992';
+    const SECOND_QUESTION = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
+    const NOTICE = 'What is your notice period?';
+    const t = withAnswer();
+    t['job_search.questions'].push({ id: SECOND_QUESTION, user_id: ME, text: NOTICE, fingerprint: questionFingerprint(NOTICE), times_seen: 1, canonical_answer: null });
+    t['job_search.application_answers'].push({
+      id: SECOND_ANSWER,
+      user_id: ME,
+      application_id: APP,
+      question_id: SECOND_QUESTION,
+      answer: 'A long old answer about notice.',
+      status: 'draft',
+      evidence_item_ids: [],
+      unsupported_claims: [],
+    });
+    const first = await made('save_answer', t, { answer_ref: ANSWER, answer: 'I like the data work here.', evidence_refs: [EVIDENCE] });
+    const second = await made('save_answer', t, { answer_ref: SECOND_ANSWER, answer: 'One month.', unsupported_claims: ['Can start sooner'] });
+    const rows = t['job_search.application_answers'];
+    expect(rows.map((row) => row.status)).toEqual(['draft', 'draft']);
+    expect(rows[0]).toMatchObject({ answer: 'I like the data work here.', evidence_item_ids: [EVIDENCE] });
+    expect(rows[1]).toMatchObject({ answer: 'One month.', unsupported_claims: ['Can start sooner'] });
+    expect(first.summary).toContain('Why do you want to work here?');
+    expect(second.summary).toContain('What is your notice period?');
+  });
+});
