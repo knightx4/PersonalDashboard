@@ -105,7 +105,7 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { isModuleId } from '../lib/modules';
 import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
-import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
@@ -477,6 +477,16 @@ async function loadVisions(sql: Sql, userId: string): Promise<VisionBodies> {
   const rows = await sql<{ module: string; body: string }[]>`
     select module, body from module_visions where user_id = ${userId}`;
   return Object.fromEntries(rows.map((row) => [row.module, row.body])) as VisionBodies;
+}
+
+/** The drawings on plan rows, by the row they sit on, for the brief to name (not the SVGs). */
+async function loadPictures(sql: Sql, userId: string): Promise<Record<string, BriefPicture[]>> {
+  const rows = await sql<{ id: string; item_id: string; caption: string }[]>`
+    select id, item_id, caption from plan_item_pictures
+    where user_id = ${userId} order by position, created_at`;
+  const out: Record<string, BriefPicture[]> = {};
+  for (const row of rows) (out[row.item_id] ??= []).push({ id: row.id, caption: row.caption });
+  return out;
 }
 
 async function loadTree(sql: Sql, userId: string): Promise<PlanSection[]> {
@@ -1131,6 +1141,7 @@ async function main(): Promise<void> {
             liveness,
             visions: await loadVisions(sql, userId),
             surfaces: changedSurfaces(item.commitSha),
+            pictures: await loadPictures(sql, userId),
           }),
         ),
       );
