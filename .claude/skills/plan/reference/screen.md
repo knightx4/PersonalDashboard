@@ -188,7 +188,17 @@ changed file serves, so a change to a shared row or folder can name dozens
 of screens nobody sent to the critic. Send the surfaces the step meant to
 change to the critic. Settle the rest with the same command, naming in the
 reason that the step did not set out to change them, and do not block on
-them. Findings the critic makes on a surface the step did not cause are not
+them.
+
+The settle lets one of those through only when it looks the same as on main
+(plan #2215.4). For every surface still waiting that the critic has not
+judged through three rounds, it compares the four shots in `.preview-shots/`
+with main's in `.preview-shots/before/` pixel by pixel, and refuses the whole
+settle, writing and printing nothing, when any shot is missing, has changed
+size, or differs in more than one pixel in ten thousand. So shoot those
+surfaces on main and on the branch first (`npm run shoot` with no id shoots
+every surface, in each checkout). A surface the refusal names has changed:
+it goes to the critic like any other, from round 1. Findings the critic makes on a surface the step did not cause are not
 this step's: file them as a ready step if they are worth doing, and close
 this one.
 
