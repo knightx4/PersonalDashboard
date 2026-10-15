@@ -25,6 +25,7 @@ export const learnActions: ModuleActions = {
     mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
     draftWantedTopic: none('spends'),
     rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    markRowsPersonal: none('theirs', 'Whether an uncited row is the person’s own is theirs to say (plan #2138.11).'),
   },
   'app/learn/lens/[id]/actions.ts': {
     saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),

@@ -10,6 +10,14 @@ import {
   type TopicDraft,
   type WantedTopic,
 } from '@/lib/learn/levels/draft-payload';
+import {
+  NO_SOURCES,
+  readDrafting,
+  sourceText,
+  type Canonicality,
+  type DraftSources,
+  type DraftingRecord,
+} from '@/lib/learn/levels/draft-sources';
 import type { CellEvidence, TopicMap, Verdict } from '@/lib/learn/levels/model';
 
 /**
@@ -130,8 +138,24 @@ export async function loadFieldOptions(client: Client): Promise<FieldOption[]> {
   return (data ?? []) as FieldOption[];
 }
 
+/** Where a row came from: null source with no personal mark is uncited (learn 0145). */
+export type RowCitation = { source: string | null; canonicality: Canonicality | null };
+
+const CANON = new Set<string>(['canonical', 'practitioner', 'emerging', 'personal']);
+function citationOf(row: { source?: string | null; canonicality?: string | null }): RowCitation {
+  return {
+    source: row.source ?? null,
+    canonicality: row.canonicality && CANON.has(row.canonicality) ? (row.canonicality as Canonicality) : null,
+  };
+}
+
+/** A row that cannot be approved as it is: no source, and not marked personal. */
+export function isUncited(row: Partial<RowCitation>): boolean {
+  return (row.source ?? null) === null && row.canonicality !== 'personal';
+}
+
 /** One level of a topic as its page shows it. */
-export type TopicCellView = {
+export type TopicCellView = Partial<RowCitation> & {
   id: string;
   level: number;
   checks: string[];
@@ -141,7 +165,9 @@ export type TopicCellView = {
 };
 
 /** A level of this topic needing a level of another. */
-export type TopicLinkView = {
+export type TopicLinkView = Partial<RowCitation> & {
+  /** The link row's id; absent on a link read from the other side. */
+  id?: string;
   fromLevel: number;
   topicId: string;
   topicName: string;
@@ -160,6 +186,9 @@ export type TopicMatch = {
 };
 
 export type TopicDetail = TopicRow & {
+  citation: RowCitation;
+  /** The sources it was drafted from and the checks they gave; null for a topic drafted before sources. */
+  drafting: DraftingRecord | null;
   fieldNames: string[];
   cells: TopicCellView[];
   links: TopicLinkView[];
@@ -170,7 +199,7 @@ export type TopicDetail = TopicRow & {
 export async function loadTopicDetail(client: Client, id: string): Promise<TopicDetail | null> {
   const { data: topic, error } = await client
     .from('topics')
-    .select(`${TOPIC_COLUMNS}, field_ids, wanted`)
+    .select(`${TOPIC_COLUMNS}, field_ids, wanted, source, canonicality, drafting`)
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(`Reading the topic failed: ${error.message}`);
@@ -178,7 +207,7 @@ export async function loadTopicDetail(client: Client, id: string): Promise<Topic
 
   const { data: cells, error: cellsError } = await client
     .from('topic_cells')
-    .select('id, level, descriptor, descriptor_original, rewritten_at')
+    .select('id, level, descriptor, descriptor_original, rewritten_at, source, canonicality')
     .eq('topic_id', id)
     .order('level');
   if (cellsError) throw new Error(`Reading the topic's levels failed: ${cellsError.message}`);
@@ -189,6 +218,8 @@ export async function loadTopicDetail(client: Client, id: string): Promise<Topic
     descriptor: string[];
     descriptor_original: string[] | null;
     rewritten_at: string | null;
+    source: string | null;
+    canonicality: string | null;
   }[];
   const levelOf = new Map(cellRows.map((c) => [c.id, c.level]));
 
@@ -196,25 +227,30 @@ export async function loadTopicDetail(client: Client, id: string): Promise<Topic
   if (cellRows.length > 0) {
     const { data: linkRows, error: linksError } = await client
       .from('cell_links')
-      .select('requiring_cell_id, why, required:topic_cells!cell_links_required_fk(level, topic:topics!topic_cells_topic_fk(id, name))')
+      .select('id, requiring_cell_id, why, source, canonicality, required:topic_cells!cell_links_required_fk(level, topic:topics!topic_cells_topic_fk(id, name))')
       .in(
         'requiring_cell_id',
         cellRows.map((c) => c.id),
       );
     if (linksError) throw new Error(`Reading the topic's links failed: ${linksError.message}`);
     for (const row of (linkRows ?? []) as unknown as {
+      id: string;
       requiring_cell_id: string;
       why: string | null;
+      source: string | null;
+      canonicality: string | null;
       required: { level: number; topic: { id: string; name: string } | null } | null;
     }[]) {
       const fromLevel = levelOf.get(row.requiring_cell_id);
       if (fromLevel === undefined || !row.required?.topic) continue;
       links.push({
+        id: row.id,
         fromLevel,
         topicId: row.required.topic.id,
         topicName: row.required.topic.name,
         level: row.required.level,
         why: row.why,
+        ...citationOf(row),
       });
     }
     links.sort((a, b) => a.fromLevel - b.fromLevel || a.topicName.localeCompare(b.topicName));
@@ -229,6 +265,8 @@ export async function loadTopicDetail(client: Client, id: string): Promise<Topic
 
   return {
     ...toRow(topic as RawTopic),
+    citation: citationOf(topic as { source: string | null; canonicality: string | null }),
+    drafting: readDrafting(topic.drafting),
     fieldNames,
     cells: cellRows
       .filter((c) => c.level <= (topic as RawTopic).ceiling)
@@ -238,6 +276,7 @@ export async function loadTopicDetail(client: Client, id: string): Promise<Topic
         checks: c.descriptor,
         original: c.descriptor_original,
         rewrittenAt: c.rewritten_at,
+        ...citationOf(c),
       })),
     links,
     wanted: readWanted(topic.wanted),
@@ -269,6 +308,12 @@ export async function nearestTopics(client: Client, topicId: string): Promise<To
  * Keep a draft: the topic as a draft, a cell per level, and each link to a
  * topic on the map. Returns the new topic's id.
  *
+ * Each row carries the source it cites, in words, and its canonicality; a row
+ * the draft could not cite is written with neither, and the approval screen
+ * flags it (plan #2138.11). `uncited` fills those for a caller whose rows all
+ * come from one place the call was not told about, such as the move from the
+ * claims graph.
+ *
  * A link the cycle trigger refuses is left out rather than failing the draft:
  * the levels are what the person reviews, and a link that would close a loop
  * was wrong to propose. The count of links left out comes back so the page
@@ -281,9 +326,18 @@ export async function saveDraft(
     draft: TopicDraft;
     asked: string | null;
     embedding: { vector: number[]; model: string } | null;
+    sources?: DraftSources;
+    drafting?: DraftingRecord | null;
+    uncited?: { source: string; canonicality: Canonicality };
   },
 ): Promise<{ id: string; linksLeftOut: number }> {
   const { draft } = input;
+  const given = input.sources ?? NO_SOURCES;
+  const cited = (row: { cites: string[]; canonicality: Canonicality | null }): RowCitation => {
+    const source = sourceText(row.cites, given);
+    if (source) return { source, canonicality: row.canonicality ?? 'practitioner' };
+    return input.uncited ?? { source: null, canonicality: null };
+  };
   const { data: topic, error } = await client
     .from('topics')
     .insert({
@@ -294,6 +348,8 @@ export async function saveDraft(
       field_ids: draft.fieldIds,
       asked: input.asked,
       wanted: draft.wanted,
+      drafting: input.drafting ?? null,
+      ...cited({ cites: draft.topicCites, canonicality: draft.canonicality }),
       scope_embedding: input.embedding ? vectorLiteral(input.embedding.vector) : null,
       embedding_model: input.embedding?.model ?? null,
     })
@@ -303,7 +359,15 @@ export async function saveDraft(
 
   const { data: cells, error: cellsError } = await client
     .from('topic_cells')
-    .insert(draft.cells.map((cell) => ({ user_id: userId, topic_id: topic.id, level: cell.level, descriptor: cell.checks })))
+    .insert(
+      draft.cells.map((cell) => ({
+        user_id: userId,
+        topic_id: topic.id,
+        level: cell.level,
+        descriptor: cell.checks,
+        ...cited(cell),
+      })),
+    )
     .select('id, level');
   if (cellsError || !cells) {
     // A topic with no levels is no draft at all; take it back out.
@@ -311,7 +375,12 @@ export async function saveDraft(
     throw new Error(`Keeping the draft's levels failed: ${cellsError?.message ?? 'no rows came back'}`);
   }
 
-  const linksLeftOut = await writeLinks(client, userId, cells as { id: string; level: number }[], draft.links);
+  const linksLeftOut = await writeLinks(
+    client,
+    userId,
+    cells as { id: string; level: number }[],
+    draft.links.map((link) => ({ ...link, ...cited(link) })),
+  );
   return { id: topic.id as string, linksLeftOut };
 }
 
@@ -320,7 +389,7 @@ async function writeLinks(
   client: Client,
   userId: string,
   cells: { id: string; level: number }[],
-  links: TopicDraft['links'],
+  links: (Omit<TopicDraft['links'][number], 'canonicality'> & RowCitation)[],
 ): Promise<number> {
   if (links.length === 0) return 0;
   const cellAt = new Map(cells.map((c) => [c.level, c.id]));
@@ -344,7 +413,14 @@ async function writeLinks(
     }
     const { error: linkError } = await client
       .from('cell_links')
-      .insert({ user_id: userId, requiring_cell_id: requiring, required_cell_id: required, why: link.why });
+      .insert({
+        user_id: userId,
+        requiring_cell_id: requiring,
+        required_cell_id: required,
+        why: link.why,
+        source: link.source,
+        canonicality: link.canonicality,
+      });
     if (linkError) {
       console.error('[learn topics] link left out', linkError.message);
       leftOut += 1;
@@ -371,6 +447,13 @@ export async function approveDraft(
   if (error) throw new Error(`Reading the draft failed: ${error.message}`);
   if (!topic) throw new Error('That draft is not one of yours, or it is no longer there.');
   if (topic.status !== 'draft') throw new Error('That topic is already approved.');
+
+  const uncited = await uncitedRows(client, topicId);
+  if (uncited > 0) {
+    throw new Error(
+      `${uncited} ${uncited === 1 ? 'row names' : 'rows name'} no source. Mark ${uncited === 1 ? 'it' : 'each'} personal, or draft again with a source that covers it.`,
+    );
+  }
 
   const { data: cells, error: cellsError } = await client
     .from('topic_cells')
@@ -407,6 +490,63 @@ export async function approveDraft(
     .eq('status', 'draft');
   if (approveError) throw new Error(`Approving the topic failed: ${approveError.message}`);
   return { rewritten };
+}
+
+/**
+ * How many of a draft's rows cite nothing and are not marked personal: the
+ * topic, its levels up to the ceiling, and the links from them. Approval
+ * refuses while any is left (plan #2138.11); the trigger in learn 0149 holds
+ * the same rule for every writer.
+ */
+export async function uncitedRows(client: Client, topicId: string): Promise<number> {
+  const { data: topic, error } = await client
+    .from('topics')
+    .select('ceiling, source, canonicality')
+    .eq('id', topicId)
+    .maybeSingle();
+  if (error || !topic) throw new Error(`Reading the draft failed: ${error?.message ?? 'not found'}`);
+  const { data: cells, error: cellsError } = await client
+    .from('topic_cells')
+    .select('id, level, source, canonicality')
+    .eq('topic_id', topicId);
+  if (cellsError) throw new Error(`Reading the draft's levels failed: ${cellsError.message}`);
+  type Cited = { source: string | null; canonicality: string | null };
+  const inside = ((cells ?? []) as ({ id: string; level: number } & Cited)[]).filter(
+    (c) => c.level <= (topic.ceiling as number),
+  );
+  let links: Cited[] = [];
+  if (inside.length > 0) {
+    const { data, error: linksError } = await client
+      .from('cell_links')
+      .select('source, canonicality')
+      .in(
+        'requiring_cell_id',
+        inside.map((c) => c.id),
+      );
+    if (linksError) throw new Error(`Reading the draft's links failed: ${linksError.message}`);
+    links = (data ?? []) as Cited[];
+  }
+  return [topic as Cited, ...inside, ...links].filter((row) => isUncited(citationOf(row))).length;
+}
+
+/** Which row of a draft a personal mark is for. */
+export type CitedRowKind = 'topic' | 'cell' | 'link';
+
+const ROW_TABLE: Record<CitedRowKind, string> = { topic: 'topics', cell: 'topic_cells', link: 'cell_links' };
+
+/**
+ * Mark uncited rows of a draft personal, or take the mark off. Only a row
+ * with no source takes the mark: a cited row keeps the canonicality its
+ * source gave it.
+ */
+export async function markPersonal(client: Client, kind: CitedRowKind, ids: readonly string[], on: boolean): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client
+    .from(ROW_TABLE[kind])
+    .update({ canonicality: on ? 'personal' : null })
+    .in('id', ids)
+    .is('source', null);
+  if (error) throw new Error(`Marking it personal failed: ${error.message}`);
 }
 
 /**

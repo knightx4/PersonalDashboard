@@ -387,6 +387,35 @@ evidence between two topics. Most of the cost of getting this wrong falls on
 the inference rules, so the decision is the person's and is never made
 automatically.
 
+A draft is compiled from sources you give. Edit sources, beside the goal,
+takes the goal's performances (the three to five things being able to do it
+means), pasted sources such as a table of contents, a syllabus or an exam
+body's outcome list, and a phrase naming the roles in `job_search` whose
+requirement lines join them. Sources are numbered S1, S2, their lines S1.1,
+S1.2, and performances P1 to P5. The call cites those ids on the topic, on
+every level and on every link, and says how settled each cited row is. A row
+it cannot cite comes back with no source.
+
+The call runs twice, side by side, and the draft more of whose rows cite a
+source is kept. Both calls go to the ledger under `draft-topic`, so a draft
+costs two calls. Before Approve, the draft's page shows five checks:
+
+- **Coverage**: of the source lines that belong to this topic, how many a row
+  cites. Lines the call puts with a neighbouring topic are not counted.
+- **Structure**: no requirement loops, and every level is on a path to a
+  performance. A level above the highest level any performance needs is on
+  none.
+- **Stability**: how far the two drafts overlap, from the words of each
+  level, the topics linked and the lines cited.
+- **Provenance**: how many rows name a source.
+- **Practitioner checklist**: three to five questions to read the top levels
+  against.
+
+A row with no source cannot be approved until you mark it personal. The
+trigger `topics_cited_on_approve` (learn 0149) refuses the move from draft to
+approved while one is left, whoever writes it. The first four checks are kept
+on the topic as `drafting`; provenance is read from the rows.
+
 Nothing is asked about a drafted topic until it is approved, the same as for
 the claims graph now. Each call's cost goes to the spend ledger in `core`.
 The first twenty drafts are the measurement for the cost line this spec does
@@ -444,7 +473,7 @@ schema.
 
 | table | holds | source for Goals? |
 | --- | --- | --- |
-| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved, source, canonicality, the frame topic it refines; shared or one account's | yes: what the person studies |
+| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved, source, canonicality, the frame topic it refines, what it was drafted from and its checks; shared or one account's | yes: what the person studies |
 | `topic_cells` | one row per topic and level: the descriptor, its version, when it was rewritten by hand, source, canonicality | no: part of the topic |
 | `cell_links` | requiring cell → required cell, the sentence why, source, canonicality, acyclic | no: structure |
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |

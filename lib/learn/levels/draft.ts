@@ -14,6 +14,7 @@ import {
   type MapTopic,
   type TopicDraft,
 } from '@/lib/learn/levels/draft-payload';
+import { NO_SOURCES, sourcesPrompt, type DraftSources } from '@/lib/learn/levels/draft-sources';
 import { LADDER } from '@/lib/learn/levels/ladder';
 
 /**
@@ -30,6 +31,11 @@ import { LADDER } from '@/lib/learn/levels/ladder';
  *
  * Nothing here writes. The draft comes back, is kept as a draft that nothing
  * asks about, and the person reads and rewords it before approving.
+ *
+ * Since plan #2138.11 the call is given the sources the person named and the
+ * goal's performances, and cites them on every row: a draft compiled from a
+ * syllabus or a textbook, not from what the model happens to believe. A row
+ * it cannot cite comes back uncited and is flagged on the approval screen.
  */
 
 const MODEL = MODELS.learnTopicDraft;
@@ -76,6 +82,27 @@ join. Do not draft it; it is drafted separately if the person wants it.
 FIELDS. Tag the topic with the fields it belongs to, by slug, from the list
 you are given. One or two is normal; none is fine when nothing fits.
 
+SOURCES. You may be given performances (P1, P2, ...) and numbered sources
+(S1, S2, ...) with numbered lines (S1.1, S1.2, ...). Draft from them. On the
+topic, on every level and on every link, list under cites the ids it came
+from: a line where one line says it, a whole source where only the source
+does, a performance where the person's own words do. Never cite an id you
+were not given. A row that none of them supports gets no cites at all; do not
+stretch a citation to cover it. Set canonicality on each cited row: canonical
+when a syllabus, exam body or standard textbook says it; practitioner when it
+comes from how the work is done, such as a role's requirements or a
+practitioner's text; emerging when the field has not settled it.
+
+PERFORMANCES. For each performance, say under performances the lowest level
+of this topic it needs, or level null when this topic does not serve it.
+
+OUT OF SCOPE. List under out_of_scope the source lines that belong to a
+neighbouring topic rather than this one, so they are not counted against it.
+
+CHECKLIST. Write three to five short questions a practitioner would ask of
+the top three levels, to read them against: "Does level 9 include the reverse
+DCF that analysts use to read a price?"
+
 IF THE GOAL IS TOO BROAD to be one topic -- "finance", "physics" -- set
 too_vague true and leave the rest empty. When the goal is a question rather
 than a topic name, draft the topic the question is about.
@@ -92,6 +119,8 @@ export type DraftInput = {
   scope?: string | null;
   map: readonly MapTopic[];
   fields: readonly FieldOption[];
+  /** What the person gave to draft from; none for a topic named alone. */
+  sources?: DraftSources;
 };
 
 export type DraftResult =
@@ -118,11 +147,20 @@ export function draftPrompt(input: DraftInput): string {
     lines.push('', 'Fields (slug: name):', ...input.fields.map((f) => `- ${f.slug}: ${f.name}`));
   }
 
+  const given = input.sources ?? NO_SOURCES;
+  if (given.sources.length === 0 && given.performances.length === 0) {
+    lines.push('', 'No sources were given, so cite nothing: every row comes back uncited.');
+  } else {
+    lines.push(...sourcesPrompt(given));
+  }
+
   lines.push('', `Call ${TOOL_NAME}.`);
   return lines.join('\n');
 }
 
 const LEVEL = { type: 'integer', minimum: 1, maximum: 10 } as const;
+const CITES = { type: 'array', items: { type: 'string' } } as const;
+const CANONICALITY = { type: 'string', enum: ['canonical', 'practitioner', 'emerging'] } as const;
 
 /** Draft a topic. Never throws. */
 export async function draftTopic(
@@ -148,6 +186,8 @@ export async function draftTopic(
               scope: { type: 'string' },
               ceiling: LEVEL,
               fields: { type: 'array', items: { type: 'string' } },
+              cites: CITES,
+              canonicality: CANONICALITY,
               levels: {
                 type: 'array',
                 items: {
@@ -155,6 +195,8 @@ export async function draftTopic(
                   properties: {
                     level: LEVEL,
                     checks: { type: 'array', items: { type: 'string' } },
+                    cites: CITES,
+                    canonicality: CANONICALITY,
                   },
                   required: ['level', 'checks'],
                 },
@@ -168,6 +210,8 @@ export async function draftTopic(
                     topic: { type: 'string' },
                     level: LEVEL,
                     why: { type: 'string' },
+                    cites: CITES,
+                    canonicality: CANONICALITY,
                   },
                   required: ['from_level', 'topic', 'level'],
                 },
@@ -182,10 +226,24 @@ export async function draftTopic(
                     from_level: LEVEL,
                     level: LEVEL,
                     why: { type: 'string' },
+                    cites: CITES,
                   },
                   required: ['name', 'scope', 'from_level', 'level'],
                 },
               },
+              performances: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    performance: { type: 'integer', minimum: 1 },
+                    level: { type: ['integer', 'null'], minimum: 1, maximum: 10 },
+                  },
+                  required: ['performance'],
+                },
+              },
+              out_of_scope: CITES,
+              checklist: { type: 'array', items: { type: 'string' } },
             },
             required: ['name', 'scope', 'ceiling', 'levels'],
           },
@@ -216,7 +274,7 @@ export async function draftTopic(
   const safe = draftPayloadSchema.safeParse(block.input);
   if (!safe.success) return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
 
-  const result = normaliseDraft(safe.data, input.map, input.fields);
+  const result = normaliseDraft(safe.data, input.map, input.fields, input.sources ?? NO_SOURCES);
   if (!result.ok) {
     return { ok: false, reason: result.reason === 'too-vague' ? 'too-vague' : 'error', detail: result.detail };
   }
