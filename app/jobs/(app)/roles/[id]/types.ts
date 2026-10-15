@@ -5,6 +5,7 @@ import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 import type { DevComment } from '@/lib/comments/load';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { StoredAsk } from '@/lib/jobs/drafting/store';
+import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 
 /** Everything the role page hands its tabs, loaded once by page.tsx. */
 export interface PanelProps {
@@ -106,6 +107,10 @@ export interface PanelProps {
   dashAsks: StoredAsk[];
   /** For the preview gallery: Draft all answers drawn mid-run, or failed. */
   draftRun?: { pending: boolean; error: string | null };
+  /** Dash's drafted cover letter waiting beside the editor, with its questions; null when none (plan #2135.2). */
+  coverLetterDraft: CoverLetterDraftView | null;
+  /** For the preview gallery: Draft a cover letter drawn mid-run, or failed. */
+  coverLetterRun?: { pending: boolean; error: string | null };
   /** The comment thread on the role, oldest first: your notes and Dash's replies. */
   thread: DevComment[];
   /** The rounds of the process. Every interview is inside one of these. */
