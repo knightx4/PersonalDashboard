@@ -20,12 +20,12 @@ database, read `offline.md` in this directory instead of guessing.
 npx tsx scripts/plan.ts show <n>               # the brief: destination, decisions, done-when, waits
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
-npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
+npx tsx scripts/plan.ts block <n> --ask "…" --on <m>[,<m>] [--note "…"]
                                                # cannot proceed; the ask is the one sentence
                                                # saying what it needs, rewritten each time.
-                                               # --on-steps: waiting on the steps it names, so
-                                               # it clears itself when they close. Without it
-                                               # the block waits for the person.
+                                               # Waits on the steps it names and clears itself
+                                               # when they close. Never on the person directly:
+                                               # SKILL.md, "When a step cannot finish".
 npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # something only the person can supply: writes a
                                                # setup step of theirs under the same feature and
@@ -312,18 +312,15 @@ instead, and stop:
 npx tsx scripts/plan.ts add "Which shape for the export?" --parent <the feature> \
   --kind decision --detail "<the question, the two or three real options, what
   each costs, and which you would choose and why>"
-npx tsx scripts/plan.ts depends <your step> --on <the decision>
-npx tsx scripts/plan.ts block <your step> --on-steps \
+npx tsx scripts/plan.ts block <your step> --on <the decision> \
   --ask "Which of the options on #<the decision>?"
 ```
 
-`--on-steps` is what makes that block clear itself: the step is waiting on the
-question you just wrote, the dependency edge names it, and answering it puts
-the step back in the ready list without anybody unblocking it by hand. Leave
-`--on-steps` off when the step is waiting on the person for something no row on
-the plan will produce, and it stays blocked until they say otherwise. A key or
-an account is not one of those: that is `needs`, in the next section, and it
-writes the row and the edge for you.
+`--on` writes the dependency edge and is what makes that block clear itself:
+answering the question puts the step back in the ready list without anybody
+unblocking it by hand. Every block names what it waits on. A key or an account
+is `needs`, in the next section, which writes the row and the edge for you;
+anything a run can do is a ready step you `add` and block on.
 
 Then report the block. Do not move on to another step; that is not your call.
 
@@ -364,14 +361,11 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
-A block is for something the person does. `block` refuses an ask that says
-nothing is needed from them (without `--on-steps`), because a blocked step is
-listed under what they have to do. A step that waits on data that does not
+A block always waits on a step, so a step that waits on data that does not
 exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
 --at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as
 "Waiting on the check on <day>", and the runner does not send it until a session
-has done the check. Never leave such a step `in_progress` without one, and never
-block it on the person, since there is nothing for them to do.
+has done the check. Never leave such a step `in_progress` without one.
 
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
@@ -454,10 +448,10 @@ on `/dev/plan` or in the Dash tab's "Waiting on you", and it carries no commit.
 `start` refuses one, the same as a decision, and `next --claude` never lists
 one.
 
-`block <n> --ask "…"` without `--on-steps` is still right for the rest: the
-person has to decide something or say what they want, and there is nothing you
-could write instructions for. That is the test — if you can say what doing it
-involves, it is a setup step; if what you need is their opinion, it is a block.
+When the person has to decide something or say what they want, and there is
+nothing you could write instructions for, that is a decision step, and the
+step blocks on it. That is the test: if you can say what doing it involves, it
+is a setup step; if what you need is their opinion, it is a decision.
 The ask is rewritten on every block, so it is what the step needs now; `--note`
 is for anything else worth recording, and that is appended to the history in
 the comment.

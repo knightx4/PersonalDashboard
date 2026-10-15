@@ -64,7 +64,8 @@ export function blockAskIsDesignCheck(ask: string): boolean {
  * fine. Three are refused, whatever the block waits on unless said: an ask
  * that names a git branch; an ask that hands the person a design check; and
  * an ask that says nothing is needed from the person, unless the block waits
- * on other steps (`--on-steps`) and so shows as waiting on them.
+ * on other steps and so shows as waiting on them, which every block a session
+ * writes now does (`blockTargetRefusal`).
  */
 export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
   if (blockAskNamesBranch(ask)) {
@@ -92,4 +93,26 @@ export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
     'check-back "<what to look at>" --after 2h --from <n> --detail "what to check and what to do about each answer". ' +
     'Block it only when you can name what the person does.'
   );
+}
+
+/**
+ * Where a step goes when a run cannot finish it (the person's rule of 15
+ * October 2026). Never a bare block on them: each of the three is a row the
+ * stopped step waits on, so the block is on steps and clears when that row
+ * closes. The database refuses a session's block on the person (0245).
+ */
+export const BLOCK_ROUTES =
+  'A block always waits on a step. File what this one needs, then block on it:\n' +
+  '  - something for the person to decide: add "<the question>" --kind decision --parent <feature> --detail "the options"\n' +
+  '  - something for the person to do: needs "<what to set>" --for <n> --detail "how" (this waits on it for you)\n' +
+  '  - anything a run can do, including a refused permission or a failed write: handle it in this run, ' +
+  'or add "<the follow-up>" --parent <feature> --detail "…" for a later run\n' +
+  'then: block <n> --ask "…" --on <that step>[,<another>].';
+
+/**
+ * The refusal for a block that names nothing to wait on, or null when it
+ * names at least one open step.
+ */
+export function blockTargetRefusal(openWaits: number): string | null {
+  return openWaits > 0 ? null : BLOCK_ROUTES;
 }

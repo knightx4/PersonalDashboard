@@ -3,6 +3,7 @@ import {
   blockAskIsDesignCheck,
   blockAskNamesBranch,
   blockAskRefusal,
+  blockTargetRefusal,
   blockAskSaysNothingNeeded,
 } from './block-ask';
 
@@ -85,5 +86,18 @@ describe('a block that puts a design check to the person', () => {
     'Set RESEND_API_KEY in Vercel, then say it is done.',
   ])('is not one: %s', (ask) => {
     expect(blockAskIsDesignCheck(ask)).toBe(false);
+  });
+});
+
+describe('blockTargetRefusal', () => {
+  it('refuses a block that waits on no open step, naming the three routes', () => {
+    const refusal = blockTargetRefusal(0);
+    expect(refusal).toContain('--kind decision');
+    expect(refusal).toContain('needs "');
+    expect(refusal).toContain('handle it in this run');
+  });
+
+  it('lets a block through once it waits on an open step', () => {
+    expect(blockTargetRefusal(1)).toBeNull();
   });
 });
