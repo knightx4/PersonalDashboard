@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import { changeSentence } from '@/lib/ask/change-view';
 import type { AskSchema } from '@/lib/ask/db';
@@ -121,7 +121,13 @@ function item(id: string, name: string, extra: Record<string, unknown> = {}) {
   };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
   tables = {
     'core.dash_actions': [],
     'public.inventory_items': [

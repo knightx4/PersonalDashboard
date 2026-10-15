@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
@@ -97,6 +97,15 @@ async function refused(name: string, data: FakeTables, input: Record<string, unk
 }
 
 const row = (data: FakeTables, table: string, id: string) => data[table]!.find((r) => r.id === id)!;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(`${TODAY}T12:00:00Z`));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('the Goals writes', () => {
   it('are the kinds Ask keeps them under, in order', () => {
