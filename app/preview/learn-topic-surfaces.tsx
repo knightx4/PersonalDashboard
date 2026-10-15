@@ -2,7 +2,11 @@
 
 import { TopicsView } from '@/app/learn/topics/topics-view';
 import { TopicView } from '@/app/learn/topics/[id]/topic-view';
+import { TopicSkeleton } from '@/app/learn/topics/[id]/topic-skeleton';
 import type { DevComment } from '@/lib/comments/load';
+import type { CellEvidence, CellLink, LevelCell, TopicMap } from '@/lib/learn/levels/model';
+import { topicStanding } from '@/lib/learn/levels/standing';
+import type { CellEvidenceView } from '@/lib/learn/levels/store-page';
 import type { TopicDetail, TopicMatch, TopicRow } from '@/lib/learn/levels/store';
 
 /**
@@ -217,4 +221,125 @@ export function LearnTopicDraftMatchPreview() {
 
 export function LearnTopicDraftCommentPreview() {
   return <TopicView topic={DCF} match={null} comments={THREAD} path={PATH} timezone={ZONE} now={NOW} />;
+}
+
+/* The approved topic's ladder (plan #2138.3). The same Discounted cash flow
+ * topic, approved, with answers behind some of its levels: levels 1 and 2 are
+ * shown, 3 is declared, 4 is met in a quote, 5 was missed, and level 2 was
+ * reworded after it was shown. Statuses come from the real model, not from
+ * fixtures of its output. */
+
+const APPROVED: TopicDetail = {
+  ...DCF,
+  status: 'approved',
+  approvedAt: '2026-10-15T09:30:00Z',
+  cells: DCF.cells.map((cell) =>
+    cell.level === 2
+      ? {
+          ...cell,
+          checks: [
+            'Can define it as the sum of future free cash flows discounted to today',
+            'Can say why a dollar later is worth less than a dollar now, and what sets the gap',
+          ],
+          original: cell.checks,
+          rewrittenAt: '2026-10-14T18:00:00Z',
+        }
+      : cell,
+  ),
+  wanted: [],
+};
+
+const RETURN_ID = TOPICS[2].id;
+const CAPM_ID = TOPICS[1].id;
+
+function mapOf(topic: TopicDetail, evidence: CellEvidence[]): TopicMap {
+  const cells: LevelCell[] = [
+    ...topic.cells.map((c) => ({ id: c.id, topicId: DCF_ID, level: c.level })),
+    ...Array.from({ length: 6 }, (_, i) => ({ id: `r-${i + 1}`, topicId: RETURN_ID, level: i + 1 })),
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `p-${i + 1}`, topicId: CAPM_ID, level: i + 1 })),
+  ];
+  const links: CellLink[] = [
+    { requiringCellId: 'c-2', requiredCellId: 'r-2' },
+    { requiringCellId: 'c-3', requiredCellId: 'p-2' },
+  ];
+  return {
+    topics: [
+      { id: DCF_ID, name: topic.name, ceiling: 10, approved: true },
+      { id: RETURN_ID, name: 'Return', ceiling: 6, approved: true },
+      { id: CAPM_ID, name: 'Capital asset pricing model', ceiling: 8, approved: true },
+    ],
+    cells,
+    links,
+    evidence,
+  };
+}
+
+const EVIDENCE: CellEvidenceView[] = [
+  { cellId: 'c-5', verdict: 'not_met', quote: null, observedAt: '2026-10-15T08:40:00Z' },
+  {
+    cellId: 'c-4',
+    verdict: 'met',
+    quote:
+      'I would take the projected free cash flow for each of the five years, divide each by one plus the discount rate to the power of the year, and add the Gordon growth terminal value discounted from year five.',
+    observedAt: '2026-10-15T08:35:00Z',
+  },
+  { cellId: 'c-3', verdict: 'declared', quote: null, observedAt: '2026-10-13T12:00:00Z' },
+  {
+    cellId: 'c-2',
+    verdict: 'met',
+    quote: 'It is the future cash the business will throw off, each year shrunk back to today by the rate you could earn elsewhere.',
+    observedAt: '2026-10-12T19:00:00Z',
+  },
+];
+
+const LINKS_IN = [
+  {
+    level: 3,
+    topicId: 'a0000000-0000-4000-8000-000000000011',
+    topicName: 'Enterprise value',
+    fromLevel: 4,
+    why: 'Bridging from a DCF to equity value starts from the enterprise value it gives.',
+  },
+];
+
+function standingOf(topic: TopicDetail, evidence: CellEvidenceView[], linksIn: typeof LINKS_IN) {
+  const model: CellEvidence[] = evidence.map((e) => ({ cellId: e.cellId, verdict: e.verdict, observedAt: e.observedAt }));
+  return topicStanding(topic, mapOf(topic, model), evidence, linksIn);
+}
+
+function ApprovedTopic({ evidence, open }: { evidence: CellEvidenceView[]; open?: { quotes?: number; edit?: number } }) {
+  // With nothing asked yet no level has been reworded either.
+  const topic = evidence.length > 0 ? APPROVED : { ...APPROVED, cells: DCF.cells };
+  return (
+    <TopicView
+      topic={topic}
+      match={null}
+      comments={[]}
+      path={PATH}
+      timezone={ZONE}
+      now={NOW}
+      standing={standingOf(topic, evidence, evidence.length > 0 ? LINKS_IN : [])}
+      open={open}
+    />
+  );
+}
+
+export function LearnTopicPreview() {
+  return <ApprovedTopic evidence={EVIDENCE} />;
+}
+
+export function LearnTopicEmptyPreview() {
+  return <ApprovedTopic evidence={[]} />;
+}
+
+export function LearnTopicQuotesPreview() {
+  return <ApprovedTopic evidence={EVIDENCE} open={{ quotes: 4 }} />;
+}
+
+export function LearnTopicEditPreview() {
+  return <ApprovedTopic evidence={EVIDENCE} open={{ edit: 4 }} />;
+}
+
+export function LearnTopicLoadingPreview() {
+  return <TopicSkeleton />;
 }

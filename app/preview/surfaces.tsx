@@ -157,6 +157,11 @@ import {
   LearnTopicsErrorPreview,
   LearnTopicsLoadingPreview,
   LearnTopicsPreview,
+  LearnTopicPreview,
+  LearnTopicEmptyPreview,
+  LearnTopicQuotesPreview,
+  LearnTopicEditPreview,
+  LearnTopicLoadingPreview,
 } from './learn-topic-surfaces';
 import {
   LearnCourseCheckPreview,
@@ -7539,6 +7544,42 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftCommentPreview />,
+  },
+  {
+    /* An approved topic: where you stand on each level (plan #2138.3). */
+    id: 'learn-topic',
+    label: 'Topic · Where you stand on each level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicPreview />,
+  },
+  {
+    id: 'learn-topic-empty',
+    label: 'Topic · Nothing shown yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEmptyPreview />,
+  },
+  {
+    id: 'learn-topic-quotes',
+    label: 'Topic · The answers behind a level, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicQuotesPreview />,
+  },
+  {
+    id: 'learn-topic-edit',
+    label: 'Topic · Rewording a level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEditPreview />,
+  },
+  {
+    id: 'learn-topic-loading',
+    label: 'Topic · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicLoadingPreview />,
   },
   {
     id: 'learn-concept',

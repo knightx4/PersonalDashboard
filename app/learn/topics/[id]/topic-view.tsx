@@ -3,13 +3,14 @@ import { Property } from '@/components/shell/detail-layout';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { Thread } from '@/components/thread/thread';
 import { Card } from '@/components/ui/card';
-import { SectionLabel } from '@/components/ui/section-heading';
 import type { DevComment } from '@/lib/comments/load';
 import { whenDay } from '@/lib/core/when';
 import { ladderLevel } from '@/lib/learn/levels/ladder';
+import type { TopicStanding } from '@/lib/learn/levels/standing';
 import type { TopicDetail, TopicMatch } from '@/lib/learn/levels/store';
 import { threadRef } from '@/lib/thread/subjects';
-import { ApproveDraft, ApproveTopicButton, DraftMatch, LevelNeeds, WantedRow } from './draft-parts';
+import { ApproveDraft, ApproveTopicButton, DraftMatch, WantedRow } from './draft-parts';
+import { LadderView, type LadderOpen } from './ladder-view';
 
 /**
  * One topic (plan #2138.2). A draft is the approval screen: what it covers,
@@ -17,8 +18,9 @@ import { ApproveDraft, ApproveTopicButton, DraftMatch, LevelNeeds, WantedRow } f
  * checks open to rewording, then the approve button. An approved topic shows
  * the same levels to read.
  *
- * The ladder with where you stand on each level is the topic page's next
- * step (#2138.3); this page shows the topic as it is written.
+ * An approved topic shows the ladder (#2138.3): where you stand on each level
+ * and why, from the model's reading of the evidence, with each level's
+ * wording open to rewording.
  *
  * The page and the gallery both draw this, so it takes the rows and reads
  * nothing itself.
@@ -30,6 +32,8 @@ export function TopicView({
   path,
   timezone,
   now,
+  standing = null,
+  open,
 }: {
   topic: TopicDetail;
   /** The closest topic already on the map, shown beside a draft. */
@@ -38,6 +42,10 @@ export function TopicView({
   path: Subject;
   timezone: string;
   now: number;
+  /** Where you stand on each level; an approved topic has it, a draft does not. */
+  standing?: TopicStanding | null;
+  /** The gallery's way to draw a part that opens on a press. */
+  open?: LadderOpen;
 }) {
   const draft = topic.status === 'draft';
   const levels = topic.ceiling === 1 ? '1' : `1 to ${topic.ceiling}`;
@@ -47,7 +55,19 @@ export function TopicView({
       header={<PageHeader subject={path} title={topic.name} actions={draft ? <ApproveTopicButton /> : undefined} />}
       details={
         <DetailFacts>
-          <Property label="Status" value={draft ? 'Draft' : 'Approved'} />
+          {standing && !draft ? (
+            <Property
+              label="Your level"
+              value={standing.level === 0 ? 'Not placed yet' : `${standing.level} of ${topic.ceiling}`}
+              hint={
+                standing.level === 0
+                  ? undefined
+                  : `${ladderLevel(standing.level).band}: you can ${ladderLevel(standing.level).can}`
+              }
+            />
+          ) : (
+            <Property label="Status" value={draft ? 'Draft' : 'Approved'} />
+          )}
           <Property label="Levels" value={levels} />
           <Property
             label={draft ? 'Drafted' : 'Approved'}
@@ -74,33 +94,7 @@ export function TopicView({
       {draft ? (
         <ApproveDraft topicId={topic.id} cells={topic.cells} links={topic.links} />
       ) : (
-        <section aria-labelledby="levels-heading">
-          <h2 id="levels-heading" className="mb-2 px-1 text-ui font-semibold text-ink">
-            The levels
-          </h2>
-          <Card padding="none">
-            <ol className="divide-y divide-border">
-              {topic.cells.map((cell) => {
-                const rung = ladderLevel(cell.level);
-                return (
-                  <li key={cell.id} className="card-pad-x py-3">
-                    <p className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="tabular text-ui font-semibold text-ink">{cell.level}</span>
-                      <SectionLabel as="span">{rung.band}</SectionLabel>
-                      {cell.rewrittenAt && <span className="text-small text-ink-muted">in your words</span>}
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ui text-ink">
-                      {cell.checks.map((check) => (
-                        <li key={check}>{check}</li>
-                      ))}
-                    </ul>
-                    <LevelNeeds links={topic.links.filter((l) => l.fromLevel === cell.level)} />
-                  </li>
-                );
-              })}
-            </ol>
-          </Card>
-        </section>
+        standing && <LadderView topicId={topic.id} standing={standing} open={open} timezone={timezone} now={now} />
       )}
 
       {topic.wanted.length > 0 && (
