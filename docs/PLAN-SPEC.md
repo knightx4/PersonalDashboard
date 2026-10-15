@@ -243,11 +243,16 @@ by migration 0081. `steps` is a block on the rows it names, and it clears
 itself when they all close. `outside` is a block on something only the person
 can supply, and it stays blocked however much else closes. The database
 refuses a row that says `blocked` without one, every path that blocks a step
-writes it (the status control, the edit form, `plan.ts block --on-steps`), and
-it is cleared whenever the step stops being blocked, like `block_ask`. A block
-written without saying which is taken as `outside`: a block that outlives its
-reason is a row somebody looks at, and one that clears itself too early is an
-afternoon a session loses.
+writes it (the status control, the edit form, `plan.ts block --on`), and
+it is cleared whenever the step stops being blocked, like `block_ask`.
+
+Only the person, signed in, can block a step `outside` (migration 0245). A
+session's block always waits on steps: what it needs becomes a decision for
+something the person decides, a setup step for something they do, and a ready
+step for anything a run can do, and the stopped step waits on that row. The
+database refuses a session that writes `outside`, and a session block that
+names no kind is taken as `steps`. A block from the page that names no kind
+is taken as `outside`, which is what the Blocked control means.
 
 `isStaleBlock` in `lib/plan/tree.ts` is the one place that reads it, and every
 surface reads through that: the health on the row, the Ready and Waiting views,

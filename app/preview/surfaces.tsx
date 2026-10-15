@@ -5840,7 +5840,8 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The Ask Dash thread on its own (plan #1708), where a change to
      * components/thread/thread.tsx without a subject is looked at: a short answer with its
-     * rows, a long markdown one, one with bars and one with a table. */
+     * rows, a long markdown one, one with bars, one with a table, and one
+     * with a figure against the usual amount and columns by month. */
     id: 'ask-dash-thread',
     label: 'Ask Dash · The thread',
     module: 'jobs',
