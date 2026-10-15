@@ -40,11 +40,11 @@ describe('the ideas list', () => {
     expect(list.suggested.map((row) => row.id)).toEqual(['suggested']);
   });
 
-  it('folds away a suggestion scored under 40, but never one of your own (note 073cacdf)', () => {
+  it('folds away a suggestion scored under the floor, but never one of your own (note 073cacdf)', () => {
     const list = ideaListFrom(
       [
-        idea({ id: 'low', source: 'claude', score: 39 }),
-        idea({ id: 'floor', source: 'claude', score: 40 }),
+        idea({ id: 'low', source: 'claude', score: 59 }),
+        idea({ id: 'floor', source: 'claude', score: 60 }),
         idea({ id: 'unscored', source: 'claude' }),
         idea({ id: 'mine-low', score: 10 }),
       ].map(ideaRowFrom),

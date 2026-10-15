@@ -107,7 +107,7 @@ describe('the ideas page', () => {
       />,
     );
 
-    expect(html).toMatch(/Suggestions scored under 40\s*<span[^>]*>\(1\)<\/span>/);
+    expect(html).toMatch(/Suggestions scored under 60\s*<span[^>]*>\(1\)<\/span>/);
     expect(html).not.toContain('Suggested by Dash');
     expect(html).not.toMatch(/<details[^>]*open/);
   });
