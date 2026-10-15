@@ -58,6 +58,15 @@ export const learnActions: ModuleActions = {
     publishEssay: none('outside', "Publishes to the person's website."),
     unpublishEssay: none('outside'),
   },
+  'app/learn/e/[id]/guide-actions.ts': {
+    changeEssayPlan: none('own'),
+    answerEssayPoint: none('own'),
+    readEssayBrief: none('spends'),
+    findEssayPoints: none('spends'),
+    shapeEssayPlan: none('spends'),
+    reviewEssayPlan: none('spends'),
+    askEssayPoint: none('spends'),
+  },
   'app/learn/flow/actions.ts': {
     flowStep: none('page'),
     fillFlowQueue: none('spends'),
