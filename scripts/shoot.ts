@@ -192,6 +192,24 @@ const FRAMES_MEASURED = `new Promise((done) => {
   check();
 })`;
 
+/**
+ * Draws every line of each CodeMirror editor. CodeMirror draws only the lines
+ * near the window and leaves a gap for the rest until they are scrolled to,
+ * and the full-page capture does not scroll, so an essay longer than the
+ * phone's screen was shot with an empty band where its closing paragraph is
+ * (note 740f8532). This is the switch CodeMirror's own print handler flips;
+ * the page is navigated away after the shot, so it is never turned back.
+ */
+const DRAW_ALL_EDITOR_LINES = `(() => {
+  for (const el of document.querySelectorAll('.cm-content')) {
+    const view = (el.cmTile ?? el.cmView)?.view;
+    if (view?.viewState) {
+      view.viewState.printing = true;
+      view.measure();
+    }
+  }
+})()`;
+
 type Send = (method: string, params?: Record<string, unknown>) => Promise<Record<string, string>>;
 
 /** Starts headless Chromium and opens a CDP session on its one page. */
@@ -338,6 +356,8 @@ async function main() {
         // the capture resizes the window; give it a moment so a shot is not
         // an empty panel (plan #1997.9).
         await wait(1500);
+        await send('Runtime.evaluate', { expression: DRAW_ALL_EDITOR_LINES });
+        await wait(200);
 
         const windowOnly = WINDOW_ONLY.has(size.name);
         if (SHELL && !windowOnly) {

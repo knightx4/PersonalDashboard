@@ -4,6 +4,7 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
+import { PageColumn } from '@/components/shell/page-width';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
@@ -1064,5 +1065,13 @@ export function EssayView({
     </div>
   );
 
-  return <MainRail main={main} rail={rail} />;
+  // The essay keeps its reading measure (max-w-2xl), so the pair is held to
+  // a one-column page's width (PageColumn, about the essay, the gap and the
+  // 18rem rail) and centred, rather than leaving the shell's spare width as a
+  // gap between the essay and its rail (note 740f8532).
+  return (
+    <PageColumn>
+      <MainRail main={main} rail={rail} />
+    </PageColumn>
+  );
 }
