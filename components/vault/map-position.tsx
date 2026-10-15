@@ -71,7 +71,7 @@ export function MapQuote({ quote, className }: { quote: string; className?: stri
   return (
     <span
       className={cn(
-        'block whitespace-pre-line border-l-2 border-border pl-3 text-ui text-ink-muted',
+        'block whitespace-pre-line voice-quote text-ui',
         className,
       )}
     >

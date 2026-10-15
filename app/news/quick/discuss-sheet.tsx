@@ -3,17 +3,18 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MessagesSquare, X } from 'lucide-react';
-import { DashMark } from '@/components/ui/dash-mark';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { DISCUSS_ROUNDS, discussionClosed } from '@/lib/news/quick/discuss';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { discussQuickStory, loadStoryDiscussion } from './actions';
 
 const ACTION = 'app/news/quick/actions.ts#discussQuickStory';
+
+/** Dash's first words, drawn by the thread as his opening turn and kept nowhere. */
+const OPENING = `What do you make of this story? Say what you think, and I will take the other side or ask what your view rests on. After ${DISCUSS_ROUNDS} rounds I will say where it held and where it was thin.`;
 
 const closedLine = (turns: readonly TalkTurn[]) =>
   discussionClosed(turns)
@@ -129,7 +130,6 @@ function DiscussSheet({
               <h2 id={`${id}-title`} className="text-ui font-semibold text-ink">
                 Discuss
               </h2>
-              <PaidHint action={ACTION} what="Cost of each reply from Dash" />
             </div>
             <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">{headline}</p>
           </div>
@@ -139,20 +139,6 @@ function DiscussSheet({
         </div>
 
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3">
-          <div className="flex gap-2">
-            <div className="flex w-4 shrink-0 justify-center pt-1">
-              <DashMark size="2xs" decorative className="text-ink-ghost" />
-            </div>
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <span className="text-small font-semibold text-ink">Dash</span>
-              <p className="text-body text-ink">
-                What do you make of this story? Say what you think, and I will take the other side
-                or ask what your view rests on. After {DISCUSS_ROUNDS} rounds I will say where it
-                held and where it was thin.
-              </p>
-            </div>
-          </div>
-
           {loaded === null ? (
             <p className="text-ui text-ink-muted" aria-live="polite">
               Reading the discussion…
@@ -160,9 +146,11 @@ function DiscussSheet({
           ) : loaded.error ? (
             <p className="text-ui text-danger">{loaded.error}</p>
           ) : (
-            <TalkThread
+            <Thread
               id={id}
               turns={loaded.turns}
+              opening={OPENING}
+              cost={{ action: ACTION, what: 'Cost of each reply from Dash' }}
               send={(body) => discussQuickStory(issueId, storyIndex, body)}
               label={loaded.turns.length ? 'Reply' : 'Say what you think'}
               placeholder="What you make of it, and why"

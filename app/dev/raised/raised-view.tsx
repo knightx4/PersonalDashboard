@@ -30,7 +30,7 @@ import { raiseAnchor } from '@/lib/search/sources/dev-map';
 import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { inboxAnchor } from '@/components/inbox/overview';
 import { InboxPage, type InboxRow, type InboxSectionKey } from '@/components/inbox/inbox-page';
 import { isRunnerSource } from '@/lib/plan/stall';
@@ -207,14 +207,23 @@ function Decide({ row }: { row: RaisedRow }) {
         />
       )}
       <div className="flex flex-wrap items-center gap-2">
+        {/* What is written beyond the yes is read by Dash as a comment, so only that press is priced. */}
         {row.consequence && (
-          <Button type="submit" size="sm" pending={pending}>
+          <DashAction
+            type="submit"
+            size="sm"
+            pending={pending}
+            paid={saying === 'more' ? 'app/dev/raised/actions.ts#decideRaise' : undefined}
+            what="Cost of Dash's reply"
+          >
             Yes, do it
-          </Button>
+          </DashAction>
         )}
-        {/* What is written beyond the yes is read by Dash as a comment. */}
-        {row.consequence && saying === 'more' && (
-          <PaidHint action="app/dev/raised/actions.ts#decideRaise" what="Cost of Dash's reply" />
+        {/* The two yeses side by side, so at phone width they wrap as a pair. */}
+        {row.consequence && saying === 'nothing' && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('more')}>
+            Yes, and…
+          </Button>
         )}
         <Button
           type="button"
@@ -224,11 +233,6 @@ function Decide({ row }: { row: RaisedRow }) {
         >
           Close with a reason
         </Button>
-        {row.consequence && saying === 'nothing' && (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('more')}>
-            Yes, and…
-          </Button>
-        )}
         <FieldError>{state.error}</FieldError>
       </div>
     </form>

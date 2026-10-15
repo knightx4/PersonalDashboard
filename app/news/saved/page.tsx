@@ -12,6 +12,8 @@ import type { DevComment } from '@/lib/comments/load';
 import { loadThreads } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
+import { rowRef, workingMove } from '@/lib/core/move';
+import { loadWorkingRefs } from '@/lib/talk/handoffs';
 import { SavedView } from './saved-view';
 
 export const metadata = { title: 'Saved' };
@@ -58,7 +60,7 @@ export default async function SavedPage() {
     .map((story) => story.issueId as string);
   const issueStories = await loadIssueStories(client, discussedIssues).catch(() => new Map<string, unknown[]>());
   const discussed = discussedIndexes(stories, discussedIds, issueStories);
-  const [sent, threads] = await Promise.all([
+  const [sent, threads, working] = await Promise.all([
     loadSentBySaved(stories.map((story) => story.id)),
     // A failed read leaves the threads empty rather than the page broken.
     loadThreads(
@@ -66,6 +68,8 @@ export default async function SavedPage() {
       stories.map((story) => threadRef('story', story.id)),
       { userId: user.id },
     ).catch(() => new Map<string, DevComment[]>()),
+    // Which stories a run or an Ask Dash hand-off is about (plan #1964.2.2).
+    loadWorkingRefs(core, user.id),
   ]);
 
   return (
@@ -76,6 +80,7 @@ export default async function SavedPage() {
         discussedIndex: discussed.get(story.id) ?? null,
         sent: sent.get(story.id) ?? null,
         thread: threads.get(threadRef('story', story.id)) ?? [],
+        working: workingMove(working, [rowRef('news.saved_stories', story.id)]) !== null,
         related: relatedNotes(vault, user.id, `${story.headline}\n${story.summary}`, {
           core,
         }).then((notes) => notes.map(toLink)),

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineTextarea, Select } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import {
   editedPoint,
   movedPoint,
@@ -85,19 +85,19 @@ export function StructureStage({
               : 'Ways to order your points so they carry the reader to your thesis.'
           }
           action={
-            <span className="flex items-center gap-1">
-              <PaidHint action={SHAPE_ACTION} what="Cost of Dash suggesting shapes" />
-              <Button
-                type="button"
-                size="sm"
-                variant={api.plan.shape ? 'secondary' : 'primary'}
-                pending={asking}
-                disabled={asking || numbered.length < 2}
-                onClick={suggest}
-              >
-                {asking ? 'Thinking…' : 'Suggest shapes'}
-              </Button>
-            </span>
+            <DashAction
+              paid={SHAPE_ACTION}
+              what="Cost of Dash suggesting shapes"
+              hintFirst
+              type="button"
+              size="sm"
+              variant={api.plan.shape ? 'secondary' : 'primary'}
+              pending={asking}
+              disabled={asking || numbered.length < 2}
+              onClick={suggest}
+            >
+              {asking ? 'Thinking…' : 'Suggest shapes'}
+            </DashAction>
           }
         >
           {numbered.length < 2 && (

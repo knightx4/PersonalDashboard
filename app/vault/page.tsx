@@ -18,6 +18,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
+import { NowDashToday } from '@/components/shell/dash-today-fold';
+import { NoteListRow } from '@/components/vault/note-list-row';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,10 +61,12 @@ export default async function VaultPage({
   }
 
   // This week's connections sit above the list, and only when not searching.
-  const [notes, connections, writable] = await Promise.all([
+  // And which notes a run or an Ask Dash hand-off is about (plan #1964.2.2).
+  const [notes, connections, writable, working] = await Promise.all([
     loadNotes(supabase, search ? { search } : {}),
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
     vaultWritable(user.id),
+    workingRefsForPage(user.id),
   ]);
   const groups = groupByFolder(notes);
   // Quick notes are the top level of the Inbox folder; the list already holds them.
@@ -86,6 +91,8 @@ export default async function VaultPage({
       {composing !== undefined && <NewVaultNote />}
 
       {!search && <QuickNoteRow waiting={waiting} writable={writable} />}
+
+      {!search && <NowDashToday workspace="vault" className="mb-5" />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />
@@ -116,19 +123,7 @@ export default async function VaultPage({
                 </h2>
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                   {group.notes.map((note) => (
-                    <li key={note.id}>
-                      <Link
-                        href={`/vault/n/${note.path.split('/').map(encodeURIComponent).join('/')}`}
-                        className="block px-4 py-3 transition-colors duration-quick hover:bg-canvas"
-                      >
-                        <span className="block text-body font-medium text-ink">{note.title}</span>
-                        {note.excerpt && (
-                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                            {note.excerpt}
-                          </span>
-                        )}
-                      </Link>
-                    </li>
+                    <NoteListRow key={note.id} note={note} working={working} />
                   ))}
                 </ul>
               </section>

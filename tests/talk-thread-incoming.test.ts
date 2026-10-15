@@ -4,7 +4,7 @@
  * a second time (note f94be0c9).
  */
 import { describe, expect, it } from 'vitest';
-import { withIncoming } from '@/components/talk/talk-thread';
+import { withIncoming } from '@/components/thread/thread';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 function turn(id: string, role: TalkTurn['role'], body: string, at: string): TalkTurn {

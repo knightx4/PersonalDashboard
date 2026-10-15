@@ -2,9 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { GraduationCap } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { ComposeBody, ComposeBox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -34,19 +32,31 @@ import { Chip } from '@/components/ui/chip';
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <GraduationCap className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposePrior"
+      what="Cost of reading it"
+      hintFirst
+    >
       {pending ? 'Reading it…' : 'Read what I know'}
-    </Button>
+    </DashAction>
   );
 }
 
 function KeepButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/know/actions.ts#approvePrior"
+      what="Cost of saving the subject"
+    >
       {pending ? 'Saving…' : 'Approve and mark known'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -108,7 +118,6 @@ function Proposal({ chain }: { chain: ProposedChain }) {
 
       <div className="mt-4 flex items-center gap-3">
         <KeepButton />
-        <PaidHint action="app/learn/know/actions.ts#approvePrior" what="Cost of saving the subject" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>
@@ -139,7 +148,6 @@ export function PriorForm({ subjectId }: { subjectId?: string }) {
           placeholder="What do you already know? Like: we spent Macro I on IS-LM and I never believed the LM curve, because the central bank sets the rate."
         />
         <div className="flex flex-wrap items-center justify-end gap-1 border-t border-border pt-2">
-          <PaidHint action="app/learn/know/actions.ts#proposePrior" what="Cost of reading it" />
           <ReadButton />
         </div>
       </ComposeBox>

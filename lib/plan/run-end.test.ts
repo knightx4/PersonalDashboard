@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  goingRunRef,
   RUN_QUIET_AFTER_MINUTES,
   isResolvingAnswers,
   RESHAPE_UNDERWAY_MINUTES,
@@ -386,5 +387,29 @@ describe('withReadings', () => {
 
   it('invents no run for a reading about a step the page never loaded', () => {
     expect(withReadings({}, { 'step-9': fresh })).toEqual({});
+  });
+});
+
+describe('goingRunRef', () => {
+  const run: LastRun = {
+    id: '0b6c7f8e-3a1d-4c2b-9e8f-1a2b3c4d5e6f',
+    status: 'started',
+    createdAt: fired,
+    error: null,
+    job: 'step',
+    reading: null,
+  };
+
+  it('names the going run to the press that started it', () => {
+    expect(goingRunRef(run, 'step')).toEqual({ table: 'plan_runs', id: run.id, going: true });
+    expect(goingRunRef(run, 'reshape')).toBeNull();
+  });
+
+  it('leaves out a run that ended, waits on you, went quiet or has no id', () => {
+    expect(goingRunRef({ ...run, status: 'finished' }, 'step')).toBeNull();
+    expect(goingRunRef({ ...run, waiting: 'awaiting_input' }, 'step')).toBeNull();
+    expect(goingRunRef(run, 'step', true)).toBeNull();
+    expect(goingRunRef({ ...run, id: undefined }, 'step')).toBeNull();
+    expect(goingRunRef(undefined, 'step')).toBeNull();
   });
 });

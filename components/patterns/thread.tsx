@@ -11,9 +11,9 @@ import { cn } from '@/lib/cn';
  * pressed. What this adds is where the thread sits: on one card with the row
  * it is about, the row's name first so the thread is never read without
  * knowing what it is on, then its state, then the turns oldest first and the
- * box last. Pressing the name opens the row. The Thread inside takes
- * `onCard`, so its turns sit on this card's ground and Dash's turns carry the
- * recessed ground instead.
+ * box last. Pressing the name opens the row. The Thread inside sits on this
+ * card's ground, and Dash's turns carry the recessed ground of his voice
+ * (`voice-dash` in app/globals.css).
  *
  * The rule is on /dev/ui under "Page patterns" (app/dev/ui/patterns.tsx), and
  * the gallery draws it as `pattern-thread`.
@@ -31,7 +31,7 @@ export function ThreadPanel({
   href?: string;
   /** One line on the row's state: its status, who it waits on. */
   meta?: string;
-  /** The `Thread` for the row, with `onCard` set so it does not draw a second panel. */
+  /** The `Thread` for the row. */
   children: React.ReactNode;
   className?: string;
 }) {

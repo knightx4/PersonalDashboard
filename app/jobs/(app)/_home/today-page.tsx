@@ -25,11 +25,14 @@ export function TodayPage({
   summary,
   since,
   timezone,
+  dashToday,
 }: {
   board: TodayBoard;
   summary: SearchSummary;
   since: SinceView;
   timezone: string;
+  /** What Dash did today in Jobs, under Since you last looked in the rail (plan #1964.4). */
+  dashToday?: React.ReactNode;
 }) {
   return (
     <MainRail
@@ -42,7 +45,12 @@ export function TodayPage({
           </div>
         </>
       }
-      rail={<SinceList since={since} timezone={timezone} />}
+      rail={
+        <>
+          <SinceList since={since} timezone={timezone} />
+          {dashToday}
+        </>
+      }
     />
   );
 }

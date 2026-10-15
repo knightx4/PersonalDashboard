@@ -1,19 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Sparkles } from 'lucide-react';
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { CloseButton } from '@/components/inbox/close-button';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { FieldError } from '@/components/ui/field';
 import Link from '@/components/ui/link';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { waitingEventId } from '@/lib/jobs/today/waiting';
 import { prepareWithDash, type PrepareState } from '../_home/prepare-actions';
 
 /**
  * A request from a company in the Jobs Inbox (plan #1937.9): the shape's
- * title, line, Done and Later, with Prepare with Dash beside Done, which
+ * title, line, Done and Later, with Prepare for this beside Done, which
  * Today's "Waiting on you" had and the shape cannot draw, since it costs
  * and shows its $ hint.
  *
@@ -32,7 +31,7 @@ export function WaitingInboxRow({
   prepare = prepareWithDash,
 }: {
   row: InboxRow;
-  /** Prepare with Dash; the gallery passes one that answers at once. */
+  /** Prepare for this, which Dash answers; the gallery passes one that answers at once. */
   prepare?: (eventId: string) => Promise<PrepareState>;
 }) {
   const eventId = waitingEventId(row.ref);
@@ -83,22 +82,17 @@ export function WaitingInboxRow({
             </Link>
           ) : (
             eventId && (
-              <span className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  pending={preparing}
-                  onClick={() => startPrep(async () => setPrep(await prepare(eventId)))}
-                >
-                  <Sparkles className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  {preparing ? 'Dash is reading it…' : 'Prepare with Dash'}
-                </Button>
-                <PaidHint
-                  action="app/jobs/(app)/_home/prepare-actions.ts#prepareWithDash"
-                  what="Cost of Dash’s help"
-                />
-              </span>
+              <DashAction
+                type="button"
+                size="sm"
+                variant="secondary"
+                pending={preparing}
+                onClick={() => startPrep(async () => setPrep(await prepare(eventId)))}
+                paid="app/jobs/(app)/_home/prepare-actions.ts#prepareWithDash"
+                what="Cost of Dash’s help"
+              >
+                {preparing ? 'Dash is reading it…' : 'Prepare for this'}
+              </DashAction>
             )
           )}
           {row.putOff && (

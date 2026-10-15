@@ -2,8 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { FileText, Network } from 'lucide-react';
 import { ChipSelect } from '@/components/ui/field';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
@@ -31,9 +30,16 @@ import { Proposal } from './brief-form';
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" pending={pending}>
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeFromNote"
+      what="Cost of reading the note"
+    >
       {pending ? 'Reading it…' : 'Read this note'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -97,13 +103,7 @@ export function FromVaultForm({
             ))}
           </ChipSelect>
         )}
-        <span className="flex items-center gap-1">
-          <ReadButton />
-          <PaidHint
-            action="app/learn/know/actions.ts#proposeFromNote"
-            what="Cost of reading the note"
-          />
-        </span>
+        <ReadButton />
       </div>
 
       <p className="mt-2 text-small text-ink-muted">

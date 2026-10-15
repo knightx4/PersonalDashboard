@@ -4,6 +4,12 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { createCoreClient } from '@/lib/core/auth/server';
 import type { FireRoutineResult } from '@/lib/feedback/routine';
+import {
+  runSubjectRefs,
+  type GoingContext,
+  type GoingGoalsItem,
+  type GoingGoalsRun,
+} from '@/lib/core/run-going';
 import type { DashHandoff } from './handoff';
 
 /**
@@ -105,11 +111,57 @@ export async function loadOpenHandoffs(core: CoreSupabaseClient, conversationId:
 }
 
 /**
- * The rows an open hand-off is about, as refs (plan #1568): what the Jobs,
- * Todo and Shopping pages read to say "Dash is on it" on those rows. A failed
- * read gives none, so the page still renders with each row's own move.
+ * The rows an open hand-off or a run still going is about, as refs (plans
+ * #1568 and #1964.2.2): what the Jobs, Todo, Shopping, Learn, vault and News
+ * pages read to say "Dash is on it" on those rows. A failed read gives none,
+ * so the page still renders with each row's own move.
  */
 export async function loadWorkingRefs(core: CoreSupabaseClient, userId: string): Promise<string[]> {
+  const [handoffs, runs] = await Promise.all([loadHandoffRefs(core, userId), loadRunRefs(core, userId)]);
+  return [...new Set([...handoffs, ...runs])];
+}
+
+/** The one status a runs row is going in (runStatusGoing, lib/core/run-going.ts). */
+const GOING = 'started';
+
+/**
+ * The refs of the plan and goals runs still going (lib/core/run-going.ts
+ * says what each is about). Read through the same client, since RLS keeps
+ * both runs tables and goals.context to the person's rows.
+ */
+async function loadRunRefs(core: CoreSupabaseClient, userId: string): Promise<string[]> {
+  try {
+    const goals = core.schema('goals');
+    const [plan, going] = await Promise.all([
+      core.schema('public').from('plan_runs').select('plan_item_id').eq('user_id', userId).eq('status', GOING).limit(50),
+      goals.from('runs').select('item_id, area_id').eq('user_id', userId).eq('status', GOING).limit(50),
+    ]);
+    if (plan.error) console.error('the plan runs going were not read', plan.error.message);
+    if (going.error) console.error('the goals runs going were not read', going.error.message);
+    const goalsRuns = (going.data ?? []) as GoingGoalsRun[];
+    const itemIds = [...new Set(goalsRuns.flatMap((run) => (run.item_id ? [run.item_id] : [])))];
+    let goalsItems: GoingGoalsItem[] = [];
+    let context: GoingContext[] = [];
+    if (itemIds.length > 0) {
+      const items = await goals.from('items').select('id, parent_id').in('id', itemIds);
+      goalsItems = (items.data ?? []) as GoingGoalsItem[];
+      const goalIds = [...new Set([...itemIds, ...goalsItems.flatMap((item) => (item.parent_id ? [item.parent_id] : []))])];
+      const found = await goals.from('context').select('item_id, source, ref, status').in('item_id', goalIds).limit(500);
+      context = (found.data ?? []) as GoingContext[];
+    }
+    return runSubjectRefs({
+      planItemIds: ((plan.data ?? []) as { plan_item_id: string | null }[]).map((run) => run.plan_item_id),
+      goalsRuns,
+      goalsItems,
+      context,
+    });
+  } catch (error) {
+    console.error('the runs going were not read', error);
+    return [];
+  }
+}
+
+async function loadHandoffRefs(core: CoreSupabaseClient, userId: string): Promise<string[]> {
   try {
     const { data, error } = await core
       .from('dash_handoffs')

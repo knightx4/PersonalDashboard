@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 function turn(id: string, role: TalkTurn['role'], body: string): TalkTurn {
@@ -13,7 +13,7 @@ function turn(id: string, role: TalkTurn['role'], body: string): TalkTurn {
 
 function render(turns: TalkTurn[]): string {
   return renderToStaticMarkup(
-    <TalkThread id="t" turns={turns} send={async () => ({})} label="Ask" />,
+    <Thread id="t" turns={turns} send={async () => ({})} label="Ask" />,
   );
 }
 

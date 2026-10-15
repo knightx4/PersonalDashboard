@@ -8,7 +8,7 @@ import { Card, CardSection } from '@/components/ui/card';
 import { InlineTextarea, Textarea } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { IconButton } from '@/components/ui/icon-button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { EssayBrief } from '@/lib/learn/essays/model';
 import {
   editedPoint,
@@ -124,19 +124,19 @@ export function PlanStage({
           title="Your points"
           hint="The claims that, together, would bring your reader round to your thesis. Order comes next."
           action={
-            <span className="flex items-center gap-1">
-              <PaidHint action={FIND_ACTION} what="Cost of finding points in your writing" />
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                pending={finding}
-                disabled={finding}
-                onClick={find}
-              >
-                {finding ? 'Looking…' : 'Find points in what I wrote'}
-              </Button>
-            </span>
+            <DashAction
+              paid={FIND_ACTION}
+              what="Cost of finding points in your writing"
+              hintFirst
+              type="button"
+              size="sm"
+              variant="secondary"
+              pending={finding}
+              disabled={finding}
+              onClick={find}
+            >
+              {finding ? 'Looking…' : 'Find points in what I wrote'}
+            </DashAction>
           }
         >
           {points.length === 0 && !adding && (
@@ -222,19 +222,19 @@ export function PlanStage({
           title="Dash on your plan"
           hint="The biggest problems with the plan as it stands, before you write it."
           action={
-            <span className="flex items-center gap-1">
-              <PaidHint action={REVIEW_ACTION} what="Cost of Dash reading your plan" />
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                pending={reviewing}
-                disabled={reviewing || points.length === 0}
-                onClick={review}
-              >
-                {reviewing ? 'Reading…' : 'Ask Dash about the plan'}
-              </Button>
-            </span>
+            <DashAction
+              paid={REVIEW_ACTION}
+              what="Cost of Dash reading your plan"
+              hintFirst
+              type="button"
+              size="sm"
+              variant="secondary"
+              pending={reviewing}
+              disabled={reviewing || points.length === 0}
+              onClick={review}
+            >
+              {reviewing ? 'Reading…' : 'Ask Dash about the plan'}
+            </DashAction>
           }
         >
           {openNotes.length === 0 && (

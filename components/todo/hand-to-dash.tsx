@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { errandAreas, handTaskToDash } from '@/app/todo/actions';
@@ -111,9 +112,9 @@ export function HandToDash({
       </FieldError>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={pending || !areaId || !dueOn}>
-          {pending ? 'Handing it to Dash…' : 'Hand it to Dash'}
-        </Button>
+        <DashAction type="submit" disabled={pending || !areaId || !dueOn}>
+          {pending ? 'Starting…' : 'Start this errand'}
+        </DashAction>
         <Button type="button" variant="ghost" onClick={onDone} pending={pending}>
           Cancel
         </Button>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { CheckCircle2, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -18,7 +19,6 @@ import {
   saveDraftedAnswer,
 } from '../actions';
 import { saveApplicationMarks, saveCoverLetter } from './actions';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { LinkedText } from '@/components/ui/linked-text';
 import { roleStage } from '@/lib/jobs/role-stage';
 import type { PanelProps } from './types';
@@ -503,11 +503,13 @@ export function AnswerCard({
         )}
         {!closed && (
           <>
-            <Button
+            <DashAction
               type="button"
               size="sm"
               variant="ghost"
               pending={drafting}
+              paid="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+              what="Cost of drafting"
               onClick={() => {
                 setDrafting(true);
                 setDraftError(null);
@@ -522,12 +524,8 @@ export function AnswerCard({
                 });
               }}
             >
-              {drafting ? 'Drafting…' : 'Draft'}
-            </Button>
-            <PaidHint
-              action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-              what="Cost of drafting"
-            />
+              {drafting ? 'Drafting…' : 'Draft an answer'}
+            </DashAction>
           </>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}

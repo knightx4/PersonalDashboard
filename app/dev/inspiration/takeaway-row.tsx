@@ -93,7 +93,7 @@ function ScoreLabel({ takeaway }: { takeaway: Takeaway }) {
   const view = ideaScoreView(takeaway.score);
   if (!takeaway.score || view.state === 'unscored') {
     return (
-      <Tooltip label="Jev has not scored this takeaway yet.">
+      <Tooltip label="Dash has not scored this takeaway yet.">
         <span tabIndex={0} className="text-small text-ink-ghost">
           Unscored
         </span>

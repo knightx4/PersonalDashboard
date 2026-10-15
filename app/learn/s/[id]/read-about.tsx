@@ -1,10 +1,9 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
-import { PaidHint } from '@/components/ui/paid-hint';
 import type { Concept } from '@/lib/learn/graph/model';
 import { readAboutConcept } from './actions';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 
 /**
  * Taking a gap to the reading queue.
@@ -44,10 +43,6 @@ export function ReadAbout({
       <input type="hidden" name="conceptId" value={concept.id} />
       <input type="hidden" name="subjectId" value={subjectId} />
       <Submit />
-      <PaidHint
-        action="app/learn/s/[id]/actions.ts#readAboutConcept"
-        what="Cost of the search"
-      />
     </form>
   );
 }
@@ -56,8 +51,14 @@ function Submit() {
   const { pending } = useFormStatus();
 
   return (
-    <Button variant="link" type="submit" pending={pending}>
-      {pending ? 'Looking for something…' : 'Find something to read for this'}
-    </Button>
+    <DashAction
+      variant="link"
+      type="submit"
+      pending={pending}
+      paid="app/learn/s/[id]/actions.ts#readAboutConcept"
+      what="Cost of the search"
+    >
+      {pending ? 'Looking for something…' : 'Find a reading on this idea'}
+    </DashAction>
   );
 }

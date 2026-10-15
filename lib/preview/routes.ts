@@ -148,6 +148,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-work-check': ['/you/work'],
   'you-work-list': ['/you/work'],
   'learn-track-readings': ['/learn/t/[id]'],
+  'dash-working-rows': ['/learn/t/[id]', '/vault', '/news/all'],
   'learn-track-header': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
   'learn-now-subject-empty': ['/learn/now'],
@@ -237,6 +238,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'home-inbox': ['/home/inbox'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
+  'now-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
   'goals-suggestions': ['/goals/[goalId]'],
   'goals-metrics-props': ['/goals/[goalId]'],
@@ -248,6 +250,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
+  'shell-status-run': ['/home'],
+  'shell-status-run-new': ['/home'],
   'news-issue-digest': ['/news/i/[id]'],
   'news-issue-digest-no-pictures': ['/news/i/[id]'],
   'news-issue-essay': ['/news/i/[id]'],
@@ -286,6 +290,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
+  // The button that started a run, while the run goes (plan #1964.2.1).
+  'dash-action-run': ['/dev/ui', '/goals', '/dev/plan'],
   'ui-kit': ['/dev/ui'],
   // A ref link's preview held open (plan #1931.4): in comments, Dash's
   // replies and plan details.
@@ -364,6 +370,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-module': ['/dev/modules/[id]'],
   'dev-module-ideas': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
+  'dev-plan-run': ['/dev/plan/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
   'jobs-analytics': ['/jobs/analytics'],
@@ -470,9 +477,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  * shows. A piece a page imports for itself still reaches that page.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
-  'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  // The one thread (plan #1964.3), with a subject or none: a change to it is
+  // looked at here and on the dev-comment-thread surfaces, rather than on
+  // every page that draws a thread.
+  'ask-dash-thread': ['components/thread/thread.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
-  'ask-dash-files': ['components/talk/talk-thread.tsx'],
+  'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).
@@ -488,6 +498,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The status line while a run is going (plan #1964.2.3).
+  'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
+  'shell-status-run-new': ['components/shell/status-line.tsx'],
   // The one Inbox component (plan #1937.4), drawn from its row shape.
   'inbox-page': ['components/inbox/inbox-page.tsx'],
   // The capture panels, which every shell mounts: the one box, and capture
@@ -530,6 +543,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/ui/chip.tsx',
     'components/ui/confirm-step.tsx',
     'components/ui/cost-hint.tsx',
+    'components/ui/dash-action.tsx',
     'components/ui/disclosure.tsx',
     'components/ui/editable-prose.tsx',
     'components/ui/empty-state.tsx',

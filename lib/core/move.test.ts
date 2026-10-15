@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MOVE_STATES, MOVE_WORD, moveInline, moveLabel, moveWord, rowRef, withRun } from '@/lib/core/move';
+import { MOVE_STATES, MOVE_WORD, moveInline, moveLabel, moveWord, rowRef, withRun, workingMove } from '@/lib/core/move';
 
 describe('moves', () => {
   it('has a word for each of the five states', () => {
@@ -43,5 +43,14 @@ describe('withRun (plan #1568)', () => {
     expect(withRun(own, undefined, ['todo.tasks:t1'])).toBe(own);
     expect(withRun(null, ['todo.tasks:t1'], ['todo.tasks:t1'])).toBeNull();
     expect(rowRef('public.returns', null)).toBeNull();
+  });
+});
+
+describe('workingMove (plan #1964.2.2)', () => {
+  it('says Dash is on it on a row with no move of its own only while something is about it', () => {
+    expect(workingMove(['learn.readings:r1'], [rowRef('learn.readings', 'r1')])?.move.state).toBe('dash_working');
+    expect(workingMove(['obsidian.notes:Plans/Job.md'], ['obsidian.notes:n1', 'obsidian.notes:Plans/Job.md'])).not.toBeNull();
+    expect(workingMove(['learn.readings:r2'], ['learn.readings:r1'])).toBeNull();
+    expect(workingMove(undefined, ['learn.readings:r1'])).toBeNull();
   });
 });

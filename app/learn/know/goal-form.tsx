@@ -2,9 +2,8 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Network, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { Network } from 'lucide-react';
+import { DashAction } from '@/components/ui/dash-action';
 import { ChipSelect, ComposeBox, ComposeTitle } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -31,19 +30,32 @@ import { Chip } from '@/components/ui/chip';
 function AskButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeGoal"
+      what="Cost of laying it out"
+      hintFirst
+      wrapperClassName="ml-auto"
+    >
       {pending ? 'Laying it out…' : 'Lay out the chain'}
-    </Button>
+    </DashAction>
   );
 }
 
 function ApproveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending}>
+    <DashAction
+      type="submit"
+      pending={pending}
+      paid="app/learn/know/actions.ts#approveChain"
+      what="Cost of saving the subject"
+    >
       {pending ? 'Saving…' : 'Approve and save'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -132,7 +144,6 @@ function Proposal({
 
       <div className="mt-4 flex items-center gap-3">
         <ApproveButton />
-        <PaidHint action="app/learn/know/actions.ts#approveChain" what="Cost of saving the subject" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>
@@ -207,10 +218,7 @@ export function GoalForm({
               <option value="">A new subject</option>
             </ChipSelect>
           )}
-          <span className="ml-auto flex items-center gap-1">
-            <PaidHint action="app/learn/know/actions.ts#proposeGoal" what="Cost of laying it out" />
-            <AskButton />
-          </span>
+          <AskButton />
         </div>
       </ComposeBox>
       {state.error && (

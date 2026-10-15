@@ -1,6 +1,8 @@
 'use client';
 
 import { DashTodayGroups, DashTodaySection } from '@/app/home/dash-today';
+import { PageColumn } from '@/components/shell/page-width';
+import { Card } from '@/components/ui/card';
 import { HomeFold } from '@/app/home/home-fold';
 import { changesLabel, dashTodayCount } from '@/lib/shell/dash-today-count';
 import type { DashTodayEntry, DashTodayGroup } from '@/lib/shell/dash-today';
@@ -98,6 +100,32 @@ export function DashTodayFoldSurface() {
   return (
     <HomeFold id="dash-today" title="What Dash did today" count={changesLabel(dashTodayCount(GROUPS))}>
       <DashTodayGroups groups={GROUPS} timezone="America/New_York" undo={async () => ({ ok: true })} />
+    </HomeFold>
+  );
+}
+
+/**
+ * The fold on a workspace's Now (plan #1964.4): the same component Home
+ * draws, with only that workspace's group, a Todo one here. A row stands in
+ * for the page above it, so the fold is seen where a Now puts it.
+ */
+export function NowDashTodaySurface() {
+  return (
+    <PageColumn className="space-y-6">
+      <Card padding="standard">
+        <p className="text-ui text-ink-muted">The rest of the workspace&apos;s Now.</p>
+      </Card>
+      <WorkspaceDashTodayFixture />
+    </PageColumn>
+  );
+}
+
+/** The fold a workspace's Now draws, from the Todo fixtures, for pages that carry it. */
+export function WorkspaceDashTodayFixture() {
+  const todo = GROUPS.filter((group) => group.workspace === 'todo');
+  return (
+    <HomeFold id="dash-today" title="What Dash did today" count={changesLabel(dashTodayCount(todo))}>
+      <DashTodayGroups groups={todo} timezone="America/New_York" undo={async () => ({ ok: true })} />
     </HomeFold>
   );
 }

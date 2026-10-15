@@ -218,6 +218,8 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { StatusLine } from '@/components/shell/status-line';
+import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
@@ -280,7 +282,10 @@ import {
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
-import { DashSeenDemo } from './dash-moment-demos';
+import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
+import { DashWorkingReadingDemo } from './dash-working-rows';
+import { NoteListRow } from '@/components/vault/note-list-row';
+import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskBuildSurface,
@@ -295,7 +300,7 @@ import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
-import { DashTodaySurface } from './dash-today-surfaces';
+import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
@@ -371,6 +376,7 @@ import {
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
+import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -1860,6 +1866,47 @@ const subjectConcepts: Concept[] = [
     mastery: [],
     testedAt: null,
     declaredAt: null,
+  },
+];
+
+/** Vault notes for the working rows surface; the second has a run on it, named by path as a goal's context names it. */
+const workingNotes = [
+  {
+    id: 'wn1',
+    path: 'Work/Interview notes, Halloran-Achterberg.md',
+    title: 'Interview notes, Halloran-Achterberg',
+    excerpt: 'Second round with the platform team. They asked about the replication lag incident twice.',
+  },
+  {
+    id: 'wn2',
+    path: 'Work/What I want from the next role.md',
+    title: 'What I want from the next role',
+    excerpt: 'A team that owns its own on-call, a manager who writes things down, and no more than two days in the office.',
+  },
+  { id: 'wn3', path: 'Work/Salary bands.md', title: 'Salary bands', excerpt: null },
+];
+
+/** Newsletter issues for the working rows surface; the first has a run on it. */
+const workingSenders = new Map([
+  ['ws1', { id: 'ws1', email: 'hello@moneystuff.example', name: 'Money Stuff', muted: false }],
+  ['ws2', { id: 'ws2', email: 'editor@thedispatch.example', name: 'The Morning Dispatch from the Engineering Desk', muted: false }],
+]);
+const workingIssues = [
+  {
+    id: 'wi1',
+    senderId: 'ws1',
+    subject: 'The bond market is pricing in two more cuts, and why the curve disagrees',
+    receivedAt: '2026-10-15T06:40:00.000Z',
+    readAt: null,
+    summaryLine: 'Rate cuts, a fund that gated withdrawals, and a lawsuit over a rounding error.',
+  },
+  {
+    id: 'wi2',
+    senderId: 'ws2',
+    subject: 'Postgres 18 ships asynchronous I/O',
+    receivedAt: '2026-10-14T17:05:00.000Z',
+    readAt: '2026-10-14T19:00:00.000Z',
+    summaryLine: null,
   },
 ];
 
@@ -3362,6 +3409,21 @@ function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   );
 }
 
+/** The foot of a page with the status line under it, the run as given. */
+function StatusRunSurface({ going }: { going: GoingRunLine }) {
+  return (
+    <div className="flex min-h-48 flex-col justify-between overflow-hidden rounded-card bg-sunken">
+      <div className="p-4 text-small text-ink-muted">Today</div>
+      <StatusLine
+        lines={[{ text: 'mail: 14 new', at: null }]}
+        brief={{ text: '3 roles waiting on you', tone: 'caution', href: '/jobs' }}
+        main={null}
+        going={going}
+      />
+    </div>
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -3726,7 +3788,6 @@ export const SURFACES: readonly Surface[] = [
         </p>
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
-          onCard
           turns={[
             {
               id: 'seen-1',
@@ -3736,6 +3797,30 @@ export const SURFACES: readonly Surface[] = [
               acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
+        />
+      </div>
+    ),
+  },
+  {
+    /* "Dash at work" on the button that started a run (plan #1964.2.1): the
+     * press hands the area to Dash and the button's working mark stands in
+     * place of its label while the run goes. */
+    id: 'dash-action-run',
+    label: 'Dash action · a run going',
+    module: 'goals',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-run"]',
+      shows:
+        'Pressing “Plan this area” turns its mark to working beside the label, then the label gives way to the working mark alone, pulsing in the middle of a button that keeps its width, as the line beside it says Dash is planning the area.',
+    },
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">Health</p>
+        <DashRunButtonDemo
+          label="Plan this area"
+          line="Dash is planning this area · Reading your notes"
         />
       </div>
     ),
@@ -5018,6 +5103,54 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* "Dash is on it" on a row while a run or an Ask Dash hand-off is about
+     * it (plan #1964.2.2), in the three workspaces whose rows had no move of
+     * their own: a reading, a vault note and a newsletter issue. The press
+     * starts a run about the reading with no source; the note and the issue
+     * are drawn with a run already going. */
+    id: 'dash-working-rows',
+    label: 'Rows · Dash is on it',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-row"]',
+      shows:
+        'Pressing “Find a source” turns the button’s mark to working beside its words, which become “Finding a source”, and on the reading with no source “No source yet” gives way to Dash’s pulsing mark and “Dash is on it” in the same place, with nothing below moving.',
+    },
+    render: () => (
+      <div className="space-y-6">
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Learn · Distributed systems</h2>
+          <DashWorkingReadingDemo readings={trackReadings.slice(1, 4)} target="rd4" />
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Vault · Work</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingNotes.map((note) => (
+              <NoteListRow key={note.id} note={note} working={['obsidian.notes:Work/What I want from the next role.md']} />
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">News · Latest</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingIssues.map((issue) => (
+              <IssueListRow
+                key={issue.id}
+                issue={issue}
+                sender={workingSenders.get(issue.senderId)}
+                from={null}
+                timezone="Europe/London"
+                working={['news.issues:wi1']}
+              />
+            ))}
+          </ul>
+        </section>
+      </div>
+    ),
+  },
+  {
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
@@ -5400,7 +5533,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Ask Dash thread on its own (plan #1708), where a change to
-     * components/talk/talk-thread.tsx is looked at: a short answer with its
+     * components/thread/thread.tsx without a subject is looked at: a short answer with its
      * rows, a long markdown one, one with bars and one with a table. */
     id: 'ask-dash-thread',
     label: 'Ask Dash · The thread',
@@ -5761,6 +5894,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashTodaySurface />,
   },
   {
+    /* A workspace's Now carries the same fold, filtered to that workspace
+     * (plan #1964.4). Fixtures in dash-today-surfaces.tsx. */
+    id: 'now-dash-today',
+    label: 'Workspace Now · What Dash did today',
+    module: 'todo',
+    width: 'wide',
+    render: () => <NowDashTodaySurface />,
+  },
+  {
     /* The "What did you do?" box (plan #1740): Home's Done today with a line
      * filed as three changes and the day's list, the same card with nothing
      * done yet, and the box on a goal's Overview. Fixtures in
@@ -5886,6 +6028,42 @@ export const SURFACES: readonly Surface[] = [
         <TodayLists board={todayBoard} timezone="Europe/London" />
       </AppShell>
     ),
+  },
+
+  {
+    /* The status line while Dash is on a run (plan #1964.2.3): its mark, working,
+     * and the run's newest line in the run's own words, linking to the run. The
+     * line is drawn from lg up only, as everywhere, so the phone shots are the
+     * page without it by design. The longest line a run writes, beside the
+     * workspace summary and the main dot, is the fixture. */
+    id: 'shell-status-run',
+    label: 'The shell · Status line while Dash is on a run',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <StatusRunSurface
+        going={{
+          href: '/goals/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+          line: {
+            id: 'line-1',
+            user_id: 'u',
+            run_table: 'goals.runs',
+            run_id: '6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+            kind: 'action',
+            body: 'Reading the three most recent statements from Gmail to fill in what the mortgage step still needs before the end of the month',
+            options: null,
+            created_at: '2026-10-15T10:00:00Z',
+          },
+        }}
+      />
+    ),
+  },
+  {
+    id: 'shell-status-run-new',
+    label: 'The shell · Status line, run started and no line written yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <StatusRunSurface going={{ href: '/dev/plan/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03', line: null }} />,
   },
 
   {
@@ -6963,6 +7141,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalRunSurface />,
+  },
+  {
+    /* One plan run's page (plan #1964.2.4): its facts, its lines and every
+     * row it touched as a link. Fixtures in plan-run-surfaces.tsx. */
+    id: 'dev-plan-run',
+    label: 'Plan · One run and what it touched',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanRunSurface />,
   },
   {
     /* A run's lines as Dash writes them (plan #1826), on a plan step's run

@@ -9,9 +9,9 @@ import {
   useTransition,
   type RefObject,
 } from 'react';
-import { Check, Plus, Sparkles, Sprout, X } from 'lucide-react';
+import { Check, Sprout, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Tooltip } from '@/components/ui/tooltip';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -158,26 +158,28 @@ export function PhraseExplainer({
   }
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-2">
-      <Button
+    // Without the mousedown kept off, the mousedown that starts the click
+    // collapses the selection before the click lands, on the button and on
+    // the figure beside it alike.
+    <div
+      className="mb-2 flex flex-wrap items-center gap-2"
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      <DashAction
         type="button"
         variant="secondary"
         size="sm"
         className="max-w-full"
-        // Without this the mousedown that starts the click collapses the
-        // selection before the click lands.
-        onMouseDown={(event) => event.preventDefault()}
+        wrapperClassName="min-w-0 max-w-full"
+        paid="app/learn/now/actions.ts#explainPhrase"
+        what="Cost of the explanation"
         onPointerDown={() => {
           pressed.current = selection;
         }}
         onClick={() => explain(pressed.current || selection)}
       >
-        <Sparkles className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         <span className="truncate">Explain “{selection}”</span>
-      </Button>
-      <span onMouseDown={(event) => event.preventDefault()}>
-        <PaidHint action="app/learn/now/actions.ts#explainPhrase" what="Cost of the explanation" />
-      </span>
+      </DashAction>
     </div>
   );
 }
@@ -246,29 +248,24 @@ function Explanation({
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {explained.article && (
-              <span className="inline-flex items-center gap-1">
-                <Button
+              made ? (
+                <Button type="button" variant="ghost" size="sm" disabled>
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Card made
+                </Button>
+              ) : (
+                <DashAction
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={makeCard}
                   pending={making}
-                  disabled={made !== null}
+                  paid="app/learn/now/actions.ts#makePhraseCard"
+                  what="Cost of writing the card"
                 >
-                  {made ? (
-                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  )}
-                  {made ? 'Card made' : making ? 'Writing the card…' : 'Make it a card'}
-                </Button>
-                {!made && (
-                  <PaidHint
-                    action="app/learn/now/actions.ts#makePhraseCard"
-                    what="Cost of writing the card"
-                  />
-                )}
-              </span>
+                  {making ? 'Writing the card…' : 'Make it a card'}
+                </DashAction>
+              )
             )}
             <form action={startTrackAction}>
               <input type="hidden" name="title" value={phrase} />
