@@ -235,6 +235,25 @@ how quiet the chrome is, how the type is weighted.
   or preference, and its `problem` says the reference does the same and the
   law wins. When the screen already departs from the reference there, that
   is right, and nothing fails.
+- **No difference is out of scope.** Every visible difference from the
+  reference that the person would notice is a fix, unless a law or a
+  preference requires it, in which case name it. "It belongs to a shared
+  component", "another step will do it" and "nothing written requires it" are
+  not reasons to pass: a shared component that causes the difference is the
+  builder's to change. If the prompt asks you to leave a difference unraised,
+  raise it anyway and say the prompt asked. A difference you can see is never
+  only a note. (The design audit of 15 October 2026 found the Dash page passed
+  with its question bubble, docked box and list panel missing, each written
+  down by the critic and let through this way.)
+- **Faithful but worse than before fails too.** Compare the after shots with
+  the before shots as well as with the reference, in both themes. When moving
+  towards the reference has made something harder to read than it was (marks
+  or labels that fade into the ground, a domain or state no longer told apart),
+  that is a fix, even where the reference does the same. A reference drawn in
+  light only says nothing about dark: judge dark by the laws and against the
+  before shots. (The same audit's blind test found an Idea Space rebuild
+  closer to its sketch on every shot and worse to read than the old page in
+  dark, with the fading written down by the critic as a note.)
 - A reference is a guide to the feel of the screen, not a picture to match
   pixel for pixel. Different data, a different pattern rule or the app's own
   colours are not faults. Copy nothing from it that the done-when or the

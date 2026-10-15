@@ -216,6 +216,14 @@ import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import {
+  TodaysPieceCheckSurface,
+  TodaysPieceDoneSurface,
+  TodaysPieceErrorSurface,
+  TodaysPieceLoadingSurface,
+  TodaysPieceNoneSurface,
+  TodaysPieceSurface,
+} from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -5440,6 +5448,62 @@ export const SURFACES: readonly Surface[] = [
     // On its second card (plan #1931.5): the first is passed, so Previous shows.
     render: () => (
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
+    ),
+  },
+  /* Today's piece, which leads the deck (plan #2164.4), and its hidden parts:
+   * the check after the last lesson, the finished state, a lesson being
+   * written, one that could not be, and a goal with no pieces yet. */
+  {
+    id: 'learn-now-deck-piece',
+    label: 'Now · Today’s piece, first lesson',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-check',
+    label: 'Now · Today’s piece, its check',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceCheckSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-done',
+    label: 'Now · Today’s piece, finished',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceDoneSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-loading',
+    label: 'Now · Today’s piece, a lesson being written',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceLoadingSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-error',
+    label: 'Now · Today’s piece, a lesson not written',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceErrorSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-none',
+    label: 'Now · A goal with no pieces yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      // Enough cards that the deck does not reach for more, which the gallery cannot load.
+      <TodaysPieceNoneSurface
+        cards={
+          <LearnNowFeed
+            first={[...deckCards, ...deckCards.map((card, index) => ({ ...card, id: `${card.id.slice(0, -1)}${'abc'[index]}` }))]}
+            ready={20}
+            low={10}
+          />
+        }
+      />
     ),
   },
   {

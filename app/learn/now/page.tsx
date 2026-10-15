@@ -26,6 +26,8 @@ import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
 import { BriefsList } from './briefs-list';
+import { PieceFirst } from './todays-piece';
+import { loadTodaysPiece, type TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
 import { loadOpenBriefs } from '@/lib/learn/briefs/load';
 import type { BriefSummary } from '@/lib/learn/briefs/view';
 import { cn } from '@/lib/cn';
@@ -69,6 +71,10 @@ export const maxDuration = 300;
  * Read it. Nothing on it asks you a question before you can read, and all the
  * rest is on the reading's own page, one click away.
  *
+ * The deck opens on today's piece of your course (plan #2164.4,
+ * `./todays-piece.tsx`): its lessons one at a time, its check, and a
+ * finished state that hands on to the cards.
+ *
  * Then the cards the app wrote, one at a time (`./feed.tsx`), with the next
  * few already loaded behind the one on screen.
  *
@@ -99,6 +105,7 @@ export default async function NowPage({
     card?: string | string[];
     brief?: string | string[];
     from?: string | string[];
+    piece?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -176,12 +183,25 @@ export default async function NowPage({
   const pushDay = openedFromPush(params, '');
   if (pushDay) await createCoreClient().then((core) => core.rpc('open_day_brief', { p_day: pushDay })).catch(() => null);
 
+  // Today's piece leads the deck (plan #2164.4), or the piece `?piece=` names;
+  // a card the notification named leads instead, since that is what it asked
+  // about. A piece that cannot be read leaves the cards first.
+  const pinnedPiece = z.string().uuid().safeParse(firstParam(params.piece));
+
   // The topics Dash researched for you (plan #2023.4); a list that cannot be
   // read is left off rather than failing the page.
-  const [cards, ready, briefs] = await Promise.all([
+  const [cards, ready, briefs, piece] = await Promise.all([
     loadFeedPage(supabase, [], { cardId: pinned.success ? pinned.data : null }),
     countReadyCards(supabase),
     loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
+    pinned.success
+      ? null
+      : loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null).catch(
+          (error: unknown): TodaysPiece | null => {
+            console.error('[learn] today’s piece', error instanceof Error ? error.message : error);
+            return null;
+          },
+        ),
   ]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
@@ -289,7 +309,9 @@ export default async function NowPage({
         />
       </div>
 
-      <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
+      <PieceFirst piece={piece}>
+        <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
+      </PieceFirst>
     </PageColumn>
   );
 }

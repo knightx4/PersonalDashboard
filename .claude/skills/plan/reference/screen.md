@@ -58,6 +58,12 @@ registered; working offline, read the line and `REFERENCES` yourself.
 - **Send a registered reference to the critic on every round** on its
   surface, in this step and every later one, as the prompt's `reference`
   (4 below). A surface with none is sent "none".
+- **Never scope the critic away from the reference.** Do not ask it to leave
+  a difference unraised because a shared component draws it or a later step
+  will. A shared component that makes the screen differ from its reference is
+  this step's to change. A difference no law requires and that you cannot
+  close goes in the close note by name, as an open difference from the
+  reference, where the person can overrule it.
 
 **The loop, for each surface:**
 
