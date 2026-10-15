@@ -11,7 +11,7 @@ export default function Error({
 }) {
   return (
     <RouteError
-      what="your questions to Dash"
+      what="your chats with Dash"
       error={error}
       reset={reset}
       backHref="/home"

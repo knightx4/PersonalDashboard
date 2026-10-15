@@ -180,3 +180,17 @@ export function bodyWithFileNames(turn: Pick<TalkTurn, 'body' | 'files'>): strin
   if (!turn.files || turn.files.length === 0) return turn.body;
   return `${turn.body}\n\n(Sent with this: ${turn.files.map((file) => file.name).join(', ')})`;
 }
+
+/**
+ * The sentence a stopped answer ends with (plan #1899.5): the person pressed
+ * Stop, and what had been written by then is kept as the answer.
+ */
+export const STOPPED_NOTE = 'You stopped this answer before I finished it.';
+
+/** What a stopped answer is kept as: the words written so far, then STOPPED_NOTE. */
+export function stoppedBody(written: string): string {
+  const said = written.trim();
+  if (!said) return STOPPED_NOTE;
+  const note = `\n\n${STOPPED_NOTE}`;
+  return `${said.slice(0, MAX_TURN - note.length)}${note}`;
+}

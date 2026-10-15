@@ -219,7 +219,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run.',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on the Dash page, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
     },
   },
   {

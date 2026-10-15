@@ -162,7 +162,8 @@ of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
 first three are the shapes the gallery shows most, the fourth was added for
 pages that hold several views of one thing, the fifth for overview pages on a
-wide screen, and the sixth for pages of peer sections:
+wide screen, the sixth for pages of peer sections, and the seventh for talking
+to Dash at length:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
@@ -188,6 +189,13 @@ wide screen, and the sixth for pages of peer sections:
   drawn, and folds may sit inside it. A page read top to bottom stays
   stacked, and two or three modes of one view are a segmented control. The
   role page uses it (feature 1624).
+- **Conversation**: Dash's page at /ask. From laptop width the list of chats
+  sits on the left and can be hidden to a thin strip holding New chat, the
+  open chat sits at reading width with its box at its foot, and a glance
+  column of what Dash read and changed sits on the right and can be hidden
+  too. Hidden or shown is kept on the device. On a phone the list is the page
+  and a chat opens over it (decision 1900, answered B, with the list
+  collapsible as in other chat apps).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

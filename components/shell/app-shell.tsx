@@ -33,6 +33,7 @@ import {
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
+import { isAskPath } from '@/lib/ask/page-name';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
 import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
@@ -343,7 +344,9 @@ export function AppShell({
   // page sits inside it is the page's own path, drawn once above its heading
   // by PageHeader's `subject`; the bar used to add the section after a ›,
   // which repeated the first part of that path a few inches lower.
-  const title = moduleById(module)?.label ?? 'Home';
+  // Dash's page is outside every workspace and is not Home (plan #1899.2).
+  const onDash = module === null && isAskPath(pathname ?? '');
+  const title = moduleById(module)?.label ?? (onDash ? 'Dash' : 'Home');
 
   useEffect(() => {
     if (!drawer) return;
@@ -478,6 +481,7 @@ export function AppShell({
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
+          dash={onDash}
           enabled={workspaces}
           counts={counts}
           onShell
@@ -631,7 +635,7 @@ export function AppShell({
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
-      <AskDashProvider>
+      <AskDashProvider account={account} workspaces={workspaces}>
         <div
           className={cn(
             // The ground, not a container: the sidebar and the page pane are both

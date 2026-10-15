@@ -290,8 +290,12 @@ import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskBuildSurface,
   AskChangesSurface,
+  AT_WORK_QUESTION,
   AskDashSurface,
   AskMadeChangesSurface,
+  DashPageSurface,
+  AskAnswerActionsSurface,
+  AskBoxSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -5470,6 +5474,27 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Dash at work in the sheet (plan #1899.8): Send pressed on a question,
+     * each lookup appearing under Dash's name as it is made, the answer's
+     * words after them, and the mark coming to rest when it lands. */
+    id: 'ask-dash-at-work',
+    label: 'Ask Dash · Dash at work',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => (
+      <AskDashSurface open draft={AT_WORK_QUESTION}>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
     /* An answer that failed (plan #1337): the question was kept, the answer
      * was not, and Dash's mark shows failed with the error beside it where
      * the working line was. */
@@ -5581,6 +5606,147 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadFilesSurface />,
+  },
+  {
+    /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
+     * left, grouped by day with the workspaces each used and chips to narrow
+     * them, and the open chat beside them. On a phone the chat is drawn over
+     * the list, with the way back above its title. */
+    id: 'ask-page',
+    label: 'Dash · A chat open beside the list',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface />,
+  },
+  {
+    /* Dash at work on the full page (plan #1899.8): Send pressed in an open
+     * chat, each lookup appearing under Dash's name, the answer written out
+     * after them and the mark coming to rest. */
+    id: 'ask-page-at-work',
+    label: 'Dash · Dash at work in a chat',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
+  },
+  {
+    /* The same page at /ask, a new chat beside the list; on a phone the
+     * list is the whole page. */
+    id: 'ask-page-new',
+    label: 'Dash · The list and a new chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* The list hidden to its strip (New chat and the button to show it),
+     * with the chat centred at its reading width. The column of what Dash
+     * used is folded too, to its button in the chat's header (#1899.4). */
+    id: 'ask-page-hidden',
+    label: 'Dash · The list hidden',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
+  },
+  {
+    /* What Dash used in the open chat (plan #1899.4): with the list hidden
+     * there is room, so the column sits beside the chat: the rows read, the
+     * change made with Undo, the lookups, the file sent and the cost. A
+     * phone has no room, so the chat shows the Used button. */
+    id: 'ask-page-used',
+    label: 'Dash · What Dash used, beside the chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* Dash's box (plan #1899.5): a question that carried two rows added
+     * with @, shown under it; an answer stopped part way, kept as far as it
+     * got; and the box open on "@cat" with the rows the top bar's search
+     * finds, one already added as a chip, the scope chip on Shopping. */
+    id: 'ask-box-rows',
+    label: 'Dash · Adding a row with @',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="rows" />,
+  },
+  {
+    /* The same box with / typed: the things Dash can already do, each
+     * written into the box for you to finish. */
+    id: 'ask-box-commands',
+    label: 'Dash · The commands / offers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="commands" />,
+  },
+  {
+    /* The scope chip's menu open: Everything, or one workspace Dash's
+     * lookups are kept to, Learn chosen. */
+    id: 'ask-box-scope',
+    label: 'Dash · Keeping the lookups to one workspace',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="scope" />,
+  },
+  {
+    /* The list searched for "Catan" (plan #1899.6): two chats found by what
+     * was said in them, one only in Dash's answer, each with the words
+     * around it. On a phone the list is the page. */
+    id: 'ask-page-search',
+    label: 'Dash · Searching the chats',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="search" />,
+  },
+  {
+    /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
+    id: 'ask-page-menu',
+    label: "Dash · A chat's menu",
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="menu" />,
+  },
+  {
+    /* A chat being renamed in place in the list (plan #1899.6). */
+    id: 'ask-page-rename',
+    label: 'Dash · Renaming a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="rename" />,
+  },
+  {
+    /* An archived chat opened from Archived at the foot of the list (plan
+     * #1899.6), with the line above it that puts it back. */
+    id: 'ask-page-archived',
+    label: 'Dash · An archived chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="archived" usedOpen={false} />,
+  },
+  {
+    /* The presses under each answer (plan #1899.7): the first answer made a
+     * todo and saved to the vault, each card with Undo, and Edit pressed on
+     * the second, so its question is back in the box. */
+    id: 'ask-answer-actions',
+    label: 'Dash · An answer kept as a todo and a note',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface />,
+  },
+  {
+    /* The same column opened as a sheet from the right, as it opens on a
+     * phone and on a laptop with the list shown. */
+    id: 'ask-page-used-sheet',
+    label: 'Dash · What Dash used, as a sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface sheetOpen />,
   },
 
   {

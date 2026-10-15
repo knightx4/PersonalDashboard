@@ -10,14 +10,20 @@ import {
   confirmAskChange,
   countOpenAskHandoffs,
   declineAskChange,
+  editAskChatInRequest,
   listAskConversations,
   loadAskChanges,
   loadAskConversation,
+  saveAskAnswer,
+  searchAskChatsInRequest,
   reopenAskChange,
   undoAskChange,
 } from '@/lib/talk/ask-request';
+import { chatQuery, chatTitleFrom } from '@/lib/talk/ask-chats';
+import type { AskChatEdit, AskChatHit } from '@/lib/talk/store';
 import { AskPagePath, AskRef } from '@/lib/talk/ask-input';
 import type { DashChange } from '@/lib/talk/changes';
+import type { SaveAnswerOutcome, SaveAnswerTo } from '@/lib/talk/save-answer';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -184,4 +190,91 @@ export async function reopenDashChange(id: string): Promise<ChangeOutcome> {
 // latency: pending
 export async function undoDashChange(id: string): Promise<ChangeOutcome> {
   return pressChange(id, undoAskChange, 'The change could not be undone. Check your connection and try again.');
+}
+
+/**
+ * Make one of Dash's answers a todo or a note in the vault (plan #1899.7).
+ * Never throws: the result is the change it made, drawn under the answer
+ * with Undo, or a sentence saying why not.
+ */
+// latency: pending
+export async function saveDashAnswer(ref: string, turnId: string, to: SaveAnswerTo): Promise<SaveAnswerOutcome> {
+  const conversation = Ref.safeParse(ref);
+  const turn = Ref.safeParse(turnId);
+  if (!conversation.success || !turn.success || (to !== 'todo' && to !== 'vault')) {
+    return { ok: false, error: 'That answer is not there any more.' };
+  }
+  try {
+    const outcome = await saveAskAnswer(conversation.data, turn.data, to);
+    if (outcome.ok) {
+      for (const path of changePaths(outcome.change)) revalidatePath(path);
+      revalidatePath('/ask');
+    }
+    return outcome;
+  } catch (error) {
+    console.error('saving an answer failed', error);
+    return { ok: false, error: 'That was not saved. Check your connection and try again.' };
+  }
+}
+
+/** What a press on a chat in the list did: ok, or a sentence saying why not. */
+export type ChatEditOutcome = { ok: true } | { ok: false; error: string };
+
+/** One edit to a chat in the list, re-reading the page when it lands. */
+async function editChat(ref: string, edit: AskChatEdit, failed: string): Promise<ChatEditOutcome> {
+  const parsed = Ref.safeParse(ref);
+  if (!parsed.success) return { ok: false, error: 'That chat is not there any more.' };
+  try {
+    const found = await editAskChatInRequest(parsed.data, edit);
+    if (!found) return { ok: false, error: 'That chat is not there any more.' };
+    revalidatePath('/ask', 'layout');
+    return { ok: true };
+  } catch (error) {
+    console.error('chat edit failed', error);
+    return { ok: false, error: failed };
+  }
+}
+
+/** Pin a chat to the top of the list on /ask, or unpin it (plan #1899.6). */
+// latency: pending
+export async function pinDashChat(ref: string, pinned: boolean): Promise<ChatEditOutcome> {
+  return editChat(
+    ref,
+    { pinned: pinned === true },
+    pinned ? 'The chat was not pinned. Try again.' : 'The chat was not unpinned. Try again.',
+  );
+}
+
+/** Give a chat a name of the person's own (plan #1899.6). */
+// latency: pending
+export async function renameDashChat(ref: string, title: string): Promise<ChatEditOutcome> {
+  const named = typeof title === 'string' ? chatTitleFrom(title) : null;
+  if (!named) return { ok: false, error: 'A chat needs a name.' };
+  return editChat(ref, { title: named }, 'The new name was not saved. Try again.');
+}
+
+/** Archive a chat out of the list, or bring it back from Archived (plan #1899.6). */
+// latency: pending
+export async function archiveDashChat(ref: string, archived: boolean): Promise<ChatEditOutcome> {
+  return editChat(
+    ref,
+    { archived: archived === true },
+    archived ? 'The chat was not archived. Try again.' : 'The chat was not brought back. Try again.',
+  );
+}
+
+/**
+ * The chats in which what was typed in the list's search box was said, by
+ * the person or by Dash (plan #1899.6), each with the words around it.
+ */
+// latency: pending
+export async function searchDashChats(text: string): Promise<{ hits: AskChatHit[]; error?: string }> {
+  const query = typeof text === 'string' ? chatQuery(text) : null;
+  if (!query) return { hits: [] };
+  try {
+    return { hits: await searchAskChatsInRequest(query) };
+  } catch (error) {
+    console.error('chat search failed', error);
+    return { hits: [], error: 'What was said in your chats could not be searched. Try again.' };
+  }
 }

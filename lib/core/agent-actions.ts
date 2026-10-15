@@ -47,6 +47,11 @@ export const coreActions: ModuleActions = {
     declineDashChange: none('theirs'),
     undoDashChange: none('theirs'),
     reopenDashChange: none('theirs', 'Undo: takes back their own decline.'),
+    saveDashAnswer: tool('add_todo', 'add_quick_note'),
+    pinDashChat: none('setting', 'Arranges the person\'s own list of chats with Dash.'),
+    renameDashChat: none('setting', 'Names a chat in the person\'s own list of chats with Dash.'),
+    archiveDashChat: none('setting', 'Clears a chat out of the person\'s own list; nothing is lost.'),
+    searchDashChats: none('page'),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
