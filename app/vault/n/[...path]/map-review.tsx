@@ -12,7 +12,7 @@ import { allKeys, edgeKey, keepTickedMap } from '@/lib/vault/map/keep';
 import { EDGE_VERB } from '@/lib/vault/map/labels';
 import type { NoteMap, NoteMapProposal } from '@/lib/vault/map/proposal';
 import { acceptMap, proposeMap, type AcceptMapState, type ProposeMapState } from './actions';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 
 /**
  * What the map would make of this note, and the tick that decides what of it
@@ -31,18 +31,32 @@ import { PaidHint } from '@/components/ui/paid-hint';
 function ReadButton({ again }: { again: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" pending={pending}>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      pending={pending}
+      paid="app/vault/n/[...path]/actions.ts#proposeMap"
+      what="Cost of reading the note"
+    >
       {pending ? 'Reading it…' : again ? 'Read it again' : 'Read it for the map'}
-    </Button>
+    </DashAction>
   );
 }
 
-function AcceptButton({ label, disabled }: { label: string; disabled: boolean }) {
+/** Each theme and position kept is embedded as it is saved, so the press is priced per item. */
+function AcceptButton({ label, disabled, count }: { label: string; disabled: boolean; count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" pending={pending} disabled={disabled}>
+    <DashAction
+      type="submit"
+      pending={pending}
+      disabled={disabled}
+      paid="app/vault/n/[...path]/actions.ts#acceptMap"
+      count={count}
+      what="Cost of adding them"
+    >
       {pending ? 'Saving…' : label}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -76,10 +90,6 @@ export function MapReview({ notePath }: { notePath: string }) {
           {state.error && <p className="mt-2 text-ui text-caution">{state.error}</p>}
           <div className="mt-3 flex items-center gap-3">
             <ReadButton again={Boolean(state.message || state.error || discarded)} />
-            <PaidHint
-              action="app/vault/n/[...path]/actions.ts#proposeMap"
-              what="Cost of reading the note"
-            />
           </div>
         </form>
       )}
@@ -232,12 +242,7 @@ function Review({
         <AcceptButton
           label={label}
           disabled={kept.themes.length === 0 && kept.positions.length === 0}
-        />
-        {/* Each theme and position kept is embedded as it is saved. */}
-        <PaidHint
-          action="app/vault/n/[...path]/actions.ts#acceptMap"
           count={kept.themes.length + kept.positions.length}
-          what="Cost of adding them"
         />
         {/* Writes nothing: the proposal is thrown away and the read button
             comes back. */}

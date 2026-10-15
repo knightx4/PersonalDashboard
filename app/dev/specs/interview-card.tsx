@@ -9,6 +9,7 @@ import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { DashAction } from '@/components/ui/dash-action';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -177,8 +178,16 @@ export function InterviewPanel({
         ) : (
           <form action={startAction} onSubmit={() => setOpen(true)} className="flex flex-wrap items-center gap-x-2">
             <input type="hidden" name="module" value={module} />
-            <Offer type="submit" label={`Interview me about ${label}`} />
-            <PaidHint action={START} what="Cost of Dash's first question" />
+            <DashAction
+              type="submit"
+              variant="ghost"
+              size="sm"
+              className="-ml-2.5"
+              paid={START}
+              what="Cost of Dash's first question"
+            >
+              {`Interview me about ${label}`}
+            </DashAction>
           </form>
         )}
         <FieldError>{started.error}</FieldError>
@@ -256,10 +265,9 @@ export function InterviewPanel({
         <form action={startAction}>
           <input type="hidden" name="module" value={module} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" variant="secondary">
+            <DashAction type="submit" size="sm" variant="secondary" paid={START} what="Cost of Dash's next question">
               Ask the next question
-            </Button>
-            <PaidHint action={START} what="Cost of Dash's next question" />
+            </DashAction>
           </div>
         </form>
       )}
@@ -298,6 +306,7 @@ export function InterviewPanel({
                   }}
                 />
                 <div className="mt-1 flex items-center justify-end gap-1">
+                  {/* dash-action-ok: the composer's send is an arrow beside what is typed, with Dash's question above it. */}
                   <PaidHint action={ANSWER} what="Cost of answering" />
                   <Tooltip label="Send your answer to Dash." align="end">
                     <IconButton
@@ -320,16 +329,17 @@ export function InterviewPanel({
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {hasAnswer ? (
               <>
-                <Button
+                <DashAction
                   type="submit"
                   name="intent"
                   value="draft"
                   size="sm"
                   variant={move === 'draft' ? 'primary' : 'secondary'}
+                  paid={ANSWER}
+                  what="Cost of drafting"
                 >
                   {move === 'draft' ? 'Draft it' : 'Draft it now'}
-                </Button>
-                <PaidHint action={ANSWER} what="Cost of drafting" />
+                </DashAction>
                 <span className="text-small text-ink-muted">Drafting takes about a minute.</span>
               </>
             ) : (

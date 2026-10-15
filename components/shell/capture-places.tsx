@@ -1,12 +1,13 @@
 'use client';
 
-import { Paperclip, Plus, Undo2 } from 'lucide-react';
+import { Paperclip, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { ToggleChip } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/ui/kbd';
 import type { CaptureAction } from '@/lib/capture/actions';
 import { capturePartLabel, filedMessage, filedModule, type FiledCapture } from '@/lib/capture/place';
@@ -183,12 +184,17 @@ export function CaptureFoot({
         <span role="status" aria-live="polite" className="text-small text-ink-muted">
           {message}
         </span>
-        <Button type="submit" size="sm" pending={pending}>
-          <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {pending ? 'Filing…' : 'File it'}
-        </Button>
         <PaidCostsProvider costs={costs}>
-          <PaidHint action="app/capture-actions.ts#fileCaptureBox" what="Cost of filing it" align="end" />
+          <DashAction
+            type="submit"
+            size="sm"
+            pending={pending}
+            paid="app/capture-actions.ts#fileCaptureBox"
+            what="Cost of filing it"
+            align="end"
+          >
+            {pending ? 'Filing…' : 'File it'}
+          </DashAction>
         </PaidCostsProvider>
       </span>
     </div>

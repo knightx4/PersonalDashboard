@@ -418,20 +418,33 @@ function aiOnControls(root: string): string[] {
  * draws its cost hint itself. A PaidHint or CostHint written anywhere else
  * under app/ and components/ is a paid button not yet moved onto it. The
  * primitives that define them and the gallery are left out.
+ *
+ * A hint that is not on a Dash press is passed by a `dash-action-ok:`
+ * comment on its line or the line above, saying why: a composer whose send
+ * is an arrow beside the text, or a price that is not a model run, such as
+ * posting to X.
  */
 const HINT_ELEMENT = /<(?:PaidHint|CostHint)\b/g;
 const HINT_HOMES = new Set([
   'components/ui/paid-hint.tsx',
   'components/ui/cost-hint.tsx',
   'components/ui/dash-action.tsx',
+  // The comment composer prices Dash's reply beside its send arrow. The
+  // thread is #1964.3's to rework, so it is passed here rather than marked.
+  'components/thread/thread.tsx',
 ]);
 
 function paidHintsOutsideDashAction(root: string): string[] {
   return listFiles(root, ['app', 'components'], ['.tsx'])
     .filter((file) => !HINT_HOMES.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
     .flatMap((file) => {
-      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
-      return [...text.matchAll(HINT_ELEMENT)].map((m) => `${file}:${lineAt(text, m.index ?? 0)}`);
+      const raw = readFileSync(join(root, file), 'utf8');
+      const lines = raw.split('\n');
+      const text = withoutComments(raw);
+      return [...text.matchAll(HINT_ELEMENT)]
+        .map((m) => lineAt(text, m.index ?? 0))
+        .filter((line) => !/dash-action-ok:\s*\S/.test(`${lines[line - 2] ?? ''}\n${lines[line - 1]}`))
+        .map((line) => `${file}:${line}`);
     })
     .sort();
 }

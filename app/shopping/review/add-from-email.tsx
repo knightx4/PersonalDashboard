@@ -2,8 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import { carryToast } from '@/components/shell/capture';
 import { makeAimedCapture, undoCaptureBox } from '@/app/capture-actions';
@@ -61,16 +60,19 @@ export function AddFromEmailButton({ messageId, subject }: { messageId: string; 
   }
 
   return (
-    <>
-      <Button type="button" variant="secondary" size="sm" onClick={press} disabled={pending}>
-        {pending ? 'Reading the email…' : 'Add from this email'}
-      </Button>
-      <PaidHint
-        action="app/capture-actions.ts#makeAimedCapture:email"
-        count={1}
-        what="Cost of reading the email"
-        className="self-center"
-      />
-    </>
+    <DashAction
+      type="button"
+      variant="secondary"
+      size="sm"
+      onClick={press}
+      disabled={pending}
+      pending={pending}
+      paid="app/capture-actions.ts#makeAimedCapture:email"
+      count={1}
+      what="Cost of reading the email"
+      wrapperClassName="self-center"
+    >
+      {pending ? 'Reading the email…' : 'Add from this email'}
+    </DashAction>
   );
 }

@@ -86,6 +86,7 @@ export function MayaConversation({
             label="Reply to Maya"
             placeholder="Agree, push back, or take it somewhere else"
             hint={
+              // dash-action-ok: the reply box's send is an arrow beside what is typed, under Maya's turns.
               <PaidHint
                 action="app/vault/maya/actions.ts#replyToMaya"
                 what="Cost of a reply from Maya"
