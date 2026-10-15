@@ -49,8 +49,16 @@ const STOPWORDS = new Set([
   'the', 'this', 'to', 'us', 'we', 'will', 'would', 'you', 'your', 'yours',
 ]);
 
+/**
+ * A list marker at the very start of the text: "1.", "2)", "(3)", "Q4:",
+ * "Question 5 -", or a bullet character. Only the start is touched, so
+ * "top 5 skills" keeps its 5.
+ */
+const LEADING_MARKER =
+  /^\s*(?:(?:question|q)\s*\d+\s*[.):\-–—]?\s+|(?:question|q)\s*\d+\s*[.):\-–—]\s*|\(?\d+\s*[.)]\s*|[-*•·▪◦‣–—]+\s+)/i;
+
 export function normalizeQuestion(text: string): string {
-  let out = text.toLowerCase();
+  let out = text.toLowerCase().replace(LEADING_MARKER, '');
 
   // Word/character limits are formatting, not content.
   out = out.replace(/\(?\s*\d+\s*(words?|characters?)\s*(or less|max(imum)?)?\s*\)?/g, ' ');
