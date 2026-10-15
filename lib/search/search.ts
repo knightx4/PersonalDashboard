@@ -50,6 +50,10 @@ export type SearchOutcome = {
   hits: SearchHit[];
   /** Sources that ran and threw. For a log line, not for the screen. */
   failed: string[];
+  /** Hits the sources returned before the caps cut the list. */
+  found?: number;
+  /** A source returned as many as it was asked for, so `found` is a floor. */
+  capped?: boolean;
 };
 
 export async function searchEverything(input: {
@@ -89,6 +93,7 @@ export async function searchEverything(input: {
 
   const hits: SearchHit[] = [];
   const failed: string[] = [];
+  let capped = false;
 
   settled.forEach((result, index) => {
     if (result.status === 'fulfilled') {
@@ -99,13 +104,14 @@ export async function searchEverything(input: {
       const answered = result.value.filter(
         (hit) => inScope(hit, scope) && (!wanted || wanted.includes(hit.kind)),
       );
+      if (result.value.length >= perSource) capped = true;
       hits.push(...answered.slice(0, perSource));
     } else {
       failed.push(active[index].label);
     }
   });
 
-  return { hits: paletteHits(hits, query, { perModule: perSource, total }), failed };
+  return { hits: paletteHits(hits, query, { perModule: perSource, total }), failed, found: hits.length, capped };
 }
 
 export type ListOutcome = SearchOutcome & {

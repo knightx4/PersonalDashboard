@@ -1,4 +1,4 @@
-import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of the job search's nav its rows sit under (app/jobs/(app)/layout.tsx). */
 const INBOX: Section = { href: '/jobs/inbox', label: 'Inbox' };
@@ -74,6 +74,7 @@ export const jobsSources: ModuleSources = {
       search: ['summary'],
       title: 'summary',
       owner: 'user_id',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.interviews',
@@ -116,6 +117,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['message', 'response_summary'],
       title: 'message',
+      parent: parentByFirst(['contact_id', 'job_search.contacts'], ['application_id', 'job_search.applications']),
     },
     {
       table: 'job_search.notes',
@@ -124,6 +126,13 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
+      parent: parentByFirst(
+        ['interview_id', 'job_search.interviews'],
+        ['application_id', 'job_search.applications'],
+        ['role_id', 'job_search.roles'],
+        ['contact_id', 'job_search.contacts'],
+        ['company_id', 'job_search.companies'],
+      ),
     },
     {
       table: 'job_search.evidence_items',
@@ -152,6 +161,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.application_answers',
@@ -160,6 +170,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['answer'],
       title: 'answer',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.questions',
@@ -180,6 +191,7 @@ export const jobsSources: ModuleSources = {
       title: 'body',
       href: () => '/jobs/inbox',
       section: INBOX,
+      parent: parentByFirst(['application_id', 'job_search.applications'], ['contact_id', 'job_search.contacts']),
     },
   ],
   notSources: [
