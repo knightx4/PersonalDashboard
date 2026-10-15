@@ -95,6 +95,7 @@ export default async function TimelinePage({
         later={newerLast === null ? null : newerLast >= current ? 'now' : newerLast}
         timezone={timezone}
         observations={observations}
+        bounds={{ first: window.first, last: window.last }}
       />
     </>
   );
