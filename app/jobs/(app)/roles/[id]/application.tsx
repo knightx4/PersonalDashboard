@@ -28,6 +28,9 @@ import {
   type DraftApplicationResult,
 } from '../actions';
 import { saveApplicationMarks } from './actions';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
 import { CopyText } from './copy-text';
 import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
@@ -49,6 +52,7 @@ export function Answers({
   draftRun,
   coverLetterDraft,
   coverLetterRun,
+  answerThreads,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
   // as a record, but adding questions and drafting from the bank are folded
@@ -277,6 +281,7 @@ export function Answers({
               key={answer.id}
               answer={answer}
               closed={closed}
+              thread={answerThreads?.[threadRef('answer', answer.id)] ?? []}
               draft={drafts[answer.id] ?? null}
               onDraftChange={(draft) =>
                 setDrafts((before) => {
@@ -306,6 +311,7 @@ export function Answers({
           initialDraft={coverLetterDraft}
           initialRun={coverLetterRun}
           onMarkedYes={() => setLetterMark(true)}
+          thread={answerThreads?.[threadRef('application', applicationId)] ?? []}
         />
       )}
     </div>
@@ -448,6 +454,7 @@ function ApplicationMarks({
 export function AnswerCard({
   answer,
   closed,
+  thread = [],
   initialDraft = null,
   draft: heldDraft,
   onDraftChange,
@@ -456,6 +463,8 @@ export function AnswerCard({
   answer: PanelProps['answers'][number];
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** The comments under this answer (note be3c6616). */
+  thread?: DevComment[];
   /** For the preview gallery: the card opens with this draft beside it. */
   initialDraft?: AnswerDraft | null;
   /** With onDraftChange, the draft is held above the card, where Draft all answers fills it. */
@@ -720,6 +729,15 @@ export function AnswerCard({
           }}
         />
       )}
+      {/* Comments on this answer: a note to yourself, or @dash to ask
+          for a change (note be3c6616). */}
+      <div className="mt-3">
+        <Thread
+          subject={threadRef('answer', answer.id)}
+          turns={thread}
+          placeholder="A note on this answer, or @dash make it shorter."
+        />
+      </div>
     </Card>
   );
 }
