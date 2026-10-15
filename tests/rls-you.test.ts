@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['courses', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['courses', 'details', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -108,5 +108,35 @@ describe('personality test results', () => {
     await expect(
       admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
+  });
+});
+
+describe('personal details', () => {
+  // migrations-you/0007_details.sql (plan #2124.1): one row per person.
+  it('keeps one row each, named by a fixed title, to its owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into details (user_id, phone, race) values (${userA}, '555-0100', 'Asian')`,
+    );
+    const own = await asUser(userA, (tx) => tx`select title, phone, race, gender from details`);
+    expect(own).toEqual([{ title: 'Personal details', phone: '555-0100', race: 'Asian', gender: null }]);
+    expect(await asUser(userB, (tx) => tx`select user_id from details`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`insert into details (user_id, phone) values (${userA}, '555-0101')`),
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user write or change another account's details", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into details (user_id, phone) values (${userA}, '999')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update details set phone = '999'`);
+    await asUser(userB, (tx) => tx`delete from details`);
+    const left = await admin`select phone from details where user_id = ${userA}`;
+    expect(left).toEqual([{ phone: '555-0100' }]);
+  });
+
+  it('refuses a detail past its length', async () => {
+    await expect(admin`update details set phone = ${'5'.repeat(201)} where user_id = ${userA}`).rejects.toThrow();
   });
 });
