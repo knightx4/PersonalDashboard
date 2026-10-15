@@ -216,8 +216,11 @@ function MonthChart({ months, bounds }: { months: TimelineMonth[]; bounds: { fir
         </div>
         <div aria-hidden className="flex gap-1">
           {totals.map((month) => (
-            <span key={month.key} className="min-w-0 flex-1 truncate text-center text-small text-ink-muted">
-              {shortMonth(month.key)}
+            <span key={month.key} className="min-w-0 flex-1 text-center text-small text-ink-muted">
+              {/* Twelve three-letter months do not fit a phone's width, so
+                  there each is its initial. */}
+              <span className="sm:hidden">{shortMonth(month.key).charAt(0)}</span>
+              <span className="hidden sm:inline">{shortMonth(month.key)}</span>
             </span>
           ))}
         </div>
