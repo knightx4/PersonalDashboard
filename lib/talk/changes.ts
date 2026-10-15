@@ -57,6 +57,8 @@ export const DASH_CHANGE_KINDS = [
   'move_roles',
   'set_goal_done_when',
   'add_quick_note',
+  // A build started on a plan step, proposed for a Confirm (plan #2106.1).
+  'start_build',
   // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
   ...LEARN_CHANGE_KINDS,
   // Todo's newer ones, in the same shape (lib/ask/todo-changes.ts, plan #1894.9.1).
@@ -139,6 +141,11 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  (plan #2044.1), in the same shape. The record keeps that
  *                  conversation as it was made in `undo.interview`, so Undo
  *                  can tell whether anything was written on it since.
+ * start_build      a session sent at a plan step (plan #2106.1), proposed
+ *                  for a Confirm: the step's id and number, its outline and
+ *                  title for the card, and whether its last run had gone quiet, in
+ *                  which case Confirm writes that run off as the plan page's
+ *                  Send does (`confirmQuiet` in lib/plan/handover.ts).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -188,6 +195,7 @@ export type DashChangeInput = {
   };
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
   add_quick_note: { noteId: string; title: string; path: string; body: string };
+  start_build: { stepId: string; number: number; outline: string; title: string; quiet: boolean };
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
   Record<YouChangeKind, YouChangeInput> &
@@ -198,8 +206,12 @@ export type DashChangeInput = {
   Record<JobsChangeKind, JobsChangeInput> &
   Record<InterviewChangeKind, InterviewChangeInput>;
 
-/** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
-export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];
+/**
+ * The kinds Dash proposes for a Confirm: the four from before plan #1440,
+ * which keep their own undo in lib/ask/changes.ts, and a build started on a
+ * plan step (plan #2106.1), which cannot be undone.
+ */
+export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch', 'start_build'];
 
 /** A proposal as the loop hands it to be kept, or a change Dash has just made. */
 export type NewDashChange = {

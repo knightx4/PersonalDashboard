@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { TaskInput } from '@/lib/todo/tasks/input';
 import { changeHref, confirmChange, declineChange, undoChange, type ChangeDeps } from './changes';
 import type { AskSchema, SchemaClient } from './db';
+
+const handOver = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/plan/handover', () => ({ handStepToClaude: handOver }));
 
 /**
  * Confirming, declining and undoing Dash's changes (plan #1189), against an
@@ -502,5 +505,52 @@ describe('start_watch', () => {
       expect(!undone.ok && undone.error).toContain(error);
       expect(tables['core.watches']).toHaveLength(1);
     }
+  });
+});
+
+describe('start_build', () => {
+  const STEP = id(2106);
+  const RUN = id(2107);
+  const BUILD_INPUT = { stepId: STEP, number: 2200, outline: '2106.2', title: 'Start the session', quiet: false };
+  const SENT = { ok: true, number: 2200, outline: '2106.2', title: 'Start the session', beneath: 0, detail: 'Started.', changed: true };
+
+  beforeEach(() => handOver.mockReset());
+
+  function build(input = BUILD_INPUT) {
+    const made = setup({ kind: 'start_build', input, enabled: ['dev'] });
+    made.tables['public.plan_runs'] = [{ id: RUN, user_id: ME, plan_item_id: STEP, created_at: '2026-09-29T12:00:00Z' }];
+    return made;
+  }
+
+  it('confirming starts the session and settles the card against the run, with no undo', async () => {
+    handOver.mockResolvedValue(SENT);
+    const { deps, change } = build();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(handOver).toHaveBeenCalledWith(expect.objectContaining({ userId: ME, id: STEP, confirmQuiet: undefined }));
+    expect(confirmed.ok && confirmed.change).toMatchObject({ status: 'done', writtenTable: 'public.plan_runs', writtenRef: RUN });
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(false);
+  });
+
+  it('shows the refusal and leaves the card waiting when the step changed after the card was made', async () => {
+    handOver.mockResolvedValue({ ok: false, error: 'A session is already working on this step.' });
+    const { tables, deps, change } = build();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed).toMatchObject({ ok: false, error: 'A session is already working on this step.' });
+    expect(tables['core.dash_actions'][0].status).toBe('proposed');
+  });
+
+  it('passes confirmQuiet only when the card said the last run was quiet', async () => {
+    handOver.mockResolvedValue(SENT);
+    const { deps, change } = build({ ...BUILD_INPUT, quiet: true });
+    await confirmChange(deps, change.id as string);
+    expect(handOver).toHaveBeenCalledWith(expect.objectContaining({ confirmQuiet: true }));
+  });
+
+  it('does nothing when the Dev workspace is off', async () => {
+    const { deps, change } = setup({ kind: 'start_build', input: BUILD_INPUT, enabled: [] });
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok).toBe(false);
+    expect(handOver).not.toHaveBeenCalled();
   });
 });
