@@ -345,6 +345,7 @@ import {
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
+import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -6791,6 +6792,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalRunSurface />,
+  },
+  {
+    /* One plan run's page (plan #1964.2.4): its facts, its lines and every
+     * row it touched as a link. Fixtures in plan-run-surfaces.tsx. */
+    id: 'dev-plan-run',
+    label: 'Plan · One run and what it touched',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanRunSurface />,
   },
   {
     /* A run's lines as Dash writes them (plan #1826), on a plan step's run
