@@ -109,11 +109,11 @@ export function PlaceLine({
       className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2 text-small"
     >
       {picked ? (
-        <span className="text-ink-muted">Dash will file this as</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash will file this as</span>
       ) : guess.state === 'reading' ? (
-        <span className="text-ink-muted">Dash is working out where this goes…</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is working out where this goes…</span>
       ) : sure && sort ? (
-        <span className="min-w-0 flex-1 text-ink-muted">
+        <span className="voice-dash min-w-0 flex-1 px-2 py-0.5 text-ink-muted">
           {sort.parts.length === 1 ? 'Dash will file this as ' : `Dash will file this in ${sort.parts.length} places: `}
           {sort.parts.map((part, index) => (
             <span key={index}>
@@ -123,7 +123,7 @@ export function PlaceLine({
           ))}
         </span>
       ) : (
-        <span className="text-ink-muted">Dash is not sure where this goes. Which is it?</span>
+        <span className="voice-dash px-2 py-0.5 text-ink-muted">Dash is not sure where this goes. Which is it?</span>
       )}
       {(asking || picked) && (
         <span className="flex w-full flex-wrap gap-1.5">
