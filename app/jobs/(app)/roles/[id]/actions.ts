@@ -111,6 +111,53 @@ export async function saveCoverLetter(input: {
   return { error: null };
 }
 
+const applicationMarksSchema = z
+  .object({
+    applicationId: z.string().uuid(),
+    roleId: z.string().uuid(),
+    readyToApply: z.boolean().optional(),
+    /** true for yes, false for no, null to clear the answer. */
+    hasCoverLetter: z.boolean().nullable().optional(),
+  })
+  .refine((v) => v.readyToApply !== undefined || v.hasCoverLetter !== undefined, {
+    message: 'Nothing to save.',
+  });
+
+/**
+ * Saves the two marks on an application: ready to apply, and whether it has a
+ * cover letter. Either or both may be sent; a field left out is not touched.
+ * hasCoverLetter is your own answer (null clears it), separate from whether
+ * applications.cover_letter holds text.
+ */
+// latency: pending
+export async function saveApplicationMarks(input: {
+  applicationId: string;
+  roleId: string;
+  readyToApply?: boolean;
+  hasCoverLetter?: boolean | null;
+}): Promise<{ error: string | null }> {
+  const parsed = applicationMarksSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const patch: { ready_to_apply?: boolean; has_cover_letter?: boolean | null } = {};
+  if (parsed.data.readyToApply !== undefined) patch.ready_to_apply = parsed.data.readyToApply;
+  if (parsed.data.hasCoverLetter !== undefined) patch.has_cover_letter = parsed.data.hasCoverLetter;
+
+  const { error } = await supabase
+    .from('applications')
+    .update(patch)
+    .eq('id', parsed.data.applicationId)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  revalidatePath('/jobs');
+  return { error: null };
+}
+
 const renameRoleSchema = z.object({
   roleId: z.string().uuid(),
   title: z.string().trim().min(1, 'A role needs a name.').max(200),

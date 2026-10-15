@@ -111,6 +111,12 @@ export function PipelinePage({
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of scoped) countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
+  const marks = {
+    ready: scoped.filter((row) => row.readyToApply).length,
+    notReady: scoped.filter((row) => !row.readyToApply).length,
+    letter: scoped.filter((row) => row.hasCoverLetter === true).length,
+    noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
+  };
   const scored = rows.some((row) => row.scoreNote);
 
   const askFilter = askListFilter('pipeline', params);
@@ -144,6 +150,7 @@ export function PipelinePage({
               (source) => [source, countsBySource.get(source) ?? 0] as const,
             )}
             scored={scored}
+            marks={marks}
           />
         </div>
         <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />
