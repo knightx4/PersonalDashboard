@@ -9,7 +9,9 @@ import { FieldError } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Timeline, type TimelineEntry } from '@/components/ui/timeline';
 import { formatClock } from '@/lib/clock';
+import { cn } from '@/lib/cn';
 import type { DashTodayEntry, DashTodayGroup } from '@/lib/shell/dash-today';
+import { changesLabel, dashTodayCount } from '@/lib/shell/dash-today-count';
 import type { UndoDashTodayResult } from './actions';
 
 /** How many rows a group shows before the rest fold under "Show N more". */
@@ -36,27 +38,45 @@ export function DashTodaySection({
   /** undoDashToday from ./actions, or a fixture. Never throws. */
   undo: (id: string) => Promise<UndoDashTodayResult>;
 }) {
-  const count = groups.reduce((sum, group) => sum + group.entries.length, 0);
+  const count = dashTodayCount(groups);
   if (count === 0) return null;
   return (
     <Card id="dash-today" padding="standard" className="scroll-mt-bar">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ui font-semibold text-ink">What Dash did today</h2>
-        <span className="tabular text-small text-ink-muted">
-          {count} {count === 1 ? 'change' : 'changes'}
-        </span>
+        <span className="tabular text-small text-ink-muted">{changesLabel(count)}</span>
       </div>
-      <div className="mt-2 space-y-4">
-        {groups.map((group) => (
-          <DashTodayGroupList
-            key={group.workspace ?? 'app'}
-            group={group}
-            timezone={timezone}
-            undo={undo}
-          />
-        ))}
-      </div>
+      <DashTodayGroups groups={groups} timezone={timezone} undo={undo} className="mt-2" />
     </Card>
+  );
+}
+
+/**
+ * The groups without the card round them: Home draws them inside its rail's
+ * fold (plan #1937.8), which carries the heading and the count.
+ */
+export function DashTodayGroups({
+  groups,
+  timezone,
+  undo,
+  className,
+}: {
+  groups: readonly DashTodayGroup[];
+  timezone: string;
+  undo: (id: string) => Promise<UndoDashTodayResult>;
+  className?: string;
+}) {
+  return (
+    <div className={cn('space-y-4', className)}>
+      {groups.map((group) => (
+        <DashTodayGroupList
+          key={group.workspace ?? 'app'}
+          group={group}
+          timezone={timezone}
+          undo={undo}
+        />
+      ))}
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Link, { linkVariants } from '@/components/ui/link';
+import Link from '@/components/ui/link';
 import { CalendarClock, Inbox } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
@@ -12,7 +12,6 @@ import { whenLabel, type Update } from '@/lib/shell/home-model';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
 import { HomeArrival } from './arrival';
 import { WatchMark } from './watching';
-import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * What Home draws, without what it reads (plan #1627). The page
@@ -29,15 +28,21 @@ import { Tooltip } from '@/components/ui/tooltip';
  * workspaces) is the rail, on the right from laptop width and under the main
  * column on a phone.
  *
+ * Under the greeting and the date, the day's brief, the workspace briefs and
+ * the Inbox count share one panel (plan #1937.8), so nothing the page is for
+ * sits bare on the background. The brief's divider goes with it when there is
+ * no brief yet.
+ *
  * The first visit of the day still arrives in order (plan #1558): the header
- * marks its own steps, and the rest of the main column and the rail rise
- * together on the last one.
+ * marks its own steps, the panel rises with the brief, and the rest of the
+ * main column and the rail rise together on the last step.
  */
 export function HomeColumns({
   arrive,
   day,
   remember,
   header,
+  brief,
   main,
   rail,
 }: {
@@ -45,6 +50,8 @@ export function HomeColumns({
   day: string;
   remember?: boolean;
   header: ReactNode;
+  /** This morning's brief, at the top of the panel. */
+  brief?: ReactNode;
   main: ReactNode;
   rail: ReactNode;
 }) {
@@ -54,9 +61,12 @@ export function HomeColumns({
         main={
           <>
             {header}
-            <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
-              {main}
-            </div>
+            <Card padding="standard" data-arrive="" style={arriveAt(2)} className="mt-5">
+              <div className="mb-1 border-b border-border pb-4 empty:hidden">{brief}</div>
+              <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
+                {main}
+              </div>
+            </Card>
           </>
         }
         rail={
@@ -69,81 +79,55 @@ export function HomeColumns({
   );
 }
 
-/** The greeting, the date with the day's sigil beside it, and this morning's brief. */
+/**
+ * The greeting, and the date with the day's sigil beside it. The date fits one
+ * line on a phone (plan #1937.8), where every line of the first screen counts.
+ */
 export function HomeHeader({
   greeting,
   date,
   sigil,
-  brief,
 }: {
   greeting: string;
   date: string;
   sigil?: ReactNode;
-  brief?: ReactNode;
 }) {
   return (
-    <header className="border-b border-border-strong pb-6 pt-2">
+    <header className="pt-2">
       <p data-arrive="" style={arriveAt(0)} className="text-ui text-ink-muted">
         {greeting}
       </p>
-      <div data-arrive="" style={arriveAt(1)} className="mt-1 flex items-center justify-between gap-4">
-        <h1 className="font-display text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
+      <div
+        data-arrive=""
+        style={arriveAt(1)}
+        className="mt-1 flex items-center justify-between gap-4"
+      >
+        <h1 className="font-display text-figure font-semibold tracking-[-0.04em] text-ink sm:text-figure-lg lg:text-figure-xl">
           {date}
         </h1>
         {sigil}
-      </div>
-      <div data-arrive="" style={arriveAt(2)}>
-        {brief}
       </div>
     </header>
   );
 }
 
-export interface HomeWorkspace {
-  id: ModuleId;
-  label: string;
-  href: string;
-}
-
-/**
- * The doors, as marks, right under the date: for when you came to get to one
- * particular workspace. Marks only, named for a screen reader and in a tooltip.
- * The rail's list is the considered version, with what is waiting in each.
- */
-export function WorkspaceMarks({ workspaces }: { workspaces: readonly HomeWorkspace[] }) {
-  if (workspaces.length === 0) return null;
-  return (
-    <nav aria-label="Jump to a workspace" className="mt-4 flex flex-wrap items-center gap-2">
-      {workspaces.map((workspace) => (
-        <Tooltip key={workspace.id} label={workspace.label}>
-          <Link
-            href={workspace.href}
-            className="press press-area rounded-control transition-opacity duration-quick hover:opacity-75"
-          >
-            <ModuleMark module={workspace.id} size="md" />
-            <span className="sr-only">{workspace.label}</span>
-          </Link>
-        </Tooltip>
-      ))}
-    </nav>
-  );
-}
-
 /** One workspace's line: the one sentence it would say if it could say only one. */
 export function BriefLine({ module, brief }: { module: ModuleId; brief: Brief }) {
+  // The sentence wraps rather than being cut (plan #1937.8): a brief cut at
+  // 390 loses the fact it is there to give, such as which day a window
+  // closes. Two lines at most, so a long one cannot push the Inbox count off
+  // a phone's first screen.
   return (
-    <li className="flex items-center gap-3 py-3.5">
+    <li className="flex items-start gap-3 py-2.5">
       <ModuleMark module={module} size="sm" />
       {brief.href ? (
-        // The words truncate inside the link rather than the link itself, so
-        // its 44px press area (press-area) is not clipped with them.
         <Link href={brief.href} className="press-area min-w-0 flex-1 text-body text-ink hover:text-accent">
-          <span className="block truncate">{brief.text}</span>
+          <span className="line-clamp-2">{brief.text}</span>
         </Link>
       ) : (
-        <span className="min-w-0 flex-1 truncate text-body text-ink">{brief.text}</span>
+        <span className="line-clamp-2 min-w-0 flex-1 text-body text-ink">{brief.text}</span>
       )}
-      {brief.tone === 'caution' && <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />}
+      {brief.tone === 'caution' && <span className="mt-2 size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />}
     </li>
   );
 }
@@ -167,7 +151,7 @@ export function InboxLine({ count }: { count: number | null }) {
   return (
     <Link
       href="/home/inbox"
-      className="press-area mt-3 flex items-center gap-3 py-2 text-body text-ink hover:text-accent"
+      className="press-area flex items-center gap-3 border-t border-border pt-3 text-body text-ink hover:text-accent"
     >
       <Inbox className="size-5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       <span className="tabular min-w-0 flex-1 truncate">{words}</span>
@@ -196,9 +180,11 @@ export interface TodayDue {
 /**
  * Overdue and today only, capped, with a count of the rest so the cap is not
  * mistaken for all. What today already holds goes above the things to do,
- * without a checkbox. The page leaves it out when there is nothing.
+ * without a checkbox. Drawn inside its fold in the rail (HomeFold, plan
+ * #1937.8), which carries the heading; the page leaves it out when there is
+ * nothing.
  */
-export function TodayCard({
+export function TodayList({
   happening,
   due,
   more,
@@ -210,22 +196,24 @@ export function TodayCard({
   timezone: string;
 }) {
   return (
-    <Card padding="standard" className="mt-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">Today</h2>
-        <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
-          The agenda
-        </Link>
-      </div>
+    <>
       {happening.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="space-y-1">
           {happening.map((entry) => (
             <li
               key={entry.key}
               className="flex flex-wrap items-baseline gap-x-2 rounded-control bg-accent-tint px-3 py-1.5 text-small text-ink"
             >
-              <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              {entry.at && <span className="tabular font-medium">{formatClock(entry.at, { timeZone: timezone })}</span>}
+              <CalendarClock
+                className="size-3.5 shrink-0 text-accent"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              {entry.at && (
+                <span className="tabular font-medium">
+                  {formatClock(entry.at, { timeZone: timezone })}
+                </span>
+              )}
               {entry.href ? (
                 <Link href={entry.href} className="press-area font-medium hover:text-accent">
                   {entry.label}
@@ -244,11 +232,16 @@ export function TodayCard({
           {due.map((entry) => (
             <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
               {entry.overdue && (
-                <span className="shrink-0 text-micro font-medium text-danger">{BUCKET_LABELS.overdue}</span>
+                <span className="shrink-0 text-micro font-medium text-danger">
+                  {BUCKET_LABELS.overdue}
+                </span>
               )}
               {/* Each line goes where the thing itself lives: a task to its own
                   row on the agenda, a source item to whatever it is about. */}
-              <Link href={entry.href} className="press-area min-w-0 flex-1 text-ui text-ink hover:text-accent">
+              <Link
+                href={entry.href}
+                className="press-area min-w-0 flex-1 text-ui text-ink hover:text-accent"
+              >
                 <span className="block truncate">{entry.title}</span>
               </Link>
             </li>
@@ -256,11 +249,14 @@ export function TodayCard({
         </ul>
       )}
       {more > 0 && (
-        <Link href="/todo" className="press-area mt-2 block text-small text-ink-muted hover:text-accent">
+        <Link
+          href="/todo"
+          className="press-area mt-2 block text-small text-ink-muted hover:text-accent"
+        >
           {more} more on the agenda
         </Link>
       )}
-    </Card>
+    </>
   );
 }
 
@@ -278,57 +274,58 @@ export interface WeekRow {
 
 /** "Tue 29", for a day in the coming week. The day is already the reader's. */
 function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${day}T00:00:00Z`),
-  );
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
 }
 
 /**
  * The next seven days after today, in the rail: what is booked and what falls
  * due, so a Tuesday interview is seen on Saturday. A title wraps rather than
- * being cut, since the rail is narrow. The page leaves it out when nothing is
- * coming.
+ * being cut, since the rail is narrow. Drawn inside its fold (HomeFold); the
+ * page leaves it out when nothing is coming.
  */
-export function WeekCard({ rows, timezone }: { rows: readonly WeekRow[]; timezone: string }) {
+export function WeekList({ rows, timezone }: { rows: readonly WeekRow[]; timezone: string }) {
   return (
-    <Card padding="standard">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">This week</h2>
-        <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
-          The agenda
-        </Link>
-      </div>
-      <ul className="mt-2 divide-y divide-border">
-        {rows.map((row) => (
-          <li key={row.key} className="flex items-baseline gap-2 py-1.5">
-            <span className="tabular w-20 shrink-0 text-small text-ink-muted">
-              {row.day ? dayLabel(row.day) : ''}
-              {row.booked && row.at ? ` ${formatClock(row.at, { timeZone: timezone })}` : ''}
-            </span>
-            {/* Every row keeps the icon's slot, so the titles share one left
+    <ul className="divide-y divide-border">
+      {rows.map((row) => (
+        <li key={row.key} className="flex items-baseline gap-2 py-1.5">
+          <span className="tabular w-20 shrink-0 text-small text-ink-muted">
+            {row.day ? dayLabel(row.day) : ''}
+            {row.booked && row.at ? ` ${formatClock(row.at, { timeZone: timezone })}` : ''}
+          </span>
+          {/* Every row keeps the icon's slot, so the titles share one left
                 edge; the slot sits on the first line's baseline. */}
-            <span className="inline-block w-3.5 shrink-0">
-              {row.booked && (
-                <CalendarClock className="block size-3.5 text-accent" strokeWidth={1.75} aria-hidden />
-              )}
-            </span>
-            <Link href={row.href} className="press-area min-w-0 flex-1 text-ui text-ink hover:text-accent">
-              {row.label}
-              {row.detail && <span className="text-ink-muted"> · {row.detail}</span>}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Card>
+          <span className="inline-block w-3.5 shrink-0">
+            {row.booked && (
+              <CalendarClock
+                className="block size-3.5 text-accent"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            )}
+          </span>
+          <Link
+            href={row.href}
+            className="press-area min-w-0 flex-1 text-ui text-ink hover:text-accent"
+          >
+            {row.label}
+            {row.detail && <span className="text-ink-muted"> · {row.detail}</span>}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /**
  * What happened in the last three days: replies, orders, the newsletters that
- * came in, and any watch that finished. Each line names the thing. The page
- * leaves it out when nothing happened.
+ * came in, and any watch that finished. Each line names the thing. Drawn
+ * inside its fold (HomeFold); the page leaves it out when nothing happened.
  */
-export function UpdatesCard({
+export function UpdatesList({
   updates,
   now,
   timezone,
@@ -338,68 +335,32 @@ export function UpdatesCard({
   timezone: string;
 }) {
   return (
-    <Card padding="standard" className="mt-4">
-      <h2 className="text-ui font-semibold text-ink">Updates</h2>
-      <ul className="mt-2 divide-y divide-border">
-        {updates.map((update) => {
-          const body = (
-            <>
-              <span className="block truncate text-ui text-ink">{update.text}</span>
-              {update.detail && <span className="block truncate text-small text-ink-muted">{update.detail}</span>}
-            </>
-          );
-          return (
-            <li key={update.key} className="flex items-center gap-3 py-2">
-              {update.module ? <ModuleMark module={update.module} size="sm" /> : <WatchMark />}
-              {update.href ? (
-                <Link href={update.href} className="press-area min-w-0 flex-1 hover:opacity-80">
-                  {body}
-                </Link>
-              ) : (
-                <span className="min-w-0 flex-1">{body}</span>
-              )}
-              <span className="tabular shrink-0 text-small text-ink-muted">{whenLabel(update.at, now, timezone)}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
-export interface WorkspaceEntry extends HomeWorkspace {
-  /** What is waiting in it (describeCount), or what it is for when nothing is. */
-  stat: string;
-}
-
-/**
- * Every workspace with what is waiting in it, at the foot of the rail. A list
- * rather than the tiles it was, since three tiles across do not fit the
- * rail's 18rem.
- */
-export function WorkspaceList({ workspaces }: { workspaces: readonly WorkspaceEntry[] }) {
-  if (workspaces.length === 0) return null;
-  return (
-    <Card padding="standard">
-      <nav aria-label="Workspaces in full">
-        <h2 className="text-ui font-semibold text-ink">Workspaces</h2>
-        <ul className="mt-2 divide-y divide-border">
-          {workspaces.map((workspace) => (
-            <li key={workspace.id}>
-              <Link
-                href={workspace.href}
-                className="group flex items-center gap-3 py-2 transition-opacity duration-quick hover:opacity-80"
-              >
-                <ModuleMark module={workspace.id} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-ui font-medium text-ink group-hover:text-accent">{workspace.label}</span>
-                  <span className="tabular block truncate text-small text-ink-muted">{workspace.stat}</span>
-                </span>
+    <ul className="divide-y divide-border">
+      {updates.map((update) => {
+        const body = (
+          <>
+            <span className="block truncate text-ui text-ink">{update.text}</span>
+            {update.detail && (
+              <span className="block truncate text-small text-ink-muted">{update.detail}</span>
+            )}
+          </>
+        );
+        return (
+          <li key={update.key} className="flex items-center gap-3 py-2">
+            {update.module ? <ModuleMark module={update.module} size="sm" /> : <WatchMark />}
+            {update.href ? (
+              <Link href={update.href} className="press-area min-w-0 flex-1 hover:opacity-80">
+                {body}
               </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    </Card>
+            ) : (
+              <span className="min-w-0 flex-1">{body}</span>
+            )}
+            <span className="tabular shrink-0 text-small text-ink-muted">
+              {whenLabel(update.at, now, timezone)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
