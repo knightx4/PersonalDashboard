@@ -54,6 +54,7 @@ import {
 import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
+import { usePutAwayItems } from './put-away';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
 import { areaCrumbs } from '@/lib/goals/crumbs';
@@ -156,7 +157,7 @@ async function writeReopen(id: string) {
 const EMPTY_VIEW: Record<AllGoalsView, { title: string; description: string }> = {
   open: {
     title: 'No open goals',
-    description: 'Every goal is finished or archived. Everything shows them all.',
+    description: 'Every goal is finished, parked or archived. Everything shows them all.',
   },
   you: {
     title: 'Nothing is waiting on you',
@@ -518,7 +519,7 @@ function GoalRow({
     write: () => writeReopen(served.id),
   });
   const moveSelf = useMoveSelf(served.id, writeGoalMove);
-  const [editState, edit, editing] = useActionState(editGoal, initial);
+  const [editState] = useActionState(editGoal, initial);
   const toast = useToast();
 
   async function archive(form: FormData) {
@@ -546,6 +547,8 @@ function GoalRow({
   }
 
   const moveToItems = useMoveToItems(goal, places);
+  // Park goal for any open goal, and Archive goal (plan #2097.1).
+  const putAwayItems = usePutAwayItems(goal, steps?.live ?? 0);
 
   // An archived goal, shown only under Everything, is restored or left be.
   const archived = Boolean(goal.archivedAt);
@@ -565,13 +568,7 @@ function GoalRow({
           onSelect: () => moveSelf('down'),
         },
         ...moveToItems,
-        {
-          id: 'archive',
-          label: 'Archive goal',
-          destructive: true,
-          formAction: archive,
-          formFields: { id: goal.id },
-        },
+        ...putAwayItems,
       ];
 
   return (
