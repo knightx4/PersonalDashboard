@@ -28,11 +28,49 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
   private cap: number | null = null;
   private window: [number, number] | null = null;
   private counted = false;
+  private head = false;
 
   constructor(private readonly rows: Row[]) {}
 
-  select(_columns?: string, options?: { count?: string }) {
+  select(_columns?: string, options?: { count?: string; head?: boolean }) {
     this.counted = options?.count === 'exact';
+    this.head = options?.head === true;
+    return this;
+  }
+  neq(column: string, value: unknown) {
+    this.filters.push((row) => row[column] != null && row[column] !== value);
+    return this;
+  }
+  gt(column: string, value: string | number) {
+    this.filters.push((row) => row[column] != null && (typeof value === 'number' ? Number(row[column]) > value : String(row[column]) > value));
+    return this;
+  }
+  not(column: string, operator: string, value: unknown) {
+    if (operator !== 'is' || value !== null) throw new Error(`fake not: ${operator}`);
+    this.filters.push((row) => row[column] != null);
+    return this;
+  }
+  ilike(column: string, pattern: string) {
+    const needle = pattern.replace(/^%|%$/g, '').replace(/\\(.)/g, '$1').toLowerCase();
+    this.filters.push((row) => typeof row[column] === 'string' && (row[column] as string).toLowerCase().includes(needle));
+    return this;
+  }
+  contains(column: string, values: unknown[]) {
+    this.filters.push((row) => Array.isArray(row[column]) && values.every((v) => (row[column] as unknown[]).includes(v)));
+    return this;
+  }
+  /** PostgREST's or-filter, for the is.null, eq and neq parts query_rows writes. */
+  or(filters: string) {
+    const parts = filters.match(/(?:[^,"]|"(?:[^"\\]|\\.)*")+/g) ?? [];
+    const tests = parts.map((part) => {
+      const [, column, op, raw] = /^(\w+)\.(is|eq|neq)\.(.*)$/.exec(part) ?? [];
+      const value = raw?.startsWith('"') ? raw.slice(1, -1).replace(/\\(.)/g, '$1') : raw;
+      if (op === 'is') return (row: Row) => row[column] == null;
+      if (op === 'eq' && value === '{}') return (row: Row) => Array.isArray(row[column]) && (row[column] as unknown[]).length === 0;
+      if (op === 'eq') return (row: Row) => row[column] != null && String(row[column]) === value;
+      return (row: Row) => row[column] != null && String(row[column]) !== value;
+    });
+    this.filters.push((row) => tests.some((t) => t(row)));
     return this;
   }
   eq(column: string, value: unknown) {
@@ -55,8 +93,8 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
     this.filters.push((row) => row[column] != null && String(row[column]) <= value);
     return this;
   }
-  lt(column: string, value: string) {
-    this.filters.push((row) => row[column] != null && String(row[column]) < value);
+  lt(column: string, value: string | number) {
+    this.filters.push((row) => row[column] != null && (typeof value === 'number' ? Number(row[column]) < value : String(row[column]) < value));
     return this;
   }
   /** Every word of the query somewhere in the title or body, as a crude full-text match. */
@@ -96,9 +134,20 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
     const count = this.counted ? out.length : null;
     if (this.window) out = out.slice(this.window[0], this.window[1] + 1);
     if (this.cap !== null) out = out.slice(0, this.cap);
+    if (this.head) out = [];
     return Promise.resolve({ data: out, error: null, count }).then(onFulfilled, onRejected);
   }
 }
+
+/** More of job_search.applications' real columns, for query_rows. */
+const APPLICATION_COLUMNS = [
+  { table: 'job_search.applications', column: 'user_id', type: 'uuid', nullable: false },
+  { table: 'job_search.applications', column: 'status', type: 'job_search.application_status', nullable: false },
+  { table: 'job_search.applications', column: 'excitement', type: 'integer', nullable: true },
+  { table: 'job_search.applications', column: 'next_action', type: 'text', nullable: true },
+  { table: 'job_search.applications', column: 'cover_letter', type: 'text', nullable: true },
+  { table: 'job_search.applications', column: 'created_at', type: 'timestamp with time zone', nullable: false },
+];
 
 /** Every rpc a lookup made, by name, with its arguments. */
 type RpcCall = { fn: string; args: Record<string, unknown> };
@@ -121,6 +170,7 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
           columns: [
             { table: 'job_search.applications', column: 'id', type: 'uuid', nullable: false },
             { table: 'job_search.applications', column: 'role_id', type: 'uuid', nullable: false },
+            ...APPLICATION_COLUMNS,
             { table: 'job_search.cover_letters', column: 'id', type: 'uuid', nullable: false },
           ],
           links: [
@@ -960,9 +1010,10 @@ describe('table_info', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const info = result.totals as { columns: unknown[]; linksTo: unknown[]; linkedFrom: unknown[] };
-    expect(info.columns).toEqual([
+    expect(info.columns.slice(0, 3)).toEqual([
       { column: 'id', type: 'uuid', nullable: false },
       { column: 'role_id', type: 'uuid', nullable: false },
+      { column: 'user_id', type: 'uuid', nullable: false },
     ]);
     expect(info.linksTo).toEqual([{ column: 'role_id', table: 'job_search.roles', toColumn: 'id' }]);
     expect(info.linkedFrom).toEqual([{ table: 'job_search.cover_letters', column: 'application_id', toColumn: 'id' }]);
@@ -1084,5 +1135,118 @@ describe('the parent of each row (plan #2109.2)', () => {
   it('names a parent with no page by its title column', async () => {
     const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'public.recurring_charges' }, context(tables)));
     expect(rows[0].parent).toEqual({ table: 'public.recurring_payments', ref: PAYMENT, title: 'Netflix', href: null });
+  });
+});
+
+describe('query_rows (plan #2109.4)', () => {
+  const ROLE = '00000000-0000-4000-8000-0000000000c1';
+  const app = (n: number, userId: string, status: string, extra: Row = {}): Row => ({
+    id: `00000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`,
+    user_id: userId,
+    role_id: ROLE,
+    status,
+    excitement: n,
+    next_action: `Next ${n}`,
+    cover_letter: null,
+    created_at: `2026-10-${String(n).padStart(2, '0')}`,
+    ...extra,
+  });
+  const tables: Tables = {
+    'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Designer at Acme' }],
+    'job_search.applications': [
+      app(1, ME, 'applied', { cover_letter: 'Dear Acme' }),
+      app(2, ME, 'applied', { cover_letter: '' }),
+      app(3, ME, 'interviewing'),
+      app(4, ME, 'to_apply', { cover_letter: 'Dear Beta' }),
+      app(5, ME, 'to_apply'),
+      app(6, THEM, 'applied'),
+      app(7, THEM, 'to_apply'),
+    ],
+  };
+  const run = (input: Record<string, unknown>) =>
+    executeAskTool('query_rows', { table: 'job_search.applications', ...input }, context(tables));
+
+  it("counts the person's applications by status in one call, and none of another person's", async () => {
+    const result = await run({ group_by: 'status' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toEqual([]);
+    expect(result.totals).toEqual({
+      matched: 5,
+      shown: 0,
+      group_by: 'status',
+      groups: [
+        { value: 'applied', count: 2 },
+        { value: 'to_apply', count: 2 },
+        { value: 'interviewing', count: 1 },
+      ],
+    });
+    expect(result.note).toContain('5 matched');
+  });
+
+  it('lists the applications where a chosen field is empty, counting empty text as empty', async () => {
+    const result = await run({ where: [{ column: 'cover_letter', op: 'empty' }], order: { column: 'excitement', ascending: true } });
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.title)).toEqual(['Next 2', 'Next 3', 'Next 5']);
+    expect(result.ok && result.totals).toEqual({ matched: 3, shown: 3 });
+    expect(result.ok && result.note).toContain('3 matched, showing all');
+  });
+
+  it('applies every condition together, and counts without listing', async () => {
+    const both = await run({
+      where: [
+        { column: 'status', op: 'equals', value: 'to_apply' },
+        { column: 'cover_letter', op: 'not_empty' },
+      ],
+    });
+    expect(expectLinkedRows(both).map((r) => r.title)).toEqual(['Next 4']);
+
+    const counted = await run({ where: [{ column: 'status', op: 'one_of', value: ['applied', 'interviewing'] }], count_only: true });
+    expect(counted.ok && counted.rows).toEqual([]);
+    expect(counted.ok && counted.totals).toEqual({ matched: 3, shown: 0 });
+
+    const others = await run({
+      where: [
+        { column: 'status', op: 'not_equals', value: 'applied' },
+        { column: 'excitement', op: 'greater', value: 3 },
+      ],
+    });
+    expect(expectLinkedRows(others).map((r) => r.title)).toEqual(['Next 5', 'Next 4']);
+
+    const words = await run({ where: [{ column: 'cover_letter', op: 'contains', value: 'beta' }], columns: ['cover_letter'] });
+    expect(expectLinkedRows(words).map((r) => r.detail)).toEqual([{ cover_letter: 'Dear Beta' }]);
+  });
+
+  it('says how many matched and how many it lists when the limit cuts them', async () => {
+    const result = await run({ limit: 2 });
+    expect(result.ok && result.rows).toHaveLength(2);
+    expect(result.ok && result.note).toContain('5 matched, showing 2');
+  });
+
+  it('refuses a column the table does not have, wherever it is named', async () => {
+    for (const input of [
+      { where: [{ column: 'company_name', op: 'equals', value: 'Acme' }] },
+      { group_by: 'company_name' },
+      { columns: ['title'] },
+      { order: { column: 'salary' } },
+    ]) {
+      expect(await run(input)).toEqual({ ok: false, error: expect.stringContaining('has no column') });
+    }
+    expect(await run({ where: [{ column: 'status', op: 'contains', value: 'app' }] })).toEqual({
+      ok: false,
+      error: expect.stringContaining('contains works on text'),
+    });
+    expect(await run({ where: [{ column: 'status', op: 'equals' }] })).toEqual({ ok: false, error: expect.stringContaining('needs a value') });
+    expect(await run({ where: [{ column: 'status', op: 'like', value: 'x' }] })).toEqual({ ok: false, error: expect.stringContaining('needs op') });
+  });
+
+  it('refuses a table outside the catalogue, and one whose workspace is off', async () => {
+    expect(await executeAskTool('query_rows', { table: 'auth.users' }, context(tables))).toEqual({
+      ok: false,
+      error: expect.stringContaining('not a table Dash can read'),
+    });
+    expect(
+      await executeAskTool('query_rows', { table: 'job_search.applications' }, context(tables, { enabledModules: ['shopping'] })),
+    ).toEqual({ ok: false, error: expect.stringContaining('Job search workspace is switched off') });
   });
 });

@@ -60,7 +60,7 @@ export function sourceWorkspace(source: Source): ModuleId | null {
  * Where a row with no page of its own is linked: its workspace's front page,
  * so the answer can still cite it. Home for a table that belongs to none.
  */
-function fallbackHref(source: Source): string {
+export function fallbackHref(source: Source): string {
   return MODULE_BY_LABEL.get(source.module)?.prefix ?? '/';
 }
 
@@ -69,14 +69,14 @@ export function listableList(): string {
   return LISTABLE.map((s) => `${s.table} (${s.holds.replace(/\.$/, '')})`).join('; ');
 }
 
-function asText(value: unknown): string | null {
+export function asText(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
 }
 
 /** The embedded row's column, whether PostgREST returned the embed as an object or a one-row list. */
-function viaTitle(row: Record<string, unknown>, via: NonNullable<Source['titleVia']>): string | null {
+export function viaTitle(row: Record<string, unknown>, via: NonNullable<Source['titleVia']>): string | null {
   const alias = via.embed.split(':')[0];
   const embedded = row[alias];
   const one = Array.isArray(embedded) ? embedded[0] : embedded;
