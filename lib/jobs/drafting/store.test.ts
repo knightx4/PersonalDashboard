@@ -3,12 +3,14 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import {
   LETTER_KEY,
   clearDrafts,
+  dropDraft,
   loadDrafts,
   parseAsks,
   parseDrafts,
   saveDrafts,
   saveReplies,
   withReplies,
+  withoutDraft,
   type StoredAsk,
 } from './store';
 
@@ -116,6 +118,18 @@ describe('application drafts store', () => {
     await saveDrafts(client, 'user-1', 'app-1', 'answers', { drafts: DRAFTS, asks: ASKS });
     await clearDrafts(client, 'app-1', 'answers');
     expect((await loadDrafts(client, 'app-1', 'answers')).drafts).toBeNull();
+  });
+
+  it('drops one inserted or discarded draft and keeps the rest and every ask', async () => {
+    const { client } = fakeClient();
+    expect(await dropDraft(client, 'app-1', 'answers', 'ans-1')).toEqual({ error: null });
+    await saveDrafts(client, 'user-1', 'app-1', 'answers', { drafts: DRAFTS, asks: ASKS });
+    await saveReplies(client, 'app-1', 'answers', { a1: 'The close team.' });
+    await dropDraft(client, 'app-1', 'answers', 'ans-1');
+    const after = (await loadDrafts(client, 'app-1', 'answers')).drafts;
+    expect(Object.keys(after?.drafts ?? {})).toEqual(['ans-2']);
+    expect(after?.asks.map((a) => a.reply)).toEqual(['The close team.', null]);
+    expect(withoutDraft(DRAFTS, 'nope')).toBe(DRAFTS);
   });
 });
 

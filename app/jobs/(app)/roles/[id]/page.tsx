@@ -38,6 +38,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { loadThread } from '@/lib/thread/store';
+import { loadDrafts } from '@/lib/jobs/drafting/store';
+import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 
@@ -166,6 +168,7 @@ export default async function RoleDetailPage({
     { data: companyContacts },
     { data: bank },
     { data: allCompanies },
+    { drafts: storedDrafts },
   ] = await Promise.all([
     supabase
       .from('application_events')
@@ -240,6 +243,9 @@ export default async function RoleDetailPage({
     supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
     // Every company on file, to move this role to the right one by name.
     supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
+    // Dash's drafts of the answers and its questions back, kept between
+    // visits (plan #2130.4). A failed read shows the tab without them.
+    loadDrafts(supabase, current.id as string, 'answers'),
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -668,8 +674,13 @@ export default async function RoleDetailPage({
               // between drafting an answer and submitting it.
               evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
               unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
+              wordLimit: (answer.word_limit as number | null) ?? null,
             };
           })}
+          answerDrafts={Object.fromEntries(
+            Object.entries(storedDrafts?.drafts ?? {}).map(([id, draft]) => [id, fromStoredDraft(draft)]),
+          )}
+          dashAsks={storedDrafts?.asks ?? []}
           thread={notes ?? []}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
             id: group.id as string,
