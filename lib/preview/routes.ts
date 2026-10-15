@@ -165,6 +165,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-goals-list': ['/goals/[goalId]', '/learn/goals'],
   'learn-flow-scope': ['/learn/flow'],
   'learn-subject-chain': ['/learn/s/[id]'],
+  'learn-topics': ['/learn/topics'],
+  'learn-topics-loading': ['/learn/topics'],
+  'learn-topics-error': ['/learn/topics'],
+  'learn-topic-draft': ['/learn/topics/[id]'],
+  'learn-topic-draft-match': ['/learn/topics/[id]'],
+  'learn-topic-draft-comment': ['/learn/topics/[id]'],
   'jobs-interviews': ['/jobs/interviews'],
   'shell-display-options': [
     '/jobs/pipeline',

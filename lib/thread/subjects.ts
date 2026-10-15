@@ -18,7 +18,8 @@ import type { CommentTarget } from '@/lib/comments/load';
  * (plan #957), a role in Jobs (note 89ad8bef), a file (note 7a6a37aa), or a
  * todo, an order, an inventory item, a saved news story or a vault note
  * (plan #1471), or a reading in Learn, where the thread is a chat with Dash
- * about it (plan #1876.5).
+ * about it (plan #1876.5), or a topic in Learn, drafted or approved (plan
+ * #2138.2).
  */
 export type ThreadTarget =
   | CommentTarget
@@ -30,7 +31,8 @@ export type ThreadTarget =
   | 'item'
   | 'story'
   | 'vault_note'
-  | 'reading';
+  | 'reading'
+  | 'topic';
 
 /** The table each target's rows live in, which is the table half of its ref. */
 export const THREAD_TABLES = {
@@ -50,6 +52,7 @@ export const THREAD_TABLES = {
   story: 'news.saved_stories',
   vault_note: 'obsidian.notes',
   reading: 'learn.readings',
+  topic: 'learn.topics',
 } as const satisfies Record<ThreadTarget, string>;
 
 const TARGET_OF = new Map<string, ThreadTarget>(
