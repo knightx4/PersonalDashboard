@@ -83,6 +83,7 @@ import { searchStudy, type StudySearch } from '@/lib/learn/essays/study-store';
 import { deeperProblem, type EssayResearch } from '@/lib/learn/essays/research';
 import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass } from '@/lib/learn/essays/research-model';
 import { mapPrompt } from '@/lib/learn/essays/research-map';
+import { logEssayCall } from '@/lib/learn/essays/log-store';
 import { GUIDE_MODEL, runResearchMap } from '@/lib/learn/essays/guide-model';
 import { insertEssayResearch } from '@/lib/learn/essays/research-store';
 import { costMicrosFor, totalMicros, type SpendReport } from '@/lib/core/spend/pricing';
@@ -1035,6 +1036,15 @@ export async function researchEssay(
         };
       const result = await runResearchMap({ prompt, anthropicApiKey: apiKey, onSpend: spend.sink });
       await recordLearnSpend(user.id, 'research-essay-question', spend.reports);
+      if (result.ok) {
+        await logEssayCall(supabase, user.id, parsed.data.id, {
+          stage: 'research',
+          action: 'research-essay-question',
+          model: GUIDE_MODEL,
+          prompt,
+          content: result.content,
+        });
+      }
       if (!result.ok) {
         console.error('[essay research] first', result.detail);
         return {

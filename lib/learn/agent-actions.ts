@@ -66,6 +66,8 @@ export const learnActions: ModuleActions = {
     shapeEssayPlan: none('spends'),
     reviewEssayPlan: none('spends'),
     askEssayPoint: none('spends'),
+    findPointEvidence: none('spends'),
+    logEssayStage: none('page'),
   },
   'app/learn/flow/actions.ts': {
     flowStep: none('page'),

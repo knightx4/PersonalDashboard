@@ -25,7 +25,11 @@ export function rephraseProblem(selection: string): string | null {
 }
 
 /** The text around the selection, cut at a line where it can be, as the model reads it. */
-export function rephraseContext(doc: string, from: number, to: number): { before: string; after: string } {
+export function rephraseContext(
+  doc: string,
+  from: number,
+  to: number,
+): { before: string; after: string } {
   let start = Math.max(0, from - BEFORE);
   if (start > 0) {
     const line = doc.indexOf('\n', start);
@@ -48,9 +52,19 @@ export function rephraseContext(doc: string, from: number, to: number): { before
  */
 export function usableRephrase(reply: string, selection: string): string | null {
   let text = reply.trim();
-  const pairs: [string, string][] = [['"', '"'], ['“', '”'], ["'", "'"], ['‘', '’']];
+  const pairs: [string, string][] = [
+    ['"', '"'],
+    ['“', '”'],
+    ["'", "'"],
+    ['‘', '’'],
+  ];
   for (const [open, close] of pairs) {
-    if (text.length > 1 && text.startsWith(open) && text.endsWith(close) && !selection.trim().startsWith(open)) {
+    if (
+      text.length > 1 &&
+      text.startsWith(open) &&
+      text.endsWith(close) &&
+      !selection.trim().startsWith(open)
+    ) {
       text = text.slice(open.length, text.length - close.length).trim();
     }
   }
@@ -78,13 +92,16 @@ export function describeRephrase(input: {
   guidance?: string;
 }): string {
   const parts: string[] = [];
-  if (input.claim.trim()) parts.push(`The essay's claim, in the writer's words: ${input.claim.trim()}`);
+  if (input.claim.trim())
+    parts.push(`The essay's claim, in the writer's words: ${input.claim.trim()}`);
   if (input.reader.trim()) parts.push(`Who it is for: ${input.reader.trim()}`);
   parts.push(`<before>\n${input.before}\n</before>`);
   parts.push(`<selected>\n${input.selection.trim()}\n</selected>`);
   parts.push(`<after>\n${input.after}\n</after>`);
   if (input.guidance?.trim()) {
-    parts.push(`What a check noticed about the selected text, which the rewording should answer: ${input.guidance.trim()}`);
+    parts.push(
+      `What a check noticed about the selected text, which the rewording should answer: ${input.guidance.trim()}`,
+    );
   }
   parts.push('Reword the selected text only.');
   return parts.join('\n\n');

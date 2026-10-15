@@ -48,6 +48,7 @@ import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
 import { EssayResearchCard, ResearchStage, useEssayResearch } from './essay-research';
 import { NextStage, StageGuide, StageStepper, useEssayPlan } from './essay-stages';
+import { logEssayStage } from './guide-actions';
 import { DiscoverStage } from './essay-discover';
 import { PlanStage } from './essay-plan';
 import { StructureStage } from './essay-structure';
@@ -683,6 +684,7 @@ export function EssayView({
         setDoc((now) => ({ ...latestDoc.current, version: now.version + 1 }));
       }
       setStageState(next);
+      if (!planFrozen) void logEssayStage(essay.id, next).catch(() => undefined);
       try {
         const url = new URL(window.location.href);
         url.searchParams.set('stage', next);
@@ -692,8 +694,14 @@ export function EssayView({
       }
       window.scrollTo({ top: 0 });
     },
-    [stage],
+    [essay.id, planFrozen, stage],
   );
+  // The stage the page opened on counts as a visit too.
+  useEffect(() => {
+    if (!planFrozen) void logEssayStage(essay.id, stage).catch(() => undefined);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const planRef = useRef<EssayPlan>(plan);
   useEffect(() => {
     planRef.current = plan;
@@ -992,6 +1000,12 @@ export function EssayView({
         canOutline={words === 0}
         onOutline={putOutline}
         onEdit={() => setStage(plan.points.length ? 'structure' : 'plan')}
+        onCite={(item) =>
+          researchApi.cite(
+            { url: item.url, title: item.sourceTitle, domain: item.domain, text: null },
+            item.quote,
+          )
+        }
       />
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
       <EssayStudyCard

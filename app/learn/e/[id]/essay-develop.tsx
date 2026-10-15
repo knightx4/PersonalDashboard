@@ -1,12 +1,10 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineTextarea, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
-import { cn } from '@/lib/cn';
 import {
   DIG_KINDS,
   DIG_LABELS,
@@ -20,6 +18,7 @@ import {
 import { answerEssayPoint, askEssayPoint } from './guide-actions';
 import { NextStage, type PlanApi } from './essay-stages';
 import { lowerFirst } from './essay-plan';
+import { ArgumentMapCard, PointEvidenceCard } from './essay-evidence';
 
 const ASK_ACTION = 'app/learn/e/[id]/guide-actions.ts#askEssayPoint';
 const ANSWER_ACTION = 'app/learn/e/[id]/guide-actions.ts#answerEssayPoint';
@@ -66,52 +65,12 @@ export function DevelopStage({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card padding="none">
-        <CardSection
-          title="Your points"
-          hint="Pick one to work on. A tick means you have enough to write it."
-        >
-          <ol className="flex flex-col divide-y divide-border">
-            {points.map((p, i) => {
-              const on = p.id === point?.id;
-              const enough = p.ready || p.notes.length >= 2;
-              return (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    aria-current={on ? 'true' : undefined}
-                    onClick={() => setChosen(p.id)}
-                    className={cn(
-                      'press flex min-h-11 w-full items-start gap-2 rounded-control px-1.5 py-2 text-left transition-colors duration-quick hover:bg-sunken lg:min-h-0',
-                      on && 'bg-accent-tint',
-                    )}
-                  >
-                    <span className="w-5 shrink-0 text-right text-ui tabular-nums text-ink-muted">
-                      {i + 1}.
-                    </span>
-                    <span className="min-w-0 flex-1 text-ui text-ink">
-                      <span className="line-clamp-2">{p.text.trim()}</span>
-                      <span className="text-small text-ink-muted">
-                        {ROLE_LABELS[p.role]} · {p.notes.length}{' '}
-                        {p.notes.length === 1 ? 'answer' : 'answers'}
-                      </span>
-                    </span>
-                    {enough && (
-                      <Check
-                        className="mt-0.5 size-3.5 shrink-0 text-positive"
-                        strokeWidth={1.75}
-                        aria-label="Enough to write"
-                      />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </CardSection>
-      </Card>
+      <ArgumentMapCard plan={api.plan} chosen={point?.id ?? null} onChoose={setChosen} />
 
       {point && <PointWork key={point.id} essayId={essayId} point={point} api={api} />}
+      {point && (
+        <PointEvidenceCard key={`e:${point.id}`} essayId={essayId} point={point} api={api} />
+      )}
 
       <NextStage
         stage="develop"

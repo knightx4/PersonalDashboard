@@ -369,6 +369,9 @@ export const LEARN_OPERATIONS = [
   'shape-essay-plan',
   'review-essay-plan',
   'word-point-question',
+  // Evidence of one kind for one point of an essay (LEARN-ESSAYS-SPEC,
+  // "Evidence on a point"): one Sonnet call with up to four web searches.
+  'find-point-evidence',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

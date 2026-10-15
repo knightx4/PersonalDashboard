@@ -48,13 +48,21 @@ export const noteRanges = StateField.define<NotesState>({
   provide: (field) =>
     EditorView.decorations.from(field, ({ ranges, active }) => {
       const range = ranges.find((r) => r.id === active && r.to > r.from);
-      return range ? Decoration.set([Decoration.mark({ class: 'cm-essay-note-active' }).range(range.from, range.to)]) : Decoration.none;
+      return range
+        ? Decoration.set([
+            Decoration.mark({ class: 'cm-essay-note-active' }).range(range.from, range.to),
+          ])
+        : Decoration.none;
     }),
 });
 
 /** One marker per paragraph: a dot, or the count when it holds more than one open note. */
 class NoteMarker extends GutterMarker {
-  constructor(readonly id: string, readonly count: number, readonly active: boolean) {
+  constructor(
+    readonly id: string,
+    readonly count: number,
+    readonly active: boolean,
+  ) {
     super();
   }
   eq(other: NoteMarker) {
@@ -62,7 +70,9 @@ class NoteMarker extends GutterMarker {
   }
   toDOM() {
     const dot = document.createElement('span');
-    dot.className = this.active ? 'cm-essay-note-dot cm-essay-note-dot-active' : 'cm-essay-note-dot';
+    dot.className = this.active
+      ? 'cm-essay-note-dot cm-essay-note-dot-active'
+      : 'cm-essay-note-dot';
     dot.dataset.note = this.id;
     dot.title = this.count > 1 ? `${this.count} notes on this paragraph` : 'Open this note';
     dot.textContent = this.count > 1 ? String(this.count) : '';
@@ -119,7 +129,11 @@ export function essayNotes(initial: NoteRange[], onOpen: (id: string) => void): 
       '.cm-gutters': { backgroundColor: 'transparent', border: 'none' },
       '.cm-essay-margin': { width: '1.75rem', paddingLeft: '0.5rem' },
       // The marker sits level with the paragraph's first line.
-      '.cm-essay-margin .cm-gutterElement': { display: 'flex', justifyContent: 'center', paddingTop: '0.5em' },
+      '.cm-essay-margin .cm-gutterElement': {
+        display: 'flex',
+        justifyContent: 'center',
+        paddingTop: '0.5em',
+      },
       '.cm-essay-note-dot': {
         display: 'inline-flex',
         alignItems: 'center',

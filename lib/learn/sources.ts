@@ -265,6 +265,7 @@ export const learnSources: ModuleSources = {
   notSources: [
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
+    { table: 'learn.essay_log', reason: 'Bookkeeping on how an essay was worked out: stages opened and the model calls made, with their responses.' },
     {
       table: 'learn.area_check_articles',
       reason:

@@ -6,7 +6,9 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { readBrief } from '@/lib/learn/essays/model';
 import { loadPlanContext, savePlanJson } from '@/lib/learn/essays/store';
-import { guideCall } from '@/lib/learn/essays/guide-model';
+import { GUIDE_MODEL, guideCall, runPointEvidence } from '@/lib/learn/essays/guide-model';
+import { evidencePrompt } from '@/lib/learn/essays/evidence';
+import { logEssayCall, logEssayStageVisit } from '@/lib/learn/essays/log-store';
 import { askPlan, readbackPlan } from '@/lib/learn/essays/guide-run';
 import {
   FIND_POINTS_SYSTEM,
@@ -41,6 +43,12 @@ import {
   withReview,
   withTake,
   withThesis,
+  withEvidence,
+  withEvidenceTake,
+  withoutEvidence,
+  EVIDENCE_KINDS,
+  STAGES,
+  type EvidenceKind,
   type EssayPlan,
   type Shape,
 } from '@/lib/learn/essays/plan';
@@ -112,6 +120,13 @@ const Change = z.discriminatedUnion('kind', [
     text: z.string().max(NOTE_MAX * 2),
   }),
   z.object({ kind: z.literal('close-review'), note: z.string().min(1).max(64) }),
+  z.object({ kind: z.literal('drop-evidence'), point: z.string().min(1).max(64), evidence: z.string().min(1).max(64) }),
+  z.object({
+    kind: z.literal('evidence-take'),
+    point: z.string().min(1).max(64),
+    evidence: z.string().min(1).max(64),
+    text: z.string().max(NOTE_MAX * 2),
+  }),
   z.object({
     kind: z.literal('shape'),
     shape: z.object({
@@ -153,6 +168,10 @@ function applied(plan: EssayPlan, change: PlanChange): EssayPlan {
       return editedPointNote(plan, change.point, change.index, change.text);
     case 'close-review':
       return closedReview(plan, change.note);
+    case 'drop-evidence':
+      return withoutEvidence(plan, change.point, change.evidence);
+    case 'evidence-take':
+      return withEvidenceTake(plan, change.point, change.evidence, change.text);
     case 'shape':
       return shapedPlan(plan, change.shape as Shape);
   }
@@ -431,5 +450,80 @@ export async function answerEssayPoint(
   } catch (error) {
     console.error('[essay dig]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Could not keep that answer. Try again in a moment.' };
+  }
+}
+
+const EvidenceInput = z.object({
+  id: Id,
+  point: z.string().min(1).max(64),
+  kind: z.enum(EVIDENCE_KINDS),
+});
+
+export type EvidenceActionResult = { ok: true; plan: EssayPlan; found: number } | { ok: false; error: string };
+
+/**
+ * Evidence of one kind for one point (LEARN-ESSAYS-SPEC, "Evidence on a
+ * point"): one narrow search, up to three cited items, kept on the point.
+ * The response is logged as it came back, so the tests can replay it.
+ */
+// latency: pending
+export async function findPointEvidence(id: string, point: string, kind: string): Promise<EvidenceActionResult> {
+  const user = await requireUser();
+  const parsed = EvidenceInput.safeParse({ id, point, kind });
+  if (!parsed.success) return { ok: false, error: 'Could not search for that.' };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return noKey();
+  try {
+    const now = await context(parsed.data.id);
+    if (!now) return { ok: false, error: 'That essay is not there any more.' };
+    const target = now.plan.points.find((p) => p.id === parsed.data.point);
+    if (!target || !target.text.trim()) return { ok: false, error: 'Write the point first; the search is built on it.' };
+    const prompt = evidencePrompt({
+      question: now.brief.question,
+      thesis: now.plan.thesis || now.brief.claim,
+      reader: now.brief.reader,
+      point: target.text,
+      kind: parsed.data.kind as EvidenceKind,
+    });
+    const spend = collectSpend();
+    const result = await runPointEvidence({
+      prompt,
+      kind: parsed.data.kind as EvidenceKind,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'find-point-evidence', spend.reports);
+    if (!result.ok) {
+      console.error('[essay evidence]', result.detail);
+      return { ok: false, error: 'Dash could not search just now. Try again in a moment.' };
+    }
+    await logEssayCall(now.supabase, user.id, parsed.data.id, {
+      stage: 'develop',
+      action: 'find-point-evidence',
+      kind: parsed.data.kind,
+      model: GUIDE_MODEL,
+      prompt,
+      content: result.content,
+    });
+    const plan = withEvidence(now.plan, target.id, result.items);
+    await savePlanJson(now.supabase, parsed.data.id, planJson(plan));
+    return { ok: true, plan, found: result.items.length };
+  } catch (error) {
+    console.error('[essay evidence]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not search just now. Try again in a moment.' };
+  }
+}
+
+/** A stage was opened: one row, so where people stop is visible. */
+// latency: instant
+export async function logEssayStage(id: string, stage: string): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.object({ id: Id, stage: z.enum(STAGES) }).safeParse({ id, stage });
+  if (!parsed.success) return;
+  try {
+    const supabase = await createLearnClient();
+    await logEssayStageVisit(supabase, user.id, parsed.data.id, parsed.data.stage);
+  } catch (error) {
+    console.error('[essay log]', error instanceof Error ? error.message : error);
   }
 }

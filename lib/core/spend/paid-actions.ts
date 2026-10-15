@@ -74,6 +74,7 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/guide-actions.ts#reviewEssayPlan': ['review-essay-plan'],
   'app/learn/e/[id]/guide-actions.ts#askEssayPoint': ['word-point-question'],
   'app/learn/e/[id]/guide-actions.ts#answerEssayPoint': ['word-point-question'],
+  'app/learn/e/[id]/guide-actions.ts#findPointEvidence': ['find-point-evidence'],
   'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
   // Learn: Finish on an essay names the claims it argues and looks for the
   // notes that already hold each (plan #1873). Accepting the offers writes

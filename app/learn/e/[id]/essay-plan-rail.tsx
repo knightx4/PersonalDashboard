@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { LinkedText } from '@/components/ui/linked-text';
-import { ROLE_LABELS, type EssayPlan } from '@/lib/learn/essays/plan';
+import { ROLE_LABELS, type EssayPlan, type PointEvidence } from '@/lib/learn/essays/plan';
+import { PlanEvidenceList } from './essay-evidence';
 
 /**
  * The plan beside the draft, in the Write step (LEARN-ESSAYS-SPEC, "The
@@ -20,8 +21,11 @@ export function EssayPlanCard({
   canOutline,
   onOutline,
   onEdit,
+  onCite,
 }: {
   plan: EssayPlan;
+  /** Insert a footnote to a piece of evidence at the cursor. */
+  onCite?: (item: PointEvidence) => void;
   /** The point whose heading the cursor is under, or null. */
   current: string | null;
   canOutline: boolean;
@@ -73,7 +77,7 @@ export function EssayPlanCard({
                 }
                 meta={point.notes.length ? `${point.notes.length}` : ROLE_LABELS[point.role]}
               >
-                {point.notes.length === 0 ? (
+                {point.notes.length === 0 && point.evidence.length === 0 ? (
                   <p className="text-small text-ink-muted">No notes on this point yet.</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
@@ -87,6 +91,7 @@ export function EssayPlanCard({
                     ))}
                   </ul>
                 )}
+                <PlanEvidenceList evidence={point.evidence} onCite={onCite} />
               </Disclosure>
             </li>
           ))}

@@ -21,11 +21,22 @@ import {
   type AuthorMark,
 } from './authorship';
 
-const dash = (from: number, to: number, name = 'claude-sonnet-5-5'): AuthorMark => ({ author: 'dash', from, to, name });
+const dash = (from: number, to: number, name = 'claude-sonnet-5-5'): AuthorMark => ({
+  author: 'dash',
+  from,
+  to,
+  name,
+});
 
 describe('sha256Hex', () => {
   it('matches node:crypto on ASCII, emoji, CRLF and a text past one block', () => {
-    for (const text of ['', 'abc', 'Money is the universal pander. 🪙👩🏽‍🔬 café', 'a\r\nb\r\n', 'x'.repeat(1000)]) {
+    for (const text of [
+      '',
+      'abc',
+      'Money is the universal pander. 🪙👩🏽‍🔬 café',
+      'a\r\nb\r\n',
+      'x'.repeat(1000),
+    ]) {
       expect(sha256Hex(text)).toBe(createHash('sha256').update(text, 'utf8').digest('hex'));
     }
   });
@@ -94,7 +105,9 @@ describe('the block', () => {
 
   it('keeps colons and angle brackets out of a quote’s name and leaves files with no block alone', () => {
     const quote: AuthorMark = { author: 'quote', from: 0, to: 3, name: 'Walzer: Spheres <ch4>' };
-    expect(authorshipBlock('abcdef', [quote], { self: 'Self' }).block).toContain('*Walzer - Spheres ch4: 0,3');
+    expect(authorshipBlock('abcdef', [quote], { self: 'Self' }).block).toContain(
+      '*Walzer - Spheres ch4: 0,3',
+    );
     expect(readAuthorshipBlock('# Title\n\n---\n\nNo block here.\n')).toBeNull();
     expect(stripAuthorshipBlock('plain\n')).toBe('plain\n');
   });
@@ -110,7 +123,11 @@ describe('marks', () => {
   });
 
   it('read back from draft_authorship, leaving out anything malformed', () => {
-    const json = [...draftMarksJson([dash(2, 6)]), { author: 'someone', start: 0, length: 1 }, { author: 'dash', start: 9, length: 50 }];
+    const json = [
+      ...draftMarksJson([dash(2, 6)]),
+      { author: 'someone', start: 0, length: 1 },
+      { author: 'dash', start: 9, length: 50 },
+    ];
     expect(readDraftMarks(json, 20)).toEqual([dash(2, 6)]);
   });
 
@@ -129,7 +146,9 @@ describe('marks', () => {
     const old = 'Mine. Dash said this. Mine.';
     const at = old.indexOf('Dash said this.');
     const next = 'A new opening line. Mine. Dash said this. Mine.';
-    expect(relocateMarks(old, [dash(at, at + 15)], next)).toEqual([dash(next.indexOf('Dash'), next.indexOf('Dash') + 15)]);
+    expect(relocateMarks(old, [dash(at, at + 15)], next)).toEqual([
+      dash(next.indexOf('Dash'), next.indexOf('Dash') + 15),
+    ]);
     expect(relocateMarks(old, [dash(at, at + 15)], 'All rewritten.')).toEqual([]);
   });
 });
@@ -139,7 +158,10 @@ describe('yourWords', () => {
     const text = '# Abc\n\n**de** fg "hij"';
     const fg = text.indexOf('fg');
     const quote = text.indexOf('"hij"');
-    const result = yourWords(text, [dash(fg, fg + 2), { author: 'quote', from: quote, to: quote + 5, name: 'Walzer' }]);
+    const result = yourWords(text, [
+      dash(fg, fg + 2),
+      { author: 'quote', from: quote, to: quote + 5, name: 'Walzer' },
+    ]);
     expect(result).toEqual({ yours: 5, dash: 2, percent: 71 });
   });
 

@@ -922,6 +922,7 @@ const guidedPlan: EssayPlan = {
       ],
       asking: null,
       ready: false,
+      evidence: [],
     },
     {
       id: 'p2',
@@ -941,6 +942,35 @@ const guidedPlan: EssayPlan = {
         ask: 'What would a quarter-point rise do to the monthly payment on the flat your sister is looking at?',
       },
       ready: false,
+      evidence: [
+        {
+          id: 'e1',
+          kind: 'rule',
+          sourceType: 'regulator',
+          title: 'Lenders must test affordability at a higher rate',
+          summary:
+            'The regulator’s mortgage rules require lenders to check a borrower could still pay if rates rose.',
+          quote:
+            'assess whether the borrower could afford the payments if interest rates were to rise',
+          url: 'https://regulator.example.gov/mortgage-rules',
+          sourceTitle: 'Mortgage conduct rules',
+          domain: 'regulator.example.gov',
+          take: 'This is why the monthly figure moves the price: the test is on the payment, not the house.',
+        },
+        {
+          id: 'e2',
+          kind: 'against',
+          sourceType: 'research',
+          title: 'Scarcity outweighed rates in two recent cycles',
+          summary:
+            'A housing study found prices kept rising through rate rises where few homes were listed.',
+          quote: 'a shortage of listings kept prices climbing even as mortgage costs rose',
+          url: 'https://research.example.ac.uk/scarcity',
+          sourceTitle: 'Listings and prices',
+          domain: 'research.example.ac.uk',
+          take: '',
+        },
+      ],
     },
     {
       id: 'p3',
@@ -950,6 +980,7 @@ const guidedPlan: EssayPlan = {
       notes: [],
       asking: null,
       ready: false,
+      evidence: [],
     },
     {
       id: 'p4',
@@ -959,6 +990,7 @@ const guidedPlan: EssayPlan = {
       notes: [],
       asking: null,
       ready: false,
+      evidence: [],
     },
   ],
   shape: 'Problem, mechanism, objection',

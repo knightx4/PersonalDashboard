@@ -121,6 +121,45 @@ Each Dash press is one Sonnet call with its price beside the button, recorded
 in the Learn spend ledger. Without the Anthropic key, Develop asks the plain
 question of each kind and Structure offers three common shapes.
 
+## Evidence on a point
+
+Research for an essay is mostly done point by point, at the moment a reason
+needs support, rather than once at the start. On 15 October 2026 an
+evaluation on the owner's essay found practitioner essays of this length for a
+CFO-office reader cite one to three sources, mostly the rules the reader
+answers to, named by identifier, with the author's own experience carrying the
+rest; and found the whole-question research had cited vendor blogs and
+write-ups of a standard rather than the standard, and missed that SR 11-7 had
+been rescinded.
+
+So each point in Develop has four buttons: **The rule that applies**,
+**Evidence for it**, **The strongest objection** and **A real case**. Each is
+one Sonnet call with up to four web searches, told to cite the primary
+document, label who published each source (regulator, standard-setter,
+research, professional body, firm, press, vendor; the address overrules the
+model's label where it is plain), and say when guidance has been superseded.
+Up to three cited items come back and are kept on the point with the quoted
+words and a line for the person's take. An uncited item is dropped.
+
+Above the points, **Your argument** shows the thesis, each point with what
+holds it up, whether the strongest objection is answered, how many sources
+there are and how many are vendors, and the gaps to close: no thesis, points
+resting on nothing, no objection, more than four sources, vendor-heavy. A
+point counts as supported with a rule, evidence or a case, or with two of the
+person's own answers about it.
+
+In the Write step each point's evidence sits under it in the plan card, with
+Insert footnote.
+
+## Measuring the tool
+
+`learn.essay_log` (migration learn 0133) keeps a row each time a stage is
+opened, so where people stop is visible, and each model call the stages make
+with its response, the encrypted search payloads left out. Saved responses
+go in `lib/learn/essays/fixtures/recorded/`, where a test replays them through
+the parsers. `fixtures/gold-sox-ai.json` is the gold list for the test essay
+and `gold.ts` scores a run's sources against it for recall and precision.
+
 ## The writing surface
 
 The editor is CodeMirror 6, the same editor Obsidian uses. It edits the

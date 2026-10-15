@@ -115,7 +115,8 @@ export async function runFirstPass(input: {
   );
   if (!turn.ok) return turn;
   const read = readFirstPass(turn.content);
-  if (read.positions.length === 0) return { ok: false, detail: 'No position came back with a source.' };
+  if (read.positions.length === 0)
+    return { ok: false, detail: 'No position came back with a source.' };
   return { ok: true, ...read };
 }
 
@@ -140,7 +141,12 @@ export async function runDeeperPass(input: {
     GATHER_SYSTEM,
     [
       { type: 'web_search_20250305', name: 'web_search', max_uses: DEEPER_SEARCHES },
-      { type: 'web_fetch_20250910', name: 'web_fetch', max_uses: DEEPER_PAGES, max_content_tokens: PAGE_TOKENS },
+      {
+        type: 'web_fetch_20250910',
+        name: 'web_fetch',
+        max_uses: DEEPER_PAGES,
+        max_content_tokens: PAGE_TOKENS,
+      },
     ],
     gatherPrompt(input.question, input.draft),
     input.onSpend,
@@ -162,7 +168,11 @@ export async function runDeeperPass(input: {
           content: [
             ...pages.map((page) => ({
               type: 'document' as const,
-              source: { type: 'text' as const, media_type: 'text/plain' as const, data: page.text ?? '' },
+              source: {
+                type: 'text' as const,
+                media_type: 'text/plain' as const,
+                data: page.text ?? '',
+              },
               title: `${page.title} (${page.domain})`,
               citations: { enabled: true },
             })),
@@ -172,7 +182,10 @@ export async function runDeeperPass(input: {
       ],
     });
   } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'Judging the claims failed.' };
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : 'Judging the claims failed.',
+    };
   }
   input.onSpend?.({ model: JUDGE_MODEL, usage: usageFrom(response.usage) });
   const claims = readClaims(response.content, pages);

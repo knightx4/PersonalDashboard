@@ -242,6 +242,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'shape-essay-plan': run(SONNET, 1_800, 600),
   'review-essay-plan': run(SONNET, 2_500, 300),
   'word-point-question': run(SONNET, 1_500, 60),
+  // A narrow search for one point: up to four searches, three short items out.
+  'find-point-evidence': searching(run(SONNET, 40_000, 1_200), 3),
   // The deeper pass gathering: up to eight searches and five pages of about
   // 6,000 tokens each, all read again on each round.
   'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),

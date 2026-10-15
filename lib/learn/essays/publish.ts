@@ -53,7 +53,10 @@ const WEB = /^(https?:\/\/|mailto:|#)/i;
 /** A note's name as a wikilink names it: the file name without folder or `.md`, lower case. */
 export function linkKey(pathOrName: string): string {
   const name = pathOrName.replace(/\.md$/i, '');
-  return name.slice(name.lastIndexOf('/') + 1).trim().toLowerCase();
+  return name
+    .slice(name.lastIndexOf('/') + 1)
+    .trim()
+    .toLowerCase();
 }
 
 function wikilinkText(raw: string): string {
@@ -73,10 +76,13 @@ export function publicLinks(body: string, published: ReadonlyMap<string, string>
     const slug = published.get(linkKey(parseWikiLink(raw, false).target));
     return slug ? `[${text}](${essayAddress(slug)})` : text;
   });
-  return wiki.replace(MARKDOWN_LINK, (match, image: string | undefined, text: string, url: string) => {
-    if (WEB.test(url) || url.startsWith(ESSAY_ADDRESS_PREFIX)) return match;
-    return image ? '' : text;
-  });
+  return wiki.replace(
+    MARKDOWN_LINK,
+    (match, image: string | undefined, text: string, url: string) => {
+      if (WEB.test(url) || url.startsWith(ESSAY_ADDRESS_PREFIX)) return match;
+      return image ? '' : text;
+    },
+  );
 }
 
 /** The first line, when it is the essay's `# Title`. */
@@ -105,7 +111,10 @@ export function essaySnapshot(
   // R4: the authorship block goes before anything reads the note.
   const note = parseNote(stripAuthorshipBlock(file), opts.path);
   const fallback = essayTitle(note.body, opts.path);
-  const fm = readEssayFrontmatter({ ...note.frontmatter, type: 'essay' }, { title: fallback, today: opts.today });
+  const fm = readEssayFrontmatter(
+    { ...note.frontmatter, type: 'essay' },
+    { title: fallback, today: opts.today },
+  );
   const body = tidy(publicLinks(withoutTitle(note.body).replace(COMMENT, ''), opts.published));
   return {
     body,
@@ -120,8 +129,10 @@ export function essaySnapshot(
 /** A snapshot with its links to the essay at `slug` turned back into their text. */
 export function unlinkEssay(body: string, slug: string): string {
   const address = essayAddress(slug);
-  return body.replace(MARKDOWN_LINK, (match, image: string | undefined, text: string, url: string) =>
-    !image && url === address ? text : match,
+  return body.replace(
+    MARKDOWN_LINK,
+    (match, image: string | undefined, text: string, url: string) =>
+      !image && url === address ? text : match,
   );
 }
 

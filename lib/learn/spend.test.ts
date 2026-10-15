@@ -143,6 +143,7 @@ describe('the operation names', () => {
       'shape-essay-plan',
       'review-essay-plan',
       'word-point-question',
+      'find-point-evidence',
     ]);
   });
 });

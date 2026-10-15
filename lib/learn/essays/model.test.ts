@@ -13,11 +13,15 @@ import { paragraphAround } from './editor';
 
 describe('essayTitle', () => {
   it('takes the first top-level heading', () => {
-    expect(essayTitle('Intro line\n# Why money is odd\n\n## Part', 'Essays/Untitled essay.md')).toBe('Why money is odd');
+    expect(
+      essayTitle('Intro line\n# Why money is odd\n\n## Part', 'Essays/Untitled essay.md'),
+    ).toBe('Why money is odd');
   });
 
   it('ignores a second-level heading and frontmatter', () => {
-    expect(essayTitle('---\ntitle: x\n---\n## Not this\ntext', 'Essays/Saved name.md')).toBe('Saved name');
+    expect(essayTitle('---\ntitle: x\n---\n## Not this\ntext', 'Essays/Saved name.md')).toBe(
+      'Saved name',
+    );
   });
 
   it('falls back to Untitled essay', () => {
@@ -85,13 +89,17 @@ describe('readBrief and toSummary', () => {
   });
 
   it('reads the interview, and none when it is missing or malformed', () => {
-    expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: 'And your answer?' } })).toEqual({
+    expect(
+      readInterview({ interview: { status: 'asking', field: 'claim', ask: 'And your answer?' } }),
+    ).toEqual({
       status: 'asking',
       field: 'claim',
       ask: 'And your answer?',
     });
     expect(readInterview({ interview: { status: 'done' } })).toEqual({ status: 'done' });
-    expect(readInterview({ interview: { status: 'asking', field: 'mood', ask: 'How?' } })).toBeNull();
+    expect(
+      readInterview({ interview: { status: 'asking', field: 'mood', ask: 'How?' } }),
+    ).toBeNull();
     expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: ' ' } })).toBeNull();
     expect(readInterview({})).toBeNull();
   });
@@ -107,7 +115,12 @@ describe('readBrief and toSummary', () => {
       published_at: null,
       updated_at: '2026-10-12T00:00:00Z',
     });
-    expect(summary).toMatchObject({ title: 'A title', question: 'Why?', words: 4, wordTarget: 400 });
+    expect(summary).toMatchObject({
+      title: 'A title',
+      question: 'Why?',
+      words: 4,
+      wordTarget: 400,
+    });
   });
 });
 

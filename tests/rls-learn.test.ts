@@ -122,6 +122,7 @@ describe('RLS coverage', () => {
       'course_embeddings',
       'course_reads',
       'curriculum_units',
+      'essay_log',
       'essay_notes',
       'essay_research',
       'essays',

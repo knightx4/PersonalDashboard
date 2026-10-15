@@ -28,7 +28,11 @@ So money is a promise, and promises can be broken by anyone who stops believing 
 describe('essayParagraphs', () => {
   it('leaves out headings and lines too short to argue anything', () => {
     const paragraphs = essayParagraphs(DOC);
-    expect(paragraphs.map((p) => p.text.slice(0, 10))).toEqual(['Money keep', 'Gold was m', 'So money i']);
+    expect(paragraphs.map((p) => p.text.slice(0, 10))).toEqual([
+      'Money keep',
+      'Gold was m',
+      'So money i',
+    ]);
     for (const p of paragraphs) expect(DOC.slice(p.from, p.to)).toBe(p.text);
   });
 });
@@ -65,12 +69,18 @@ describe('readFinding', () => {
   });
 
   it('falls back to the first sentence when the quote is not in the paragraph', () => {
-    const finding = readFinding(reply({ ...found, quote: 'something it never said at all' }), DOC, unit)!;
+    const finding = readFinding(
+      reply({ ...found, quote: 'something it never said at all' }),
+      DOC,
+      unit,
+    )!;
     expect(finding.anchor.quote).toBe('Gold was money for centuries, yet nobody eats gold.');
   });
 
   it('drops a whole-essay finding it cannot place, and reads none as none', () => {
-    expect(readFinding(reply({ ...found, quote: 'something it never said at all' }), DOC, null)).toBeNull();
+    expect(
+      readFinding(reply({ ...found, quote: 'something it never said at all' }), DOC, null),
+    ).toBeNull();
     expect(readFinding('{"finding": null}', DOC, unit)).toBeNull();
     expect(readFinding('not json', DOC, unit)).toBeNull();
   });
@@ -121,9 +131,9 @@ describe('three open at most, and a check dismissed twice stops', () => {
 
   it('stops a check after two dismissals in the essay', () => {
     expect(stoppedChecks([note({ status: 'dismissed' })]).size).toBe(0);
-    expect([...stoppedChecks([note({ status: 'dismissed' }), note({ status: 'dismissed' })])]).toEqual([
-      'counterpoint',
-    ]);
+    expect([
+      ...stoppedChecks([note({ status: 'dismissed' }), note({ status: 'dismissed' })]),
+    ]).toEqual(['counterpoint']);
   });
 
   it('does not raise the same place twice for a check', () => {

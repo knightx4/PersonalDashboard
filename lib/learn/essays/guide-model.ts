@@ -7,6 +7,8 @@ import { finalText } from '@/lib/learn/briefs/research';
 import { searchQueries } from './research';
 import { searchTurn } from './research-model';
 import { MAP_SEARCHES, MAP_SYSTEM, readMap, type ResearchMap } from './research-map';
+import { EVIDENCE_SEARCHES, EVIDENCE_SYSTEM, readEvidence } from './evidence';
+import type { EvidenceKind, PointEvidence } from './plan';
 
 /**
  * The guided essay's calls (docs/LEARN-ESSAYS-SPEC.md, "The stages"). guide.ts
@@ -50,7 +52,9 @@ export async function guideCall(input: {
   return { ok: true, text: finalText(response.content) };
 }
 
-export type MapResult = ({ ok: true; queries: string[] } & ResearchMap) | Failure;
+export type MapResult =
+  | ({ ok: true; queries: string[]; content: unknown[] } & ResearchMap)
+  | Failure;
 
 /**
  * The research written up for the writer: one Sonnet call that searches (the
@@ -78,5 +82,36 @@ export async function runResearchMap(input: {
   if (map.findings.filter((f) => f.kind !== 'debate').length === 0) {
     return { ok: false, detail: 'Nothing came back with a source.' };
   }
-  return { ok: true, queries: searchQueries(searched.content), ...map };
+  return { ok: true, queries: searchQueries(searched.content), content: searched.content, ...map };
+}
+
+export type EvidenceResult =
+  | { ok: true; items: Omit<PointEvidence, 'id'>[]; content: unknown[]; queries: string[] }
+  | Failure;
+
+/** Evidence of one kind for one point: a narrow search, up to three cited items. */
+export async function runPointEvidence(input: {
+  prompt: string;
+  kind: EvidenceKind;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}): Promise<EvidenceResult> {
+  const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
+  const searched = await searchTurn(
+    client,
+    EVIDENCE_SYSTEM,
+    [{ type: 'web_search_20260209', name: 'web_search', max_uses: EVIDENCE_SEARCHES }],
+    input.prompt,
+    input.onSpend,
+    GUIDE_MODEL,
+    8_000,
+  );
+  if (!searched.ok) return searched;
+  return {
+    ok: true,
+    items: readEvidence(searched.content, input.kind),
+    content: searched.content,
+    queries: searchQueries(searched.content),
+  };
 }

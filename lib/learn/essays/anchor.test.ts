@@ -48,10 +48,15 @@ describe('locateAnchor', () => {
   });
 
   it('finds the sentence after a few words in it changed', () => {
-    const edited = DOC.replace(quote, 'Gold was money for many centuries, though nobody eats gold.');
+    const edited = DOC.replace(
+      quote,
+      'Gold was money for many centuries, though nobody eats gold.',
+    );
     const at = locateAnchor(edited, anchor);
     expect(at?.how).toBe('fuzzy');
-    expect(edited.slice(at!.from, at!.to)).toBe('Gold was money for many centuries, though nobody eats gold.');
+    expect(edited.slice(at!.from, at!.to)).toBe(
+      'Gold was money for many centuries, though nobody eats gold.',
+    );
   });
 
   it('gives up when the text has gone', () => {

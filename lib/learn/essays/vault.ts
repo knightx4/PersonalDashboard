@@ -140,11 +140,17 @@ async function store(ports: EssayVaultPorts, id: string, patch: EssayVaultPatch)
   } catch (error) {
     // The commit has landed, so the save happened; the essay row only lags.
     // The editor keeps the new blob SHA, so its next save starts from it.
-    console.error('[essay vault] recording the note on the essay', error instanceof Error ? error.message : error);
+    console.error(
+      '[essay vault] recording the note on the essay',
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 
-export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVaultInput): Promise<EssayVaultResult> {
+export async function saveEssayToVault(
+  ports: EssayVaultPorts,
+  input: EssayVaultInput,
+): Promise<EssayVaultResult> {
   const body = essayNoteBody(input.body);
   if (!body) return failed('empty');
 
@@ -181,7 +187,10 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         // as it is and no commit is made.
         const change = { title, stage: input.stage, published: input.published };
         const same = rewriteEssayFile(raw, next, change, fresh, marked);
-        written = same === raw ? raw : rewriteEssayFile(raw, next, { ...change, updated: input.today }, fresh, marked);
+        written =
+          same === raw
+            ? raw
+            : rewriteEssayFile(raw, next, { ...change, updated: input.today }, fresh, marked);
         return written;
       },
     });

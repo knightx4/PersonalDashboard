@@ -105,7 +105,48 @@ export type PlanPoint = {
   asking: { kind: DigKind; ask: string } | null;
   /** True once they say they have enough to write it. */
   ready: boolean;
+  /** What Dash found on the web for this point, each with the person's take on it. */
+  evidence: PointEvidence[];
 };
+
+/**
+ * What a piece of evidence does for a point: the rule or standard the reader
+ * answers to, evidence for the point, the strongest case against it, or a
+ * real case that shows it (LEARN-ESSAYS-SPEC, "Evidence on a point").
+ */
+export const EVIDENCE_KINDS = ['rule', 'for', 'against', 'case'] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+/** Who published a source, as Dash labelled it and the address confirms. */
+export const SOURCE_TYPES = [
+  'regulator',
+  'standard-setter',
+  'research',
+  'professional body',
+  'firm',
+  'press',
+  'vendor',
+] as const;
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
+export type PointEvidence = {
+  id: string;
+  kind: EvidenceKind;
+  sourceType: SourceType;
+  /** Dash's one-line headline and sentence or two, from the source. */
+  title: string;
+  summary: string;
+  /** The words the API's citation located on the page. */
+  quote: string;
+  url: string;
+  sourceTitle: string;
+  domain: string;
+  /** What the person makes of it, in their words. */
+  take: string;
+};
+
+/** The most evidence kept on one point. */
+export const POINT_EVIDENCE_MAX = 8;
 
 export type PlanNoteStatus = 'open' | 'done';
 export type PlanNote = { id: string; body: string; status: PlanNoteStatus };
@@ -201,6 +242,32 @@ function readPoint(raw: Record<string, unknown>): PlanPoint | null {
       .slice(0, POINT_NOTES_MAX),
     asking: kind && text(asking.ask).trim() ? { kind, ask: text(asking.ask, 400) } : null,
     ready: raw.ready === true,
+    evidence: list(raw.evidence)
+      .map(readEvidence)
+      .filter((e): e is PointEvidence => e !== null)
+      .slice(0, POINT_EVIDENCE_MAX),
+  };
+}
+
+function readEvidence(raw: Record<string, unknown>): PointEvidence | null {
+  const kind = raw.kind;
+  const type = raw.sourceType;
+  const url = text(raw.url, 2_000);
+  if (!(EVIDENCE_KINDS as readonly unknown[]).includes(kind) || !/^https?:\/\//.test(url))
+    return null;
+  return {
+    id: text(raw.id, 64),
+    kind: kind as EvidenceKind,
+    sourceType: (SOURCE_TYPES as readonly unknown[]).includes(type)
+      ? (type as SourceType)
+      : 'press',
+    title: text(raw.title, 200),
+    summary: text(raw.summary, 600),
+    quote: text(raw.quote, 600),
+    url,
+    sourceTitle: text(raw.sourceTitle, 300),
+    domain: text(raw.domain, 200),
+    take: text(raw.take, NOTE_MAX),
   };
 }
 
@@ -313,7 +380,7 @@ export function withPoint(plan: EssayPlan, words: string, role: Role = 'point'):
     ...plan,
     points: [
       ...plan.points,
-      { id, text: kept, role, guide: '', notes: [], asking: null, ready: false },
+      { id, text: kept, role, guide: '', notes: [], asking: null, ready: false, evidence: [] },
     ],
   };
 }
@@ -443,6 +510,7 @@ export function shapedPlan(plan: EssayPlan, shape: Shape): EssayPlan {
         notes: [],
         asking: null,
         ready: false,
+        evidence: [],
       });
       continue;
     }
@@ -591,4 +659,143 @@ export function isOwnWords(passage: string, sources: readonly { text: string }[]
   const want = squash(passage).replace(/^["“'‘]+|["”'’.]+$/g, '');
   if (want.length < 12) return false;
   return sources.some((s) => squash(s.text).includes(want));
+}
+
+// ---------------------------------------------------------------------------
+// Evidence on a point
+// ---------------------------------------------------------------------------
+
+/**
+ * New evidence on a point, after what is there. An item whose page and quote
+ * the point already has is skipped, and the oldest items go when the point
+ * is full.
+ */
+export function withEvidence(
+  plan: EssayPlan,
+  pointId: string,
+  items: Omit<PointEvidence, 'id'>[],
+): EssayPlan {
+  return {
+    ...plan,
+    points: plan.points.map((p) => {
+      if (p.id !== pointId) return p;
+      const evidence = [...p.evidence];
+      for (const item of items) {
+        if (evidence.some((e) => e.url === item.url && e.quote === item.quote)) continue;
+        evidence.push({
+          ...item,
+          id: newId(
+            evidence.map((e) => e.id),
+            'e',
+          ),
+        });
+      }
+      return { ...p, evidence: evidence.slice(-POINT_EVIDENCE_MAX) };
+    }),
+  };
+}
+
+export function withoutEvidence(plan: EssayPlan, pointId: string, evidenceId: string): EssayPlan {
+  return {
+    ...plan,
+    points: plan.points.map((p) =>
+      p.id === pointId ? { ...p, evidence: p.evidence.filter((e) => e.id !== evidenceId) } : p,
+    ),
+  };
+}
+
+export function withEvidenceTake(
+  plan: EssayPlan,
+  pointId: string,
+  evidenceId: string,
+  take: string,
+): EssayPlan {
+  return {
+    ...plan,
+    points: plan.points.map((p) =>
+      p.id === pointId
+        ? {
+            ...p,
+            evidence: p.evidence.map((e) =>
+              e.id === evidenceId ? { ...e, take: clean(take, NOTE_MAX) } : e,
+            ),
+          }
+        : p,
+    ),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The argument as it stands
+// ---------------------------------------------------------------------------
+
+export type ArgumentGap =
+  | 'no-thesis'
+  | 'no-points'
+  | 'unsupported'
+  | 'no-objection'
+  | 'too-many-sources'
+  | 'vendor-heavy';
+
+export type ArgumentReason = {
+  id: string;
+  text: string;
+  role: Role;
+  notes: number;
+  /** Evidence on the point, counted by what it does. */
+  counts: Record<EvidenceKind, number>;
+  /** True with a rule, a piece of evidence, a case, or two answers of the person's own about it. */
+  supported: boolean;
+};
+
+export type ArgumentMap = {
+  thesis: string;
+  reasons: ArgumentReason[];
+  /** True when a point is an objection, or evidence against a point is on file. */
+  objection: boolean;
+  /** Distinct sites the evidence comes from, and how many are vendors. */
+  sources: number;
+  vendors: number;
+  gaps: ArgumentGap[];
+};
+
+/** Practitioner essays of this length cite about three outside sources at most. */
+export const SOURCES_AIM = 4;
+
+/**
+ * The plan read as an argument (Booth, Colomb and Williams): the claim, each
+ * reason with what supports it, and whether the strongest objection is
+ * there. The gaps are what the Develop step points at first.
+ */
+export function argumentMap(plan: EssayPlan): ArgumentMap {
+  const reasons = plan.points
+    .filter((p) => p.text.trim())
+    .map((p) => {
+      const counts = { rule: 0, for: 0, against: 0, case: 0 } as Record<EvidenceKind, number>;
+      for (const e of p.evidence) counts[e.kind] += 1;
+      const answered = p.notes.filter((n) => n.answer.trim()).length;
+      return {
+        id: p.id,
+        text: p.text.trim(),
+        role: p.role,
+        notes: answered,
+        counts,
+        supported: counts.rule + counts.for + counts.case > 0 || answered >= 2,
+      };
+    });
+  const all = plan.points.flatMap((p) => p.evidence);
+  const domains = new Map<string, SourceType>();
+  for (const e of all) domains.set(e.domain || e.url, e.sourceType);
+  const vendors = [...domains.values()].filter((t) => t === 'vendor').length;
+  const objection =
+    plan.points.some((p) => p.role === 'objection' && p.text.trim()) ||
+    all.some((e) => e.kind === 'against');
+  const gaps: ArgumentGap[] = [];
+  if (!plan.thesis.trim()) gaps.push('no-thesis');
+  if (reasons.length === 0) gaps.push('no-points');
+  if (reasons.some((r) => !r.supported)) gaps.push('unsupported');
+  if (!objection) gaps.push('no-objection');
+  if (domains.size > SOURCES_AIM) gaps.push('too-many-sources');
+  if (vendors > 0 && vendors * 2 >= domains.size) gaps.push('vendor-heavy');
+  return { thesis: plan.thesis.trim(), reasons, objection, sources: domains.size, vendors, gaps };
 }
