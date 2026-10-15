@@ -21,7 +21,8 @@ import {
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { useClockNow } from '@/lib/use-clock-now';
-import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { useOptimisticWrite, writeError } from '@/lib/use-optimistic-write';
+import { useToast } from '@/components/ui/toast';
 import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
@@ -518,17 +519,10 @@ function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
 export function withSessionDrop(
   node: Pick<PlanNode, 'id' | 'status' | 'comment'>,
   menu: ActionMenuItem[],
+  drop: () => void,
 ): ActionMenuItem[] {
   if (isClosed(node.status) || !sessionOrigin(node.comment)) return menu;
-  return [
-    {
-      id: 'drop-session-step',
-      label: 'Drop',
-      formAction: (formData: FormData) => setPlanItemStatus({}, formData),
-      formFields: { id: node.id, status: 'dropped' },
-    },
-    ...menu,
-  ];
+  return [{ id: 'drop-session-step', label: 'Drop', lifecycle: 'dropped', onSelect: drop }, ...menu];
 }
 
 function useResolving(
@@ -701,10 +695,24 @@ export function usePlanRow({
     () => ({ status: served.status, priority: served.priority, assignee: served.assignee }),
     [served.status, served.priority, served.assignee],
   );
+  const toast = useToast();
   const { shown: fields, run: changeRow } = useOptimisticWrite<RowFields, RowChange>({
     value: serverFields,
     apply: applyRowChange,
     write: (change) => writeRowChange(served.id, change),
+    // Done or Dropped from the row says so with the way back (plan #1957.3).
+    onDone: (change) => {
+      if (change.kind !== 'status' || !isClosed(change.status) || isClosed(served.status)) return;
+      const back = served.status;
+      toast({
+        text: change.status === 'done' ? 'Done' : 'Dropped',
+        undo: async () => {
+          const result = await writeRowChange(served.id, { kind: 'status', status: back });
+          const error = writeError(result);
+          if (error) throw new Error(error);
+        },
+      });
+    },
   });
   // The steps beneath draw in the order their list holds, so a press of Move up
   // on one of them swaps it here before the server has answered.
@@ -996,7 +1004,7 @@ export function usePlanRow({
       formAction: (formData: FormData) => deletePlanItem({}, formData),
       formFields: { id: node.id },
     },
-  ]);
+  ], () => changeRow({ kind: 'status', status: 'dropped' }));
 
   const actionError =
     sendState.error ??

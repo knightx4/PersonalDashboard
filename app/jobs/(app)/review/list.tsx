@@ -1,5 +1,7 @@
 'use client';
 
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { ExternalLink, Plus, Search } from 'lucide-react';
@@ -210,7 +212,7 @@ function JobsBulkBar({ rows }: { rows: ReviewRow[] }) {
     let restore: DismissedMessage[] = [];
     run({
       ids: messageIds,
-      verb: 'Dismissed',
+      verb: 'Declined',
       one: 'message',
       write: async (ids) => {
         const result = await dismissMessages([...ids]);
@@ -241,7 +243,8 @@ function JobsBulkBar({ rows }: { rows: ReviewRow[] }) {
           pending={pending}
           onClick={dismissSelected}
         >
-          Dismiss {countNoun(messageIds.length, 'message')}
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
+          {LIFECYCLE_VERB.declined} {countNoun(messageIds.length, 'message')}
         </Button>
       )}
       {eventIds.length > 0 && (

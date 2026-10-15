@@ -163,7 +163,7 @@ export async function archiveShare(shareId: string): Promise<ShareActionState> {
   if (error) return { error: error.message };
 
   revalidatePath('/shopping/share');
-  return { message: 'Archived. Every link to it stops working.' };
+  return { message: 'Dropped. Every link to it stops working.' };
 }
 
 /** Put specific items on a share. The "I found another one" path. */

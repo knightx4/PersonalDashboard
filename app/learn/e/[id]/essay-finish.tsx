@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
+import { CloseButton } from '@/components/inbox/close-button';
 import { Card, CardSection } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { EssayClaim, OfferedClaim } from '@/lib/learn/essays/finish';
@@ -163,9 +164,7 @@ function Offering({
         >
           {busy ? 'Adding…' : addLabel(picked.size, bank)}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
-          Not now
-        </Button>
+        <CloseButton lifecycle="later" disabled={busy} onClick={onSkip} />
       </div>
     </div>
   );

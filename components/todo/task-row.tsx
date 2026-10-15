@@ -1,5 +1,6 @@
 'use client';
 
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { useOptimistic, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -14,7 +15,6 @@ import {
   RotateCcw,
   Trash2,
   Undo2,
-  X,
 } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { IconButton } from '@/components/ui/icon-button';
@@ -375,9 +375,17 @@ export function TaskRow({
           onSelect: () => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) }),
         }
       : // Later turns the menu into Later's days, the same five as the row's own menu.
-        { id: 'later', label: 'Later', closeOnSelect: false, onSelect: () => setLaterStep(true) },
+        {
+          id: 'later',
+          label: LIFECYCLE_VERB.later,
+          lifecycle: 'later',
+          closeOnSelect: false,
+          onSelect: () => setLaterStep(true),
+        },
     // On All the phone row is the menu alone, so Drop and Edit come in too.
-    ...(archive ? [{ id: 'drop', label: 'Drop', onSelect: drop }] : []),
+    ...(archive
+      ? [{ id: 'drop', label: LIFECYCLE_VERB.dropped, lifecycle: 'dropped' as const, onSelect: drop }]
+      : []),
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
     ...(archive ? [{ id: 'edit', label: 'Edit everything', onSelect: () => setEditing(true) }] : []),
     { id: 'comment', label: 'Comment', onSelect: () => setCommenting(true) },
@@ -503,11 +511,11 @@ export function TaskRow({
           is the same claim twice. A dropped task gets the struck hexagon here
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
-        <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+        <Tooltip label={done ? 'Reopen' : LIFECYCLE_VERB.done} className="shrink-0">
           <button
             ref={glyph}
             type="button"
-            aria-label={done ? 'Reopen' : 'Mark done'}
+            aria-label={done ? 'Reopen' : LIFECYCLE_VERB.done}
             onClick={() =>
               done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
             }
@@ -673,8 +681,8 @@ export function TaskRow({
               ) : (
                 <LaterMenu compact label={task.title} onChoose={later} />
               )}
-              <RowAction label="Drop" onClick={drop}>
-                <X strokeWidth={1.75} aria-hidden />
+              <RowAction label={LIFECYCLE_VERB.dropped} onClick={drop}>
+                <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
               </RowAction>
               {/* Breaking the task up: the box opens under the row, where the
                 list is. Hidden with the rest of the actions until the row is
@@ -717,8 +725,8 @@ export function TaskRow({
               {/* On All the menu holds these two as well (plan #1776). */}
               {!archive && (
                 <>
-                  <RowAction label="Drop" onClick={drop}>
-                    <X strokeWidth={1.75} aria-hidden />
+                  <RowAction label={LIFECYCLE_VERB.dropped} onClick={drop}>
+                    <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
                   </RowAction>
                   <RowAction label="Edit everything" onClick={() => setEditing(true)}>
                     <Pencil strokeWidth={1.75} aria-hidden />
@@ -903,7 +911,7 @@ function TaskItems({
               }
               onDrop={() =>
                 write(item.id, 'dropped', () => dropTask(item.id), {
-                  text: 'removed',
+                  text: 'dropped',
                   undo: undoWith(() => reopenTask(item.id)),
                   undone: 'back on the list',
                 })
@@ -924,10 +932,10 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
 
   return (
     <li className="group/item flex items-start gap-2">
-      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+      <Tooltip label={done ? 'Reopen' : LIFECYCLE_VERB.done} className="shrink-0">
         <button
           type="button"
-          aria-label={done ? 'Reopen' : 'Mark done'}
+          aria-label={done ? 'Reopen' : LIFECYCLE_VERB.done}
           onClick={onTick}
           className={cn(
             'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
@@ -947,14 +955,14 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         {item.title}
       </span>
 
-      <Tooltip label="Remove" align="end" className="shrink-0">
+      <Tooltip label={LIFECYCLE_VERB.dropped} align="end" className="shrink-0">
         <IconButton
-          label="Remove"
+          label={`${LIFECYCLE_VERB.dropped}: ${item.title}`}
           size="sm"
           onClick={onDrop}
           className="opacity-100 sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
         >
-          <X strokeWidth={1.75} aria-hidden />
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
         </IconButton>
       </Tooltip>
     </li>

@@ -117,6 +117,10 @@ export const goalStepsSource: AgendaSource = {
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'goal_step', key, null, ctx.clients);
   },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'goal_step', key, ctx.clients);
+  },
 };
 
 function idOf(key: string): string {

@@ -41,6 +41,7 @@ import {
   askDashPageLabel,
   confirmDashChange,
   declineDashChange,
+  reopenDashChange,
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
@@ -144,6 +145,7 @@ const ACTIONS: AskSource = {
   label: askDashPageLabel,
   confirm: confirmDashChange,
   decline: declineDashChange,
+  reopen: reopenDashChange,
   undo: undoDashChange,
 };
 

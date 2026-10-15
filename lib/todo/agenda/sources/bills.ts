@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sessionClients } from '@/lib/todo/agenda/clients';
-import { dismiss } from '@/lib/todo/agenda/dismissals';
+import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import { formatMoney } from '@/lib/money';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
@@ -80,5 +80,9 @@ export const billsSource: AgendaSource = {
 
   async dismiss(ctx, key) {
     await dismiss(ctx.userId, 'recurring_payment', key, null, ctx.clients);
+  },
+
+  async restore(ctx, key) {
+    await undismiss(ctx.userId, 'recurring_payment', key, ctx.clients);
   },
 };

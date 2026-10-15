@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Banner } from '@/components/ui/banner';
 import { chipVariants, ToggleChip } from '@/components/ui/chip';
-import { IconButton } from '@/components/ui/icon-button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -19,7 +19,6 @@ import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run'
 import { disconnectInbox, savePreference, updateProfile, type SettingsState } from './actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { cardVariants } from '@/components/ui/card';
-import { Tooltip } from '@/components/ui/tooltip';
 import { useCloseOnSuccess } from '@/lib/jobs/use-close-on-success';
 import {
   COMPANY_STAGE_LABELS,
@@ -606,7 +605,6 @@ function ExcludedSendersSection({
 }) {
   const [state, action] = useActionState(addExcludedSender, {});
   const [adding, setAdding] = useCloseOnSuccess(state);
-  const [, startTransition] = useTransition();
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -622,20 +620,18 @@ function ExcludedSendersSection({
           {excludedSenders.map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 text-ui">
               <span className="tabular text-ink">{entry.domain}</span>
-              <Tooltip label="Stop excluding this sender" align="end" className="ml-auto">
-                <IconButton
-                  size="sm"
-                  label={`Stop excluding ${entry.domain}`}
-                  className="hover:text-danger"
-                  onClick={() =>
-                    startTransition(async () => {
-                      await removeExcludedSender(entry.id);
-                    })
-                  }
-                >
-                  <Trash2 strokeWidth={1.75} aria-hidden />
-                </IconButton>
-              </Tooltip>
+              <ConfirmStep
+                size="xs"
+                className="ml-auto text-danger"
+                prompt={`Mail from ${entry.domain} can show up as leads again.`}
+                confirmLabel="Stop excluding"
+                onConfirm={async () => {
+                  await removeExcludedSender(entry.id);
+                }}
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Stop excluding
+              </ConfirmStep>
             </li>
           ))}
         </ul>

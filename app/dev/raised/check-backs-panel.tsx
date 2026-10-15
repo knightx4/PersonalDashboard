@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { whenDate } from '@/lib/core/when';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
 import { SectionFold } from '@/components/ui/disclosure';
@@ -12,7 +11,7 @@ import {
   type CheckBackStep,
   type PlacedCheckBack,
 } from '@/lib/plan/check-backs';
-import { dropCheckBack } from './check-back-actions';
+import { DropCheckBack } from './drop-check-back';
 
 /**
  * What Dash has said it will come back to (supabase/migrations/0103).
@@ -69,12 +68,7 @@ export function CheckBacksPanel({
               <li key={row.id} className="row-pad">
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 flex-1 text-body break-words text-ink">{row.title}</p>
-                  <form action={dropCheckBack} className="shrink-0">
-                    <input type="hidden" name="id" value={row.id} />
-                    <Button type="submit" variant="ghost" size="sm">
-                      Drop
-                    </Button>
-                  </form>
+                  <DropCheckBack id={row.id} />
                 </div>
                 <p>
                   <Tooltip label={`${how}. Nothing is needed from you unless you drop it.`}>

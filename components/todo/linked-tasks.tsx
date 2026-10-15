@@ -1,5 +1,7 @@
 'use client';
 
+import { useToast } from '@/components/ui/toast';
+import { LIFECYCLE_VERB, LIFECYCLE_WORD } from '@/lib/core/lifecycle';
 import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Plus, Unlink } from 'lucide-react';
@@ -150,6 +152,7 @@ function LinkedRow({
   returnTo: string;
 }) {
   const [pending, start] = useTransition();
+  const toast = useToast();
 
   // The same checkbox as a row on /todo, and drawn the same way: filled the
   // moment it is clicked, back on the server's status if the write is refused.
@@ -161,6 +164,17 @@ function LinkedRow({
       const result = await completeTask(task.id);
       if (!result.error) completionMoment();
       return result;
+    },
+    // Done says so, with the way back (plan #1957.3).
+    onDone: (next) => {
+      if (next !== 'done') return;
+      toast({
+        text: LIFECYCLE_WORD.done,
+        undo: async () => {
+          const back = await reopenTask(task.id);
+          if (back.error) throw new Error(back.error);
+        },
+      });
     },
   });
 
@@ -177,10 +191,10 @@ function LinkedRow({
     >
       {/* The same toggle as a row on /todo: the glyph is the state, the
           button is the hit area. */}
-      <Tooltip label={done ? 'Reopen' : 'Mark done'} className="shrink-0">
+      <Tooltip label={done ? 'Reopen' : LIFECYCLE_VERB.done} className="shrink-0">
         <button
           type="button"
-          aria-label={done ? 'Reopen' : 'Mark done'}
+          aria-label={done ? 'Reopen' : LIFECYCLE_VERB.done}
           onClick={() => run(done ? 'open' : 'done')}
           className={cn(
             'press flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',

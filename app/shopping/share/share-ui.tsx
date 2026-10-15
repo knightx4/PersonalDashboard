@@ -5,6 +5,9 @@ import { Check, Copy, Plus } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH, LIFECYCLE_VERB } from '@/lib/core/lifecycle';
 import { usePopover } from '@/lib/use-popover';
 import {
   archiveShare,
@@ -186,14 +189,16 @@ export function ShareControls({ shareId, archived }: { shareId: string; archived
         Regroup
       </Button>
       {!archived && (
-        <Button
-          size="sm"
+        <ConfirmStep
           variant="danger"
           disabled={pending}
-          onClick={() => run(() => archiveShare(shareId))}
+          prompt="Every link to this share stops working, and nobody can open it again."
+          confirmLabel={LIFECYCLE_VERB.dropped}
+          onConfirm={() => run(() => archiveShare(shareId))}
         >
-          Archive
-        </Button>
+          <StatusGlyph glyph={LIFECYCLE_GLYPH.dropped} />
+          {LIFECYCLE_VERB.dropped}
+        </ConfirmStep>
       )}
       {note && <span className="text-ui text-ink-muted">{note}</span>}
     </div>
