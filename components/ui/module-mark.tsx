@@ -65,6 +65,11 @@ type Drawing = {
    */
   bends?: readonly (readonly [number, number, number])[];
   glints?: React.ReactNode;
+  /**
+   * For a prism mark only: the detail as a closed shape carved into the glass,
+   * drawn with the same refraction as the rim, in place of `lines`.
+   */
+  recess?: string;
 };
 
 const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
@@ -149,6 +154,8 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
     front:
       'M10.47 4.59Q12 3.3 13.53 4.59L19.98 10.07Q21.2 11.1 21.2 12.7V18A3.2 3.2 0 0 1 18 21.2H6A3.2 3.2 0 0 1 2.8 18V12.7Q2.8 11.1 4.02 10.07Z',
     lines: <path d="M9.9 20.4V17.3a2.1 2.1 0 0 1 4.2 0v3.1" />,
+    // The door, carved into the glass rather than drawn on it.
+    recess: 'M9.7 21.4V17.3a2.3 2.3 0 0 1 4.6 0v4.1Z',
     // The peak, the two eaves and the two foot corners.
     bends: [
       [12, 4.2, 4.2],
@@ -162,7 +169,6 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       <>
         <path d="M4.9 11.3 10.5 6.5" stroke="#fff" strokeWidth={0.9} strokeLinecap="round" />
         <circle cx={12} cy={5.3} r={0.5} fill="#fff" />
-        <path d="M6.4 19.9h3M15.2 19.9h2.4" stroke="#fff" strokeWidth={0.6} strokeLinecap="round" strokeOpacity={0.8} />
       </>
     ),
   },
@@ -227,6 +233,8 @@ function GlassObject({
   prism?: boolean;
 }) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
+  // A prism mark carves its detail into the glass instead of drawing it on.
+  const recess = prism ? drawing.recess : undefined;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   // White on dark, the deep hue on light, where white would not hold against the tint.
   // A white pane takes its deep end on both, since white lines would vanish on it.
@@ -300,6 +308,20 @@ function GlassObject({
               <stop offset="1" stopColor="#0a0f45" stopOpacity={0.9} />
             </linearGradient>
             <clipPath id={`${id}-back-clip`}>{back}</clipPath>
+            {recess && (
+              <>
+                <clipPath id={`${id}-recess-clip`}>
+                  <path d={recess} />
+                </clipPath>
+                {/* The cut's own spread of the spectrum, cool on its lit side
+                    to warm on the far one, as the rim runs across the mark. */}
+                <linearGradient id={`${id}-recess-light`} gradientUnits="userSpaceOnUse" x1={9.2} y1={15} x2={14.8} y2={21.4}>
+                  {SPECTRUM.map((stop) => (
+                    <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+                  ))}
+                </linearGradient>
+              </>
+            )}
             {/* Where the rim's spectrum shows: faintly everywhere, fully at the bends. */}
             {drawing.bends?.map(([cx, cy, r], i) => (
               <radialGradient key={i} id={`${id}-bend-${i}`} gradientUnits="userSpaceOnUse" cx={cx} cy={cy} r={r}>
@@ -386,15 +408,35 @@ function GlassObject({
       )}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
       {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55 })}
-      <g
-        fill="none"
-        strokeWidth={weight}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ stroke: ink }}
-      >
-        {lines}
-      </g>
+      {recess ? (
+        // The detail carved into the glass, seen the way the rim is: dark where
+        // the cut bends in the light around it, the spectrum round its edge,
+        // and the edge of the cut catching the light.
+        <g clipPath={`url(#${id}-clip)`}>
+          <path d={recess} fill={`url(#${id}-depth)`} opacity={0.7} />
+          <g clipPath={`url(#${id}-recess-clip)`} filter={`url(#${id}-soft)`}>
+            <path d={recess} fill="none" stroke={`url(#${id}-recess-light)`} strokeWidth={1.8} opacity={0.8} />
+          </g>
+          <path
+            d={recess}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={0.45}
+            strokeOpacity={0.75}
+            filter={`url(#${id}-fine)`}
+          />
+        </g>
+      ) : (
+        <g
+          fill="none"
+          strokeWidth={weight}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ stroke: ink }}
+        >
+          {lines}
+        </g>
+      )}
       {dots && <g style={{ fill: ink }}>{dots}</g>}
     </>
   );
