@@ -30,7 +30,7 @@ export function StoryText({
     return (
       <Link
         href={href}
-        className={`mt-1.5 inline-flex items-center gap-1 text-ui ${linkVariants()}`}
+        className={`press-area mt-1.5 inline-flex items-center gap-1 text-ui ${linkVariants()}`}
       >
         <ChevronRight className="size-3.5" strokeWidth={1.75} aria-hidden />
         Read the full story

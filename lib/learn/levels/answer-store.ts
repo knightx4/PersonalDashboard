@@ -11,6 +11,7 @@ import {
   type GradeEvidence,
   type Moved,
 } from '@/lib/learn/levels/grade';
+import { writeLevelCase } from '@/lib/learn/levels/case-call';
 import { gradeCellAnswer, LEVEL_GRADE_MODEL } from '@/lib/learn/levels/grade-call';
 import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { questionFormat, readCells } from '@/lib/learn/levels/model';
@@ -34,6 +35,8 @@ export type AskedCell = {
   topicName: string;
   level: number;
   question: string;
+  /** What the question is: an explanation, or a case to work (levels 4 to 6). */
+  format: 'explain' | 'case';
 };
 
 export type AskCellResult = { ok: true; asked: AskedCell } | { ok: false; error: string };
@@ -43,50 +46,88 @@ export type AskCellResult = { ok: true; asked: AskedCell } | { ok: false; error:
  * leaving and coming back does not pile up rows. Refuses a cell on a draft
  * topic and a cell whose level is not explained.
  */
-export async function askCell(learn: LearnSupabaseClient, userId: string, cellId: string): Promise<AskCellResult> {
+export async function askCell(
+  learn: LearnSupabaseClient,
+  userId: string,
+  cellId: string,
+  writer?: { anthropicApiKey: string; onSpend?: SpendSink },
+): Promise<AskCellResult> {
   const { data: cell, error } = await learn
     .from('topic_cells')
-    .select('id, level, topic:topics!inner(name, status)')
+    .select('id, level, descriptor, topic:topics!inner(name, status)')
     .eq('user_id', userId)
     .eq('id', cellId)
     .maybeSingle();
   if (error) return { ok: false, error: `Reading that level failed: ${error.message}` };
-  const row = cell as { id: string; level: number; topic: { name: string; status: string } } | null;
+  const row = cell as {
+    id: string;
+    level: number;
+    descriptor: string[] | null;
+    topic: { name: string; status: string };
+  } | null;
   if (!row) return { ok: false, error: 'That level is not one of yours.' };
   if (row.topic.status !== 'approved') return { ok: false, error: 'Approve the topic before it is asked about.' };
-  const text = explainQuestion(row.topic.name, row.level);
-  if (!text) return { ok: false, error: `Level ${row.level} is asked as a ${questionFormat(row.level)}, not an explanation.` };
+  const format = questionFormat(row.level);
+  if (format === 'defend') return { ok: false, error: `Level ${row.level} is asked as a defence, which is not built yet.` };
 
   const { data: open } = await learn
     .from('cell_questions')
     .select('id, question')
     .eq('user_id', userId)
     .eq('cell_id', cellId)
-    .eq('format', 'explain')
+    .eq('format', format)
     .is('answered_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   const reuse = open as { id: string; question: string } | null;
-  if (reuse) {
-    return {
-      ok: true,
-      asked: { questionId: reuse.id, cellId, topicName: row.topic.name, level: row.level, question: reuse.question },
-    };
+  const asked = (questionId: string, question: string): AskCellResult => ({
+    ok: true,
+    asked: { questionId, cellId, topicName: row.topic.name, level: row.level, question, format },
+  });
+  if (reuse) return asked(reuse.id, reuse.question);
+
+  let text: string;
+  let expected: string | null = null;
+  if (format === 'case') {
+    if (!writer) return { ok: false, error: 'Writing a case needs ANTHROPIC_API_KEY to be set.' };
+    const { data: before } = await learn
+      .from('cell_questions')
+      .select('question')
+      .eq('user_id', userId)
+      .eq('cell_id', cellId)
+      .eq('format', 'case')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const written = await writeLevelCase({
+      topicName: row.topic.name,
+      level: row.level,
+      descriptor: row.descriptor ?? [],
+      asked: ((before ?? []) as Array<{ question: string }>).map((b) => b.question),
+      anthropicApiKey: writer.anthropicApiKey,
+      onSpend: writer.onSpend,
+    });
+    if (!written.ok) {
+      console.error('[learn levels] case', written.detail);
+      return { ok: false, error: 'Dash could not write a case just now.' };
+    }
+    text = written.case.question;
+    expected = written.case.expected;
+  } else {
+    const explain = explainQuestion(row.topic.name, row.level);
+    if (!explain) return { ok: false, error: `Level ${row.level} has no explain question.` };
+    text = explain;
   }
 
   const { data: inserted, error: insertError } = await learn
     .from('cell_questions')
-    .insert({ user_id: userId, cell_id: cellId, format: 'explain', question: text })
+    .insert({ user_id: userId, cell_id: cellId, format, question: text, expected })
     .select('id')
     .single();
   if (insertError || !inserted) {
     return { ok: false, error: `Saving the question failed: ${insertError?.message ?? 'no row came back'}` };
   }
-  return {
-    ok: true,
-    asked: { questionId: (inserted as { id: string }).id, cellId, topicName: row.topic.name, level: row.level, question: text },
-  };
+  return asked((inserted as { id: string }).id, text);
 }
 
 export type AnswerCellResult = { ok: true; moved: Moved } | { ok: false; error: string };
@@ -105,12 +146,18 @@ export async function answerCell(
 
   const { data: q, error: qError } = await learn
     .from('cell_questions')
-    .select('id, cell_id, question, answered_at')
+    .select('id, cell_id, question, expected, answered_at')
     .eq('user_id', userId)
     .eq('id', input.questionId)
     .maybeSingle();
   if (qError) return { ok: false, error: `Reading the question failed: ${qError.message}` };
-  const question = q as { id: string; cell_id: string; question: string; answered_at: string | null } | null;
+  const question = q as {
+    id: string;
+    cell_id: string;
+    question: string;
+    expected: string | null;
+    answered_at: string | null;
+  } | null;
   if (!question) return { ok: false, error: 'That question is not one of yours.' };
   if (question.answered_at) return { ok: false, error: 'That question has been answered already.' };
 
@@ -120,12 +167,15 @@ export async function answerCell(
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Reading your topics failed.' };
   }
-  const cells = graderCells(map, question.cell_id);
+  const allCells = graderCells(map, question.cell_id);
+  // A case is graded on the asked cell alone (the spec's "Cases and defences").
+  const cells = allCells && question.expected ? allCells.slice(0, 1) : allCells;
   if (!cells) return { ok: false, error: 'That level is on a topic that is not approved.' };
 
   const grade = await gradeCellAnswer({
     cells,
     question: question.question,
+    expected: question.expected,
     answer: response,
     anthropicApiKey: input.anthropicApiKey,
     onSpend: input.onSpend,

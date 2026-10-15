@@ -413,7 +413,7 @@ export function AppShell({
             'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
             on ? 'opacity-100' : 'opacity-0',
           )}
-          style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+          style={{ background: moduleById(module)?.key.from ?? `var(${HOME_MARK.accent})` }}
           aria-hidden
         />
         {/* Muted until the row is current, so the column reads as a list
@@ -533,7 +533,9 @@ export function AppShell({
   const overflow = sections.length > 3 || Boolean(settingsHref);
   const tabs = sections.slice(0, overflow ? 3 : 4);
 
-  const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
+  // Home's mark is white, which would vanish on a light shell, so Home's bar
+  // is its accent instead.
+  const dockKey = moduleById(module)?.key.from ?? `var(${HOME_MARK.accent})`;
   // Taller than the icons need: a thumb target, and on a phone a bar you can
   // hit without looking. The icons stay at the dock's 20px (the icon law);
   // the room is around them. The height is --dock-h in app/globals.css, less

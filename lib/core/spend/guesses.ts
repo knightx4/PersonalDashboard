@@ -119,6 +119,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
   'grade-cell-answer': run(HAIKU, 3_000, 600),
+  'write-cell-case': run(HAIKU, 1_200, 500),
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),

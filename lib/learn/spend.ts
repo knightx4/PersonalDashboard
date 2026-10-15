@@ -71,6 +71,9 @@ export const LEARN_OPERATIONS = [
   // "How answers are graded"; plan #2138.5): one Haiku call per answer, reading
   // the asked cell, its neighbours and the cells it requires.
   'grade-cell-answer',
+  // Writing the case a level 4 to 6 cell is asked as (plan #2138.8): one Haiku
+  // call when the cell is first asked, none when an unanswered one is reused.
+  'write-cell-case',
   // The catalogue embedding sweep, which records through its own postgres
   // connection rather than through `recordLearnSpend`: it runs from a script,
   // and reaching the ledger the usual way would pull `next/headers` in. The

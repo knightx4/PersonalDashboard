@@ -434,7 +434,7 @@ function PhoneCard({
                 />
               )}
               {issueHref && (
-                <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
+                <Link href={issueHref} className={`press-area text-ui ${linkVariants()}`}>
                   {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
                 </Link>
               )}
@@ -496,7 +496,7 @@ function gridStory(
       from,
       actions: (
         <>
-          <Link href={issueHref} className={`text-ui ${linkVariants()}`}>
+          <Link href={issueHref} className={`press-area text-ui ${linkVariants()}`}>
             Read the newsletter
           </Link>
           <ReactionButtons

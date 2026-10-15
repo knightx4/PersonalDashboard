@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
-import { HOME_MARK } from '@/lib/modules';
+import { DASH_MARK } from '@/lib/modules';
 import { MOTION_MS } from '@/lib/motion';
 
 /**
@@ -242,7 +242,7 @@ export function DashGlyph({
   const visor: Visor = runner ? RUNNERS[runner].visor : 'capsule';
   const ramp: readonly string[] = runner
     ? RUNNERS[runner].core
-    : [HOME_MARK.key.from, HOME_MARK.key.mid, HOME_MARK.key.to];
+    : [DASH_MARK.key.from, DASH_MARK.key.mid, DASH_MARK.key.to];
   const coloured = Boolean(runner) || tone === 'brand';
   const failed = state === 'failed';
   const stops = state === 'done' && coloured ? GREEN : ramp;

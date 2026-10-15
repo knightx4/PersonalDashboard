@@ -118,6 +118,8 @@ export const MODELS = {
   learnProbe: HAIKU,
   /** lib/learn/levels/grade-call.ts, an explanation graded against several levels at once */
   learnLevelGrade: HAIKU,
+  /** lib/learn/levels/case-call.ts, a case written for a level 4 to 6 cell */
+  learnLevelCase: HAIKU,
   /** lib/learn/chat/subjects.ts */
   learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */

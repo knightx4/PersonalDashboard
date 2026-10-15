@@ -26,11 +26,13 @@ import { dirname } from 'node:path';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { MODULES, type ModuleId } from '@/lib/modules';
 
-/** Home first, then the modules in sidebar order. */
-const MARKS: (ModuleId | null)[] = [null, ...MODULES.map((module) => module.id)];
+/** Home and Dash first, then the modules in sidebar order. */
+const MARKS: (ModuleId | null | 'dash')[] = [null, 'dash', ...MODULES.map((module) => module.id)];
 
-function label(id: ModuleId | null): string {
-  return id === null ? 'Home' : (MODULES.find((module) => module.id === id)?.label ?? id);
+function label(id: ModuleId | null | 'dash'): string {
+  if (id === null) return 'Home';
+  if (id === 'dash') return 'Dash';
+  return MODULES.find((module) => module.id === id)?.label ?? id;
 }
 
 /** Every mark at every size, on one ground. */
