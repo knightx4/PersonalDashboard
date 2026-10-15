@@ -28,6 +28,7 @@ import {
   type DraftApplicationResult,
 } from '../actions';
 import { saveApplicationMarks } from './actions';
+import { CopyText } from './copy-text';
 import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
 import { DashQuestions } from './dash-questions';
@@ -516,6 +517,7 @@ export function AnswerCard({
               aria-label="Approved"
             />
           )}
+          {!editing && text.trim() && <CopyText text={text} what="answer" />}
           {/* Up here, opposite the question it removes, rather than at the end
               of the action row, where on a phone it wrapped onto a line alone. */}
           {!editing && (
