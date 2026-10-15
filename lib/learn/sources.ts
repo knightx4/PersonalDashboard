@@ -8,7 +8,7 @@ const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
 /** Briefs are listed on Now (app/learn/now/briefs-list.tsx). */
 const NOW: Section = { href: '/learn/now', label: 'Now' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
-const GOALS_HOME: Section = { href: '/goals', label: 'Home' };
+const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
 
 /**
  * Learn's tables, as Goals reads them (lib/sources/types.ts). What someone

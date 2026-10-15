@@ -2,7 +2,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of the vault's nav its rows sit under (app/vault/layout.tsx). */
-const NOTES: Section = { href: '/vault', label: 'Notes' };
+const NOTES: Section = { href: '/vault', label: 'Now' };
 const MAP: Section = { href: '/vault/map', label: 'Map' };
 const MAYA: Section = { href: '/vault/maya', label: 'Maya' };
 

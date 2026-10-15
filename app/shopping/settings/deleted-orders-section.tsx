@@ -1,7 +1,6 @@
 'use client';
 
 import Link from '@/components/ui/link';
-import { Trash2 } from 'lucide-react';
 import {
   permanentlyDeleteOrder,
   restoreDeletedOrder,
@@ -90,14 +89,5 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
         </ul>
       )}
     </div>
-  );
-}
-
-export function DeletedOrdersTitle() {
-  return (
-    <span className="flex items-center gap-2">
-      <Trash2 className="size-4 text-ink-muted" strokeWidth={1.75} />
-      Deleted orders
-    </span>
   );
 }

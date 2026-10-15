@@ -2,10 +2,9 @@ import type { Feed } from '@/lib/todo/feeds/load';
 import type { SourceId } from '@/lib/todo/agenda/sources';
 import { allSources } from '@/lib/todo/agenda/registry';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { PageHeader } from '@/components/shell/page-header';
-import { AgendaSettingsForm, type SourceGroup } from './view';
+import { SettingsPage } from '@/components/patterns/settings-page';
+import { AgendaHorizon, AgendaSources, type SourceGroup } from './view';
 import { CalendarFeeds } from './feeds';
-import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The agenda's sources, grouped by the workspace they read. `isOn` says
@@ -36,8 +35,9 @@ export function agendaSourceGroups(isOn: (moduleId: ModuleId) => boolean): Sourc
 }
 
 /**
- * Todo settings, drawn from what the page read (page.tsx), so the gallery
- * can draw it from fixtures (plan #1603).
+ * Todo settings on the settings page pattern (plan #1937.11), drawn from
+ * what the page read (page.tsx), so the gallery can draw it from fixtures
+ * (plan #1603). Three sections, so they stack.
  */
 export function TodoSettingsView({
   groups,
@@ -53,14 +53,28 @@ export function TodoSettingsView({
   timezone: string;
 }) {
   return (
-    <PageColumn>
-      <PageHeader title="Todo settings" />
-
-      <AgendaSettingsForm groups={groups} enabled={enabled} horizonDays={horizonDays} />
-
-      <div className="mt-6">
-        <CalendarFeeds feeds={feeds} timezone={timezone} />
-      </div>
-    </PageColumn>
+    <SettingsPage
+      title="Todo settings"
+      href="/todo/settings"
+      sections={[
+        {
+          id: 'sources',
+          title: 'Sources',
+          hint: 'Things the other workspaces already know about, shown on your agenda. They are read where they live and never copied here. Finishing one writes to the workspace that owns it.',
+          content: <AgendaSources groups={groups} enabled={enabled} />,
+        },
+        {
+          id: 'week',
+          title: 'This week',
+          content: <AgendaHorizon horizonDays={horizonDays} />,
+        },
+        {
+          id: 'calendars',
+          title: 'Subscribed calendars',
+          hint: 'Paste the private address of a calendar you already keep and its appointments appear here beside your own. Nothing you type here is ever sent back to it.',
+          content: <CalendarFeeds feeds={feeds} timezone={timezone} />,
+        },
+      ]}
+    />
   );
 }

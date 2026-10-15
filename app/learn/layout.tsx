@@ -20,12 +20,15 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     sections: async ({ owner }) =>
       learnSections(owner, await countReadNow(await createLearnClient())),
     brief: () => loadLearnBrief(),
+    // What Learn offers without being asked (plan #1937.10).
+    settingsHref: '/learn/settings',
+    settingsLabel: 'Learn settings',
     children,
   });
 }
 
 /**
- * Now first (plan #1486): the feed, with what is waiting in a strip at the
+ * Now first (plan #1486), then the Inbox (plan #1937.6). Now is the feed, with what is waiting in a strip at the
  * top and the practice questions behind its Practice only switch. Home and
  * Practice Flow were tabs of their own until then, and /learn/home and
  * /learn/flow redirect to Now. Then the subjects, then the rest. A subject,
@@ -40,13 +43,22 @@ export default async function LearnLayout({ children }: { children: React.ReactN
 function learnSections(owner: boolean, readNow: number): NavSection[] {
   return [
     // Learn now replaced the Read now tab (plan #805) and became Now (plan
-    // #1486). The badge counts the readings you queued, which the feed shows
-    // first, and not the cards it wrote: there are always about twenty of
-    // those, and a number that never goes down is not information (plan #808).
+    // #1486).
     {
       href: '/learn/now',
       label: 'Now',
       icon: 'readNow',
+      exact: true,
+    },
+    // Second, as in every workspace (plan #1937.6), and the one badge. It
+    // counts the readings you queued, which the Inbox lists as a row and the
+    // feed shows first, and not the cards Now wrote: there are always about
+    // twenty of those, and a number that never goes down is not information
+    // (plan #808).
+    {
+      href: '/learn/inbox',
+      label: 'Inbox',
+      icon: 'inbox',
       exact: true,
       badge: readNow,
     },

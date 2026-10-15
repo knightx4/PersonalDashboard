@@ -4,7 +4,6 @@ import { useActionState, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { FieldError, Input, Label } from '@/components/ui/field';
 import { CAPTURE_TOKEN_LABEL_MAX } from '@/lib/capture/token-label';
@@ -51,9 +50,9 @@ export function CaptureTokensSection({
   const when = (at: string) => whenDay(at, { timeZone: timezone });
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
+    <section>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-body font-semibold text-ink">Capture tokens</h2>
+        <h3 className="text-ui font-semibold text-ink">Capture tokens</h3>
         {!making && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMaking(true)}>
             Make a token

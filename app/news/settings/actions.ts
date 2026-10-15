@@ -68,7 +68,7 @@ export async function setTopicShown(
  * Name, change or clear the place the Local topic is about (note 552a9407).
  * Only newsletters summarised from now on are tagged by it.
  */
-// latency: pending
+// latency: optimistic -- the field keeps what was typed, and a refused save puts it back with a toast
 export async function setLocalArea(value: string): Promise<{ error?: string }> {
   const user = await requireUser();
   const client = await createNewsClient();

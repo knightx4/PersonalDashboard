@@ -17,7 +17,7 @@ import { phoneShot } from './plan-surfaces';
 import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
-import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { DevSettingsView } from '@/app/dev/settings/settings-view';
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { DigestNight } from '@/lib/digest/night';
@@ -981,13 +981,14 @@ export function DevInboxSurface() {
 }
 
 /**
- * The Status panel at the top of Home in Dev: the plan runner resting with
- * three features ready, and the notes routine with twelve notes open. Dash's
- * mark sits under Plan (note 076e7744).
+ * Dev settings (plan #1937.10), once the Status panel at the top of Home: the
+ * plan runner resting with three features ready, the notes routine with
+ * twelve notes open, and the vision review. Dash's mark sits under Plan
+ * (note 076e7744).
  */
-export function DevRaisedStatusSurface() {
-  return column(
-    <StatusPanel
+export function DevSettingsSurface() {
+  return (
+    <DevSettingsView
       run={null}
       canSend
       card={{
@@ -1002,11 +1003,16 @@ export function DevRaisedStatusSurface() {
       }}
       goals={null}
       openNotes={12}
-      notesLastRun={null}
-      vision={null}
+      notesLastRun={{ at: '2026-10-06T02:40:00Z', done: 7, declined: 1, blocked: 2 }}
+      vision={{
+        lastRunAt: '2026-10-03T07:00:00Z',
+        failed: null,
+        nextAt: '2026-10-10T07:00:00Z',
+        pendingEdits: 2,
+      }}
       autoApprove={false}
       now={Date.parse('2026-10-06T08:00:00Z')}
-    />,
+    />
   );
 }
 
@@ -1082,7 +1088,7 @@ export function AccountSurface({
   /** Only the newest capture token, as the list reads once the first is made. */
   onlyFirstToken?: boolean;
 }) {
-  return column(
+  return (
     <>
       <AccountView
         tab={tab}
@@ -1100,7 +1106,7 @@ export function AccountSurface({
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
         capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
-    </>,
+    </>
   );
 }
 

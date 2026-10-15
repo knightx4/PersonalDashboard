@@ -2271,12 +2271,14 @@ describe('RLS coverage', () => {
 
   // goals.visits (plan #1019) is the other exception: it changes on every
   // load of the home and records nothing done to a goal (migrations-goals/0027).
-  it('records history on every table but history itself and visits', async () => {
+  // goals.settings (plan #1937.10) is the third: whether the routines start,
+  // which is a setting rather than anything done to a goal (0077).
+  it('records history on every table but history itself, visits and settings', async () => {
     const tables = await admin<{ tablename: string }[]>`
       select c.relname as tablename
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'goals' and c.relkind = 'r' and c.relname not in ('history', 'visits')
+      where n.nspname = 'goals' and c.relkind = 'r' and c.relname not in ('history', 'visits', 'settings')
       order by 1`;
     const recorded = await admin<{ tablename: string }[]>`
       select distinct c.relname as tablename
