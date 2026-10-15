@@ -12,6 +12,8 @@ import {
   positionOf,
   projectionOf,
   routePath,
+  worldFrame,
+  type MapFrame,
   type PlacesMapDrawing,
 } from './places-map';
 import type { Place } from './places';
@@ -75,14 +77,40 @@ function lonSpan(projection: GeoProjection, width: number, height: number): numb
 export function drawPlacesMap(places: readonly Place[]): PlacesMapDrawing | null {
   const positioned = places.filter((place) => positionOf(place));
   if (positioned.length === 0) return null;
+  return drawFrame(
+    fitFrame(positioned.map((place) => positionOf(place)!)),
+    positioned,
+  );
+}
 
+/**
+ * The map on one place's page (plan #2091.5), with that place's dot alone.
+ * It shows the place's own region when it has a position, or else the
+ * region of their other places, so a press to place it lands near where
+ * they have lived. With neither the drawing is null, and the page draws
+ * the whole world only once Set on map is pressed, since its outlines are
+ * large.
+ */
+export function drawPlaceMap(place: Place, places: readonly Place[]): { drawing: PlacesMapDrawing | null } {
+  const own = positionOf(place);
+  const others = places
+    .filter((other) => other.id !== place.id)
+    .map(positionOf)
+    .filter((at): at is [number, number] => at !== null);
+  const points = own ? [own] : others;
+  if (points.length === 0) return { drawing: null };
+  return { drawing: drawFrame(fitFrame(points), own ? [place] : []) };
+}
+
+/** The whole world, with no dots, for setting a place outside the region the place page shows. */
+export function drawWorldMap(): PlacesMapDrawing {
+  return drawFrame(worldFrame(), [], false);
+}
+
+/** The outlines, dots and line for one frame. `withStates` leaves the US state borders off a world view. */
+function drawFrame(frame: MapFrame, places: readonly Place[], withStates = true): PlacesMapDrawing {
   const width = MAP_WIDTH;
   const height = MAP_HEIGHT;
-  const frame = fitFrame(
-    positioned.map((place) => positionOf(place)!),
-    width,
-    height,
-  );
   // Clipped a little outside the view, so no outline's edge shows at the frame.
   const projection = projectionOf(frame).clipExtent([
     [-4, -4],
@@ -90,7 +118,7 @@ export function drawPlacesMap(places: readonly Place[]): PlacesMapDrawing | null
   ]);
   const path = geoPath(projection).digits(1);
   const world = outlines(lonSpan(projection, width, height) < FINE_SPAN);
-  const dots = placeDots(positioned, projectionOf(frame));
+  const dots = placeDots(places, projectionOf(frame));
 
   return {
     width,
@@ -98,7 +126,7 @@ export function drawPlacesMap(places: readonly Place[]): PlacesMapDrawing | null
     frame,
     land: path(world.land) ?? '',
     borders: path(world.borders) ?? '',
-    states: path(statesMesh()) ?? '',
+    states: withStates ? (path(statesMesh()) ?? '') : '',
     route: routePath(dots),
     dots,
   };

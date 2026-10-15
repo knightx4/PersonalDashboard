@@ -73,6 +73,28 @@ export async function updatePlace(
   return (data as Record<string, unknown> | null) ?? null;
 }
 
+/**
+ * Puts a place on the map by hand, or takes it off with null (plan #2091.5).
+ * Written straight to the row rather than through positionForSave, which
+ * works from the city: a save that leaves the city alone keeps this
+ * position. False when there was none of theirs with that id.
+ */
+export async function setPlacePosition(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+  position: { latitude: number; longitude: number } | null,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('places')
+    .update({ latitude: position?.latitude ?? null, longitude: position?.longitude ?? null })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id');
+  if (error) throw new Error(`Changing where the place is failed: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
 /** Removes one of their places. False when there was none of theirs with that id. */
 export async function deletePlace(client: YouSupabaseClient, userId: string, id: string): Promise<boolean> {
   const { data, error } = await client

@@ -8,9 +8,11 @@ import {
   placeDots,
   positionAt,
   projectionOf,
+  checkPosition,
   splitByPosition,
+  worldFrame,
 } from './places-map';
-import { drawPlacesMap } from './places-map-outlines';
+import { drawPlaceMap, drawPlacesMap, drawWorldMap } from './places-map-outlines';
 
 function place(id: string, movedIn: string, movedOut: string | null, at: [number, number] | null): Place {
   return {
@@ -103,5 +105,57 @@ describe('the places map', () => {
 
   it('draws nothing when no place has a position', () => {
     expect(drawPlacesMap([place('nowhere', '2005', null, null)])).toBeNull();
+  });
+});
+
+describe('placing a place by hand (plan #2091.5)', () => {
+  it('takes a position in range, rounded, and refuses anything else', () => {
+    expect(checkPosition({ latitude: 30.123456, longitude: -97.987654 })).toEqual({
+      latitude: 30.1235,
+      longitude: -97.9877,
+    });
+    expect(checkPosition({ latitude: 91, longitude: 0 })).toBeNull();
+    expect(checkPosition({ latitude: 0, longitude: -181 })).toBeNull();
+    expect(checkPosition({ latitude: '30', longitude: 0 })).toBeNull();
+    expect(checkPosition({ latitude: Number.NaN, longitude: 0 })).toBeNull();
+    expect(checkPosition(null)).toBeNull();
+  });
+
+  it('turns a press on the whole world back into the position it shows', () => {
+    const frame = worldFrame();
+    const [x, y] = projectionOf(frame)([NEW_YORK[1], NEW_YORK[0]])!;
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThan(MAP_WIDTH);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(MAP_HEIGHT);
+    const back = positionAt(frame, x, y)!;
+    expect(back.latitude).toBeCloseTo(NEW_YORK[0], 4);
+    expect(back.longitude).toBeCloseTo(NEW_YORK[1], 4);
+  });
+
+  it("shows a place's own region with its dot alone", () => {
+    const home = place('home', '2018', null, AUSTIN);
+    const { drawing } = drawPlaceMap(home, [home, place('away', '2010', '2018', NEW_YORK)]);
+    expect(drawing!.dots.map((d) => d.id)).toEqual(['home']);
+    expect(drawing!.route).toBe('');
+  });
+
+  it('shows the region of the other places for a place with no position, with no dot', () => {
+    const lost = place('lost', '2000', '2005', null);
+    const { drawing } = drawPlaceMap(lost, [lost, place('austin', '2010', null, AUSTIN)]);
+    expect(drawing!.dots).toEqual([]);
+    const [x, y] = projectionOf(drawing!.frame)([AUSTIN[1], AUSTIN[0]])!;
+    expect(x).toBeCloseTo(MAP_WIDTH / 2, 0);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(MAP_HEIGHT);
+  });
+
+  it('leaves the map undrawn when nothing has a position, and draws the world on request without state borders', () => {
+    const lost = place('lost', '2000', null, null);
+    expect(drawPlaceMap(lost, [lost]).drawing).toBeNull();
+    const world = drawWorldMap();
+    expect(world.dots).toEqual([]);
+    expect(world.states).toBe('');
+    expect(world.land.length).toBeGreaterThan(1000);
   });
 });

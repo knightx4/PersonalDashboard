@@ -47,7 +47,7 @@ export type PlacesMapDrawing = {
   land: string;
   /** The borders between countries. */
   borders: string;
-  /** The borders between US states, where the view reaches them. */
+  /** The borders between US states, where the view reaches them; empty on the whole world. */
   states: string;
   /** The line through the dots in move-in order; empty with fewer than two. */
   route: string;
@@ -125,6 +125,43 @@ export function fitFrame(points: readonly [number, number][], width = MAP_WIDTH,
     );
   const [tx, ty] = projection.translate();
   return { scale: projection.scale(), translate: [tx, ty], rotate: -centre };
+}
+
+/**
+ * The whole world, from the Southern Ocean to the Arctic, for placing a
+ * place by hand (#2091.5) when nothing else gives the map a region to show.
+ */
+export function worldFrame(width = MAP_WIDTH, height = MAP_HEIGHT): MapFrame {
+  const projection = geoMercator().fitExtent(
+    [
+      [0, 0],
+      [width, height],
+    ],
+    {
+      type: 'MultiPoint',
+      coordinates: [
+        [-179.9, -58],
+        [179.9, 78],
+      ],
+    },
+  );
+  const [tx, ty] = projection.translate();
+  return { scale: projection.scale(), translate: [tx, ty], rotate: 0 };
+}
+
+/**
+ * A position a press or a request names, rounded to four places (about ten
+ * metres), or null when it is not one: the database holds a latitude from
+ * -90 to 90 and a longitude from -180 to 180.
+ */
+export function checkPosition(value: unknown): { latitude: number; longitude: number } | null {
+  if (!value || typeof value !== 'object') return null;
+  const { latitude, longitude } = value as Record<string, unknown>;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  const four = (n: number) => Math.round(n * 1e4) / 1e4;
+  return { latitude: four(latitude), longitude: four(longitude) };
 }
 
 /** The projection a frame names. */
