@@ -20,6 +20,7 @@ import { ensureCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
+import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
 import { classifyNote } from '@/lib/learn/vault/classify';
 import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -62,6 +63,8 @@ export async function proposeGoal(_prev: ProposeState, formData: FormData): Prom
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
 
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+
   const supabase = await createLearnClient();
   let id: string;
   try {
@@ -70,6 +73,18 @@ export async function proposeGoal(_prev: ProposeState, formData: FormData): Prom
     id = result.id;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
+  }
+
+  // Named on a subject's page, the topic joins that subject's lens, and the
+  // lens of every goal on the subject with it (plan #2138.7). The draft is
+  // kept even if this fails: it is on the map and can be added again.
+  if (subjectId.success) {
+    try {
+      await addToSubjectLens(supabase, user.id, subjectId.data, id);
+      revalidatePath('/learn/know');
+    } catch (error) {
+      console.error('[learn goal] subject lens', error instanceof Error ? error.message : error);
+    }
   }
 
   revalidatePath('/learn/topics');

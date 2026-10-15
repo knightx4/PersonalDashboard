@@ -293,7 +293,9 @@ export const learnSources: ModuleSources = {
       search: ['name'],
       title: 'name',
       facts: ['origin'],
-      note: 'The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
+      href: (id) => `/learn/lens/${id}`,
+      section: SUBJECTS,
+      note: 'Every subject and every learning goal has one (subject_id or aim_id; learn 0137). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
     },
   ],
   notSources: [

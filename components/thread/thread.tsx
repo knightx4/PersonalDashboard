@@ -415,6 +415,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   vault_note: ROW_STORE,
   reading: READING_STORE,
   topic: ROW_STORE,
+  lens: ROW_STORE,
 };
 
 function DeleteComment({

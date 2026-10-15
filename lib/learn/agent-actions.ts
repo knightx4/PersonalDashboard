@@ -24,6 +24,10 @@ export const learnActions: ModuleActions = {
     approveTopicDraft: none('theirs'),
     mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
     draftWantedTopic: none('spends'),
+    rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+  },
+  'app/learn/lens/[id]/actions.ts': {
+    saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),
   },
   'app/learn/topics/review/actions.ts': {
     moveClaimsSubject: none('spends'),
@@ -85,6 +89,9 @@ export const learnActions: ModuleActions = {
     fillFlowQueue: none('spends'),
     answerTrackOffer: none('theirs'),
     takeBackOfferAnswer: none('theirs', 'Undo: takes back their own answer.'),
+  },
+  'app/learn/flow/cell-actions.ts': {
+    answerCellQuestion: none('own'),
   },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
