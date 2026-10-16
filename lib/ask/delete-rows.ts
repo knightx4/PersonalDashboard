@@ -17,7 +17,7 @@ export type { DeletableTable } from './deletable';
  * them in `undo.rows`. Undo (undoDeletedRows) inserts those rows again.
  *
  * The tables Dash may propose deleting from are the short list DELETABLE:
- * application answers and job notes (plan #2266.2). Adding a table is adding
+ * application answers, job notes (plan #2266.2) and tasks (plan #2266.3). Adding a table is adding
  * its name and nouns in deletable.ts and an entry here. An entry whose rows can have other rows attached (a role with
  * applications, a task with subtasks) gives a `refuse` check, and Dash
  * declines those rows with its reason rather than deleting them (decision
@@ -118,6 +118,37 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
       return { titles, href: '/jobs' };
     },
   },
+  // A task. Its subtasks (parent_id) would be deleted with it by the cascade,
+  // so a task that has any is refused (decision #2266.1). Its links to a role,
+  // note and so on cascade too but are not attachments: Undo puts the task
+  // back without them.
+  'todo.tasks': {
+    schema: 'todo',
+    table: 'tasks',
+    module: 'todo',
+    moduleLabel: 'To-do',
+    noun: DELETE_NOUNS['todo.tasks'],
+    async describe(_db, _userId, rows) {
+      return {
+        titles: rows.map((r) => clip(String(r.title ?? '').replace(/\s+/g, ' ').trim() || 'An untitled task')),
+        href: '/todo/all?status=all',
+      };
+    },
+    async refuse(db, userId, rows) {
+      const taskIds = ids(rows, 'id');
+      if (taskIds.length === 0) return null;
+      const client = await db('todo');
+      const { data, error } = await client.from('tasks').select('id, parent_id').in('parent_id', taskIds).eq('user_id', userId);
+      if (error) throw new Error(`tasks: ${error.message}`);
+      const subtasks = (data ?? []) as unknown as Values[];
+      if (subtasks.length === 0) return null;
+      const withSubtasks = rows.filter((r) => subtasks.some((s) => s.parent_id === r.id));
+      const names = withSubtasks.map((r) => `"${clip(String(r.title ?? 'Untitled'), 40)}"`).join(', ');
+      return withSubtasks.length === 1
+        ? `The task ${names} has ${subtasks.length === 1 ? 'a subtask' : `${subtasks.length} subtasks`}, and deleting it would delete them too.`
+        : `These tasks have subtasks, and deleting them would delete the subtasks too: ${names}.`;
+    },
+  },
 };
 
 export function isDeletableTable(table: string): table is DeletableTable {
@@ -139,7 +170,7 @@ export type DeleteRowsInput = {
   rows: Values[];
 };
 
-export const DELETABLE_LIST = 'application answers (job_search.application_answers) and notes on a job, company or contact (job_search.notes)';
+export const DELETABLE_LIST = 'application answers (job_search.application_answers), notes on a job, company or contact (job_search.notes) and tasks (todo.tasks)';
 
 /** The rows asked for, as the person: nothing else is read, and a row that is not theirs is not found. */
 export async function snapshotRows(
