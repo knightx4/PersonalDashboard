@@ -91,7 +91,7 @@ export function topicsFor(ideas: readonly IdeaOnMap[], fields: readonly FieldOnM
       const id = `t4-${field.id}-${i}`;
       rows.level4.push({ id, title, parent_id: parent });
       if (AS_LINKS.has(title) || i >= fieldIdeas.length + 7) {
-        rows.links.push({ target_id: id, weight: 1, similarity: 0.5 + ((i * 7 + f) % 5) / 10, found_at: found, matched_by: 'name' });
+        rows.links.push({ target_id: id, kind: 'note', ceiling: 0.5, similarity: 0.5 + ((i * 7 + f) % 5) / 10, found_at: found, matched_by: 'name' });
       }
     });
     fieldIdeas.forEach((idea, i) => {
@@ -102,7 +102,7 @@ export function topicsFor(ideas: readonly IdeaOnMap[], fields: readonly FieldOnM
     seed.level4.forEach((_, i) => {
       const id = `t4-${field.id}-${i}`;
       if (!rows.parents.some((p) => p.topic_id === id) && !rows.links.some((l) => l.target_id === id)) {
-        rows.links.push({ target_id: id, weight: 0.4, similarity: 0.3, found_at: found, matched_by: 'similarity' });
+        rows.links.push({ target_id: id, kind: 'work', ceiling: 0.4, similarity: 0.3, found_at: found, matched_by: 'similarity' });
       }
     });
   });

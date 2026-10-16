@@ -1,3 +1,5 @@
+import type { EvidenceKind } from './kinds';
+
 /**
  * What backs an idea, as a row of learn.evidence_links (plan #2006.1) and as
  * the app reads it. Pure, so the ordering can be tested without a database.
@@ -21,7 +23,9 @@ export type EvidenceRow = {
   source_kind: EvidenceSourceKind;
   source_id: string;
   similarity: number;
-  weight: number;
+  /** What kind of evidence it is, and the most it can count for (plan #2172.2, learn 0156). */
+  kind: EvidenceKind;
+  ceiling: number;
   basis: string;
   found_at: string;
   /** Links to topics only: how the source touched it (plan #2016.3). */
@@ -37,8 +41,10 @@ export type EvidenceLink = {
   sourceId: string;
   /** How close the match is, 0 to 1. */
   similarity: number;
-  /** How much the link counts, 0 to 1. */
-  weight: number;
+  /** What kind of evidence it is: work, a course, a note, a clipping, a video or a mention. */
+  kind: EvidenceKind;
+  /** The most the link can count for, 0 to 1: its weight, never past its kind's ceiling. */
+  ceiling: number;
   /** One sentence on why it counts: "you wrote about this in <note>". */
   basis: string;
   foundAt: string;
@@ -47,7 +53,7 @@ export type EvidenceLink = {
 };
 
 /**
- * Rows as links, strongest first. The weight decides, then the similarity,
+ * Rows as links, strongest first. The ceiling decides, then the similarity,
  * then the newer find, then the id, so the order is the same on every read.
  */
 export function evidenceFromRows(rows: EvidenceRow[]): EvidenceLink[] {
@@ -59,14 +65,15 @@ export function evidenceFromRows(rows: EvidenceRow[]): EvidenceLink[] {
       sourceKind: row.source_kind,
       sourceId: row.source_id,
       similarity: row.similarity,
-      weight: row.weight,
+      kind: row.kind,
+      ceiling: row.ceiling,
       basis: row.basis,
       foundAt: row.found_at,
       matchedBy: row.matched_by ?? null,
     }))
     .sort(
       (a, b) =>
-        b.weight - a.weight ||
+        b.ceiling - a.ceiling ||
         b.similarity - a.similarity ||
         b.foundAt.localeCompare(a.foundAt) ||
         a.id.localeCompare(b.id),

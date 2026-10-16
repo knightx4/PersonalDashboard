@@ -10,6 +10,7 @@ import { lightOn } from '@/lib/learn/map/sky';
 import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
+import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
 
 /**
@@ -713,11 +714,11 @@ function linksFor(ideaId: string, from: number, count: number): EvidenceLink[] {
       sourceKind: base.sourceKind,
       sourceId: `src-${(from + i) % EVIDENCE_BASES.length}`,
       similarity: base.similarity,
-      weight: base.weight,
+      ...kindAndCeiling({ source_kind: base.sourceKind, weight: base.weight }),
       basis: base.basis,
       foundAt: AS_OF.toISOString(),
     };
-  }).sort((a, b) => b.weight - a.weight || b.similarity - a.similarity);
+  }).sort((a, b) => b.ceiling - a.ceiling || b.similarity - a.similarity);
 }
 
 const EVIDENCE_FIXTURE: IdeaMapView = (() => {
