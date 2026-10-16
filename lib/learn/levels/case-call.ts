@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
+import { roleSituation, type RoleLine } from '@/lib/learn/levels/role-line';
 
 /**
  * Writing the case a level 4 to 6 cell is asked as (docs/LEARN-LEVELS-SPEC.md,
@@ -60,11 +61,14 @@ export function casePrompt(input: {
    * graph (a goal question, plan #2164.3) rather than a cell of a territory.
    */
   claim?: string;
+  /** A requirement line of a role pursued that the topic serves; the case is set in its posting's terms (plan #2184.2). */
+  role?: RoleLine | null;
 }): string {
   const lines = [`Topic: ${input.topicName}`, `Level: ${input.level}`];
   if (input.claim) lines.push(`The idea: ${input.claim}`);
   lines.push('', 'The checks for this level:');
   for (const check of input.descriptor) lines.push(`- ${check}`);
+  if (input.role) lines.push('', ...roleSituation(input.role));
   if (input.asked.length > 0) {
     lines.push('', 'Cases already asked on this level, so write a different one:');
     for (const q of input.asked) lines.push(`- ${q.slice(0, 200)}`);
@@ -80,6 +84,7 @@ export async function writeLevelCase(input: {
   descriptor: readonly string[];
   asked?: readonly string[];
   claim?: string;
+  role?: RoleLine | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
