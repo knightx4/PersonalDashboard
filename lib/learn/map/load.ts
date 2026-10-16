@@ -9,7 +9,6 @@ import type { StrengthInput } from '@/lib/learn/strength';
 import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
 import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
 import type { SkyTerritory } from './place-graph';
-import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
 import { readCells } from '@/lib/learn/levels/model';
 import { placeAreas, placeVectors, type DomainPlacement, type FieldPlacement } from './area-map';
 import { goalsOnMap, type GoalOnMap, type TopicPlacement } from './goals';
@@ -100,6 +99,7 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
    * the graph a chosen goal's topic opens. Undefined where nothing loads them.
    */
   territories?: SkyTerritory[];
+  /**
    * Your open learning goals, each with its topics placed on the sky and the
    * requirements between them (plan #2187.2). Null when they could not be
    * read; left out where nothing reads them, as in most gallery entries.
