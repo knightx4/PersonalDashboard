@@ -58,7 +58,7 @@ export type CatalogueSegmentInput = {
 export type CatalogueItemInput = {
   externalId: string;
   title: string;
-  kind: 'article' | 'video' | 'course' | 'structure';
+  kind: 'article' | 'video' | 'course' | 'structure' | 'page';
   canonicalUrl: string;
   lengthChars: number | null;
   durationSeconds: number | null;

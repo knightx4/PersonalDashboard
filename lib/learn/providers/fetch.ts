@@ -43,6 +43,10 @@ const MAX_REDIRECTS = 5;
  * `text/vtt` is there for the same reason: MIT OpenCourseWare publishes its
  * lecture transcripts as WebVTT caption files (lib/learn/providers/ocw.ts),
  * and it is read as plain text.
+ *
+ * `text/xml` and `application/xml` likewise, read as plain text: OCW's sitemap
+ * is the one listing of every course by its number, which is how a course
+ * number is confirmed to exist (lib/learn/providers/ocw-structure.ts).
  */
 const ALLOWED_TYPES = [
   'text/html',
@@ -50,6 +54,8 @@ const ALLOWED_TYPES = [
   'application/pdf',
   'text/plain',
   'text/vtt',
+  'text/xml',
+  'application/xml',
   'application/json',
 ];
 
@@ -88,7 +94,9 @@ function classify(contentType: string): FetchedDocument['contentType'] | null {
   const type = contentType.split(';')[0].trim().toLowerCase();
   if (type === 'application/pdf') return 'pdf';
   if (type === 'text/html' || type === 'application/xhtml+xml') return 'html';
-  if (type === 'text/plain' || type === 'text/vtt') return 'text';
+  if (type === 'text/plain' || type === 'text/vtt' || type === 'text/xml' || type === 'application/xml') {
+    return 'text';
+  }
   if (type === 'application/json') return 'json';
   return null;
 }
