@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { requestOrigin } from '@/lib/auth/origin';
 import { requireUser } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { judgeSubjectChannelsNow } from '@/inngest/learn/youtube-library';
@@ -23,6 +24,7 @@ import { writeSubjectCurriculum } from '@/lib/learn/graph/curriculum-run';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
 import { planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { kickPreparation } from '@/lib/learn/prepare/kick';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
@@ -535,4 +537,29 @@ export async function addUnitToPlan(_prev: PlanEditState, formData: FormData): P
   if (!result.ok) return { error: result.detail };
   afterPlanEdit(track.subjectId);
   return {};
+}
+
+export type PreparationPressState = { error?: string; started?: boolean };
+
+/**
+ * Continue a subject's preparation (plan #2276.1): the page's press for a
+ * failed step, and its Prepare press for a subject made before preparation
+ * existed. Starts the run in a function of its own and returns at once; the
+ * page shows the steps moving as the rows change (#2276.2).
+ */
+// latency: pending
+export async function continuePreparation(_prev: PreparationPressState, formData: FormData): Promise<PreparationPressState> {
+  await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+
+  // Read on the session, so only the person's own subject can be started.
+  const supabase = await createLearnClient();
+  const { data: subject } = await supabase.from('subjects').select('id').eq('id', subjectId.data).maybeSingle();
+  if (!subject) return { error: 'That subject is gone.' };
+
+  const started = await kickPreparation(await requestOrigin(), subjectId.data);
+  if (!started) return { error: 'Dash could not start the preparation just now. Try again in a minute.' };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { started: true };
 }

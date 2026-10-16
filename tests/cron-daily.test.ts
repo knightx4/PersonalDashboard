@@ -146,6 +146,9 @@ vi.mock('@/inngest/learn/embeddings-daily', () => ({
 vi.mock('@/inngest/learn/brief-watch', () => ({
   runBriefWatch: vi.fn(async () => ({ due: 1, checked: [], cards: 0 })),
 }));
+vi.mock('@/inngest/learn/prepare', () => ({
+  runPreparationsDaily: vi.fn(async () => ({ unfinished: 1, started: 1 })),
+}));
 vi.mock('@/inngest/dev/idea-scores', () => ({
   runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),
 }));
