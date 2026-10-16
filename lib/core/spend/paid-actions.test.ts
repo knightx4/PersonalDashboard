@@ -4,11 +4,15 @@ import { describe, expect, it } from 'vitest';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
   exportedFunctions,
+  functionsReachedBy,
   namedImports,
   operationsReachedBy,
+  paidToolConstants,
   REPO_ROOT,
   serverDirective,
 } from './action-graph';
+import { ASK_DASH_TOOLS, DASH_TOOLS, dashToolsOf, threadDashTools } from '@/lib/dash/registry';
+import { CONNECTOR_TOOLS } from '@/lib/connector/mcp';
 import { isBackgroundOperation } from './estimate';
 import { OPERATION_GUESSES, type OperationName } from './guesses';
 import {
@@ -179,6 +183,55 @@ describe('paid actions', () => {
       PAID_ACTIONS[key].filter((op) => isBackgroundOperation(op)).map((op) => `${key}: ${op}`),
     );
     expect(background).toEqual([]);
+  });
+});
+
+/**
+ * Dash's paid tools (plan #2228.1) press the same buttons: each names its
+ * button's key and the function both call (`runs`). Its declaration is found
+ * in the source and followed the way an action is, so a tool that carried a
+ * second copy of the button's work, or recorded something its hint does not
+ * name, fails here.
+ */
+describe('paid tools', () => {
+  const PAID = dashToolsOf('paid');
+  const DECLARED = new Map(
+    files(join(REPO_ROOT, 'lib/dash'), /\.ts$/)
+      .filter((file) => !/\.test\.ts$/.test(file))
+      .flatMap((file) => paidToolConstants(file).map((found) => [found.tool, { file, constant: found.constant }] as const)),
+  );
+
+  it('finds where each one is declared, and declares no other', () => {
+    expect(PAID.length).toBeGreaterThan(0);
+    expect([...DECLARED.keys()].sort()).toEqual(PAID.map((tool) => tool.name).sort());
+  });
+
+  it.each(PAID.map((tool) => [tool.name, tool] as const))('%s and its button reach the same function', (_name, tool) => {
+    expect(PAID_ACTION_KEYS).toContain(tool.action);
+    const declared = DECLARED.get(tool.name)!;
+    const { file, name } = actionOf(tool.action);
+    expect(functionsReachedBy(declared.file, declared.constant), `${tool.name} does not call ${tool.runs}`).toContain(tool.runs);
+    expect(functionsReachedBy(join(REPO_ROOT, file), name), `${tool.action} does not call ${tool.runs}`).toContain(tool.runs);
+  });
+
+  it.each(PAID.map((tool) => [tool.name, tool] as const))('%s records what its button\'s hint names, and nothing else', (_name, tool) => {
+    const declared = DECLARED.get(tool.name)!;
+    const found = operationsReachedBy(declared.file, declared.constant, KNOWN);
+    expect(found.unread).toEqual([]);
+    const named: string[] = [...PAID_ACTIONS[tool.action]].sort();
+    expect(named.filter((op) => !found.operations.has(op))).toEqual([]);
+    expect(foreground(found.operations).filter((op) => !named.includes(op))).toEqual([]);
+  });
+
+  it('is offered in Ask and in threads, and never on the connector', () => {
+    const connector = new Set(CONNECTOR_TOOLS.map((tool) => tool.name));
+    for (const tool of PAID) {
+      expect(tool.inAppOnly).toBe(true);
+      expect(connector.has(tool.name)).toBe(false);
+      expect(ASK_DASH_TOOLS).toContain(tool);
+      expect(threadDashTools('job_search.roles')).toContain(tool);
+    }
+    expect(DASH_TOOLS.filter((tool) => tool.kind === 'paid')).toEqual(PAID);
   });
 });
 

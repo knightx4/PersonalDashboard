@@ -42,7 +42,10 @@ export const shoppingActions: ModuleActions = {
   'app/shopping/settings/actions.ts': {
     disconnectInbox: none('account'),
     resetInboxImport: none('account'),
-    reparseInboxOrders: none('spends'),
+    reparseInboxOrders: none(
+      'spends',
+      "A repair in an inbox's settings menu that re-reads every imported order email the parser has since improved on, priced per email with a count known only once it has looked, and long enough to outrun one approval.",
+    ),
     createCustomCategory: none('setting'),
     renameCustomCategory: none('setting'),
     deleteCustomCategory: none('deletes'),
@@ -75,7 +78,10 @@ export const shoppingActions: ModuleActions = {
   },
   'app/shopping/inventory/[id]/attribute-actions.ts': {
     saveCategoryTemplate: none('setting'),
-    lookupItemAttributes: none('spends'),
+    lookupItemAttributes: none(
+      'spends',
+      "Looks a board game up on BoardGameGeek with the deployment's search keys; no model runs, so it has no PAID_ACTIONS key to price a card by.",
+    ),
   },
   'app/shopping/inventory/group-actions.ts': {
     groupItemsTogether: tool('change_items'),
@@ -127,8 +133,11 @@ export const shoppingActions: ModuleActions = {
     testEbayConnection: none('account'),
     updateSellSettings: none('setting'),
     noteListingIntent: tool('change_item'),
-    priceSellItems: none('spends'),
-    priceOneItem: none('spends'),
+    priceSellItems: tool('price_items_for_sale'),
+    priceOneItem: {
+      tool: 'price_items_for_sale',
+      note: 'Dash names the one item; both presses price each item fresh under estimate-resale-price.',
+    },
     searchItemPrice: none('page'),
     setSellPrice: tool('change_item'),
   },

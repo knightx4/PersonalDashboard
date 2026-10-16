@@ -4,10 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { createCoreClient } from '@/lib/core/auth/server';
-import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSessionSpend } from '@/lib/core/spend/session';
-import { draftAndSaveCoverLetter } from '@/lib/jobs/drafting/draft-cover-letter';
+import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
 
@@ -175,17 +172,7 @@ export async function draftCoverLetter(input: {
   if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
 
   const user = await requireUser();
-  const [jobs, core] = await Promise.all([createClient(), createCoreClient()]);
-
-  const spend: SpendReport[] = [];
-  const result = await draftAndSaveCoverLetter(
-    { jobs, core, apiKey, onSpend: (report) => spend.push(report) },
-    { userId: user.id, applicationId: parsed.data.applicationId, replies: parsed.data.replies },
-  );
-  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-cover-letter' }, spend);
-
-  if (!result.ok) return { draft: null, error: result.error };
-  return { draft: result.draft, error: null };
+  return draftCoverLetterFor(user.id, apiKey, parsed.data);
 }
 
 /**

@@ -113,3 +113,25 @@ export async function writeYearReviewFor(
   });
   return { status: 'written', events: events.length, paragraphs: kept.length, dropped };
 }
+
+/**
+ * Why a run wrote nothing, in the sentence the person reads, or null when it
+ * wrote the review. The button on the year's page and Dash's
+ * write_year_review (lib/dash/paid-tools.ts) both say these.
+ */
+export function yearReviewRefusal(result: YearReviewResult, year: number): string | null {
+  switch (result.status) {
+    case 'written':
+      return null;
+    case 'already-complete':
+      return `The review of ${year} was written after the year ended, so it stays as it is.`;
+    case 'too-few':
+      return `${year} has ${result.events === 1 ? '1 event' : `${result.events} events`} on the timeline, too few to write about.`;
+    case 'no-model':
+      return 'This deployment has no Anthropic API key set, so Dash cannot write.';
+    case 'nothing-kept':
+      return 'Nothing Dash wrote could be checked against the numbers on this page, so none of it was kept. Try again.';
+    case 'not-yet':
+      return `${year} has not started.`;
+  }
+}

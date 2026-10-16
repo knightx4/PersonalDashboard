@@ -277,6 +277,7 @@ import { formatMoney } from '@/lib/money';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
+import type { DashChange } from '@/lib/talk/changes';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -331,6 +332,7 @@ import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskBuildSurface,
+  AskPaidSurface,
   AskChangesSurface,
   AT_WORK_QUESTION,
   AskDashSurface,
@@ -4120,6 +4122,76 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* What a comment asked Dash to run that costs money (plan #2228.2): the
+     * approval card under the reply that says it was queued, in the thread
+     * on a goal, as every row's thread draws it. */
+    id: 'thread-paid',
+    label: 'Thread · Paid actions waiting under a comment',
+    module: 'goals',
+    width: 'narrow',
+    render: () => {
+      const at = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
+      const press = (id: string, line: string, medianMicros: number): DashChange => ({
+        id,
+        conversationId: '00000000-0000-4000-8000-000000000441',
+        turnId: 'paid-ask',
+        kind: 'paid_action',
+        status: 'proposed',
+        subjectRef: null,
+        writtenTable: null,
+        writtenRef: null,
+        undo: null,
+        createdAt: at(4),
+        doneAt: null,
+        declinedAt: null,
+        undoneAt: null,
+        input: {
+          tool: 'write_year_review',
+          action: 'app/timeline/actions.ts#writeYearReview',
+          args: {},
+          line,
+          estimate: {
+            lowMicros: Math.round(medianMicros * 0.7),
+            medianMicros,
+            highMicros: Math.round(medianMicros * 1.6),
+            runs: 9,
+            basis: 'measured',
+            per: 'run',
+            models: [SONNET],
+          },
+          workspace: null,
+          paths: ['/jobs/pipeline'],
+        },
+      });
+      return (
+        <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+          <p className="text-body text-ink">Move into a senior analyst role by spring</p>
+          <Thread
+            subject={threadRef('goal', '00000000-0000-4000-8000-000000000442')}
+            turns={[
+              {
+                id: 'paid-ask',
+                author: 'me',
+                body: '@dash draft my answers on the Northwind and Fernhill applications',
+                createdAt: at(5),
+                paid: [
+                  press('thread-paid-1', 'Draft the answers on the Northwind Analytics application.', 148_000),
+                  press('thread-paid-2', 'Draft the answers on the Fernhill Labs application.', 131_000),
+                ],
+              },
+              {
+                id: 'paid-reply',
+                author: 'claude',
+                body: 'I have queued both drafts. They cost money, so nothing runs until you accept them below.',
+                createdAt: at(4),
+              },
+            ]}
+          />
+        </div>
+      );
+    },
+  },
+  {
     /* "Dash at work" on the button that started a run (plan #1964.2.1): the
      * press hands the area to Dash and the button's working mark stands in
      * place of its label while the run goes. */
@@ -6131,6 +6203,47 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AskBuildSurface refused />,
+  },
+  {
+    /* What costs money, on one card under the answer that queued it (plan
+     * #2228.2): a cost on each line, the total, Accept all and Decline. */
+    id: 'ask-dash-paid',
+    label: 'Ask Dash · Paid actions waiting',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface />,
+  },
+  {
+    /* Accept all pressed: the first line running, the rest waiting their turn. */
+    id: 'ask-dash-paid-running',
+    label: 'Ask Dash · Paid actions running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="running" />,
+  },
+  {
+    /* Every line run: each links to what it wrote, and none has an Undo. */
+    id: 'ask-dash-paid-done',
+    label: 'Ask Dash · Paid actions run',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="done" />,
+  },
+  {
+    /* One line refused with its reason; the lines either side of it still ran. */
+    id: 'ask-dash-paid-failed',
+    label: 'Ask Dash · A paid action that failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="failed" />,
+  },
+  {
+    /* Declined: the card greyed, nothing run and nothing spent. */
+    id: 'ask-dash-paid-declined',
+    label: 'Ask Dash · Paid actions declined',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="declined" />,
   },
   {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind

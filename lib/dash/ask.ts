@@ -15,6 +15,7 @@ import {
   type DashExecutor,
   type DashLookupEvent,
   type DashProposer,
+  type DashQueuer,
   type DashSeen,
   type DashStop,
   type DashVoice,
@@ -22,7 +23,8 @@ import {
 } from './loop';
 import { lookupInScope } from '@/lib/ask/tools';
 import { moduleById, type ModuleId } from '@/lib/modules';
-import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import type { PaidQueued } from './paid';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -251,6 +253,8 @@ export async function answerQuestion(input: {
   propose?: AskProposer;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /** Absent: every paid tool is refused (plan #2228.1). */
+  queue?: DashQueuer;
   /**
    * Keeps a hand-off and returns what to tell the model. Absent: every
    * hand-off is refused. `seen` says whether Dash has seen the row it names.
@@ -346,6 +350,12 @@ export type AskWriteRunner = (
   seen: DashSeen,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
+/**
+ * Checks and prices a paid press as the person (queuePaidPress in
+ * lib/dash/paid.ts, bound to a request), without keeping it (plan #2228.1).
+ */
+export type AskQueueRunner = (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
+
 /** What the model is told once a change is made and kept. */
 function madeNote(summary: string): string {
   return `Done: ${summary} It shows under your answer with an Undo. Say what you did, and cite the row this returned.`;
@@ -394,6 +404,12 @@ export async function askDash(
      * `saveChange` store: every write is refused.
      */
     write?: AskWriteRunner;
+    /**
+     * Checks and prices a paid press (plan #2228.1); the press is kept as a
+     * proposal with the answer's others, and runs only on an approval.
+     * Absent: every paid tool is refused.
+     */
+    queue?: AskQueueRunner;
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
@@ -500,6 +516,23 @@ export async function askDash(
           return { ok: true, rows: [row], note: madeNote(result.summary) };
         }
       : undefined;
+  // A paid press is checked and priced, then kept as a proposal like any
+  // other: nothing runs until the person approves it (plan #2228.1).
+  const queueRun = input.queue;
+  const queue: DashQueuer | undefined = queueRun
+    ? async (tool, args, seen) => {
+        const queued = await queueRun(tool, args, seen);
+        if (!queued.ok) return { ok: false, error: queued.error };
+        let kept: DashChange;
+        try {
+          kept = await save(queued.change);
+        } catch (error) {
+          console.error(`ask paid tool ${tool.name} was not queued`, error);
+          return { ok: false, error: 'That could not be queued. Tell them nothing was run.' };
+        }
+        return { ok: true, rows: [], totals: { queued: { id: kept.id, kind: kept.kind, input: kept.input } }, note: queued.note };
+      }
+    : undefined;
   const handed: DashHandoff[] = [];
   const saveHandoff = stores.saveHandoff;
   const handOff =
@@ -550,6 +583,7 @@ export async function askDash(
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     write,
+    queue,
     handOff,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,

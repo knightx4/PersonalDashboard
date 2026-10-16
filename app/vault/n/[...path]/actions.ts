@@ -13,8 +13,7 @@ import { noteMapSchema, type NoteMapProposal } from '@/lib/vault/map/proposal';
 import { quoteInNote } from '@/lib/vault/map/rules';
 import { loadNearestThemeNames, loadThemeNames, offerThemes } from '@/lib/vault/map/themes';
 import { loadNote } from '@/lib/vault/notes/load';
-import { loadNoteThread, saveThought } from '@/lib/vault/maya/store';
-import { MAYA_THOUGHT_OPERATION, writeThought } from '@/lib/vault/maya/thought';
+import { askMayaAbout } from '@/lib/vault/maya/ask-run';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { noteRenamePorts, noteSavePorts } from '@/lib/vault/db/ports';
@@ -200,43 +199,16 @@ export async function askMaya(_prev: AskMayaState, formData: FormData): Promise<
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Asking Maya needs ANTHROPIC_API_KEY to be set.' };
 
-  const vault = await createVaultClient();
-  const note = await loadNote(vault, path.data);
-  if (!note) return { error: 'That note is not in the vault any more.' };
-
-  const db = { core: await createCoreClient(), vault };
-  const existing = await loadNoteThread(db, note.id);
-  if (existing) return { threadHref: mayaThreadHref(existing.id) };
-
-  const spend = collectSpend();
-  const written = await writeThought({
-    vault,
+  const outcome = await askMayaAbout({
+    db: { core: await createCoreClient(), vault: await createVaultClient() },
     userId: user.id,
-    noteId: note.id,
-    anthropicApiKey: apiKey,
-    onSpend: spend.sink,
+    notePath: path.data,
+    apiKey,
   });
-  await recordLearnSpend(user.id, MAYA_THOUGHT_OPERATION, spend.reports);
-
-  if (!written.ok) {
-    return written.reason === 'error' || written.reason === 'no-key'
-      ? { error: written.detail }
-      : { message: written.detail };
-  }
-  if (written.points.length === 0) {
-    return { message: 'Maya read this note and had nothing worth saying about it yet.' };
-  }
-
-  const saved = await saveThought(db, {
-    userId: user.id,
-    noteId: note.id,
-    origin: 'asked',
-    written,
-  });
-  if (!saved.ok) return { error: saved.detail };
-
-  revalidatePath(noteHref(note.path));
-  return { threadHref: mayaThreadHref(saved.threadId) };
+  if (outcome.kind === 'error') return { error: outcome.detail };
+  if (outcome.kind === 'message') return { message: outcome.detail };
+  if (!outcome.existing) revalidatePath(noteHref(outcome.notePath));
+  return { threadHref: mayaThreadHref(outcome.threadId) };
 }
 
 export type SaveNoteState = {

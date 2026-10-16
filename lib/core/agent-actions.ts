@@ -60,7 +60,8 @@ export const coreActions: ModuleActions = {
   },
   'app/timeline/actions.ts': {
     markObservationNotUseful: none('theirs'),
-    writeYearReview: none('spends'),
+    // Queued for an approval, since it spends (plan #2228.1).
+    writeYearReview: tool('write_year_review'),
   },
   'app/s/[token]/actions.ts': {
     respondToShare: none(
