@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react';
 import { RowLink } from '@/components/shell/back-link';
 import { ActionMenu } from '@/components/ui/action-menu';
 import Link from '@/components/ui/link';
@@ -76,14 +75,11 @@ export function RolesTable({
                     label={`Sort or filter by ${entry.label.toLowerCase()}`}
                     align="start"
                     defaultOpen={openFilter === entry.id}
-                    trigger={
-                      <>
-                        {entry.label}
-                        <ChevronDown className="size-3" strokeWidth={2} aria-hidden />
-                      </>
-                    }
+                    // The heading alone, at the width the sort link had: a
+                    // chevron on five headings pushed Comp off the card.
+                    trigger={entry.label}
                     triggerClassName={cn(
-                      '-mx-1 h-auto w-auto gap-0.5 px-1 py-0.5 text-micro font-semibold uppercase tracking-wider',
+                      'h-auto w-auto justify-start p-0 text-left text-micro font-semibold uppercase tracking-wider',
                       entry.chosen || filters[entry.id].active ? 'text-accent' : 'text-ink-muted hover:text-ink',
                     )}
                     items={[

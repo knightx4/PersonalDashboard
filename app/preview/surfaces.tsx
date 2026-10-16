@@ -740,7 +740,8 @@ const pipelineRow = (
 ): PipelineRow => ({
   roleId: `role-${row.applicationId}`,
   companyId: `co-${row.applicationId}`,
-  companySlug: 'a-company',
+  // Each company its own slug, so the Company column's filter narrows.
+  companySlug: row.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   companyLogoUrl: null,
   companyDomains: [],
   companyWebsite: null,

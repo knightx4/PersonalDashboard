@@ -74,6 +74,13 @@ function useMenuPosition(
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    // A trigger that is not drawn (a table header hidden on a phone) has no
+    // place to hang the menu from, so the menu stays closed rather than
+    // floating over the top of the page.
+    if (rect.width === 0 && rect.height === 0) {
+      setPos(null);
+      return;
+    }
     const minWidth = Math.max(180, rect.width);
     const left =
       align === 'end'
