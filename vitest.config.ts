@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
@@ -13,8 +13,13 @@ const include = ['tests/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}'];
 // reading the files so that a new database test needs no list kept by hand.
 const DB_TEST = /helpers\/db(-[a-z]+)?['"]|TEST_DATABASE_URL/;
 const root = import.meta.dirname;
-const dbTests = include
-  .flatMap((pattern) => globSync(pattern, { cwd: root, exclude: ['**/node_modules/**'] }))
+const dbTests = ['tests', 'lib']
+  .flatMap((dir) =>
+    readdirSync(join(root, dir), { recursive: true, encoding: 'utf8' }).map(
+      (file) => `${dir}/${file}`,
+    ),
+  )
+  .filter((file) => /\.test\.tsx?$/.test(file) && !file.includes('node_modules'))
   .filter((file) => DB_TEST.test(readFileSync(join(root, file), 'utf8')));
 
 export default defineConfig({
