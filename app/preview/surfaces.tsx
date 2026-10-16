@@ -258,6 +258,10 @@ import {
   LearnBriefQuoteSourceSurface,
   LearnBriefResearchingSurface,
   LearnBriefShortAnswerEditorSurface,
+  LearnBriefTopicsSurface,
+  LearnBriefGoalEmptySurface,
+  LearnBriefGoalPendingSurface,
+  LearnBriefGoalErrorSurface,
   LearnBriefSurface,
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
@@ -8929,6 +8933,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnBriefShortAnswerEditorSurface />,
+  },
+  /* The brief's place on your map (plan #2184.1): topics drafted from it
+   * under a goal, no goal yet, and Draft its topic running or failed. */
+  {
+    id: 'learn-brief-topics',
+    label: 'Research brief · Topics drafted under a goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefTopicsSurface />,
+  },
+  {
+    id: 'learn-brief-goal-empty',
+    label: 'Research brief · No learning goal yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalEmptySurface />,
+  },
+  {
+    id: 'learn-brief-goal-pending',
+    label: 'Research brief · Drafting its topic',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalPendingSurface />,
+  },
+  {
+    id: 'learn-brief-goal-error',
+    label: 'Research brief · Drafting its topic failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalErrorSurface />,
   },
   {
     id: 'learn-now-briefs',
