@@ -296,6 +296,29 @@ describe('a subject\'s preparation run (plan #2276.1)', () => {
       asUser(userA, (tx) => tx`insert into subject_preparations (user_id, subject_id) values (${userA}, ${subjectA})`),
     ).rejects.toThrow();
   });
+
+  it('opens a branch run of five steps when the owner picks a direction, and only the owner (plan #2276.7)', async () => {
+    const branch = { key: 'land-use', frame: 'Land use', name: 'Land use', asks: ['Bid rent'] };
+    await expect(
+      asUser(userB, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`),
+    ).rejects.toThrow();
+
+    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`);
+    // A second press on the same branch opens nothing more.
+    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 32)`);
+    const runs = await admin<{ id: string; branch_key: string | null; direction: { state?: string; answers?: number } | null }[]>`
+      select id, branch_key, direction from subject_preparations where subject_id = ${subjectA} order by created_at`;
+    expect(runs.map((r) => r.branch_key)).toEqual([null, 'land-use']);
+    expect(runs[0].direction).toMatchObject({ state: 'picked', answers: 32 });
+    const steps = await admin<{ key: string }[]>`
+      select key from subject_preparation_steps where preparation_id = ${runs[1].id} order by ordinal`;
+    expect(steps.map((s) => s.key)).toEqual(['pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'finish']);
+
+    await asUser(userA, (tx) => tx`select learn.dismiss_subject_direction(${subjectA}, 40)`);
+    const [own] = await admin<{ direction: { state?: string; answers?: number } }[]>`
+      select direction from subject_preparations where subject_id = ${subjectA} and branch_key is null`;
+    expect(own.direction).toMatchObject({ state: 'dismissed', answers: 40 });
+  });
 });
 
 describe('the areas, which change only by migration', () => {

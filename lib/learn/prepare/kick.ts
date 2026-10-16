@@ -20,8 +20,12 @@ function secret(): string | null {
   return process.env.CRON_SECRET?.trim() || process.env.TOKEN_ENCRYPTION_KEY?.trim() || null;
 }
 
-/** Ask the route to work the run. False when it could not be reached; the daily cron picks the run up then. */
-export async function kickPreparation(origin: string, subjectId: string): Promise<boolean> {
+/**
+ * Ask the route to work the run. False when it could not be reached; the
+ * daily cron picks the run up then. `branch` names a branch run by its key
+ * (plan #2276.7); without one it is the subject's own run.
+ */
+export async function kickPreparation(origin: string, subjectId: string, branch: string | null = null): Promise<boolean> {
   const token = secret();
   if (!token) {
     console.error('[learn prepare] no CRON_SECRET, so the run waits for the daily cron');
@@ -31,7 +35,7 @@ export async function kickPreparation(origin: string, subjectId: string): Promis
     const res = await fetch(`${origin}${PREPARE_ROUTE}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ subjectId }),
+      body: JSON.stringify(branch ? { subjectId, branch } : { subjectId }),
     });
     if (!res.ok) console.error('[learn prepare] kick refused', res.status);
     return res.ok;

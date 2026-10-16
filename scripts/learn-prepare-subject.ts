@@ -36,7 +36,7 @@ async function main() {
 
   const [subjects, runs, lenses, units] = await Promise.all([
     learn.from('subjects').select('id, name, survey').eq('user_id', userId),
-    learn.from('subject_preparations').select('subject_id, status').eq('user_id', userId),
+    learn.from('subject_preparations').select('subject_id, status').eq('user_id', userId).is('branch_key', null),
     learn.from('lenses').select('id, subject_id').eq('user_id', userId).not('subject_id', 'is', null),
     learn.from('curriculum_units').select('id, subject_id, write_model').eq('user_id', userId),
   ]);

@@ -121,8 +121,10 @@ export function finishPreparationStep(ports: FinishPorts): StepHandler {
 
     const territory = await ports.territory(ctx.run.id);
     const asks = (territory?.topics ?? []).map((t) => t.ask);
+    // A branch run (plan #2276.7) writes no units: it starts on its first deeper topic.
+    const branch = ctx.subject.branch ?? null;
     const [unit, drafted] = await Promise.all([
-      ports.firstUnit(ctx.subject.id),
+      branch ? Promise.resolve(null) : ports.firstUnit(ctx.subject.id),
       asks.length > 0 ? ports.drafted(asks) : Promise.resolve(new Map<string, { id: string; name: string }>()),
     ]);
     // The first topic of the territory that was drafted: one given up on is passed over.
@@ -139,9 +141,10 @@ export function finishPreparationStep(ports: FinishPorts): StepHandler {
       frames: framesOf(territory),
     };
     const where = unit ? ` Start with ${unit}.` : topic ? ` Start with ${topic.name}.` : '';
+    const took = `${minutes} minute${minutes === 1 ? '' : 's'}`;
     return {
       state: 'done',
-      summary: `Prepared in ${minutes} minute${minutes === 1 ? '' : 's'}.${where}`,
+      summary: branch ? `Went deeper on ${branch.name} in ${took}.${where}` : `Prepared in ${took}.${where}`,
       counts: { seconds },
       detail,
     };

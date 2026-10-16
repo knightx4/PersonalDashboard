@@ -7,7 +7,8 @@ import { pumpPreparation } from '@/inngest/learn/prepare';
 // is made before the function is stopped. lib/learn/prepare/run.test.ts checks it.
 export const maxDuration = 300;
 
-const bodySchema = z.object({ subjectId: z.string().uuid() });
+// `branch` names a branch run by its key (plan #2276.7); absent is the subject's own run.
+const bodySchema = z.object({ subjectId: z.string().uuid(), branch: z.string().min(1).max(80).optional() });
 
 /**
  * Work a subject's preparation run (plan #2276.1). Internal: called with the
@@ -23,9 +24,9 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: 'name a subject' }, { status: 400 });
 
   const origin = requestOrigin(request);
-  const { subjectId } = parsed.data;
+  const { subjectId, branch } = parsed.data;
   after(() =>
-    pumpPreparation({ subjectId, origin }).catch((error: unknown) => {
+    pumpPreparation({ subjectId, origin, branch: branch ?? null }).catch((error: unknown) => {
       console.error('[learn prepare]', subjectId, error instanceof Error ? error.message : error);
     }),
   );

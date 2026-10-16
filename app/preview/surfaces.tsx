@@ -261,6 +261,8 @@ import {
   LearnEssaysSurface,
 } from './essay-surfaces';
 import {
+  LearnSubjectPrepareBranchSurface,
+  LearnSubjectPrepareDirectionSurface,
   LearnSubjectPrepareEmptySurface,
   LearnSubjectPrepareFailedSurface,
   LearnSubjectPrepareFinishedSurface,
@@ -9215,6 +9217,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-direction',
+    label: 'Subject · Offer to go deeper, past thirty answers',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareDirectionSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-branch',
+    label: 'Subject · Going deeper on a branch, steps running',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareBranchSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

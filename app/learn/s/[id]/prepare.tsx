@@ -69,8 +69,10 @@ function StepMark({ state }: { state: PreparationLineState }) {
   return <StatusGlyph glyph={mark.glyph} label={mark.word} className={mark.tone} />;
 }
 
-function ContinueForm({ subjectId, label, onStarted, costText }: {
+function ContinueForm({ subjectId, branch = null, label, onStarted, costText }: {
   subjectId: string;
+  /** A branch run's key (plan #2276.7), so Continue works that run. */
+  branch?: string | null;
   label: string;
   onStarted: () => void;
   costText?: string;
@@ -86,6 +88,7 @@ function ContinueForm({ subjectId, label, onStarted, costText }: {
   return (
     <form action={press} className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <input type="hidden" name="subjectId" value={subjectId} />
+      {branch && <input type="hidden" name="branch" value={branch} />}
       <DashAction type="submit" variant="secondary" size="sm" pending={pending} costText={costText} what="Cost of preparing the subject">
         {pending ? 'Starting…' : label}
       </DashAction>
@@ -127,9 +130,15 @@ export function PreparationBlock({
   view,
   live = true,
   sourcesHref = null,
+  branch = null,
 }: {
   subjectId: string;
   view: PreparationView;
+  /**
+   * A run for one branch of the territory (plan #2276.7): its key, for
+   * Continue, and its name, for the heading. Absent on the subject's own run.
+   */
+  branch?: { key: string; name: string } | null;
   /** False in the gallery, which has no server to re-read. */
   live?: boolean;
   /** Where the finished line's Sources link goes, once the page has that section (#2276.6). */
@@ -184,7 +193,13 @@ export function PreparationBlock({
   return (
     <Card padding="standard" className="mb-6" aria-live="polite">
       <h2 className="text-body font-semibold text-ink">
-        {failed ? 'Preparation stopped' : 'Preparing this subject'}
+        {branch
+          ? failed
+            ? `Going deeper on ${branch.name} stopped`
+            : `Going deeper on ${branch.name}`
+          : failed
+            ? 'Preparation stopped'
+            : 'Preparing this subject'}
         <span className="font-normal text-ink-muted">
           {' · '}step {view.position} of {view.total}
         </span>
@@ -200,7 +215,7 @@ export function PreparationBlock({
             index={i}
             action={
               failed && line.state === 'failed' ? (
-                <ContinueForm subjectId={subjectId} label="Continue" onStarted={markKicked} />
+                <ContinueForm subjectId={subjectId} branch={branch?.key ?? null} label="Continue" onStarted={markKicked} />
               ) : undefined
             }
           />

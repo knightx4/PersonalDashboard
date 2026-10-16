@@ -9,6 +9,7 @@ import type {
   StepPatch,
 } from './run';
 import { isPreparationStepKey, PREPARATION_STEPS, type PreparationStepKey } from './steps';
+import { readBranch, readDirection, type DirectionChoice } from './branch';
 
 /**
  * Where a subject's preparation run is kept (plan #2276.1):
@@ -29,6 +30,7 @@ type RunDb = {
   finished_at: string | null;
   error: string | null;
   failures: number;
+  branch: unknown;
 };
 
 type StepDb = {
@@ -44,7 +46,7 @@ type StepDb = {
   error: string | null;
 };
 
-const RUN_COLUMNS = 'id, user_id, subject_id, status, current_step, started_at, finished_at, error, failures';
+const RUN_COLUMNS = 'id, user_id, subject_id, status, current_step, started_at, finished_at, error, failures, branch';
 const STEP_COLUMNS = 'key, ordinal, status, started_at, finished_at, summary, counts, detail, calls, error';
 
 /** A run left this many failures behind is left for the person's Continue. */
@@ -61,6 +63,7 @@ function toRun(row: RunDb): PreparationRow {
     finishedAt: row.finished_at,
     error: row.error,
     failures: row.failures,
+    branch: readBranch(row.branch),
   };
 }
 
@@ -113,25 +116,25 @@ function stepColumns(patch: StepPatch): Record<string, unknown> {
  * subject with a run keeps it as it is. Returns the run's id.
  */
 export async function ensurePreparation(learn: LearnSupabaseClient, userId: string, subjectId: string): Promise<string> {
-  const { data: existing, error: readError } = await learn
-    .from('subject_preparations')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('subject_id', subjectId)
-    .maybeSingle();
+  const readOwn = () =>
+    learn.from('subject_preparations').select('id').eq('user_id', userId).eq('subject_id', subjectId).is('branch_key', null).maybeSingle();
+  const { data: existing, error: readError } = await readOwn();
   if (readError) throw new Error(`Reading the preparation failed: ${readError.message}`);
   let id = (existing as { id: string } | null)?.id ?? null;
   if (!id) {
+    // The subject's own run is unique by a partial key (learn 0171), which an
+    // upsert cannot name, so a run opened in the meantime shows as a clash.
     const { data: made, error } = await learn
       .from('subject_preparations')
-      .upsert({ user_id: userId, subject_id: subjectId }, { onConflict: 'subject_id', ignoreDuplicates: true })
+      .insert({ user_id: userId, subject_id: subjectId })
       .select('id')
       .maybeSingle();
-    if (error) throw new Error(`Opening the preparation failed: ${error.message}`);
+    if (error && error.code !== '23505') throw new Error(`Opening the preparation failed: ${error.message}`);
     id = (made as { id: string } | null)?.id ?? null;
     if (!id) {
-      const { data: raced } = await learn.from('subject_preparations').select('id').eq('user_id', userId).eq('subject_id', subjectId).single();
-      id = (raced as { id: string }).id;
+      const { data: raced } = await readOwn();
+      id = (raced as { id: string } | null)?.id ?? null;
+      if (!id) throw new Error('Opening the preparation failed: no run came back.');
     }
   }
   const { error: stepsError } = await learn.from('subject_preparation_steps').upsert(
@@ -153,6 +156,7 @@ export async function loadPreparation(
     .select(RUN_COLUMNS)
     .eq('user_id', userId)
     .eq('subject_id', subjectId)
+    .is('branch_key', null)
     .maybeSingle();
   if (error) throw new Error(`Reading the preparation failed: ${error.message}`);
   if (!data) return null;
@@ -176,20 +180,20 @@ export async function unfinishedPreparations(
   userId: string,
   now: Date,
   limit: number,
-): Promise<string[]> {
+): Promise<{ subjectId: string; branch: string | null }[]> {
   const { data, error } = await learn
     .from('subject_preparations')
-    .select('subject_id, status, failures')
+    .select('subject_id, branch_key, status, failures')
     .eq('user_id', userId)
     .neq('status', 'done')
     .or(`lease_until.is.null,lease_until.lt.${now.toISOString()}`)
     .order('created_at', { ascending: true })
     .limit(limit * 4);
   if (error) throw new Error(`Reading unfinished preparations failed: ${error.message}`);
-  return ((data ?? []) as { subject_id: string; status: string; failures: number }[])
+  return ((data ?? []) as { subject_id: string; branch_key: string | null; status: string; failures: number }[])
     .filter((r) => r.status !== 'failed' || r.failures < CRON_RETRIES)
     .slice(0, limit)
-    .map((r) => r.subject_id);
+    .map((r) => ({ subjectId: r.subject_id, branch: r.branch_key }));
 }
 
 /** The territory a run compiled (plan #2276.4), by the run's id; null before compile_territory has kept one. */
@@ -211,6 +215,7 @@ export async function loadSubjectTerritory(learn: LearnSupabaseClient, userId: s
     .select('territory')
     .eq('user_id', userId)
     .eq('subject_id', subjectId)
+    .is('branch_key', null)
     .maybeSingle();
   if (error) throw new Error(`Reading the subject's territory failed: ${error.message}`);
   return readTerritory((data as { territory: unknown } | null)?.territory);
@@ -225,20 +230,79 @@ export async function saveRunTerritory(learn: LearnSupabaseClient, userId: strin
   if (error) throw new Error(`Saving the territory failed: ${error.message}`);
 }
 
+export type BranchPreparation = { run: PreparationRow; steps: PreparationStepRow[] };
+
+/**
+ * What the direction offer reads (plan #2276.7): the last answer to it, the
+ * graded answers on the subject's lens, and the subject's branch runs with
+ * their steps, oldest first. Null when the subject has no run of its own.
+ */
+export async function loadDirection(
+  learn: LearnSupabaseClient,
+  userId: string,
+  subjectId: string,
+): Promise<{ direction: DirectionChoice | null; prepared: boolean; answers: number; branches: BranchPreparation[] } | null> {
+  const [own, lens, runs] = await Promise.all([
+    learn
+      .from('subject_preparations')
+      .select('direction, status')
+      .eq('user_id', userId)
+      .eq('subject_id', subjectId)
+      .is('branch_key', null)
+      .maybeSingle(),
+    learn.from('lenses').select('id').eq('user_id', userId).eq('subject_id', subjectId).limit(1).maybeSingle(),
+    learn
+      .from('subject_preparations')
+      .select(RUN_COLUMNS)
+      .eq('user_id', userId)
+      .eq('subject_id', subjectId)
+      .not('branch_key', 'is', null)
+      .order('created_at', { ascending: true }),
+  ]);
+  if (own.error) throw new Error(`Reading the direction failed: ${own.error.message}`);
+  if (runs.error) throw new Error(`Reading the branch runs failed: ${runs.error.message}`);
+  if (!own.data) return null;
+
+  const lensId = (lens.data as { id: string } | null)?.id ?? null;
+  let answers = 0;
+  if (lensId) {
+    const counted = await learn.rpc('lens_graded_answers', { p_user: userId, p_lens: lensId });
+    if (counted.error) throw new Error(`Counting the answers on the lens failed: ${counted.error.message}`);
+    answers = typeof counted.data === 'number' ? counted.data : 0;
+  }
+
+  const branchRuns = ((runs.data ?? []) as RunDb[]).map(toRun);
+  let branches: BranchPreparation[] = [];
+  if (branchRuns.length > 0) {
+    const { data: steps, error: stepsError } = await learn
+      .from('subject_preparation_steps')
+      .select(`preparation_id, ${STEP_COLUMNS}`)
+      .eq('user_id', userId)
+      .in('preparation_id', branchRuns.map((r) => r.id));
+    if (stepsError) throw new Error(`Reading the branch runs' steps failed: ${stepsError.message}`);
+    const rows = (steps ?? []) as (StepDb & { preparation_id: string })[];
+    branches = branchRuns.map((run) => ({ run, steps: toSteps(rows.filter((r) => r.preparation_id === run.id)) }));
+  }
+  const ownRow = own.data as { direction: unknown; status: string };
+  return { direction: readDirection(ownRow.direction), prepared: ownRow.status === 'done', answers, branches };
+}
+
 /** The ports of runPreparation over the database, for one account. */
 export function preparationStore(
   learn: LearnSupabaseClient,
   userId: string,
 ): Pick<PreparationPorts, 'claim' | 'saveRun' | 'saveStep'> {
   return {
-    async claim(subjectId, leaseUntil): Promise<ClaimedPreparation | null> {
+    async claim(subjectId, leaseUntil, branch): Promise<ClaimedPreparation | null> {
       const now = new Date().toISOString();
-      // One statement, so two calls cannot both take a free run.
-      const { data, error } = await learn
+      // One statement, so two calls cannot both take a free run. A branch run
+      // is named by its key (plan #2276.7); no key is the subject's own run.
+      const update = learn
         .from('subject_preparations')
         .update({ lease_until: leaseUntil, updated_at: now })
         .eq('user_id', userId)
-        .eq('subject_id', subjectId)
+        .eq('subject_id', subjectId);
+      const { data, error } = await (branch ? update.eq('branch_key', branch) : update.is('branch_key', null))
         .or(`lease_until.is.null,lease_until.lt.${now}`)
         .select(RUN_COLUMNS)
         .maybeSingle();
@@ -257,7 +321,14 @@ export function preparationStore(
       return {
         run,
         steps: toSteps((stepsRead.data ?? []) as StepDb[]),
-        subject: { id: subject.id, userId: subject.user_id, name: subject.name, note: subject.note, kind: subject.kind },
+        subject: {
+          id: subject.id,
+          userId: subject.user_id,
+          name: subject.name,
+          note: subject.note,
+          kind: subject.kind,
+          branch: run.branch ?? null,
+        },
       };
     },
 

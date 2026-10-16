@@ -168,6 +168,22 @@ export function preparationView(
   return { kind: 'working', lines, position, total, starting };
 }
 
+/** A branch run as the page draws it (plan #2276.7): its name and its lines. */
+export type BranchPreparationView = { key: string; name: string; view: PreparationView };
+
+export function branchPreparationView(prep: { run: PreparationRow; steps: PreparationStepRow[] }): BranchPreparationView | null {
+  const branch = prep.run.branch;
+  if (!branch) return null;
+  const view = preparationView(prep);
+  if (view.kind !== 'finished') return { key: branch.key, name: branch.name, view };
+  // One sentence with no separator to break on: the drafted topics are what a branch run is for.
+  const drafted = finishedCounts(prep.steps).topics ?? 0;
+  const took = tookLine(prep.run.startedAt, prep.run.finishedAt);
+  const summary =
+    `Went deeper on ${branch.name}: ${plural(drafted, 'topic')} drafted` + (took ? ` in ${took}.` : '.');
+  return { key: branch.key, name: branch.name, view: { kind: 'finished', summary } };
+}
+
 /**
  * Where a finished preparation says to start and what it came from (plan
  * #2276.6), read from the finish step's detail. A run that finished before

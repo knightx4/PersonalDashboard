@@ -24,7 +24,13 @@ import { ensurePreparation, preparationStore, unfinishedPreparations } from '@/l
 const DAILY_RESUMES = 5;
 const ownerSchema = z.object({ userId: z.string() });
 
-export async function pumpPreparation(input: { subjectId: string; origin: string }): Promise<PreparationResult | { outcome: 'missing' }> {
+export async function pumpPreparation(input: {
+  subjectId: string;
+  origin: string;
+  /** A branch run's key (plan #2276.7); null is the subject's own run. */
+  branch?: string | null;
+}): Promise<PreparationResult | { outcome: 'missing' }> {
+  const branch = input.branch ?? null;
   const learn = createLearnServiceSupabase();
   // The subject names its account; everything after this is scoped to it.
   const { data, error } = await learn
@@ -38,7 +44,8 @@ export async function pumpPreparation(input: { subjectId: string; origin: string
 
   const userId = subject.user_id;
   // A subject made before the trigger in 0167 has no run until it is asked for one.
-  await ensurePreparation(learn, userId, input.subjectId);
+  // A branch run is opened by the press that picked it, never here.
+  if (!branch) await ensurePreparation(learn, userId, input.subjectId);
   const result = await runPreparation(
     {
       ...preparationStore(learn, userId),
@@ -51,9 +58,9 @@ export async function pumpPreparation(input: { subjectId: string; origin: string
       now: () => Date.now(),
     },
     input.subjectId,
-    { budgetMs: PREPARE_BUDGET_MS },
+    { budgetMs: PREPARE_BUDGET_MS, branch },
   );
-  if (result.outcome === 'paused') await kickPreparation(input.origin, input.subjectId);
+  if (result.outcome === 'paused') await kickPreparation(input.origin, input.subjectId, branch);
   return result;
 }
 
@@ -64,8 +71,8 @@ export async function runPreparationsDaily(origin: string) {
   const learn = createLearnServiceSupabase();
   const subjects = await unfinishedPreparations(learn, owner.data.userId, new Date(), DAILY_RESUMES);
   let started = 0;
-  for (const subjectId of subjects) {
-    if (await kickPreparation(origin, subjectId)) started += 1;
+  for (const { subjectId, branch } of subjects) {
+    if (await kickPreparation(origin, subjectId, branch)) started += 1;
   }
   return { unfinished: subjects.length, started };
 }

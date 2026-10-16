@@ -4,6 +4,8 @@ import { MAX_ITEMS_PER_SOURCE } from '@/lib/learn/levels/draft-sources';
 import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
 import { readTerritory, unsourcedFrom, type Territory } from '@/lib/learn/levels/territory';
 import {
+  BRANCH_MAX_TOPICS,
+  BRANCH_MIN_TOPICS,
   chosenUnits,
   compilePrompt,
   compileStep,
@@ -104,6 +106,25 @@ describe('readCompiled', () => {
     expect(unsourcedFrom(territory)).toEqual([]);
     expect(territory.performances).toEqual(['Explain why rents fall with distance from the centre']);
     expect(territory).toMatchObject({ key: 'subject-sub-1', name: 'Urban economics', subjectLens: 'Urban economics', roles: [], kind: null });
+  });
+
+  it('lays out a branch beneath its topics: none repeated, at most twenty, keyed by the branch (plan #2276.7)', () => {
+    const branch = { key: 'transport', frame: 'Transport', name: 'Transport', asks: ['Congestion pricing'] };
+    const topics = [
+      { ask: 'congestion pricing', scope: 'Again.', frame: 'Transport', target: 4, cites: [] },
+      ...Array.from({ length: 25 }, (_, i) => ({ ask: `Deeper ${i}`, scope: 's', frame: 'Transport', target: 5, cites: [] })),
+    ];
+    const branchInput = { ...input(documents), frames: ['Transport'], branch };
+    const { territory, dropped } = readCompiled({ performances: [], topics }, branchInput, texts);
+    expect(territory.topics).toHaveLength(BRANCH_MAX_TOPICS);
+    expect(territory.topics.some((t) => t.ask.toLowerCase() === 'congestion pricing')).toBe(false);
+    expect(dropped.topics).toBe(6);
+    expect(territory).toMatchObject({ key: 'subject-sub-1-transport', name: 'Urban economics: Transport' });
+
+    const prompt = compilePrompt(branchInput, texts);
+    expect(prompt).toContain('Branch to go deeper on: Transport');
+    expect(prompt).toContain('- Congestion pricing');
+    expect(prompt).toContain(`${BRANCH_MIN_TOPICS} to ${BRANCH_MAX_TOPICS} topics`);
   });
 
   it('cuts the list at fifty', () => {

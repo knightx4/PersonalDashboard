@@ -6,6 +6,7 @@ import {
   type PreparationStepKey,
   type PreparationStepStatus,
 } from './steps';
+import type { PreparationBranch } from './branch';
 
 /**
  * The preparation runner (plan #2276.1).
@@ -57,6 +58,8 @@ export type PreparationRow = {
   finishedAt: string | null;
   error: string | null;
   failures: number;
+  /** The branch a second run prepares alone (plan #2276.7); null or absent on the subject's own run. */
+  branch?: PreparationBranch | null;
 };
 
 export type PreparedSubject = {
@@ -65,6 +68,8 @@ export type PreparedSubject = {
   name: string;
   note: string | null;
   kind: string | null;
+  /** Set on a branch run: the steps aim beneath it (searchSubject in branch.ts). */
+  branch?: PreparationBranch | null;
 };
 
 /** A run held by this call, with its steps in order and the subject it prepares. */
@@ -110,8 +115,10 @@ export type PreparationPorts = {
   /**
    * Take the run for this call until `leaseUntil`: null when another call
    * holds it or there is no run. A finished run is returned as it is.
+   * `branch` names a branch run by its key (plan #2276.7); null or absent is
+   * the subject's own run.
    */
-  claim: (subjectId: string, leaseUntil: string) => Promise<ClaimedPreparation | null>;
+  claim: (subjectId: string, leaseUntil: string, branch?: string | null) => Promise<ClaimedPreparation | null>;
   saveRun: (runId: string, patch: RunPatch) => Promise<void>;
   saveStep: (runId: string, key: PreparationStepKey, patch: StepPatch) => Promise<void>;
   handlers: Partial<Record<PreparationStepKey, StepHandler>>;
@@ -161,14 +168,14 @@ export const finishStep: StepHandler = async (ctx) => {
 export async function runPreparation(
   ports: PreparationPorts,
   subjectId: string,
-  options: { budgetMs?: number; minStepMs?: number } = {},
+  options: { budgetMs?: number; minStepMs?: number; branch?: string | null } = {},
 ): Promise<PreparationResult> {
   const budget = options.budgetMs ?? PREPARE_BUDGET_MS;
   const minStep = Math.min(options.minStepMs ?? MIN_STEP_MS, budget);
   const started = ports.now();
   const deadline = started + budget;
 
-  const claimed = await ports.claim(subjectId, iso(deadline + LEASE_MARGIN_MS));
+  const claimed = await ports.claim(subjectId, iso(deadline + LEASE_MARGIN_MS), options.branch ?? null);
   if (!claimed) return { outcome: 'busy' };
   const { subject } = claimed;
   const run: PreparationRow = { ...claimed.run };
