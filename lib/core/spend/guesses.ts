@@ -137,6 +137,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-curriculum': run(SONNET, 3_000, 1_500),
   'place-track': run(SONNET, 3_000, 400),
   'place-aim': run(SONNET, 2_500, 300),
+  'classify-goal-kind': run(HAIKU, 1_500, 250),
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.

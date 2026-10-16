@@ -121,6 +121,10 @@ export const LEARN_OPERATIONS = [
   // is retried by the next save; kept apart from 'place-track' so the cost of
   // goals can be read on its own.
   'place-aim',
+  // Sorting a learning goal into one of six kinds before any source is tried
+  // (plan #2247.2). One Haiku call carries every goal not yet sorted, run
+  // after a goal in the Learn area is saved or reworded.
+  'classify-goal-kind',
   // Naming the Wikipedia sections a Learn now card is made from (plan #806).
   // One Sonnet call per target, recorded through the service role from the
   // picking pass against the account the target belongs to.
