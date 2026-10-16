@@ -26,12 +26,22 @@ export const LEVEL_GRADE_MODEL = MODELS.learnLevelGrade;
 export const LEVEL_GRADE_SECOND_MODEL = MODELS.learnLevelGradeSecond;
 const TOOL = 'report_grades';
 
-const SYSTEM = `You grade one written answer against several levels of understanding.
-
-Each level is a cell with a key (C1, C2, ...), a topic, a level from 1 to 10,
+const CELL_SCOPE = `Each level is a cell with a key (C1, C2, ...), a topic, a level from 1 to 10,
 and two to four checks saying what meeting it looks like. C1 is the cell the
 question asked about. The others are the levels around it on the same topic
-and the levels of other topics it rests on.
+and the levels of other topics it rests on.`;
+
+/** For a prompt about a whole course (plan #2172.4.2): no cell is the one asked about. */
+const COURSE_SCOPE = `Each level is a cell with a key (C1, C2, ...), a topic, a level from 1 to 10,
+and the checks saying what meeting it looks like. The question asked about a
+whole course, and every cell is a level of a topic that course taught. The
+answer will go to some topics and not others; grade each cell on what the
+answer shows about that topic alone. Use not_met only where the answer wrote
+about the topic and got it wrong or fell short of the level.`;
+
+const system = (scope: 'cell' | 'course') => `You grade one written answer against several levels of understanding.
+
+${scope === 'course' ? COURSE_SCOPE : CELL_SCOPE}
 
 FOR EVERY CELL, SAY ONE OF THREE THINGS.
 - met: the answer itself does what the checks describe. Not a mention of the
@@ -52,6 +62,9 @@ them; naming a formula is not explaining why each part is there. Give the
 level the answer actually reaches.
 
 Call ${TOOL} once, with one entry per cell.`;
+
+const SYSTEM = system('cell');
+const COURSE_SYSTEM = system('course');
 
 const gradeSchema = z.object({
   grades: z.array(
@@ -82,7 +95,9 @@ export function gradePrompt(input: {
         ? 'the cell asked about'
         : cell.role === 'nearby'
           ? 'same topic'
-          : 'a level the asked cell rests on';
+          : cell.role === 'course'
+            ? 'a topic the course taught'
+            : 'a level the asked cell rests on';
     lines.push(`${cell.key}: ${cell.topicName}, level ${cell.level} (${role})`);
     for (const check of cell.descriptor) lines.push(`  - ${check}`);
     lines.push('');
@@ -114,6 +129,8 @@ export async function gradeCellAnswer(input: {
   onSpend?: SpendSink;
   /** The model to grade with; the first grader's unless set. */
   model?: string;
+  /** 'course' for a prompt about a whole course, whose cells are all its topics' levels (plan #2172.4.2). */
+  scope?: 'cell' | 'course';
 }): Promise<LevelGradeResult> {
   const model = input.model ?? LEVEL_GRADE_MODEL;
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
@@ -123,7 +140,7 @@ export async function gradeCellAnswer(input: {
     response = await client.messages.create({
       model,
       max_tokens: 400 + 200 * input.cells.length,
-      system: SYSTEM,
+      system: input.scope === 'course' ? COURSE_SYSTEM : SYSTEM,
       tools: [
         {
           name: TOOL,

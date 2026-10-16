@@ -189,6 +189,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // The one explain prompt on a graded course (plan #2172.4.2)
+  'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it

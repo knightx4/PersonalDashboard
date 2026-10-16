@@ -406,6 +406,11 @@ export const LEARN_OPERATIONS = [
   // (plan #2172.4.1): one Haiku call per course, from the daily run, and again
   // only when what the course is known by changes.
   'name-course-topics',
+  // Grading the one explain prompt on a graded course (plan #2172.4.2): one
+  // Haiku call per answer, reading levels 1 to 3 of every topic the course
+  // was named for. Apart from 'grade-cell-answer', whose answers are about
+  // one level of one topic.
+  'grade-course-explain',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -6,6 +6,7 @@ import {
   type EvidenceSourceKind,
 } from '@/lib/learn/evidence/model';
 import { bandWords } from '@/lib/learn/evidence/course-bands';
+import { testedWords } from '@/lib/learn/evidence/course-explain';
 import { KIND_WORDS } from '@/lib/learn/evidence/kinds';
 import { EVIDENCE_CEILING } from '@/lib/learn/strength';
 
@@ -22,11 +23,13 @@ const CEILING_PERCENT = Math.round(EVIDENCE_CEILING * 100);
 /**
  * The most one link can add, on the same scale as the line above the list
  * (plan #2172.2), and for a course named for the topic the band of levels it
- * likely reached (plan #2172.4.1). The basis above it gives the reason.
+ * likely reached (plan #2172.4.1), or once its explain prompt was answered
+ * the level it was tested at (plan #2172.4.2). The basis above it gives the
+ * reason.
  */
-function markLine(link: Pick<EvidenceLink, 'kind' | 'ceiling' | 'band'>): string {
+function markLine(link: Pick<EvidenceLink, 'kind' | 'ceiling' | 'band' | 'tested'>): string {
   const percent = Math.round(Math.max(0, link.ceiling) * EVIDENCE_CEILING * 100);
-  const band = link.band ? ` · ${bandWords(link.band)}` : '';
+  const band = link.tested ? ` · ${testedWords(link.tested)}` : link.band ? ` · ${bandWords(link.band)}` : '';
   return `${KIND_WORDS[link.kind]}${band} · counts up to ${percent}%`;
 }
 

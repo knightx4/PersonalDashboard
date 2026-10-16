@@ -152,4 +152,39 @@ describe('the band links', () => {
     expect(rows[0].weight).toBeCloseTo(0.917, 3);
     expect(rows[0].basis).toMatch(/^from MGT 847/);
   });
+
+  it('gives a tested topic its level in place of the band, and drops one the answer missed', () => {
+    const rows = bandLinks(
+      [
+        {
+          course_id: 'c1',
+          depth: 'advanced',
+          guessed: false,
+          topics: [
+            { id: 'debt', similarity: 0.8 },
+            { id: 'equity', similarity: 0.8 },
+            { id: 'finance', similarity: 0.8 },
+          ],
+          named_at: '2026-10-16T06:00:00Z',
+        },
+      ],
+      [course()],
+      2026,
+      [
+        {
+          course_id: 'c1',
+          marks: [
+            { topic_id: 'debt', level: 3, basis: 'from MGT 847, and your explanation of it: tested at level 3.' },
+            { topic_id: 'equity', level: 0, basis: 'missed' },
+          ],
+        },
+      ],
+    );
+    const byTopic = new Map(rows.map((r) => [r.target_id, r]));
+    expect(byTopic.get('debt')).toMatchObject({ band_low: null, band_high: null, tested_level: 3 });
+    expect(byTopic.get('debt')?.basis).toMatch(/tested at level 3/);
+    expect(byTopic.has('equity')).toBe(false);
+    // A topic the answer did not go to keeps its band.
+    expect(byTopic.get('finance')).toMatchObject({ band_low: 1, band_high: 4, tested_level: null });
+  });
 });

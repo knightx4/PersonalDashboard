@@ -169,9 +169,18 @@ export type BandLinkRow = {
   basis: string;
   matched_by: null;
   held_reason: null;
-  band_low: number;
-  band_high: number;
+  /** Null once the course's explain prompt tested the topic (plan #2172.4.2). */
+  band_low: number | null;
+  band_high: number | null;
+  /** The level the explain prompt showed, in place of the band; null until then. */
+  tested_level: number | null;
   found_at: string;
+};
+
+/** A course's explain marks, as learn.course_explains holds them (plan #2172.4.2). */
+export type CourseExplainMarks = {
+  course_id: string;
+  marks: readonly { topic_id: string; level: number; basis: string }[];
 };
 
 /** A course's stored naming, as learn.course_topics holds it. */
@@ -188,13 +197,21 @@ export type CourseNaming = {
  * whose grade no longer counts, makes none. The weight is the course's grade
  * times its age, as every course link's is (./courses), so the kind's
  * ceiling holds as it does today.
+ *
+ * A topic the course's explain prompt marked (plan #2172.4.2) takes its
+ * tested level in place of the band, with the mark's basis; one marked 0
+ * makes no link. learn.apply_course_explain writes the same from a press.
  */
 export function bandLinks(
   namings: readonly CourseNaming[],
   courses: readonly CourseSource[],
   nowYear: number,
+  explains: readonly CourseExplainMarks[] = [],
 ): BandLinkRow[] {
   const byId = new Map(courses.map((c) => [c.course_id, c]));
+  const marked = new Map(
+    explains.map((e) => [e.course_id, new Map(e.marks.map((m) => [m.topic_id, m]))]),
+  );
   const rows: BandLinkRow[] = [];
   for (const naming of namings) {
     const course = byId.get(naming.course_id);
@@ -203,7 +220,11 @@ export function bandLinks(
     if (!band) continue;
     const weight = courseWeight(course, nowYear);
     const basis = bandBasis(course, naming.depth, band, naming.guessed, nowYear);
+    const marks = marked.get(course.course_id);
     for (const topic of naming.topics) {
+      const mark = marks?.get(topic.id);
+      if (mark && mark.level <= 0) continue;
+      const tested = mark ? Math.min(10, Math.round(mark.level)) : null;
       rows.push({
         target_kind: 'topic',
         target_id: topic.id,
@@ -211,11 +232,12 @@ export function bandLinks(
         source_id: course.course_id,
         similarity: Math.min(1, Math.max(0, topic.similarity)),
         weight,
-        basis,
+        basis: mark ? mark.basis : basis,
         matched_by: null,
         held_reason: null,
-        band_low: band.low,
-        band_high: band.high,
+        band_low: tested ? null : band.low,
+        band_high: tested ? null : band.high,
+        tested_level: tested,
         found_at: naming.named_at,
       });
     }

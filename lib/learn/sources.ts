@@ -344,6 +344,10 @@ export const learnSources: ModuleSources = {
       table: 'learn.course_topics',
       reason: 'The topics a model call named for each graded course, worked out from the course; the course is in you.courses and its bands in evidence_links.',
     },
+    {
+      table: 'learn.course_explains',
+      reason: 'The one explain prompt answered about each graded course and its grade; what each answer showed is read through evidence_links, as cell_questions is read through cell_evidence.',
+    },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },

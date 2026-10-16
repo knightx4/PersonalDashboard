@@ -160,11 +160,18 @@ export async function refreshTopicUnlocks(
     if (error) throw new Error(`Writing topic unlocks failed: ${error.message}`);
   }
 
-  const existing: { id: string; target_id: string; source_kind: string; source_id: string; band_high: number | null }[] = [];
+  const existing: {
+    id: string;
+    target_id: string;
+    source_kind: string;
+    source_id: string;
+    band_high: number | null;
+    tested_level: number | null;
+  }[] = [];
   for (let from = 0; ; from += ARTICLE_PAGE) {
     const { data, error } = await learn
       .from('evidence_links')
-      .select('id, target_id, source_kind, source_id, band_high')
+      .select('id, target_id, source_kind, source_id, band_high, tested_level')
       .eq('user_id', userId)
       .eq('target_kind', 'topic')
       .order('id')
@@ -174,9 +181,9 @@ export async function refreshTopicUnlocks(
     existing.push(...page);
     if (page.length < ARTICLE_PAGE) break;
   }
-  // A course's band links are the band stage's to keep or clear.
+  // A course's band and tested links are the band stage's to keep or clear.
   const stale = staleTopicLinkIds(
-    existing.filter((row) => row.band_high === null),
+    existing.filter((row) => row.band_high === null && row.tested_level === null),
     rows,
   );
   for (let start = 0; start < stale.length; start += DELETE_CHUNK) {

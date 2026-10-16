@@ -15,6 +15,7 @@ import {
   namingText,
   resolveNamedTopics,
   type Candidate,
+  type CourseExplainMarks,
   type CourseNaming,
 } from './course-bands';
 import { loadCourseSources } from './course-store';
@@ -31,7 +32,9 @@ import { loadCourseSources } from './course-store';
  *    deadline, the rest wait for the next run.
  * 2. Every naming becomes band links in learn.evidence_links, and band links
  *    no naming makes any more are cleared: a course whose grade stopped
- *    counting, or a topic a renaming dropped.
+ *    counting, or a topic a renaming dropped. A topic the course's explain
+ *    prompt marked takes its tested level instead (plan #2172.4.2), and one
+ *    it marked 0 has no link.
  *
  * The topic unlock stage (./topics-store) leaves a named course to this one.
  * Runs under the service role, so every query names the person.
@@ -66,6 +69,13 @@ async function loadNamings(learn: LearnSupabaseClient, userId: string): Promise<
     .eq('user_id', userId);
   if (error) throw new Error(`Reading the course topics failed: ${error.message}`);
   return (data ?? []) as (CourseNaming & { text: string })[];
+}
+
+/** The marks each course's explain prompt left (plan #2172.4.2). */
+async function loadExplainMarks(learn: LearnSupabaseClient, userId: string): Promise<CourseExplainMarks[]> {
+  const { data, error } = await learn.from('course_explains').select('course_id, marks').eq('user_id', userId);
+  if (error) throw new Error(`Reading the course explanations failed: ${error.message}`);
+  return (data ?? []) as CourseExplainMarks[];
 }
 
 async function loadFrameNames(learn: LearnSupabaseClient) {
@@ -166,7 +176,10 @@ export async function refreshCourseBands(
   }
 
   // 2. The links every naming makes, and clearing the ones none does.
-  const rows = bandLinks([...stored.values()], sources, nowYear).map((r) => ({ ...r, user_id: userId }));
+  const rows = bandLinks([...stored.values()], sources, nowYear, await loadExplainMarks(learn, userId)).map((r) => ({
+    ...r,
+    user_id: userId,
+  }));
   if (rows.length > 0) {
     const { error } = await learn.from('evidence_links').upsert(rows, { onConflict: ON_CONFLICT });
     if (error) throw new Error(`Writing the course bands failed: ${error.message}`);
@@ -177,7 +190,7 @@ export async function refreshCourseBands(
     .eq('user_id', userId)
     .eq('target_kind', 'topic')
     .eq('source_kind', 'course')
-    .not('band_high', 'is', null);
+    .or('band_high.not.is.null,tested_level.not.is.null');
   if (readError) throw new Error(`Reading the course bands failed: ${readError.message}`);
   const keep = new Set(rows.map(bandKey));
   const stale = ((existing ?? []) as { id: string; target_id: string; source_id: string }[])
