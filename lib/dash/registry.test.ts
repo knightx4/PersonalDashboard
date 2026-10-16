@@ -31,6 +31,7 @@ describe('DASH_TOOLS', () => {
       ...CAPTURE_TOOL_NAMES,
       'propose_watch',
       'propose_build',
+      'propose_delete',
       ...PAID_NAMES,
       HAND_OFF_TOOL_NAME,
     ]);
@@ -63,7 +64,7 @@ describe('DASH_TOOLS', () => {
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
     // The other three proposals became writes (plan #1440); a watch acts outside
     // the app, and a build starts a session that cannot be undone (plan #2106.1).
-    expect(dashToolsOf('proposal').map((t) => t.name)).toEqual(['propose_watch', 'propose_build']);
+    expect(dashToolsOf('proposal').map((t) => t.name)).toEqual(['propose_watch', 'propose_build', 'propose_delete']);
     expect(dashToolsOf('handoff').map((t) => t.name)).toEqual([
       'send_step',
       'pass_to_session',
@@ -128,6 +129,7 @@ describe('DASH_TOOLS', () => {
       ...WRITE_TOOL_NAMES,
       'propose_watch',
       'propose_build',
+      'propose_delete',
       ...PAID_NAMES,
       HAND_OFF_TOOL_NAME,
     ]);
@@ -147,6 +149,7 @@ describe('DASH_TOOLS', () => {
       expect(names).not.toContain('show_chart');
       expect(names).not.toContain('propose_watch');
       expect(names).not.toContain('propose_build');
+      expect(names).not.toContain('propose_delete');
       expect(names).not.toContain(HAND_OFF_TOOL_NAME);
       for (const name of PAID_NAMES) expect(names).toContain(name);
     }

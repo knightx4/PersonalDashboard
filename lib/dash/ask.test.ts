@@ -608,7 +608,7 @@ describe('askDash proposals', () => {
       stores,
     );
     const back = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
-    expect(back[0].content).toContain('You can propose only a todo, a goal step, a return, a watch or a build');
+    expect(back[0].content).toContain('You can propose only a todo, a goal step, a return, a watch, a build or a delete');
     expect(executed).toEqual([]);
     expect(changes).toEqual([]);
   });
