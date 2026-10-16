@@ -31,12 +31,12 @@ import {
   outcomesByKind,
   outcomesBySittingPlace,
   toCsv,
-  type ExportInput,
   type OfferRow,
   type OutcomeLine,
   type OutcomeRow,
   type ProbeEvent,
 } from '../lib/learn/ordering-report';
+import { loadHarnessExport } from '../lib/learn/harness-export';
 
 const argv = process.argv.slice(2);
 function arg(flag: string): string | null {
@@ -94,19 +94,7 @@ async function main() {
     from learn.probes p
     join learn.concepts c on c.id = p.concept_id and c.user_id = p.user_id
     where p.discarded_at is null and (${user}::uuid is null or p.user_id = ${user}::uuid)`) as unknown as Rows;
-  const probeExport = (await sql`
-    select id, shown_at, answered_at, answer_seconds, predicted_strength, dont_know,
-           response_correct, chosen_index, correct_index
-    from learn.probes
-    where answered_at is not null and discarded_at is null
-      and (${user}::uuid is null or user_id = ${user}::uuid)
-    order by answered_at`) as unknown as Rows;
-  const cellExport = (await sql`
-    select id, shown_at, answered_at, answer_seconds, predicted_status, predicted_level, grade, grade_second
-    from learn.cell_questions
-    where answered_at is not null and grade is not null
-      and (${user}::uuid is null or user_id = ${user}::uuid)
-    order by answered_at`) as unknown as Rows;
+  const harness = await loadHarnessExport(sql, user);
 
   const outcomes: OutcomeRow[] = outcomeRows.map((r) => ({
     userId: String(r.user_id),
@@ -165,52 +153,10 @@ async function main() {
     console.log(`   ${o.at.toISOString().slice(0, 10)}  ${o.outcome.padEnd(8)} ${o.themeName}${strength}${after}`);
   }
 
-  const exported: ExportInput[] = [
-    ...probeExport.map(
-      (r): ExportInput => ({
-        source: 'probe',
-        id: String(r.id),
-        shownAt: date(r.shown_at),
-        answeredAt: date(r.answered_at),
-        answerSeconds: num(r.answer_seconds),
-        predictedStrength: num(r.predicted_strength),
-        predictedStatus: null,
-        predictedLevel: null,
-        outcome: r.dont_know
-          ? 'dont_know'
-          : typeof r.response_correct === 'boolean'
-            ? r.response_correct
-              ? 'right'
-              : 'wrong'
-            : r.chosen_index === null || r.chosen_index === undefined
-              ? null
-              : r.chosen_index === r.correct_index
-                ? 'right'
-                : 'wrong',
-        grade: typeof r.response_correct === 'boolean' ? r.response_correct : null,
-        gradeSecond: null,
-      }),
-    ),
-    ...cellExport.map(
-      (r): ExportInput => ({
-        source: 'cell_question',
-        id: String(r.id),
-        shownAt: date(r.shown_at),
-        answeredAt: date(r.answered_at),
-        answerSeconds: num(r.answer_seconds),
-        predictedStrength: null,
-        predictedStatus: r.predicted_status ? String(r.predicted_status) : null,
-        predictedLevel: num(r.predicted_level),
-        outcome: null,
-        grade: r.grade,
-        gradeSecond: r.grade_second,
-      }),
-    ),
-  ];
-  const rows = exported.map(exportRow);
+  const rows = harness.rows.map(exportRow);
   const filled = (key: keyof (typeof rows)[number]) => rows.filter((r) => r[key] !== '').length;
   console.log(
-    `\n3. Harness export: ${rows.length} graded answers (${probeExport.length} probes, ${cellExport.length} cell questions)`,
+    `\n3. Harness export: ${rows.length} graded answers (${harness.probes} probes, ${harness.cellQuestions} cell questions)`,
   );
   console.log(
     `   filled: predicted strength ${filled('predicted_strength')}, predicted status ${filled('predicted_status')}, ` +
