@@ -30,6 +30,14 @@
  * itself (`uiSettleSql`): one still failing after the critic's third round,
  * or one reached only through a shared file. Design checks are not put to the
  * person (their answer of 12 October 2026).
+ *
+ * The second kind is settled only when it looks the same as on main (plan
+ * #2215.4): every surface the critic has not judged through three rounds has
+ * its four shots in `.preview-shots/` compared with main's in
+ * `.preview-shots/before/`, and the settle is refused, with nothing written
+ * or printed, while any of them differs or is missing
+ * (`lib/plan/ui-settle-diff.ts`). The rounds come from ui_checks with
+ * DATABASE_URL, and from `.preview-shots/checks/` without it.
  */
 import postgres from 'postgres';
 import {
@@ -41,6 +49,13 @@ import {
   type CheckRound,
 } from '../lib/plan/ui-check-guard';
 import { localGit, stepScreenInputs } from '../lib/plan/ui-check-local';
+import {
+  compareSurfaceShots,
+  fileShotReader,
+  localCheckRounds,
+  settleRefusal,
+  surfacesToCompare,
+} from '../lib/plan/ui-settle-diff';
 
 function arg(flag: string): string | null {
   const i = process.argv.indexOf(flag);
@@ -112,6 +127,18 @@ async function main(): Promise<void> {
 
   const databaseUrl = process.env.DATABASE_URL;
   if (settle !== null) {
+    // A surface the critic has not judged through three rounds is settled only
+    // when its shots match main's (plan #2215.4).
+    const checks = databaseUrl ? await stepRounds(databaseUrl, step) : localCheckRounds(step, process.cwd());
+    const compare = surfacesToCompare(surfaces, checks);
+    const read = fileShotReader(process.cwd());
+    const comparisons = [];
+    for (const surface of compare) comparisons.push(await compareSurfaceShots(surface, read));
+    const refusal = settleRefusal(name, step, comparisons);
+    if (refusal) fail(refusal);
+    if (compare.length > 0) {
+      console.log(`Shots match main's on ${compare.length === 1 ? compare[0] : `all ${compare.length}: ${compare.join(', ')}`}.`);
+    }
     const statement = uiSettleSql(step, surfaces, settle);
     if (!databaseUrl) {
       console.log('\nRun this through the Supabase connector. It settles each surface still waiting.\n');
@@ -159,15 +186,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  const checks = await stepRounds(databaseUrl, step);
+  const refusal = uiCheckRefusal({ step, outline, files, surfaces, checks });
+  if (refusal) fail(refusal);
+  console.log(`Every surface has passed: ${name} may close.`);
+}
+
+/** The step's recorded rounds in ui_checks, under the account whose plan it is on. */
+async function stepRounds(databaseUrl: string, step: number): Promise<CheckRound[]> {
   const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
   try {
-    const checks = await sql<CheckRound[]>`
+    return await sql<CheckRound[]>`
       select c.surface, c.round, c.verdict from ui_checks c
       where c.step = ${step}
         and c.user_id = (select p.user_id from plan_items p where p.number = ${step} limit 1)`;
-    const refusal = uiCheckRefusal({ step, outline, files, surfaces, checks });
-    if (refusal) fail(refusal);
-    console.log(`Every surface has passed: ${name} may close.`);
   } finally {
     await sql.end({ timeout: 5 });
   }

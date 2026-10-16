@@ -19,6 +19,7 @@ import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
+import { withMockups } from '@/lib/plan/mockup';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { loadRunnerGoals } from '@/lib/goals/runner-status-load';
@@ -248,6 +249,9 @@ export async function renderPlanPage({
   // The drawn options on a proposal or decision, by row id; each drawing
   // loads when its row opens.
   const pictures = await loadPlanPictures(supabase, user.id);
+  // Each changed screen with the mockup you approved for it, shown beside the
+  // build on a finished step's row (plan #2215.10).
+  const screens = withMockups(screenChanges, everything, pictures);
 
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
@@ -325,7 +329,7 @@ export async function renderPlanPage({
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
         criticStops={criticStops}
-        screenChanges={screenChanges}
+        screenChanges={screens}
         pictures={pictures}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}

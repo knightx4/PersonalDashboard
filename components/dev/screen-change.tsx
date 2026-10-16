@@ -48,7 +48,67 @@ function roundLine(change: ScreenChangeView): string {
     : `passed in round ${change.round}`;
 }
 
-/** Before and after for each surface a step changed, for the opened plan row. */
+type Mockup = NonNullable<ScreenChangeView['mockup']>;
+
+/**
+ * The mockup you approved beside the screen as built (plan #2215.10): the
+ * mockup first, and the two side by side at every width, since stacked on a
+ * phone each frame filled the screen and the pair was never seen together.
+ * The screen before the step is a link under the pair rather than a third
+ * picture, so the two being compared stay the same size.
+ */
+function MockupPair({ change, mockup }: { change: ScreenChangeView; mockup: Mockup }) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-3">
+        <figure className="space-y-1">
+          <figcaption>
+            <SectionLabel as="span">Mockup you approved</SectionLabel>
+          </figcaption>
+          <Picture src={mockup.src} alt={`The approved mockup for ${change.surface}`} />
+        </figure>
+        <figure className="space-y-1">
+          <figcaption>
+            <SectionLabel as="span">As built</SectionLabel>
+          </figcaption>
+          {change.after ? (
+            <Picture src={change.after} alt={`${change.surface} as this step built it, on a phone`} />
+          ) : (
+            <Missing>Not uploaded by the session that checked it</Missing>
+          )}
+        </figure>
+      </div>
+      <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
+        <span>Mockup {mockup.from}</span>
+        {mockup.link && (
+          <a
+            href={mockup.link}
+            target="_blank"
+            rel="noreferrer"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
+          >
+            Open the mockup
+          </a>
+        )}
+        {change.before && (
+          <a
+            href={change.before}
+            target="_blank"
+            rel="noreferrer"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
+          >
+            The screen before
+          </a>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Before and after for each surface a step changed, for the opened plan row,
+ * or the approved mockup beside the after where the surface has one.
+ */
 export function ScreenChanges({
   changes,
   footer,
@@ -60,13 +120,15 @@ export function ScreenChanges({
   return (
     <section aria-label="Screens this step changed" className="space-y-4">
       {changes.map((change) => (
-        <div key={change.surface} className="max-w-md space-y-2">
+        <div key={change.surface} className={cn('space-y-2', change.mockup ? 'max-w-xl' : 'max-w-md')}>
           <p className="text-small text-ink-muted">
             <span className="font-mono text-ink">{change.surface}</span> · {roundLine(change)}
           </p>
           {/* Neither picture means none were uploaded, which says nothing
               about whether the screen is new: one line, not two empty boxes. */}
-          {!change.before && !change.after ? (
+          {change.mockup ? (
+            <MockupPair change={change} mockup={change.mockup} />
+          ) : !change.before && !change.after ? (
             <p className="text-small text-ink-muted">
               The session that checked it could not upload its pictures.
             </p>

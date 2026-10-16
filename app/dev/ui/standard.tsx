@@ -59,6 +59,8 @@ import { ANATOMIES } from './anatomy';
 import * as C from './content';
 import * as M from './measurements';
 import { CorrectionsChart } from './corrections';
+import { SentBackChart } from './sent-back';
+import type { SentBackWeek } from '@/lib/plan/sent-back';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { PageColumn } from '@/components/shell/page-width';
@@ -674,10 +676,13 @@ const NO_OUTLINES: OutlineIndex = new Map();
  */
 export function UiStandard({
   corrections,
+  sentBack,
   removedTaste,
   outlines = NO_OUTLINES,
 }: {
   corrections: readonly CorrectionWeek[] | null;
+  /** Screen steps shipped and sent back each week (plan #2215.5); null when unreadable. */
+  sentBack: readonly SentBackWeek[] | null;
   /** Ids of the preferences the person removed (`public.ui_taste_removals`). */
   removedTaste: readonly string[];
   /**
@@ -789,6 +794,14 @@ export function UiStandard({
         lead="Each week, the share of your notes filed on a screen that a step changed in the 30 days before. If the critic and your preferences are working, it falls."
       >
         <CorrectionsChart weeks={corrections} />
+      </Section>
+
+      <Section
+        id="sent-back"
+        title="How many new screens you send back"
+        lead="Each week since 31 August, the share of screen steps that shipped which you sent back or complained about the look of. If building to the mockup you approved is working, it falls."
+      >
+        <SentBackChart weeks={sentBack} />
       </Section>
 
       <Section
