@@ -20,6 +20,7 @@ import {
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
 import { applicationAnswersLookup } from './answers';
+import { duplicateAnswersLookup } from './duplicate-answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { withParents } from './parents';
@@ -56,6 +57,7 @@ export const ASK_TOOL_NAMES = [
   'spend_by_merchant',
   'job_applications',
   'application_answers',
+  'duplicate_answers',
   'todos',
   'agenda',
   'goal_status',
@@ -312,6 +314,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'duplicate_answers',
+    description:
+      'The application answers that repeat a question already answered on another role, grouped by question ("1. Why are you interested in Rogo?" and "Why are you interested in Rogo?" are one question). Each row is a copy that could go: its answer ref, the question, the role, its status and the first words, with remove true when it is an identical copy of the one kept (and keeps naming that one) and remove false when the copies are worded differently and the person has to say which to keep. Submitted answers are never rows. Use it for "remove my duplicate answers" or "which answers are repeated", then propose_delete for the rows with remove true.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'todos',
     description:
       'The person\'s todos finished between two dates, and the ones still open and past their due date today. Each links to the task on the todo list. Defaults to the last seven days.',
@@ -555,6 +563,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   application_answers: { run: applicationAnswersLookup, module: 'jobs' },
+  duplicate_answers: { run: duplicateAnswersLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
   agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },

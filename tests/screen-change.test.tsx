@@ -56,6 +56,31 @@ describe('ScreenChanges', () => {
   });
 });
 
+describe('ScreenChanges with an approved mockup (plan #2215.10)', () => {
+  const mockup = {
+    src: '/dev/plan/reference?path=m.png',
+    from: 'registered by #2215.9',
+    link: 'https://claude.ai/artifact/x',
+  };
+
+  it('puts the mockup first beside the after, with the before as a link and the footer under the pair', () => {
+    const html = renderToStaticMarkup(
+      <ScreenChanges changes={[{ ...both, mockup }]} footer={(c) => <span>send {c.surface}</span>} />,
+    );
+    expect(html.indexOf('Mockup you approved')).toBeLessThan(html.indexOf('As built'));
+    expect(html.indexOf('path=m.png')).toBeLessThan(html.indexOf('path=after'));
+    expect(html).toContain('registered by #2215.9');
+    expect(html).toContain('href="https://claude.ai/artifact/x"');
+    expect(html).toContain('The screen before');
+    expect(html).toContain('send jobs-contact');
+  });
+
+  it('draws a surface with no mockup as before and after', () => {
+    const html = renderToStaticMarkup(<ScreenChanges changes={[both]} />);
+    expect(html).not.toContain('Mockup you approved');
+  });
+});
+
 describe('ScreenAfters', () => {
   it('shows only the after pictures, and leaves out a surface with none', () => {
     const html = renderToStaticMarkup(

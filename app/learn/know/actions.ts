@@ -13,10 +13,8 @@ import {
   conceptsFromBrief,
   MAX_BRIEFING_CHARS,
 } from '@/lib/learn/graph/from-brief';
-import { declareKnown, existingConcepts, findOrCreateSubject, saveChain } from '@/lib/learn/graph/save';
-import { parseOwnUnits } from '@/lib/learn/graph/curriculum-payload';
-import { placeTrackAfterResponse } from '@/lib/learn/areas/place-track';
-import { ensureCurriculum } from '@/lib/learn/graph/curriculum-store';
+import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { makeCustomSubject } from '@/lib/learn/graph/curriculum-run';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
@@ -656,53 +654,15 @@ export async function createCustomTrack(
     units: formData.get('units') ?? '',
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Could not read that.' };
-  const own = parseOwnUnits(parsed.data.units);
-  if (!own.ok) return { error: own.detail };
-
   const supabase = await createLearnClient();
-  const name = parsed.data.name;
-  const want = parsed.data.want || null;
-
-  let subject: { id: string; created: boolean; placed: boolean };
-  try {
-    subject = await findOrCreateSubject(supabase, user.id, name);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not make that subject.' };
-  }
-
-  if (subject.created) {
-    if (want) await supabase.from('subjects').update({ note: want }).eq('id', subject.id);
-    // Placed in the areas once the response has gone, as a track from a
-    // chain is; a track with no field yet is still a track.
-    placeTrackAfterResponse(supabase, user.id, {
-      id: subject.id,
-      name,
-      context: [want ? `aimed at: ${want}` : '', own.titles.length > 0 ? `units: ${own.titles.join('; ')}` : '']
-        .filter(Boolean)
-        .join('. '),
-    });
-  }
-
-  const curriculum = await ensureCurriculum(
-    supabase,
-    user.id,
-    { id: subject.id, name },
-    want,
-    own.titles,
-  ).catch((error: unknown) => ({
-    ok: false as const,
-    detail: error instanceof Error ? error.message : 'Could not write the curriculum.',
-  }));
-  // An existing track with a curriculum already keeps it; say so rather than
-  // quietly dropping the units that were typed.
-  if (!subject.created && curriculum.ok && !curriculum.written && own.titles.length > 0) {
-    return {
-      error: `You already have a subject called ${name}, and its curriculum is fixed.`,
-      existing: { id: subject.id, name },
-    };
-  }
+  const made = await makeCustomSubject(supabase, user.id, {
+    name: parsed.data.name,
+    want: parsed.data.want || null,
+    units: parsed.data.units,
+  });
+  if (!made.ok) return made.existing ? { error: made.detail, existing: made.existing } : { error: made.detail };
 
   revalidatePath('/learn/know');
   // A failed curriculum still leaves the track, whose page offers to write it.
-  redirect(`/learn/s/${subject.id}`);
+  redirect(`/learn/s/${made.id}`);
 }

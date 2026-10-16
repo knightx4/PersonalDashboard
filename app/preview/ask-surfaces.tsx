@@ -936,6 +936,107 @@ export function AskAnswerActionsSurface() {
   );
 }
 
+/** Which moment of the paid card a surface draws (plan #2228.2). */
+export type AskPaidMoment = 'pending' | 'running' | 'done' | 'failed' | 'declined';
+
+const PAID_ASKED =
+  'Write up this year, and draft my answers on the Northwind Analytics application and the Fernhill Labs one';
+const PAID_ANSWER =
+  'I have queued three things that cost money: the review of 2026, and drafts of the answers on both applications. Nothing runs until you accept them on the card below.';
+
+/**
+ * The approval card for what costs money (plan #2228.2): three queued
+ * presses with a cost each and the total, one Accept all and Decline.
+ * `running` presses Accept all and holds the first line running; `done`,
+ * `failed` and `declined` draw the card as it is once each has come back.
+ */
+export function AskPaidSurface({ moment = 'pending' }: { moment?: AskPaidMoment }) {
+  const at = (minute: number) => `2026-10-16T09:${String(minute).padStart(2, '0')}:00Z`;
+  const priced = (medianMicros: number) => ({
+    lowMicros: Math.round(medianMicros * 0.7),
+    medianMicros,
+    highMicros: Math.round(medianMicros * 1.6),
+    runs: 9,
+    basis: 'measured' as const,
+    per: 'run' as const,
+    models: [SONNET],
+  });
+  const press = (id: string, line: string, medianMicros: number | null, paths: string[]): DashChange => ({
+    ...CHANGE_BASE,
+    id,
+    turnId: 'paid-a',
+    status: 'proposed',
+    kind: 'paid_action',
+    createdAt: at(1),
+    input: {
+      tool: 'write_year_review',
+      action: 'app/timeline/actions.ts#writeYearReview',
+      args: {},
+      line,
+      estimate: medianMicros == null ? null : priced(medianMicros),
+      workspace: null,
+      paths,
+    },
+  });
+  const ran = (change: DashChange, summary: string): DashChange => ({
+    ...change,
+    status: 'done',
+    doneAt: at(3),
+    summary,
+    undo: { none: 'Dash ran this and the money is spent, so it cannot be undone.' },
+  });
+  const review = press('paid-1', 'Write the review of 2026.', 62_000, ['/timeline']);
+  const northwind = press(
+    'paid-2',
+    'Draft the answers on the Northwind Analytics application, Senior Data Analyst.',
+    148_000,
+    ['/jobs/pipeline'],
+  );
+  const fernhill = press('paid-3', 'Draft the answers on the Fernhill Labs application.', 131_000, ['/jobs/pipeline']);
+  const wrote = 'Dash wrote the review of 2026: 6 paragraphs from 84 events.';
+  const drafted = 'Dash drafted answers to the 5 questions on it.';
+  const changes: DashChange[] =
+    moment === 'done'
+      ? [ran(review, wrote), ran(northwind, 'Dash drafted answers to the 7 questions on it.'), ran(fernhill, drafted)]
+      : moment === 'failed'
+        ? [
+            ran(review, wrote),
+            {
+              ...northwind,
+              undo: { failed: 'The application has no questions on it yet. Paste them in on its page, then run this again.' },
+            },
+            ran(fernhill, drafted),
+          ]
+        : moment === 'declined'
+          ? [review, northwind, fernhill].map((change) => ({ ...change, status: 'declined' as const, declinedAt: at(3) }))
+          : [review, northwind, fernhill];
+  const turns: TalkTurn[] = [
+    { id: 'paid-q', role: 'user', body: PAID_ASKED, createdAt: at(0) },
+    { id: 'paid-a', role: 'assistant', body: PAID_ANSWER, createdAt: at(1) },
+  ];
+  // Running: the first press never comes back, so its line holds the spinner.
+  const source: AskSource =
+    moment === 'running' ? { ...FIXTURES, confirm: () => new Promise<ChangeOutcome>(() => undefined) } : FIXTURES;
+  return (
+    <AskDashProvider source={source}>
+      <PageColumn className="py-4">
+        {moment === 'running' && <PressOnArrival label="Accept all" />}
+        {/* On the chat's card at reading width, as Dash's page draws it. */}
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id={`ask-paid-preview-${moment}`}
+            conversationRef="00000000-0000-4000-8000-000000000031"
+            turns={turns}
+            changes={changes}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
 const BUILD_TITLE = 'Show a Confirm card when Ask Dash is asked to build a step';
 const BUILD_ASKED = 'I can start this one.';
 
@@ -1010,6 +1111,93 @@ export function AskBuildSurface({ refused = false }: { refused?: boolean }) {
       </PageColumn>
     </AskDashProvider>
   );
+}
+
+const ANSWERS = [
+  'Why do you want to work at Northwind?',
+  'Why us?',
+  'Why are you interested in this role?',
+  'What draws you to Northwind Logistics?',
+  'Tell us about a time you led a project under a tight deadline and had to change the plan halfway through',
+  'Describe your biggest strength',
+  'What is your biggest strength?',
+  'Where do you see yourself in five years?',
+  'Why this role?',
+  'What would you bring to the team?',
+  'What are you looking for in your next role?',
+  'Why now?',
+];
+
+/**
+ * The "Are you sure?" popup for a proposed delete (plan #2232.2): Confirm on
+ * the card opens it over the thread, listing the answers with Cancel and
+ * Delete. `refused` presses Delete too, for the popup after the server turned
+ * the delete down, with the reason inside it and the rows kept; `deleting`
+ * presses it and leaves the delete running, for the pending buttons.
+ */
+export function AskDeleteSurface({ mode = 'open' }: { mode?: 'open' | 'refused' | 'deleting' }) {
+  const at = (minute: number) => `2026-10-15T09:${String(minute).padStart(2, '0')}:00Z`;
+  const change: DashChange = {
+    ...CHANGE_BASE,
+    id: 'rd-delete',
+    turnId: 'rd',
+    status: 'proposed',
+    kind: 'delete_rows',
+    createdAt: at(1),
+    input: {
+      table: 'job_search.application_answers',
+      count: ANSWERS.length,
+      titles: ANSWERS,
+      href: '/jobs/answers',
+      rows: [],
+    },
+  };
+  const turns: TalkTurn[] = [
+    { id: 'pd', role: 'user', body: 'Remove my duplicate application answers', createdAt: at(0) },
+    { id: 'rd', role: 'assistant', body: 'These answer the same questions as ones you kept.', createdAt: at(1) },
+  ];
+  const source: AskSource =
+    mode === 'refused'
+      ? {
+          ...FIXTURES,
+          confirm: async () => ({
+            ok: false,
+            error: '“Why us?” was edited after Dash found it. Nothing was deleted; ask again to see the current list.',
+            change,
+          }),
+        }
+      : mode === 'deleting'
+        ? { ...FIXTURES, confirm: () => new Promise<ChangeOutcome>(() => {}) }
+        : FIXTURES;
+  return (
+    <AskDashProvider source={source}>
+      <PageColumn className="py-4">
+        <PressInOrder labels={mode === 'open' ? ['Confirm'] : ['Confirm', 'Delete']} />
+        <AskThread
+          id="ask-delete-preview"
+          conversationRef="00000000-0000-4000-8000-000000000021"
+          turns={turns}
+          changes={[change]}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+        />
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+/** Presses the buttons reading `labels` in turn once the page has arrived. */
+function PressInOrder({ labels }: { labels: string[] }) {
+  useEffect(() => {
+    const timers = labels.map((label, index) =>
+      setTimeout(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        buttons.find((b) => b.textContent?.trim() === label)?.click();
+      }, 100 * index),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [labels]);
+  return null;
 }
 
 /** Presses the first button reading `label` once the page has arrived: a state only a press reaches. */

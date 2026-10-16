@@ -63,6 +63,8 @@ import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
+import { SentBackChart } from '@/app/dev/ui/sent-back';
+import type { SentBackWeek } from '@/lib/plan/sent-back';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { PATTERNS } from '@/app/dev/ui/patterns';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
@@ -277,6 +279,7 @@ import { formatMoney } from '@/lib/money';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
+import type { DashChange } from '@/lib/talk/changes';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -301,6 +304,7 @@ import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
   PlanScreenChangeSurface,
+  PlanScreenMockupSurface,
   PlanSendBackSurface,
   PlanOpenedSurface,
   PlanFeatureSurface,
@@ -331,6 +335,8 @@ import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskBuildSurface,
+  AskDeleteSurface,
+  AskPaidSurface,
   AskChangesSurface,
   AT_WORK_QUESTION,
   AskDashSurface,
@@ -3343,6 +3349,20 @@ const CORRECTION_WEEKS: CorrectionWeek[] = [
   { week: '2026-10-05', notes: 7, corrections: 2 },
 ];
 
+/**
+ * Seven weeks of the sent-back count on /dev/ui (plan #2215.5): a week that
+ * shipped nothing, one where none were sent back, and the audit week.
+ */
+const SENT_BACK_WEEKS: SentBackWeek[] = [
+  { week: '2026-08-31', shipped: 31, sentBack: 4 },
+  { week: '2026-09-07', shipped: 24, sentBack: 3 },
+  { week: '2026-09-14', shipped: 0, sentBack: 0 },
+  { week: '2026-09-21', shipped: 38, sentBack: 5 },
+  { week: '2026-09-28', shipped: 42, sentBack: 3 },
+  { week: '2026-10-05', shipped: 47, sentBack: 0 },
+  { week: '2026-10-12', shipped: 19, sentBack: 2 },
+];
+
 /** People to meet: one with a drafted message and a long title, one with only a move. */
 const recommendedPeople: OpenSuggestion[] = [
   recommendedOpening({
@@ -4120,6 +4140,76 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* What a comment asked Dash to run that costs money (plan #2228.2): the
+     * approval card under the reply that says it was queued, in the thread
+     * on a goal, as every row's thread draws it. */
+    id: 'thread-paid',
+    label: 'Thread · Paid actions waiting under a comment',
+    module: 'goals',
+    width: 'narrow',
+    render: () => {
+      const at = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
+      const press = (id: string, line: string, medianMicros: number): DashChange => ({
+        id,
+        conversationId: '00000000-0000-4000-8000-000000000441',
+        turnId: 'paid-ask',
+        kind: 'paid_action',
+        status: 'proposed',
+        subjectRef: null,
+        writtenTable: null,
+        writtenRef: null,
+        undo: null,
+        createdAt: at(4),
+        doneAt: null,
+        declinedAt: null,
+        undoneAt: null,
+        input: {
+          tool: 'write_year_review',
+          action: 'app/timeline/actions.ts#writeYearReview',
+          args: {},
+          line,
+          estimate: {
+            lowMicros: Math.round(medianMicros * 0.7),
+            medianMicros,
+            highMicros: Math.round(medianMicros * 1.6),
+            runs: 9,
+            basis: 'measured',
+            per: 'run',
+            models: [SONNET],
+          },
+          workspace: null,
+          paths: ['/jobs/pipeline'],
+        },
+      });
+      return (
+        <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+          <p className="text-body text-ink">Move into a senior analyst role by spring</p>
+          <Thread
+            subject={threadRef('goal', '00000000-0000-4000-8000-000000000442')}
+            turns={[
+              {
+                id: 'paid-ask',
+                author: 'me',
+                body: '@dash draft my answers on the Northwind and Fernhill applications',
+                createdAt: at(5),
+                paid: [
+                  press('thread-paid-1', 'Draft the answers on the Northwind Analytics application.', 148_000),
+                  press('thread-paid-2', 'Draft the answers on the Fernhill Labs application.', 131_000),
+                ],
+              },
+              {
+                id: 'paid-reply',
+                author: 'claude',
+                body: 'I have queued both drafts. They cost money, so nothing runs until you accept them below.',
+                createdAt: at(4),
+              },
+            ]}
+          />
+        </div>
+      );
+    },
+  },
+  {
     /* "Dash at work" on the button that started a run (plan #1964.2.1): the
      * press hands the area to Dash and the button's working mark stands in
      * place of its label while the run goes. */
@@ -4372,6 +4462,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanSendBackSurface />,
+  },
+  {
+    /* A finished step's screens with the mockup you approved beside the
+     * build (plan #2215.10): the mockup first, Send back under each pair,
+     * and a surface with no mockup drawn as before. */
+    id: 'dev-plan-screen-mockup',
+    label: 'Plan · a step’s screens beside their mockup',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanScreenMockupSurface />,
   },
   {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
@@ -4721,7 +4821,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <UiStandard corrections={CORRECTION_WEEKS} removedTaste={REMOVED_TASTE} />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} sentBack={SENT_BACK_WEEKS} removedTaste={REMOVED_TASTE} />,
   },
   {
     /* The correction measure on /dev/ui alone (plan #1543), since the whole
@@ -4736,6 +4836,22 @@ export const SURFACES: readonly Surface[] = [
         <CorrectionsChart weeks={CORRECTION_WEEKS} />
         <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
         <CorrectionsChart weeks={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The sent-back count on /dev/ui alone (plan #2215.5), with the empty and
+     * unread states beneath, since the whole page is too tall to read a chart. */
+    id: 'dev-ui-sent-back',
+    label: 'UI · how many new screens you send back',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <SentBackChart weeks={SENT_BACK_WEEKS} />
+        <SentBackChart weeks={SENT_BACK_WEEKS.slice(-2)} />
+        <SentBackChart weeks={[]} />
+        <SentBackChart weeks={null} />
       </div>
     ),
   },
@@ -6155,12 +6271,78 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBuildSurface />,
   },
   {
+    /* The "Are you sure?" popup Confirm opens on a proposed delete (plan
+     * #2232.2): the answers listed, Cancel focused, Delete beside it. */
+    id: 'ask-dash-delete-popup',
+    label: 'Ask Dash · Delete, are you sure',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface />,
+  },
+  {
+    /* The same popup after Delete was turned down: the reason inside, the rows kept. */
+    id: 'ask-dash-delete-popup-refused',
+    label: 'Ask Dash · Delete, refused',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="refused" />,
+  },
+  {
+    /* The popup while the delete runs: both buttons held, Delete working. */
+    id: 'ask-dash-delete-popup-deleting',
+    label: 'Ask Dash · Delete, running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="deleting" />,
+  },
+  {
     /* The build card after a Confirm the server refused, the reason under it. */
     id: 'ask-dash-build-refused',
     label: 'Ask Dash · Start a build, refused',
     module: 'dev',
     width: 'page',
     render: () => <AskBuildSurface refused />,
+  },
+  {
+    /* What costs money, on one card under the answer that queued it (plan
+     * #2228.2): a cost on each line, the total, Accept all and Decline. */
+    id: 'ask-dash-paid',
+    label: 'Ask Dash · Paid actions waiting',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface />,
+  },
+  {
+    /* Accept all pressed: the first line running, the rest waiting their turn. */
+    id: 'ask-dash-paid-running',
+    label: 'Ask Dash · Paid actions running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="running" />,
+  },
+  {
+    /* Every line run: each links to what it wrote, and none has an Undo. */
+    id: 'ask-dash-paid-done',
+    label: 'Ask Dash · Paid actions run',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="done" />,
+  },
+  {
+    /* One line refused with its reason; the lines either side of it still ran. */
+    id: 'ask-dash-paid-failed',
+    label: 'Ask Dash · A paid action that failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="failed" />,
+  },
+  {
+    /* Declined: the card greyed, nothing run and nothing spent. */
+    id: 'ask-dash-paid-declined',
+    label: 'Ask Dash · Paid actions declined',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="declined" />,
   },
   {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind

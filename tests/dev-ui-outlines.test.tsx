@@ -24,6 +24,7 @@ vi.mock('@/lib/auth/server', () => ({
   }),
 }));
 vi.mock('@/lib/plan/correction-share-load', () => ({ loadCorrectionWeeks: async () => null }));
+vi.mock('@/lib/plan/sent-back-load', () => ({ loadSentBackWeeks: async () => null }));
 vi.mock('@/lib/dev/taste-removals-load', () => ({ loadRemovedTaste: async () => [] }));
 vi.mock('@/app/dev/ui/standard', () => ({
   UiStandard: () => null,

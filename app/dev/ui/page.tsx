@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadCorrectionWeeks } from '@/lib/plan/correction-share-load';
+import { loadSentBackWeeks } from '@/lib/plan/sent-back-load';
 import { loadRemovedTaste } from '@/lib/dev/taste-removals-load';
 import { UiStandard } from './standard';
 
@@ -40,10 +41,11 @@ export const dynamic = 'force-dynamic';
 export default async function DevUiPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [corrections, removedTaste, outlines] = await Promise.all([
+  const [corrections, sentBack, removedTaste, outlines] = await Promise.all([
     loadCorrectionWeeks(supabase, user.id),
+    loadSentBackWeeks(supabase, user.id),
     loadRemovedTaste(supabase, user.id),
     loadOutlines(supabase, user.id),
   ]);
-  return <UiStandard corrections={corrections} removedTaste={removedTaste} outlines={outlines} />;
+  return <UiStandard corrections={corrections} sentBack={sentBack} removedTaste={removedTaste} outlines={outlines} />;
 }

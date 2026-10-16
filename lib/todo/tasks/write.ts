@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 
@@ -54,8 +55,16 @@ export async function createTask(
   input: TaskInput,
   timezone: string,
 ): Promise<{ id: string | null; error: string | null }> {
-  const supabase = await createTodoClient();
+  return insertTask(await createTodoClient(), userId, input, timezone);
+}
 
+/** createTask on a client the caller made, such as the ask address's session as the token's owner. */
+export async function insertTask(
+  supabase: TodoSupabaseClient,
+  userId: string,
+  input: TaskInput,
+  timezone: string,
+): Promise<{ id: string | null; error: string | null }> {
   const { data, error } = await supabase
     .from('tasks')
     .insert({

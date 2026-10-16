@@ -8,12 +8,13 @@ import { checkStepSend } from '@/lib/plan/handover';
 import { isClosed } from '@/lib/plan/load';
 import { stepRef } from '@/lib/plan/ref';
 import { isUuid, type AskContext, type AskToolResult } from './db';
+import { DELETABLE, DELETABLE_LIST, MAX_DELETE_ROWS, deleteInput, isDeletableTable, snapshotRows } from './delete-rows';
 
 /**
  * The changes Dash may propose in an answer (plan #1188, feature #1186):
  * add a todo, add a step under a goal, mark an owned item returned, and start
  * a watch on a price (plan #1296), and start the build of a plan step (plan
- * #2106.1). A
+ * #2106.1), and delete rows from an allowed table (plan #2232.1). A
  * proposal is checked the way the page's own action checks it and kept as a
  * proposed row in core.dash_actions; nothing else is written until the person
  * presses Confirm (#1189).
@@ -31,6 +32,7 @@ export const PROPOSAL_TOOL_NAMES = [
   'propose_returned',
   'propose_watch',
   'propose_build',
+  'propose_delete',
 ] as const;
 export type ProposalToolName = (typeof PROPOSAL_TOOL_NAMES)[number];
 
@@ -124,6 +126,25 @@ export const PROPOSAL_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'propose_delete',
+    description: `Propose deleting rows of the person's, when they ask you to remove or delete them (duplicate application answers, say). Only ${DELETABLE_LIST} can be proposed for now; table is job_search.application_answers. Name each row by the ref a lookup returned for it in this conversation (application_answers returns one per answer); look them up first, at most ${MAX_DELETE_ROWS} at once. Nothing is deleted: the person sees the rows listed on a card and confirms or declines, and a confirmed delete can be undone. Never propose rows they did not ask to remove, and say in your answer which you proposed and why. ${PROPOSE_NOTE}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: { type: 'string', enum: Object.keys(DELETABLE), description: 'The table the rows are in.' },
+        refs: {
+          type: 'array',
+          minItems: 1,
+          maxItems: MAX_DELETE_ROWS,
+          items: { type: 'string' },
+          description: 'The refs a lookup returned for the rows to remove.',
+        },
+      },
+      required: ['table', 'refs'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** What a proposal needs beyond the lookups' context. */
@@ -146,6 +167,8 @@ const MODULES: Record<ProposalToolName, ModuleId | null> = {
   // A watch belongs to no workspace: it shows on the home page.
   propose_watch: null,
   propose_build: 'dev',
+  // The workspace depends on the table, checked in checkDelete.
+  propose_delete: null,
 };
 
 const MODULE_LABELS: Partial<Record<ModuleId, string>> = { todo: 'Todo', goals: 'Goals', shopping: 'Shopping', dev: 'Dev' };
@@ -302,12 +325,41 @@ async function checkBuild(ctx: CheckContext, args: Record<string, unknown>): Pro
   };
 }
 
+/**
+ * A delete (plan #2232.1): only a table on the allowed list, only rows a
+ * lookup returned here, read again as the person so a row that is not theirs
+ * is refused. Nothing is deleted; the snapshot of each row is kept.
+ */
+async function checkDelete(ctx: CheckContext, args: Record<string, unknown>): Promise<NewDashChange> {
+  const table = text(args, 'table');
+  if (!isDeletableTable(table)) {
+    throw new Refused(`Dash can propose deleting ${DELETABLE_LIST} only, not ${table || 'that'}. Say so instead of proposing it.`);
+  }
+  const spec = DELETABLE[table];
+  if (!ctx.enabledModules.includes(spec.module)) {
+    throw new Refused(`The ${spec.moduleLabel} workspace is switched off, so nothing can be deleted there.`);
+  }
+  const given = args.refs;
+  if (!Array.isArray(given) || given.length === 0) throw new Refused('refs is missing: name the rows to delete.');
+  if (given.length > MAX_DELETE_ROWS) throw new Refused(`Name at most ${MAX_DELETE_ROWS} rows in one proposal.`);
+  const ids = [...new Set(given.map((ref) => seenRef(ctx, { ref: typeof ref === 'string' ? ref : '' }, 'ref', table)))];
+  const rows = await snapshotRows(ctx, table, ids);
+  if (rows.length !== ids.length) {
+    throw new Refused(`${ids.length - rows.length} of those ${spec.noun[1]} are not one of theirs, or are gone.`);
+  }
+  if (table === 'job_search.application_answers' && rows.some((row) => row.status === 'submitted')) {
+    throw new Refused('A submitted answer is never removed. Leave those out and propose the others.');
+  }
+  return { kind: 'delete_rows', input: await deleteInput(ctx, table, rows) };
+}
+
 const CHECKS: Record<ProposalToolName, (ctx: CheckContext, args: Record<string, unknown>) => Promise<NewDashChange>> = {
   propose_todo: checkTodo,
   propose_goal_step: checkGoalStep,
   propose_returned: checkReturned,
   propose_watch: checkWatch,
   propose_build: checkBuild,
+  propose_delete: checkDelete,
 };
 
 /** How a kept proposal reads back to the model. */
@@ -334,6 +386,11 @@ function described(change: NewDashChange): string {
         ? ' Its last run has gone quiet, and confirming writes that run off: say so.'
         : '';
       return `Start the build of #${change.input.outline} "${change.input.title}". Confirming starts a session on it at once, and it cannot be undone.${quiet}`;
+    }
+    case 'delete_rows': {
+      const { count, titles } = change.input;
+      const listed = titles.slice(0, 5).map((title) => `"${title}"`).join(', ');
+      return `Delete ${count} ${DELETABLE[change.input.table].noun[count === 1 ? 0 : 1]}: ${listed}${count > 5 ? ` and ${count - 5} more` : ''}. Nothing is deleted until they confirm the card, and a confirmed delete can be undone.`;
     }
     default:
       return 'Make the change.';
@@ -372,7 +429,7 @@ export async function checkChange(
  */
 export async function executeProposal(name: string, input: unknown, ctx: ProposeContext): Promise<AskToolResult> {
   if (!isProposalToolName(name)) {
-    return { ok: false, error: `There is no tool called ${name}. You can propose only a todo, a goal step, a return, a watch or a build.` };
+    return { ok: false, error: `There is no tool called ${name}. You can propose only a todo, a goal step, a return, a watch, a build or a delete.` };
   }
   const workspace = MODULES[name];
   if (workspace && !ctx.enabledModules.includes(workspace)) {
