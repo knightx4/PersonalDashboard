@@ -158,6 +158,7 @@ describe('the operation names', () => {
       'grade-course-explain',
       'propose-structure-sources',
       'match-structure-units',
+      'pull-lit-topic-structure',
     ]);
   });
 });

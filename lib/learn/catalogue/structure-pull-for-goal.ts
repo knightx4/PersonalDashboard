@@ -5,6 +5,7 @@ import type postgres from 'postgres';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { pullOcwForGoal } from '@/lib/learn/catalogue/ocw-structure-pull';
+import { pullUtForGoal, type UtPullLine } from '@/lib/learn/catalogue/ut-austin-pull';
 import type { StructureDocumentInput } from '@/lib/learn/catalogue/structure';
 import { storeStructure } from '@/lib/learn/catalogue/structure-store';
 import { providersForKind, type GoalKind, type GoalToClassify, type ProviderId } from '@/lib/learn/goal-kind';
@@ -32,7 +33,7 @@ import { pullYaleCourse } from '@/lib/learn/providers/yale';
  *   official_explainers   the same allowlist
  *   extension             pages on the practical allowlist, by pullPractical
  *   certification         the same allowlist
- *   ut_austin             not here yet: #2247.4 adds its puller to PULLERS
+ *   ut_austin             pullUtForGoal: department searches, public syllabi, a screen
  *   monographs, frame     no code; skipped
  *
  * For every provider but OCW the proposing call is the one below, told what
@@ -116,7 +117,7 @@ export const CANDIDATE_PROVIDERS: Partial<Record<ProviderId, CandidateProvider>>
 
 /** The providers with code, ocw included. */
 export function wiredProviders(): ProviderId[] {
-  return ['ocw', ...(Object.keys(CANDIDATE_PROVIDERS) as ProviderId[])];
+  return ['ocw', 'ut_austin', ...(Object.keys(CANDIDATE_PROVIDERS) as ProviderId[])];
 }
 
 const SYSTEM = `You name documents whose structure (weeks, chapters, sections, lessons)
@@ -212,6 +213,7 @@ export type GoalPullPorts = {
   propose: (provider: CandidateProvider) => Promise<{ ok: true; candidates: string[] } | { ok: false; detail: string }>;
   store: (document: StructureDocumentInput) => Promise<{ itemId: string; unchanged: boolean }>;
   ocw: () => Promise<ProviderRun>;
+  ut: () => Promise<ProviderRun>;
   wait: (ms: number) => Promise<void>;
 };
 
@@ -219,6 +221,8 @@ export function liveGoalPullPorts(input: {
   sql: postgres.Sql;
   goal: GoalToClassify;
   anthropicApiKey: string;
+  /** Whether the screen on UT syllabi may use Jev (lib/jev/enabled.ts); false when unknown. */
+  jevEnabled?: boolean;
   onSpend?: SpendSink;
 }): GoalPullPorts {
   return {
@@ -239,8 +243,22 @@ export function liveGoalPullPorts(input: {
         ),
       };
     },
+    ut: async () => {
+      const pulled = await pullUtForGoal({ ...input, jevEnabled: input.jevEnabled ?? false });
+      if (!pulled.ok) return { provider: 'ut_austin', ok: false, detail: pulled.detail };
+      return { provider: 'ut_austin', ok: true, lines: pulled.searches.flatMap((search) => search.lines.map(utLine)) };
+    },
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
+}
+
+/** A UT line as the shared line shape: the course and term name the candidate. */
+function utLine(line: UtPullLine): PullLine {
+  if (line.status === 'stored') {
+    return { candidate: `${line.courseCode} ${line.term}`, status: 'stored', itemId: line.itemId, units: line.units, unchanged: line.unchanged };
+  }
+  if (line.status === 'failed') return { candidate: 'UT Austin', status: 'failed', detail: line.detail };
+  return { candidate: `${line.courseCode} ${line.term}`, status: 'not-confirmed', detail: line.status };
 }
 
 /** One provider's candidates, confirmed and stored one at a time. Never throws for one candidate. */
@@ -273,18 +291,25 @@ export async function pullCandidates(provider: CandidateProvider, ports: GoalPul
 export async function pullStructureForGoal(kind: GoalKind | null, ports: GoalPullPorts): Promise<GoalStructurePull> {
   const out: GoalStructurePull = { ran: [], skipped: [] };
   for (const id of providersForKind(kind)) {
-    if (id === 'ocw') {
-      out.ran.push(await ports.ocw());
-      continue;
-    }
-    const provider = CANDIDATE_PROVIDERS[id];
-    if (!provider) {
-      out.skipped.push(id);
-      continue;
-    }
-    out.ran.push(await pullCandidates(provider, ports));
+    const ran = await runProvider(id, ports);
+    if (ran) out.ran.push(ran);
+    else out.skipped.push(id);
   }
   return out;
+}
+
+/** Run one provider, or null when it has no code. */
+export async function runProvider(id: ProviderId, ports: GoalPullPorts): Promise<ProviderRun | null> {
+  if (id === 'ocw') return ports.ocw();
+  if (id === 'ut_austin') return ports.ut();
+  const provider = CANDIDATE_PROVIDERS[id];
+  return provider ? pullCandidates(provider, ports) : null;
+}
+
+/** The first provider a kind names that has code, or null. */
+export function firstWiredProvider(kind: GoalKind | null): ProviderId | null {
+  const wired = wiredProviders();
+  return providersForKind(kind).find((id) => wired.includes(id)) ?? null;
 }
 
 /** Documents a pull stored, new or unchanged. */

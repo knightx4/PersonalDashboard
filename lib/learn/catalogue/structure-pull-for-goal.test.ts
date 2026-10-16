@@ -41,6 +41,7 @@ function ports(proposals: Record<string, string[]>): Ports & { stored: string[];
       return { itemId: `id-${document.title}`, unchanged: false };
     },
     ocw: async () => ({ provider: 'ocw', ok: true, lines: [{ candidate: '15.431', status: 'stored', itemId: 'ocw-1', units: 12, unchanged: false }] }),
+    ut: async () => ({ provider: 'ut_austin', ok: true, lines: [] }),
     wait: async (ms) => {
       waits.push(ms);
     },
@@ -92,9 +93,8 @@ describe('pulling what a goal’s kind calls for', () => {
   it('runs the kind’s providers in order and skips the ones with no code', async () => {
     const p = ports({});
     const pull = await pullStructureForGoal('academic_course', p);
-    // ocw, ut_austin, openstax, yale: ut_austin lands with #2247.4.
-    expect(pull.ran.map((r) => r.provider)).toEqual(['ocw', 'openstax', 'yale']);
-    expect(pull.skipped).toEqual(['ut_austin']);
+    expect(pull.ran.map((r) => r.provider)).toEqual(['ocw', 'ut_austin', 'openstax', 'yale']);
+    expect(pull.skipped).toEqual([]);
     expect(storedCount(pull)).toBe(1);
   });
 
@@ -119,7 +119,7 @@ describe('pulling what a goal’s kind calls for', () => {
 
   it('lists every provider with code', () => {
     expect(wiredProviders().sort()).toEqual(
-      ['arxiv', 'certification', 'extension', 'ocw', 'official_explainers', 'openstax', 'primary_sources', 'yale'].sort(),
+      ['arxiv', 'certification', 'extension', 'ocw', 'official_explainers', 'openstax', 'primary_sources', 'ut_austin', 'yale'].sort(),
     );
   });
 });

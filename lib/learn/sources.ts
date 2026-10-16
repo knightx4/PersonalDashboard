@@ -321,6 +321,7 @@ export const learnSources: ModuleSources = {
       reason:
         "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
+    { table: 'learn.topic_structure_pulls', reason: 'Bookkeeping for the daily pull of structure documents: which lit topics have had one, and the day.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
