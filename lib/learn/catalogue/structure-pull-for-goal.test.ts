@@ -87,6 +87,15 @@ describe('reading what the proposing call names', () => {
     expect(prompt).toContain('Goal: The American Revolution. its French ideas');
     expect(prompt).toContain('oyc.yale.edu');
   });
+
+  it('names each practical page whole, so a SaaS goal can be told the practitioner guides (plan #2247.6)', () => {
+    for (const id of ['extension', 'certification'] as const) {
+      const ask = CANDIDATE_PROVIDERS[id]!.ask;
+      expect(ask).toContain('https://www.forentrepreneurs.com/saas-metrics-2/');
+      expect(ask).toContain('https://a16z.com/16-startup-metrics/');
+      expect(CANDIDATE_PROVIDERS[id]!.read('https://a16z.com/16-startup-metrics/')).toBe('https://a16z.com/16-startup-metrics/');
+    }
+  });
 });
 
 describe('pulling what a goal’s kind calls for', () => {

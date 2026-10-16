@@ -562,6 +562,12 @@ describe('a card from a research brief source (plan #2023.6)', () => {
     );
   });
 
+  it('names the goal when the brief is under one (plan #2184.1)', () => {
+    expect(whyLine({ ...researched, aimName: 'SOX and internal control' })).toBe(
+      'For your research: How do SOX controls apply to AI? For your goal: SOX and internal control.',
+    );
+  });
+
   it('tells the writer it is reading a source for their question, not a Wikipedia section', () => {
     const pick = describePick(researched);
     expect(pick).toContain('"How do SOX controls apply to AI?"');
