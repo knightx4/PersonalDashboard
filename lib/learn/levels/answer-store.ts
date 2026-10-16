@@ -16,6 +16,7 @@ import { writeLevelCase } from '@/lib/learn/levels/case-call';
 import { gradeCellAnswer, LEVEL_GRADE_MODEL, LEVEL_GRADE_SECOND_MODEL } from '@/lib/learn/levels/grade-call';
 import { loadGradeMap, territoryOf } from '@/lib/learn/levels/loader-grade';
 import { questionFormat, readCells } from '@/lib/learn/levels/model';
+import { predictedCell } from '@/lib/learn/predicted';
 
 /**
  * Asking an explain question about a cell and recording the answer
@@ -123,9 +124,22 @@ export async function askCell(
     text = explain;
   }
 
+  // The belief is the one at this moment, and the question is put in front of
+  // the person as it is saved, so shown_at starts the answer clock (plan #2179.5).
+  const believed = await predictedCell(learn, userId, cellId);
   const { data: inserted, error: insertError } = await learn
     .from('cell_questions')
-    .insert({ user_id: userId, cell_id: cellId, format, question: text, expected, piece_id: pieceId ?? null })
+    .insert({
+      user_id: userId,
+      cell_id: cellId,
+      format,
+      question: text,
+      expected,
+      piece_id: pieceId ?? null,
+      shown_at: new Date().toISOString(),
+      predicted_status: believed?.status ?? null,
+      predicted_level: believed?.level ?? null,
+    })
     .select('id')
     .single();
   if (insertError || !inserted) {

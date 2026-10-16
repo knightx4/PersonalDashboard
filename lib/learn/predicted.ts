@@ -1,6 +1,8 @@
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { strength } from '@/lib/learn/strength';
+import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
+import { readCells } from '@/lib/learn/levels/model';
 
 /**
  * What Learn believed about an idea at the moment it asked (plan #2179.1):
@@ -36,4 +38,29 @@ export async function predictedStrength(
   } | null;
   if (!row) return 0;
   return Math.round(strength(row, at) * 10_000) / 10_000;
+}
+
+/**
+ * What Learn believed about a level of a topic at the moment it asked about it
+ * (plan #2179.5): the status it computes for the cell (open, implied, shown,
+ * declared or missed) and the level that cell sits at, 1 to 10. The two are
+ * written together or not at all, as the table's pair check requires.
+ *
+ * Returns null when the topic map cannot be read, or the cell is not on it. As
+ * with predictedStrength, asking the question matters more than recording the
+ * belief, so a failed read leaves both columns empty and says so in the log.
+ */
+export async function predictedCell(
+  learn: LearnSupabaseClient,
+  userId: string,
+  cellId: string,
+): Promise<{ status: string; level: number } | null> {
+  try {
+    const map = await loadGradeMap(learn, userId);
+    const reading = readCells(map).get(cellId);
+    return reading ? { status: reading.status, level: reading.level } : null;
+  } catch (error) {
+    console.error('[learn predicted cell]', error instanceof Error ? error.message : error);
+    return null;
+  }
 }
