@@ -63,6 +63,8 @@ import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
+import { SentBackChart } from '@/app/dev/ui/sent-back';
+import type { SentBackWeek } from '@/lib/plan/sent-back';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { PATTERNS } from '@/app/dev/ui/patterns';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
@@ -3345,6 +3347,20 @@ const CORRECTION_WEEKS: CorrectionWeek[] = [
   { week: '2026-10-05', notes: 7, corrections: 2 },
 ];
 
+/**
+ * Seven weeks of the sent-back count on /dev/ui (plan #2215.5): a week that
+ * shipped nothing, one where none were sent back, and the audit week.
+ */
+const SENT_BACK_WEEKS: SentBackWeek[] = [
+  { week: '2026-08-31', shipped: 31, sentBack: 4 },
+  { week: '2026-09-07', shipped: 24, sentBack: 3 },
+  { week: '2026-09-14', shipped: 0, sentBack: 0 },
+  { week: '2026-09-21', shipped: 38, sentBack: 5 },
+  { week: '2026-09-28', shipped: 42, sentBack: 3 },
+  { week: '2026-10-05', shipped: 47, sentBack: 0 },
+  { week: '2026-10-12', shipped: 19, sentBack: 2 },
+];
+
 /** People to meet: one with a drafted message and a long title, one with only a move. */
 const recommendedPeople: OpenSuggestion[] = [
   recommendedOpening({
@@ -4793,7 +4809,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <UiStandard corrections={CORRECTION_WEEKS} removedTaste={REMOVED_TASTE} />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} sentBack={SENT_BACK_WEEKS} removedTaste={REMOVED_TASTE} />,
   },
   {
     /* The correction measure on /dev/ui alone (plan #1543), since the whole
@@ -4808,6 +4824,22 @@ export const SURFACES: readonly Surface[] = [
         <CorrectionsChart weeks={CORRECTION_WEEKS} />
         <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
         <CorrectionsChart weeks={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The sent-back count on /dev/ui alone (plan #2215.5), with the empty and
+     * unread states beneath, since the whole page is too tall to read a chart. */
+    id: 'dev-ui-sent-back',
+    label: 'UI · how many new screens you send back',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <SentBackChart weeks={SENT_BACK_WEEKS} />
+        <SentBackChart weeks={SENT_BACK_WEEKS.slice(-2)} />
+        <SentBackChart weeks={[]} />
+        <SentBackChart weeks={null} />
       </div>
     ),
   },
