@@ -1,5 +1,7 @@
+import type { CellEvidence } from '@/lib/learn/levels/model';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 import type { SkyTerritory, TerritoryLinkIn, TerritoryStanding, TerritoryTopicIn } from '@/lib/learn/map/place-graph';
+import type { GoalLevels } from '@/lib/learn/map/panels';
 import { domainSlot } from '@/lib/learn/map/view';
 
 /**
@@ -235,4 +237,54 @@ export function territoryFixture(ideas: readonly IdeaOnMap[]): SkyTerritory {
     };
   });
   return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links, ready, standing };
+}
+
+/**
+ * The same territory as the topic map the panels under the map read (plan
+ * #2187.6): a cell for every level up to each ceiling, the links above, and
+ * evidence that gives each ladder its tested, held and missed levels. The
+ * top answers land over the last seven weeks and an earlier, lower one five
+ * weeks before that, so four weeks back reads lower than today. The thin one
+ * is the live goal: every topic a draft, one link, no evidence.
+ */
+export function territoryLevels(asOf: string, options: { thin?: boolean } = {}): GoalLevels {
+  const now = new Date(asOf).getTime();
+  const daysAgo = (n: number) => new Date(now - n * 86_400_000).toISOString();
+  const cell = (topicId: string, level: number) => `cell-${topicId}-${level}`;
+  const topics = SEEDS.map((seed) => ({ id: seed.id, name: seed.name, ceiling: seed.ceiling, approved: !options.thin }));
+  const cells = SEEDS.flatMap((seed) =>
+    Array.from({ length: seed.ceiling }, (_, i) => ({ id: cell(seed.id, i + 1), topicId: seed.id, level: i + 1 })),
+  );
+  const links = (options.thin ? LINKS.slice(0, 1) : LINKS).map(([a, at, b, needs]) => ({
+    requiringCellId: cell(a, at),
+    requiredCellId: cell(b, needs),
+  }));
+  const evidence: CellEvidence[] = [];
+  if (!options.thin) {
+    SEEDS.forEach((seed, i) => {
+      const recent = 4 + i * 5;
+      if (seed.tested > 0) {
+        evidence.push({ cellId: cell(seed.id, seed.tested), verdict: 'met', observedAt: daysAgo(recent) });
+        if (seed.tested > 2 && i % 2 === 0) {
+          evidence.push({ cellId: cell(seed.id, seed.tested - 2), verdict: 'met', observedAt: daysAgo(recent + 35) });
+        }
+      }
+      if (seed.held > seed.tested) {
+        evidence.push({ cellId: cell(seed.id, seed.held), verdict: 'declared', observedAt: daysAgo(recent + 1) });
+      }
+      for (const level of seed.missed) {
+        evidence.push({ cellId: cell(seed.id, level), verdict: 'not_met', observedAt: daysAgo(recent) });
+      }
+    });
+  }
+  return {
+    map: { topics, cells, links, evidence },
+    lenses: [
+      {
+        id: TERRITORY_GOAL,
+        name: 'Read a SaaS company’s numbers',
+        targets: SEEDS.flatMap((seed) => (seed.target === null ? [] : [{ topicId: seed.id, targetLevel: seed.target }])),
+      },
+    ],
+  };
 }

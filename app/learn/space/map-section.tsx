@@ -27,6 +27,7 @@ import { StarSky, type Constellation, type SkyName, type SkyTopic, type Star } f
 import { ringRadius } from '@/lib/learn/map/goals';
 import { StarSwatch, TopicSwatch } from './swatch';
 import { MapTimeline } from './timeline';
+import { MapPanels } from './map-panels';
 import { backedByText } from '@/lib/learn/evidence/model';
 
 /**
@@ -55,6 +56,7 @@ export function MapSection({
   pointingAt,
   daysAgo,
   zoomOn,
+  pickThen,
 }: {
   view: IdeaMapView;
   pointingAt?: string | null;
@@ -62,6 +64,8 @@ export function MapSection({
   daysAgo?: number;
   /** The gallery opens the sky flown into this topic. */
   zoomOn?: string | null;
+  /** The gallery draws the day picker under the map open (plan #2187.6). */
+  pickThen?: boolean;
 }) {
   const { params, set } = usePick();
   const domains = useMemo(() => ideaDomains(view.ideas), [view.ideas]);
@@ -211,6 +215,7 @@ export function MapSection({
           <MapNotes view={view} params={params} graph={graph} past={past} litNames={lighting.names} />
         </div>
       </Card>
+      <MapPanels view={view} params={params} set={set} pickOpen={pickThen} />
     </section>
   );
 }

@@ -58,6 +58,7 @@ export function IdeaSpaceView({
   layersOn = ALL_LAYERS,
   holdQuote,
   holdMore,
+  pickThen,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -87,6 +88,8 @@ export function IdeaSpaceView({
   holdQuote?: boolean;
   /** The gallery draws the open idea's fold of further evidence open. */
   holdMore?: boolean;
+  /** The gallery draws the then and now tab's day picker open (plan #2187.6). */
+  pickThen?: boolean;
 }) {
   const [recording, setRecording] = useState(saved);
   const [layers, setLayers] = useState(layersOn);
@@ -149,7 +152,7 @@ export function IdeaSpaceView({
         main={
           <>
             {header}
-            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} zoomOn={zoomOn} />
+            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} zoomOn={zoomOn} pickThen={pickThen} />
           </>
         }
         rail={

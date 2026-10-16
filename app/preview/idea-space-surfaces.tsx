@@ -12,7 +12,7 @@ import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
-import { TERRITORY_GOAL, TERRITORY_OPEN, TERRITORY_POINTED, territoryFixture } from './idea-space-territory';
+import { TERRITORY_GOAL, TERRITORY_OPEN, TERRITORY_POINTED, territoryFixture, territoryLevels } from './idea-space-territory';
 import { goalsFor } from './idea-space-goals';
 
 /**
@@ -659,6 +659,57 @@ export function IdeaSpaceTerritoryHoverSurface() {
  */
 export function IdeaSpaceTerritoryQuoteSurface() {
   return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} holdQuote />;
+}
+
+/**
+ * The panels under the map (plan #2187.6), on the territory opened: what
+ * will fade, the gaps to a target and then and now, each its own tab.
+ */
+const PANELS_VIEW = { ...TERRITORY_VIEW, levels: territoryLevels(VIEW.asOf) };
+/** As thin as the live goal: drafts with nothing held, one link, and none of the ideas round it held. */
+const THIN_PANELS_VIEW = {
+  ...THIN_VIEW,
+  territories: THIN_VIEW.territories.map((t) => ({
+    ...t,
+    topics: t.topics.map((topic) => ({
+      ...topic,
+      ideaIds: topic.ideaIds.filter((id) => VIEW.ideas.find((idea) => idea.id === id)?.stateRow === null),
+    })),
+  })),
+  levels: territoryLevels(VIEW.asOf, { thin: true }),
+};
+
+export function IdeaSpaceFadeSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'fade' }} />;
+}
+
+export function IdeaSpaceFadeEmptySurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'fade' }} />;
+}
+
+export function IdeaSpaceGapsSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'gaps' }} />;
+}
+
+export function IdeaSpaceGapsThinSurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'gaps' }} />;
+}
+
+/** No goal chosen: the gaps tab says to choose one. */
+export function IdeaSpaceGapsEmptySurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...DEFAULT_PARAMS, panel: 'gaps' }} />;
+}
+
+export function IdeaSpaceThenSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} />;
+}
+
+export function IdeaSpaceThenPickSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} pickThen />;
+}
+
+export function IdeaSpaceThenThinSurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} />;
 }
 
 export function IdeaSpaceDenseSurface() {
