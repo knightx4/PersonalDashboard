@@ -19,6 +19,7 @@ import {
   type MergeState,
   type WantedState,
 } from './actions';
+import { CardNote, RowSource } from './draft-checks';
 
 /**
  * The parts of a draft topic's page that write (plan #2138.2): the match
@@ -27,11 +28,11 @@ import {
  * links need, drafted on a press.
  */
 
-/** What a level needs from other topics, under its checks. */
+/** What a level needs from other topics, under its checks, each with where it came from. */
 export function LevelNeeds({ links }: { links: readonly TopicLinkView[] }) {
   if (links.length === 0) return null;
   return (
-    <ul className="mt-1.5 space-y-0.5">
+    <ul className="mt-1.5 space-y-1">
       {links.map((link) => (
         <li key={`${link.topicId}:${link.level}`} className="text-small text-ink-muted">
           Needs{' '}
@@ -39,6 +40,7 @@ export function LevelNeeds({ links }: { links: readonly TopicLinkView[] }) {
             {link.topicName} {link.level}
           </Link>
           {link.why && <span>: {link.why}</span>}
+          {link.id && <RowSource kind="link" id={link.id} citation={link} />}
         </li>
       ))}
     </ul>
@@ -104,11 +106,19 @@ const APPROVE_FORM = 'approve-topic';
 
 /**
  * Approve, in the header so it is in reach without scrolling past ten
- * levels. It sends the levels form below it by id.
+ * levels. It sends the levels form below it by id. While a row names no
+ * source and is not marked personal it is shut, and the checks under the
+ * header say which rows (plan #2138.11).
  */
-export function ApproveTopicButton() {
+export function ApproveTopicButton({ uncited = 0 }: { uncited?: number }) {
   return (
-    <Button type="submit" size="sm" form={APPROVE_FORM}>
+    <Button
+      type="submit"
+      size="sm"
+      form={APPROVE_FORM}
+      disabled={uncited > 0}
+      title={uncited > 0 ? `${uncited} ${uncited === 1 ? 'row names' : 'rows name'} no source` : undefined}
+    >
       Approve
     </Button>
   );
@@ -198,18 +208,16 @@ export function ApproveDraft({
   return (
     <form id={APPROVE_FORM} action={approve} aria-labelledby="levels-heading">
       <input type="hidden" name="topicId" value={topicId} />
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-1">
-        <h2 id="levels-heading" className="text-ui font-semibold text-ink">
-          The levels
-        </h2>
-        <p className="text-small text-ink-muted">Press a level to reword it. Nothing is asked until you approve.</p>
-      </div>
+      <h2 id="levels-heading" className="mb-2 px-1 text-ui font-semibold text-ink">
+        The levels
+      </h2>
       {state.error && (
         <p role="alert" className="mb-2 px-1 text-small text-danger">
           {state.error}
         </p>
       )}
       <Card padding="none">
+        <CardNote>Press a level to reword it. Nothing is asked until you approve.</CardNote>
         <ol className="divide-y divide-border">
           {cells.map((cell) => {
             const rung = ladderLevel(cell.level);
@@ -221,6 +229,7 @@ export function ApproveDraft({
                   <span className="min-w-0 text-small text-ink-muted">You can {rung.can}</span>
                 </p>
                 <LevelChecks level={cell.level} checks={cell.checks} problem={state.levels?.[cell.level]} />
+                <RowSource kind="cell" id={cell.id} citation={cell} />
                 <LevelNeeds links={links.filter((l) => l.fromLevel === cell.level)} />
               </li>
             );

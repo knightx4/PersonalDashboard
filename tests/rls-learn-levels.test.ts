@@ -1,8 +1,9 @@
 /**
  * The topic tables of LEARN-LEVELS-SPEC (plan #2138.1): each account sees
- * only its own rows, a link cannot point across accounts, and the database
- * refuses a link that would close a cycle once the in-topic level chain is
- * counted.
+ * only its own rows and the shared map, a link cannot point across accounts,
+ * and the database refuses a link that would close a cycle once the in-topic
+ * level chain is counted. Shared rows (plan #2138.10, learn 0145) are read by
+ * every account and written by none of them.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-learn';
@@ -14,14 +15,14 @@ const capm: Record<number, string> = {};
 const ret: Record<number, string> = {};
 let cellB = '';
 
-async function seedTopic(userId: string, name: string): Promise<string> {
+async function seedTopic(userId: string | null, name: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
     insert into topics (user_id, name, scope) values (${userId}, ${name}, ${`What ${name} covers.`})
     returning id`;
   return row.id;
 }
 
-async function seedCell(userId: string, topicId: string, level: number): Promise<string> {
+async function seedCell(userId: string | null, topicId: string, level: number): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
     insert into topic_cells (user_id, topic_id, level, descriptor)
     values (${userId}, ${topicId}, ${level}, ${['Can say one thing.', 'Can say another.']})
@@ -29,14 +30,20 @@ async function seedCell(userId: string, topicId: string, level: number): Promise
   return row.id;
 }
 
-async function link(userId: string, requiring: string, required: string): Promise<void> {
+async function link(userId: string | null, requiring: string, required: string): Promise<void> {
   await admin`
     insert into cell_links (user_id, requiring_cell_id, required_cell_id)
     values (${userId}, ${requiring}, ${required})`;
 }
 
-beforeAll(async () => {
+/** Shared topics hang off no account, so removing the accounts leaves them. */
+async function clearAll(): Promise<void> {
   await truncateAll();
+  await admin`delete from topics where user_id is null`;
+}
+
+beforeAll(async () => {
+  await clearAll();
   userA = await createUser('levels-a@example.com');
   userB = await createUser('levels-b@example.com');
   const capmTopic = await seedTopic(userA, 'CAPM');
@@ -59,7 +66,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await truncateAll();
+  await clearAll();
   await closeDb();
 });
 
@@ -77,7 +84,7 @@ describe('the topic tables', () => {
   });
 
   it('refuses a link to another account’s cell', async () => {
-    await expect(link(userA, capm[5], cellB)).rejects.toThrow(/foreign key/);
+    await expect(link(userA, capm[5], cellB)).rejects.toThrow(/another account/);
   });
 
   it('refuses a link within one topic', async () => {
@@ -142,5 +149,114 @@ describe('questions about a cell (plan #2138.5)', () => {
       admin`insert into cell_questions (user_id, cell_id, format, question)
             values (${userA}, ${capm[5]}, 'case', 'Value this firm.')`,
     ).rejects.toThrow(/cell_questions_case_ck/);
+  });
+});
+
+describe('the shared territory (plan #2138.10)', () => {
+  let shared = '';
+  const wacc: Record<number, string> = {};
+
+  beforeAll(async () => {
+    shared = await seedTopic(null, 'WACC');
+    for (const level of [1, 2]) wacc[level] = await seedCell(null, shared, level);
+  });
+
+  it('lets every signed-in account read a topic with no owner, with its cells', async () => {
+    for (const user of [userA, userB]) {
+      const seen = await asUser(user, async (tx) => ({
+        topic: (await tx`select name from topics where id = ${shared}`).map((r) => r.name),
+        cells: (await tx`select id from topic_cells where topic_id = ${shared}`).length,
+      }));
+      expect(seen).toEqual({ topic: ['WACC'], cells: 2 });
+    }
+  });
+
+  it('lets no account write a shared row', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`insert into topics (user_id, name, scope) values (null, 'Debt', 'What debt covers.')`),
+    ).rejects.toThrow(/row-level security/);
+    const changed = await asUser(userA, async (tx) => ({
+      updated: (await tx`update topics set name = 'Hijacked' where id = ${shared} returning id`).length,
+      cells: (await tx`update topic_cells set descriptor = ${['One.', 'Two.']} where topic_id = ${shared} returning id`)
+        .length,
+      deleted: (await tx`delete from topics where id = ${shared} returning id`).length,
+    }));
+    expect(changed).toEqual({ updated: 0, cells: 0, deleted: 0 });
+  });
+
+  it('lets an account link its own cell to a shared one and keep evidence on a shared cell', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into cell_links (user_id, requiring_cell_id, required_cell_id)
+      values (${userA}, ${capm[5]}, ${wacc[2]})`);
+    await asUser(userA, (tx) => tx`
+      insert into cell_evidence (user_id, cell_id, verdict) values (${userA}, ${wacc[1]}, 'declared')`);
+    const seenByB = await asUser(userB, async (tx) => ({
+      links: (await tx`select id from cell_links where required_cell_id = ${wacc[2]}`).length,
+      evidence: (await tx`select id from cell_evidence where cell_id = ${wacc[1]}`).length,
+    }));
+    expect(seenByB).toEqual({ links: 0, evidence: 0 });
+  });
+
+  it('refuses a shared row that points at a personal one, and a personal cell on a shared topic', async () => {
+    await expect(link(null, wacc[2], capm[1])).rejects.toThrow(/another account/);
+    await expect(seedCell(userA, shared, 3)).rejects.toThrow(/another account/);
+    await expect(admin`update topics set user_id = ${userA} where id = ${shared}`).rejects.toThrow(/keeps the owner/);
+  });
+
+  it('versions a cell when its checks are reworded, and stamps evidence with the version', async () => {
+    const [before] = await admin<{ id: string; cell_version: number }[]>`
+      insert into cell_evidence (user_id, cell_id, verdict) values (${userB}, ${wacc[2]}, 'declared')
+      returning id, cell_version`;
+    expect(before.cell_version).toBe(1);
+    await admin`update topic_cells set descriptor = ${['Can say it again.', 'Can say more.']} where id = ${wacc[2]}`;
+    await admin`update topic_cells set source = 'A textbook' where id = ${wacc[2]}`;
+    const [cell] = await admin<{ version: number }[]>`select version from topic_cells where id = ${wacc[2]}`;
+    expect(cell.version).toBe(2);
+    const [after] = await admin<{ cell_version: number }[]>`
+      insert into cell_evidence (user_id, cell_id, verdict) values (${userB}, ${wacc[2]}, 'declared')
+      returning cell_version`;
+    expect(after.cell_version).toBe(2);
+  });
+
+  it('takes a source, a canonicality and the frame topic a topic refines', async () => {
+    await expect(admin`update topics set canonicality = 'folk' where id = ${shared}`).rejects.toThrow(
+      /topics_canonicality_ck/,
+    );
+    await admin`update topics set source = 'CFA level I outcomes', canonicality = 'canonical' where id = ${shared}`;
+    const [row] = await admin<{ source: string; canonicality: string; refines_article_id: string | null }[]>`
+      select source, canonicality, refines_article_id from topics where id = ${shared}`;
+    expect(row).toEqual({ source: 'CFA level I outcomes', canonicality: 'canonical', refines_article_id: null });
+  });
+});
+
+describe('approving a draft (plan #2138.11)', () => {
+  it('refuses a draft with an uncited row until it is cited or marked personal', async () => {
+    const topic = await seedTopic(userA, 'Free cash flow');
+    const one = await seedCell(userA, topic, 1);
+    await admin`update topics set ceiling = 1, source = 'A syllabus', canonicality = 'canonical' where id = ${topic}`;
+    await link(userA, one, ret[1]);
+    await admin`update cell_links set source = 'A syllabus', canonicality = 'canonical' where requiring_cell_id = ${one}`;
+
+    const approve = () =>
+      asUser(userA, (tx) => tx`update topics set status = 'approved', approved_at = now() where id = ${topic}`);
+    await expect(approve()).rejects.toThrow(/uncited/);
+
+    // The person marks the one uncited level personal; the draft then goes through.
+    const marked = await asUser(
+      userA,
+      (tx) => tx`update topic_cells set canonicality = 'personal' where id = ${one} and source is null returning id`,
+    );
+    expect(marked).toHaveLength(1);
+    await approve();
+    const [row] = await admin<{ status: string }[]>`select status from topics where id = ${topic}`;
+    expect(row.status).toBe('approved');
+  });
+
+  it('keeps what the drafting checks were as an object', async () => {
+    const topic = await seedTopic(userA, 'Terminal value');
+    await expect(admin`update topics set drafting = '[]'::jsonb where id = ${topic}`).rejects.toThrow(
+      /topics_drafting_ck/,
+    );
+    await admin`update topics set drafting = '{"sources": [], "performances": []}'::jsonb where id = ${topic}`;
   });
 });

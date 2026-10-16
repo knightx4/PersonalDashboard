@@ -121,6 +121,8 @@ export type RawVerdict = {
   cell: string;
   verdict: 'met' | 'not_met' | 'not_touched';
   quote?: string | null;
+  /** One sentence on why, kept on the row; the rules ignore it. */
+  reason?: string | null;
 };
 
 export type EvidenceToWrite = {
