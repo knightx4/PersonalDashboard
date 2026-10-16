@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
+import Link from '@/components/ui/link';
+import { practiceHref } from '@/lib/learn/flow/href';
 import type { Point } from '@/lib/learn/map/layout';
 import {
   ladderText,
@@ -12,6 +14,7 @@ import {
   type IdeaGraph,
   type Ladder,
   type Opened,
+  type RouteStep,
   type SpreadNode,
 } from '@/lib/learn/map/place-graph';
 import { SKY, ease, overlaps, starColour } from '@/lib/learn/map/sky';
@@ -40,6 +43,10 @@ import type { Star } from './star-sky';
  * faint beyond, a dashed ring for the goal's target with a tick at the target
  * level, and a small red ring at a level whose answer missed. Its disc is as
  * bright as the tested level alone. Tapping a star opens the graph on it.
+ *
+ * The stars you are ready for pulse with a pale ring. A dotted line of light
+ * runs through them in the order the engine would ask, each with its number,
+ * and Start here sits under the first: it opens Practice on that cell.
  */
 
 const CORE_SIZE = 13;
@@ -66,15 +73,23 @@ const LADDER_R = 15;
 const TRACK_R = 10.5;
 const DISC_R = 5.5;
 const RING_R = 14;
+/** The pale gold of exposure, which the route and its numbers borrow: it says where you can go, not how much you know. */
+const HALO = `rgb(${SKY.halo.join(',')})`;
+/** Start here's pill, in pixels. */
+const START_W = 78;
+const START_H = 22;
 /** A requirement's label is about this wide a character, in pixels, at its size. */
 const LABEL_CHAR = 5.6;
 
-type Laid = SpreadNode & { name: string; lines: string[]; door: string | null; ladder: Ladder | null };
+type Laid = SpreadNode & {
+  name: string;
+  lines: string[];
+  door: string | null;
+  ladder: Ladder | null;
+};
 
 function reducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export function PlaceGraph({
@@ -114,11 +129,7 @@ export function PlaceGraph({
       const size = core ? CORE_SIZE : NEXT_SIZE;
       context.font = `400 ${size}px ${family}`;
       const name = readableName(star.name);
-      const wrapped = wrapName(
-        name,
-        core ? (narrow ? 120 : 150) : 118,
-        (text) => context.measureText(text).width,
-      );
+      const wrapped = wrapName(name, core ? (narrow ? 120 : 150) : 118, (text) => context.measureText(text).width);
       const door = core ? null : (graph.doors.get(id)?.placeName ?? null);
       let width = Math.max(wrapped.width, ladder ? LADDER_R * 2 : 0);
       if (door) {
@@ -180,15 +191,13 @@ export function PlaceGraph({
       ? selectedId
       : null;
   const radius = new Map(laid.nodes.map((n) => [n.id, n.r]));
+  const route = graph.route ?? [];
+  const stop = new Map(route.map((step) => [step.topicId, step]));
+  const first = route[0] ?? null;
   const arrow = useId();
   // Pointing shows an idea's links; on a phone, with nothing to point with, tapping does.
   const focus = hover ?? (pointingAt && shownIds.has(pointingAt) ? pointingAt : null) ?? picked;
-  const lit = focus
-    ? new Set([
-        focus,
-        ...graph.edges.filter((x) => x.a === focus || x.b === focus).flatMap((x) => [x.a, x.b]),
-      ])
-    : null;
+  const lit = focus ? new Set([focus, ...graph.edges.filter((x) => x.a === focus || x.b === focus).flatMap((x) => [x.a, x.b])]) : null;
   const edges = graph.edges.filter((x) => x.drawn || (focus && (x.a === focus || x.b === focus)));
   const settled = progress >= 1;
 
@@ -206,12 +215,25 @@ export function PlaceGraph({
     const p = at(n.id);
     const own = nodeBox(n, p);
     const others = laid.nodes.filter((other) => other.id !== n.id).map((other) => nodeBox(other, at(other.id)));
-    const above = { x: p.x - w / 2, y: own.y - SCORE_H - 4, w, h: SCORE_H };
+    const lift = stop.has(n.id) ? 9 : 0;
+    const above = { x: p.x - w / 2, y: own.y - SCORE_H - 4 - lift, w, h: SCORE_H };
     const below = { x: p.x - w / 2, y: own.y + own.h + 3, w, h: SCORE_H };
-    const box = others.some((other) => overlaps(above, other)) && !others.some((other) => overlaps(below, other))
-      ? below
-      : above;
+    const box = others.some((other) => overlaps(above, other)) && !others.some((other) => overlaps(below, other)) ? below : above;
     return { text, box };
+  };
+
+  // Start here, under the first stop's name where that is clear of every
+  // other star, else above its mark.
+  const startBox = (step: RouteStep) => {
+    const n = laid.nodes.find((node) => node.id === step.topicId);
+    if (!n) return null;
+    const p = at(n.id);
+    const own = nodeBox(n, p);
+    const others = laid.nodes.filter((other) => other.id !== n.id).map((other) => nodeBox(other, at(other.id)));
+    const below = { x: p.x - START_W / 2, y: own.y + own.h + 3, w: START_W, h: START_H };
+    const above = { x: p.x - START_W / 2, y: own.y - START_H - 3, w: START_W, h: START_H };
+    const fits = (b: typeof below) => b.y >= 0 && b.y + b.h <= frame.h && !others.some((other) => overlaps(b, other));
+    return fits(below) || !fits(above) ? below : above;
   };
 
   const scores = (id: string | null) => {
@@ -228,7 +250,12 @@ export function PlaceGraph({
       const q = at(x.b);
       // What a label at `c` would cover, kept `pad` pixels clear.
       const hits = (c: Point, pad = 0) => {
-        const box = { x: c.x - w / 2 - pad, y: c.y - SCORE_H / 2 - pad, w: w + 2 * pad, h: SCORE_H + 2 * pad };
+        const box = {
+          x: c.x - w / 2 - pad,
+          y: c.y - SCORE_H / 2 - pad,
+          w: w + 2 * pad,
+          h: SCORE_H + 2 * pad,
+        };
         return (
           boxes.filter((other) => overlaps(box, other)).length +
           placed.filter((other) =>
@@ -247,9 +274,17 @@ export function PlaceGraph({
         const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
         const nx = -(q.y - p.y) / d;
         const ny = (q.x - p.x) / d;
-        const along = REQUIRES_AT.map((t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }));
+        const along = REQUIRES_AT.map((t) => ({
+          x: p.x + (q.x - p.x) * t,
+          y: p.y + (q.y - p.y) * t,
+        }));
         const beside = [1, 2].flatMap((k) =>
-          along.flatMap((c) => [1, -1].map((s) => ({ x: c.x + s * k * nx * (SCORE_H + 3), y: c.y + s * k * ny * (SCORE_H + 3) }))),
+          along.flatMap((c) =>
+            [1, -1].map((s) => ({
+              x: c.x + s * k * nx * (SCORE_H + 3),
+              y: c.y + s * k * ny * (SCORE_H + 3),
+            })),
+          ),
         );
         let best = along[0]!;
         let fewest = Infinity;
@@ -274,11 +309,7 @@ export function PlaceGraph({
   };
 
   return (
-    <div
-      className="absolute inset-0"
-      role="group"
-      aria-label={`${graph.title}, as a graph of its ideas`}
-    >
+    <div className="absolute inset-0" role="group" aria-label={`${graph.title}, as a graph of its ideas`}>
       <svg aria-hidden className="absolute inset-0 size-full" viewBox={`0 0 ${frame.w} ${frame.h}`}>
         {graph.ladders && (
           <defs>
@@ -331,6 +362,35 @@ export function PlaceGraph({
             />
           );
         })}
+        {route.length > 1 &&
+          route.slice(1).map((step, i) => {
+            const from = route[i]!;
+            let p = at(from.topicId);
+            let q = at(step.topicId);
+            const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+            const ux = (q.x - p.x) / d;
+            const uy = (q.y - p.y) / d;
+            const ra = (radius.get(from.topicId) ?? 0) + 3;
+            const rb = (radius.get(step.topicId) ?? 0) + 3;
+            if (d > ra + rb) {
+              p = { x: p.x + ux * ra, y: p.y + uy * ra };
+              q = { x: q.x - ux * rb, y: q.y - uy * rb };
+            }
+            return (
+              <line
+                key={`route:${from.topicId}:${step.topicId}`}
+                x1={p.x}
+                y1={p.y}
+                x2={q.x}
+                y2={q.y}
+                stroke={HALO}
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeDasharray="0.1 5.5"
+                opacity={(focus ? 0.35 : 0.95) * e}
+              />
+            );
+          })}
       </svg>
 
       {laid.nodes.map((n) => {
@@ -352,12 +412,12 @@ export function PlaceGraph({
             }}
             aria-label={
               n.ladder
-                ? ladderLabel(n.ladder, graph, laid.nodes)
+                ? ladderLabel(n.ladder, graph, laid.nodes, stop.get(n.id) ?? null, route.length)
                 : n.core
-                ? n.name
-                : door?.placeName
-                  ? `${n.name}, in ${door.placeName}. Opens that place.`
-                  : `${n.name}. Opens its neighbourhood.`
+                  ? n.name
+                  : door?.placeName
+                    ? `${n.name}, in ${door.placeName}. Opens that place.`
+                    : `${n.name}. Opens its neighbourhood.`
             }
             aria-pressed={n.core ? picked === n.id : undefined}
             onPointerEnter={() => setHover(n.id)}
@@ -371,7 +431,7 @@ export function PlaceGraph({
             }}
           >
             {n.ladder ? (
-              <LadderMark ladder={n.ladder} picked={picked === n.id} />
+              <LadderMark ladder={n.ladder} picked={picked === n.id} step={stop.get(n.id) ?? null} />
             ) : (
               star && <Mark star={star} r={n.r} picked={picked === n.id} />
             )}
@@ -384,7 +444,7 @@ export function PlaceGraph({
                 color: n.core ? SKY.ideaName : SKY.placeName,
                 background: NAME_GROUND,
                 textShadow: `0 0 3px ${SKY.groundOuter}`,
-                opacity: n.core ? 1 : 0.85,
+                opacity: territory && !n.core && frame.w < 600 && hover !== n.id ? 0 : n.core ? 1 : 0.85,
               }}
             >
               {n.lines.map((line, i) => (
@@ -409,6 +469,35 @@ export function PlaceGraph({
           </button>
         );
       })}
+
+      {settled && first && startBox(first) && (
+        <Link
+          href={practiceHref({ cell: first.cellId })}
+          aria-label={`Start here: ${laid.nodes.find((n) => n.id === first.topicId)?.name ?? ''}, level ${first.level}`}
+          className="absolute flex items-center justify-center outline-offset-2 focus-visible:outline-2"
+          style={{
+            left: startBox(first)!.x + START_W / 2 - 44,
+            top: startBox(first)!.y + START_H / 2 - 22,
+            width: 88,
+            height: 44,
+            outlineColor: SKY.ring,
+          }}
+        >
+          <span
+            className="flex items-center justify-center rounded-pill font-medium whitespace-nowrap"
+            style={{
+              width: START_W,
+              height: START_H,
+              fontSize: 11.5,
+              background: HALO,
+              color: SKY.groundOuter,
+              boxShadow: `0 0 10px ${HALO}`,
+            }}
+          >
+            Start here
+          </span>
+        </Link>
+      )}
 
       {settled &&
         [levelLine(focus)].map(
@@ -475,10 +564,7 @@ function Mark({ star, r, picked }: { star: Star; r: number; picked: boolean }) {
         height: r * 2,
         background: lit ? colour : 'transparent',
         opacity: lit ? 0.5 + 0.5 * s : 1,
-        border:
-          lit && star.state !== 'misconception'
-            ? 'none'
-            : `1.5px solid ${lit ? SKY.mixedUp : ring}`,
+        border: lit && star.state !== 'misconception' ? 'none' : `1.5px solid ${lit ? SKY.mixedUp : ring}`,
         boxShadow: picked ? `0 0 0 2px ${SKY.groundOuter}, 0 0 0 3.5px ${SKY.ring}, ${glow}` : glow,
       }}
     />
@@ -486,7 +572,7 @@ function Mark({ star, r, picked }: { star: Star; r: number; picked: boolean }) {
 }
 
 /** What a territory's star says to a screen reader: its level, target, misses and what it requires. */
-function ladderLabel(ladder: Ladder, graph: IdeaGraph, nodes: readonly Laid[]): string {
+function ladderLabel(ladder: Ladder, graph: IdeaGraph, nodes: readonly Laid[], step: RouteStep | null, steps: number): string {
   const name = new Map(nodes.map((n) => [n.id, n.name]));
   const needs = graph.edges
     .filter((x) => x.requires && x.a === ladder.id)
@@ -494,6 +580,7 @@ function ladderLabel(ladder: Ladder, graph: IdeaGraph, nodes: readonly Laid[]): 
   const parts = [`${ladder.name}. ${ladderText(ladder)}.`];
   if (ladder.missed.length > 0) parts.push(`Missed level ${ladder.missed.join(' and ')}.`);
   if (needs.length > 0) parts.push(`Requires ${needs.join('; ')}.`);
+  if (step) parts.push(`Ready: level ${step.level} is stop ${step.n} of ${steps} on the route.`);
   return parts.join(' ');
 }
 
@@ -516,7 +603,7 @@ function arcPath(f: number, r: number): string {
  * track as far as you hold, a dashed ring with a tick at the target, and a
  * small red ring at each level missed.
  */
-function LadderMark({ ladder, picked }: { ladder: Ladder; picked: boolean }) {
+function LadderMark({ ladder, picked, step }: { ladder: Ladder; picked: boolean; step: RouteStep | null }) {
   const colour = starColour(ladder.slot);
   const top = Math.max(ladder.ceiling, 1);
   const tested = Math.min(ladder.tested, top) / top;
@@ -525,58 +612,80 @@ function LadderMark({ ladder, picked }: { ladder: Ladder; picked: boolean }) {
   const size = LADDER_R * 2;
   const tick = ladder.target !== null ? Math.min(ladder.target, top) / top : null;
   return (
-    <svg
-      aria-hidden
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="block shrink-0 overflow-visible"
-    >
-      {ladder.target !== null && (
+    <span aria-hidden className="relative block shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block overflow-visible">
+        {step && (
+          <circle cx={LADDER_R} cy={LADDER_R} r={RING_R} fill="none" stroke={HALO} strokeWidth={1.6} opacity={0.9}>
+            {!reducedMotion() && (
+              <>
+                <animate attributeName="r" values={`${RING_R};${RING_R + 9}`} dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.9;0" dur="2.4s" repeatCount="indefinite" />
+              </>
+            )}
+          </circle>
+        )}
+        {ladder.target !== null && (
+          <circle
+            cx={LADDER_R}
+            cy={LADDER_R}
+            r={RING_R}
+            fill="none"
+            stroke={SKY.ring}
+            strokeWidth={1}
+            strokeDasharray="2.2 2.4"
+            opacity={0.75}
+          />
+        )}
+        <circle cx={LADDER_R} cy={LADDER_R} r={TRACK_R} fill="none" stroke={SKY.thread} strokeWidth={2} opacity={0.3} />
+        {held > tested && (
+          <path d={arcPath(held, TRACK_R)} fill="none" stroke={colour} strokeWidth={2} strokeLinecap="round" opacity={0.45} />
+        )}
+        {lit && <path d={arcPath(tested, TRACK_R)} fill="none" stroke={colour} strokeWidth={2.2} strokeLinecap="round" />}
+        {tick !== null && (
+          <line
+            x1={round(tick, TRACK_R - 2.5).x}
+            y1={round(tick, TRACK_R - 2.5).y}
+            x2={round(tick, RING_R + 1).x}
+            y2={round(tick, RING_R + 1).y}
+            stroke={SKY.ring}
+            strokeWidth={1.4}
+            strokeLinecap="round"
+          />
+        )}
+        {ladder.missed.map((level) => {
+          const c = round((Math.min(level, top) - 0.5) / top, TRACK_R);
+          return <circle key={level} cx={c.x} cy={c.y} r={2.4} fill={SKY.groundOuter} stroke={SKY.mixedUp} strokeWidth={1.4} />;
+        })}
+        {picked && <circle cx={LADDER_R} cy={LADDER_R} r={DISC_R + 2.5} fill="none" stroke={SKY.ring} strokeWidth={1.5} />}
         <circle
           cx={LADDER_R}
           cy={LADDER_R}
-          r={RING_R}
-          fill="none"
-          stroke={SKY.ring}
-          strokeWidth={1}
-          strokeDasharray="2.2 2.4"
-          opacity={0.75}
+          r={DISC_R}
+          fill={lit ? colour : 'transparent'}
+          fillOpacity={lit ? 0.45 + 0.55 * tested : 1}
+          stroke={lit ? 'none' : SKY.unlit}
+          strokeWidth={1.5}
+          style={lit ? { filter: `drop-shadow(0 0 ${3 + 6 * tested}px ${colour})` } : undefined}
         />
+      </svg>
+      {step && (
+        <span
+          className="tabular absolute flex items-center justify-center rounded-full font-semibold"
+          style={{
+            left: LADDER_R + 12 - 7,
+            top: LADDER_R - 12 - 7,
+            width: 14,
+            height: 14,
+            fontSize: 9.5,
+            lineHeight: 1,
+            background: HALO,
+            color: SKY.groundOuter,
+            boxShadow: `0 0 0 1.2px ${SKY.groundOuter}`,
+          }}
+        >
+          {step.n}
+        </span>
       )}
-      <circle cx={LADDER_R} cy={LADDER_R} r={TRACK_R} fill="none" stroke={SKY.thread} strokeWidth={2} opacity={0.3} />
-      {held > tested && (
-        <path d={arcPath(held, TRACK_R)} fill="none" stroke={colour} strokeWidth={2} strokeLinecap="round" opacity={0.45} />
-      )}
-      {lit && <path d={arcPath(tested, TRACK_R)} fill="none" stroke={colour} strokeWidth={2.2} strokeLinecap="round" />}
-      {tick !== null && (
-        <line
-          x1={round(tick, TRACK_R - 2.5).x}
-          y1={round(tick, TRACK_R - 2.5).y}
-          x2={round(tick, RING_R + 1).x}
-          y2={round(tick, RING_R + 1).y}
-          stroke={SKY.ring}
-          strokeWidth={1.4}
-          strokeLinecap="round"
-        />
-      )}
-      {ladder.missed.map((level) => {
-        const c = round((Math.min(level, top) - 0.5) / top, TRACK_R);
-        return (
-          <circle key={level} cx={c.x} cy={c.y} r={2.4} fill={SKY.groundOuter} stroke={SKY.mixedUp} strokeWidth={1.4} />
-        );
-      })}
-      {picked && <circle cx={LADDER_R} cy={LADDER_R} r={DISC_R + 2.5} fill="none" stroke={SKY.ring} strokeWidth={1.5} />}
-      <circle
-        cx={LADDER_R}
-        cy={LADDER_R}
-        r={DISC_R}
-        fill={lit ? colour : 'transparent'}
-        fillOpacity={lit ? 0.45 + 0.55 * tested : 1}
-        stroke={lit ? 'none' : SKY.unlit}
-        strokeWidth={1.5}
-        style={lit ? { filter: `drop-shadow(0 0 ${3 + 6 * tested}px ${colour})` } : undefined}
-      />
-    </svg>
+    </span>
   );
 }

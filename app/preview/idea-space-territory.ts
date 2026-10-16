@@ -143,6 +143,24 @@ const LINKS: [string, number, string, number][] = [
   ['tp-burn', 2, 'tp-arr', 3],
 ];
 
+/**
+ * What you are ready for inside the goal, in the order the engine would ask
+ * it (plan #2187.4): the missed level first, then what settles most. Burn
+ * multiple has no target, so it is not on the route.
+ */
+const READY: [string, number][] = [
+  ['tp-churn', 4],
+  ['tp-nrr', 3],
+  ['tp-arr', 6],
+  ['tp-cac', 3],
+  ['tp-ltv', 1],
+  ['tp-rule40', 1],
+  ['tp-unit', 1],
+];
+
+/** A cell's id, as Practice wants one. */
+const cellId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
 /** Where the business field sits in each layout (idea-space-surfaces.tsx FIELDS). */
 const FIELD = { neighbourMap: { x: -0.1, y: 0.7 }, pca: { x: 0.05, y: 0.45 } };
 
@@ -162,5 +180,6 @@ export function territoryFixture(ideas: readonly IdeaOnMap[]): SkyTerritory {
     requiredTopicId: b,
     requiredLevel: needs,
   }));
-  return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links };
+  const ready = READY.map(([topicId, level], i) => ({ topicId, level, cellId: cellId(i + 1) }));
+  return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links, ready };
 }
