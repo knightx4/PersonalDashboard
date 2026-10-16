@@ -39,6 +39,13 @@ export const SAAS_METRICS: Territory = {
   key: 'saas-metrics',
   name: 'SaaS metrics',
   subjectLens: 'SaaS and subscription business metrics',
+  // The learn aim this territory serves, and the kind classified for it
+  // (plan #2247.2), which names the providers a first draft pulls from.
+  goal: {
+    name: 'SaaS and subscription business metrics',
+    about: 'ARR, net revenue retention, CAC payback, cohort analysis, gross margin structure and how these drive valuation',
+  },
+  kind: 'practical_skill',
   performances: [
     'Build an ARR bridge from a customer list for a quarter and explain each movement: new, expansion, contraction and churn',
     'Compute gross and net revenue retention from cohort data and say what drives the gap between them',

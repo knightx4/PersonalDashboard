@@ -418,6 +418,13 @@ export const LEARN_OPERATIONS = [
   // was named for. Apart from 'grade-cell-answer', whose answers are about
   // one level of one topic.
   'grade-course-explain',
+  // Proposing the structure documents a goal's kind calls for (plan
+  // #2247.10): one Haiku call per provider when a territory is drafted, each
+  // candidate then confirmed by a fetch before anything is stored.
+  'propose-structure-sources',
+  // Embedding a goal and its performances as queries to find the stored weeks
+  // and chapters about it (plan #2247.10). One call per territory tick.
+  'match-structure-units',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
