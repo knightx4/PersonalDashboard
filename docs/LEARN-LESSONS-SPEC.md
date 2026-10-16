@@ -234,6 +234,34 @@ answer expected, and offers another question, written knowing the ones already
 asked so it is not the same one reworded. Nothing on the page marks a piece
 passed any other way.
 
+### A piece names the cells it teaches
+
+Plan #2138.13. A piece also names the cells of its goal's territory that it
+teaches (docs/LEARN-LEVELS-SPEC.md), in `plan_pieces.cell_ids` (learn 0146).
+The territory is every approved topic on the lens of the track's subject or of
+a learning goal whose track it is, each up to the target that lens sets
+(`loadTrackTerritory` in `lib/learn/lessons/piece-cells-store.ts`). When a
+unit's pieces are written, one Haiku call matches them against it
+(`matchPieceCells`), at most four cells a piece, and `cells_matched_at`
+records that it ran. A piece written before its goal had a territory keeps an
+empty list with no date, and the pieces pass of the top-up matches up to two
+such units a run once a territory exists (`fillDuePieceCells`). The call is
+recorded as `write-plan-pieces`.
+
+The piece's page lists its cells under "What this piece teaches", each with
+where you stand on it and a link to its topic's ladder. A piece with a cell it
+can ask about checks with a cell question in place of its own: on the highest
+level among its cells that is asked in writing (not level 10), preferring one
+you do not hold yet (`checkCell` in `lib/learn/lessons/piece-cells.ts`). The
+question is a `learn.cell_questions` row with `piece_id` set, asked and graded
+as Practice Flow asks and grades any cell (`askCell` and `answerCell`), so
+the answer writes `cell_evidence` for every cell it reached and the topic
+ladder shows it. The check is right when the answer showed the asked cell; it
+then marks the piece's ideas tested and passes the piece with its practice, as
+a right answer to the piece's own question does. A case's expected answer
+stays with the grader and is never shown. A piece with no cells it can ask
+about keeps the check above.
+
 ### A piece has a practice task
 
 Plan #1142. Between a piece's lessons and its check sits one hands-on task,

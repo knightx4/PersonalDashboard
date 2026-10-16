@@ -59,7 +59,10 @@ export async function nameEssayClaims(input: {
       ],
     });
   } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'Reading the claims failed.' };
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : 'Reading the claims failed.',
+    };
   }
   input.onSpend?.({ model: CLAIMS_MODEL, usage: usageFrom(response.usage) });
 

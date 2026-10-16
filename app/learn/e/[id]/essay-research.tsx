@@ -1,19 +1,13 @@
 'use client';
 
-import { useCallback, useId, useState, type RefObject } from 'react';
-import { Disclosure } from '@/components/ui/disclosure';
+import { useCallback, useState, type RefObject } from 'react';
 import { LinkedText } from '@/components/ui/linked-text';
-import { InlineTextarea } from '@/components/ui/field';
-import { takeKey } from '@/lib/learn/essays/research-map';
-import { withPoint, withTake } from '@/lib/learn/essays/plan';
-import type { PlanApi } from './essay-stages';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
 import type { MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { cn } from '@/lib/cn';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
-import { deviceTimeZone, whenDay } from '@/lib/core/when';
 import {
   countLine,
   DEEPER_PAGES,
@@ -28,7 +22,7 @@ import {
   type ResearchLevel,
   type ResearchSource,
 } from '@/lib/learn/essays/research';
-import { MAP_PAGES, MAP_SEARCHES } from '@/lib/learn/essays/research-map';
+import { MAP_SEARCHES } from '@/lib/learn/essays/research-map';
 import { researchEssay } from './actions';
 import { linkVariants } from '@/components/ui/link';
 
@@ -163,6 +157,13 @@ function Quotes({
   );
 }
 
+/** What each finding of a write-up for the writer is, said above it. */
+const KIND_LABELS = {
+  for: 'Supports your answer',
+  against: 'Pushes back',
+  use: 'You could use',
+} as const;
+
 function FirstPass({
   run,
   onCite,
@@ -178,17 +179,22 @@ function FirstPass({
         </p>
       )}
       <ol className="flex flex-col divide-y divide-border">
-        {run.positions.map((position, i) => (
-          <li key={i} className="py-3 first:pt-0 last:pb-0">
-            <p className="text-ui font-medium text-ink">{position.title}</p>
-            {position.summary && (
-              <p className="mt-1 text-small text-ink-muted">
-                <LinkedText text={position.summary} refs={false} />
-              </p>
-            )}
-            <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
-          </li>
-        ))}
+        {run.positions
+          .filter((position) => position.kind !== 'debate')
+          .map((position, i) => (
+            <li key={i} className="py-3 first:pt-0 last:pb-0">
+              {position.kind && position.kind !== 'debate' && (
+                <p className="text-small text-ink-muted">{KIND_LABELS[position.kind]}</p>
+              )}
+              <p className="text-ui font-medium text-ink">{position.title}</p>
+              {position.summary && (
+                <p className="mt-1 text-small text-ink-muted">
+                  <LinkedText text={position.summary} refs={false} />
+                </p>
+              )}
+              <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
+            </li>
+          ))}
       </ol>
     </>
   );
@@ -312,7 +318,7 @@ export function EssayResearchCard({ api, className }: { api: ResearchApi; classN
       <Level
         level="first"
         title="Research the question"
-        about={`Dash breaks your question down, searches up to ${MAP_SEARCHES} times, reads ${MAP_PAGES} pages and writes up what they say, quoting them. Nothing from your notes goes into a search. The Research step shows it in full.`}
+        about={`Dash searches up to ${MAP_SEARCHES} times for evidence for and against your answer and material you could use, with sources. Nothing from your notes goes into a search. Insert puts a quote at the cursor, as a footnote.`}
         run={api.runs.first}
         pending={api.pending.first}
         onRun={(level) => void api.run(level)}
@@ -328,271 +334,5 @@ export function EssayResearchCard({ api, className }: { api: ResearchApi; classN
         onCite={api.cite}
       />
     </Card>
-  );
-}
-
-/** Where the research has got to while it runs, said once rather than as a spinner alone. */
-const RUNNING_LINE =
-  'Dash is breaking your question down, searching, reading up to five pages and writing up what they say. This takes a minute or two; you can stay on this page or go to another step.';
-
-/**
- * Research, as its own step (LEARN-ESSAYS-SPEC, "The stages"): the first pass
- * in full, laid out to be read top to bottom. The short answer comes first;
- * then each part of the question as a heading with the answer the pages give
- * and, folded under it, the words quoted from them; then the questions the
- * run ends on. Under every part and question is a line for what the person
- * makes of it, in their words, and Make it a point copies that line into the
- * plan. The sources are listed at the foot, numbered.
- */
-export function ResearchStage({
-  api,
-  plan,
-  hasQuestion,
-  footer,
-}: {
-  api: ResearchApi;
-  plan: PlanApi;
-  hasQuestion: boolean;
-  footer?: React.ReactNode;
-}) {
-  const run = api.runs.first;
-  const pending = api.pending.first;
-  const running = pending === 'running';
-  const error = typeof pending === 'object' ? pending.error : null;
-  const takes = plan.plan.takes;
-  const points = new Set(plan.plan.points.map((p) => p.text.trim().toLowerCase()));
-
-  const take = (key: string, text: string) =>
-    plan.change({ kind: 'take', key, text }, (now) => withTake(now, key, text));
-  const toPoint = (text: string) =>
-    plan.change({ kind: 'add', text }, (now) => withPoint(now, text));
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card padding="none">
-        <CardSection
-          title={run ? 'Research on your question' : 'Research your question'}
-          hint={
-            run
-              ? `${ranLine(run)} · ${whenRan(run.createdAt)}`
-              : `Dash breaks the question into the parts a writer needs, searches up to ${MAP_SEARCHES} times, reads ${MAP_PAGES} pages in full, and writes up what they say, quoting them. Only your question and what would change your mind go into the searches.`
-          }
-          action={
-            <DashAction
-              paid="app/learn/e/[id]/actions.ts#researchEssay:first"
-              what="Cost of researching the question"
-              hintFirst
-              type="button"
-              size="sm"
-              variant={run ? 'secondary' : 'primary'}
-              disabled={running || !hasQuestion}
-              pending={running}
-              onClick={() => void api.run('first')}
-            >
-              {running ? 'Researching…' : run ? 'Research again' : 'Research it'}
-            </DashAction>
-          }
-        >
-          {!hasQuestion && (
-            <p className="text-ui text-ink-muted">
-              Write the essay’s question on the Discover step first; the research starts from it.
-            </p>
-          )}
-          {running && (
-            <p role="status" className="text-ui text-ink-muted">
-              {RUNNING_LINE}
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="text-ui text-danger">
-              {error}
-            </p>
-          )}
-          {run && run.summary && (
-            <div className="mt-1">
-              <p className="text-small font-medium text-ink-muted">The short answer</p>
-              <p className="mt-1 text-body text-ink">
-                <LinkedText text={run.summary} refs={false} />
-              </p>
-            </div>
-          )}
-        </CardSection>
-      </Card>
-
-      {run && (
-        <Card padding="none" aria-busy={running || undefined}>
-          {run.positions.map((part, i) => {
-            const key = takeKey(run.id, { part: i });
-            return (
-              <CardSection key={key} title={`${i + 1}. ${part.title}`}>
-                <p className="text-body text-ink">
-                  <LinkedText text={part.summary} refs={false} />
-                </p>
-                {part.citations.length > 0 && (
-                  <Disclosure
-                    title={`What the pages say (${part.citations.length})`}
-                    className="mt-2"
-                    summaryClassName="text-small"
-                  >
-                    <MapQuotes citations={part.citations} sources={run.sources} />
-                  </Disclosure>
-                )}
-                <TakeLine
-                  label="What you make of it"
-                  value={takes[key] ?? ''}
-                  onSave={(text) => take(key, text)}
-                  onPoint={toPoint}
-                  isPoint={points.has((takes[key] ?? '').trim().toLowerCase())}
-                />
-              </CardSection>
-            );
-          })}
-          {run.asks.length > 0 && (
-            <CardSection
-              title="Questions for you"
-              hint="Where do you stand? Answer in your own words."
-            >
-              <ol className="flex flex-col gap-4">
-                {run.asks.map((ask, i) => {
-                  const key = takeKey(run.id, { ask: i });
-                  return (
-                    <li key={key}>
-                      <p className="text-ui font-medium text-ink">{ask}</p>
-                      <TakeLine
-                        label="Your answer"
-                        value={takes[key] ?? ''}
-                        onSave={(text) => take(key, text)}
-                        onPoint={toPoint}
-                        isPoint={points.has((takes[key] ?? '').trim().toLowerCase())}
-                      />
-                    </li>
-                  );
-                })}
-              </ol>
-            </CardSection>
-          )}
-          <CardSection
-            title="Sources"
-            fold="essay-research-sources"
-            defaultOpen={false}
-            meta={`${run.sources.length}`}
-          >
-            <ol className="flex list-decimal flex-col gap-1 pl-5 text-ui">
-              {run.sources.map((source) => (
-                <li key={source.url}>
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={cn('break-words', linkVariants())}
-                  >
-                    {source.title}
-                  </a>
-                  <span className="text-ink-muted"> · {source.domain}</span>
-                </li>
-              ))}
-            </ol>
-          </CardSection>
-        </Card>
-      )}
-      {plan.error && (
-        <p role="alert" className="text-small text-danger">
-          {plan.error}
-        </p>
-      )}
-      {footer}
-    </div>
-  );
-}
-
-function whenRan(iso: string): string {
-  const day = whenDay(iso, { timeZone: deviceTimeZone() ?? 'UTC' });
-  return day === 'Today' || day === 'Yesterday' ? `run ${day.toLowerCase()}` : `run on ${day}`;
-}
-
-/** The quotes under one part of the map, each opening its page at the words. */
-function MapQuotes({
-  citations,
-  sources,
-}: {
-  citations: ResearchCitation[];
-  sources: ResearchSource[];
-}) {
-  return (
-    <ul className="mt-2 flex flex-col gap-2">
-      {citations.map((citation, i) => {
-        const source = sources[citation.source];
-        if (!source) return null;
-        return (
-          <li key={i}>
-            <blockquote className="border-l-2 border-border pl-3 text-ui text-ink">
-              {citation.quote}
-            </blockquote>
-            <a
-              href={textFragmentUrl(source.url, citation.quote)}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(
-                'ml-3 inline-flex min-h-11 items-center text-small lg:min-h-8',
-                linkVariants(),
-              )}
-            >
-              {source.domain || source.title}
-            </a>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** The person's line under a part of the research, saved when they leave it, and offered as a point. */
-function TakeLine({
-  label,
-  value,
-  onSave,
-  onPoint,
-  isPoint,
-}: {
-  label: string;
-  value: string;
-  onSave: (text: string) => void;
-  onPoint: (text: string) => void;
-  isPoint: boolean;
-}) {
-  const id = useId();
-  const [text, setText] = useState(value);
-  return (
-    <div className="mt-3 flex flex-col gap-0.5 border-l-2 border-accent pl-3">
-      <label htmlFor={id} className="text-small text-ink-muted">
-        {label}
-      </label>
-      <InlineTextarea
-        id={id}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="In your own words: agree, disagree, or what it makes you think"
-        onBlur={() => {
-          if (text.trim() !== value.trim()) onSave(text);
-        }}
-        className="min-h-11 lg:min-h-0 -mx-1 text-ink"
-      />
-      {text.trim() && (
-        <div>
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={isPoint}
-            onClick={() => {
-              if (text.trim() !== value.trim()) onSave(text);
-              onPoint(text);
-            }}
-          >
-            {isPoint ? 'In your plan' : 'Make it a point'}
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }

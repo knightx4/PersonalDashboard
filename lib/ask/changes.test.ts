@@ -3,6 +3,9 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { TaskInput } from '@/lib/todo/tasks/input';
 import { changeHref, confirmChange, declineChange, undoChange, type ChangeDeps } from './changes';
 import type { AskSchema, SchemaClient } from './db';
+import type { DashPaidTool } from '@/lib/dash/registry';
+import { PAID_NO_UNDO } from '@/lib/dash/paid-input';
+import { noUndoReason } from '@/lib/core/dash-actions';
 
 const handOver = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/plan/handover', () => ({ handStepToClaude: handOver }));
@@ -26,6 +29,18 @@ type Row = Record<string, unknown>;
 type Tables = Record<string, Row[]>;
 
 let counter = 1000;
+
+/** One `column[->>key].op.value` part of an `or` filter. */
+function orPart(row: Row, part: string): boolean {
+  const match = /^(\w+)(?:->>(\w+))?\.(not\.is|is|lt)\.(.+)$/.exec(part);
+  if (!match) throw new Error(`The fake cannot read the filter ${part}`);
+  const [, column, key, op, value] = match;
+  const base = row[column] as Row | null | undefined;
+  const cell = key ? (base?.[key] ?? null) : (base ?? null);
+  if (op === 'is') return cell === null;
+  if (op === 'not.is') return cell !== null;
+  return typeof cell === 'string' && cell < value;
+}
 
 function fakeDb(tables: Tables) {
   let historyId = 0;
@@ -110,6 +125,8 @@ function fakeDb(tables: Tables) {
           eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), query),
           is: (c: string, v: null) => (filters.push((r) => (r[c] ?? null) === v), query),
           gt: (c: string, v: number) => (filters.push((r) => (r[c] as number) > v), query),
+          // The few PostgREST `or` filters a paid press's claim uses (plan #2228.1).
+          or: (expr: string) => (filters.push((r) => expr.split(',').some((part) => orPart(r, part))), query),
           order: (column: string, o?: { ascending?: boolean }) => ((order = { column, ascending: o?.ascending ?? true }), query),
           limit: (n: number) => ((limit = n), query),
           single: () => ((single = 'one'), query),
@@ -552,5 +569,99 @@ describe('start_build', () => {
     const confirmed = await confirmChange(deps, change.id as string);
     expect(confirmed.ok).toBe(false);
     expect(handOver).not.toHaveBeenCalled();
+  });
+});
+
+describe('paid_action', () => {
+  const ran = vi.fn();
+  const PAID_INPUT = {
+    tool: 'write_year_review',
+    action: 'app/timeline/actions.ts#writeYearReview',
+    args: { year: 2026 },
+    line: 'Write the review of 2026 from the timeline.',
+    estimate: null,
+    workspace: null,
+    paths: ['/timeline/year/2026'],
+  };
+  const REVIEW = id(700);
+
+  function paid(outcome: Awaited<ReturnType<DashPaidTool['run']>> | Error = { ok: true, subjectRef: `core.year_reviews:${REVIEW}`, op: 'insert', summary: 'Dash wrote the review of 2026.' }) {
+    const made = setup({ kind: 'paid_action', input: PAID_INPUT });
+    const tool = {
+      name: 'write_year_review',
+      kind: 'paid',
+      workspace: null,
+      run: async (ctx: unknown, args: unknown) => {
+        ran(ctx, args);
+        if (outcome instanceof Error) throw outcome;
+        return outcome;
+      },
+    } as unknown as DashPaidTool;
+    made.deps.paidTool = (name) => (name === tool.name ? tool : undefined);
+    return made;
+  }
+
+  beforeEach(() => ran.mockReset());
+
+  it('runs the tool once with the arguments it was queued with, and keeps the row it wrote with no Undo', async () => {
+    const { deps, change, tables } = paid();
+    const outcome = await confirmChange(deps, change.id as string);
+    expect(outcome.ok).toBe(true);
+    expect(ran).toHaveBeenCalledTimes(1);
+    expect(ran.mock.calls[0][1]).toEqual({ year: 2026 });
+    const row = tables['core.dash_actions'][0];
+    expect(row).toMatchObject({ status: 'done', subject_ref: `core.year_reviews:${REVIEW}`, op: 'insert', summary: 'Dash wrote the review of 2026.' });
+    expect(noUndoReason({ undo: row.undo as Row })).toBe(PAID_NO_UNDO);
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone).toMatchObject({ ok: false, error: PAID_NO_UNDO });
+  });
+
+  it('runs nothing on a second approval, whether the first is still running or done', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].undo = { running_at: '2026-09-29T11:59:00Z' };
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false, error: 'Dash is already running this.' });
+    tables['core.dash_actions'][0].undo = null;
+    await confirmChange(deps, change.id as string);
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false });
+    expect(ran).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a failed run proposed with the reason, so it can be approved again', async () => {
+    const { deps, change, tables } = paid({ ok: false, error: '2026 has 3 events on the timeline, too few to write about.' });
+    const outcome = await confirmChange(deps, change.id as string);
+    expect(outcome).toMatchObject({ ok: false, error: '2026 has 3 events on the timeline, too few to write about.' });
+    expect(tables['core.dash_actions'][0]).toMatchObject({ status: 'proposed', undo: { failed: '2026 has 3 events on the timeline, too few to write about.' } });
+    await confirmChange(deps, change.id as string);
+    expect(ran).toHaveBeenCalledTimes(2);
+  });
+
+  it('says so when the run throws, and leaves it proposed', async () => {
+    const { deps, change, tables } = paid(new Error('boom'));
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false, error: 'Dash could not run this. Try again.' });
+    expect(tables['core.dash_actions'][0].status).toBe('proposed');
+  });
+
+  it('is dismissed without running, but not while it runs', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].undo = { running_at: '2026-09-29T11:59:00Z' };
+    expect((await declineChange(deps, change.id as string)).ok).toBe(false);
+    tables['core.dash_actions'][0].undo = null;
+    expect((await declineChange(deps, change.id as string)).ok).toBe(true);
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false });
+    expect(ran).not.toHaveBeenCalled();
+  });
+
+  it('is approved from a thread too', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].surface = 'thread';
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(true);
+    expect(ran).toHaveBeenCalledTimes(1);
+  });
+
+  it('is refused when Dash no longer has the tool', async () => {
+    const { deps, change } = paid();
+    deps.paidTool = () => undefined;
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
+    expect(ran).not.toHaveBeenCalled();
   });
 });

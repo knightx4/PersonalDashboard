@@ -62,6 +62,19 @@ export function entryTools(entry: ActionEntry): readonly string[] {
   return typeof entry.tool === 'string' ? [entry.tool] : entry.tool;
 }
 
+/**
+ * The paid buttons Dash cannot yet press: entries still plain `none('spends')`
+ * with no note saying why, outside the Dev workspace. An entry converted to a
+ * paid tool, or left with a stated reason (it proposes, it is pressed while
+ * studying, only the owner can), is not one. The Dev routines start runs of
+ * Dash itself, so 'spends' is the whole of their reason.
+ */
+export function unconvertedPaidButtons(actions: readonly CataloguedAction[] = AGENT_ACTIONS): string[] {
+  return actions
+    .filter((a) => a.workspace !== 'dev' && 'none' in a.entry && a.entry.none === 'spends' && !a.entry.note)
+    .map(actionKey);
+}
+
 /** The actions an agent should be able to do and has no tool for: what `agent-action-gaps` counts. */
 export function actionGaps(actions: readonly CataloguedAction[] = AGENT_ACTIONS): string[] {
   return actions.filter((a) => 'gap' in a.entry).map(actionKey);

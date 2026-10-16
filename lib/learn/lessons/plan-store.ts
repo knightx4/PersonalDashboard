@@ -20,7 +20,7 @@ type PieceRow = { id: string; unit_id: string; subject_id: string; ordinal: numb
 type AimRow = { id: string; name: string; subject_id: string };
 
 /** Active open goals with a track, oldest first. The Level 3 goal has no plan. */
-async function goalsWithTracks(learn: LearnSupabaseClient, userId: string): Promise<AimRow[]> {
+export async function goalsWithTracks(learn: LearnSupabaseClient, userId: string): Promise<AimRow[]> {
   const { data, error } = await learn
     .from('aims')
     .select('id, name, subject_id')

@@ -6,7 +6,7 @@ import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
-import { CaptureShortcutSection } from './capture-shortcut';
+import { AskShortcutSection, CaptureShortcutSection } from './capture-shortcut';
 import { CaptureTokensSection } from './capture-tokens';
 import { ConnectedAppsSection } from './connected-apps';
 import { FeelSection } from './haptics';
@@ -55,7 +55,7 @@ export function AccountView({
    */
   connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string } | null;
   /**
-   * The Capture tokens section's data (plan #1705), read with the connected
+   * The Tokens section's data (plan #1705), read with the connected
    * apps and only on Activity; null on the other tabs. `justMade` is the
    * gallery's, for a token as it shows straight after it is made.
    */
@@ -65,6 +65,8 @@ export function AccountView({
     justMade?: { label: string; token: string };
     /** The capture address on this app's own origin, for the Shortcut's steps. */
     address: string;
+    /** The ask address on this app's own origin, for the ask Shortcut's steps. */
+    askAddress: string;
   } | null;
 }) {
   const title = (id: AccountTab) => ACCOUNT_TABS.find((entry) => entry.id === id)!.label;
@@ -128,6 +130,7 @@ export function AccountView({
                 />
               )}
               {capture && <CaptureShortcutSection address={capture.address} />}
+              {capture && <AskShortcutSection address={capture.askAddress} />}
             </Parts>
           ),
         },

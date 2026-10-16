@@ -48,8 +48,6 @@ export const PAID_ACTIONS = {
   'app/learn/know/actions.ts#proposeFromNote': ['classify-note', 'concepts-from-brief'],
   'app/learn/know/actions.ts#proposeFromCourse': ['concepts-from-course'],
   'app/learn/know/actions.ts#approveFromCourse': ['place-track'],
-  // Learn: an essay's interview, one question per answer (plan #1867)
-  'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question', 'read-essay-brief'],
   // Learn: Rephrase on a selection in an essay (plan #1868)
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
@@ -69,15 +67,12 @@ export const PAID_ACTIONS = {
   // Learn: research on an essay (plan #1863.9), one button per level. The
   // first pass searches the question; the deeper pass gathers pages and
   // marks the draft's claims against them.
-  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question', 'write-essay-research'],
-  // Learn: the guided essay's stages (LEARN-ESSAYS-SPEC, "The stages").
-  // Answering the interview's last question also has Dash read the brief.
-  'app/learn/e/[id]/guide-actions.ts#readEssayBrief': ['read-essay-brief'],
-  'app/learn/e/[id]/guide-actions.ts#findEssayPoints': ['find-essay-points'],
-  'app/learn/e/[id]/guide-actions.ts#shapeEssayPlan': ['shape-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#reviewEssayPlan': ['review-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#askEssayPoint': ['word-point-question'],
-  'app/learn/e/[id]/guide-actions.ts#answerEssayPoint': ['word-point-question'],
+  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
+  // Learn: the notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): the map
+  // of the notes, sources for one cluster, and a model draft.
+  'app/learn/e/[id]/guide-actions.ts#updateNoteMap': ['map-essay-notes'],
+  'app/learn/e/[id]/guide-actions.ts#findClusterEvidence': ['find-point-evidence'],
+  'app/learn/e/[id]/guide-actions.ts#writeModelDraft': ['draft-essay-model'],
   'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
   // Learn: Finish on an essay names the claims it argues and looks for the
   // notes that already hold each (plan #1873). Accepting the offers writes
@@ -109,10 +104,18 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
+  'app/learn/now/piece-talk-actions.ts#talkPiece': [
+    'mark-teach-back',
+    'reply-about-card',
+    'write-piece-check',
+    'mark-piece-check',
+    'write-cell-case',
+    'grade-cell-answer',
+  ],
 
   // Learn: questions
-  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],
-  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check', 'write-cell-case'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check', 'grade-cell-answer'],
   'app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice': ['write-piece-practice'],
   'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': ['mark-piece-practice'],
   'app/learn/s/[id]/project-actions.ts#writePlanProject': ['write-plan-project'],
@@ -124,7 +127,12 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/flow/actions.ts#flowStep:answer': [
+    'name-misconception',
+    'grade-applied-answer',
+    'mark-teach-back',
+  ],
+  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
   'app/learn/flow/actions.ts#flowStep:start-track': [
     'generate-track-from-theme',
     'place-track',
@@ -244,6 +252,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/ask/voice/route.ts#POST':
+    'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
     'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':

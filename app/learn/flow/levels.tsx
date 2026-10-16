@@ -1,15 +1,19 @@
 import { CellAnswer } from '@/components/learn/cell-answer';
 import { NoTopicToPlace, PracticeError } from '@/components/learn/practice-states';
 import { RunSummaryView } from '@/components/learn/run-summary-view';
+import { ThemeLensOffer } from '@/components/learn/theme-lens-offer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { declineLensFromTheme, makeLensFromTheme } from '@/app/learn/flow/theme-lens-actions';
+import { loadThemeOffers } from '@/lib/learn/levels/theme-offer-store';
+import { createVaultClient } from '@/lib/vault/auth/server';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { askCell } from '@/lib/learn/levels/answer-store';
 import type { GradeMap } from '@/lib/learn/levels/grade';
 import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { pickCell, whyLine } from '@/lib/learn/levels/pick';
 import { countAnswered, loadLensScope, loadRunDoubts, type LensScope } from '@/lib/learn/levels/practice-store';
-import { runSummary } from '@/lib/learn/levels/run';
+import { runSummary, type RunSummary } from '@/lib/learn/levels/run';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
 /**
@@ -42,6 +46,20 @@ async function summary(
     loadRunDoubts(learn, userId, since, map),
   ]);
   return runSummary({ map, since, answered, doubted });
+}
+
+/** The lens to offer for the levels a run missed, if any; a failed read offers nothing. */
+async function lensOffer(
+  learn: Awaited<ReturnType<typeof createLearnClient>>,
+  userId: string,
+  missed: RunSummary['missed'],
+  since: string,
+) {
+  const offers = await createVaultClient()
+    .then((vault) => loadThemeOffers(learn, vault, userId, missed))
+    .catch(() => []);
+  const offer = offers[0];
+  return offer ? <ThemeLensOffer offer={offer} since={since} make={makeLensFromTheme} decline={declineLensFromTheme} /> : null;
 }
 
 export async function LevelsFlow({
@@ -82,7 +100,11 @@ export async function LevelsFlow({
       (error: unknown) => ({ ok: false as const, message: error instanceof Error ? error.message : 'Reading this run failed.' }),
     );
     return ended.ok ? (
-      <RunSummaryView summary={ended.s} againHref={practiceHref(scopeHref)} />
+      <RunSummaryView
+        summary={ended.s}
+        againHref={practiceHref(scopeHref)}
+        offer={await lensOffer(learn, userId, ended.s.missed, end)}
+      />
     ) : (
       <PracticeError message={ended.message} retryHref={practiceHref({ ...scopeHref, end })} />
     );
@@ -113,7 +135,16 @@ export async function LevelsFlow({
   if (!picked) {
     if (run) {
       const ended = await summary(learn, userId, map, run).catch(() => null);
-      if (ended) return <RunSummaryView summary={ended} againHref={practiceHref(scopeHref)} nothingLeft />;
+      if (ended) {
+        return (
+          <RunSummaryView
+            summary={ended}
+            againHref={practiceHref(scopeHref)}
+            nothingLeft
+            offer={await lensOffer(learn, userId, ended.missed, run)}
+          />
+        );
+      }
     }
     return (
       <EmptyState

@@ -268,7 +268,8 @@ export const LEARN_OPERATIONS = [
   // chat on a reading's page (plan #1876.5) records here too, one Sonnet call
   // per question over the reading's text (at most 200,000 characters, cached
   // across a thread): the same kind of reply, kept to one operation by the
-  // conversational-model-paths count.
+  // conversational-model-paths count. A question asked in a piece's
+  // conversation on Now (plan #2164.5) records here for the same reason.
   'reply-about-card',
   // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
   // call per phrase per card; selecting it again reads the stored one.
@@ -340,7 +341,7 @@ export const LEARN_OPERATIONS = [
   // also finds the notes to compare with, under 'embed-note-match'.
   'check-essay-paragraph',
   // Research on an essay, at the level whose button was pressed (plan
-  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // #1863.9). The first is one Sonnet call with up to eight web searches.
   // The deeper pass is one Haiku call with up to eight searches and five
   // pages read, then one Sonnet call marking the draft's claims against the
   // pages; apart, so each model's share can be read.
@@ -376,6 +377,14 @@ export const LEARN_OPERATIONS = [
   'shape-essay-plan',
   'review-essay-plan',
   'word-point-question',
+  // Evidence of one kind for one point of an essay (LEARN-ESSAYS-SPEC,
+  // "Evidence on a point"): one Sonnet call with up to four web searches.
+  'find-point-evidence',
+  // The notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): one Sonnet
+  // call reading the whole notes page into a map, on each press of Update
+  // the map, and one writing a model draft from the notes.
+  'map-essay-notes',
+  'draft-essay-model',
   // The essay's research written up as a map (plan stage Research): the
   // Sonnet calls framing the question and writing from the pages read. The
   // Haiku search and reading in between records under

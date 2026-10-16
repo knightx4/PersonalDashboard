@@ -8,7 +8,9 @@ import {
 } from '@/components/learn/cell-answer-view';
 import { NoTopicToPlace, PracticeError } from '@/components/learn/practice-states';
 import { RunSummaryView } from '@/components/learn/run-summary-view';
+import type { ThemeOffer } from '@/lib/learn/levels/theme-offer';
 import type { RunSummary } from '@/lib/learn/levels/run';
+import { ThemeLensOffer } from '@/components/learn/theme-lens-offer';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ANSWER_CELL_PAID } from '@/components/learn/cell-answer-view';
 import { HAIKU } from '@/lib/core/models';
@@ -170,25 +172,59 @@ const placementWhy =
 const runEnded: RunSummary = {
   answered: 5,
   shown: [
-    { cellId: 'capm3', topicName: 'CAPM', level: 3 },
-    { cellId: 'dcf4', topicName: 'Discounted cash flow', level: 4 },
-    { cellId: 'sys2', topicName: 'Systematic and idiosyncratic risk', level: 2 },
+    { cellId: 'capm3', topicId: 'capm3', topicName: 'CAPM', level: 3 },
+    { cellId: 'dcf4', topicId: 'dcf4', topicName: 'Discounted cash flow', level: 4 },
+    { cellId: 'sys2', topicId: 'sys2', topicName: 'Systematic and idiosyncratic risk', level: 2 },
   ],
   implied: [
-    { cellId: 'beta1', topicName: 'Beta', level: 1 },
-    { cellId: 'beta2', topicName: 'Beta', level: 2 },
-    { cellId: 'dcf3', topicName: 'Discounted cash flow', level: 3 },
-    { cellId: 'rf1', topicName: 'Risk-free rate of return on government debt', level: 1 },
+    { cellId: 'beta1', topicId: 'beta1', topicName: 'Beta', level: 1 },
+    { cellId: 'beta2', topicId: 'beta2', topicName: 'Beta', level: 2 },
+    { cellId: 'dcf3', topicId: 'dcf3', topicName: 'Discounted cash flow', level: 3 },
+    { cellId: 'rf1', topicId: 'rf1', topicName: 'Risk-free rate of return on government debt', level: 1 },
   ],
-  missed: [{ cellId: 'capm5', topicName: 'CAPM', level: 5 }],
+  missed: [{ cellId: 'capm5', topicId: 'capm5', topicName: 'CAPM', level: 5 }],
   doubted: [{ from: { topicName: 'CAPM', level: 3 }, to: { topicName: 'Return', level: 2 } }],
 };
 
+/** A vault theme the missed levels point to, which no lens covers (plan #2138.14). */
+const themeOffer: ThemeOffer = {
+  themeId: 'theme-1',
+  themeName: 'Interest rates',
+  topics: [{ topicId: 'capm', name: 'CAPM', level: 5 }],
+};
+
+/** The longest theme name and topic names the offer has to hold. */
+const longThemeOffer: ThemeOffer = {
+  themeId: 'theme-2',
+  themeName: 'Monetary policy transmission through the banking system and into household borrowing',
+  topics: [
+    { topicId: 'a', name: 'Systematic and idiosyncratic risk in a diversified equity portfolio', level: 8 },
+    { topicId: 'b', name: 'Discounted cash flow', level: 4 },
+    { topicId: 'c', name: 'Beta', level: 2 },
+  ],
+};
+
 /** The end of a practice run, the question skeleton, and the states with no question (plan #2138.6). */
-export function PracticeRunPreview({ state }: { state: 'end' | 'end-empty' | 'end-nothing-left' | 'loading' | 'no-topic' | 'error' }) {
+export function PracticeRunPreview({ state }: { state: 'end' | 'end-offer' | 'end-offer-long' | 'end-empty' | 'end-nothing-left' | 'loading' | 'no-topic' | 'error' }) {
   switch (state) {
     case 'end':
       return <RunSummaryView summary={runEnded} againHref={NEXT} />;
+    case 'end-offer':
+      return (
+        <RunSummaryView
+          summary={runEnded}
+          againHref={NEXT}
+          offer={<ThemeLensOffer offer={themeOffer} since={RUN} />}
+        />
+      );
+    case 'end-offer-long':
+      return (
+        <RunSummaryView
+          summary={runEnded}
+          againHref={NEXT}
+          offer={<ThemeLensOffer offer={longThemeOffer} since={RUN} />}
+        />
+      );
     case 'end-empty':
       return (
         <RunSummaryView

@@ -73,6 +73,43 @@ that cannot be reached answers 503 or 500.
 Siri, the Watch, the iPhone share sheet, Zapier, IFTTT and a browser
 extension would all call it.
 
+## Asking Dash from outside the app
+
+A second route, `POST /api/ask/voice` (`lib/talk/voice-ask.ts`), takes
+`{ question }` and answers it the way Ask Dash does, so "Hey Siri, ask Dash"
+can be followed by "how many jobs did I apply to today?" or "add call the
+dentist to my todos", and the answer read aloud.
+
+It takes an ask token: a row in the same table with `kind = 'ask'`
+(`supabase/migrations/0248_ask_tokens.sql`), made on the account page by
+choosing "Asks Dash". The two kinds refuse each other, so a capture token
+still cannot read anything. An ask token can read and change whatever Dash can, which
+is why it is its own kind and not a widened capture token. It is limited to
+5 questions a minute and 60 a day.
+
+The route checks the token on the service role, then signs in as the
+token's owner for the length of one answer (`lib/talk/voice-session.ts`): a
+one-time sign-in link is made and spent on the server, never sent, and the
+session is ended once the answer is kept. The lookups therefore run under
+the person's own row level security, as they do in the browser and for the
+connector, and not on the service role.
+
+Asked this way, Dash has the lookups and the writes it has in Ask, run on
+that session: a todo, a quick note, a goal step and the rest are made at
+once and kept in the Ask conversation with an Undo. It is given no
+proposals and no hand-offs, since nobody is there to confirm one or hear
+the reply later. One Shortcut therefore covers asking and adding; the
+capture address stays for tools that should only add.
+
+A reply is JSON. An answer is 200 with `spoken` (the answer without
+Markdown, cut at a sentence after 600 characters with a pointer to Ask),
+`answer` (as Dash wrote it) and `href` (the conversation in the app). A
+refusal has `ok: false`, an `error` code and a `spoken` sentence: 401 for a
+missing, malformed, unknown, revoked or capture token, 429 with
+`Retry-After` for the limit, 413 for a body over 8,000 bytes, 400 for no
+question, 502 when Dash gave no answer, and 503 when the database or the
+sign-in could not be reached.
+
 ## The channels
 
 ### Siri Shortcuts

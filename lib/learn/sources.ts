@@ -271,7 +271,7 @@ export const learnSources: ModuleSources = {
       facts: ['status', 'ceiling'],
       href: (id) => `/learn/topics/${id}`,
       section: SUBJECTS,
-      note: 'A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.',
+      note: 'A topic with no user_id is on the shared map that every account reads; one with theirs is personal to them. Their evidence (cell_evidence) is always theirs. A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.',
     },
     {
       table: 'learn.cell_evidence',
@@ -295,13 +295,14 @@ export const learnSources: ModuleSources = {
       href: (id) => `/learn/lens/${id}`,
       parent: parentByFirst(['aim_id', 'learn.aims'], ['subject_id', 'learn.subjects']),
       section: SUBJECTS,
-      note: 'Every subject and every learning goal has one (subject_id or aim_id; learn 0137). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
+      note: 'Every subject and every learning goal has one (subject_id or aim_id; learn 0137), and a vault theme can have one made at the end of a practice run (theme_id; learn 0143). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
     },
   ],
   notSources: [
     { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
     { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
     { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
+    { table: 'learn.lens_offer_declines', reason: 'Bookkeeping: the vault themes whose offer of a lens they said no to, so it is not made again.' },
     { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
     { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
     { table: 'learn.cell_questions', reason: 'Questions asked about a level of a topic and the answers to them; what each answer showed is read through cell_evidence.' },
@@ -309,6 +310,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.move_reviews', reason: 'Bookkeeping for the placements and edges the move from the claims graph left for them to settle.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
+    { table: 'learn.essay_log', reason: 'Bookkeeping on how an essay was worked out: stages opened and the model calls made, with their responses.' },
     {
       table: 'learn.area_check_articles',
       reason:

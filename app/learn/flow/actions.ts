@@ -13,6 +13,9 @@ import {
   themeStrength,
 } from '@/lib/learn/flow/offer';
 import { trackMove } from '@/lib/learn/flow/track';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
+import { answerExplainFollowUp, answerExplanation } from '@/lib/learn/flow/explain-store';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { loadGraph } from '@/lib/learn/graph/load';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { answerQuestion } from '../s/[id]/probe/actions';
@@ -69,6 +72,10 @@ function scopeOf(track: unknown, only: unknown, goal: unknown): FlowScope {
  * have to be worked out on every render, and the question after an answer
  * would be read from the wrong one.
  *
+ * An explain question (plan #2164.2) is answered here too: its explanation
+ * comes with intent `answer` and is marked by the teach-back grader, and its
+ * one follow-up comes with intent `follow-up`.
+ *
  * Either way the queue of questions written ahead is topped up afterwards.
  * After an answer is when it matters: the claim just answered may have moved,
  * and the picks after it are worked out from where things stand now.
@@ -78,7 +85,8 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
 
-  const scope = scopeFrom(formData);
+  // Goals only on Learn settings (plan #2164.1) takes the survey out of every filter.
+  const scope = { ...scopeFrom(formData), noSurvey: await goalsOnlyOrDefault(supabase, user.id) };
   const intent = formData.get('intent');
 
   // Not now is a button on the answer form, so it arrives carrying that
@@ -86,13 +94,17 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const state =
     formData.get('notNow') === '1'
       ? await notNow(prev, scope, user.id)
-      : intent === 'answer'
-        ? await answerFlowQuestion(prev, formData, scope)
-        : intent === 'start-track'
-          ? await startOfferedTrack(prev, formData, user.id)
-          : toFlowState(
-              await nextQuestion(supabase, user.id, { resume: false, ...scope, vault }),
-            );
+      : intent === 'answer' && prev.explain
+        ? await answerExplainQuestion(prev, formData, user.id)
+        : intent === 'follow-up'
+          ? await answerFollowUp(prev, formData, user.id)
+          : intent === 'answer'
+            ? await answerFlowQuestion(prev, formData, scope)
+            : intent === 'start-track'
+              ? await startOfferedTrack(prev, formData, user.id)
+              : toFlowState(
+                  await nextQuestion(supabase, user.id, { resume: false, ...scope, vault }),
+                );
 
   after(() => fillQueue(supabase, user.id, scope, vault));
   return state;
@@ -108,7 +120,7 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
  * question stays on the screen rather than the flow saying it is finished.
  */
 async function notNow(prev: FlowState, scope: FlowScope, userId: string): Promise<FlowState> {
-  if (!prev.probeId || prev.answered) return prev;
+  if (!prev.probeId || prev.answered || prev.explained) return prev;
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
 
   const next = await nextQuestion(supabase, userId, { resume: false, ...scope, vault });
@@ -169,7 +181,10 @@ export async function fillFlowQueue(focus: {
 }): Promise<void> {
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
-  const scope = scopeOf(focus?.track, focus?.only, focus?.goal);
+  const scope = {
+    ...scopeOf(focus?.track, focus?.only, focus?.goal),
+    noSurvey: await goalsOnlyOrDefault(supabase, user.id),
+  };
   after(() => fillQueue(supabase, user.id, scope, vault));
 }
 
@@ -219,6 +234,95 @@ async function answerFlowQuestion(
     ...(before && after ? { track: trackMove(before, after) } : {}),
     ...(offer ? { offer } : {}),
   };
+}
+
+const MAX_EXPLANATION = 4000;
+const Written = z.string().trim().min(1).max(MAX_EXPLANATION);
+
+/** The typed answer, or why it cannot be marked. */
+function writtenAnswer(
+  raw: FormDataEntryValue | null,
+): { ok: true; text: string } | { ok: false; error: string } {
+  const parsed = Written.safeParse(typeof raw === 'string' ? raw : '');
+  if (parsed.success) return { ok: true, text: parsed.data };
+  return {
+    ok: false,
+    error:
+      typeof raw === 'string' && raw.trim().length > MAX_EXPLANATION
+        ? 'That is longer than a few sentences. Cut it down and send it again.'
+        : 'Write a few sentences first.',
+  };
+}
+
+/**
+ * The explanation, on an explain question (plan #2164.2): marked by the
+ * teach-back grader, with the one follow-up it writes. "I don't know" is a
+ * miss with nothing to mark. A failure keeps the question and what was
+ * written on the screen, with the reason under it.
+ */
+async function answerExplainQuestion(
+  prev: FlowState,
+  formData: FormData,
+  userId: string,
+): Promise<FlowState> {
+  if (!prev.probeId || !prev.conceptId)
+    return { ...prev, error: 'Could not work out what you answered.' };
+  if (prev.explained) return prev;
+  const dontKnow = formData.get('dontKnow') === '1';
+  const typed = dontKnow ? null : writtenAnswer(formData.get('response'));
+  if (typed && !typed.ok) return { ...prev, error: typed.error };
+
+  const supabase = await createLearnClient();
+  const spend = collectSpend();
+  const result = await answerExplanation(supabase, userId, {
+    probeId: prev.probeId,
+    conceptId: prev.conceptId,
+    response: typed?.ok ? typed.text : '',
+    dontKnow,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    onSpend: spend.sink,
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    detail: error instanceof Error ? error.message : 'Could not mark that.',
+  }));
+  await recordLearnSpend(userId, 'mark-teach-back', spend.reports);
+
+  const explanation = typed?.ok ? typed.text : undefined;
+  if (!result.ok) return { ...prev, explanation, error: result.detail };
+  return { ...prev, explanation, explained: result.value, error: undefined };
+}
+
+/** The answer to the follow-up an explanation was given (plan #2164.2). */
+async function answerFollowUp(
+  prev: FlowState,
+  formData: FormData,
+  userId: string,
+): Promise<FlowState> {
+  const followUp = prev.explained?.followUp;
+  if (!prev.probeId || !prev.conceptId || !followUp) {
+    return { ...prev, error: 'Could not work out what you answered.' };
+  }
+  if (prev.followedUp) return prev;
+  const typed = writtenAnswer(formData.get('response'));
+  if (!typed.ok) return { ...prev, error: typed.error };
+
+  const supabase = await createLearnClient();
+  const spend = collectSpend();
+  const result = await answerExplainFollowUp(supabase, userId, {
+    probeId: prev.probeId,
+    followUpId: followUp.probeId,
+    conceptId: prev.conceptId,
+    response: typed.text,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    onSpend: spend.sink,
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    detail: error instanceof Error ? error.message : 'Could not mark that.',
+  }));
+  await recordLearnSpend(userId, 'mark-teach-back', spend.reports);
+
+  if (!result.ok) return { ...prev, followUpAnswer: typed.text, error: result.detail };
+  return { ...prev, followUpAnswer: typed.text, followedUp: result.value, error: undefined };
 }
 
 const OfferAnswer = z.object({

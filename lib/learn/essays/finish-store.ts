@@ -13,7 +13,10 @@ export type FinishRow = {
   evidenceItemId: string | null;
 };
 
-export async function loadFinishRow(supabase: LearnSupabaseClient, id: string): Promise<FinishRow | null> {
+export async function loadFinishRow(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<FinishRow | null> {
   const { data, error } = await supabase
     .from('essays')
     .select('brief, draft_body, path, note_id, evidence_item_id')
@@ -38,7 +41,11 @@ export async function loadFinishRow(supabase: LearnSupabaseClient, id: string): 
 }
 
 /** Mark the essay finished now. */
-export async function markFinished(supabase: LearnSupabaseClient, id: string, at: string): Promise<void> {
+export async function markFinished(
+  supabase: LearnSupabaseClient,
+  id: string,
+  at: string,
+): Promise<void> {
   const { error } = await supabase.from('essays').update({ finished_at: at }).eq('id', id);
   if (error) throw new Error(`Could not mark the essay finished: ${error.message}`);
 }
@@ -49,6 +56,9 @@ export async function recordEvidenceItem(
   id: string,
   evidenceItemId: string,
 ): Promise<void> {
-  const { error } = await supabase.from('essays').update({ evidence_item_id: evidenceItemId }).eq('id', id);
+  const { error } = await supabase
+    .from('essays')
+    .update({ evidence_item_id: evidenceItemId })
+    .eq('id', id);
   if (error) throw new Error(`Could not record the evidence item: ${error.message}`);
 }

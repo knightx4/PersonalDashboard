@@ -10,10 +10,10 @@ write the essay.
 Written to [WRITING-GUIDE.md](WRITING-GUIDE.md). The decisions below were made
 by the owner on 12 October 2026, after a survey of Lex, Copilot for Obsidian,
 Smart Connections, iA Writer, NotebookLM, Elicit, Consensus, Khanmigo and the
-research on AI writing help. The stages between the interview and the draft
-were added on 15 October 2026, after the owner's first essay: the interview
-ended on an empty editor with nothing said about what to do next, and the
-research was too hard to read to use.
+research on AI writing help. On 15 October 2026 the owner's first essay
+showed the interview ending on an empty editor and research too hard to use;
+six planning stages were tried that day and replaced the same evening by
+"Notes first", below, which fits how the owner writes.
 
 ---
 
@@ -60,66 +60,86 @@ Rules for the ladder:
 - Text you accept from rung 4 is marked as Dash's (see "Who wrote what"). It
   becomes yours when you rewrite it.
 
-## Starting an essay
+## Notes first
 
-An essay starts from a question, not a topic. "New essay" opens a short
-interview: Dash asks one question at a time, at most five, and never says
-anything like "That sounds interesting". The questions are fixed in kind:
+Decided by the owner on 15 October 2026, after using the six planning stages
+built that morning: "I like to just write down a lot of scratch notes … go
+through all those points and develop them … eventually I figure out a
+structure along the way … I don't want to manually do much at all other than
+write my raw thoughts down, tweak the writing, and answer some questions."
 
-1. What is the question you want to answer?
-2. What do you think the answer is, right now, in a sentence?
-3. Who is it for? (A friend who knows nothing about it is the default.)
-4. What made you think this? (Dash offers what it found in your study, below.)
-5. What would change your mind?
+The owner writes by discovery (Galbraith 1999, 2009; Elbow's loop writing):
+ideas form while producing text and structure appears late. A planner's
+sequence of question, thesis, points and outline, kept by hand, gets in the
+way. So the rule is: **the person only writes. Dash keeps everything else,
+and the person corrects Dash by writing, never by editing what Dash made.**
 
-Answering the last question also has Dash read the whole brief back (see
-"The stages", Discover), so the interview ends on what to tighten next rather
-than on an empty page.
+An essay has two views, **Notes** and **Draft**, switched at the top of the
+page. It opens on the draft once the draft has 150 words, and on the notes
+otherwise.
 
-Your answers, in your own words, become the **brief**: question, claim,
-reader, what made you think it, what would change your mind, and the notes
-and readings you pinned. The brief sits above the
-draft, folded, and every check reads it. You can skip the interview and fill
-the brief in yourself, or leave it empty.
+**Notes.** One editor for everything the person thinks: claims, examples,
+doubts, fragments, quotes, in any order. It saves itself a moment after they
+stop typing. An essay with no notes yet opens on what was already written for
+it (the brief's answers, replies to Dash, points and answers from the earlier
+stages, takes on research), so nothing is lost. The brief sits folded above.
 
-Learn suggests essays, and you start one from the suggestion with the brief
-already half filled:
+**The map.** Beside the notes, Dash's map of them, made only when the person
+presses **Update the map** (one Sonnet call, a few cents). It shows:
 
-- a learning goal you finished, from its plan page;
-- two readings you saved that disagree, from either reading;
-- a theme on the vault map with several of your positions in it;
-- an entry in the learning log with ideas you have not written about.
+- what they seem to be arguing: one to three of their own sentences;
+- their threads: the three to seven things the notes keep returning to, each
+  with a short name in Dash's words, the passages that belong to it, whether
+  the notes hold it up (nothing yet, thin, supported) and what is missing,
+  in the order an essay could take once there is enough to suggest one;
+- where the notes pull against each other;
+- one to three questions aimed at the biggest gap or tension.
 
-These are buttons on pages that exist. Learn does not push essay prompts into
-the Now deck.
+Every passage shown is the person's own, kept only when it is in the notes
+word for word. The map is read-only. A question is answered in place and the
+answer is added to the end of the notes. The map never changes on its own.
 
-## The stages
+**Sources on a thread.** Each thread has **Find sources for this**: the
+rule that applies, evidence for it, the strongest objection, a real case.
+Each is one Sonnet call with up to four web searches, told to cite the
+primary document, label who published each source (the address overrules
+the model's label where it is plain), and say when guidance has been
+superseded. Up to three cited items wait beside the thread; **Add the quote
+to my notes** puts the quoted words and the address at the end of the notes.
 
-An essay is worked out in six stages, shown as steps across the top of the
-page. Every step can be opened at any time and nothing is locked; a tick marks
-a step with enough in it to move on, and the foot of each step says what the
-next one is for. The page opens on the interview while it is asking, on Write
-once the draft has 150 words, and otherwise on the first step not done. The
-rail beside each step says how it works and shows the essay so far: the
-question, the thesis and the points.
+Why per thread: on 15 October an evaluation found practitioner essays of
+this length for a CFO-office reader rest on one to three sources, mostly the
+rule the reader answers to, with the author's own experience carrying the
+rest; and the whole-question research had cited vendor blogs and write-ups
+of a standard rather than the standard, and missed that SR 11-7 had been
+rescinded.
 
-Everything the person writes along the way is kept in `learn.essays.plan` in
-their words. Dash contributes questions, short notes naming a problem, sharper
-versions of the question, and what each part of a shape does. Each is labelled
-as Dash's where it is shown, and none of it goes into the draft.
+**Draft.** The writing surface below. Beside it, **From your notes**:
 
-| Step | What the person does | What Dash does, when asked |
-|---|---|---|
-| Discover | Answers the interview, then edits the brief in place and replies to Dash's notes | Reads the brief: up to three notes, each naming one problem and ending in a question, and up to three sharper versions of the question. Read it again sends the replies too. |
-| Research | Reads the research and writes what they make of each part | Researches the question (see "Research, when you ask") |
-| Plan | Writes the thesis in one sentence and lists the points | Find points lifts passages from what the person already wrote, word for word; a passage not found verbatim is dropped. Ask Dash about the plan names up to three problems, each ending in a question. |
-| Structure | Orders the points, gives each a role (opening, point, objection, closing), fills empty parts | Suggests two or three shapes built around the person's points, each part saying what it does for the reader and which points go in it. Using one reorders the plan and leaves an empty part where no point fits. No point is dropped. |
-| Develop | Answers questions about one point at a time, in rough notes | Asks one question about a point, of a kind the person can choose (why it is true, an example, what shows it, what a doubter says, why the reader cares, how it connects), then the next after each answer, until the person stops or marks the point ready |
-| Write | Writes the essay | Shows the plan beside the draft, opening the notes for the point whose heading the cursor is under. With an empty draft, Put the outline in the draft writes the title and one heading per point, in the person's words. |
+- **Assemble a draft** lays the person's own passages out in the map's order:
+  their lead claim, then each thread as a heading in Dash's words with its
+  passages under it, and a "[Gap: …]" line where the notes do not hold it
+  up. The headings and gap lines carry Dash's mark, so "Your words" stays
+  honest; every other word is theirs. On a draft with words in it the press
+  asks once more before replacing it.
+- **Write a model draft** has Dash write the essay from the notes, at the
+  word target, faithful to what they argue and marking gaps rather than
+  filling them. It is shown folded under the draft, labelled as Dash's, and
+  never put into it: a sparring partner, at the ownership cost Dhillon et al.
+  (CHI 2024) measured, which is why it stays apart.
 
-Each Dash press is one Sonnet call with its price beside the button, recorded
-in the Learn spend ledger. Without the Anthropic key, Develop asks the plain
-question of each kind and Structure offers three common shapes.
+The interview and the six stages (Discover, Research, Plan, Structure,
+Develop, Write) are gone. What they wrote is kept in the plan and seeded
+into the notes.
+
+## Measuring the tool
+
+`learn.essay_log` (migrations learn 0133 and 0134) keeps a row each time the
+notes or the draft is opened, so where people stop is visible, and each model call the stages make
+with its response, the encrypted search payloads left out. Saved responses
+go in `lib/learn/essays/fixtures/recorded/`, where a test replays them through
+the parsers. `fixtures/gold-sox-ai.json` is the gold list for the test essay
+and `gold.ts` scores a run's sources against it for recall and precision.
 
 ## The writing surface
 
@@ -282,21 +302,26 @@ price before it runs. There are two levels.
 
 | | Research the question | Check the draft's claims |
 |---|---|---|
-| What it does | Sonnet splits the question into 3 to 5 parts a writer needs answered; Haiku runs up to 8 searches and reads 5 pages; Sonnet writes, from those pages, a short answer of about 110 words, an answer to each part, and up to three questions asking the writer where they stand | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
+| What it does | One Sonnet call with up to 8 web searches. It is told the question, the writer's answer so far, the reader and what would change their mind, and that the writer knows the field. It writes where the debate stands, then up to four items each of evidence for the answer, evidence against it, and material the writer could use (a framework, a figure, a case, a line to quote), then up to three questions for the writer | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
 | Typical cost | $0.25 to $0.45 | $0.15 to $0.60, shown as "up to $0.60" |
-| Model | Sonnet frames and writes, Haiku searches and reads | Haiku gathers, Sonnet judges |
+| Model | Sonnet, with the dynamic-filtering web search | Haiku gathers, Sonnet judges |
 
-The first level has its own step, Research, laid out to be read top to bottom:
-the short answer, then each part as a heading with its answer and, folded
-under it, the quoted words; then the questions for the writer; then the
-numbered sources. Under every part and question is a line for what the person
-makes of it, and Make it a point copies that line into the plan. The rail's
-research card in the Write step shows the same run compactly, with Insert
-footnote on each quote.
+The research card sits beside the notes and the draft. It shows where the
+debate stands first, then what supports the answer, what pushes back and
+what the writer could use, each a headline, a sentence or two and its
+sources, with Insert putting a quote at the cursor as a footnote. An item
+with no citation is dropped.
 
-Until 15 October 2026 the first level was one Haiku call listing positions
-with quotes, shown only in the rail. Runs from before then still show as
-positions.
+The writer's answer, reader and what would change their mind go to the model
+as context, and the model is told never to paste their words into a search.
+The origin answer, which often quotes the vault, is not sent.
+
+History: until 15 October 2026 the first level was one Haiku call listing
+positions. For one day it then framed the question into parts, read five
+pages and wrote only from them; on the owner's first essay it read three
+pages about one announcement and answered most parts with "the pages do not
+say", so it was replaced by the call above. Older runs still show in their
+own layout.
 
 **Haiku and web search** (checked 12 October 2026, plan #1863.9). Haiku
 takes the basic tools, `web_search_20250305` and `web_fetch_20250910`, but
@@ -320,8 +345,9 @@ have been measured.
 - The count of supporting and opposing sources says it counts sources and
   does not weigh them.
 - Vault text never goes into a web search query. The first pass sends the
-  brief's question and what would change your mind, and nothing else. The
-  deeper pass has to read the draft to know its claims, and is told to
+  brief's question, your answer, your reader and what would change your
+  mind, and is told to search in general terms and never paste your words.
+  The deeper pass has to read the draft to know its claims, and is told to
   search in general terms and never paste a sentence of it; your other
   notes, the pinned items and the origin answer are never sent.
 - Every run records its real cost from the API's usage, through the Learn

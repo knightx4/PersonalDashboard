@@ -21,6 +21,7 @@ import {
 } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS, type PostChangeInput, type PostChangeKind } from '@/lib/ask/post-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import type { PaidActionInput } from '@/lib/dash/paid-input';
 
 /**
  * The changes Dash proposes in an Ask Dash answer (feature #1186), kept in
@@ -60,6 +61,8 @@ export const DASH_CHANGE_KINDS = [
   'add_quick_note',
   // A build started on a plan step, proposed for a Confirm (plan #2106.1).
   'start_build',
+  // A paid button Dash pressed for an approval (plan #2228.1, lib/dash/paid.ts).
+  'paid_action',
   // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
   ...LEARN_CHANGE_KINDS,
   // Todo's newer ones, in the same shape (lib/ask/todo-changes.ts, plan #1894.9.1).
@@ -149,6 +152,12 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  title for the card, and whether its last run had gone quiet, in
  *                  which case Confirm writes that run off as the plan page's
  *                  Send does (`confirmQuiet` in lib/plan/handover.ts).
+ * paid_action      a press of a button that spends money, queued by a paid
+ *                  tool (plan #2228.1, lib/dash/paid.ts) for an approval:
+ *                  the tool and the button's key in PAID_ACTIONS, the
+ *                  checked arguments its run takes, the line the card shows,
+ *                  and the estimate the button's hint would show. Approving
+ *                  runs the function the button calls; it cannot be undone.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -199,6 +208,7 @@ export type DashChangeInput = {
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
   add_quick_note: { noteId: string; title: string; path: string; body: string };
   start_build: { stepId: string; number: number; outline: string; title: string; quiet: boolean };
+  paid_action: PaidActionInput;
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
   Record<YouChangeKind, YouChangeInput> &
@@ -239,6 +249,8 @@ export type DashChange = NewDashChange & {
   doneAt: string | null;
   declinedAt: string | null;
   undoneAt: string | null;
+  /** What the write said it did, once done: a paid press's result line (plan #2228.2). */
+  summary?: string | null;
 };
 
 type DashChangeRow = {
@@ -254,10 +266,11 @@ type DashChangeRow = {
   done_at: string | null;
   declined_at: string | null;
   undone_at: string | null;
+  summary?: string | null;
 };
 
 export const DASH_CHANGE_SELECT =
-  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at';
+  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary';
 
 export function toDashChange(row: DashChangeRow): DashChange {
   const subject = row.subject_ref ? parseRef(row.subject_ref) : null;
@@ -276,6 +289,7 @@ export function toDashChange(row: DashChangeRow): DashChange {
     doneAt: row.done_at,
     declinedAt: row.declined_at,
     undoneAt: row.undone_at,
+    summary: row.summary ?? null,
   } as DashChange;
 }
 
@@ -293,6 +307,34 @@ export async function insertProposal(
     .single();
   assertSchemaExposed(error, CORE_SCHEMA);
   if (error) throw new Error(`Keeping the proposal failed: ${error.message}`);
+  return toDashChange(data as DashChangeRow);
+}
+
+/**
+ * Keeps one paid press a thread queued (plan #2228.1), under the comment that
+ * asked for it: surface 'thread', proposed, with the comment as its turn so
+ * the card can gather the items one comment queued.
+ */
+export async function insertThreadProposal(
+  core: CoreSupabaseClient,
+  userId: string,
+  cause: ThreadCause,
+  change: NewDashChange,
+): Promise<DashChange> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .insert({
+      user_id: userId,
+      conversation_id: cause.conversationId,
+      turn_id: cause.turnId,
+      surface: 'thread',
+      kind: change.kind,
+      input: change.input,
+    })
+    .select(DASH_CHANGE_SELECT)
+    .single();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Keeping the queued press failed: ${error.message}`);
   return toDashChange(data as DashChangeRow);
 }
 

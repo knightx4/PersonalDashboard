@@ -1,11 +1,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
-import type { MadeDashChange, ThreadCause } from '@/lib/talk/changes';
+import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation } from '@/lib/talk/talk';
-import { MAX_LOOKUPS, runDash, type DashExecutor, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { MAX_LOOKUPS, runDash, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import type { PaidQueued } from './paid';
 import {
   threadDashTools,
+  type DashPaidTool,
   type DashRecordedWrite,
   type DashThreadActs,
   type DashWriteResult,
@@ -150,6 +152,13 @@ export type ThreadDash = {
    * 'thread', under the comment that asked for it when there is one.
    */
   saveChange: (made: MadeDashChange, cause: ThreadCause | null) => Promise<unknown>;
+  /**
+   * Checks and prices a paid press as the person (plan #2228.1), without
+   * keeping it. Absent: every paid tool is refused.
+   */
+  queue?: (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
+  /** Keeps a queued paid press as proposed, under the comment that asked for it. */
+  saveProposal?: (change: NewDashChange, cause: ThreadCause) => Promise<DashChange>;
 };
 
 /** What a thread's hand-off did: started something, or why not. */
@@ -183,11 +192,16 @@ export type ThreadReply =
        * is empty and the caller writes nothing into the thread.
        */
       acknowledged: boolean;
+      /** The paid presses queued for an approval (plan #2228.1), as their core.dash_actions ids. */
+      queued?: string[];
     }
   | { ok: false; detail: string };
 
 /** The reply when a change was made and the answer saying so never came. */
 const UNFINISHED = 'I made the change you asked for, but could not finish writing this reply. It is listed on Home, with its Undo.';
+
+/** The reply when a paid press was queued and the answer saying so never came. */
+const QUEUED_UNFINISHED = 'I queued what you asked for, but could not finish writing this reply. Nothing has run: approve it on the card when you are ready.';
 
 /** What the model is told once a registry write is made and kept. */
 function madeNote(summary: string, kept: boolean): string {
@@ -266,6 +280,28 @@ export async function replyInThread(input: {
     return { ok: true, rows: [result.row], note: madeNote(result.summary, kept) };
   };
 
+  // A paid press is kept as proposed under the comment that asked for it,
+  // and runs only on an approval (plan #2228.1). With no comment to hang it
+  // from there is nowhere for its card, so nothing is queued.
+  const queued: string[] = [];
+  const { queue: check, saveProposal } = dash;
+  const cause = input.cause ?? null;
+  const queue: DashQueuer | undefined =
+    check && saveProposal && cause
+      ? async (tool, args, seen) => {
+          const result = await check(tool, args, seen);
+          if (!result.ok) return { ok: false, error: result.error };
+          try {
+            const kept = await saveProposal(result.change, cause);
+            queued.push(kept.id);
+            return { ok: true, rows: [], totals: { queued: { id: kept.id, kind: kept.kind, input: kept.input } }, note: result.note };
+          } catch (error) {
+            console.error(`thread paid tool ${tool.name} was not queued`, error);
+            return { ok: false, error: 'That could not be queued. Tell them nothing was run.' };
+          }
+        }
+      : undefined;
+
   const { handOff, acknowledge } = input;
   const answer = await runDash({
     voice: input.voice,
@@ -274,6 +310,7 @@ export async function replyInThread(input: {
     today: dash.today,
     execute: dash.execute,
     write,
+    queue,
     handOff: handOff
       ? async (args, _seen, tool) => {
           const outcome = await handOff(tool.name, args);
@@ -288,7 +325,7 @@ export async function replyInThread(input: {
       ? async () => {
           // A change is always reported in words, so the mark is refused once
           // one is made; the database cannot tell (plan #1648).
-          if (made.length > 0 || started > 0) return { ok: false, error: CHANGED_SO_ANSWER };
+          if (made.length > 0 || started > 0 || queued.length > 0) return { ok: false, error: CHANGED_SO_ANSWER };
           await acknowledge();
           return { ok: true };
         }
@@ -302,8 +339,9 @@ export async function replyInThread(input: {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {
       const body = said.length > 0 ? said.join('\n\n') : UNFINISHED;
-      return { ok: true, body, citations: [], made, passedOn, acknowledged: false };
+      return { ok: true, body, citations: [], made, passedOn, acknowledged: false, queued };
     }
+    if (queued.length > 0) return { ok: true, body: QUEUED_UNFINISHED, citations: [], made, passedOn, acknowledged: false, queued };
     return { ok: false, detail: answer.detail };
   }
   if (answer.acknowledged) return { ok: true, body: '', citations: [], made, passedOn, acknowledged: true };
@@ -314,6 +352,7 @@ export async function replyInThread(input: {
     made,
     passedOn,
     acknowledged: false,
+    queued,
   };
 }
 

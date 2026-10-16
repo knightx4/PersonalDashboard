@@ -9,6 +9,10 @@ import { PieceLessons, PiecePassing } from './piece-view';
 import { cn } from '@/lib/cn';
 import { PageColumn } from '@/components/shell/page-width';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { STATUS_GLYPH } from '@/app/learn/topics/[id]/ladder-view';
+import { checkCell, type PieceCellView } from '@/lib/learn/lessons/piece-cells';
+import { STATUS_WORDS } from '@/lib/learn/levels/standing';
 
 export type PiecePageProps = {
   page: PiecePage;
@@ -51,6 +55,8 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
         showPlan={false}
       />
 
+      <PieceCells cells={page.cells} />
+
       {page.ideas.length === 0 ? (
         <p className="mb-6 text-body text-ink-muted">
           The ideas this piece covered are no longer in the subject.
@@ -67,6 +73,7 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
               passedAt={piece.passedAt}
               practicePassed={standing.practicePassed}
               checkPassed={standing.checkPassed}
+              checkOn={checkCell(page.cells)}
             />
           </div>
         </>
@@ -102,5 +109,42 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
         </nav>
       )}
     </PageColumn>
+  );
+}
+
+/**
+ * The cells the piece teaches, each with where you stand on it and a link to
+ * its topic's ladder (plan #2138.13). Nothing is drawn for a piece that names
+ * none.
+ */
+function PieceCells({ cells }: { cells: readonly PieceCellView[] }) {
+  if (cells.length === 0) return null;
+  return (
+    <section aria-labelledby="piece-cells" className="mb-6">
+      <h2 id="piece-cells" className="mb-2 text-ui font-semibold text-ink-muted">
+        What this piece teaches
+      </h2>
+      <Card padding="none">
+        <ul className="divide-y divide-border">
+          {cells.map((cell) => (
+            <li
+              key={cell.cellId}
+              className="card-pad-x flex items-baseline justify-between gap-3 py-3"
+            >
+              <Link
+                href={`/learn/topics/${cell.topicId}`}
+                className={cn('press-area min-w-0 flex-1', linkVariants())}
+              >
+                {cell.topicName}, level {cell.level}
+              </Link>
+              <span className="inline-flex shrink-0 items-center gap-1 text-small text-ink">
+                <StatusGlyph glyph={STATUS_GLYPH[cell.status]} size={12} />
+                {STATUS_WORDS[cell.status]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }

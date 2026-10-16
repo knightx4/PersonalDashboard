@@ -95,6 +95,18 @@ describe('draftPrompt', () => {
     expect(prompt).not.toContain('Beta');
   });
 
+  it('numbers the sources and performances to cite, and says when there are none', () => {
+    const prompt = draftPrompt({
+      goal: 'DCF',
+      map: [],
+      fields: [],
+      sources: { sources: [{ id: 'S1', label: 'CFA syllabus', items: ['Calculate FCFF'] }], performances: ['Value a company'] },
+    });
+    expect(prompt).toContain('P1. Value a company');
+    expect(prompt).toContain('  S1.1 Calculate FCFF');
+    expect(draftPrompt({ goal: 'DCF', map: [], fields: [] })).toContain('No sources were given');
+  });
+
   it('carries the scope a link gave a wanted topic', () => {
     const prompt = draftPrompt({ goal: 'Risk-free rate', scope: 'The return on a riskless asset.', map: [], fields: [] });
     expect(prompt).toContain('with this scope: The return on a riskless asset.');

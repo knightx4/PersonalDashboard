@@ -139,6 +139,17 @@ subject and cross-listed under the subject named after the article, which is
 what `learn.article_evidence` reads, so a right answer moves the article from
 claimed to tested on the Goals page.
 
+A goal question asks you to explain the idea in a few sentences rather than
+pick from options (plan #2164.2). The prompt names the idea and, from its
+checks, what a full answer also covers, so one answer reaches several sides of
+it. Writing it takes no model call. The answer is marked by the teach-back
+grader for what was right and what was missing, Dash asks one follow-up, and
+that answer is marked too. The idea is left where a teach-back leaves it:
+shaky when the explanation does not hold, known when it does, and sharp when
+the follow-up holds as well. Skipping the follow-up leaves it known. Multiple
+choice on a goal's idea is only ever a re-check of one already settled, and a
+multiple-choice goal question written before this is thrown away unshown.
+
 An answered goal question counts towards the goal's field on the Know grid,
 as a survey answer does, and so towards the survey rate above. A goal not
 placed in a field adds to no field.

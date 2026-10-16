@@ -118,7 +118,10 @@ export function buildEssayFrontmatter(fm: EssayFrontmatter): string {
  * the parser would read back means a save with nothing new makes no commit.
  */
 export function essayNoteBody(draft: string): string {
-  const trimmed = draft.replace(/\r\n/g, '\n').replace(/^\s*\n/, '').replace(/\s+$/, '');
+  const trimmed = draft
+    .replace(/\r\n/g, '\n')
+    .replace(/^\s*\n/, '')
+    .replace(/\s+$/, '');
   return trimmed ? `${trimmed}\n` : '';
 }
 
@@ -148,7 +151,12 @@ export function noteBodyMarks(draft: string, marks: readonly AuthorMark[]): Auth
  * grapheme, as an LF is, so the offsets hold, and the hash is taken of the
  * text as it is written.
  */
-function withAuthorship(head: string, body: string, authorship: EssayAuthorship, eol: string): string {
+function withAuthorship(
+  head: string,
+  body: string,
+  authorship: EssayAuthorship,
+  eol: string,
+): string {
   const text = `${head}${body.replace(/\n+$/, '')}`;
   const marks = shiftMarks(authorship.marks, head.length, text.length);
   const written = eol === '\n' ? text : text.replace(/\n/g, eol);
@@ -161,11 +169,20 @@ function withAuthorship(head: string, body: string, authorship: EssayAuthorship,
  * and with `authorship` the block saying who wrote what. `authorship.marks`
  * are ranges of the draft.
  */
-export function essayNoteText(fm: EssayFrontmatter, draft: string, authorship?: EssayAuthorship): string {
+export function essayNoteText(
+  fm: EssayFrontmatter,
+  draft: string,
+  authorship?: EssayAuthorship,
+): string {
   const head = `${buildEssayFrontmatter(fm)}\n`;
   const body = essayNoteBody(draft);
   if (!authorship || !body) return `${head}${body}`;
-  return withAuthorship(head, body, { ...authorship, marks: noteBodyMarks(draft, authorship.marks) }, '\n');
+  return withAuthorship(
+    head,
+    body,
+    { ...authorship, marks: noteBodyMarks(draft, authorship.marks) },
+    '\n',
+  );
 }
 
 /**
@@ -207,7 +224,9 @@ export function rewriteEssayFile(
       title: change.title,
       updated: change.updated ?? fresh.updated,
       stage: change.stage ? atLeastStage(fresh.stage, change.stage) : fresh.stage,
-      ...(change.published ? { publish: true, published: fresh.published ?? change.published } : {}),
+      ...(change.published
+        ? { publish: true, published: fresh.published ?? change.published }
+        : {}),
     };
     const written = essayNoteBody(body);
     if (!authorship || !written) return essayNoteText(fm, body);
@@ -227,7 +246,10 @@ export function rewriteEssayFile(
   if (change.updated) set('updated', change.updated);
   if (change.stage) {
     const line = lines.find((entry) => entry.startsWith('stage:'));
-    const have = line?.slice('stage:'.length).trim().replace(/^["']|["']$/g, '');
+    const have = line
+      ?.slice('stage:'.length)
+      .trim()
+      .replace(/^["']|["']$/g, '');
     const next = atLeastStage(have, change.stage);
     if (next !== have) set('stage', next);
   }
@@ -248,15 +270,19 @@ export function rewriteEssayFile(
 
 /** A frontmatter date as `YYYY-MM-DD`, whether the parser gave a Date or a string. */
 function day(value: unknown): string | null {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value.trim())) return value.trim().slice(0, 10);
+  if (value instanceof Date && !Number.isNaN(value.getTime()))
+    return value.toISOString().slice(0, 10);
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value.trim()))
+    return value.trim().slice(0, 10);
   return null;
 }
 
 function strings(value: unknown): string[] {
   if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map((s) => s.trim());
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+    .map((s) => s.trim());
 }
 
 function isOneOf<T extends string>(values: readonly T[], value: unknown): value is T {
@@ -293,8 +319,35 @@ export function readEssayFrontmatter(
 
 /** Words a slug leaves out, so "Why money is the odd good out" is `money-odd-good-out`. */
 const SLUG_SKIP = new Set([
-  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'of', 'to', 'in', 'on', 'at', 'for', 'and', 'or',
-  'but', 'why', 'how', 'what', 'when', 'where', 'who', 'which', 'do', 'does', 'did', 'it', 'its',
+  'a',
+  'an',
+  'the',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'of',
+  'to',
+  'in',
+  'on',
+  'at',
+  'for',
+  'and',
+  'or',
+  'but',
+  'why',
+  'how',
+  'what',
+  'when',
+  'where',
+  'who',
+  'which',
+  'do',
+  'does',
+  'did',
+  'it',
+  'its',
 ]);
 
 /** Longest slug, cut at a word. */

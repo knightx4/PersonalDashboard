@@ -39,6 +39,16 @@ export function briefUrl(day: string): string {
   return `/home?${BRIEF_DAY_PARAM}=${encodeURIComponent(day)}#${BRIEF_ANCHOR}`;
 }
 
+/**
+ * Where the notification opens when the day's first thing is on Learn
+ * (plan #2164.7): Now, on that card, marked with the day like the home link.
+ * The card is the one the brief read as the next to read; Now deals it first
+ * and falls back to its usual deck when the card has been answered since.
+ */
+export function learnBriefUrl(day: string, cardId: string): string {
+  return `/learn/now?card=${encodeURIComponent(cardId)}&${BRIEF_DAY_PARAM}=${encodeURIComponent(day)}`;
+}
+
 type SearchParams = Record<string, string | string[] | undefined>;
 
 function first(value: string | string[] | undefined): string | undefined {
