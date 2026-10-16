@@ -8,7 +8,7 @@ import { checkStepSend } from '@/lib/plan/handover';
 import { isClosed } from '@/lib/plan/load';
 import { stepRef } from '@/lib/plan/ref';
 import { isUuid, type AskContext, type AskToolResult } from './db';
-import { DELETABLE, DELETABLE_LIST, MAX_DELETE_ROWS, deleteInput, isDeletableTable, snapshotRows } from './delete-rows';
+import { DELETABLE, DELETABLE_LIST, MAX_DELETE_ROWS, deleteInput, isDeletableTable, refusal, snapshotRows } from './delete-rows';
 
 /**
  * The changes Dash may propose in an answer (plan #1188, feature #1186):
@@ -128,7 +128,7 @@ export const PROPOSAL_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'propose_delete',
-    description: `Propose deleting rows of the person's, when they ask you to remove or delete them (duplicate application answers, say). Only ${DELETABLE_LIST} can be proposed for now; table is job_search.application_answers. Name each row by the ref a lookup returned for it in this conversation (application_answers returns one per answer); look them up first, at most ${MAX_DELETE_ROWS} at once. Nothing is deleted: the person sees the rows listed on a card and confirms or declines, and a confirmed delete can be undone. Never propose rows they did not ask to remove, and say in your answer which you proposed and why. ${PROPOSE_NOTE}`,
+    description: `Propose deleting rows of the person's, when they ask you to remove or delete them (duplicate application answers, a note on a job, or a task, say). Only ${DELETABLE_LIST} can be proposed for now, one table per proposal. Name each row by the ref a lookup returned for it in this conversation (application_answers returns one per answer; list_rows on job_search.notes or recall one per note; search and todos return one per task, and a task with subtasks is refused); look them up first, at most ${MAX_DELETE_ROWS} at once. Nothing is deleted: the person sees the rows listed on a card and confirms or declines, and a confirmed delete can be undone. Never propose rows they did not ask to remove, and say in your answer which you proposed and why. ${PROPOSE_NOTE}`,
     input_schema: {
       type: 'object',
       properties: {
@@ -347,9 +347,9 @@ async function checkDelete(ctx: CheckContext, args: Record<string, unknown>): Pr
   if (rows.length !== ids.length) {
     throw new Refused(`${ids.length - rows.length} of those ${spec.noun[1]} are not one of theirs, or are gone.`);
   }
-  if (table === 'job_search.application_answers' && rows.some((row) => row.status === 'submitted')) {
-    throw new Refused('A submitted answer is never removed. Leave those out and propose the others.');
-  }
+  // A row with something attached, or one the table never lets go (a submitted answer).
+  const refused = await refusal(ctx, table, rows);
+  if (refused) throw new Refused(`${refused} Leave those out, propose any others, and tell them why.`);
   return { kind: 'delete_rows', input: await deleteInput(ctx, table, rows) };
 }
 
