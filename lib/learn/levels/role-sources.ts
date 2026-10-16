@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { rolesSource, type DraftSource } from '@/lib/learn/levels/draft-sources';
 
 /**
@@ -21,13 +22,26 @@ type RawRole = {
 };
 
 export async function roleRequirementSource(phrase: string): Promise<Omit<DraftSource, 'id'> | null> {
+  if (phrase.trim() === '') return null;
+  return roleRequirementSourceFrom(await createJobsClient(), phrase);
+}
+
+/**
+ * The same read through a client the caller gives. A service-role client
+ * sees every account, so it names whose roles to read (`owner`); the
+ * territory drafter (plan #2172.6) runs that way.
+ */
+export async function roleRequirementSourceFrom(
+  jobs: AppSupabaseClient,
+  phrase: string,
+  owner?: string,
+): Promise<Omit<DraftSource, 'id'> | null> {
   const words = phrase.trim();
   if (words === '') return null;
-  const jobs = await createJobsClient();
   const pattern = `%${words.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-  const { data, error } = await jobs
-    .from('roles')
-    .select('title, requirements, company:companies(name)')
+  let query = jobs.from('roles').select('title, requirements, company:companies(name)');
+  if (owner) query = query.eq('user_id', owner);
+  const { data, error } = await query
     .ilike('title', pattern)
     .not('requirements', 'is', null)
     .order('first_seen_at', { ascending: false })

@@ -26,6 +26,10 @@ export const youActions: ModuleActions = {
     discardUploadAction: none('page'),
     updateCourseAction: tool('change_course'),
     removeCourseAction: none('deletes'),
+    answerCourseExplainAction: none(
+      'own',
+      'The explain answer is what the person writes about a course, graded on a press; Dash does not answer for them.',
+    ),
     removeTranscriptAction: none('deletes'),
   },
   'app/you/places/actions.ts': {

@@ -82,13 +82,25 @@ export async function listTopics(client: Client): Promise<TopicRow[]> {
  * and evidence, reduced to the columns its rules use. Drafts are included and
  * marked, since the model itself leaves them out of what it asks.
  */
-export async function loadTopicMap(client: Client): Promise<TopicMap> {
-  const [topics, cells, links, evidence] = await Promise.all([
-    client.from('topics').select('id, name, ceiling, status'),
-    client.from('topic_cells').select('id, topic_id, level'),
-    client.from('cell_links').select('requiring_cell_id, required_cell_id'),
-    client.from('cell_evidence').select('cell_id, verdict, observed_at'),
-  ]);
+export async function loadTopicMap(client: Client, options: { userId?: string } = {}): Promise<TopicMap> {
+  // Under the service role, which RLS does not narrow, `userId` keeps the
+  // map to the shared territory and that account's rows (plan #2172.2).
+  const { userId } = options;
+  const sharedOrOwn = `user_id.is.null,user_id.eq.${userId}`;
+  const topicRead = client.from('topics').select('id, name, ceiling, status');
+  const cellRead = client.from('topic_cells').select('id, topic_id, level');
+  const linkRead = client.from('cell_links').select('requiring_cell_id, required_cell_id');
+  const evidenceRead = client.from('cell_evidence').select('cell_id, verdict, observed_at');
+  const [topics, cells, links, evidence] = await Promise.all(
+    userId
+      ? [
+          topicRead.or(sharedOrOwn),
+          cellRead.or(sharedOrOwn),
+          linkRead.or(sharedOrOwn),
+          evidenceRead.eq('user_id', userId),
+        ]
+      : [topicRead, cellRead, linkRead, evidenceRead],
+  );
   for (const read of [topics, cells, links, evidence]) {
     if (read.error) throw new Error(`Reading your topic map failed: ${read.error.message}`);
   }
@@ -118,9 +130,14 @@ export async function loadTopicMap(client: Client): Promise<TopicMap> {
   };
 }
 
-/** The map as the drafting call is told about it. */
-export async function loadMapTopics(client: Client): Promise<MapTopic[]> {
-  const { data, error } = await client.from('topics').select('id, name, scope, ceiling, status').order('name');
+/**
+ * The map as the drafting call is told about it. `owner` keeps a service-role
+ * read to the shared rows and that account's own, which RLS does otherwise.
+ */
+export async function loadMapTopics(client: Client, owner?: string): Promise<MapTopic[]> {
+  let query = client.from('topics').select('id, name, scope, ceiling, status');
+  if (owner) query = query.or(`user_id.is.null,user_id.eq.${owner}`);
+  const { data, error } = await query.order('name');
   if (error) throw new Error(`Reading your topics failed: ${error.message}`);
   return (data ?? []).map((t: { id: string; name: string; scope: string; ceiling: number; status: string }) => ({
     id: t.id,

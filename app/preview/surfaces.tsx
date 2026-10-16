@@ -242,7 +242,7 @@ import {
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
-import { educationGroups, educationCounts } from './education-fixtures';
+import { educationGroups, educationCounts, educationExplains } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -5494,7 +5494,9 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* Saved courses by school and then by term, newest first, with the
-     * transcripts each school issued. */
+     * transcripts each school issued. A graded course named for its topics
+     * offers its one explain prompt, and one already explained says what
+     * the answer showed (plan #2172.4.2). */
     id: 'you-work-list',
     label: 'Work & school · Courses by school and term',
     module: 'you',
@@ -5502,7 +5504,35 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <PageHeader title="Work & school" />
-        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+        <EducationSection
+          groups={educationGroups}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          explains={educationExplains}
+        />
+      </>
+    ),
+  },
+  {
+    /* A course's explain prompt open on its row (plan #2172.4.2): the
+     * question naming the topics the course was named for, the box, and the
+     * press that grades it. */
+    id: 'you-work-explain',
+    label: 'Work & school · Explaining a course',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          explains={educationExplains}
+          explaining="c3"
+        />
       </>
     ),
   },

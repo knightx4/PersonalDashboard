@@ -1,4 +1,5 @@
 import type { TranscriptDraft } from '@/app/you/work/actions';
+import { courseExplainPrompt, type CourseExplain } from '@/lib/learn/evidence/course-explain';
 import { groupCourses } from '@/lib/you/education';
 import type { Course, Transcript } from '@/lib/you/transcripts';
 
@@ -74,3 +75,38 @@ const courses: Course[] = [
 export const educationGroups = groupCourses(transcripts, courses);
 
 export const educationCounts: Record<string, number> = { 't-umich': 6, 't-lse': 3 };
+
+function offer(courseId: string, titles: string[]): CourseExplain {
+  const topics = titles.map((title, i) => ({ id: `${courseId}-t${i}`, title }));
+  return { state: 'offer', question: courseExplainPrompt(topics), topics };
+}
+
+/**
+ * The explain prompt on graded courses named for their topics (plan
+ * #2172.4.2): three offered, one with eight topics, one answered with a topic
+ * tested, one at a lower level and one the answer did not show. The
+ * ungraded course and the ones not yet named have none.
+ */
+export const educationExplains: Record<string, CourseExplain> = {
+  c3: offer('c3', ['Microeconomics', 'Supply and demand', 'Market equilibrium', 'Price elasticity of demand']),
+  c4: offer('c4', [
+    'Statistics',
+    'Probability distribution',
+    'Statistical hypothesis testing',
+    'Confidence interval',
+    'Linear regression',
+    'Sampling (statistics)',
+    'Standard deviation',
+    'Data analysis',
+  ]),
+  c5: {
+    state: 'tested',
+    answeredAt: '2026-10-14T19:20:00Z',
+    results: [
+      { title: 'Computer programming', level: 3 },
+      { title: 'Algorithm', level: 2 },
+      { title: 'Data structure', level: 0 },
+    ],
+  },
+  c7: offer('c7', ['Microeconomics', 'Game theory', 'General equilibrium theory']),
+};

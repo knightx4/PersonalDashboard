@@ -23,6 +23,8 @@ import {
   type CourseEditState,
 } from './actions';
 import { whenDate } from '@/lib/core/when';
+import type { CourseExplain } from '@/lib/learn/evidence/course-explain';
+import { CourseExplainForm, CourseExplainLine } from './course-explain';
 
 /**
  * One school's courses, term by term with the newest first, and the
@@ -32,10 +34,16 @@ import { whenDate } from '@/lib/core/when';
 export function SchoolCourses({
   group,
   courseCounts,
+  explains = {},
+  explaining,
 }: {
   group: SchoolGroup;
   /** How many courses each transcript holds, across every school. */
   courseCounts: Record<string, number>;
+  /** Each graded course's explain prompt or what its answer showed, by course id (plan #2172.4.2). */
+  explains?: Record<string, CourseExplain>;
+  /** The gallery's way to draw one course with its prompt open. */
+  explaining?: string;
 }) {
   const courses = group.terms.flatMap((term) => term.courses);
   const credits = courses.reduce((sum, course) => sum + (course.credits ?? 0), 0);
@@ -52,11 +60,18 @@ export function SchoolCourses({
         <section key={`${term.term ?? ''}|${term.year ?? ''}`} className="mt-3 first:mt-0">
           <h3 className="text-small font-medium text-ink-muted">
             {term.term ?? 'No term given'}
-            {term.term && term.year && !term.term.includes(String(term.year)) ? ` · ${term.year}` : ''}
+            {term.term && term.year && !term.term.includes(String(term.year))
+              ? ` · ${term.year}`
+              : ''}
           </h3>
           <ul className="divide-y divide-border">
             {term.courses.map((course) => (
-              <CourseRow key={course.id} course={course} />
+              <CourseRow
+                key={course.id}
+                course={course}
+                explain={explains[course.id]}
+                explaining={explaining === course.id}
+              />
             ))}
           </ul>
         </section>
@@ -82,37 +97,63 @@ export function SchoolCourses({
   );
 }
 
-function CourseRow({ course }: { course: Course }) {
+function CourseRow({
+  course,
+  explain,
+  explaining = false,
+}: {
+  course: Course;
+  explain?: CourseExplain;
+  explaining?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(explaining);
   if (editing) return <CourseEdit course={course} onClose={() => setEditing(false)} />;
 
   const credits = creditsLabel(course.credits);
+  const prompt = open && explain?.state === 'offer' ? explain : null;
   return (
-    <li id={courseAnchor(course.id)} className="flex scroll-mt-bar items-center gap-3 py-2 target:bg-accent-tint">
-      <span className="min-w-0 flex-1">
-        <span className="block text-body text-ink">
-          {course.code && <span className="mr-2 tabular-nums text-ink-muted">{course.code}</span>}
-          {course.title}
+    <li id={courseAnchor(course.id)} className="scroll-mt-bar py-2 target:bg-accent-tint">
+      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-body text-ink">
+            {course.code && <span className="mr-2 tabular-nums text-ink-muted">{course.code}</span>}
+            {course.title}
+          </span>
+          {explain && !prompt && (
+            <CourseExplainLine explain={explain} onOpen={() => setOpen(true)} />
+          )}
         </span>
-      </span>
-      <span className="shrink-0 text-right">
-        <span className="block text-body font-medium tabular-nums text-ink">{course.grade ?? '–'}</span>
-        {credits && <span className="block text-small tabular-nums text-ink-muted">{credits}</span>}
-      </span>
-      <ActionMenu
-        label={`Actions for ${course.title}`}
-        items={[
-          { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
-          {
-            id: 'remove',
-            label: 'Remove',
-            destructive: true,
-            confirm: 'Remove this course? It stays on the original transcript.',
-            formAction: removeCourseAction,
-            formFields: { id: course.id },
-          },
-        ]}
-      />
+        <span className="shrink-0 text-right">
+          <span className="block text-body font-medium tabular-nums text-ink">
+            {course.grade ?? '–'}
+          </span>
+          {credits && (
+            <span className="block text-small tabular-nums text-ink-muted">{credits}</span>
+          )}
+        </span>
+        <ActionMenu
+          label={`Actions for ${course.title}`}
+          items={[
+            { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
+            {
+              id: 'remove',
+              label: 'Remove',
+              destructive: true,
+              confirm: 'Remove this course? It stays on the original transcript.',
+              formAction: removeCourseAction,
+              formFields: { id: course.id },
+            },
+          ]}
+        />
+      </div>
+      {prompt && (
+        <CourseExplainForm
+          courseId={course.id}
+          question={prompt.question}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </li>
   );
 }
@@ -129,7 +170,12 @@ function CourseEdit({ course, onClose }: { course: Course; onClose: () => void }
     name: 'school' | 'code' | 'title' | 'term' | 'year' | 'credits' | 'grade',
     label: string,
     value: string | number | null,
-    extra: { className?: string; required?: boolean; inputMode?: 'numeric' | 'decimal'; max?: number } = {},
+    extra: {
+      className?: string;
+      required?: boolean;
+      inputMode?: 'numeric' | 'decimal';
+      max?: number;
+    } = {},
   ) => (
     <Field id={`${id}-${name}`} label={label} error={error(name)} className={extra.className}>
       <Input
@@ -148,13 +194,20 @@ function CourseEdit({ course, onClose }: { course: Course; onClose: () => void }
       <form action={save} className="space-y-3">
         <input type="hidden" name="id" value={course.id} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-          {field('title', 'Title', course.title, { className: 'col-span-2 sm:col-span-4', required: true, max: 300 })}
+          {field('title', 'Title', course.title, {
+            className: 'col-span-2 sm:col-span-4',
+            required: true,
+            max: 300,
+          })}
           {field('code', 'Code', course.code, { className: 'sm:col-span-2', max: 50 })}
           {field('term', 'Term', course.term, { className: 'sm:col-span-2', max: 50 })}
           {field('year', 'Year', course.year, { inputMode: 'numeric' })}
           {field('credits', 'Credits', course.credits, { inputMode: 'decimal' })}
           {field('grade', 'Grade', course.grade, { max: 20 })}
-          {field('school', 'School', course.school, { className: 'col-span-2 sm:col-span-5', max: 200 })}
+          {field('school', 'School', course.school, {
+            className: 'col-span-2 sm:col-span-5',
+            max: 200,
+          })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" size="sm" pending={saving}>
@@ -174,7 +227,9 @@ function TranscriptRow({ transcript, courses }: { transcript: Transcript; course
   return (
     <li
       id={transcriptAnchor(transcript.id)}
-      className={cn('flex scroll-mt-bar flex-wrap items-center gap-x-3 gap-y-1 py-2 target:bg-accent-tint')}
+      className={cn(
+        'flex scroll-mt-bar flex-wrap items-center gap-x-3 gap-y-1 py-2 target:bg-accent-tint',
+      )}
     >
       <a
         href={transcriptFileHref(transcript.id)}
