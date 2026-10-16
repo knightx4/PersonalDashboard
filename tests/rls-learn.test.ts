@@ -133,6 +133,7 @@ describe('RLS coverage', () => {
       'essay_research',
       'essays',
       'evidence_links',
+      'external_checks',
       'feed_cards',
       'goals',
       'graph_moves',

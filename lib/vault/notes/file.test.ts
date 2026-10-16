@@ -178,6 +178,15 @@ describe('making a quick note a note of its own', () => {
     expect(rows.get(quick.path)!.deleted).toBe(true);
   });
 
+  it('takes the name the person gave it in place of its first line (note 24fd1e02)', async () => {
+    const { ports, rows } = vault([quick]);
+    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'own', title: 'Lease call' } });
+
+    expect(result).toMatchObject({ ok: true, path: 'Lease call.md', removed: true });
+    expect(rows.get('Lease call.md')!.body).toBe('Ask Ana about the lease\nbefore Friday\n');
+    expect(rows.get(quick.path)!.deleted).toBe(true);
+  });
+
   it('takes the next number when the name is already taken', async () => {
     const taken: Row = { id: 't2', path: 'Ask Ana about the lease.md', title: 'Ask Ana about the lease', body: 'Older\n', blobSha: 'ob', deleted: false };
     const { ports, rows } = vault([quick, taken]);

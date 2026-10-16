@@ -233,6 +233,11 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
   },
   {
     file: 'app/dev/posts/actions.ts',
+    name: 'savePostWants',
+    run: () => (posts.savePostWants as Action)({}, form({ wants: 'No hashtags.' })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
     name: 'markPostPosted',
     run: () =>
       (posts.markPostPosted as Action)({}, form({ id: SOME_UUID, url: 'https://x.com/a/status/1' })),

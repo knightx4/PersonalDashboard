@@ -211,7 +211,13 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
 }
 
 /** The turn appended to the plan routine's session. */
-export function postsRunText(input: { userId: string; focus?: PostsRunFocus | null }): string {
+export function postsRunText(input: {
+  userId: string;
+  focus?: PostsRunFocus | null;
+  /** What the person saved on the Posts tab; empty or absent adds nothing. */
+  wants?: string | null;
+}): string {
+  const wants = (input.wants ?? '').trim();
   const lines = [
     `Suggest X posts about building this app, for user_id ${input.userId}.`,
     '',
@@ -223,6 +229,16 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
     '',
     focusLine(input.focus),
     '',
+    ...(wants
+      ? [
+          'What the person wants from their posts, as they saved it on the Posts tab. Read it ' +
+            'before choosing angles and count it as direction on topic and tone. The voice ' +
+            "guide's privacy and length checks win where they disagree with it.",
+          '',
+          ...wants.split('\n').map((line) => `> ${line}`),
+          '',
+        ]
+      : []),
     'Dash never posts. You change rows, not code, and do not touch any plan step. The one ' +
       'commit you may push is screenshots under public/posts/, as the skill describes.',
   ];

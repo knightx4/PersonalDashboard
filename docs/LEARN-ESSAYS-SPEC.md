@@ -74,17 +74,24 @@ sequence of question, thesis, points and outline, kept by hand, gets in the
 way. So the rule is: **the person only writes. Dash keeps everything else,
 and the person corrects Dash by writing, never by editing what Dash made.**
 
-An essay has two views, **Notes** and **Draft**, switched at the top of the
-page. It opens on the draft once the draft has 150 words, and on the notes
-otherwise.
+An essay has three tabs, **Prepare**, **Notes** and **Draft**, switched at
+the top of the page. It opens on the draft once the draft has 150 words, and
+on the notes otherwise. Notes and Draft hold an editor and nothing else.
+Prepare holds everything else, one card under another in the same column:
+the brief, the map, From your notes, the checks, what you studied, research,
+the length and the vault note, Finish and Publish. They sat in a rail beside
+the editor until 16 October 2026, when the owner found the page hard to read
+with both side by side. What Prepare puts into the draft (a link, a quote, a
+footnote) goes in where the cursor was, and the page moves to the Draft tab
+to show it.
 
 **Notes.** One editor for everything the person thinks: claims, examples,
 doubts, fragments, quotes, in any order. It saves itself a moment after they
 stop typing. An essay with no notes yet opens on what was already written for
 it (the brief's answers, replies to Dash, points and answers from the earlier
-stages, takes on research), so nothing is lost. The brief sits folded above.
+stages, takes on research), so nothing is lost. The brief sits on Prepare.
 
-**The map.** Beside the notes, Dash's map of them, made only when the person
+**The map.** On Prepare, Dash's map of the notes, made only when the person
 presses **Update the map** (one Sonnet call, a few cents). It shows:
 
 - what they seem to be arguing: one to three of their own sentences;
@@ -114,7 +121,7 @@ rest; and the whole-question research had cited vendor blogs and write-ups
 of a standard rather than the standard, and missed that SR 11-7 had been
 rescinded.
 
-**Draft.** The writing surface below. Beside it, **From your notes**:
+**Draft.** The writing surface below. On Prepare, **From your notes**:
 
 - **Assemble a draft** lays the person's own passages out in the map's order:
   their lead claim, then each thread as a heading in Dash's words with its
@@ -154,12 +161,15 @@ What the page looks like while you write:
 
 - One column, about 66 characters wide, body text at 19px with line height
   1.6.
-- The line you are typing stays in the middle of the screen.
+- The page scrolls only when the line you are typing comes within a third
+  of the screen of the bottom, and then only as far as it must. It used to
+  re-centre on every keystroke, which moved the page under you.
 - Markdown symbols are dimmed rather than hidden. Headings are larger.
 - A word count at the bottom, against a target if you set one.
-- No toolbar while you type. The tools come back when you move the mouse.
-- Margin notes are small markers in the right margin until you hover or open
-  one.
+- The tools stay where they are while you type. Hiding them on the first
+  keystroke moved the text up the page each time.
+- Margin notes are small markers in the right margin. Pressing one opens it
+  on Prepare.
 - An optional focus mode dims everything except the current paragraph.
 - Laptop first. On a phone the page is readable and editable, without the
   study panel.

@@ -299,6 +299,11 @@ export const learnSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'learn.external_checks',
+      reason:
+        'Published question sets the person sat once, kept with their score as an anchor for lens progress. The questions are not theirs and nothing on the map reads or changes because of a row.',
+    },
     { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
     { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
     { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },

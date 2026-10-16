@@ -318,6 +318,11 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.social_posts = socialPost.id;
 
+  await admin`
+    insert into post_preferences (user_id, wants)
+    values (${userId}, ${`${tag} wants short posts`})`;
+  ids.post_preferences = userId;
+
   const [xAccount] = await admin<{ id: string }[]>`
     insert into x_accounts (user_id, x_user_id, handle)
     values (${userId}, ${`${tag}-x`}, ${`${tag}handle`})
@@ -673,6 +678,7 @@ describe('cross-user reads', () => {
     inspiration_settings: 'user_id',
     inspiration_takeaway_videos: 'takeaway_id',
     module_visions: 'user_id',
+    post_preferences: 'user_id',
   };
 
   it('shows user B zero rows belonging to user A, in every table', async () => {

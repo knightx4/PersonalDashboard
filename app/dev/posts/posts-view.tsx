@@ -4,7 +4,8 @@ import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
-import type { PostCard, PostsPage } from '@/lib/dev/posts-page';
+import { POST_WANTS_MAX, type PostCard, type PostsPage } from '@/lib/dev/posts-page';
+import { PostWantsLine } from './post-wants';
 import { PostItem } from './post-item';
 import { AskForPost, SuggestPosts } from './suggest-posts';
 import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
@@ -67,11 +68,14 @@ export function PostsScreen({
   page,
   x,
   xNotice,
+  wantsPreview,
 }: {
   page: PostsPage;
   /** The X connection (plan #1818); left out where a surface draws only the drafts. */
   x?: XConnectionView;
   xNotice?: XConnectNotice | null;
+  /** The surface gallery's way to draw the wants box open, mid-save or refused. */
+  wantsPreview?: { open?: boolean; pending?: boolean; error?: string };
 }) {
   const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
   // Who a draft is posted as from the tab: only a sign-in that carries
@@ -88,6 +92,14 @@ export function PostsScreen({
         />
         <div className="-mt-3 space-y-1">
           <RunLine page={page} />
+          <PostWantsLine
+            text={page.wants.text}
+            day={page.wantsDay}
+            max={POST_WANTS_MAX}
+            defaultOpen={wantsPreview?.open}
+            pendingPreview={wantsPreview?.pending}
+            errorPreview={wantsPreview?.error}
+          />
           <AskForPost runState={page.runState} />
           <WritePost />
         </div>
