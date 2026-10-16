@@ -15,6 +15,7 @@ import {
 } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
+import { predictedStrength } from '@/lib/learn/predicted';
 import { EVIDENCE_CEILING } from '@/lib/learn/strength';
 
 /**
@@ -485,9 +486,16 @@ export async function recordProbe(
     };
   },
 ): Promise<string> {
+  // What Learn believed when it asked (plan #2179.1). A question written ahead
+  // has no such moment yet; `takeWaiting` records it when the question is shown.
+  const predicted =
+    input.flow && input.flow.shownAt === null
+      ? null
+      : await predictedStrength(supabase, input.conceptId);
   const { data, error } = await supabase
     .from('probes')
     .insert({
+      predicted_strength: predicted,
       ...(input.flow && {
         picked_state: input.flow.pickedState,
         picked_recheck: input.flow.pickedRecheck,
@@ -577,9 +585,11 @@ export async function recordAppliedCase(
   userId: string,
   input: { conceptId: string; case: AppliedCase; model: string },
 ): Promise<string> {
+  const predicted = await predictedStrength(supabase, input.conceptId);
   const { data, error } = await supabase
     .from('probes')
     .insert({
+      predicted_strength: predicted,
       user_id: userId,
       concept_id: input.conceptId,
       rung: 'apply',

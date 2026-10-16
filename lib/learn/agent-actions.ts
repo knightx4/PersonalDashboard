@@ -282,4 +282,9 @@ export const learnActions: ModuleActions = {
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },
+  'app/learn/settings/external/actions.ts': {
+    startExternalCheck: none('own', 'Pasting a published set to sit once is the person starting their own measurement.'),
+    answerExternal: none('own', 'The answers are the person\'s own, given blind; marking one spends.'),
+    skipExternal: none('own'),
+  },
 };
