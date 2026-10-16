@@ -1149,6 +1149,24 @@ export function StarSky({
     }
     return null;
   };
+  /** The chosen goal's topic whose ring is under a point, if any: a tap opens its territory (plan #2187.7). */
+  const goalStarAt = (at: Point, reach: number): string | null => {
+    const goalStars = latest.current.constellation?.stars;
+    if (!goalStars || !camera.current || !size || open) return null;
+    const cam = camera.current;
+    let best: string | null = null;
+    let bestDistance = Infinity;
+    for (const star of goalStars) {
+      const x = size.w / 2 + (star.at.x - cam.x) * cam.k;
+      const y = size.h / 2 - (star.at.y - cam.y) * cam.k;
+      const d = Math.hypot(x - at.x, y - at.y);
+      if (d <= Math.max(reach, star.ring + 4) && d < bestDistance) {
+        best = star.id;
+        bestDistance = d;
+      }
+    }
+    return best;
+  };
   const [overName, setOverName] = useState(false);
 
   const down = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1169,7 +1187,7 @@ export function StarSky({
     if (!last) {
       // A mouse passing over: the star under it is pointed at, and a name shows it can be pressed.
       if (event.pointerType !== 'mouse') return;
-      const onName = nameAt(at) !== null || topicAt(at) !== null;
+      const onName = nameAt(at) !== null || topicAt(at) !== null || goalStarAt(at, POINT_REACH) !== null;
       if (onName !== overName) setOverName(onName);
       const i = onName ? -1 : nearest(at, POINT_REACH);
       const id = i >= 0 ? stars[i]!.id : null;
@@ -1220,7 +1238,14 @@ export function StarSky({
       flyToTopic(topicId);
       return;
     }
-    const i = nearest(at, event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH);
+    const reach = event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH;
+    // A ringed topic of the chosen goal opens its territory, keeping the goal.
+    const goalTopic = params.goal ? goalStarAt(at, reach) : null;
+    if (goalTopic) {
+      openGraph({ kind: 'territory', id: params.goal!, topic: goalTopic });
+      return;
+    }
+    const i = nearest(at, reach);
     if (i < 0) {
       // Empty sky lets go of the open idea, then of a domain picked out in the legend.
       if (selectedId) pick(null);

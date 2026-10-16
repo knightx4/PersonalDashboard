@@ -615,6 +615,27 @@ export function IdeaSpaceTerritorySurface() {
   return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} />;
 }
 
+/**
+ * A territory as thin as the live one (plan #2187.7): topics with nothing
+ * held yet, one requirement between them, and nothing ready, so no route.
+ */
+const THIN = territoryFixture(VIEW.ideas);
+const THIN_VIEW = {
+  ...VIEW,
+  territories: [
+    {
+      ...THIN,
+      topics: THIN.topics.map((topic) => ({ ...topic, tested: 0, held: 0, missed: [] })),
+      links: THIN.links.slice(0, 1),
+      ready: [],
+    },
+  ],
+};
+
+export function IdeaSpaceTerritoryThinSurface() {
+  return <IdeaSpaceView view={THIN_VIEW} params={TERRITORY_PARAMS} />;
+}
+
 /** The same territory with its most linked star pointed at: every link it has, the level each needs, and its level line. */
 export function IdeaSpaceTerritoryHoverSurface() {
   return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} pointingAt={TERRITORY_POINTED} />;

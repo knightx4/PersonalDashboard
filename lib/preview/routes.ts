@@ -319,6 +319,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-around': ['/learn/space'],
   'learn-idea-space-territory': ['/learn/space'],
   'learn-idea-space-territory-hover': ['/learn/space'],
+  'learn-idea-space-territory-thin': ['/learn/space'],
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],

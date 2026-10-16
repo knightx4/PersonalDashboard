@@ -47,7 +47,7 @@ export function GoalRail({
       <ul className="mt-1 divide-y divide-border">
         {goals.map((goal) => {
           const on = goal.id === chosen?.id;
-          const change = { goal: on ? null : goal.id };
+          const change = { goal: on ? null : goal.id, topic: null };
           return (
             <li key={goal.id}>
               <Link
@@ -79,7 +79,7 @@ export function GoalRail({
       </ul>
       <p className="mt-1 text-small text-ink-muted">
         {chosen
-          ? `${chosen.stars.length === 1 ? 'Its topic is' : `Its ${countText(chosen.stars.length)} topics are`} ringed on the sky, wider for a higher target, and joined where one needs another. Press it again for the plain sky.`
+          ? `${chosen.stars.length === 1 ? 'Its topic is' : `Its ${countText(chosen.stars.length)} topics are`} ringed on the sky, wider for a higher target, and joined where one needs another. Tap a ring to open the goal there, with what you are ready for. Press the goal again for the plain sky.`
           : 'Choose one to ring its topics on the sky.'}
       </p>
     </Card>

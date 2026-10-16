@@ -49,6 +49,7 @@ import {
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
   IdeaSpaceTerritoryHoverSurface,
+  IdeaSpaceTerritoryThinSurface,
   IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
   IdeaSpaceGoalSurface,
@@ -6716,6 +6717,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceTerritoryHoverSurface />,
+  },
+  {
+    /* A territory as thin as the live one (plan #2187.7): nothing held,
+     * one requirement line, nothing ready, so no route and no Start here. */
+    id: 'learn-idea-space-territory-thin',
+    label: 'Learn · Idea Space, a territory with little in it',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryThinSurface />,
   },
   {
     /* The moment An idea lights up (plan #1997.10): three ideas set in the
