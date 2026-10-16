@@ -27,13 +27,19 @@ describe('opening the interview', () => {
   });
 
   it('names a finished goal in the first question', () => {
-    expect(openingAsk([goal])).toBe('You finished your goal “Monetary policy”. What is the question about it you want to answer?');
+    expect(openingAsk([goal])).toBe(
+      'You finished your goal “Monetary policy”. What is the question about it you want to answer?',
+    );
   });
 
   it('starts a brief with the pin and the first question', () => {
     const brief = newEssayBrief([goal]);
     expect(readBrief(brief).pinned).toEqual([goal]);
-    expect(readInterview(brief)).toEqual({ status: 'asking', field: 'question', ask: openingAsk([goal]) });
+    expect(readInterview(brief)).toEqual({
+      status: 'asking',
+      field: 'question',
+      ask: openingAsk([goal]),
+    });
   });
 
   it('starts from a research brief with its question filled in and the interview on the next one', () => {
@@ -42,7 +48,11 @@ describe('opening the interview', () => {
     expect(readBrief(brief).question).toBe('Does remote work raise output?');
     expect(readBrief(brief).claim).toBe('');
     expect(readBrief(brief).pinned).toEqual([pin]);
-    expect(readInterview(brief)).toEqual({ status: 'asking', field: 'claim', ask: PLAIN_ASKS.claim });
+    expect(readInterview(brief)).toEqual({
+      status: 'asking',
+      field: 'claim',
+      ask: PLAIN_ASKS.claim,
+    });
   });
 });
 
@@ -60,17 +70,35 @@ describe('answering', () => {
       field: 'claim',
       ask: 'What is your answer?',
     });
-    expect(readBrief(after)).toMatchObject({ question: 'Why do rates move house prices?', pinned: [goal] });
-    expect(readInterview(after)).toEqual({ status: 'asking', field: 'claim', ask: 'What is your answer?' });
+    expect(readBrief(after)).toMatchObject({
+      question: 'Why do rates move house prices?',
+      pinned: [goal],
+    });
+    expect(readInterview(after)).toEqual({
+      status: 'asking',
+      field: 'claim',
+      ask: 'What is your answer?',
+    });
   });
 
   it('ends the interview after the fifth answer, with all five in the brief', () => {
     let brief: Record<string, unknown> = newEssayBrief([goal]);
-    const answers = ['Q?', 'A claim.', 'My sister', 'A chart I saw', 'Prices falling while rates fell'];
+    const answers = [
+      'Q?',
+      'A claim.',
+      'My sister',
+      'A chart I saw',
+      'Prices falling while rates fell',
+    ];
     const fields = ['question', 'claim', 'reader', 'origin', 'change'] as const;
     fields.forEach((field, index) => {
       const next = nextField(field);
-      brief = answeredBrief(brief, field, answers[index]!, next ? { field: next, ask: PLAIN_ASKS[next] } : null);
+      brief = answeredBrief(
+        brief,
+        field,
+        answers[index]!,
+        next ? { field: next, ask: PLAIN_ASKS[next] } : null,
+      );
     });
     expect(readInterview(brief)).toEqual({ status: 'done' });
     expect(readBrief(brief)).toEqual({
@@ -84,7 +112,10 @@ describe('answering', () => {
   });
 
   it('skips a question on a blank answer without clearing what was there', () => {
-    const after = answeredBrief({ claim: 'Kept' }, 'claim', '   ', { field: 'reader', ask: PLAIN_ASKS.reader });
+    const after = answeredBrief({ claim: 'Kept' }, 'claim', '   ', {
+      field: 'reader',
+      ask: PLAIN_ASKS.reader,
+    });
     expect(readBrief(after).claim).toBe('Kept');
   });
 
@@ -94,13 +125,20 @@ describe('answering', () => {
   });
 
   it('skips the rest, keeping the answers', () => {
-    const after = skippedBrief({ question: 'Q?', interview: { status: 'asking', field: 'claim', ask: 'A?' } });
+    const after = skippedBrief({
+      question: 'Q?',
+      interview: { status: 'asking', field: 'claim', ask: 'A?' },
+    });
     expect(readInterview(after)).toEqual({ status: 'skipped' });
     expect(readBrief(after).question).toBe('Q?');
   });
 
   it('edits one line and leaves the rest', () => {
-    const after = editedBrief({ question: 'Q?', pinned: [goal], interview: { status: 'done' } }, 'reader', ' Anyone ');
+    const after = editedBrief(
+      { question: 'Q?', pinned: [goal], interview: { status: 'done' } },
+      'reader',
+      ' Anyone ',
+    );
     expect(readBrief(after)).toMatchObject({ question: 'Q?', reader: 'Anyone', pinned: [goal] });
     expect(readInterview(after)).toEqual({ status: 'done' });
   });
@@ -154,7 +192,12 @@ describe("Dash's question", () => {
 
   it('says so when the reply breaks the rules', async () => {
     const { client } = clientReplying('What a fascinating question! Who is it for?');
-    const result = await askNextQuestion({ brief: readBrief({}), field: 'reader', anthropicApiKey: 'k', client });
+    const result = await askNextQuestion({
+      brief: readBrief({}),
+      field: 'reader',
+      anthropicApiKey: 'k',
+      client,
+    });
     expect(result.ok).toBe(false);
   });
 });

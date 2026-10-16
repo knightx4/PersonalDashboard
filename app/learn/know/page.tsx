@@ -1,5 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { Network, Plus } from 'lucide-react';
+import { Layers, Network, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -43,6 +43,8 @@ import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { FieldLevels, GoalLenses, SubjectLenses, type SubjectLensRow } from './lens-lists';
+import { loadKnowLenses } from './lens-load';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +134,22 @@ export default async function KnowPage({
   );
   const rows = graphs.map(({ subject, graph }) => ({ subject, counts: countStates(graph) }));
 
+  // Every subject and goal is a lens (plan #2138.7). A failed read keeps the
+  // subjects list on the claims graph's counts and says the fields are
+  // missing, rather than taking the page.
+  const lenses = await loadKnowLenses(supabase, user.id);
+  const subjectRows: SubjectLensRow[] = rows.map(({ subject, counts }) => {
+    const lens = lenses?.bySubject.get(subject.id) ?? null;
+    return {
+      subjectId: subject.id,
+      name: subject.name,
+      note: subject.note,
+      lens,
+      graphLine: settledLine(counts),
+      comments: lens ? (lenses?.comments.get(lens.id) ?? 0) : 0,
+    };
+  });
+
   // The grid failing must not take the tracks list and the forms with it, so
   // a failed read becomes one line where the grid would be (law 2).
   let areas: LoadedAreaGrid | null = null;
@@ -213,6 +231,13 @@ export default async function KnowPage({
         description="One graph per subject, and it grows every time you use it."
         actions={
           <>
+            {/* The topics map (plan #2138.4), which the claims graph is
+                moving onto. A link here rather than a tab of its own, so
+                Learn's nav does not grow. */}
+            <Link href="/learn/topics" className={buttonVariants({ variant: 'secondary' })}>
+              <Layers className="size-4" strokeWidth={1.75} aria-hidden />
+              Topics
+            </Link>
             {!making && (
               <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
                 <Plus className="size-4" strokeWidth={1.75} aria-hidden />
@@ -236,25 +261,12 @@ export default async function KnowPage({
           description="A subject is the container: Economics, not the Phillips curve. Make one from the button above and it gets its first units, with more added as you finish them, or ask one question and the subject forms around it."
         />
       ) : (
-        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-          {rows.map(({ subject, counts }) => (
-            <li key={subject.id}>
-              <Link
-                href={`/learn/s/${subject.id}`}
-                className="flex items-baseline justify-between gap-3 px-4 py-3 hover:bg-sunken"
-              >
-                <span className="min-w-0">
-                  <span className="block text-body font-medium text-ink">{subject.name}</span>
-                  {subject.note && (
-                    <span className="block truncate text-ui text-ink-muted">{subject.note}</span>
-                  )}
-                </span>
-                <span className="shrink-0 text-ui text-ink-muted">{settledLine(counts)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <SubjectLenses rows={subjectRows} />
       )}
+
+      <GoalLenses goals={lenses?.goals ?? []} comments={lenses?.comments ?? new Map()} />
+
+      <FieldLevels fields={lenses?.fields ?? []} failed={lenses === null} />
 
       {areas ? (
         <AreasGrid

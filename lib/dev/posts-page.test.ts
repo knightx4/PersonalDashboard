@@ -87,6 +87,25 @@ describe('buildPostsPage', () => {
     expect(page.onX.total).toBe(60);
   });
 
+  it('hands each waiting or posted draft its thread, and a dropped one none (plan #2202.2)', () => {
+    const turn = (id: string) => ({ id, author: 'me' as const, body: '@dash shorter', createdAt: '2026-10-02T10:00:00Z' });
+    const page = buildPostsPage({
+      posts: [row('a', 'suggested'), row('b', 'posted'), row('c', 'dropped'), row('d', 'suggested')],
+      steps: [],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+      threads: new Map([
+        ['public.social_posts:a', [turn('t1')]],
+        ['public.social_posts:b', [turn('t2')]],
+        ['public.social_posts:c', [turn('t3')]],
+      ]),
+    });
+    expect(page.suggested.map((card) => card.thread.map((t) => t.id))).toEqual([['t1'], []]);
+    expect(page.posted[0].thread.map((t) => t.id)).toEqual(['t2']);
+    expect(page.dropped[0].thread).toEqual([]);
+  });
+
   it('lists the posts on X in whole pages of fifty, up to what X returns', () => {
     expect(xPostsShown(null)).toBe(50);
     expect(xPostsShown('70')).toBe(100);

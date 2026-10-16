@@ -106,6 +106,10 @@ export default async function NowPage({
     brief?: string | string[];
     from?: string | string[];
     piece?: string | string[];
+    cell?: string | string[];
+    run?: string | string[];
+    end?: string | string[];
+    after?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -172,7 +176,15 @@ export default async function NowPage({
       <PageColumn>
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
         {strip}
-        <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
+        <PracticeFlow
+          track={params.track}
+          goal={params.goal}
+          only={params.only}
+          cell={params.cell}
+          run={params.run}
+          end={params.end}
+          after={params.after}
+        />
       </PageColumn>
     );
   }

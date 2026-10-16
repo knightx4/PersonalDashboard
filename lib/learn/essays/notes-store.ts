@@ -50,7 +50,9 @@ function toNote(row: Row): EssayNote {
     checkName: row.check_name,
     rung: row.rung,
     body: row.body,
-    ladder: Array.isArray(row.ladder) ? row.ladder.filter((s): s is string => typeof s === 'string') : [],
+    ladder: Array.isArray(row.ladder)
+      ? row.ladder.filter((s): s is string => typeof s === 'string')
+      : [],
     why: row.why,
     status: row.status,
     anchor: {
@@ -97,7 +99,9 @@ function state(note: EssayNote): NoteState {
 
 function shown(notes: readonly EssayNote[]): EssayNotes {
   return {
-    notes: notes.filter((note) => note.status === 'open' || note.status === 'waiting' || note.status === 'detached'),
+    notes: notes.filter(
+      (note) => note.status === 'open' || note.status === 'waiting' || note.status === 'detached',
+    ),
     stopped: [...stoppedChecks(notes.map(state))],
   };
 }
@@ -154,7 +158,10 @@ export async function loadEssayNotes(
 }
 
 /** The notes the rules need to decide what a new run may raise. */
-export async function loadNoteStates(supabase: LearnSupabaseClient, essayId: string): Promise<NoteState[]> {
+export async function loadNoteStates(
+  supabase: LearnSupabaseClient,
+  essayId: string,
+): Promise<NoteState[]> {
   return (await loadRows(supabase, essayId)).map(state);
 }
 
@@ -188,7 +195,10 @@ export async function insertNotes(
 }
 
 /** The notes the page shows, after a change to them. */
-export async function shownNotes(supabase: LearnSupabaseClient, essayId: string): Promise<EssayNotes> {
+export async function shownNotes(
+  supabase: LearnSupabaseClient,
+  essayId: string,
+): Promise<EssayNotes> {
   return shown(await loadRows(supabase, essayId));
 }
 
@@ -209,8 +219,15 @@ export async function loadNote(
 }
 
 /** Move a note to a rung, saying what that rung says. */
-export async function setNoteRung(supabase: LearnSupabaseClient, note: EssayNote, rung: number): Promise<void> {
-  await update(supabase, note.id, { rung, body: rung === 4 ? note.body : bodyAt(note.ladder, rung) });
+export async function setNoteRung(
+  supabase: LearnSupabaseClient,
+  note: EssayNote,
+  rung: number,
+): Promise<void> {
+  await update(supabase, note.id, {
+    rung,
+    body: rung === 4 ? note.body : bodyAt(note.ladder, rung),
+  });
 }
 
 /**

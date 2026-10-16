@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { essayNoteText, newEssayFrontmatter, rewriteEssayFile } from './note';
 import { essaySnapshot, linksToEssay, publicLinks, unlinkEssay } from './publish';
 
-const fm = { ...newEssayFrontmatter({ title: 'Money', slug: 'money', description: 'Why money is odd.', today: '2026-10-12' }), stage: 'seedling' as const };
+const fm = {
+  ...newEssayFrontmatter({
+    title: 'Money',
+    slug: 'money',
+    description: 'Why money is odd.',
+    today: '2026-10-12',
+  }),
+  stage: 'seedling' as const,
+};
 
 const draft = [
   '# Money',
@@ -63,15 +71,20 @@ describe('essaySnapshot (plan #1863.11, R4)', () => {
   });
 
   it('takes the fields the site shows from the frontmatter', () => {
-    expect(snapshot).toMatchObject({ description: 'Why money is odd.', stage: 'seedling', confidence: null, tags: [] });
+    expect(snapshot).toMatchObject({
+      description: 'Why money is odd.',
+      stage: 'seedling',
+      confidence: null,
+      tags: [],
+    });
   });
 });
 
 describe('publicLinks', () => {
   it('reads a wikilink with a heading by its note name', () => {
-    expect(publicLinks('[[Fairness essay#Part two]]', new Map([['fairness essay', 'fairness']]))).toBe(
-      '[Fairness essay](/writing/fairness)',
-    );
+    expect(
+      publicLinks('[[Fairness essay#Part two]]', new Map([['fairness essay', 'fairness']])),
+    ).toBe('[Fairness essay](/writing/fairness)');
     expect(publicLinks('[[Private#Part two]]', new Map())).toBe('Private');
   });
 
@@ -94,14 +107,29 @@ describe('rewriteEssayFile with published', () => {
   const raw = essayNoteText(fm, 'Some words.');
 
   it('marks the note published and sets the first date', () => {
-    const next = rewriteEssayFile(raw, 'Some words.', { title: 'Money', published: '2026-10-13' }, fm);
+    const next = rewriteEssayFile(
+      raw,
+      'Some words.',
+      { title: 'Money', published: '2026-10-13' },
+      fm,
+    );
     expect(next).toContain('publish: true');
     expect(next).toMatch(/^published: 2026-10-13$/m);
   });
 
   it('keeps a first date already there', () => {
-    const once = rewriteEssayFile(raw, 'Some words.', { title: 'Money', published: '2026-10-13' }, fm);
-    const again = rewriteEssayFile(once, 'Some words.', { title: 'Money', published: '2026-11-01' }, fm);
+    const once = rewriteEssayFile(
+      raw,
+      'Some words.',
+      { title: 'Money', published: '2026-10-13' },
+      fm,
+    );
+    const again = rewriteEssayFile(
+      once,
+      'Some words.',
+      { title: 'Money', published: '2026-11-01' },
+      fm,
+    );
     expect(again).toMatch(/^published: 2026-10-13$/m);
   });
 });

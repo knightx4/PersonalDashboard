@@ -17,6 +17,23 @@ export const learnActions: ModuleActions = {
     },
     addConceptNote: tool('add_concept_note'),
   },
+  'app/learn/topics/actions.ts': {
+    draftTopicFromGoal: none('spends'),
+  },
+  'app/learn/topics/[id]/actions.ts': {
+    approveTopicDraft: none('theirs'),
+    mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    draftWantedTopic: none('spends'),
+    rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+  },
+  'app/learn/lens/[id]/actions.ts': {
+    saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),
+  },
+  'app/learn/topics/review/actions.ts': {
+    moveClaimsSubject: none('spends'),
+    refreshMoveReview: none('page', 'Reloads the review page once a run of moves ends; changes nothing.'),
+    answerMoveReview: none('theirs', 'Where an idea sits and whether a need between two ideas stands is the person’s call (LEARN-LEVELS-SPEC, "Migration from the claims graph").'),
+  },
   'app/learn/b/[id]/actions.ts': {
     saveShortAnswer: none('own'),
     setBriefWatch: none('setting'),
@@ -40,8 +57,6 @@ export const learnActions: ModuleActions = {
     saveEssayDraft: none('own'),
     saveEssayBriefField: none('own'),
     setEssayWordTarget: none('setting'),
-    answerEssayInterview: none('own'),
-    skipEssayInterview: none('own'),
     finishEssay: none('own'),
     acceptEssayFinish: none('theirs'),
     saveEssayToVaultAction: none('own'),
@@ -60,12 +75,10 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/e/[id]/guide-actions.ts': {
     changeEssayPlan: none('own'),
-    answerEssayPoint: none('own'),
-    readEssayBrief: none('spends'),
-    findEssayPoints: none('spends'),
-    shapeEssayPlan: none('spends'),
-    reviewEssayPlan: none('spends'),
-    askEssayPoint: none('spends'),
+    updateNoteMap: none('spends'),
+    findClusterEvidence: none('spends'),
+    writeModelDraft: none('spends'),
+    logEssayView: none('page'),
   },
   'app/learn/flow/actions.ts': {
     flowStep: none('page'),
@@ -73,12 +86,14 @@ export const learnActions: ModuleActions = {
     answerTrackOffer: none('theirs'),
     takeBackOfferAnswer: none('theirs', 'Undo: takes back their own answer.'),
   },
+  'app/learn/flow/cell-actions.ts': {
+    answerCellQuestion: none('own'),
+  },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
   },
   'app/learn/know/actions.ts': {
     proposeGoal: none('spends'),
-    approveChain: none('theirs'),
     proposePrior: none('spends'),
     approvePrior: none('theirs'),
     proposeFromCourse: none('spends'),

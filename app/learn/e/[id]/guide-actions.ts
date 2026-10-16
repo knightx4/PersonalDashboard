@@ -5,56 +5,39 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { readBrief } from '@/lib/learn/essays/model';
-import { loadPlanContext, savePlanJson } from '@/lib/learn/essays/store';
-import { guideCall } from '@/lib/learn/essays/guide-model';
-import { askPlan, readbackPlan } from '@/lib/learn/essays/guide-run';
+import { loadEssayDraftTarget, loadPlanContext, savePlanJson } from '@/lib/learn/essays/store';
 import {
-  FIND_POINTS_SYSTEM,
-  findPointsPrompt,
-  plainShapes,
-  readFoundPoints,
-  readReview,
-  readShapes,
-  REVIEW_SYSTEM,
-  reviewPrompt,
-  SHAPES_SYSTEM,
-  shapesPrompt,
-} from '@/lib/learn/essays/guide';
+  GUIDE_MODEL,
+  runModelDraft,
+  runNotesMap,
+  runPointEvidence,
+} from '@/lib/learn/essays/guide-model';
+import { evidencePrompt } from '@/lib/learn/essays/evidence';
+import { logEssayCall, logEssayStageVisit } from '@/lib/learn/essays/log-store';
 import {
-  answeredPoint,
-  closedReview,
-  DIG_KINDS,
-  editedPoint,
-  editedPointNote,
-  movedPoint,
-  NOTE_MAX,
-  ownWords,
+  mapNotesPrompt,
+  modelDraftPrompt,
+  notesOf,
+  NOTES_MAX,
+  readMapReply,
+} from '@/lib/learn/essays/notebook';
+import {
+  EVIDENCE_KINDS,
   planJson,
-  POINT_MAX,
   readPlan,
-  ROLES,
-  shapedPlan,
-  THESIS_MAX,
-  withoutPoint,
-  withPoint,
-  withReadbackReply,
-  withReview,
-  withTake,
-  withThesis,
   type EssayPlan,
-  type Shape,
+  type EvidenceKind,
 } from '@/lib/learn/essays/plan';
 
 /**
- * The guided essay's actions (docs/LEARN-ESSAYS-SPEC.md, "The stages").
+ * The notes-first essay's actions (docs/LEARN-ESSAYS-SPEC.md, "Notes first").
  *
- * The person's own changes to the plan go through `changeEssayPlan`, one
- * small change at a time, each read against the stored plan so two tabs do
- * not undo each other's points. The rest each make one Sonnet call, recorded
- * in the Learn spend ledger, and either change the plan (the read of the
- * brief, the notes on the plan, the next question about a point) or offer
- * something the person then chooses from (points found in their own words,
- * shapes for the essay).
+ * The person's own writing goes through `changeEssayPlan`: the notes page as
+ * typed, including the answers and sources the page appends to it.
+ * Each change is read against the stored plan, so two tabs do not undo each
+ * other. The rest each make one Sonnet call, recorded in the Learn spend
+ * ledger and logged with its response: the map of the notes, sources for one
+ * cluster of it, and a model draft.
  */
 
 export type PlanResult = { ok: true; plan: EssayPlan } | { ok: false; error: string };
@@ -65,6 +48,10 @@ function noKey(): { ok: false; error: string } {
   return { ok: false, error: 'Dash needs the Anthropic key, which is not set on this deployment.' };
 }
 
+function enough(notes: string): boolean {
+  return notes.trim().split(/\s+/).length >= 40;
+}
+
 async function context(id: string) {
   const supabase = await createLearnClient();
   const row = await loadPlanContext(supabase, id);
@@ -73,61 +60,17 @@ async function context(id: string) {
 }
 
 const Change = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('thesis'), text: z.string().max(THESIS_MAX * 2) }),
   z.object({
-    kind: z.literal('reply'),
-    index: z.number().int().min(0).max(10),
-    text: z.string().max(NOTE_MAX * 2),
+    kind: z.literal('notes'),
+    text: z.string().max(NOTES_MAX, 'The notes are longer than one page holds.'),
   }),
+  // The answer itself goes into the notes through the editor; this takes the question off the map.
+  z.object({ kind: z.literal('answered'), question: z.string().min(1).max(400) }),
+  // A source taken into the notes (through the editor) or dropped: either way it leaves the list.
   z.object({
-    kind: z.literal('take'),
-    key: z.string().min(1).max(120),
-    text: z.string().max(NOTE_MAX * 2),
-  }),
-  z.object({
-    kind: z.literal('add'),
-    text: z.string().max(POINT_MAX * 2),
-    role: z.enum(ROLES).optional(),
-  }),
-  z.object({
-    kind: z.literal('edit'),
-    point: z.string().min(1).max(64),
-    text: z
-      .string()
-      .max(POINT_MAX * 2)
-      .optional(),
-    role: z.enum(ROLES).optional(),
-    ready: z.boolean().optional(),
-  }),
-  z.object({ kind: z.literal('remove'), point: z.string().min(1).max(64) }),
-  z.object({
-    kind: z.literal('move'),
-    point: z.string().min(1).max(64),
-    by: z.union([z.literal(-1), z.literal(1)]),
-  }),
-  z.object({
-    kind: z.literal('note'),
-    point: z.string().min(1).max(64),
-    index: z.number().int().min(0).max(20),
-    text: z.string().max(NOTE_MAX * 2),
-  }),
-  z.object({ kind: z.literal('close-review'), note: z.string().min(1).max(64) }),
-  z.object({
-    kind: z.literal('shape'),
-    shape: z.object({
-      name: z.string().min(1).max(120),
-      why: z.string().max(400),
-      parts: z
-        .array(
-          z.object({
-            role: z.enum(ROLES),
-            guide: z.string().max(300),
-            points: z.array(z.string().max(64)).max(20),
-          }),
-        )
-        .min(1)
-        .max(12),
-    }),
+    kind: z.literal('drop-find'),
+    label: z.string().min(1).max(120),
+    item: z.string().min(1).max(64),
   }),
 ]);
 
@@ -135,37 +78,41 @@ export type PlanChange = z.infer<typeof Change>;
 
 function applied(plan: EssayPlan, change: PlanChange): EssayPlan {
   switch (change.kind) {
-    case 'thesis':
-      return withThesis(plan, change.text);
-    case 'reply':
-      return withReadbackReply(plan, change.index, change.text);
-    case 'take':
-      return withTake(plan, change.key, change.text);
-    case 'add':
-      return withPoint(plan, change.text, change.role);
-    case 'edit':
-      return editedPoint(plan, change.point, change);
-    case 'remove':
-      return withoutPoint(plan, change.point);
-    case 'move':
-      return movedPoint(plan, change.point, change.by);
-    case 'note':
-      return editedPointNote(plan, change.point, change.index, change.text);
-    case 'close-review':
-      return closedReview(plan, change.note);
-    case 'shape':
-      return shapedPlan(plan, change.shape as Shape);
+    case 'notes':
+      return { ...plan, notes: change.text };
+    case 'answered':
+      return plan.noteMap
+        ? {
+            ...plan,
+            noteMap: {
+              ...plan.noteMap,
+              questions: plan.noteMap.questions.filter((q) => q !== change.question),
+            },
+          }
+        : plan;
+    case 'drop-find':
+      return {
+        ...plan,
+        found: plan.found
+          .map((f) =>
+            f.label === change.label
+              ? { ...f, items: f.items.filter((i) => i.id !== change.item) }
+              : f,
+          )
+          .filter((f) => f.items.length > 0),
+      };
   }
 }
 
-/** One change the person made to their plan, in their own words. */
+/** One change the person made: their notes, a question answered, or a source taken or dropped. */
 // latency: optimistic
 export async function changeEssayPlan(id: string, change: PlanChange): Promise<PlanResult> {
   await requireUser();
   const parsedId = Id.safeParse(id);
   const parsed = Change.safeParse(change);
-  if (!parsedId.success || !parsed.success)
-    return { ok: false, error: 'Could not keep that change.' };
+  if (!parsedId.success) return { ok: false, error: 'Could not find that essay.' };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that change.' };
   try {
     const now = await context(parsedId.data);
     if (!now) return { ok: false, error: 'That essay is not there any more.' };
@@ -173,56 +120,18 @@ export async function changeEssayPlan(id: string, change: PlanChange): Promise<P
     await savePlanJson(now.supabase, parsedId.data, planJson(plan));
     return { ok: true, plan };
   } catch (error) {
-    console.error('[essay plan]', error instanceof Error ? error.message : error);
+    console.error('[essay notes]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Could not keep that change. Try again in a moment.' };
   }
 }
 
-/** Dash reads the brief again, with the person's replies to the last read. */
-// latency: pending
-export async function readEssayBrief(id: string): Promise<PlanResult> {
-  const user = await requireUser();
-  if (!Id.safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return noKey();
-  try {
-    const now = await context(id);
-    if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    if (!now.brief.question.trim() && !now.brief.claim.trim()) {
-      return {
-        ok: false,
-        error: 'Answer at least the question and your answer first; Dash reads those.',
-      };
-    }
-    const spend = collectSpend();
-    const read = await readbackPlan({
-      brief: now.brief,
-      plan: now.plan,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
-    });
-    await recordLearnSpend(user.id, 'read-essay-brief', spend.reports);
-    if (!read.ok) {
-      console.error('[essay readback]', read.detail);
-      return { ok: false, error: 'Dash could not read the brief just now. Try again in a moment.' };
-    }
-    await savePlanJson(now.supabase, id, planJson(read.plan));
-    return { ok: true, plan: read.plan };
-  } catch (error) {
-    console.error('[essay readback]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'Dash could not read the brief just now. Try again in a moment.' };
-  }
-}
-
-export type FoundPointsResult = { ok: true; found: string[] } | { ok: false; error: string };
-
 /**
- * Points found in what the person already wrote: their brief answers, their
- * replies to Dash and their takes on the research. Only passages that are
- * there word for word come back, and none is saved until they choose it.
+ * Dash's map of the notes, on the press of Update the map. The notes it read
+ * are saved with it, so an essay whose notes were only the seed from the old
+ * stages keeps them.
  */
 // latency: pending
-export async function findEssayPoints(id: string): Promise<FoundPointsResult> {
+export async function updateNoteMap(id: string): Promise<PlanResult> {
   const user = await requireUser();
   if (!Id.safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -230,89 +139,147 @@ export async function findEssayPoints(id: string): Promise<FoundPointsResult> {
   try {
     const now = await context(id);
     if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    const sources = ownWords(now.brief, now.plan);
-    if (sources.length === 0) {
+    const notes = notesOf(now.brief, now.plan);
+    if (!enough(notes)) {
       return {
         ok: false,
-        error:
-          'There is nothing of yours to look through yet. Answer the interview or note your take on the research first.',
+        error: 'Write a little more first: the map needs a paragraph or two of notes.',
       };
     }
-    const spend = collectSpend();
-    const reply = await guideCall({
-      system: FIND_POINTS_SYSTEM,
-      prompt: findPointsPrompt(now.brief, sources, now.plan.points),
-      maxTokens: 1_200,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
+    const prompt = mapNotesPrompt({
+      question: now.brief.question,
+      reader: now.brief.reader,
+      notes,
+      previous: now.plan.noteMap,
     });
-    await recordLearnSpend(user.id, 'find-essay-points', spend.reports);
+    const spend = collectSpend();
+    const reply = await runNotesMap({ prompt, anthropicApiKey: apiKey, onSpend: spend.sink });
+    await recordLearnSpend(user.id, 'map-essay-notes', spend.reports);
     if (!reply.ok) {
-      console.error('[essay points]', reply.detail);
+      console.error('[essay map]', reply.detail);
       return {
         ok: false,
-        error: 'Dash could not look through your writing just now. Try again in a moment.',
+        error: 'Dash could not read your notes just now. Try again in a moment.',
       };
     }
-    return { ok: true, found: readFoundPoints(reply.text, sources, now.plan.points) };
+    await logEssayCall(now.supabase, user.id, id, {
+      stage: 'notes',
+      action: 'map-essay-notes',
+      model: GUIDE_MODEL,
+      prompt,
+      content: [{ type: 'text', text: reply.text }],
+    });
+    const noteMap = readMapReply(reply.text, notes, new Date().toISOString());
+    if (!noteMap) {
+      console.error('[essay map] unreadable reply');
+      return {
+        ok: false,
+        error: 'Dash could not make a map of these notes. Try again, or write a little more.',
+      };
+    }
+    const plan = { ...now.plan, notes, noteMap };
+    await savePlanJson(now.supabase, id, planJson(plan));
+    return { ok: true, plan };
   } catch (error) {
-    console.error('[essay points]', error instanceof Error ? error.message : error);
-    return {
-      ok: false,
-      error: 'Dash could not look through your writing just now. Try again in a moment.',
-    };
+    console.error('[essay map]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not read your notes just now. Try again in a moment.' };
   }
 }
 
-export type ShapesResult =
-  | { ok: true; shapes: Shape[]; fromDash: boolean }
+const EvidenceInput = z.object({
+  id: Id,
+  label: z.string().min(1).max(120),
+  kind: z.enum(EVIDENCE_KINDS),
+});
+
+export type FindResult =
+  | { ok: true; plan: EssayPlan; found: number }
   | { ok: false; error: string };
 
 /**
- * Two or three shapes the essay could take, built around the person's
- * points. Nothing changes until they choose one. Without the key, or when
- * Dash's reply cannot be read, the three plain shapes are offered instead.
+ * Sources for one cluster of the map: the rule that applies, evidence, the
+ * strongest objection or a real case. They wait beside the cluster until the
+ * person adds one to the notes or drops it.
  */
 // latency: pending
-export async function shapeEssayPlan(id: string): Promise<ShapesResult> {
+export async function findClusterEvidence(
+  id: string,
+  label: string,
+  kind: string,
+): Promise<FindResult> {
   const user = await requireUser();
-  if (!Id.safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
+  const parsed = EvidenceInput.safeParse({ id, label, kind });
+  if (!parsed.success) return { ok: false, error: 'Could not search for that.' };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return noKey();
   try {
-    const now = await context(id);
+    const now = await context(parsed.data.id);
     if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    if (now.plan.points.filter((p) => p.text.trim()).length < 2) {
+    const cluster = now.plan.noteMap?.clusters.find((c) => c.label === parsed.data.label);
+    if (!cluster)
       return {
         ok: false,
-        error:
-          'Write at least two points on the Plan step first; the shapes are built around them.',
+        error: 'That part of the map has changed. Update the map and try again.',
       };
-    }
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { ok: true, shapes: plainShapes(now.plan), fromDash: false };
+    const prompt = evidencePrompt({
+      question: now.brief.question,
+      thesis: now.plan.noteMap?.claims[0] ?? now.brief.claim,
+      reader: now.brief.reader,
+      point: `${cluster.label}. In the writer's words: ${cluster.quotes.slice(0, 3).join(' / ')}`,
+      kind: parsed.data.kind as EvidenceKind,
+    });
     const spend = collectSpend();
-    const reply = await guideCall({
-      system: SHAPES_SYSTEM,
-      prompt: shapesPrompt(now.brief, now.plan),
-      maxTokens: 1_500,
+    const result = await runPointEvidence({
+      prompt,
+      kind: parsed.data.kind as EvidenceKind,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
-    await recordLearnSpend(user.id, 'shape-essay-plan', spend.reports);
-    const shapes = reply.ok ? readShapes(reply.text, now.plan) : [];
-    if (shapes.length === 0) {
-      console.error('[essay shapes]', reply.ok ? 'no shape could be read' : reply.detail);
-      return { ok: true, shapes: plainShapes(now.plan), fromDash: false };
+    await recordLearnSpend(user.id, 'find-point-evidence', spend.reports);
+    if (!result.ok) {
+      console.error('[essay evidence]', result.detail);
+      return { ok: false, error: 'Dash could not search just now. Try again in a moment.' };
     }
-    return { ok: true, shapes, fromDash: true };
+    await logEssayCall(now.supabase, user.id, parsed.data.id, {
+      stage: 'notes',
+      action: 'find-point-evidence',
+      kind: parsed.data.kind,
+      model: GUIDE_MODEL,
+      prompt,
+      content: result.content,
+    });
+    const group = now.plan.found.find((f) => f.label === cluster.label) ?? {
+      label: cluster.label,
+      items: [],
+    };
+    const taken = new Set(group.items.map((i) => i.id));
+    const items = [...group.items];
+    for (const item of result.items) {
+      if (items.some((i) => i.url === item.url && i.quote === item.quote)) continue;
+      let n = 1;
+      while (taken.has(`f${n}`)) n += 1;
+      taken.add(`f${n}`);
+      items.push({ ...item, id: `f${n}` });
+    }
+    const found = [
+      { label: cluster.label, items: items.slice(-6) },
+      ...now.plan.found.filter((f) => f.label !== cluster.label),
+    ].slice(0, 12);
+    const plan = { ...now.plan, found };
+    await savePlanJson(now.supabase, parsed.data.id, planJson(plan));
+    return { ok: true, plan, found: result.items.length };
   } catch (error) {
-    console.error('[essay shapes]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'Dash could not suggest shapes just now. Try again in a moment.' };
+    console.error('[essay evidence]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not search just now. Try again in a moment.' };
   }
 }
 
-/** Dash's notes on the plan as it stands: the biggest problems, each ending in a question. */
+/**
+ * Dash's model draft from the notes: a sparring partner shown beside the
+ * essay and never put into it.
+ */
 // latency: pending
-export async function reviewEssayPlan(id: string): Promise<PlanResult & { clean?: boolean }> {
+export async function writeModelDraft(id: string): Promise<PlanResult> {
   const user = await requireUser();
   if (!Id.safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -320,116 +287,63 @@ export async function reviewEssayPlan(id: string): Promise<PlanResult & { clean?
   try {
     const now = await context(id);
     if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    if (now.plan.points.length === 0)
-      return { ok: false, error: 'Add a point or two first; Dash reads the plan.' };
-    const spend = collectSpend();
-    const reply = await guideCall({
-      system: REVIEW_SYSTEM,
-      prompt: reviewPrompt(now.brief, now.plan),
-      maxTokens: 800,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
-    });
-    await recordLearnSpend(user.id, 'review-essay-plan', spend.reports);
-    if (!reply.ok) {
-      console.error('[essay review]', reply.detail);
-      return { ok: false, error: 'Dash could not read the plan just now. Try again in a moment.' };
+    const notes = notesOf(now.brief, now.plan);
+    if (!enough(notes)) {
+      return {
+        ok: false,
+        error: 'Write a little more in your notes first; the model draft is built from them.',
+      };
     }
-    const notes = readReview(reply.text);
-    const plan = withReview(now.plan, notes);
-    await savePlanJson(now.supabase, id, planJson(plan));
-    return { ok: true, plan, clean: notes.length === 0 };
-  } catch (error) {
-    console.error('[essay review]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'Dash could not read the plan just now. Try again in a moment.' };
-  }
-}
-
-const PointInput = z.object({
-  id: Id,
-  point: z.string().min(1).max(64),
-  kind: z.enum(DIG_KINDS).nullable(),
-});
-
-/** Dash's next question about one point, of the kind the person picked or the next in turn. */
-// latency: pending
-export async function askEssayPoint(
-  id: string,
-  point: string,
-  kind: string | null,
-): Promise<PlanResult> {
-  const user = await requireUser();
-  const parsed = PointInput.safeParse({ id, point, kind });
-  if (!parsed.success) return { ok: false, error: 'Could not ask about that point.' };
-  try {
-    const now = await context(parsed.data.id);
-    if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    const spend = collectSpend();
-    const plan = await askPlan({
-      brief: now.brief,
-      plan: now.plan,
-      pointId: parsed.data.point,
-      kind: parsed.data.kind,
-      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-      onSpend: spend.sink,
+    const target = await loadEssayDraftTarget(now.supabase, id);
+    const prompt = modelDraftPrompt({
+      question: now.brief.question,
+      reader: now.brief.reader,
+      target,
+      notes,
     });
-    await recordLearnSpend(user.id, 'word-point-question', spend.reports);
-    await savePlanJson(now.supabase, parsed.data.id, planJson(plan));
+    const spend = collectSpend();
+    const reply = await runModelDraft({ prompt, anthropicApiKey: apiKey, onSpend: spend.sink });
+    await recordLearnSpend(user.id, 'draft-essay-model', spend.reports);
+    if (!reply.ok || !reply.text.trim()) {
+      console.error('[essay model draft]', reply.ok ? 'empty' : reply.detail);
+      return {
+        ok: false,
+        error: 'Dash could not write a model draft just now. Try again in a moment.',
+      };
+    }
+    await logEssayCall(now.supabase, user.id, id, {
+      stage: 'draft',
+      action: 'draft-essay-model',
+      model: GUIDE_MODEL,
+      prompt,
+      content: [{ type: 'text', text: reply.text }],
+    });
+    const plan = {
+      ...now.plan,
+      notes,
+      modelDraft: { text: reply.text.trim(), at: new Date().toISOString() },
+    };
+    await savePlanJson(now.supabase, id, planJson(plan));
     return { ok: true, plan };
   } catch (error) {
-    console.error('[essay dig]', error instanceof Error ? error.message : error);
+    console.error('[essay model draft]', error instanceof Error ? error.message : error);
     return {
       ok: false,
-      error: 'Dash could not ask about that point just now. Try again in a moment.',
+      error: 'Dash could not write a model draft just now. Try again in a moment.',
     };
   }
 }
 
-const AnswerInput = z.object({
-  id: Id,
-  point: z.string().min(1).max(64),
-  answer: z
-    .string()
-    .max(NOTE_MAX * 2, 'That is long for one answer; keep it to a paragraph or two.'),
-  more: z.boolean(),
-});
-
-/**
- * The person's answer to the question about a point, kept under it in their
- * words. With `more`, Dash asks the next question straight away, so the
- * conversation carries on; without it, the point is left with its notes.
- */
-// latency: pending
-export async function answerEssayPoint(
-  id: string,
-  point: string,
-  answer: string,
-  more: boolean,
-): Promise<PlanResult> {
+/** The notes or the draft was opened: one row, so where people stop is visible. */
+// latency: instant
+export async function logEssayView(id: string, view: string): Promise<void> {
   const user = await requireUser();
-  const parsed = AnswerInput.safeParse({ id, point, answer, more });
-  if (!parsed.success)
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that answer.' };
+  const parsed = z.object({ id: Id, view: z.enum(['notes', 'draft']) }).safeParse({ id, view });
+  if (!parsed.success) return;
   try {
-    const now = await context(parsed.data.id);
-    if (!now) return { ok: false, error: 'That essay is not there any more.' };
-    let plan = answeredPoint(now.plan, parsed.data.point, parsed.data.answer);
-    if (parsed.data.more) {
-      const spend = collectSpend();
-      plan = await askPlan({
-        brief: now.brief,
-        plan,
-        pointId: parsed.data.point,
-        kind: null,
-        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-        onSpend: spend.sink,
-      });
-      await recordLearnSpend(user.id, 'word-point-question', spend.reports);
-    }
-    await savePlanJson(now.supabase, parsed.data.id, planJson(plan));
-    return { ok: true, plan };
+    const supabase = await createLearnClient();
+    await logEssayStageVisit(supabase, user.id, parsed.data.id, parsed.data.view);
   } catch (error) {
-    console.error('[essay dig]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'Could not keep that answer. Try again in a moment.' };
+    console.error('[essay log]', error instanceof Error ? error.message : error);
   }
 }

@@ -31,12 +31,16 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  */
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
-  'app/learn/know/actions.ts#proposeGoal': [
-    'name-opening-claims',
-    'write-opening-question',
-    'generate-chain',
-  ],
-  'app/learn/know/actions.ts#approveChain': ['place-track', 'write-curriculum'],
+  // Naming a goal drafts its topic since the claims graph moved (plan #2138.4).
+  'app/learn/know/actions.ts#proposeGoal': ['draft-topic', 'embed-topic-scope'],
+  // Learn: a topic with ten levels (plan #2138.2). Drafting embeds the scope
+  // in the same press to find a topic it duplicates; a topic the draft's links
+  // need is drafted the same way.
+  'app/learn/topics/actions.ts#draftTopicFromGoal': ['draft-topic', 'embed-topic-scope'],
+  'app/learn/topics/[id]/actions.ts#draftWantedTopic': ['draft-topic', 'embed-topic-scope'],
+  // Moving one subject from the claims graph (plan #2138.4): the call placing
+  // its ideas, and each topic it names that the map lacks, drafted and embedded.
+  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics', 'draft-topic', 'embed-topic-scope'],
   'app/learn/know/actions.ts#proposePrior': ['concepts-from-prior'],
   'app/learn/know/actions.ts#approvePrior': ['place-track'],
   'app/learn/know/actions.ts#proposeBrief': ['concepts-from-brief'],
@@ -44,8 +48,6 @@ export const PAID_ACTIONS = {
   'app/learn/know/actions.ts#proposeFromNote': ['classify-note', 'concepts-from-brief'],
   'app/learn/know/actions.ts#proposeFromCourse': ['concepts-from-course'],
   'app/learn/know/actions.ts#approveFromCourse': ['place-track'],
-  // Learn: an essay's interview, one question per answer (plan #1867)
-  'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question', 'read-essay-brief'],
   // Learn: Rephrase on a selection in an essay (plan #1868)
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
@@ -65,15 +67,12 @@ export const PAID_ACTIONS = {
   // Learn: research on an essay (plan #1863.9), one button per level. The
   // first pass searches the question; the deeper pass gathers pages and
   // marks the draft's claims against them.
-  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question', 'write-essay-research'],
-  // Learn: the guided essay's stages (LEARN-ESSAYS-SPEC, "The stages").
-  // Answering the interview's last question also has Dash read the brief.
-  'app/learn/e/[id]/guide-actions.ts#readEssayBrief': ['read-essay-brief'],
-  'app/learn/e/[id]/guide-actions.ts#findEssayPoints': ['find-essay-points'],
-  'app/learn/e/[id]/guide-actions.ts#shapeEssayPlan': ['shape-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#reviewEssayPlan': ['review-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#askEssayPoint': ['word-point-question'],
-  'app/learn/e/[id]/guide-actions.ts#answerEssayPoint': ['word-point-question'],
+  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
+  // Learn: the notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): the map
+  // of the notes, sources for one cluster, and a model draft.
+  'app/learn/e/[id]/guide-actions.ts#updateNoteMap': ['map-essay-notes'],
+  'app/learn/e/[id]/guide-actions.ts#findClusterEvidence': ['find-point-evidence'],
+  'app/learn/e/[id]/guide-actions.ts#writeModelDraft': ['draft-essay-model'],
   'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
   // Learn: Finish on an essay names the claims it argues and looks for the
   // notes that already hold each (plan #1873). Accepting the offers writes
@@ -137,6 +136,8 @@ export const PAID_ACTIONS = {
     'place-track',
     'write-probe',
   ],
+  // Learn: an explanation graded against the levels of a topic (plan #2138.5)
+  'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],

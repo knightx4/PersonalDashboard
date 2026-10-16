@@ -405,6 +405,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   spec: DEV_STORE,
   takeaway: DEV_STORE,
   change: DEV_STORE,
+  post: DEV_STORE,
   goal: GOALS_STORE,
   role: ROLE_STORE,
   file: ROW_STORE,
@@ -414,6 +415,8 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   story: ROW_STORE,
   vault_note: ROW_STORE,
   reading: READING_STORE,
+  topic: ROW_STORE,
+  lens: ROW_STORE,
 };
 
 function DeleteComment({

@@ -3,20 +3,19 @@
  * (plan #2016.3). Pure, so the rules can be tested without a database; the
  * store that reads the sources and writes the links is ./topics-store.
  *
- * A topic unlocks in one of three ways:
+ * A topic unlocks in one of two ways:
  *
- *   1. Your text names it by a sure name: a title of two or more words
- *      ("Expected value", "Four Noble Truths"), or a short capitalised name
- *      such as "LBO" or "CAPM", matched case for case.
- *   2. Your text names it by a loose name, and the same text is about it: a
- *      one-word title ("Time", "Stoicism"), the bare part of a title that has
- *      a qualifier ("Derivative" for "Derivative (finance)"), or one of the
- *      other names Wikipedia redirects from, with the source's vector at
- *      NAME_CONFIRM_SIMILARITY or closer to the topic's. On the live vault a
- *      one-word title is named in 1,684 topics' worth of notes, from "Time"
- *      in 379 of them to "Well", "Lead" and "Bit" read in the wrong sense,
- *      and redirects include phrases such as "the change" and "for lease".
- *   3. Two sources agree: one source's vector is STRONG_SIMILARITY or closer
+ *   1. Your text names it (a title, a bare title, a redirect name, or a short
+ *      capitalised name such as "LBO"), and the source's vector is at
+ *      NAME_CONFIRM_SIMILARITY or closer to the topic's, or two different
+ *      documents name it by a sure name (plan #2172.1). A name alone, in one document that is
+ *      not about the topic, counts for nothing: a city named once in a travel
+ *      note is not a city you know. The link is still kept, with matched_by
+ *      'name' and a held_reason, and topic state does not read it. On the live
+ *      vault a one-word title is named in 1,684 topics' worth of notes, from
+ *      "Time" in 379 of them to "Well", "Lead" and "Bit" read in the wrong
+ *      sense.
+ *   2. Two sources agree: one source's vector is STRONG_SIMILARITY or closer
  *      to the topic, and a source from another document is at least
  *      AGREE_SIMILARITY. One match alone never unlocks anything, however
  *      close, since similarity alone put "the three statements are linked"
@@ -253,20 +252,21 @@ export type TopicLinkRow = {
   weight: number;
   basis: string;
   matched_by: 'name' | 'similarity';
+  /** Set on a name match that does not count (plan #2172.1); topic state skips it. */
+  held_reason: string | null;
 };
 
 const sourceKey = (source: TopicSource) => `${source.kind} ${source.id}`;
 
-/** Whether a name on its own unlocks: a sure one, or a loose one the text is about. */
-function nameCounts(hit: TopicHit): boolean {
-  if (!hit.name) return false;
-  return hit.name.sure || (hit.similarity ?? 0) >= NAME_CONFIRM_SIMILARITY;
-}
+/** Why a name match on its own is not believed. */
+export const HELD_REASON = 'Named in the text, but the text is not about the topic (similarity under 0.5) and no second document names it.';
 
 /**
  * The links that unlock topics. Hits for the same topic and source are
- * merged first: the name kept, the closer similarity kept. A topic with no
- * name that counts and no two agreeing sources gets no link at all.
+ * merged first: the name kept, the closer similarity kept. A name counts when
+ * the source is at least NAME_CONFIRM_SIMILARITY close to the topic or two
+ * documents name it by a sure name; a name that does neither is kept with a held_reason. A
+ * topic with no name at all and no two agreeing sources gets no link.
  */
 export function decideTopicUnlocks(hits: readonly TopicHit[]): TopicLinkRow[] {
   const byTopic = new Map<string, Map<string, TopicHit>>();
@@ -289,7 +289,14 @@ export function decideTopicUnlocks(hits: readonly TopicHit[]): TopicLinkRow[] {
   const rows: TopicLinkRow[] = [];
   for (const [topicId, sources] of byTopic) {
     const all = [...sources.values()];
-    const named = all.filter(nameCounts);
+    const nameHits = all.filter((h) => h.name);
+    // A name counts where the text is about the topic, or two documents use it.
+    // Only a sure name can be confirmed that way: "Valley" in two notes is two uses of a common word.
+    const independent = new Set(nameHits.filter((h) => h.name?.sure).map((h) => h.source.document)).size >= 2;
+    const named = nameHits.filter(
+      (h) => (independent && h.name?.sure) || (h.similarity ?? 0) >= NAME_CONFIRM_SIMILARITY,
+    );
+    const held = nameHits.filter((h) => !named.includes(h));
 
     const close = all.filter((h) => (h.similarity ?? 0) >= AGREE_SIMILARITY);
     const agreed = close.some(
@@ -298,26 +305,29 @@ export function decideTopicUnlocks(hits: readonly TopicHit[]): TopicLinkRow[] {
         close.some((other) => other.source.document !== strong.source.document),
     );
 
-    const namedKeys = new Set(named.map((h) => sourceKey(h.source)));
+    const namedKeys = new Set(nameHits.map((h) => sourceKey(h.source)));
     const kept = [
-      ...named.map((hit) => ({ hit, by: 'name' as const })),
+      ...named.map((hit) => ({ hit, by: 'name' as const, hold: false })),
       ...(agreed ? close.filter((h) => !namedKeys.has(sourceKey(h.source))) : []).map((hit) => ({
         hit,
         by: 'similarity' as const,
+        hold: false,
       })),
+      ...held.map((hit) => ({ hit, by: 'name' as const, hold: true })),
     ];
     if (kept.length === 0) continue;
 
     kept
       .sort(
         (a, b) =>
+          Number(a.hold) - Number(b.hold) ||
           (a.by === b.by ? 0 : a.by === 'name' ? -1 : 1) ||
           b.hit.source.weight * (b.hit.similarity ?? 0) - a.hit.source.weight * (a.hit.similarity ?? 0) ||
           b.hit.source.weight - a.hit.source.weight ||
           sourceKey(a.hit.source).localeCompare(sourceKey(b.hit.source)),
       )
       .slice(0, LINKS_PER_TOPIC)
-      .forEach(({ hit, by }) => {
+      .forEach(({ hit, by, hold }) => {
         rows.push({
           target_kind: 'topic',
           target_id: topicId,
@@ -327,6 +337,7 @@ export function decideTopicUnlocks(hits: readonly TopicHit[]): TopicLinkRow[] {
           weight: Math.min(1, Math.max(0, hit.source.weight)),
           basis: by === 'name' ? `named in ${hit.source.label}` : `close to ${hit.source.label}`,
           matched_by: by,
+          held_reason: hold ? HELD_REASON : null,
         });
       });
   }

@@ -12,7 +12,10 @@ describe('claimsText', () => {
 describe('readClaims', () => {
   const reply = JSON.stringify({
     claims: [
-      { name: 'Money is a shared expectation', claim: 'It holds value because  everyone expects it to.' },
+      {
+        name: 'Money is a shared expectation',
+        claim: 'It holds value because  everyone expects it to.',
+      },
       { name: 'money is a shared expectation', claim: 'A repeat.' },
       { name: '', claim: 'No name.' },
       { name: 'No claim', claim: '' },
@@ -22,7 +25,10 @@ describe('readClaims', () => {
 
   it('keeps entries with a name and a claim, once each, with spaces closed up', () => {
     expect(readClaims(reply)).toEqual([
-      { name: 'Money is a shared expectation', claim: 'It holds value because everyone expects it to.' },
+      {
+        name: 'Money is a shared expectation',
+        claim: 'It holds value because everyone expects it to.',
+      },
       { name: 'Scarcity is not enough', claim: 'Gold is scarce; agreement makes it money.' },
     ]);
   });
@@ -38,14 +44,22 @@ describe('readClaims', () => {
   });
 
   it('keeps at most the limit', () => {
-    const many = Array.from({ length: 20 }, (_, i) => ({ name: `Claim ${i}`, claim: `Says ${i}.` }));
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      name: `Claim ${i}`,
+      claim: `Says ${i}.`,
+    }));
     expect(readClaims(JSON.stringify(many))).toHaveLength(MAX_CLAIMS);
   });
 });
 
 describe('claimNote', () => {
   it('is a heading, the claim and a link back to the essay', () => {
-    expect(claimNote({ name: 'Money is a shared expectation', claim: 'It holds value.' }, 'Why money is [odd]')).toBe(
+    expect(
+      claimNote(
+        { name: 'Money is a shared expectation', claim: 'It holds value.' },
+        'Why money is [odd]',
+      ),
+    ).toBe(
       '# Money is a shared expectation\n\nIt holds value.\n\nArgued in [[Why money is odd]].\n',
     );
   });
@@ -85,11 +99,19 @@ describe('essayEvidence', () => {
       finishedOn: '2026-10-12',
     });
     expect(item.title).toBe('Essay: Why money is the odd good out');
-    expect(item.body).toContain('I wrote an essay arguing that money holds value because we expect it to.');
+    expect(item.body).toContain(
+      'I wrote an essay arguing that money holds value because we expect it to.',
+    );
     expect(item.body).toContain('- Shared expectation: Everyone expects others to accept it.');
     expect(item.body).toContain('/learn/e/abc');
     expect(item.context).toBe('An essay I finished on 2026-10-12.');
-    const long = essayEvidence({ id: 'a', title: 'x'.repeat(400), claim: '', claims: [], finishedOn: 'd' });
+    const long = essayEvidence({
+      id: 'a',
+      title: 'x'.repeat(400),
+      claim: '',
+      claims: [],
+      finishedOn: 'd',
+    });
     expect(long.title.length).toBeLessThanOrEqual(160);
   });
 });

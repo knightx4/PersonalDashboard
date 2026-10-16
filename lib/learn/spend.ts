@@ -67,6 +67,13 @@ export const LEARN_OPERATIONS = [
   'grade-quiz-answer',
   'write-applied-case',
   'grade-applied-answer',
+  // Grading an explanation against the levels of a topic (LEARN-LEVELS-SPEC,
+  // "How answers are graded"; plan #2138.5): one Haiku call per answer, reading
+  // the asked cell, its neighbours and the cells it requires.
+  'grade-cell-answer',
+  // Writing the case a level 4 to 6 cell is asked as (plan #2138.8): one Haiku
+  // call when the cell is first asked, none when an unanswered one is reused.
+  'write-cell-case',
   // The catalogue embedding sweep, which records through its own postgres
   // connection rather than through `recordLearnSpend`: it runs from a script,
   // and reaching the ledger the usual way would pull `next/headers` in. The
@@ -334,7 +341,7 @@ export const LEARN_OPERATIONS = [
   // also finds the notes to compare with, under 'embed-note-match'.
   'check-essay-paragraph',
   // Research on an essay, at the level whose button was pressed (plan
-  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // #1863.9). The first is one Sonnet call with up to eight web searches.
   // The deeper pass is one Haiku call with up to eight searches and five
   // pages read, then one Sonnet call marking the draft's claims against the
   // pages; apart, so each model's share can be read.
@@ -370,11 +377,31 @@ export const LEARN_OPERATIONS = [
   'shape-essay-plan',
   'review-essay-plan',
   'word-point-question',
+  // Evidence of one kind for one point of an essay (LEARN-ESSAYS-SPEC,
+  // "Evidence on a point"): one Sonnet call with up to four web searches.
+  'find-point-evidence',
+  // The notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): one Sonnet
+  // call reading the whole notes page into a map, on each press of Update
+  // the map, and one writing a model draft from the notes.
+  'map-essay-notes',
+  'draft-essay-model',
   // The essay's research written up as a map (plan stage Research): the
   // Sonnet calls framing the question and writing from the pages read. The
   // Haiku search and reading in between records under
   // 'research-essay-question'.
   'write-essay-research',
+  // Drafting a topic with its ten levels from a goal the person named
+  // (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"; plan #2138.2). One Sonnet
+  // call per draft. The first twenty are the measurement for the spec's
+  // missing cost line, so it stays apart from 'generate-chain'.
+  'draft-topic',
+  // Embedding a drafted topic's scope to find a topic it duplicates. Apart
+  // from 'embed-claim' so the cost of deduplication can be read on its own.
+  'embed-topic-scope',
+  // Moving the claims graph onto topics (plan #2138.4): one Sonnet call per
+  // subject placing its concepts on topics and levels. The topics it names
+  // that the map lacks are drafted under 'draft-topic'.
+  'assign-topics',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -4,20 +4,23 @@
  * and R2; plan #1937.6). The dock shows the first three sections beside the
  * switcher and More, so these two fix its first two slots in every workspace.
  *
- * The section lists are built inside server layouts that read the database,
- * so this reads the layouts' source instead: every object literal with both
- * an `href` and a `label` is a section, in the order it is written.
+ * The tabs and their order come from the one list in lib/shell/tabs.ts
+ * (plan #2208). The badges and the settings link are still each layout's, and
+ * its layout reads the database, so those are read from the layout's source:
+ * a `badge` on an object literal with an `href`, or an address given a count
+ * through `withBadges(…, { '<href>': … })`.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { MODULES } from '@/lib/modules';
+import { WORKSPACE_TABS, type TabWorkspace } from '@/lib/shell/tabs';
 
 const ROOT = join(__dirname, '..');
 
 /** Each workspace's layout, the file that names its sections. */
-const LAYOUTS: Record<string, string> = {
+const LAYOUTS: Partial<Record<TabWorkspace, string>> = {
   shopping: 'app/shopping/layout.tsx',
   jobs: 'app/jobs/(app)/layout.tsx',
   todo: 'app/todo/layout.tsx',
@@ -33,8 +36,6 @@ const LAYOUTS: Record<string, string> = {
  * Inboxes were built (plan #1937.5); take it off this list when it has one.
  */
 const NO_INBOX_YET = new Set(['you']);
-
-type Section = { href: string; label: string; badge: boolean };
 
 function stringProp(node: ts.ObjectLiteralExpression, name: string): string | null {
   for (const prop of node.properties) {
@@ -59,7 +60,7 @@ function hasProp(node: ts.ObjectLiteralExpression, name: string): boolean {
   );
 }
 
-function read(file: string): { sections: Section[]; settings: boolean } {
+function read(file: string): { badged: string[]; settings: boolean } {
   const source = ts.createSourceFile(
     file,
     readFileSync(join(ROOT, file), 'utf8'),
@@ -67,19 +68,30 @@ function read(file: string): { sections: Section[]; settings: boolean } {
     true,
     ts.ScriptKind.TSX,
   );
-  const sections: Section[] = [];
+  const badged: string[] = [];
   let settings = false;
   const visit = (node: ts.Node) => {
     if (ts.isObjectLiteralExpression(node)) {
       const href = stringProp(node, 'href');
-      const label = stringProp(node, 'label');
-      if (href !== null && label !== null) sections.push({ href, label, badge: hasProp(node, 'badge') });
+      if (href !== null && hasProp(node, 'badge')) badged.push(href);
       if (stringProp(node, 'settingsHref') !== null) settings = true;
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'withBadges'
+    ) {
+      const counts = node.arguments[1];
+      if (counts && ts.isObjectLiteralExpression(counts)) {
+        for (const prop of counts.properties) {
+          if (prop.name && ts.isStringLiteral(prop.name)) badged.push(prop.name.text);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { sections, settings };
+  return { badged, settings };
 }
 
 describe('the rooms every workspace opens with', () => {
@@ -88,9 +100,10 @@ describe('the rooms every workspace opens with', () => {
     expect(workspaces.sort()).toEqual(Object.keys(LAYOUTS).sort());
   });
 
-  for (const [workspace, file] of Object.entries(LAYOUTS)) {
+  for (const [workspace, file] of Object.entries(LAYOUTS) as [TabWorkspace, string][]) {
     describe(workspace, () => {
-      const { sections, settings } = read(file);
+      const sections = WORKSPACE_TABS[workspace];
+      const { badged, settings } = read(file);
 
       it('starts with Now, then Inbox', () => {
         expect(sections.slice(0, 2).map((s) => s.label)).toEqual(['Now', 'Inbox']);
@@ -101,8 +114,7 @@ describe('the rooms every workspace opens with', () => {
       });
 
       it('carries a badge on the Inbox and nowhere else', () => {
-        const badged = sections.filter((s, i) => s.badge && i !== 1).map((s) => s.label);
-        expect(badged).toEqual([]);
+        expect(badged.filter((href) => href !== sections[1]?.href)).toEqual([]);
       });
 
       it('sets its settings link', () => {

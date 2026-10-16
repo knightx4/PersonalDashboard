@@ -157,7 +157,20 @@ describe('the Jobs writes', () => {
     expect(cleared.after).toMatchObject({ ready_to_apply: false, has_cover_letter: null });
   });
 
+  it('marks that all of an application\'s questions are added', async () => {
+    const t = tables();
+    const done = await made('change_application', t, { application_ref: APP_1, all_questions_added: true });
+    expect(done.after).toMatchObject({ all_questions_added: true });
+    expect(done.summary).toBe('Dash marked that all its questions are added for the role Role from email at Acme.');
+    const undone = await made('change_application', t, { application_ref: APP_1, all_questions_added: false });
+    expect(undone.before).toMatchObject({ all_questions_added: true });
+    expect(undone.after).toMatchObject({ all_questions_added: false });
+  });
+
   it('refuses marks that are not true or false', async () => {
+    expect(await refused('change_application', tables(), { application_ref: APP_1, all_questions_added: 'yes' })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1, all_questions_added: null })).toMatch(/true or false/);
+    expect(await refused('change_application', tables(), { application_ref: APP_1 })).toMatch(/all_questions_added/);
     expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: 'yes' })).toMatch(/true or false/);
     expect(await refused('change_application', tables(), { application_ref: APP_1, ready_to_apply: null })).toMatch(/true or false/);
     expect(await refused('change_application', tables(), { application_ref: APP_1, has_cover_letter: 1 })).toMatch(/null to clear/);

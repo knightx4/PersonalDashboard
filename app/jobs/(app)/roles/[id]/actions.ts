@@ -215,16 +215,23 @@ const applicationMarksSchema = z
     applicationId: z.string().uuid(),
     roleId: z.string().uuid(),
     readyToApply: z.boolean().optional(),
+    allQuestionsAdded: z.boolean().optional(),
     /** true for yes, false for no, null to clear the answer. */
     hasCoverLetter: z.boolean().nullable().optional(),
   })
-  .refine((v) => v.readyToApply !== undefined || v.hasCoverLetter !== undefined, {
-    message: 'Nothing to save.',
-  });
+  .refine(
+    (v) =>
+      v.readyToApply !== undefined ||
+      v.allQuestionsAdded !== undefined ||
+      v.hasCoverLetter !== undefined,
+    {
+      message: 'Nothing to save.',
+    },
+  );
 
 /**
- * Saves the two marks on an application: ready to apply, and whether it has a
- * cover letter. Either or both may be sent; a field left out is not touched.
+ * Saves the marks on an application: ready to apply, all questions added, and
+ * whether it has a cover letter. Either or both may be sent; a field left out is not touched.
  * hasCoverLetter is your own answer (null clears it), separate from whether
  * applications.cover_letter holds text.
  */
@@ -233,6 +240,7 @@ export async function saveApplicationMarks(input: {
   applicationId: string;
   roleId: string;
   readyToApply?: boolean;
+  allQuestionsAdded?: boolean;
   hasCoverLetter?: boolean | null;
 }): Promise<{ error: string | null }> {
   const parsed = applicationMarksSchema.safeParse(input);
@@ -241,8 +249,13 @@ export async function saveApplicationMarks(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const patch: { ready_to_apply?: boolean; has_cover_letter?: boolean | null } = {};
+  const patch: {
+    ready_to_apply?: boolean;
+    all_questions_added?: boolean;
+    has_cover_letter?: boolean | null;
+  } = {};
   if (parsed.data.readyToApply !== undefined) patch.ready_to_apply = parsed.data.readyToApply;
+  if (parsed.data.allQuestionsAdded !== undefined) patch.all_questions_added = parsed.data.allQuestionsAdded;
   if (parsed.data.hasCoverLetter !== undefined) patch.has_cover_letter = parsed.data.hasCoverLetter;
 
   const { error } = await supabase

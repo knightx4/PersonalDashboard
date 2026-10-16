@@ -60,7 +60,21 @@ export type ResearchCitation = {
   stance?: Stance;
 };
 
-export type ResearchPosition = { title: string; summary: string; citations: ResearchCitation[] };
+/**
+ * What one finding is for, on research written up for the writer (research-map.ts):
+ * the state of the debate, evidence for their answer, evidence against it, or
+ * material they could use. Absent on older runs, whose findings are positions
+ * or parts of the question.
+ */
+export type FindingKind = 'debate' | 'for' | 'against' | 'use';
+export const FINDING_KINDS: readonly FindingKind[] = ['debate', 'for', 'against', 'use'];
+
+export type ResearchPosition = {
+  title: string;
+  summary: string;
+  citations: ResearchCitation[];
+  kind?: FindingKind;
+};
 
 export type ClaimVerdict = 'supported' | 'opposed' | 'mixed' | 'unsourced';
 
@@ -169,8 +183,10 @@ export function gatherPrompt(question: string, draft: string): string {
 /** Why a deeper pass cannot run on this draft yet, or null when it can. */
 export function deeperProblem(draft: string): string | null {
   const words = draft.trim().split(/\s+/).filter(Boolean).length;
-  if (words < 60) return 'Write a paragraph or two first; the deeper pass checks the claims your draft makes.';
-  if (draft.length > RESEARCH_DRAFT_MAX) return 'The deeper pass reads essays up to about 4,000 words. This one is longer.';
+  if (words < 60)
+    return 'Write a paragraph or two first; the deeper pass checks the claims your draft makes.';
+  if (draft.length > RESEARCH_DRAFT_MAX)
+    return 'The deeper pass reads essays up to about 4,000 words. This one is longer.';
   return null;
 }
 
@@ -204,7 +220,7 @@ export function domainOf(url: string): string {
   }
 }
 
-function isWebUrl(url: string): boolean {
+export function isWebUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
@@ -224,7 +240,7 @@ export function searchQueries(content: unknown): string[] {
 }
 
 /** The sources a run cites, one per page, built up as the citations are read. */
-class SourceList {
+export class SourceList {
   readonly sources: ResearchSource[] = [];
   private readonly byUrl = new Map<string, number>();
 
@@ -236,16 +252,26 @@ class SourceList {
       return known;
     }
     const index = this.sources.length;
-    this.sources.push({ url: key, title: oneLine(title) || domainOf(key) || key, domain: domainOf(key), text });
+    this.sources.push({
+      url: key,
+      title: oneLine(title) || domainOf(key) || key,
+      domain: domainOf(key),
+      text,
+    });
     this.byUrl.set(key, index);
     return index;
   }
 }
 
-function addCitation(list: ResearchCitation[], citation: ResearchCitation): void {
+export function addCitation(list: ResearchCitation[], citation: ResearchCitation): void {
   const quote = citation.quote.trim();
   if (!quote) return;
-  if (list.some((c) => c.source === citation.source && c.quote === quote && c.stance === citation.stance)) return;
+  if (
+    list.some(
+      (c) => c.source === citation.source && c.quote === quote && c.stance === citation.stance,
+    )
+  )
+    return;
   list.push({ ...citation, quote });
 }
 
@@ -253,7 +279,12 @@ function addCitation(list: ResearchCitation[], citation: ResearchCitation): void
 function headingIn(line: string): string | null {
   const match = /^\s*#{2,3}\s+(.+?)\s*$/.exec(line);
   if (!match) return null;
-  return match[1].replace(/^(position|claim)\s*\d*\s*[:.-]\s*/i, '').replace(/\*\*/g, '').trim() || null;
+  return (
+    match[1]
+      .replace(/^(position|claim)\s*\d*\s*[:.-]\s*/i, '')
+      .replace(/\*\*/g, '')
+      .trim() || null
+  );
 }
 
 /**
@@ -286,7 +317,10 @@ export function readFirstPass(content: unknown): {
       if (raw.type !== 'web_search_result_location') continue;
       const url = str(raw.url);
       if (!isWebUrl(url)) continue;
-      addCitation(current.citations, { source: list.add(url, str(raw.title)), quote: str(raw.cited_text) });
+      addCitation(current.citations, {
+        source: list.add(url, str(raw.title)),
+        quote: str(raw.cited_text),
+      });
     }
   }
 
@@ -294,7 +328,13 @@ export function readFirstPass(content: unknown): {
     .map((p) => ({ ...p, summary: oneLine(p.summary.replace(/^\s*[-*]\s+/gm, '')) }))
     .filter((p) => p.citations.length > 0)
     .slice(0, POSITIONS_MAX);
-  return compact(kept, list.sources, searchQueries(content), (p) => p.citations, (p, citations) => ({ ...p, citations }));
+  return compact(
+    kept,
+    list.sources,
+    searchQueries(content),
+    (p) => p.citations,
+    (p, citations) => ({ ...p, citations }),
+  );
 }
 
 /** The pages a gathering call read with web_fetch, with their text kept. */
@@ -347,15 +387,26 @@ export function readClaims(content: unknown, pages: readonly ResearchSource[]): 
     }
   }
 
-  return claims.slice(0, CLAIMS_MAX).map(({ claim, citations }) => ({ claim, citations, ...tally(citations) }));
+  return claims
+    .slice(0, CLAIMS_MAX)
+    .map(({ claim, citations }) => ({ claim, citations, ...tally(citations) }));
 }
 
 /** How many distinct sources are quoted for and against, and the verdict that follows. */
-export function tally(citations: readonly ResearchCitation[]): Pick<ResearchClaim, 'verdict' | 'supporting' | 'opposing'> {
+export function tally(
+  citations: readonly ResearchCitation[],
+): Pick<ResearchClaim, 'verdict' | 'supporting' | 'opposing'> {
   const supporting = new Set(citations.filter((c) => c.stance === 'for').map((c) => c.source)).size;
-  const opposing = new Set(citations.filter((c) => c.stance === 'against').map((c) => c.source)).size;
+  const opposing = new Set(citations.filter((c) => c.stance === 'against').map((c) => c.source))
+    .size;
   const verdict: ClaimVerdict =
-    supporting > 0 && opposing > 0 ? 'mixed' : supporting > 0 ? 'supported' : opposing > 0 ? 'opposed' : 'unsourced';
+    supporting > 0 && opposing > 0
+      ? 'mixed'
+      : supporting > 0
+        ? 'supported'
+        : opposing > 0
+          ? 'opposed'
+          : 'unsourced';
   return { verdict, supporting, opposing };
 }
 
@@ -367,7 +418,9 @@ function compact<T>(
   citationsOf: (item: T) => ResearchCitation[],
   withCitations: (item: T, citations: ResearchCitation[]) => T,
 ): { positions: T[]; sources: ResearchSource[]; queries: string[] } {
-  const used = [...new Set(items.flatMap((item) => citationsOf(item).map((c) => c.source)))].sort((a, b) => a - b);
+  const used = [...new Set(items.flatMap((item) => citationsOf(item).map((c) => c.source)))].sort(
+    (a, b) => a - b,
+  );
   const renumber = new Map(used.map((old, i) => [old, i]));
   return {
     positions: items.map((item) =>
@@ -386,13 +439,20 @@ export function citedPages(
   claims: ResearchClaim[],
   pages: ResearchSource[],
 ): { claims: ResearchClaim[]; sources: ResearchSource[] } {
-  const out = compact(claims, pages, [], (c) => c.citations, (c, citations) => ({ ...c, citations }));
+  const out = compact(
+    claims,
+    pages,
+    [],
+    (c) => c.citations,
+    (c, citations) => ({ ...c, citations }),
+  );
   return { claims: out.positions, sources: out.sources };
 }
 
 /** "2 sources support it, 1 opposes it": a count, and the card says it is not a weighing. */
 export function countLine(claim: Pick<ResearchClaim, 'supporting' | 'opposing'>): string {
-  const part = (n: number, one: string, many: string) => `${n} ${n === 1 ? 'source' : 'sources'} ${n === 1 ? one : many}`;
+  const part = (n: number, one: string, many: string) =>
+    `${n} ${n === 1 ? 'source' : 'sources'} ${n === 1 ? one : many}`;
   const parts = [
     claim.supporting > 0 ? part(claim.supporting, 'supports it', 'support it') : null,
     claim.opposing > 0 ? part(claim.opposing, 'opposes it', 'oppose it') : null,
@@ -499,7 +559,14 @@ function readSources(raw: unknown): ResearchSource[] {
   return blocks(raw).flatMap((s) => {
     const url = str(s.url);
     if (!isWebUrl(url)) return [];
-    return [{ url, title: str(s.title) || domainOf(url), domain: str(s.domain) || domainOf(url), text: typeof s.text === 'string' ? s.text : null }];
+    return [
+      {
+        url,
+        title: str(s.title) || domainOf(url),
+        domain: str(s.domain) || domainOf(url),
+        text: typeof s.text === 'string' ? s.text : null,
+      },
+    ];
   });
 }
 
@@ -523,6 +590,7 @@ export function researchFromRow(row: ResearchRow): EssayResearch | null {
           title: str(f.title),
           summary: str(f.summary),
           citations: readCitations(f.citations, sources.length),
+          ...(FINDING_KINDS.includes(f.kind as FindingKind) ? { kind: f.kind as FindingKind } : {}),
         }))
       : [];
   const claims =

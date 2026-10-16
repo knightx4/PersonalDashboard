@@ -1,5 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
+import { CellAnswerPreview, PracticeRunPreview } from './cell-answer-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -153,6 +154,35 @@ import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import { FlowExplainPreview } from './learn-flow-explain-surfaces';
 import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
+  LearnTopicDraftCommentPreview,
+  LearnTopicDraftMatchPreview,
+  LearnTopicDraftPreview,
+  LearnTopicsErrorPreview,
+  LearnTopicsLoadingPreview,
+  LearnTopicsPreview,
+  LearnTopicPreview,
+  LearnTopicEmptyPreview,
+  LearnTopicQuotesPreview,
+  LearnTopicEditPreview,
+  LearnTopicLoadingPreview,
+} from './learn-topic-surfaces';
+import {
+  LearnKnowLensesEmptyPreview,
+  LearnKnowLensesPreview,
+  LearnLensEditPreview,
+  LearnLensEmptyPreview,
+  LearnLensErrorPreview,
+  LearnLensFringePreview,
+  LearnLensLoadingPreview,
+  LearnLensPreview,
+  LearnLensUntouchedPreview,
+} from './learn-lens-surfaces';
+import {
+  LearnTopicsReviewEmptyPreview,
+  LearnTopicsReviewPreview,
+  LearnTopicsReviewRunningPreview,
+} from './learn-move-surfaces';
+import {
   LearnCourseCheckPreview,
   LearnCoursesEmptyPreview,
   LearnCoursesListPreview,
@@ -189,14 +219,9 @@ import {
   LearnEssayResearchSurface,
   LearnEssayFinishSurface,
   LearnEssayPublishSurface,
-  LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
-  LearnEssayDiscoverSurface,
-  LearnEssayResearchMapSurface,
-  LearnEssayPlanSurface,
-  LearnEssayStructureSurface,
-  LearnEssayDevelopSurface,
-  LearnEssayWritePlanSurface,
+  LearnEssayNotesMapSurface,
+  LearnEssayDraftFromNotesSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectConversationsSurface,
@@ -344,11 +369,13 @@ import {
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
 import {
+  PostsCommentSurface,
   PostsDraftingSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
   PostsSendSurface,
   PostsSurface,
+  PostsThreadSurface,
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
@@ -568,6 +595,7 @@ const rolePanels: PanelProps = {
   coverLetter: '',
   coverLetterDraft: null,
   readyToApply: false,
+  allQuestionsAdded: false,
   hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
@@ -707,6 +735,7 @@ const pipelineRow = (
   excitement: 3,
   needsReview: false,
   readyToApply: false,
+  allQuestionsAdded: false,
   hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
@@ -734,6 +763,7 @@ const pipelineRows: PipelineRow[] = [
     status: 'in_process',
     excitement: 5,
     readyToApply: true,
+    allQuestionsAdded: false,
     hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
@@ -749,6 +779,7 @@ const pipelineRows: PipelineRow[] = [
     status: 'in_process',
     excitement: 4,
     readyToApply: true,
+    allQuestionsAdded: true,
     hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
@@ -3605,6 +3636,7 @@ export const SURFACES: readonly Surface[] = [
             everSubmitted: true,
             closedOn: '8 Sep',
             interviewCount: 1,
+            allQuestionsAdded: true,
           })}
         />
         <RoleTodos
@@ -3651,12 +3683,13 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers, marked ready',
     module: 'jobs',
     width: 'wide',
-    // Ready ticked and the cover letter answered Yes (plan #2102.2).
+    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
         status="drafting"
         readyToApply
+        allQuestionsAdded
         hasCoverLetter
         defaultTab={defaultRoleTab('drafting')}
       />
@@ -3673,6 +3706,7 @@ export const SURFACES: readonly Surface[] = [
         {...rolePanels}
         status="rejected"
         readyToApply
+        allQuestionsAdded
         hasCoverLetter={false}
         defaultTab="answers"
       />
@@ -3871,15 +3905,15 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Pipeline narrowed to the roles marked ready to apply (plan #2102.3), the
-     * letter (plan #2102.3): the two chips set, the rest of the line unchanged. */
+    /* The Pipeline narrowed to the roles with all their questions added (plan
+     * #2196.2): the one chip set, the rest of the line unchanged. */
     id: 'jobs-pipeline-marks',
-    label: 'Pipeline · Ready and cover letter filters',
+    label: 'Pipeline · All questions added filter',
     module: 'jobs',
     width: 'wide',
     render: () => (
       <PreviewShell>
-        <PipelinePage rows={pipelineRows} params={{ view: 'table', ready: 'yes' }} />
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', questions: 'yes' }} />
       </PreviewShell>
     ),
   },
@@ -5679,6 +5713,122 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FlowExplainPreview stage="error" />,
   },
   {
+    /* An explain question about one level of a topic, before an answer
+     * (plan #2138.5). The forward row holds Check my answer. */
+    id: 'learn-cell-answer',
+    label: 'Practice Flow · Explain a level',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" />,
+  },
+  {
+    /* The same question while the answer is graded. */
+    id: 'learn-cell-answer-loading',
+    label: 'Practice Flow · Explain a level, grading',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="loading" />,
+  },
+  {
+    /* Grading failed: the answer stays in the box to send again. */
+    id: 'learn-cell-answer-error',
+    label: 'Practice Flow · Explain a level, grading failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="error" />,
+  },
+  {
+    /* The answer screen: every level the answer reached, shown or implied,
+     * and a link put up for review. */
+    id: 'learn-cell-answer-reached',
+    label: 'Practice Flow · What an answer reached',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="reached" />,
+  },
+  {
+    /* The same list with the quote behind the first shown level opened. */
+    id: 'learn-cell-answer-quote',
+    label: 'Practice Flow · What an answer reached, quote open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="quote" />,
+  },
+  {
+    /* A case at level 4: numbers to work and a box to show the working in
+     * (plan #2138.8). */
+    id: 'learn-cell-answer-case',
+    label: 'Practice Flow · Work a case',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case" />,
+  },
+  {
+    /* The same case graded on the asked level alone. */
+    id: 'learn-cell-answer-case-reached',
+    label: 'Practice Flow · Work a case, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
+    /* A question Practice Flow picked (plan #2138.6), with the reason it was
+     * chosen opened, and End run beside the forward action. */
+    id: 'learn-practice-why',
+    label: 'Practice Flow · Why this question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" openWhy />,
+  },
+  {
+    /* The end of a run: every level that moved while it lasted. */
+    id: 'learn-practice-run-end',
+    label: 'Practice Flow · End of a run',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end" />,
+  },
+  {
+    /* A run ended before anything was answered. */
+    id: 'learn-practice-run-end-empty',
+    label: 'Practice Flow · End of a run, nothing answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-empty" />,
+  },
+  {
+    /* A run that ended because nothing was left to ask. */
+    id: 'learn-practice-run-end-nothing-left',
+    label: 'Practice Flow · End of a run, nothing left',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-nothing-left" />,
+  },
+  {
+    /* The next question while it is chosen and written. */
+    id: 'learn-practice-loading',
+    label: 'Practice Flow · Choosing the next question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="loading" />,
+  },
+  {
+    /* No approved topic to place you on. */
+    id: 'learn-practice-no-topic',
+    label: 'Practice Flow · No topic yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="no-topic" />,
+  },
+  {
+    /* The next question could not be chosen. */
+    id: 'learn-practice-error',
+    label: 'Practice Flow · Choosing failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="error" />,
+  },
+  {
     /* The chain a subject reads as: the doors it turns on, then everything
      * downstream of them. The size difference is the surface. */
     id: 'learn-subject-chain',
@@ -6449,6 +6599,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsSendSurface />,
+  },
+  {
+    /* Comments on a draft (plan #2202.2): a waiting draft Dash shortened
+     * when tagged, with an untagged note under it, and a posted one whose
+     * tagged comment Dash marked seen. */
+    id: 'dev-posts-thread',
+    label: 'Dev · Posts, comments on a draft',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsThreadSurface />,
+  },
+  {
+    /* Add a comment pressed on a draft with no thread: the box open. */
+    id: 'dev-posts-comment',
+    label: 'Dev · Posts, writing a comment',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsCommentSurface />,
   },
   {
     /* Home's Inbox (plan #1937.7), which took the bell's place: every
@@ -7878,6 +8046,174 @@ export const SURFACES: readonly Surface[] = [
   /* The Learn pages that had no picture (plan #1602). Fixtures in
    * learn-page-surfaces.tsx. */
   {
+    /* Learn's topics (plan #2138.2): drafts first, then the map. */
+    id: 'learn-topics',
+    label: 'Topics · Name a goal, and the topics you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsPreview />,
+  },
+  {
+    id: 'learn-topics-loading',
+    label: 'Topics · While a draft is written',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsLoadingPreview />,
+  },
+  {
+    id: 'learn-topics-error',
+    label: 'Topics · When drafting fails',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsErrorPreview />,
+  },
+  {
+    /* A draft topic to read, reword and approve (plan #2138.2). */
+    id: 'learn-topic-draft',
+    label: 'Topic · A draft to approve',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftPreview />,
+  },
+  {
+    id: 'learn-topic-draft-match',
+    label: 'Topic · A draft close to a topic you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    id: 'learn-topic-draft-comment',
+    label: 'Topic · A draft with comments',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftCommentPreview />,
+  },
+  {
+    /* An approved topic: where you stand on each level (plan #2138.3). */
+    id: 'learn-topic',
+    label: 'Topic · Where you stand on each level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicPreview />,
+  },
+  {
+    id: 'learn-topic-empty',
+    label: 'Topic · Nothing shown yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEmptyPreview />,
+  },
+  {
+    id: 'learn-topic-quotes',
+    label: 'Topic · The answers behind a level, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicQuotesPreview />,
+  },
+  {
+    id: 'learn-topic-edit',
+    label: 'Topic · Rewording a level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEditPreview />,
+  },
+  {
+    id: 'learn-topic-loading',
+    label: 'Topic · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicLoadingPreview />,
+  },
+  {
+    /* Moving the claims graph onto topics (plan #2138.4): what the move
+     * left for you, with a failed subject and a downward edge. */
+    id: 'learn-topics-review',
+    label: 'From the claims graph · What needs your answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewPreview />,
+  },
+  {
+    id: 'learn-topics-review-running',
+    label: 'From the claims graph · While subjects move',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewRunningPreview />,
+  },
+  {
+    id: 'learn-topics-review-empty',
+    label: 'From the claims graph · Before anything has moved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewEmptyPreview />,
+  },
+  {
+    /* A subject or learning goal as a lens (plan #2138.7). */
+    id: 'learn-lens',
+    label: 'Lens · A subject as topics to targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensPreview />,
+  },
+  {
+    id: 'learn-lens-fringe',
+    label: 'Lens · What you are ready for on one topic, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensFringePreview />,
+  },
+  {
+    id: 'learn-lens-edit',
+    label: 'Lens · Setting the targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEditPreview />,
+  },
+  {
+    id: 'learn-lens-untouched',
+    label: 'Lens · A goal with no answers yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensUntouchedPreview />,
+  },
+  {
+    id: 'learn-lens-empty',
+    label: 'Lens · No topics yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEmptyPreview />,
+  },
+  {
+    id: 'learn-lens-loading',
+    label: 'Lens · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensLoadingPreview />,
+  },
+  {
+    id: 'learn-lens-error',
+    label: 'Lens · When it cannot be read',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensErrorPreview />,
+  },
+  {
+    /* The Know page's lenses and fields (plan #2138.7). */
+    id: 'learn-know-lenses',
+    label: 'Subjects · Lenses, goals and fields by level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesPreview />,
+  },
+  {
+    id: 'learn-know-lenses-empty',
+    label: 'Subjects · Before anything is on topics',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesEmptyPreview />,
+  },
+  {
     id: 'learn-concept',
     label: 'Idea · One idea, partly known',
     module: 'learn',
@@ -8158,59 +8494,24 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'learn-essay-interview',
-    label: 'Essay · Interview opening on a finished goal',
+    label: 'Essay · A new essay on an empty notes page',
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayInterviewSurface />,
   },
   {
-    id: 'learn-essay-interview-later',
-    label: 'Essay · Interview, fourth question',
+    id: 'learn-essay-notes-map',
+    label: 'Essay · Notes with Dash’s map beside them',
     module: 'learn',
     width: 'page',
-    render: () => <LearnEssayInterviewLaterSurface />,
+    render: () => <LearnEssayNotesMapSurface />,
   },
   {
-    id: 'learn-essay-discover',
-    label: 'Essay · Discover, with Dash’s read of the brief',
+    id: 'learn-essay-draft-from-notes',
+    label: 'Essay · Draft view with Assemble and the model draft',
     module: 'learn',
     width: 'page',
-    render: () => <LearnEssayDiscoverSurface />,
-  },
-  {
-    id: 'learn-essay-research-map',
-    label: 'Essay · Research step, the question mapped',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayResearchMapSurface />,
-  },
-  {
-    id: 'learn-essay-plan',
-    label: 'Essay · Plan, thesis and points',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayPlanSurface />,
-  },
-  {
-    id: 'learn-essay-structure',
-    label: 'Essay · Structure, shapes offered',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayStructureSurface />,
-  },
-  {
-    id: 'learn-essay-develop',
-    label: 'Essay · Develop, a question about one point',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayDevelopSurface />,
-  },
-  {
-    id: 'learn-essay-write-plan',
-    label: 'Essay · Write, with the plan beside an empty draft',
-    module: 'learn',
-    width: 'page',
-    render: () => <LearnEssayWritePlanSurface />,
+    render: () => <LearnEssayDraftFromNotesSurface />,
   },
   {
     id: 'learn-plan-finished',

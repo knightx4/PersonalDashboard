@@ -116,7 +116,11 @@ function fuzzy(doc: string, anchor: Anchor): Located | null {
       const score = similarity(doc.slice(from, to), target);
       if (score < FUZZY_FLOOR) continue;
       const context = contextScore(doc, from, to, anchor);
-      if (!best || score > best.score + 0.01 || (Math.abs(score - best.score) <= 0.01 && context > best.context)) {
+      if (
+        !best ||
+        score > best.score + 0.01 ||
+        (Math.abs(score - best.score) <= 0.01 && context > best.context)
+      ) {
         best = { from, to, score, context };
       }
     }

@@ -926,6 +926,7 @@ export function AppShell({
             module={module}
             sections={sections}
             enabledModules={workspaces}
+            isOwner={isOwner}
             theme={theme}
             open={searching}
             opensOn={searchOn}

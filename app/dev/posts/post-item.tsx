@@ -35,6 +35,8 @@ import {
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
 import { AddImage } from './add-image';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 
 /**
  * One draft on the Posts tab (plan #1419): its angle, its post and any thread
@@ -52,6 +54,11 @@ import { AddImage } from './add-image';
  * Copy puts the whole thread on the clipboard with a blank line between
  * posts. In a thread each post has its own copy as well, since X takes a
  * thread one reply at a time.
+ *
+ * Last comes the comment thread (plan #2202.2), on a waiting or posted draft:
+ * an Add a comment control until one is written. "@dash make this shorter"
+ * gets a reply, and on a waiting draft Dash rewrites the text with
+ * rewrite_post; a comment without the tag is only kept.
  */
 
 function useCopy() {
@@ -553,12 +560,15 @@ export function PostItem({
   card,
   postAs = null,
   postArmed,
+  commentOpen,
 }: {
   card: PostCard;
   /** The handle a draft is posted as from the tab; null when the sign-in cannot post. */
   postAs?: string | null;
   /** Draw Post already pressed once, its confirm showing: the gallery's hidden part. */
   postArmed?: boolean;
+  /** Draw the comment box open: the gallery's hidden part. */
+  commentOpen?: boolean;
 }) {
   const { post } = card;
   const editable = post.status === 'suggested';
@@ -731,6 +741,17 @@ export function PostItem({
 
       {editable && editing === null && <SuggestedActions card={card} postAs={postAs} postArmed={postArmed} />}
       {post.status === 'dropped' && <RestoreButton id={post.id} />}
+
+      {post.status !== 'dropped' && (
+        <Thread
+          subject={threadRef('post', post.id)}
+          turns={card.thread}
+          composerOpen={commentOpen}
+          placeholder={
+            editable ? 'A note on this draft, or @dash to ask for a change.' : 'A note on this post, or a question for Dash.'
+          }
+        />
+      )}
     </li>
   );
 }

@@ -19,6 +19,7 @@ import {
   type InterviewChangeInput,
   type InterviewChangeKind,
 } from '@/lib/ask/interview-changes';
+import { POST_CHANGE_KINDS, type PostChangeInput, type PostChangeKind } from '@/lib/ask/post-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -77,6 +78,8 @@ export const DASH_CHANGE_KINDS = [
   ...JOBS_CHANGE_KINDS,
   // A round on a role, in the same shape (lib/ask/interview-changes.ts, plan #2044.1).
   ...INTERVIEW_CHANGE_KINDS,
+  // A post draft's text rewritten, in the same shape (lib/ask/post-changes.ts, plan #2202.1).
+  ...POST_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -204,7 +207,8 @@ export type DashChangeInput = {
   Record<ShoppingChangeKind, ShoppingChangeInput> &
   Record<VaultChangeKind, VaultChangeInput> &
   Record<JobsChangeKind, JobsChangeInput> &
-  Record<InterviewChangeKind, InterviewChangeInput>;
+  Record<InterviewChangeKind, InterviewChangeInput> &
+  Record<PostChangeKind, PostChangeInput>;
 
 /**
  * The kinds Dash proposes for a Confirm: the four from before plan #1440,

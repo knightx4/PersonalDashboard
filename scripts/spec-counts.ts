@@ -95,7 +95,20 @@ const MODEL_ID = /['"`]claude-(?:opus|sonnet|haiku)-[0-9][a-z0-9.-]*['"`]/;
 
 // -- docs/CUT-BACK-SPEC.md -----------------------------------------------------
 
-const LEARN_LAYOUT = 'app/learn/layout.tsx';
+/**
+ * Learn's tabs are written in the shared list since plan #2208.2, not in its
+ * layout: the `learn: [` block of lib/shell/tabs.ts, up to the line that
+ * closes it.
+ */
+const TAB_LIST = 'lib/shell/tabs.ts';
+
+function learnTabs(root: string): string {
+  const text = read(root, TAB_LIST, 'learn-nav-tabs');
+  const start = text.indexOf('\n  learn: [');
+  const end = text.indexOf('\n  ],', start);
+  if (start < 0 || end < 0) throw new Error(`learn-nav-tabs cannot find Learn's tabs in ${TAB_LIST}; update the counter`);
+  return text.slice(start, end);
+}
 
 // -- docs/UI-QUALITY-SPEC.md ---------------------------------------------------
 
@@ -531,7 +544,7 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     name: 'learn-nav-tabs',
     counts: "tabs in Learn's nav",
     measure: (root) =>
-      [...read(root, LEARN_LAYOUT, 'learn-nav-tabs').matchAll(/\bhref:\s*'([^']+)'/g)].map((m) => m[1]),
+      [...learnTabs(root).matchAll(/\bhref:\s*'([^']+)'/g)].map((m) => m[1]),
   },
   {
     name: 'raw-motion-values',
