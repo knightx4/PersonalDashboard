@@ -57,6 +57,7 @@ export const GOAL_KIND_LABELS: Record<GoalKind, { label: string; means: string }
  *   official_explainers   official explainers from the allowlist (#2247.6)
  *   extension             cooperative extension short courses (#2247.7)
  *   certification         certification syllabi (#2247.7)
+ *   yale                  Open Yale Courses lecture lists (#2247.9)
  */
 export const PROVIDER_IDS = [
   'ocw',
@@ -69,6 +70,7 @@ export const PROVIDER_IDS = [
   'official_explainers',
   'extension',
   'certification',
+  'yale',
 ] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
@@ -83,8 +85,8 @@ export type KindPlan = {
 };
 
 export const KIND_PLANS: Record<GoalKind, KindPlan> = {
-  academic_course: { providers: ['ocw', 'ut_austin', 'openstax'], grain: 'week' },
-  broad_field: { providers: ['ocw', 'ut_austin', 'openstax'], grain: 'chapter' },
+  academic_course: { providers: ['ocw', 'ut_austin', 'openstax', 'yale'], grain: 'week' },
+  broad_field: { providers: ['ocw', 'ut_austin', 'openstax', 'yale'], grain: 'chapter' },
   research_subfield: { providers: ['arxiv', 'ocw'], grain: 'section' },
   narrow_question: { providers: ['monographs', 'primary_sources', 'frame'], grain: 'source' },
   institution: { providers: ['official_explainers'], grain: 'chapter' },

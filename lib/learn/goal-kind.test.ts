@@ -123,8 +123,8 @@ describe('the providers a kind decides', () => {
 
   it('sends a research subfield to arXiv first, courses and broad fields to OCW, UT and OpenStax', () => {
     expect(providersForKind('research_subfield')[0]).toBe('arxiv');
-    expect(providersForKind('academic_course')).toEqual(['ocw', 'ut_austin', 'openstax']);
-    expect(providersForKind('broad_field')).toEqual(['ocw', 'ut_austin', 'openstax']);
+    expect(providersForKind('academic_course')).toEqual(['ocw', 'ut_austin', 'openstax', 'yale']);
+    expect(providersForKind('broad_field')).toEqual(['ocw', 'ut_austin', 'openstax', 'yale']);
     expect(providersForKind('narrow_question')).toEqual(['monographs', 'primary_sources', 'frame']);
     expect(providersForKind('institution')).toEqual(['official_explainers']);
   });
