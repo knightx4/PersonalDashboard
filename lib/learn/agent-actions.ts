@@ -228,6 +228,9 @@ export const learnActions: ModuleActions = {
     answerReview: none('own'),
   },
   'app/learn/s/[id]/actions.ts': {
+    continuePreparation: none('spends', "Restarts a subject's preparation run, which spends on the person's account; the daily run also resumes them."),
+    chooseDirection: none('spends', "The person picks a branch to go deeper on, which starts a branch preparation run."),
+    dismissDirection: none('theirs', 'Holds the offer of a direction back until another thirty answers.'),
     readAboutConcept: none(
       'spends',
       'Lands the person on the reading it found for one idea of the graph, or the row already queued for it; the page it lands on is the result.',
