@@ -62,7 +62,10 @@ export function QuickNoteTriage({
   writable,
   actions = REAL_ACTIONS,
   alreadyPassed,
+  naming = false,
 }: {
+  /** For the gallery: draw the first card with its name field open. */
+  naming?: boolean;
   /** Ids of notes to start as already left for later; the gallery draws Previous with it. */
   alreadyPassed?: readonly string[];
   notes: readonly TriageNote[];
@@ -91,6 +94,7 @@ export function QuickNoteTriage({
         note={note}
         writable={writable}
         actions={actions}
+        naming={naming}
         onFiled={(into, state) => onFiled(note, into, state)}
       />
     ),
@@ -173,9 +177,11 @@ function QuickNoteCard({
   note,
   writable,
   actions,
+  naming: startNaming,
   onFiled,
 }: {
   note: TriageNote;
+  naming: boolean;
   writable: boolean;
   actions: TriageActions;
   onFiled: (into: TriagePlace | null, state: FileQuickNoteState) => void;
@@ -185,7 +191,7 @@ function QuickNoteCard({
   const [error, setError] = useState<string | null>(null);
   // A note of its own is named before it is made (note 24fd1e02): the name
   // its first line would give it, for the person to keep or change.
-  const [naming, setNaming] = useState(false);
+  const [naming, setNaming] = useState(startNaming);
   const [name, setName] = useState(note.title);
 
   /** `target` null makes it a note of its own, named `title` when one is given. */

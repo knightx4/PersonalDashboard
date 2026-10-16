@@ -25,6 +25,7 @@ export function RolesTable({
   sorts,
   hidden = [],
   filters = {},
+  openFilter,
 }: {
   rows: PipelineRow[];
   /**
@@ -41,6 +42,8 @@ export function RolesTable({
    * a column without one is the sort link alone.
    */
   filters?: Readonly<Record<string, ColumnFilter>>;
+  /** For the gallery: the column whose menu is drawn open. */
+  openFilter?: string;
 }) {
   const showing = (property: string) => !hidden.includes(property);
   // Tighter than the table's own padding, so every column fits inside a
@@ -72,6 +75,7 @@ export function RolesTable({
                   <ActionMenu
                     label={`Sort or filter by ${entry.label.toLowerCase()}`}
                     align="start"
+                    defaultOpen={openFilter === entry.id}
                     trigger={
                       <>
                         {entry.label}

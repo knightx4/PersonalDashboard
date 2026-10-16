@@ -81,11 +81,14 @@ export function TriagePreview({
   empty = false,
   writable,
   second = false,
+  naming = false,
 }: {
   empty?: boolean;
   writable: boolean;
   /** The first note already left for later, so Previous shows. */
   second?: boolean;
+  /** The first note's name field open, as Make it a note of its own leaves it. */
+  naming?: boolean;
 }) {
   return (
     <QuickNoteTriage
@@ -93,6 +96,7 @@ export function TriagePreview({
       writable={writable}
       actions={triageActions}
       alreadyPassed={second ? ['triage-1'] : undefined}
+      naming={naming}
     />
   );
 }

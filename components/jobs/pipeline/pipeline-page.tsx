@@ -62,6 +62,7 @@ export function PipelinePage({
   working = [],
   hasInbox = false,
   timezone = 'UTC',
+  openColumn,
 }: {
   /** Every application, live and closed, with its fit and chance. */
   rows: readonly PipelineRow[];
@@ -73,6 +74,8 @@ export function PipelinePage({
   hasInbox?: boolean;
   /** The person's zone, for the next interview's date and time. */
   timezone?: string;
+  /** For the gallery: the table column whose filter menu is drawn open. */
+  openColumn?: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -228,6 +231,7 @@ export function PipelinePage({
                   sorts={menu.sorts}
                   hidden={display.hidden}
                   filters={columnFilters}
+                  openFilter={section === sections[0] ? openColumn : undefined}
                 />
               </Card>
             </div>

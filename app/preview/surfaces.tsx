@@ -3972,6 +3972,21 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
+    /* The table with a column's menu open (note f05f5f04): its sort, then
+     * the companies it can be narrowed to, one already chosen. */
+    id: 'jobs-pipeline-column-menu',
+    label: 'Pipeline · Table · Column filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PipelinePage
+        rows={pipelineRows}
+        params={{ view: 'table', company: pipelineRows[0].companySlug }}
+        openColumn="company"
+      />
+    ),
+  },
+  {
     /* The page as it opens: what is in process, waiting and to apply. */
     id: 'jobs-pipeline-focus',
     label: 'Pipeline · Focus',
@@ -5222,6 +5237,20 @@ export const SURFACES: readonly Surface[] = [
       <div className={SHELL_FOOT}>
         <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable />
+      </div>
+    ),
+  },
+  {
+    /* Make it a note of its own, pressed (note 24fd1e02): the name field,
+     * filled with the name the first line gives it, ready to change. */
+    id: 'vault-triage-naming',
+    label: 'Vault · Quick note triage · Naming a new note',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
+        <TriagePreview writable naming />
       </div>
     ),
   },
