@@ -7,14 +7,13 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
-import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSessionSpend } from '@/lib/core/spend/session';
-import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
-import { runApplicationDraft } from '@/lib/jobs/drafting/draft-application';
-import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
-import { VAULT_SOURCES } from '@/lib/jobs/drafting/gather';
-import { dropDraft, saveReplies, type ApplicationDrafts, type StoredAsk } from '@/lib/jobs/drafting/store';
+import {
+  draftAnswerFor,
+  draftApplicationAs,
+  type DraftApplicationResult,
+} from '@/lib/jobs/drafting/run-draft';
+import { dropDraft, saveReplies, type StoredAsk } from '@/lib/jobs/drafting/store';
 
 // latency: pending
 export async function updateRole(
@@ -364,28 +363,8 @@ export async function draftAnswerFromEvidence(
   if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
 
   const user = await requireUser();
-  const supabase = await createClient();
-
-  const { data: row, error: rowError } = await supabase
-    .from('application_answers')
-    .select('id, application_id')
-    .eq('id', parsed.data.answerId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (rowError) return { draft: null, error: rowError.message };
-  if (!row) return { draft: null, error: 'That question is not yours.' };
-
-  const result = await draftApplicationAs(user.id, apiKey, {
-    applicationId: row.application_id as string,
-    answerIds: [parsed.data.answerId],
-  });
-  if (result.error || !result.drafts) return { draft: null, error: result.error ?? 'No draft came back.' };
-  const stored = result.drafts.drafts[parsed.data.answerId];
-  if (!stored || !result.drafted.includes(parsed.data.answerId)) {
-    return { draft: null, error: 'No draft came back.' };
-  }
-  return { draft: fromStoredDraft(stored), asks: result.drafts.asks, error: null };
+  const result = await draftAnswerFor(user.id, apiKey, parsed.data.answerId);
+  return { draft: result.draft, asks: result.asks, error: result.error };
 }
 
 /**
@@ -406,48 +385,7 @@ const draftApplicationSchema = z.object({
   replies: z.record(z.string(), z.string().max(4_000)).optional(),
 });
 
-export type DraftApplicationResult = {
-  /** The stored draft after this run, earlier drafts and asks included; null on error. */
-  drafts: ApplicationDrafts | null;
-  /** Answer ids drafted by this run. */
-  drafted: string[];
-  /** Answer ids whose draft is still over its limit after the retry. */
-  flagged: string[];
-  /** Answer ids asked for that came back with no draft. */
-  missing: string[];
-  error: string | null;
-};
-
-/** How long the model calls may run inside the page's maxDuration of 300 seconds. */
-const DRAFT_DEADLINE_MS = 270_000;
-
-async function draftApplicationAs(
-  userId: string,
-  apiKey: string,
-  input: z.output<typeof draftApplicationSchema>,
-): Promise<DraftApplicationResult> {
-  const started = Date.now();
-  const jobs = await createClient();
-  const core = await createCoreClient();
-  const settings = await loadAccountSettings(userId, core);
-
-  const spend: SpendReport[] = [];
-  const result = await runApplicationDraft(
-    {
-      jobs,
-      core,
-      vaultSources: moduleEnabled(settings, 'vault') ? VAULT_SOURCES : [],
-      apiKey,
-      onSpend: (report) => spend.push(report),
-      deadline: started + DRAFT_DEADLINE_MS,
-    },
-    { userId, applicationId: input.applicationId, answerIds: input.answerIds, replies: input.replies },
-  );
-  await recordSessionSpend(userId, { module: 'jobs', operation: 'draft-application' }, spend);
-
-  if (!result.ok) return { drafts: null, drafted: [], flagged: [], missing: [], error: result.error };
-  return { drafts: result.drafts, drafted: result.drafted, flagged: result.flagged, missing: result.missing, error: null };
-}
+export type { DraftApplicationResult };
 
 // latency: pending
 export async function draftApplication(

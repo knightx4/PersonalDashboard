@@ -37,6 +37,14 @@ describe('DASH_TOOLS', () => {
     // A paid press is queued for an approval (plan #2228.1).
     expect(dashToolsOf('paid').map((t) => t.name)).toEqual([
       'write_year_review',
+      // Jobs (plan #2228.3)
+      'draft_answer',
+      'draft_application_answers',
+      'draft_cover_letter',
+      'find_startups',
+      'suggest_people',
+      'find_openings',
+      'match_role_requirements',
       // Learn (plan #2228.4)
       'draft_topic',
       'make_learn_subject',
