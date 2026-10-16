@@ -10,6 +10,8 @@ import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
+import { LinkedText } from '@/components/ui/linked-text';
+import { WrittenAnswer } from '@/components/learn/written-answer';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { AskButton, DontKnowButton, EndHereButton, NotNowButton } from './buttons';
@@ -347,7 +349,9 @@ export function FlowSession({
             : 'A quick review. You answered this one a while ago.'}
         </p>
       )}
-      <p className="mt-1 text-body text-ink">{live.question}</p>
+      <p className="mt-1 whitespace-pre-line text-body text-ink">
+        <LinkedText text={live.question} />
+      </p>
 
       <form action={step} className="mt-4 space-y-2">
         <input type="hidden" name="intent" value="answer" />
@@ -356,10 +360,19 @@ export function FlowSession({
         <input type="hidden" name="conceptId" value={live.conceptId} />
         <input type="hidden" name="subjectId" value={live.subjectId} />
 
-        <ProbeOptions options={live.options} answered={live.answered ?? null} />
+        {live.case ? (
+          // A worked case (plan #2164.3): a number or two sentences, graded
+          // as the applied rung is.
+          <WrittenAnswer
+            response={live.answered?.response ?? null}
+            paid="app/learn/flow/actions.ts#flowStep:answer"
+          />
+        ) : (
+          <ProbeOptions options={live.options} answered={live.answered ?? null} />
+        )}
         {!live.answered && (
           <div className="flex flex-wrap items-center gap-4 pt-1">
-            <DontKnowButton />
+            {!live.case && <DontKnowButton />}
             <span className="inline-flex items-center gap-1">
               <NotNowButton />
               {/* dash-action-ok: the hint sits beside the Later close button, which does not run the model. */}
@@ -384,6 +397,13 @@ export function FlowSession({
           {/* Written when the question was, not in response to what was
               picked. That is what makes it worth reading. */}
           <p className="mt-1 text-body text-ink">{live.answered.reason}</p>
+
+          {live.answered.expected && (
+            <>
+              <p className="mt-3 text-small text-ink-muted">The answer expected</p>
+              <p className="mt-0.5 text-body text-ink">{live.answered.expected}</p>
+            </>
+          )}
 
           {live.answered.misconception && (
             <p className="mt-3 border-l-2 border-danger pl-3 text-body text-ink">

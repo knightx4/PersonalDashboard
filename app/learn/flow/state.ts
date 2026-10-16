@@ -39,6 +39,12 @@ export type FlowState = AskState & {
    * and marked, with one follow-up, instead of picked from options.
    */
   explain?: true;
+  /**
+   * Set on a worked case (plan #2164.3): figures and a task, answered with a
+   * number or two sentences and graded as the applied rung, so the answer
+   * comes back with the grader's sentence and the answer expected.
+   */
+  case?: true;
   /** The marks on the explanation and the follow-up, once it is marked. */
   explained?: Explained;
   /** The marks on the follow-up, once that is marked too. */
