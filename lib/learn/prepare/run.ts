@@ -20,6 +20,9 @@ import {
  *     made progress and wants calling again, or `skipped` with a reason.
  *   - A step reads `ctx.deadline` and returns `more` before it, rather than
  *     starting work it cannot finish. What it has written stays written.
+ *     A step whose next piece of work is one call too long for the time left
+ *     returns `more` with `pause`, which ends this call so the next one starts
+ *     the step with a full budget.
  *   - A step that throws fails the run. The next call (Continue on the page,
  *     or the daily cron) starts again at that step.
  *   - A step with no handler yet is skipped with the plan step that builds it.
@@ -73,7 +76,17 @@ export type ClaimedPreparation = {
 
 export type StepOutcome =
   | { state: 'done'; summary?: string; counts?: Record<string, number>; detail?: Record<string, unknown> }
-  | { state: 'more'; summary?: string; counts?: Record<string, number>; detail?: Record<string, unknown> }
+  | {
+      state: 'more';
+      summary?: string;
+      counts?: Record<string, number>;
+      detail?: Record<string, unknown>;
+      /**
+       * End this call here and carry on in the next one: for a step whose
+       * one piece of work (a long model call) will not fit in the time left.
+       */
+      pause?: boolean;
+    }
   | { state: 'skipped'; reason: string; detail?: Record<string, unknown> };
 
 export type StepContext = {
@@ -231,6 +244,10 @@ export async function runPreparation(
           };
     Object.assign(step, patch);
     await ports.saveStep(run.id, step.key, patch);
+    if (outcome.state === 'more' && outcome.pause) {
+      await ports.saveRun(run.id, { leaseUntil: null });
+      return { outcome: 'paused', step: step.key, ran };
+    }
   }
 
   await ports.saveRun(run.id, {

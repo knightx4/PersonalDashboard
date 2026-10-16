@@ -281,6 +281,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
   'app/api/cron/territory-draft/route.ts#POST':
     'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
+  'app/api/cron/learn-prepare/route.ts#POST':
+    "Works a subject's preparation run (plan #2276), called with the cron secret after a subject is made, by the daily cron and by itself when a call runs out of time. Its paid steps are classifying the subject, pulling and matching its structure documents, and compiling its territory (plan #2276.4), one Sonnet call and one query embedding per subject; the press that made the subject never waits for them.",
   'app/api/cron/startup-discovery/route.ts#GET':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/startup-discovery/route.ts#POST':

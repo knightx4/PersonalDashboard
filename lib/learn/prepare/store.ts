@@ -1,4 +1,5 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { readTerritory, type Territory } from '@/lib/learn/levels/territory';
 import type {
   ClaimedPreparation,
   PreparationPorts,
@@ -189,6 +190,39 @@ export async function unfinishedPreparations(
     .filter((r) => r.status !== 'failed' || r.failures < CRON_RETRIES)
     .slice(0, limit)
     .map((r) => r.subject_id);
+}
+
+/** The territory a run compiled (plan #2276.4), by the run's id; null before compile_territory has kept one. */
+export async function loadRunTerritory(learn: LearnSupabaseClient, userId: string, runId: string): Promise<Territory | null> {
+  const { data, error } = await learn
+    .from('subject_preparations')
+    .select('territory')
+    .eq('user_id', userId)
+    .eq('id', runId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the territory failed: ${error.message}`);
+  return readTerritory((data as { territory: unknown } | null)?.territory);
+}
+
+/** The territory a subject's preparation compiled, for the drafter and the territory-draft route. */
+export async function loadSubjectTerritory(learn: LearnSupabaseClient, userId: string, subjectId: string): Promise<Territory | null> {
+  const { data, error } = await learn
+    .from('subject_preparations')
+    .select('territory')
+    .eq('user_id', userId)
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the subject's territory failed: ${error.message}`);
+  return readTerritory((data as { territory: unknown } | null)?.territory);
+}
+
+export async function saveRunTerritory(learn: LearnSupabaseClient, userId: string, runId: string, territory: Territory): Promise<void> {
+  const { error } = await learn
+    .from('subject_preparations')
+    .update({ territory, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', runId);
+  if (error) throw new Error(`Saving the territory failed: ${error.message}`);
 }
 
 /** The ports of runPreparation over the database, for one account. */

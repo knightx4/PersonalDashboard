@@ -6,13 +6,18 @@ import { recordSpend } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
-import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
+import { embedCatalogueSegments, vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
+import { readStructure } from '@/lib/learn/catalogue/structure-store';
+import { TOPIC_DIMENSIONS } from '@/lib/learn/areas/topic-import';
+import { embedOne } from '@/lib/learn/embed/embed';
 import { liveGoalPullPorts, runProvider, wiredProviders } from '@/lib/learn/catalogue/structure-pull-for-goal';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { isGoalKind } from '@/lib/learn/goal-kind';
 import { GOAL_KIND_MODEL, classifyGoals } from '@/lib/learn/goal-kind-call';
 import { findStoredUnits, liveStoredUnitPorts } from '@/lib/learn/levels/stored-sources-run';
+import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishStep, type StepHandler } from './run';
+import { loadRunTerritory, saveRunTerritory } from './store';
 import type { PreparationStepKey } from './steps';
 import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKindRow } from './structure-steps';
 
@@ -21,8 +26,8 @@ import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKin
  *
  * A key missing here is skipped by the runner with the plan step that builds
  * it, so the run still reaches its end. classify, pull_documents and
- * match_weeks are here from #2276.3; compile_territory arrives with #2276.4,
- * draft_topics and write_units with #2276.5.
+ * match_weeks are here from #2276.3, compile_territory from #2276.4;
+ * draft_topics and write_units arrive with #2276.5.
  */
 export type PreparationDeps = {
   learn: LearnSupabaseClient;
@@ -36,7 +41,7 @@ export type PreparationDeps = {
 const EMBED_PER_PASS = 600;
 const EMBED_PASSES = 5;
 
-type Operation = 'classify-goal-kind' | 'propose-structure-sources' | 'match-structure-units';
+type Operation = 'classify-goal-kind' | 'propose-structure-sources' | 'match-structure-units' | 'compile-territory';
 
 export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationStepKey, StepHandler>> {
   const { learn, userId } = deps;
@@ -168,10 +173,57 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     },
   });
 
+  const compile = compileStep({
+    stored: (runId) => loadRunTerritory(learn, userId, runId),
+    async documents(items) {
+      const read = await Promise.all(items.map((item) => readStructure(sql(), item.itemId)));
+      return items.flatMap((item, i): CompileDocument[] => {
+        const doc = read[i];
+        if (!doc) return [];
+        return [
+          {
+            itemId: doc.itemId,
+            title: doc.title,
+            url: doc.canonicalUrl,
+            institution: doc.institution,
+            courseCode: doc.courseCode,
+            term: doc.term,
+            units: doc.units.map((u) => ({ ordinal: u.ordinal, label: u.label, heading: u.heading, topics: u.topics })),
+            matched: item.matched,
+            best: item.best,
+          },
+        ];
+      });
+    },
+    async frames(subject) {
+      // The frame articles are embedded at 512 wide (learn 0128); the subject is searched the same way.
+      const spent: SpendReport[] = [];
+      const query = `${subject.name.trim()}${subject.note?.trim() ? `. ${subject.note.trim()}` : ''}`;
+      const embedded = await embedOne(query, { inputType: 'query', dimensions: TOPIC_DIMENSIONS, onSpend: (r) => spent.push(r) });
+      await ledger('compile-territory', spent);
+      if (!embedded.ok) throw new Error(`Finding the frame topics failed: ${embedded.reason}: ${embedded.detail}`);
+      const rows = await sql()<{ title: string }[]>`
+        select title from learn.area_check_articles
+         where level = 4 and embedding is not null
+         order by embedding operator(extensions.<=>) ${vectorLiteral(embedded.vector, TOPIC_DIMENSIONS)}::extensions.vector
+         limit ${FRAMES_OFFERED}`;
+      return [...new Set(rows.map((r) => r.title))];
+    },
+    async compile(input) {
+      if (!deps.anthropicApiKey) return { ok: false, detail: 'No ANTHROPIC_API_KEY is set.' };
+      const spent: SpendReport[] = [];
+      const result = await compileTerritory({ ...input, anthropicApiKey: deps.anthropicApiKey, onSpend: (r) => spent.push(r) });
+      await ledger('compile-territory', spent);
+      return result;
+    },
+    save: (runId, territory) => saveRunTerritory(learn, userId, runId, territory),
+  });
+
   return {
     classify,
     pull_documents: pull,
     match_weeks: match,
+    compile_territory: compile,
     finish: finishStep,
   };
 }

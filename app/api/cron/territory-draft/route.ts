@@ -5,6 +5,8 @@ import { createServiceSupabase as createJobsServiceSupabase } from '@/inngest/jo
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
+import type { Territory } from '@/lib/learn/levels/territory';
+import { loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
 import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
 
@@ -14,6 +16,7 @@ export const maxDuration = 300;
 const BUDGET_MS = 240_000;
 const TERRITORIES = { [SAAS_METRICS.key]: SAAS_METRICS } as const;
 const ownerSchema = z.object({ userId: z.string() });
+const subjectSchema = z.string().uuid();
 
 /** The catalogue connection, or none on a deployment without DATABASE_URL. */
 function catalogueOrNone() {
@@ -27,7 +30,9 @@ function catalogueOrNone() {
 
 /**
  * Drafts a territory from its sources (plan #2172.6), for the owner, the
- * account the dev tooling runs as. `?territory=saas-metrics`. Call it until
+ * account the dev tooling runs as. `?territory=saas-metrics` drafts the
+ * hand-written fixture; `?subject=<id>` drafts the territory that subject's
+ * preparation compiled from its stored documents (plan #2276.4). Call it until
  * `remaining` is zero; each call picks up the topics not yet drafted. Every
  * topic lands as a draft with its five checks, for the person to approve on
  * /learn/topics.
@@ -44,17 +49,27 @@ async function tick(request: NextRequest) {
   if (!authorizeCron(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+  const subjectParam = request.nextUrl.searchParams.get('subject');
   const key = request.nextUrl.searchParams.get('territory') ?? '';
-  const territory = TERRITORIES[key];
-  if (!territory) return NextResponse.json({ error: `no territory "${key}"` }, { status: 404 });
+  const subject = subjectParam === null ? null : subjectSchema.safeParse(subjectParam);
+  if (subject && !subject.success) return NextResponse.json({ error: 'subject must be an id' }, { status: 400 });
+  const fixture = TERRITORIES[key];
+  if (!subject && !fixture) return NextResponse.json({ error: `no territory "${key}"` }, { status: 404 });
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY is not set' }, { status: 500 });
   try {
     const { data } = await createServiceSupabase().rpc('app_owner');
     const owner = ownerSchema.safeParse(data);
     if (!owner.success) return NextResponse.json({ error: 'no owner account' }, { status: 500 });
+    const learn = createLearnServiceSupabase();
+    let territory: Territory | null = fixture ?? null;
+    if (subject?.success) {
+      territory = await loadSubjectTerritory(learn, owner.data.userId, subject.data);
+      if (!territory) return NextResponse.json({ error: 'that subject has no compiled territory yet' }, { status: 404 });
+    }
+    if (!territory) return NextResponse.json({ error: `no territory "${key}"` }, { status: 404 });
     const summary = await draftTerritoryTick(
-      { learn: createLearnServiceSupabase(), jobs: createJobsServiceSupabase() },
+      { learn, jobs: createJobsServiceSupabase() },
       owner.data.userId,
       territory,
       { anthropicApiKey: apiKey, budgetMs: BUDGET_MS, catalogue: catalogueOrNone() },
