@@ -12,6 +12,7 @@ import {
   type RawVerdict,
   type Moved,
 } from '@/lib/learn/levels/grade';
+import type { RoleLine, RoleLineFinder } from '@/lib/learn/levels/role-line';
 import { writeLevelCase } from '@/lib/learn/levels/case-call';
 import { gradeCellAnswer, LEVEL_GRADE_MODEL, LEVEL_GRADE_SECOND_MODEL } from '@/lib/learn/levels/grade-call';
 import { loadGradeMap, territoryOf } from '@/lib/learn/levels/loader-grade';
@@ -39,6 +40,8 @@ export type AskedCell = {
   question: string;
   /** What the question is: an explanation, or a case to work (levels 4 to 6). */
   format: 'explain' | 'case';
+  /** The requirement line of a role you pursued that this topic serves, when one is near (plan #2184.2). */
+  role?: RoleLine | null;
 };
 
 export type AskCellResult = { ok: true; asked: AskedCell } | { ok: false; error: string };
@@ -55,6 +58,8 @@ export async function askCell(
   writer?: { anthropicApiKey: string; onSpend?: SpendSink },
   /** The piece of a plan whose check this question is (plan #2138.13). */
   pieceId?: string,
+  /** Finds the role requirement the topic serves: shown on the question and used to set a case. */
+  findRole?: RoleLineFinder,
 ): Promise<AskCellResult> {
   const { data: cell, error } = await learn
     .from('topic_cells')
@@ -86,9 +91,10 @@ export async function askCell(
     .limit(1)
     .maybeSingle();
   const reuse = open as { id: string; question: string } | null;
+  const role = findRole ? await findRole(row.topic.name) : null;
   const asked = (questionId: string, question: string): AskCellResult => ({
     ok: true,
-    asked: { questionId, cellId, topicName: row.topic.name, level: row.level, question, format },
+    asked: { questionId, cellId, topicName: row.topic.name, level: row.level, question, format, role },
   });
   if (reuse) return asked(reuse.id, reuse.question);
 
@@ -108,6 +114,7 @@ export async function askCell(
       topicName: row.topic.name,
       level: row.level,
       descriptor: row.descriptor ?? [],
+      role,
       asked: ((before ?? []) as Array<{ question: string }>).map((b) => b.question),
       anthropicApiKey: writer.anthropicApiKey,
       onSpend: writer.onSpend,

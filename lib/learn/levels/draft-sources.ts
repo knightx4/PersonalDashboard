@@ -392,13 +392,32 @@ export type DraftingRecord = {
   documents?: DraftedDocument[];
   /** The textbooks the stored documents name, with how many name each; absent when none were read. */
   canon?: CanonText[];
+  /** The research brief the sources came from and the goal it was drafted under (plan #2184.1); absent otherwise. */
+  brief?: DraftedFromBrief;
 };
+
+/** What a topic drafted from a research brief keeps of it (plan #2184.1; lib/learn/briefs/topics.ts). */
+export type DraftedFromBrief = { id: string; question: string; aimId: string; aimName: string };
+
+/** `topics.drafting.brief` as read back, or null when the topic was not drafted from a brief. */
+export function readDraftedFromBrief(value: unknown): DraftedFromBrief | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Partial<DraftedFromBrief>;
+  if (typeof v.id !== 'string' || typeof v.aimId !== 'string') return null;
+  return {
+    id: v.id,
+    question: typeof v.question === 'string' ? v.question : '',
+    aimId: v.aimId,
+    aimName: typeof v.aimName === 'string' ? v.aimName : '',
+  };
+}
 
 /** `topics.drafting` as read back; null for a topic drafted before sources (or a shape not written here). */
 export function readDrafting(value: unknown): DraftingRecord | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Partial<DraftingRecord>;
   if (!Array.isArray(v.sources) || !Array.isArray(v.performances) || !v.coverage || !v.structure) return null;
+  const brief = readDraftedFromBrief(v.brief);
   return {
     sources: v.sources,
     performances: v.performances,
@@ -409,6 +428,7 @@ export function readDrafting(value: unknown): DraftingRecord | null {
     checklist: Array.isArray(v.checklist) ? v.checklist.filter((c): c is string => typeof c === 'string') : [],
     ...(Array.isArray(v.documents) ? { documents: v.documents } : {}),
     ...(Array.isArray(v.canon) ? { canon: v.canon } : {}),
+    ...(brief ? { brief } : {}),
   };
 }
 

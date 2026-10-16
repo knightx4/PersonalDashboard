@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   MIN_SOURCE_CHARS,
+  SECTION_IDEA_BASE,
   briefCardToWrite,
+  briefSectionSources,
   orderQuickRead,
   planBriefCards,
   sourceText,
@@ -71,6 +73,60 @@ describe('planning the cards', () => {
       },
     });
     expect(briefCardToWrite(source({ summary: null }), 'c1')).toBeNull();
+  });
+});
+
+describe('a brief under a goal (plan #2184.1)', () => {
+  const aim = { id: 'a1', name: 'SOX and internal control' };
+  const brief = {
+    id: 'b1',
+    userId: 'u1',
+    question: 'How do SOX controls apply to AI?',
+    angle: '',
+    aim,
+    subQuestions: [
+      { id: '1', text: 'When does an AI tool become part of ICFR?' },
+      { id: '2', text: 'What must management document?' },
+      { id: '3', text: 'Who is liable?' },
+    ],
+    sections: [
+      {
+        sub_question_id: '1',
+        position: 'As soon as its output feeds a figure or a review that management relies on in the close.',
+        citations: [
+          { reading_id: 'gone', quote: 'Not on the list.' },
+          { reading_id: 'r2', quote: 'The tool is then part of the process and in scope.' },
+        ],
+      },
+      { sub_question_id: '2', position: 'The model, its inputs and the review of its output.', citations: [] },
+    ],
+  };
+  const titles = new Map([['r2', 'COSO on AI']]);
+
+  it('makes a card of each answered sub-question that quotes a page, on that page, for the goal', () => {
+    const sections = briefSectionSources(brief, titles);
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({ readingId: 'r2', ideaIndex: SECTION_IDEA_BASE, aim, title: 'COSO on AI' });
+    expect(sourceText(sections[0]!)).toContain('“The tool is then part of the process and in scope.” (COSO on AI)');
+  });
+
+  it('writes the section card from the answer, for the sub-question, naming the goal', () => {
+    const [section] = briefSectionSources(brief, titles);
+    expect(briefCardToWrite(section!, 'c9')).toMatchObject({
+      reason: 'researched',
+      aimName: 'SOX and internal control',
+      research: { question: 'When does an AI tool become part of ICFR?' },
+    });
+    expect(briefCardToWrite(source({ aim }), 'c1')?.aimName).toBe('SOX and internal control');
+  });
+
+  it("keeps a page's card and a section card on the same page apart", () => {
+    const [section] = briefSectionSources(brief, titles);
+    const jobs = planBriefCards([source({ readingId: 'r2' }), section!], [{ id: 'c-page', readingId: 'r2', status: 'ready' }]);
+    expect(jobs.map((job) => job.source.ideaIndex)).toEqual([SECTION_IDEA_BASE]);
+    expect(
+      planBriefCards([section!], [{ id: 'c-s', readingId: 'r2', status: 'ready', ideaIndex: SECTION_IDEA_BASE }]),
+    ).toEqual([]);
   });
 });
 

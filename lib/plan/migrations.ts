@@ -105,3 +105,26 @@ export function unappliedSentence(paths: readonly string[]): string | null {
   const noun = paths.length === 1 ? 'migration is' : 'migrations are';
   return `${paths.length} ${noun} on main but not applied to the live database: ${named}${more}.`;
 }
+
+/**
+ * The name a file is applied under: the file's own name, with its folder in
+ * front for every folder but `migrations`. `migrations-learn/0154_merge_ideas.sql`
+ * goes in as `learn_0154_merge_ideas`, the shape CLAUDE.md asks sessions for
+ * and `migrationApplied` reads back.
+ */
+export function liveMigrationName(path: string): string {
+  const [dir, file] = path.split('/');
+  const stem = file.replace(/\.sql$/, '');
+  if (dir === 'migrations') return stem;
+  return `${dir.replace(/^migrations-/, '').replace(/-/g, '_')}_${stem}`;
+}
+
+/**
+ * The order to apply `folder/file` paths in: the core folder first, because
+ * the modules' tables refer to its tables and never the other way, then each
+ * module folder by name, and by file name within a folder.
+ */
+export function applyOrder(paths: readonly string[]): string[] {
+  const core = (path: string) => (path.startsWith('migrations/') ? 0 : 1);
+  return [...paths].sort((a, b) => core(a) - core(b) || a.localeCompare(b));
+}

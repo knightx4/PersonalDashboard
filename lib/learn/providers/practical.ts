@@ -12,7 +12,10 @@ import { extractPdfPages } from './pdf-text';
  * a cooperative extension's short course page, which lists numbered lessons
  * with a video and a handout each, and an association's examination outline,
  * a PDF whose headed sections are the domains the exam covers and whose
- * tasks say what a certified person can do.
+ * tasks say what a certified person can do. A skill practised in business
+ * rather than taught by an extension service has a third place (plan
+ * #2247.6): a practitioner's long guide, whose headed sections are the
+ * curriculum operators actually learn from.
  *
  * Both are pulled from an allowlist in code, `PRACTICAL_SOURCES`, as the
  * explainers are (./explainers.ts): an address on no entry is refused before
@@ -21,9 +24,10 @@ import { extractPdfPages } from './pdf-text';
  * fetch in fixtures/structure/practical/.
  *
  * Licence mode is per entry, and `structure_only` unless the document states
- * its terms. Neither starting source does: the course page carries only the
- * university's copyright line and the outline PDF none, so both keep the
- * order, the headings and the tasks, and show or feed nothing.
+ * its terms. None of them does: the course page carries only the university's
+ * copyright line, the outline PDF none, and the two practitioner articles
+ * their publishers' copyright, so all keep the order, the headings and the
+ * tasks, and show or feed nothing.
  *
  * The parsers are pure functions of the page text, or of the text a PDF
  * yields. The fetch path is ./fetch, which refuses private addresses on every
@@ -36,6 +40,8 @@ export type PracticalSource = {
   providerSlug: string;
   host: string;
   licenceMode: LicenceMode;
+  /** The addresses it reads, as the proposing call is told them. */
+  pages: string[];
   accepts: (url: URL) => boolean;
   pull: (url: URL) => Promise<PracticalResult>;
 };
@@ -60,6 +66,10 @@ function decodeEntities(text: string): string {
     .replace(/&#0?39;|&#x27;|&apos;/g, "'")
     .replace(/&#34;/g, '"')
     .replace(/&rsquo;/g, '’')
+    .replace(/&lsquo;/g, '‘')
+    .replace(/&ldquo;/g, '“')
+    .replace(/&rdquo;/g, '”')
+    .replace(/&hellip;/g, '…')
     .replace(/&mdash;/g, '—')
     .replace(/&ndash;/g, '–')
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
@@ -376,6 +386,216 @@ async function pullExamOutline(pdfUrl: URL): Promise<PracticalResult> {
 }
 
 // ---------------------------------------------------------------------------
+// A practitioner's guide: one long article whose headings lay a skill out
+// (plan #2247.6). David Skok's SaaS Metrics 2.0 and a16z's 16 Startup Metrics
+// are how SaaS metrics are taught to operators; no university teaches them.
+
+export type PractitionerSection = {
+  /** The article's own number for the section ("1"), or null when it numbers none. */
+  label: string | null;
+  heading: string;
+  /** The sub-headings under it and, when asked for, the terms it sets in bold, in the order they appear. */
+  topics: string[];
+};
+
+export type PractitionerText = {
+  title: string;
+  sections: PractitionerSection[];
+  /** The article's text from its title to where it ends, one block per line. */
+  text: string;
+};
+
+/** A section heading that ends the article: what follows is not about the subject. */
+const END_MATTER = /^(acknowledg(e)?ments?|about the authors?|related (posts|reading)|further reading)$/i;
+/** A section heading that is not a section of the subject. */
+const NOT_A_SECTION = /^(intro|introduction)$/i;
+
+const headingText = (fragment: string): string => plain(fragment).replace(/\s*:$/, '');
+
+/** Bold runs longer than this are sentences set in bold, not terms. */
+const MAX_TERM_WORDS = 6;
+
+/**
+ * The terms a stretch of a section sets in bold, as an article does where it
+ * defines them: "ARR (annual recurring revenue)", "Gross churn". A run that
+ * reads as a sentence (over six words, starting lower case, or with a comma
+ * in it, such as an attribution "Ron Gill, NetSuite") is left out.
+ */
+function boldTerms(fragment: string): string[] {
+  const terms: string[] = [];
+  for (const match of fragment.matchAll(/<(b|strong)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+    const term = plain(match[2]).replace(/[\s:,.]+$/, '');
+    if (term.length < 2 || term.length > 60 || !/^[A-Z0-9]/.test(term) || term.includes(',')) continue;
+    if (term.split(' ').length > MAX_TERM_WORDS) continue;
+    terms.push(term);
+  }
+  return terms;
+}
+
+/**
+ * A practitioner's article from its page. The sections are the headings at
+ * `level` (2 for an article whose sections are h2, 3 for one that groups them
+ * under h2 parts), each with the headings one level below as its topics. A
+ * section numbered "1. Bookings vs. revenue" keeps the number as its label.
+ *
+ * Only headings with no class attribute are the article's: the site's own
+ * furniture (related posts, author cards, newsletter boxes) is drawn with
+ * classed headings on both starting pages, so the first classed heading after
+ * a section has opened ends the article, as does an acknowledgements heading.
+ *
+ * With `terms`, the terms each section sets in bold join its topics where
+ * they appear: a16z's sections define their metrics that way, and a heading
+ * such as "Recurring revenue vs. Total revenue" is found by a search for ARR
+ * only through them. Skok's bold is emphasis and attributions, so his guide
+ * is read without. Pure.
+ */
+export function parsePractitionerText(html: string, level: 2 | 3, options: { terms?: boolean } = {}): PractitionerText {
+  const h1 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1];
+  const pageTitle = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
+  const title = h1 ? plain(h1) : pageTitle ? plain(pageTitle) : '';
+
+  const start = html.search(/<h1\b/i);
+  const body = (start >= 0 ? html.slice(start) : html)
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  const sections: PractitionerSection[] = [];
+  let open: PractitionerSection | null = null;
+  let end = body.length;
+  // Where the stretch of body since the last heading starts, for its bold terms.
+  let since = 0;
+  const harvest = (until: number) => {
+    if (!open || !options.terms) return;
+    for (const term of boldTerms(body.slice(since, until))) {
+      if (term !== open.heading && !open.topics.includes(term)) open.topics.push(term);
+    }
+  };
+  for (const match of body.matchAll(/<h([2-6])\b([^>]*)>([\s\S]*?)<\/h\1>/gi)) {
+    harvest(match.index);
+    since = match.index + match[0].length;
+    const depth = Number(match[1]);
+    const classed = /\bclass\s*=/i.test(match[2]);
+    if (classed) {
+      if (sections.length > 0) {
+        end = match.index;
+        break;
+      }
+      continue;
+    }
+    const text = headingText(match[3]);
+    if (!text) continue;
+    if (depth === level) {
+      if (END_MATTER.test(text)) {
+        end = match.index;
+        break;
+      }
+      if (NOT_A_SECTION.test(text)) {
+        open = null;
+        continue;
+      }
+      const numbered = /^(\d{1,3})\.\s*(.+)$/.exec(text);
+      open = { label: numbered ? numbered[1] : null, heading: numbered ? numbered[2] : text, topics: [] };
+      sections.push(open);
+    } else if (depth === level + 1 && open) {
+      open.topics.push(text);
+    }
+  }
+  if (end === body.length) harvest(end);
+
+  const text = decodeEntities(
+    body
+      .slice(0, end)
+      .replace(/<\/(h[1-6]|p|li|div|tr|blockquote)>|<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]*>/g, ' '),
+  )
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line !== '')
+    .join('\n');
+
+  return { title, sections, text };
+}
+
+/** One allowlisted practitioner article and who wrote it. */
+export type PractitionerPage = {
+  providerSlug: string;
+  host: string;
+  /** The article's path, with its trailing slash. */
+  path: string;
+  /** The heading level its sections are drawn at. */
+  level: 2 | 3;
+  /** Whether the terms it sets in bold are its topics too (parsePractitionerText). */
+  terms: boolean;
+  author: string;
+  institution: string;
+};
+
+export const SKOK_SAAS_METRICS: PractitionerPage = {
+  providerSlug: 'forentrepreneurs',
+  host: 'www.forentrepreneurs.com',
+  path: '/saas-metrics-2/',
+  level: 2,
+  terms: false,
+  author: 'David Skok',
+  institution: 'For Entrepreneurs',
+};
+
+export const A16Z_STARTUP_METRICS: PractitionerPage = {
+  providerSlug: 'a16z',
+  host: 'a16z.com',
+  path: '/16-startup-metrics/',
+  level: 3,
+  terms: true,
+  author: 'Jeff Jordan, Anu Hariharan, Frank Chen and Preethi Kasireddy',
+  institution: 'Andreessen Horowitz',
+};
+
+const pageUrl = (page: PractitionerPage) => `https://${page.host}${page.path}`;
+
+/** The article as the document the store keeps: one unit per section, in the article's order. */
+export function practitionerDocument(article: PractitionerText, page: PractitionerPage): StructureDocumentInput {
+  const url = pageUrl(page);
+  return {
+    providerSlug: page.providerSlug,
+    externalId: page.path.replace(/^\/|\/$/g, ''),
+    title: article.title,
+    canonicalUrl: url,
+    sourceUrl: url,
+    author: page.author,
+    institution: page.institution,
+    licenceMode: 'structure_only',
+    rawText: [article.title, url, article.text].join('\n\n'),
+    units: article.sections.map((section) => ({
+      label: section.label,
+      heading: section.heading,
+      topics: section.topics,
+      readings: [],
+    })),
+  };
+}
+
+function practitionerSource(page: PractitionerPage): PracticalSource {
+  const bare = page.path.replace(/\/$/, '');
+  return {
+    providerSlug: page.providerSlug,
+    host: page.host,
+    licenceMode: 'structure_only',
+    pages: [pageUrl(page)],
+    accepts: (url) => url.pathname === page.path || url.pathname === bare,
+    pull: async () => {
+      const fetched = await fetchDocument(pageUrl(page));
+      if (!fetched.ok) return failure('fetch-failed', `${fetched.reason}: ${fetched.detail}`);
+      const article = parsePractitionerText(fetched.text, page.level, { terms: page.terms });
+      if (!article.title || article.sections.length === 0) {
+        return failure('unparseable', 'No sections in the practitioner article.');
+      }
+      return { ok: true, document: practitionerDocument(article, page) };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The allowlist
 
 export const PRACTICAL_SOURCES: PracticalSource[] = [
@@ -383,6 +603,7 @@ export const PRACTICAL_SOURCES: PracticalSource[] = [
     providerSlug: 'uaex',
     host: UAEX_HOST,
     licenceMode: 'structure_only',
+    pages: [UAEX_BEEKEEPING_URL],
     accepts: (url) => url.pathname === '/farm-ranch/special-programs/beekeeping/beekeepingshortcourse.aspx',
     pull: pullExtensionCourse,
   },
@@ -390,9 +611,12 @@ export const PRACTICAL_SOURCES: PracticalSource[] = [
     providerSlug: 'isa-arbor',
     host: ISA_HOST,
     licenceMode: 'structure_only',
+    pages: [ISA_CERTIFIED_ARBORIST_URL],
     accepts: (url) => url.pathname === '/Portals/0/Assets/PDF/Certification-Applications/Cert-Exam-Outline-CA.pdf',
     pull: pullExamOutline,
   },
+  practitionerSource(SKOK_SAAS_METRICS),
+  practitionerSource(A16Z_STARTUP_METRICS),
 ];
 
 /** The allowlisted source an address belongs to, or null. https only. */
