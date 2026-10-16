@@ -159,6 +159,7 @@ describe('the operation names', () => {
       'propose-structure-sources',
       'match-structure-units',
       'pull-lit-topic-structure',
+      'compile-territory',
     ]);
   });
 });

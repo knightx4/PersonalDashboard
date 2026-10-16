@@ -428,6 +428,10 @@ export const LEARN_OPERATIONS = [
   // Proposing and confirming one structure document for a topic that just lit
   // (plan #2247.11): the daily run's own pulls, at most five a day.
   'pull-lit-topic-structure',
+  // Compiling a subject's territory from its stored documents (plan
+  // #2276.4): one Sonnet call per preparation, laying out thirty to fifty
+  // topics with their frames, targets and source lines.
+  'compile-territory',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

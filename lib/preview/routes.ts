@@ -563,6 +563,16 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-essay-draft-from-notes': ['/learn/e/[id]'],
   'learn-plan-finished': ['/learn/s/[id]'],
   'learn-subject-conversations': ['/learn/s/[id]'],
+  'learn-subject-prepare': ['/learn/s/[id]'],
+  'learn-subject-prepare-starting': ['/learn/s/[id]'],
+  'learn-subject-prepare-failed': ['/learn/s/[id]'],
+  'learn-subject-prepare-finished': ['/learn/s/[id]'],
+  'learn-subject-prepare-empty': ['/learn/s/[id]'],
+  'learn-subject-prepare-start': ['/learn/s/[id]'],
+  'learn-subject-prepare-sources-empty': ['/learn/s/[id]'],
+  'learn-subject-prepare-sources-folded': ['/learn/s/[id]'],
+  'learn-subject-prepare-direction': ['/learn/s/[id]'],
+  'learn-subject-prepare-branch': ['/learn/s/[id]'],
   'news-all': ['/news/all'],
   'news-story': ['/news/i/[id]/s/[index]'],
   'news-settings': ['/news/settings'],
@@ -612,6 +622,18 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  * shows. A piece a page imports for itself still reaches that page.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
+  // A subject's preparation block (plan #2276.2), drawn at each stage of a run.
+  'learn-subject-prepare': ['app/learn/s/[id]/prepare.tsx'],
+  'learn-subject-prepare-starting': ['app/learn/s/[id]/prepare.tsx'],
+  'learn-subject-prepare-failed': ['app/learn/s/[id]/prepare.tsx'],
+  'learn-subject-prepare-finished': ['app/learn/s/[id]/prepare.tsx'],
+  'learn-subject-prepare-empty': ['app/learn/s/[id]/prepare.tsx'],
+  // What a finished preparation leaves (plan #2276.6): Start here and Sources.
+  'learn-subject-prepare-start': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-prepare-sources-empty': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-prepare-sources-folded': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-prepare-direction': ['app/learn/s/[id]/direction.tsx'],
+  'learn-subject-prepare-branch': ['app/learn/s/[id]/prepare.tsx'],
   // The one thread (plan #1964.3), with a subject or none: a change to it is
   // looked at here and on the dev-comment-thread surfaces, rather than on
   // every page that draws a thread.

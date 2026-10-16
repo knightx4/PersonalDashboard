@@ -107,6 +107,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // naming documents to fetch.
   'match-structure-units': run(VOYAGE_LITE, 200, 0),
   'propose-structure-sources': run(HAIKU, 400, 200),
+  // Compiling a subject's territory (plan #2276.4): up to eight documents'
+  // ordered units and forty frame titles in, thirty to fifty topics out.
+  'compile-territory': run(SONNET, 25_000, 6_000),
   // The daily pull for a topic that just lit (plan #2247.11): one proposing call.
   'pull-lit-topic-structure': background(run(HAIKU, 400, 200)),
   // Moving a subject from the claims graph (plan #2138.4): its claims and the

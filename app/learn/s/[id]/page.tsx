@@ -33,6 +33,13 @@ import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
 import { PullCourse } from './pull-course';
+import { PreparationBlock } from './prepare';
+import { DirectionOffer } from './direction';
+import { directionOffer } from '@/lib/learn/prepare/branch';
+import { SourcesSection, StartHere } from './sources';
+import { loadDirection, loadPreparation, loadSubjectTerritory } from '@/lib/learn/prepare/store';
+import { loadStartTopic } from '@/lib/learn/prepare/start-load';
+import { branchPreparationView, preparationSources, preparationView } from '@/lib/learn/prepare/view';
 import {
   countStates,
   learningOrder,
@@ -265,7 +272,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -279,6 +286,13 @@ export default async function SubjectPage({
     // Readings related to it and chats logged about it (plan #1814). Ones that
     // cannot be read leave the section out.
     loadSubjectLearning(supabase, id).catch((): SubjectLearning => ({ readings: [], sessions: [] })),
+    // The subject's preparation run (plan #2276.2): null for a subject made
+    // before preparation existed. One that cannot be read leaves the block out.
+    loadPreparation(supabase, user.id, id).catch(() => undefined),
+    // The direction offer and the branch runs (plan #2276.7). Ones that cannot
+    // be read leave the offer and the branch blocks out.
+    loadDirection(supabase, user.id, id).catch(() => null),
+    loadSubjectTerritory(supabase, user.id, id).catch(() => null),
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
@@ -300,6 +314,31 @@ export default async function SubjectPage({
     : null;
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
+  // Where a finished preparation says to start, and what it came from (plan
+  // #2276.6). The topic is read as it stands, since it is approved after the
+  // run; one that cannot be read leaves the name the run recorded.
+  const sources = preparation ? preparationSources(preparation) : null;
+  const startTopic = sources?.start.topic
+    ? await loadStartTopic(supabase, user.id, sources.start.topic.id).catch(() => null)
+    : null;
+  // The card stays until the first unit is done; the curriculum's Next takes over from there.
+  const firstRow = unitRows[0] ?? null;
+  const showStart = sources !== null && (firstRow === null || firstRow.state !== 'done');
+  // Going deeper (plan #2276.7): the offer once enough answers are graded on
+  // the lens, and each branch run's steps, newest last.
+  const offer = direction
+    ? directionOffer({
+        answers: direction.answers,
+        direction: direction.direction,
+        territory,
+        taken: new Set(direction.branches.flatMap((b) => (b.run.branch ? [b.run.branch.key] : []))),
+        prepared: direction.prepared,
+      })
+    : null;
+  const branchRuns = (direction?.branches ?? []).flatMap((b) => {
+    const view = branchPreparationView(b);
+    return view ? [view] : [];
+  });
   const live =
     units.length > 0
       ? outside
@@ -389,11 +428,33 @@ export default async function SubjectPage({
         </p>
       )}
 
+      {/* The person's own words about the subject, on a quiet panel rather
+          than the bare page (taste:no-bare-text, raised on plan #2276.2). */}
       {subject.note && (
-        <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">
-          {subject.note}
-        </p>
+        <div className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
+          <p className="border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>
+        </div>
       )}
+
+      {/* While the subject is being prepared this leads the page; once the run
+          is finished it is one line (plan #2276.2). */}
+      {/* Finished, it gives way to the Start here card, and its line opens
+          the Sources section under the curriculum (plan #2276.6). */}
+      {preparation !== undefined && !showEverything && !sources && (
+        <PreparationBlock subjectId={id} view={preparationView(preparation)} />
+      )}
+      {sources && showStart && !showEverything && (
+        <StartHere
+          unit={firstRow ? { ordinal: firstRow.unit.ordinal, title: firstRow.unit.title, covers: firstRow.unit.covers } : null}
+          topic={startTopic}
+          draftedName={sources.start.topic?.name ?? null}
+        />
+      )}
+      {!showEverything &&
+        branchRuns.map((b) => (
+          <PreparationBlock key={b.key} subjectId={id} view={b.view} branch={{ key: b.key, name: b.name }} />
+        ))}
+      {offer && !showEverything && <DirectionOffer subjectId={id} offer={offer} />}
 
       {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
@@ -495,6 +556,8 @@ export default async function SubjectPage({
           />
         ))
       )}
+
+      {sources && !showEverything && <SourcesSection subjectId={id} sources={sources} readings={learning.readings} />}
 
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}

@@ -64,12 +64,77 @@ Plain sentences. No slogans, no "not X, but Y" contrasts, no dashes used for rhy
 
 Report through ${TOOL_NAME}.`;
 
+/**
+ * What a subject's preparation read the subject's structure from (plan
+ * #2276.5): its opening topics as drafted, the opening lines of the documents
+ * the territory was laid out from, and units the course keeps after the ones
+ * written now.
+ */
+export type CurriculumTerritory = {
+  topics: readonly { name: string; scope: string }[];
+  documents: readonly { label: string; lines: readonly string[] }[];
+  /** Units the course already has that stay, after the opening units. */
+  after: readonly string[];
+};
+
+export type CurriculumPromptInput = {
+  subject: string;
+  asked: string | null;
+  units?: readonly string[];
+  territory?: CurriculumTerritory;
+};
+
+/** The user message for the first units. Exported so its content is tested without a model. */
+export function curriculumPrompt(input: CurriculumPromptInput): string {
+  const territory = input.territory;
+  return [
+    `The track: ${input.subject}`,
+    input.asked ? `What they asked for when they started it: ${input.asked}` : 'They did not say more than the name.',
+    ...(input.units && input.units.length > 0
+      ? [
+          '',
+          'They wrote the units themselves. Keep exactly these, with these titles, in this order: add none, drop none, reorder none. Write covers and outcome for each. The count rule does not apply: these are all the units for now.',
+          ...input.units.map((title, index) => `${index + 1}. ${title}`),
+        ]
+      : []),
+    ...(territory
+      ? [
+          '',
+          'The subject has been laid out from the syllabi and course documents below, as a list of topics in the order a learner meets them. Write the opening units from these: the course should start where the documents start.',
+          '',
+          'Opening topics, foundations first:',
+          ...territory.topics.map((topic, index) => `${index + 1}. ${topic.name}: ${topic.scope}`),
+          ...(territory.documents.length > 0
+            ? [
+                '',
+                'How the documents open, each line one week or unit:',
+                ...territory.documents.flatMap((doc) => [`${doc.label}:`, ...doc.lines.map((line) => `- ${line}`)]),
+              ]
+            : []),
+          ...(territory.after.length > 0
+            ? [
+                '',
+                'The course keeps these units after the ones you write. Do not repeat them:',
+                ...territory.after.map((title) => `- ${title}`),
+              ]
+            : []),
+          '',
+          'Each unit teaches one or more of the opening topics, in their order. In covers, name the topics the unit teaches using their names exactly as listed above.',
+        ]
+      : []),
+    '',
+    `Call ${TOOL_NAME}.`,
+  ].join('\n');
+}
+
 export async function writeCurriculum(input: {
   subject: string;
   /** What the person typed when the track was started, when there was something. */
   asked: string | null;
   /** Units the person wrote themselves, in their order. Kept exactly. */
   units?: readonly string[];
+  /** The territory a preparation drafted, which the opening units are read off (plan #2276.5). */
+  territory?: CurriculumTerritory;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -111,21 +176,7 @@ export async function writeCurriculum(input: {
       messages: [
         {
           role: 'user',
-          content: [
-            `The track: ${input.subject}`,
-            input.asked
-              ? `What they asked for when they started it: ${input.asked}`
-              : 'They did not say more than the name.',
-            ...(input.units && input.units.length > 0
-              ? [
-                  '',
-                  'They wrote the units themselves. Keep exactly these, with these titles, in this order: add none, drop none, reorder none. Write covers and outcome for each. The count rule does not apply: these are all the units for now.',
-                  ...input.units.map((title, index) => `${index + 1}. ${title}`),
-                ]
-              : []),
-            '',
-            `Call ${TOOL_NAME}.`,
-          ].join('\n'),
+          content: curriculumPrompt(input),
         },
       ],
     });

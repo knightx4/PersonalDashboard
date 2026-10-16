@@ -6,6 +6,7 @@ import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
+import { prepareSubjectAfterResponse } from '@/lib/learn/prepare/kick';
 
 /**
  * Turning the subject names a chat gives into the person's own subjects (plan
@@ -153,7 +154,11 @@ async function createSubject(
     .insert({ user_id: userId, name, note })
     .select('id, name')
     .single();
-  if (data) return data as SubjectRow;
+  if (data) {
+    // The insert opened its preparation run (0167); start it once the response has gone.
+    prepareSubjectAfterResponse((data as SubjectRow).id);
+    return data as SubjectRow;
+  }
 
   // Made by another write a moment ago: subjects_user_name_uq let that one in.
   if (error?.code === '23505') {
