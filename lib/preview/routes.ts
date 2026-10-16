@@ -273,6 +273,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'ask-dash-thread': ['/ask/[ref]'],
   'ask-dash-files': ['/ask', '/ask/[ref]'],
+  'ask-dash-waiting': ['/ask', '/ask/[ref]'],
   'ask-page': ['/ask/[ref]'],
   'ask-page-new': ['/ask'],
   'ask-page-hidden': ['/ask', '/ask/[ref]'],
@@ -608,6 +609,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['components/thread/thread.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
+  'ask-dash-waiting': ['components/thread/thread.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
   // Dash's box: @ rows, / commands and the scope chip (plan #1899.5).
   'ask-box-rows': ['components/talk/ask-box.tsx'],
