@@ -33,6 +33,7 @@ declare
   gone job_search.companies%rowtype;
   fk record;
   pair record;
+  twin job_search.contacts%rowtype;
   moved jsonb := '{}'::jsonb;
   n integer;
 begin
@@ -58,18 +59,7 @@ begin
       on k.user_id = g.user_id and k.company_id = p_keep and lower(k.full_name) = lower(g.full_name)
     where g.company_id = p_merge
   loop
-    update job_search.contacts k set
-      title = coalesce(k.title, g.title),
-      linkedin_url = coalesce(k.linkedin_url, g.linkedin_url),
-      email = coalesce(k.email, g.email),
-      how_we_connect = coalesce(k.how_we_connect, g.how_we_connect),
-      notes = case
-        when k.notes is null then g.notes
-        when g.notes is null or g.notes = k.notes then k.notes
-        else k.notes || E'\n\n' || g.notes
-      end
-    from job_search.contacts g
-    where k.id = pair.keep_id and g.id = pair.gone_id;
+    select * into twin from job_search.contacts where id = pair.gone_id;
 
     for fk in
       select c.conrelid::regclass::text as tbl, a.attname::text as col
@@ -82,7 +72,21 @@ begin
         using pair.keep_id, pair.gone_id;
     end loop;
 
+    -- Gone before its details are copied: contacts are unique on email too,
+    -- so the kept row cannot take the email while the twin still holds it.
     delete from job_search.contacts where id = pair.gone_id;
+
+    update job_search.contacts k set
+      title = coalesce(k.title, twin.title),
+      linkedin_url = coalesce(k.linkedin_url, twin.linkedin_url),
+      email = coalesce(k.email, twin.email),
+      how_we_connect = coalesce(k.how_we_connect, twin.how_we_connect),
+      notes = case
+        when k.notes is null then twin.notes
+        when twin.notes is null or twin.notes = k.notes then k.notes
+        else k.notes || E'\n\n' || twin.notes
+      end
+    where k.id = pair.keep_id;
     moved := moved || jsonb_build_object(
       'contacts folded', coalesce((moved ->> 'contacts folded')::integer, 0) + 1
     );
@@ -112,8 +116,7 @@ begin
     end if;
   end loop;
 
-  -- Deleted before the kept row takes the merged one's board, so the
-  -- one-company-per-board index never sees two rows holding it.
+  -- Nothing points at it now. `gone` still holds its values for the fill below.
   delete from job_search.companies where id = p_merge;
 
   update job_search.companies k set
@@ -145,7 +148,22 @@ begin
     updated_at = now()
   where k.id = p_keep;
 
-  perform job_search.sync_company_status(p_keep);
+  -- The rule sync_company_status keeps, inline: that function is closed to
+  -- callers and runs only from the applications trigger, which a move of
+  -- roles between companies does not fire.
+  update job_search.companies k set status = case
+      when s.total = 0 then 'no_activity'::job_search.company_status
+      when s.live > 0 then 'active'::job_search.company_status
+      else 'closed_out'::job_search.company_status
+    end
+  from (
+    select count(*) as total,
+      count(*) filter (where not job_search.is_terminal_application_status(a.status)) as live
+    from job_search.applications a
+    join job_search.roles r on r.id = a.role_id
+    where r.company_id = p_keep
+  ) s
+  where k.id = p_keep;
 
   return jsonb_build_object(
     'kept', p_keep,
