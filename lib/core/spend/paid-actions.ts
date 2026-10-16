@@ -109,6 +109,8 @@ export const PAID_ACTIONS = {
     'reply-about-card',
     'write-piece-check',
     'mark-piece-check',
+    'write-cell-case',
+    'grade-cell-answer',
   ],
 
   // Learn: questions

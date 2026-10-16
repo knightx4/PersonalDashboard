@@ -222,6 +222,7 @@ function piece(over: { turns?: TalkTurn[]; state?: PieceTalkState | null } = {})
       unit: { id: '5d000000-0000-4000-8000-000000000301', ordinal: 2, title: 'Keeping customers', outcome: null },
       siblings: [],
       ideas,
+      cells: [],
       check: null,
     },
     talk: { turns: over.turns ?? [], state: over.state ?? null, openedAt: OPENED_AT },
