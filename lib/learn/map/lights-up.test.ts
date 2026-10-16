@@ -9,6 +9,7 @@ function idea(id: string, setHoursAgo: number | null, strength = 0.8) {
     id,
     strength,
     haze: 0,
+    exposure: 0,
     state: 'known' as const,
     stateRow:
       setHoursAgo === null

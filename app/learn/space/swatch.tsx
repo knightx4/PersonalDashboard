@@ -1,9 +1,10 @@
 import { cn } from '@/lib/cn';
-import { SKY, starColour } from '@/lib/learn/map/sky';
+import { FAINTEST_MARK, SKY, starColour } from '@/lib/learn/map/sky';
 
 /**
  * A star as the legend and the rail show it (plan #1997.6): a small patch of
- * the night sky with one star on it, as bright as the strength it stands for.
+ * the night sky with one star on it, as bright as the tested strength it
+ * stands for, ringed in gold when it was met without a test (plan #2187.1).
  * The patch is dark in both themes, as the map is, so a star here looks like
  * the star on the map.
  */
@@ -11,6 +12,7 @@ export function StarSwatch({
   strength,
   slot = 'none',
   haze = 0,
+  exposure = 0,
   mixedUp = false,
   dust = false,
   className,
@@ -18,6 +20,8 @@ export function StarSwatch({
   strength: number;
   slot?: number | 'other' | 'none';
   haze?: number;
+  /** A course, your work, your writing or your word touched it: a gold halo (plan #2187.1). */
+  exposure?: number;
   mixedUp?: boolean;
   /** A vault note's speck instead of a star. */
   dust?: boolean;
@@ -39,6 +43,14 @@ export function StarSwatch({
           {haze > 0 && <circle r={4.5} style={{ fill: `rgb(${SKY.haze.join(',')})`, opacity: 0.35 }} />}
           <circle r={2.6} fill="none" strokeWidth={1} style={{ stroke: SKY.unlit }} />
         </>
+      )}
+      {!dust && exposure > FAINTEST_MARK && (
+        <circle
+          r={4.4}
+          fill="none"
+          strokeWidth={1.3}
+          style={{ stroke: `rgb(${SKY.halo.join(',')})`, opacity: 0.45 + 0.5 * Math.min(exposure, 1) }}
+        />
       )}
       {mixedUp && <circle r={3.6} fill="none" strokeWidth={1} style={{ stroke: SKY.mixedUp }} />}
     </svg>

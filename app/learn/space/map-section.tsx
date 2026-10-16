@@ -11,7 +11,7 @@ import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
 import { ideaGraph, openedFrom, paramsFor, type IdeaGraph } from '@/lib/learn/map/place-graph';
 import { TOUR_DWELL_MS, tourScript, type TourScript } from '@/lib/learn/map/tour';
-import { dustAt } from '@/lib/learn/map/sky';
+import { dustAt, FAINTEST_MARK } from '@/lib/learn/map/sky';
 import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/learn/map/lights-up';
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
@@ -70,6 +70,7 @@ export function MapSection({
         stateRow: idea.stateRow,
         strength: idea.strength,
         haze: idea.haze,
+        exposure: idea.exposure,
         slot: idea.domain ? (slots.get(idea.domain.id) ?? 'other') : 'none',
         domainId: idea.domain?.id ?? null,
         neighbours: idea.neighbours.map((n) => n.id),
@@ -116,7 +117,7 @@ export function MapSection({
     () => (replay ? ideaDomains(view.ideas.filter((idea) => replay.has(idea.id))) : domains),
     [replay, view.ideas, domains],
   );
-  const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
+  const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'exposure' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
   const lighting = useLightsUp(view, !!graph);
 
 
@@ -171,7 +172,7 @@ export function MapSection({
             dust={dust}
             asOf={replay ? momentOf(span, shownDay, today).toISOString() : view.asOf}
             replay={replay ?? lighting.replay}
-            label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as you know it`}
+            label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as your answers say you know it`}
             pointingAt={pointingAt}
             graph={graph}
           />
@@ -257,8 +258,8 @@ function MapNotes({
   litNames: readonly string[];
 }) {
   const bright = past
-    ? 'A star is as bright as you knew the idea on the day shown.'
-    : 'A star is as bright as you know the idea today.';
+    ? 'A star is as bright as your answers said you knew the idea on the day shown. A gold ring is one met in a course or your writing, or one you said you know.'
+    : 'A star is as bright as your answers say you know the idea today. A gold ring is one met in a course or your writing, or one you said you know.';
   if (graph) {
     return (
       <div className="mt-2 space-y-1 text-ui text-ink-muted">
@@ -339,9 +340,10 @@ function ideaDomains(ideas: readonly IdeaOnMap[]): { id: string; name: string; i
 }
 
 /**
- * What the sky shows, with how many of each: brightness, haze, the ring for
- * an idea held wrongly, the dust, and every domain's colour, which can be
- * pressed to pick out its ideas.
+ * What the sky shows, with how many of each: brightness for what answers
+ * lit, the gold halo for what you met untested, haze for what sits near what
+ * you know (plan #2187.1), the ring for an idea held wrongly, the dust, and
+ * every domain's colour, which can be pressed to pick out its ideas.
  */
 function Legend({
   params,
@@ -354,15 +356,16 @@ function Legend({
   params: MapParams;
   set: (change: Partial<MapParams>) => void;
   /** Every idea on the map on the day shown, lit as it was then. */
-  lights: readonly Pick<LightThen, 'strength' | 'haze' | 'state'>[];
+  lights: readonly Pick<LightThen, 'strength' | 'haze' | 'exposure' | 'state'>[];
   domains: { id: string; name: string; ideaCount: number }[];
   slots: Map<string, number>;
   dust: number;
 }) {
   const [allDomains, setAllDomains] = useState(false);
   const lit = lights.filter((idea) => idea.strength > 0).length;
-  const hazed = lights.filter((idea) => idea.strength <= 0 && idea.haze > 0.02).length;
+  const hazed = lights.filter((idea) => idea.strength <= 0 && idea.haze > FAINTEST_MARK).length;
   const dark = lights.length - lit - hazed;
+  const met = lights.filter((idea) => idea.exposure > FAINTEST_MARK).length;
   const mixedUp = lights.filter((idea) => idea.state === 'misconception').length;
 
   const marks: { key: string; swatch: React.ReactNode; label: string; count: number }[] = [
@@ -375,11 +378,17 @@ function Legend({
           <StarSwatch strength={1} />
         </span>
       ),
-      label: 'Known, dim to bright',
+      label: 'Tested, dim to bright',
       count: lit,
     },
-    { key: 'haze', swatch: <StarSwatch strength={0} haze={1} />, label: 'Not known, beside ideas you know', count: hazed },
-    { key: 'dark', swatch: <StarSwatch strength={0} />, label: 'Not known yet', count: dark },
+    {
+      key: 'halo',
+      swatch: <StarSwatch strength={0} exposure={1} />,
+      label: 'Met, not tested yet',
+      count: met,
+    },
+    { key: 'haze', swatch: <StarSwatch strength={0} haze={1} />, label: 'Near what you know', count: hazed },
+    { key: 'dark', swatch: <StarSwatch strength={0} />, label: 'Not tested yet', count: dark },
     { key: 'mixed', swatch: <StarSwatch strength={0} mixedUp />, label: 'Mixed up', count: mixedUp },
     { key: 'dust', swatch: <StarSwatch strength={0} dust />, label: 'Vault notes', count: dust },
   ];

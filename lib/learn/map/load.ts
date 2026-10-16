@@ -41,17 +41,19 @@ export type IdeaOnMap = MapIdea & {
   domain: Named | null;
   /** The columns of its state row the strength score reads, or null for an idea never seen. */
   stateRow: StrengthInput | null;
-  /** How well you know it on `asOf`, from 0 to 1 (plan #1997.6). */
+  /** How well your answers say you know it on `asOf`, from 0 to 1 (plan #1997.6): tested only (plan #2187.1). */
   strength: number;
-  /** For an idea not known yet, the light its known neighbours spill onto it, from 0 to 1. */
+  /** For an idea with no tested strength, the light its tested neighbours spill onto it, from 0 to 1. */
   haze: number;
+  /** How strongly a course, your work, your writing or your own word touched it, from 0 to 1: the gold halo. */
+  exposure: number;
   /** The place it is in (plan #1997.3), or null for an idea in none. */
   placeId: string | null;
   /** When the idea was written, which the timeline replays from (plan #1997.8). */
   createdAt: string | null;
   /**
    * The notes, courses and work that back it, strongest first (plan #2006.6).
-   * The strength above already counts them; the card lists the first three.
+   * They give it a halo (exposure above), never strength; the card lists the first three.
    */
   evidence: EvidenceLink[];
 };
@@ -328,6 +330,7 @@ export async function loadIdeaMap(
         stateRow: stateRowOf(idea.id),
         strength: light.get(idea.id)?.strength ?? 0,
         haze: light.get(idea.id)?.haze ?? 0,
+        exposure: light.get(idea.id)?.exposure ?? 0,
         placeId: placeRead?.placeOf.get(idea.id) ?? null,
         createdAt: row.created_at ?? null,
         evidence: linksOf(idea.id),
