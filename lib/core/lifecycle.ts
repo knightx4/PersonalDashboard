@@ -281,7 +281,7 @@ export const LIFECYCLE_SOURCES = {
     dir: 'migrations',
     kind: 'check',
     name: 'social_posts_status_ck',
-    words: { suggested: null, posted: 'done', dropped: 'dropped' },
+    words: { suggested: null, planned: null, posted: 'done', dropped: 'dropped' },
   },
   'public.spec_changes.status': {
     dir: 'migrations',

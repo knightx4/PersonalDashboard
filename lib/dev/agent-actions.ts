@@ -78,6 +78,8 @@ export const devActions: ModuleActions = {
     suggestPostAbout: none('spends', DEV_SPENDS),
     editPostBody: tool('rewrite_post'),
     markPostPosted: none('theirs', 'Says the person posted it; Dash never posts.'),
+    promotePost: none('theirs', 'Moving a post between suggested and planned is the person deciding to write it.'),
+    demotePost: none('theirs', 'Moving a post between suggested and planned is the person deciding to write it.'),
     dropPost: none('theirs'),
     restorePost: none('theirs'),
     writePost: none('own', 'A post the person wrote themselves.'),
