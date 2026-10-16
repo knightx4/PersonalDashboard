@@ -483,7 +483,6 @@ import {
   VaultThemeSurface,
 } from './vault-page-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
-import { SONNET } from '@/lib/core/models';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
