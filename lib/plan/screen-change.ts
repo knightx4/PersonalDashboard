@@ -52,8 +52,14 @@ export type ScreenChange = {
   after: string | null;
 };
 
-/** The same, with `before` and `after` as links the page can load rather than bucket paths. */
-export type ScreenChangeView = ScreenChange;
+/**
+ * The same, with `before` and `after` as links the page can load rather than
+ * bucket paths, and on the plan row the mockup you approved for the surface
+ * (plan #2215.10, lib/plan/mockup.ts).
+ */
+export type ScreenChangeView = ScreenChange & {
+  mockup?: { src: string; from: string; link: string | null } | null;
+};
 
 /** The shot's name from its bucket path: `…/r2/before-phone-light.png` is `before-phone-light`. */
 export function shotNameOf(path: string): string {
