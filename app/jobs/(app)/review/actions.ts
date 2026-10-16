@@ -514,8 +514,7 @@ export async function dismissMessages(
       link_confidence: null,
       error: null,
     })
-    .in('id', changed)
-    .in('email_account_id', accountIds);
+    .in('id', changed);
 
   if (error) return { changed: [], restore: [], error: error.message };
 
@@ -550,8 +549,7 @@ export async function restoreDismissedMessages(
         link_confidence: message.linkConfidence,
         error: message.error,
       })
-      .eq('id', message.id)
-      .in('email_account_id', accountIds);
+      .eq('id', message.id);
 
     if (error) return { changed: [], error: error.message };
   }
