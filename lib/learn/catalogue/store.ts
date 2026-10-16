@@ -29,7 +29,7 @@ import { passageRowsForSections } from '@/lib/learn/catalogue/passages';
  * `catalogue_segments_unembedded_idx` and the wrong vector is not.
  */
 
-type Sql = postgres.Sql | postgres.TransactionSql;
+export type Sql = postgres.Sql | postgres.TransactionSql;
 
 /**
  * One row of `catalogue_segments`, before it has an id.
@@ -58,7 +58,7 @@ export type CatalogueSegmentInput = {
 export type CatalogueItemInput = {
   externalId: string;
   title: string;
-  kind: 'article' | 'video' | 'course';
+  kind: 'article' | 'video' | 'course' | 'structure';
   canonicalUrl: string;
   lengthChars: number | null;
   durationSeconds: number | null;
@@ -89,7 +89,7 @@ export type StoredPassages = {
  * `enabled` goes true here rather than in the migration: the seed deliberately
  * leaves every provider off until its sweep exists, and this is that sweep.
  */
-async function markProviderSwept(
+export async function markProviderSwept(
   sql: Sql,
   slug: string,
   channelId: string | null = null,
@@ -113,7 +113,7 @@ async function markProviderSwept(
   return row.id;
 }
 
-async function upsertItem(
+export async function upsertItem(
   sql: Sql,
   providerId: string,
   item: CatalogueItemInput,
@@ -191,7 +191,7 @@ async function upsertSegments(
                               then null else catalogue_segments.embedded_at end`;
 }
 
-async function deleteTrailingSegments(sql: Sql, itemId: string, kept: number): Promise<number> {
+export async function deleteTrailingSegments(sql: Sql, itemId: string, kept: number): Promise<number> {
   const removed = await sql<{ id: string }[]>`
     delete from learn.catalogue_segments
      where item_id = ${itemId} and ordinal >= ${kept}
