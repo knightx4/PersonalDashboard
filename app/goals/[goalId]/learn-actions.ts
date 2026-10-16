@@ -6,6 +6,8 @@ import { requireUser } from '@/lib/auth/server';
 import { AIM_DEPTHS, type AimDepth } from '@/lib/learn/aims';
 import { updateAim } from '@/lib/learn/aims-store';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { GOAL_KINDS } from '@/lib/learn/goal-kind';
+import { setAimKind } from '@/lib/learn/goal-kind-store';
 
 /**
  * How well you want to know a goal in the Learn area (plan #1491), set from
@@ -32,6 +34,35 @@ export async function setLearnDepth(
   if (!depth.success) return { error: 'Pick familiar, solid or deep.' };
   try {
     const changed = await updateAim(await createLearnClient(), id.data, { depth: depth.data });
+    if (!changed) return { error: 'That learning goal is no longer active.' };
+  } catch {
+    return { error: 'The change could not be saved. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now() };
+}
+
+/**
+ * What kind of goal this is (plan #2247.2), changed from the goal's page. The
+ * kind decides which sources the next draft tries, and a kind the person sets
+ * is kept against the classifying call. Nothing here reaches a model.
+ */
+export type LearnKindState = { error?: string; done?: number };
+
+const Kind = z.enum(GOAL_KINDS);
+
+// latency: pending
+export async function setLearnKind(
+  _prev: LearnKindState,
+  form: FormData,
+): Promise<LearnKindState> {
+  await requireUser();
+  const id = AimId.safeParse(form.get('aimId'));
+  if (!id.success) return { error: 'Could not tell which learning goal that was.' };
+  const kind = Kind.safeParse(form.get('kind'));
+  if (!kind.success) return { error: 'Pick one of the kinds listed.' };
+  try {
+    const changed = await setAimKind(await createLearnClient(), id.data, kind.data);
     if (!changed) return { error: 'That learning goal is no longer active.' };
   } catch {
     return { error: 'The change could not be saved. Try again.' };

@@ -2,15 +2,17 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
-import { Gauge, Route, Timer } from 'lucide-react';
+import { Gauge, Route, Shapes, Timer } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ChipSelect } from '@/components/ui/field';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { AIM_DEPTHS, AIM_DEPTH_LABELS, type AimDepth, type Level3Counts } from '@/lib/learn/aims';
-import { setLearnDepth, type LearnDepthState } from './learn-actions';
+import { GOAL_KINDS, GOAL_KIND_LABELS, type GoalKind, type GoalKindBy } from '@/lib/learn/goal-kind';
+import { setLearnDepth, setLearnKind, type LearnDepthState, type LearnKindState } from './learn-actions';
 import { formatNumber } from '@/lib/money';
 
 const initial: LearnDepthState = {};
+const initialKind: LearnKindState = {};
 
 /** The Learn goal a goal stands for, as this section needs it. */
 export type GoalLearnAim = {
@@ -18,6 +20,10 @@ export type GoalLearnAim = {
   name: string;
   depth: AimDepth;
   level3: boolean;
+  /** The kind of goal it is (plan #2247.2); null until Dash has sorted it. */
+  kind: GoalKind | null;
+  kindReason: string | null;
+  kindBy: GoalKindBy | null;
 };
 
 /** A count with thousands separators: 1,001. */
@@ -42,6 +48,7 @@ export function GoalLearn({
   level3Counts: Level3Counts | null;
 }) {
   const [state, save, saving] = useActionState(setLearnDepth, initial);
+  const [kindState, saveKind, savingKind] = useActionState(setLearnKind, initialKind);
   return (
     <section aria-labelledby="learn-heading" className="space-y-2">
       <h2 id="learn-heading" className="px-1 text-ui font-semibold text-ink">
@@ -69,6 +76,45 @@ export function GoalLearn({
             Know it {AIM_DEPTH_LABELS[aim.depth].means}.
           </span>
         </form>
+        {!aim.level3 && (
+          <form action={saveKind} className="space-y-0.5">
+            <input type="hidden" name="aimId" value={aim.id} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ChipSelect
+                name="kind"
+                defaultValue={aim.kind ?? ''}
+                key={`kind-${aim.kind ?? 'none'}`}
+                aria-label={`What kind of goal ${aim.name} is`}
+                icon={<Shapes className="size-3.5" strokeWidth={1.75} />}
+                placeholderValue=""
+                disabled={savingKind}
+                onChange={(event) => event.currentTarget.form?.requestSubmit()}
+              >
+                {aim.kind === null && (
+                  <option value="" disabled>
+                    Not sorted yet
+                  </option>
+                )}
+                {GOAL_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {GOAL_KIND_LABELS[kind].label}
+                  </option>
+                ))}
+              </ChipSelect>
+              <span className="text-small text-ink-muted">
+                {aim.kind
+                  ? `Sources are chosen for ${GOAL_KIND_LABELS[aim.kind].means}.`
+                  : 'Dash sorts it when the goal is next saved.'}
+              </span>
+            </div>
+            {aim.kind && aim.kindReason && (
+              <p className="px-1.5 text-small text-ink-muted">
+                {aim.kindBy === 'person' ? 'You chose this kind.' : `Why: ${aim.kindReason}`}
+              </p>
+            )}
+            {kindState.error && <p className="px-1.5 text-small text-danger">{kindState.error}</p>}
+          </form>
+        )}
         {aim.level3 && (
           <p className="text-small tabular-nums text-ink-muted">
             {level3Counts

@@ -79,6 +79,7 @@ describe('the operation names', () => {
       'place-themes',
       'place-track',
       'place-aim',
+      'classify-goal-kind',
       'name-feed-material',
       'write-feed-card',
       'embed-feed-ideas',
