@@ -97,8 +97,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
 
   // Learn: drafting a topic with its levels (plan #2138.2). The map's topic
   // names go in, ten levels of checks and the links come out; the scope is
-  // embedded in the same press to find a duplicate.
-  'draft-topic': run(SONNET, 5_000, 4_000),
+  // embedded in the same press to find a duplicate. Since plan #2138.11 the
+  // call runs twice per press, with the sources given, so the guess is two
+  // calls' worth.
+  'draft-topic': run(SONNET, 12_000, 9_000),
   'embed-topic-scope': run(VOYAGE_LITE, 60, 0),
   // Moving a subject from the claims graph (plan #2138.4): its claims and the
   // map's topics go in, a topic and level per claim come out.

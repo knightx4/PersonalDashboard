@@ -383,6 +383,9 @@ export async function moveSubject(
         draft: result.draft,
         asked: null,
         embedding: embedded.ok ? { vector: embedded.vector, model: embedded.model } : null,
+        // Approved in the same press, so every row needs a source (learn 0149):
+        // what it came from is the person's own subject on the claims graph.
+        uncited: { source: `Your claims graph subject ${subject.name}`, canonicality: 'personal' },
       });
       await approveDraft(client, saved.id, new Map());
       madeId.set(fresh.name.toLowerCase(), saved.id);

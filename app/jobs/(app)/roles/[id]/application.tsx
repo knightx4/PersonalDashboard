@@ -28,6 +28,10 @@ import {
   type DraftApplicationResult,
 } from '../actions';
 import { saveApplicationMarks } from './actions';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
+import { CopyText } from './copy-text';
 import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
 import { DashQuestions } from './dash-questions';
@@ -48,6 +52,7 @@ export function Answers({
   draftRun,
   coverLetterDraft,
   coverLetterRun,
+  answerThreads,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
   // as a record, but adding questions and drafting from the bank are folded
@@ -276,6 +281,7 @@ export function Answers({
               key={answer.id}
               answer={answer}
               closed={closed}
+              thread={answerThreads?.[threadRef('answer', answer.id)] ?? []}
               draft={drafts[answer.id] ?? null}
               onDraftChange={(draft) =>
                 setDrafts((before) => {
@@ -292,17 +298,22 @@ export function Answers({
       )}
 
       {/* Keyed on the text so a letter Dash writes from the Comments tab
-          replaces what this box holds rather than sitting behind it. */}
-      <CoverLetter
-        key={coverLetter}
-        applicationId={applicationId}
-        roleId={roleId}
-        initial={coverLetter}
-        closed={closed}
-        initialDraft={coverLetterDraft}
-        initialRun={coverLetterRun}
-        onMarkedYes={() => setLetterMark(true)}
-      />
+          replaces what this box holds rather than sitting behind it. Marked
+          No, the application takes no letter, so there is none to write
+          (note 67df30d0); pressing No again brings it back. */}
+      {letterMark !== false && (
+        <CoverLetter
+          key={coverLetter}
+          applicationId={applicationId}
+          roleId={roleId}
+          initial={coverLetter}
+          closed={closed}
+          initialDraft={coverLetterDraft}
+          initialRun={coverLetterRun}
+          onMarkedYes={() => setLetterMark(true)}
+          thread={answerThreads?.[threadRef('application', applicationId)] ?? []}
+        />
+      )}
     </div>
   );
 }
@@ -443,6 +454,7 @@ function ApplicationMarks({
 export function AnswerCard({
   answer,
   closed,
+  thread = [],
   initialDraft = null,
   draft: heldDraft,
   onDraftChange,
@@ -451,6 +463,8 @@ export function AnswerCard({
   answer: PanelProps['answers'][number];
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** The comments under this answer (note be3c6616). */
+  thread?: DevComment[];
   /** For the preview gallery: the card opens with this draft beside it. */
   initialDraft?: AnswerDraft | null;
   /** With onDraftChange, the draft is held above the card, where Draft all answers fills it. */
@@ -512,6 +526,7 @@ export function AnswerCard({
               aria-label="Approved"
             />
           )}
+          {!editing && text.trim() && <CopyText text={text} what="answer" />}
           {/* Up here, opposite the question it removes, rather than at the end
               of the action row, where on a phone it wrapped onto a line alone. */}
           {!editing && (
@@ -638,22 +653,6 @@ export function AnswerCard({
             {text.trim() ? 'Edit' : 'Write an answer'}
           </Button>
         )}
-        {!editing && status === 'approved' && !answer.canonicalAnswer && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await promoteToCanonical(answer.questionId, text);
-                setSaved(result.error ?? 'This is now your default answer for this question.');
-              })
-            }
-          >
-            Make this my default answer
-          </Button>
-        )}
         {!closed && (
           <DashAction
             type="button"
@@ -680,6 +679,24 @@ export function AnswerCard({
           >
             {drafting ? 'Drafting…' : draft ? 'Draft again' : 'Draft an answer'}
           </DashAction>
+        )}
+        {/* Last, and a link with no padding, so on a phone where it wraps it
+            starts on the card's text edge (law 18). */}
+        {!editing && status === 'approved' && !answer.canonicalAnswer && (
+          <Button
+            type="button"
+            size="sm"
+            variant="link"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await promoteToCanonical(answer.questionId, text);
+                setSaved(result.error ?? 'This is now your default answer for this question.');
+              })
+            }
+          >
+            Make this my default answer
+          </Button>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}
@@ -714,6 +731,15 @@ export function AnswerCard({
           }}
         />
       )}
+      {/* Comments on this answer: a note to yourself, or @dash to ask
+          for a change (note be3c6616). */}
+      <div className="mt-3">
+        <Thread
+          subject={threadRef('answer', answer.id)}
+          turns={thread}
+          placeholder="A note on this answer, or @dash make it shorter."
+        />
+      </div>
     </Card>
   );
 }

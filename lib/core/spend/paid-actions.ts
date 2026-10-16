@@ -106,8 +106,8 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
 
   // Learn: questions
-  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],
-  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check', 'write-cell-case'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check', 'grade-cell-answer'],
   'app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice': ['write-piece-practice'],
   'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': ['mark-piece-practice'],
   'app/learn/s/[id]/project-actions.ts#writePlanProject': ['write-plan-project'],

@@ -163,6 +163,8 @@ import {
   LearnTopicQuotesPreview,
   LearnTopicEditPreview,
   LearnTopicLoadingPreview,
+  LearnTopicDraftChecksPreview,
+  LearnTopicsSourcesPreview,
 } from './learn-topic-surfaces';
 import {
   LearnKnowLensesEmptyPreview,
@@ -191,6 +193,7 @@ import {
   LearnListsSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
+  LearnPieceCellCheckSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -3673,7 +3676,9 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers, marked ready',
     module: 'jobs',
     width: 'wide',
-    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1).
+    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1),
+    // with an answer and a letter written, so each shows Copy, and a comment under the
+    // answer (notes 69abdbad, be3c6616).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
@@ -3681,6 +3686,20 @@ export const SURFACES: readonly Surface[] = [
         readyToApply
         allQuestionsAdded
         hasCoverLetter
+        answers={[
+          {
+            ...rolePanels.answers[0],
+            answer:
+              'The payments risk team sits where the product meets the money, and the last two years of my work have been there: models that flag a bad merchant before the first chargeback.',
+            status: 'approved',
+          },
+        ]}
+        coverLetter={'Dear hiring team,\n\nI have spent the last two years building risk models for a payments platform, and Lattice Pay is the team I would most like to do that with next.'}
+        answerThreads={{
+          [`job_search.application_answers:${rolePanels.answers[0].id}`]: [
+            { id: 'c-1', author: 'me', body: 'Too long for their form, cut the second clause.', createdAt: '2026-10-14T09:00:00Z' },
+          ],
+        }}
         defaultTab={defaultRoleTab('drafting')}
       />
     ),
@@ -5668,6 +5687,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <PracticeRunPreview state="end" />,
+  },
+  {
+    /* The end of a run with a lens offered for a vault theme no lens covers. */
+    id: 'learn-practice-run-end-offer',
+    label: 'Practice Flow · End of a run, lens offered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer" />,
+  },
+  {
+    /* The same offer with the longest names it has to hold. */
+    id: 'learn-practice-run-end-offer-long',
+    label: 'Practice Flow · End of a run, lens offered, long names',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer-long" />,
   },
   {
     /* A run ended before anything was answered. */
@@ -7949,6 +7984,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnTopicsErrorPreview />,
   },
   {
+    /* What a topic is drafted from, open on Edit sources (plan #2138.11). */
+    id: 'learn-topics-sources',
+    label: 'Topics · The sources a draft is compiled from',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsSourcesPreview />,
+  },
+  {
     /* A draft topic to read, reword and approve (plan #2138.2). */
     id: 'learn-topic-draft',
     label: 'Topic · A draft to approve',
@@ -7962,6 +8005,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    /* The five checks with every row cited or marked personal (plan #2138.11). */
+    id: 'learn-topic-draft-checks',
+    label: 'Topic · A draft whose checks let it be approved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftChecksPreview />,
   },
   {
     id: 'learn-topic-draft-comment',
@@ -8193,6 +8244,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceSurface />,
+  },
+  {
+    id: 'learn-piece-cell-check',
+    label: 'Plan · One piece, its check answered on a cell',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCellCheckSurface />,
   },
   {
     id: 'learn-probe',

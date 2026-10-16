@@ -5,8 +5,9 @@ import type { GradeEvidence, GradeLink, GradeMap, GradeCell } from '@/lib/learn/
 import type { LevelTopic, Verdict } from '@/lib/learn/levels/model';
 
 /**
- * The whole topic map of one account, as grading reads it: every topic, cell,
- * link and evidence row, with descriptors and ids (lib/learn/levels/grade.ts
+ * The whole topic map of one account, as grading reads it: every topic, cell
+ * and link on the shared map or the account's own, and the account's
+ * evidence, with descriptors and ids (lib/learn/levels/grade.ts
  * `GradeMap`). Drafts are loaded too and marked unapproved, so the model and
  * the grader leave them out by the same rule.
  *
@@ -16,6 +17,16 @@ import type { LevelTopic, Verdict } from '@/lib/learn/levels/model';
  */
 
 const PAGE = 1000;
+
+/**
+ * The PostgREST filter for the territory one account reads: shared rows (no
+ * owner) and its own (plan #2138.10, learn 0145). The policies give a
+ * signed-in client the same; this is for the service role, which they do not
+ * bind.
+ */
+export function territoryOf(userId: string): string {
+  return `user_id.is.null,user_id.eq.${userId}`;
+}
 
 async function all<T>(
   run: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
@@ -34,12 +45,12 @@ async function all<T>(
 export async function loadGradeMap(learn: LearnSupabaseClient, userId: string): Promise<GradeMap> {
   const [topics, cells, links, evidence] = await Promise.all([
     all<{ id: string; name: string; ceiling: number; status: string }>(
-      (a, b) => learn.from('topics').select('id, name, ceiling, status').eq('user_id', userId).order('id').range(a, b),
+      (a, b) => learn.from('topics').select('id, name, ceiling, status').or(territoryOf(userId)).order('id').range(a, b),
       'your topics',
     ),
     all<{ id: string; topic_id: string; level: number; descriptor: string[] }>(
       (a, b) =>
-        learn.from('topic_cells').select('id, topic_id, level, descriptor').eq('user_id', userId).order('id').range(a, b),
+        learn.from('topic_cells').select('id, topic_id, level, descriptor').or(territoryOf(userId)).order('id').range(a, b),
       'the levels of your topics',
     ),
     all<{ id: string; requiring_cell_id: string; required_cell_id: string }>(
@@ -47,7 +58,7 @@ export async function loadGradeMap(learn: LearnSupabaseClient, userId: string): 
         learn
           .from('cell_links')
           .select('id, requiring_cell_id, required_cell_id')
-          .eq('user_id', userId)
+          .or(territoryOf(userId))
           .order('id')
           .range(a, b),
       'the links between your topics',

@@ -752,6 +752,11 @@ const piecePage: PiecePage = {
       },
     },
   ],
+  cells: [
+    { cellId: 'cl1', topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4, status: 'open' },
+    { cellId: 'cl2', topicId: 'tp2', topicName: 'Total revenue and how a price change moves it', level: 3, status: 'implied' },
+    { cellId: 'cl3', topicId: 'tp3', topicName: 'Percentage change', level: 2, status: 'shown' },
+  ],
   check: null,
 };
 
@@ -807,6 +812,39 @@ export function LearnPieceSurface() {
         practice={practice}
         standing={{ practicePassed: false, checkPassed: false }}
         reviews={reviews}
+      />
+    </PaidCostsProvider>
+  );
+}
+
+/** The piece's check asked on one of its cells and answered right (plan #2138.13). */
+export function LearnPieceCellCheckSurface() {
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          cells: piecePage.cells.map((cell) => (cell.cellId === 'cl1' ? { ...cell, status: 'shown' } : cell)),
+          check: {
+            id: 'cq1',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response:
+              'Price up 20%, seats down 10%, so elasticity is 0.5 and demand is inelastic. Takings went from £6,000 to £6,480, so they rose.',
+            correct: true,
+            why: 'The answer works out both percentage changes, gets 0.5 and ties the inelastic reading to the rise in takings.',
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: true }}
+        reviews={[]}
       />
     </PaidCostsProvider>
   );

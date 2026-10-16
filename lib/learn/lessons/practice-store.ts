@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { cellCheckPassed } from './piece-cells-store';
 import { markPiecePassed } from './piece-store';
 import {
   HANDIN_COLUMNS,
@@ -89,7 +90,11 @@ async function practicePassed(learn: LearnSupabaseClient, userId: string, pieceI
   return (await loadHandIns(learn, userId, row.id)).passed;
 }
 
-/** Whether any question of the piece's check has been answered right. */
+/**
+ * Whether any question of the piece's check has been answered right: one of
+ * its own questions marked right, or a cell question that showed the cell it
+ * asked about (plan #2138.13).
+ */
 async function checkPassed(learn: LearnSupabaseClient, userId: string, pieceId: string): Promise<boolean> {
   const { data, error } = await learn
     .from('piece_checks')
@@ -99,7 +104,8 @@ async function checkPassed(learn: LearnSupabaseClient, userId: string, pieceId: 
     .eq('correct', true)
     .limit(1);
   if (error) throw new Error(`Reading the piece's check failed: ${error.message}`);
-  return (data ?? []).length > 0;
+  if ((data ?? []).length > 0) return true;
+  return cellCheckPassed(learn, userId, pieceId);
 }
 
 /** Whether the piece's practice and its check are each passed. */

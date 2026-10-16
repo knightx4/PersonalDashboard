@@ -3,10 +3,14 @@
 import { TopicsView } from '@/app/learn/topics/topics-view';
 import { TopicView } from '@/app/learn/topics/[id]/topic-view';
 import { TopicSkeleton } from '@/app/learn/topics/[id]/topic-skeleton';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { MODELS } from '@/lib/core/models';
 import type { DevComment } from '@/lib/comments/load';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { CellEvidence, CellLink, LevelCell, TopicMap } from '@/lib/learn/levels/model';
 import { topicStanding } from '@/lib/learn/levels/standing';
 import type { CellEvidenceView } from '@/lib/learn/levels/store-page';
+import type { DraftingRecord } from '@/lib/learn/levels/draft-sources';
 import type { TopicDetail, TopicMatch, TopicRow } from '@/lib/learn/levels/store';
 
 /**
@@ -26,7 +30,8 @@ const TOPICS: TopicRow[] = [
   {
     id: DCF_ID,
     name: 'Discounted cash flow',
-    scope: 'Valuing a company as the discounted sum of its future free cash flows, with a terminal value; multiples are a neighbour.',
+    scope:
+      'Valuing a company as the discounted sum of its future free cash flows, with a terminal value; multiples are a neighbour.',
     status: 'draft',
     ceiling: 10,
     asked: 'How do you value a company from its cash flows?',
@@ -36,7 +41,8 @@ const TOPICS: TopicRow[] = [
   {
     id: 'a0000000-0000-4000-8000-000000000002',
     name: 'Capital asset pricing model',
-    scope: 'Expected return from beta, the risk-free rate and the market premium; multi-factor models are a neighbour.',
+    scope:
+      'Expected return from beta, the risk-free rate and the market premium; multi-factor models are a neighbour.',
     status: 'approved',
     ceiling: 8,
     asked: 'CAPM',
@@ -56,7 +62,8 @@ const TOPICS: TopicRow[] = [
   {
     id: 'a0000000-0000-4000-8000-000000000004',
     name: "Braess's paradox",
-    scope: 'Why adding a road to a network can slow every driver down, at the equilibrium selfish routing reaches.',
+    scope:
+      'Why adding a road to a network can slow every driver down, at the equilibrium selfish routing reaches.',
     status: 'approved',
     ceiling: 7,
     asked: null,
@@ -67,39 +74,164 @@ const TOPICS: TopicRow[] = [
 
 const COMMENTS = new Map<string, number>([[DCF_ID, 2]]);
 
+/* What drafting a topic costs, as the learn layout provides it, so the $
+ * beside Draft the topic is drawn (law 16): two Sonnet calls and an embedding. */
+const DRAFT_COST: CostEstimate = {
+  lowMicros: 120_000,
+  medianMicros: 180_000,
+  highMicros: 260_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [MODELS.learnTopicDraft, 'voyage-4-lite'],
+};
+
+function Priced({ children }: { children: React.ReactNode }) {
+  return (
+    <PaidCostsProvider costs={{ 'app/learn/topics/actions.ts#draftTopicFromGoal': DRAFT_COST }}>
+      {children}
+    </PaidCostsProvider>
+  );
+}
+
 export function LearnTopicsPreview() {
-  return <TopicsView topics={TOPICS} move={{ toMove: 9, toAnswer: 3 }} comments={COMMENTS} timezone={ZONE} now={NOW} />;
+  return (
+    <TopicsView
+      topics={TOPICS}
+      move={{ toMove: 9, toAnswer: 3 }}
+      comments={COMMENTS}
+      timezone={ZONE}
+      now={NOW}
+    />
+  );
 }
 
 export function LearnTopicsLoadingPreview() {
   return (
-    <TopicsView
-      topics={TOPICS.slice(1)}
-      comments={new Map()}
-      timezone={ZONE}
-      now={NOW}
-      form={{ pending: true, goal: 'How do you value a company from its cash flows?' }}
-    />
+    <Priced>
+      <TopicsView
+        topics={TOPICS.slice(1)}
+        comments={new Map()}
+        timezone={ZONE}
+        now={NOW}
+        form={{ pending: true, goal: 'How do you value a company from its cash flows?' }}
+      />
+    </Priced>
   );
 }
 
 export function LearnTopicsErrorPreview() {
   return (
-    <TopicsView
-      topics={TOPICS.slice(1)}
-      comments={new Map()}
-      timezone={ZONE}
-      now={NOW}
-      form={{
-        error: 'Dash could not write the draft. Request timed out. Press Draft the topic to send it again.',
-        goal: 'How do you value a company from its cash flows?',
-      }}
-    />
+    <Priced>
+      <TopicsView
+        topics={TOPICS.slice(1)}
+        comments={new Map()}
+        timezone={ZONE}
+        now={NOW}
+        form={{
+          error:
+            'Dash could not write the draft. Request timed out. Press Draft the topic to send it again.',
+          goal: 'How do you value a company from its cash flows?',
+        }}
+      />
+    </Priced>
   );
 }
 
+/* What the draft was compiled from (plan #2138.11): a syllabus, a textbook's
+ * contents and the requirement lines of the roles pursued, with three
+ * performances. The longest label is the roles' one. */
+const SYLLABUS = 'CFA Level I, Equity valuation: free cash flow models';
+const TEXTBOOK = 'Damodaran, Investment Valuation (3rd ed.), contents';
+const ROLES = 'Requirement lines of 7 roles you pursued matching “FP&A”';
+
+const DRAFTING: DraftingRecord = {
+  sources: [
+    {
+      id: 'S1',
+      label: SYLLABUS,
+      items: [
+        'Compare the free cash flow approach with dividend discount models',
+        'Calculate FCFF and FCFE from net income, EBIT and cash flow from operations',
+        'Explain the single-stage and two-stage free cash flow models',
+        'Calculate a terminal value with the Gordon growth model',
+        'Describe how sensitivity analysis is used in valuation',
+        'Explain the use of multiples as a cross-check',
+      ],
+    },
+    {
+      id: 'S2',
+      label: TEXTBOOK,
+      items: [
+        'Estimating discount rates',
+        'Estimating cash flows',
+        'Estimating growth',
+        'Closure in valuation: estimating terminal value',
+        'Valuing firms with negative earnings',
+        'Valuing financial service firms',
+        'Real options',
+      ],
+    },
+    {
+      id: 'S3',
+      label: ROLES,
+      items: [
+        'Build and maintain three-statement financial models',
+        'Experience with DCF and comparable company analysis',
+        'Present valuation outcomes to leadership',
+      ],
+    },
+  ],
+  performances: [
+    'Value a listed company from its 10-K and defend the result',
+    'Read a sell-side DCF and find the assumption that drives it',
+    'Explain to a manager why the valuation moved',
+  ],
+  coverage: {
+    share: 13 / 15,
+    sources: [
+      { id: 'S1', label: SYLLABUS, covered: 6, inScope: 6, total: 6 },
+      { id: 'S2', label: TEXTBOOK, covered: 5, inScope: 6, total: 7 },
+      { id: 'S3', label: ROLES, covered: 2, inScope: 3, total: 3 },
+    ],
+    uncovered: ['S2.7 Real options', 'S3.1 Build and maintain three-statement financial models'],
+  },
+  structure: {
+    acyclic: true,
+    offPath: [10],
+    served: [
+      { performance: 'Value a listed company from its 10-K and defend the result', level: 5 },
+      { performance: 'Read a sell-side DCF and find the assumption that drives it', level: 6 },
+      { performance: 'Explain to a manager why the valuation moved', level: 9 },
+    ],
+    unserved: [],
+  },
+  overlap: 0.64,
+  overlapMissing: null,
+  checklist: [
+    'Does level 9 include the reverse DCF analysts use to read what a price implies?',
+    'Does level 8 tie the discount rate to WACC rather than restating CAPM?',
+    'Would a practitioner expect stock-based compensation at level 9 or earlier?',
+  ],
+};
+
+const CELL_SOURCES: (string | null)[] = [
+  `${SYLLABUS}: Compare the free cash flow approach with dividend discount models`,
+  `${TEXTBOOK}: Estimating cash flows`,
+  `${SYLLABUS}: Calculate FCFF and FCFE from net income, EBIT and cash flow from operations`,
+  `${SYLLABUS}: Calculate a terminal value with the Gordon growth model`,
+  `${ROLES}: Experience with DCF and comparable company analysis`,
+  `${SYLLABUS}: Describe how sensitivity analysis is used in valuation`,
+  `${TEXTBOOK}: Valuing firms with negative earnings; ${TEXTBOOK}: Valuing financial service firms`,
+  `${TEXTBOOK}: Estimating discount rates`,
+  null,
+  `${TEXTBOOK}: Closure in valuation: estimating terminal value`,
+];
+
 const DCF: TopicDetail = {
   ...TOPICS[0],
+  citation: { source: `${SYLLABUS}; ${TEXTBOOK}`, canonicality: 'canonical' },
+  drafting: DRAFTING,
   fieldNames: ['Finance', 'Accounting'],
   cells: [
     [
@@ -150,27 +282,36 @@ const DCF: TopicDetail = {
     checks,
     original: null,
     rewrittenAt: null,
+    source: CELL_SOURCES[i],
+    canonicality: CELL_SOURCES[i] === null ? null : i === 4 ? 'practitioner' : 'canonical',
   })),
   links: [
     {
+      id: 'l-1',
       fromLevel: 2,
       topicId: TOPICS[2].id,
       topicName: 'Return',
       level: 2,
       why: 'Discounting is a required return run backwards.',
+      source: `${TEXTBOOK}: Estimating discount rates`,
+      canonicality: 'canonical',
     },
     {
+      id: 'l-2',
       fromLevel: 3,
       topicId: TOPICS[1].id,
       topicName: 'Capital asset pricing model',
       level: 2,
       why: 'The cost of equity in the discount rate comes from it.',
+      source: null,
+      canonicality: null,
     },
   ],
   wanted: [
     {
       name: 'Weighted average cost of capital',
-      scope: 'The blended rate a company pays its lenders and shareholders, weighted by how it is financed.',
+      scope:
+        'The blended rate a company pays its lenders and shareholders, weighted by how it is financed.',
       from_level: 3,
       level: 2,
       why: 'The discount rate for a whole company is its WACC.',
@@ -216,11 +357,65 @@ export function LearnTopicDraftPreview() {
 }
 
 export function LearnTopicDraftMatchPreview() {
-  return <TopicView topic={DCF} match={MATCH} comments={[]} path={PATH} timezone={ZONE} now={NOW} />;
+  return (
+    <TopicView topic={DCF} match={MATCH} comments={[]} path={PATH} timezone={ZONE} now={NOW} />
+  );
+}
+
+/* Every row cited or marked personal, so Approve is open; this draft's
+ * second call failed, so stability has nothing to compare. */
+const DCF_SETTLED: TopicDetail = {
+  ...DCF,
+  drafting: {
+    ...DRAFTING,
+    overlap: null,
+    overlapMissing: 'The second draft failed (Request timed out), so there is nothing to compare.',
+  },
+  cells: DCF.cells.map((cell) => (cell.source ? cell : { ...cell, canonicality: 'personal' })),
+  links: DCF.links.map((link) => (link.source ? link : { ...link, canonicality: 'personal' })),
+};
+
+export function LearnTopicDraftChecksPreview() {
+  return (
+    <TopicView
+      topic={DCF_SETTLED}
+      match={null}
+      comments={[]}
+      path={PATH}
+      timezone={ZONE}
+      now={NOW}
+    />
+  );
+}
+
+export function LearnTopicsSourcesPreview() {
+  return (
+    <Priced>
+      <TopicsView
+        topics={TOPICS.slice(1)}
+        comments={new Map()}
+        timezone={ZONE}
+        now={NOW}
+        form={{
+          goal: 'How do you value a company from its cash flows?',
+          sources: {
+            performances: DRAFTING.performances.join('\n'),
+            sources: [
+              [SYLLABUS, ...DRAFTING.sources[0].items.slice(0, 4)].join('\n'),
+              [TEXTBOOK, ...DRAFTING.sources[1].items.slice(0, 3)].join('\n'),
+            ].join('\n\n'),
+            roles: 'FP&A',
+          },
+        }}
+      />
+    </Priced>
+  );
 }
 
 export function LearnTopicDraftCommentPreview() {
-  return <TopicView topic={DCF} match={null} comments={THREAD} path={PATH} timezone={ZONE} now={NOW} />;
+  return (
+    <TopicView topic={DCF} match={null} comments={THREAD} path={PATH} timezone={ZONE} now={NOW} />
+  );
 }
 
 /* The approved topic's ladder (plan #2138.3). The same Discounted cash flow
@@ -255,7 +450,11 @@ const CAPM_ID = TOPICS[1].id;
 function mapOf(topic: TopicDetail, evidence: CellEvidence[]): TopicMap {
   const cells: LevelCell[] = [
     ...topic.cells.map((c) => ({ id: c.id, topicId: DCF_ID, level: c.level })),
-    ...Array.from({ length: 6 }, (_, i) => ({ id: `r-${i + 1}`, topicId: RETURN_ID, level: i + 1 })),
+    ...Array.from({ length: 6 }, (_, i) => ({
+      id: `r-${i + 1}`,
+      topicId: RETURN_ID,
+      level: i + 1,
+    })),
     ...Array.from({ length: 8 }, (_, i) => ({ id: `p-${i + 1}`, topicId: CAPM_ID, level: i + 1 })),
   ];
   const links: CellLink[] = [
@@ -287,7 +486,8 @@ const EVIDENCE: CellEvidenceView[] = [
   {
     cellId: 'c-2',
     verdict: 'met',
-    quote: 'It is the future cash the business will throw off, each year shrunk back to today by the rate you could earn elsewhere.',
+    quote:
+      'It is the future cash the business will throw off, each year shrunk back to today by the rate you could earn elsewhere.',
     observedAt: '2026-10-12T19:00:00Z',
   },
 ];
@@ -303,11 +503,21 @@ const LINKS_IN = [
 ];
 
 function standingOf(topic: TopicDetail, evidence: CellEvidenceView[], linksIn: typeof LINKS_IN) {
-  const model: CellEvidence[] = evidence.map((e) => ({ cellId: e.cellId, verdict: e.verdict, observedAt: e.observedAt }));
+  const model: CellEvidence[] = evidence.map((e) => ({
+    cellId: e.cellId,
+    verdict: e.verdict,
+    observedAt: e.observedAt,
+  }));
   return topicStanding(topic, mapOf(topic, model), evidence, linksIn);
 }
 
-function ApprovedTopic({ evidence, open }: { evidence: CellEvidenceView[]; open?: { quotes?: number; edit?: number } }) {
+function ApprovedTopic({
+  evidence,
+  open,
+}: {
+  evidence: CellEvidenceView[];
+  open?: { quotes?: number; edit?: number };
+}) {
   // With nothing asked yet no level has been reworded either.
   const topic = evidence.length > 0 ? APPROVED : { ...APPROVED, cells: DCF.cells };
   return (

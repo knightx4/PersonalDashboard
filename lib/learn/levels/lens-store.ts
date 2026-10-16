@@ -29,7 +29,7 @@ function toRecord(lens: RawLens, targets: readonly RawTarget[]): LensRecord {
   return {
     id: lens.id,
     name: lens.name,
-    origin: lens.origin === 'goal' ? 'goal' : 'subject',
+    origin: lens.origin === 'goal' ? 'goal' : lens.origin === 'theme' ? 'theme' : 'subject',
     subjectId: lens.subject_id,
     aimId: lens.aim_id,
     createdAt: lens.created_at,
