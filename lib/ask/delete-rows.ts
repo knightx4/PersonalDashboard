@@ -1,6 +1,9 @@
 import { parseRef, toRef } from '@/lib/core/refs';
 import type { AskDb, AskSchema } from './db';
 import type { ModuleId } from '@/lib/modules';
+import { DELETE_NOUNS, type DeletableTable } from './deletable';
+
+export type { DeletableTable } from './deletable';
 
 /**
  * Deleting rows Dash proposed (plan #2232.1, feature #2232).
@@ -13,16 +16,19 @@ import type { ModuleId } from '@/lib/modules';
  * deletes them, and hands back the values it removed so the record can keep
  * them in `undo.rows`. Undo (undoDeletedRows) inserts those rows again.
  *
- * The tables Dash may propose deleting from are the short list DELETABLE.
- * Application answers only, at first. Adding a table is adding an entry.
+ * The tables Dash may propose deleting from are the short list DELETABLE:
+ * application answers and job notes (plan #2266.2). Adding a table is adding
+ * its name and nouns in deletable.ts and an entry here. An entry whose rows can have other rows attached (a role with
+ * applications, a task with subtasks) gives a `refuse` check, and Dash
+ * declines those rows with its reason rather than deleting them (decision
+ * #2266.1): propose_delete calls it before keeping a card, and deleteRows
+ * again before deleting, since something may have been attached in between.
  *
  * No `server-only` and no clients made here: callers hand in the person's
  * clients, and the tests hand in stubs.
  */
 
 type Values = Record<string, unknown>;
-
-export type DeletableTable = 'job_search.application_answers';
 
 type Deletable = {
   schema: AskSchema;
@@ -31,12 +37,27 @@ type Deletable = {
   module: ModuleId;
   moduleLabel: string;
   /** What the rows are called, singular and plural. */
-  noun: [string, string];
+  noun: readonly [string, string];
   /** What each row is called on the card, and the page that shows them. */
   describe: (db: AskDb, userId: string, rows: Values[]) => Promise<{ titles: string[]; href: string }>;
+  /**
+   * Why these rows cannot be deleted, in a sentence the person can read, or
+   * null when they all can. Read as the person; a row with something attached
+   * to it is refused whole, never deleted with what hangs off it.
+   */
+  refuse?: (db: AskDb, userId: string, rows: Values[]) => Promise<string | null>;
 };
 
 const clip = (text: string, max = 80) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
+const ids = (rows: Values[], column: string) =>
+  [...new Set(rows.map((r) => r[column]).filter((v): v is string => typeof v === 'string'))];
+
+/** The one id every row shares in a column, or null when they differ or any is empty. */
+const onlyOne = (rows: Values[], column: string) => {
+  const found = ids(rows, column);
+  return found.length === 1 && rows.every((r) => r[column] === found[0]) ? found[0] : null;
+};
 
 async function readIn(db: AskDb, schema: AskSchema, table: string, columns: string, ids: string[], userId: string) {
   if (ids.length === 0) return [] as Values[];
@@ -52,7 +73,7 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
     table: 'application_answers',
     module: 'jobs',
     moduleLabel: 'Jobs',
-    noun: ['answer', 'answers'],
+    noun: DELETE_NOUNS['job_search.application_answers'],
     async describe(db, userId, rows) {
       const questionIds = [...new Set(rows.map((r) => r.question_id).filter((v): v is string => typeof v === 'string'))];
       const applicationIds = [...new Set(rows.map((r) => r.application_id).filter((v): v is string => typeof v === 'string'))];
@@ -66,6 +87,35 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
         titles: rows.map((r) => clip(text.get(r.question_id as string) || 'A question no longer in the bank')),
         href: roles.size === 1 ? `/jobs/roles/${[...roles][0]}` : '/jobs/roles',
       };
+    },
+    async refuse(_db, _userId, rows) {
+      return rows.some((row) => row.status === 'submitted')
+        ? 'A submitted answer is never removed.'
+        : null;
+    },
+  },
+  // A note on a company, role, application, contact or interview. Nothing
+  // hangs off a note, so it needs no refuse check.
+  'job_search.notes': {
+    schema: 'job_search',
+    table: 'notes',
+    module: 'jobs',
+    moduleLabel: 'Jobs',
+    noun: DELETE_NOUNS['job_search.notes'],
+    async describe(db, userId, rows) {
+      const titles = rows.map((r) => clip(String(r.body ?? '').replace(/\s+/g, ' ').trim() || 'An empty note'));
+      const role = onlyOne(rows, 'role_id');
+      if (role) return { titles, href: `/jobs/roles/${role}` };
+      const company = onlyOne(rows, 'company_id');
+      if (company && ids(rows, 'role_id').length === 0) {
+        const [found] = await readIn(db, 'job_search', 'companies', 'id, slug', [company], userId);
+        if (typeof found?.slug === 'string' && found.slug) return { titles, href: `/jobs/companies/${found.slug}` };
+      }
+      const contact = onlyOne(rows, 'contact_id');
+      if (contact && ids(rows, 'role_id').length === 0 && ids(rows, 'company_id').length === 0) {
+        return { titles, href: `/jobs/contacts/${contact}` };
+      }
+      return { titles, href: '/jobs' };
     },
   },
 };
@@ -89,7 +139,7 @@ export type DeleteRowsInput = {
   rows: Values[];
 };
 
-export const DELETABLE_LIST = 'application answers';
+export const DELETABLE_LIST = 'application answers (job_search.application_answers) and notes on a job, company or contact (job_search.notes)';
 
 /** The rows asked for, as the person: nothing else is read, and a row that is not theirs is not found. */
 export async function snapshotRows(
@@ -103,6 +153,16 @@ export async function snapshotRows(
   if (error) throw new Error(`${table}: ${error.message}`);
   const found = new Map(((data ?? []) as Values[]).map((row) => [row.id as string, row]));
   return ids.flatMap((id) => (found.has(id) ? [found.get(id) as Values] : []));
+}
+
+/** Why these rows cannot be deleted, from the table's own check, or null when they can. */
+export async function refusal(
+  deps: { userId: string; db: AskDb },
+  table: DeletableTable,
+  rows: Values[],
+): Promise<string | null> {
+  const check = DELETABLE[table].refuse;
+  return check && rows.length > 0 ? check(deps.db, deps.userId, rows) : null;
 }
 
 /** The card's input for rows already read. */
@@ -124,8 +184,9 @@ export type DeletedRows = { rows: { ref: string; values: Values }[] };
 
 /**
  * Delete the rows a proposal named. Refused, with nothing deleted, when the
- * table is not on the list, a row has changed since the snapshot, or none of
- * them is there any more. A row already gone is left out.
+ * table is not on the list, a row has changed since the snapshot, the table's
+ * refuse check names a reason, or none of them is there any more. A row
+ * already gone is left out.
  */
 export async function deleteRows(
   deps: { userId: string; db: AskDb },
@@ -145,6 +206,8 @@ export async function deleteRows(
       error: `One of those ${spec.noun[1]} has changed since Dash proposed removing it, so nothing was removed. Ask Dash again.`,
     };
   }
+  const refused = await refusal(deps, input.table, current);
+  if (refused) return { ok: false, error: `Nothing was removed. ${refused}` };
 
   const client = await deps.db(spec.schema);
   const { data, error } = await client
