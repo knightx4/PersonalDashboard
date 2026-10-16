@@ -153,6 +153,7 @@ describe('the operation names', () => {
       'embed-topic-scope',
       'assign-topics',
       'name-course-topics',
+      'grade-course-explain',
     ]);
   });
 });
