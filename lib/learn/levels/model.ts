@@ -172,6 +172,19 @@ function cone(ix: Indexed, from: readonly string[]): Set<string> {
   return out;
 }
 
+/**
+ * Every cell a performance needs: the cell itself, every level below it on
+ * its topic, and everything those require through the links, as `cone`
+ * walks them (plan #2187.6). A cell not on the map needs nothing.
+ */
+export function cellsUnder(map: TopicMap, cellId: string): Set<string> {
+  const ix = index(map);
+  if (!ix.cells.has(cellId)) return new Set();
+  const out = cone(ix, [cellId]);
+  out.add(cellId);
+  return out;
+}
+
 /** Each cell's own latest evidence, the later row winning a tie. */
 function latestEvidence(ix: Indexed, evidence: readonly CellEvidence[]): Map<string, CellEvidence> {
   const latest = new Map<string, CellEvidence>();

@@ -54,6 +54,7 @@ export function IdeaSpaceView({
   zoomOn,
   nextTopics,
   holdNext,
+  pickThen,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -77,6 +78,8 @@ export function IdeaSpaceView({
   nextTopics?: NextTopic[] | null;
   /** The gallery holds this goal's next rung open in the rail (plan #2187.2). */
   holdNext?: string | null;
+  /** The gallery draws the then and now tab's day picker open (plan #2187.6). */
+  pickThen?: boolean;
 }) {
   const [recording, setRecording] = useState(saved);
   // Names are made private here, once, so nothing below can draw one.
@@ -136,7 +139,7 @@ export function IdeaSpaceView({
         main={
           <>
             {header}
-            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} zoomOn={zoomOn} />
+            <MapSection view={view} pointingAt={pointingAt} daysAgo={daysAgo} zoomOn={zoomOn} pickThen={pickThen} />
           </>
         }
         rail={

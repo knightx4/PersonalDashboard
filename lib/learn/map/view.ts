@@ -43,7 +43,17 @@ export type MapParams = {
    */
   goal: string | null;
   topic: string | null;
+  /**
+   * The tab open under the map (plan #2187.6): what will fade, the gaps to a
+   * target, or then and now, and the earlier day the last compares, as
+   * `YYYY-MM-DD`, null for the four weeks back it opens on.
+   */
+  panel: MapPanel;
+  then: string | null;
 };
+
+export type MapPanel = 'fade' | 'gaps' | 'then';
+const MAP_PANELS: readonly MapPanel[] = ['fade', 'gaps', 'then'];
 
 /**
  * The neighbour map is the default: it pulls each idea towards its six
@@ -58,6 +68,8 @@ export const DEFAULT_PARAMS: MapParams = {
   around: null,
   goal: null,
   topic: null,
+  panel: 'fade',
+  then: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -73,6 +85,8 @@ export function parseMapParams(search: Search): MapParams {
   const around = one(search.around)?.trim();
   const goal = one(search.goal)?.trim() || null;
   const topic = (goal && one(search.topic)?.trim()) || null;
+  const panel = MAP_PANELS.find((p) => p === one(search.panel)) ?? DEFAULT_PARAMS.panel;
+  const then = one(search.then)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
     idea: idea ? idea : null,
@@ -81,6 +95,8 @@ export function parseMapParams(search: Search): MapParams {
     around: !place && around ? around : null,
     goal,
     topic,
+    panel,
+    then: then && /^\d{4}-\d{2}-\d{2}$/.test(then) ? then : null,
   };
 }
 
@@ -97,6 +113,8 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
     query.set('goal', next.goal);
     if (next.topic) query.set('topic', next.topic);
   }
+  if (next.panel !== DEFAULT_PARAMS.panel) query.set('panel', next.panel);
+  if (next.then) query.set('then', next.then);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }

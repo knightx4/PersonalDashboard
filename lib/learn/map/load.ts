@@ -9,6 +9,7 @@ import type { StrengthInput } from '@/lib/learn/strength';
 import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
 import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
 import type { SkyTerritory } from './place-graph';
+import type { GoalLevels } from './panels';
 import { readCells } from '@/lib/learn/levels/model';
 import { placeAreas, placeVectors, type DomainPlacement, type FieldPlacement } from './area-map';
 import { goalsOnMap, territoriesOnMap, type GoalOnMap, type TopicPlacement, type TopicSurroundings } from './goals';
@@ -106,6 +107,13 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
    * read; left out where nothing reads them, as in most gallery entries.
    */
   goals?: GoalOnMap[] | null;
+  /**
+   * The topic map and each goal's targets, for the panels under the map
+   * (plan #2187.6), which work the gaps and an earlier day's levels out in
+   * the browser. Null when they could not be read; left out where nothing
+   * reads them, and then the panels are not drawn.
+   */
+  levels?: GoalLevels | null;
 };
 
 type ConceptRow = {
@@ -314,6 +322,7 @@ export async function loadIdeaMap(
 
   let goals: GoalOnMap[] | null | undefined;
   let territories: SkyTerritory[] | undefined;
+  let levels: GoalLevels | null | undefined;
   if (goalRows) {
     const vectors = goalRows.vectors.flatMap((row) => {
       const vector = parseVector(row.embedding);
@@ -345,8 +354,17 @@ export async function loadIdeaMap(
     const readings = readCells(goalRows.map);
     goals = goalsOnMap(goalRows.lenses, goalRows.map, readings, placedTopics);
     territories = territoriesOnMap(goalRows.lenses, goalRows.map, readings, placedTopics, around);
+    levels = {
+      map: goalRows.map,
+      lenses: goalRows.lenses.map((lens) => ({
+        id: lens.id,
+        name: lens.name,
+        targets: lens.targets.map((t) => ({ topicId: t.topicId, targetLevel: t.targetLevel })),
+      })),
+    };
   } else if (!userId) {
     goals = null;
+    levels = null;
   }
 
   return {
@@ -354,6 +372,7 @@ export async function loadIdeaMap(
     topics,
     goals,
     territories,
+    levels,
     missing: concepts.length - embedded.length,
     asOf: asOf.toISOString(),
     places,

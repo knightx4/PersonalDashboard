@@ -54,6 +54,14 @@ import {
   IdeaSpaceTopicsSurface,
   IdeaSpaceGoalSurface,
   IdeaSpaceGoalNextSurface,
+  IdeaSpaceFadeSurface,
+  IdeaSpaceFadeEmptySurface,
+  IdeaSpaceGapsSurface,
+  IdeaSpaceGapsThinSurface,
+  IdeaSpaceGapsEmptySurface,
+  IdeaSpaceThenSurface,
+  IdeaSpaceThenPickSurface,
+  IdeaSpaceThenThinSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
@@ -6807,6 +6815,73 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceGoalNextSurface />,
+  },
+  {
+    /* The panels under the map (plan #2187.6) on a territory opened, the
+     * first tab: the ideas round the goal whose strength halves soonest,
+     * each with a re-check that opens Practice Flow. */
+    id: 'learn-idea-space-fade',
+    label: 'Learn · Idea Space, what will fade',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeSurface />,
+  },
+  {
+    /* The fade tab with none of the goal's ideas held, so nothing fades. */
+    id: 'learn-idea-space-fade-empty',
+    label: 'Learn · Idea Space, nothing fading',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeEmptySurface />,
+  },
+  {
+    /* The gaps tab: the open topic at its target, and the levels under it
+     * that are not held, the ready ones with Practise and a miss marked. */
+    id: 'learn-idea-space-gaps',
+    label: 'Learn · Idea Space, the gaps to a target',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsSurface />,
+  },
+  {
+    /* The gaps tab as thin as the live goal: a draft with every level open. */
+    id: 'learn-idea-space-gaps-thin',
+    label: 'Learn · Idea Space, the gaps on a draft goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsThinSurface />,
+  },
+  {
+    /* The gaps tab with no goal chosen. */
+    id: 'learn-idea-space-gaps-empty',
+    label: 'Learn · Idea Space, gaps with no goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsEmptySurface />,
+  },
+  {
+    /* The then and now tab: the goal four weeks ago beside today. */
+    id: 'learn-idea-space-then',
+    label: 'Learn · Idea Space, then and now',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenSurface />,
+  },
+  {
+    /* Then and now with its day picker open, as tapping the day opens it. */
+    id: 'learn-idea-space-then-pick',
+    label: 'Learn · Idea Space, choosing the earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenPickSurface />,
+  },
+  {
+    /* Then and now on the thin goal: nothing held on either day. */
+    id: 'learn-idea-space-then-thin',
+    label: 'Learn · Idea Space, then and now with nothing held',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenThinSurface />,
   },
   {
     /* Clips before any are cut. */
