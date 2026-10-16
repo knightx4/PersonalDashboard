@@ -15,6 +15,10 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { isGoalKind } from '@/lib/learn/goal-kind';
 import { GOAL_KIND_MODEL, classifyGoals } from '@/lib/learn/goal-kind-call';
 import { findStoredUnits, liveStoredUnitPorts } from '@/lib/learn/levels/stored-sources-run';
+import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
+import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { CURRICULUM_MODEL, writeCurriculum } from '@/lib/learn/graph/curriculum';
+import { draftTopicsStep, writeUnitsStep, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishStep, type StepHandler } from './run';
 import { loadRunTerritory, saveRunTerritory } from './store';
@@ -26,13 +30,15 @@ import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKin
  *
  * A key missing here is skipped by the runner with the plan step that builds
  * it, so the run still reaches its end. classify, pull_documents and
- * match_weeks are here from #2276.3, compile_territory from #2276.4;
- * draft_topics and write_units arrive with #2276.5.
+ * match_weeks are here from #2276.3, compile_territory from #2276.4,
+ * draft_topics and write_units from #2276.5.
  */
 export type PreparationDeps = {
   learn: LearnSupabaseClient;
   userId: string;
   anthropicApiKey: string | undefined;
+  /** The job search client the territory drafter reads role requirements through; a compiled territory names none. */
+  jobs: AppSupabaseClient;
   /** The catalogue connection; the live one unless a test gives its own. */
   catalogue?: () => postgres.Sql;
 };
@@ -41,7 +47,12 @@ export type PreparationDeps = {
 const EMBED_PER_PASS = 600;
 const EMBED_PASSES = 5;
 
-type Operation = 'classify-goal-kind' | 'propose-structure-sources' | 'match-structure-units' | 'compile-territory';
+type Operation =
+  | 'classify-goal-kind'
+  | 'propose-structure-sources'
+  | 'match-structure-units'
+  | 'compile-territory'
+  | 'write-curriculum';
 
 export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationStepKey, StepHandler>> {
   const { learn, userId } = deps;
@@ -219,11 +230,146 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     save: (runId, territory) => saveRunTerritory(learn, userId, runId, territory),
   });
 
+  const draftTopics = draftTopicsStep({
+    territory: (runId) => loadRunTerritory(learn, userId, runId),
+    async lens(subject) {
+      const { data: found, error } = await learn
+        .from('lenses')
+        .select('id, name')
+        .eq('user_id', userId)
+        .eq('subject_id', subject.id)
+        .maybeSingle();
+      if (error) throw new Error(`Reading the subject's lens failed: ${error.message}`);
+      if (found) return found as { id: string; name: string };
+      const { data: made, error: makeError } = await learn
+        .from('lenses')
+        .insert({ user_id: userId, name: subject.name, origin: 'subject', subject_id: subject.id })
+        .select('id, name')
+        .single();
+      if (made) return made as { id: string; name: string };
+      // Made by another call in the meantime: that one stands.
+      const { data: raced } = await learn
+        .from('lenses')
+        .select('id, name')
+        .eq('user_id', userId)
+        .eq('subject_id', subject.id)
+        .maybeSingle();
+      if (raced) return raced as { id: string; name: string };
+      throw new Error(`Making the subject's lens failed: ${makeError?.message ?? 'no row came back'}`);
+    },
+    async asked() {
+      const { data, error } = await learn.from('topics').select('asked').eq('user_id', userId);
+      if (error) throw new Error(`Reading the topics already drafted failed: ${error.message}`);
+      return ((data ?? []) as { asked: string | null }[]).map((t) => t.asked);
+    },
+    async draft(territory, budgetMs) {
+      if (!deps.anthropicApiKey) throw new Error('No ANTHROPIC_API_KEY is set.');
+      // No catalogue: the compiled territory already carries its documents as its texts.
+      const tick = await draftTerritoryTick({ learn, jobs: deps.jobs }, userId, territory, {
+        anthropicApiKey: deps.anthropicApiKey,
+        budgetMs,
+      });
+      return { drafted: tick.drafted, failed: tick.failed };
+    },
+    async targets(lensId, topics) {
+      const asks = topics.map((t) => t.ask);
+      const { data, error } = await learn.from('topics').select('id, asked, ceiling').eq('user_id', userId).in('asked', asks);
+      if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
+      const byAsk = new Map(
+        ((data ?? []) as { id: string; asked: string; ceiling: number | null }[]).map((t) => [t.asked.trim().toLowerCase(), t]),
+      );
+      const rows = topics.flatMap((t) => {
+        const topic = byAsk.get(t.ask.trim().toLowerCase());
+        return topic
+          ? [{ user_id: userId, lens_id: lensId, topic_id: topic.id, target_level: Math.min(t.target, topic.ceiling ?? t.target) }]
+          : [];
+      });
+      if (rows.length === 0) return 0;
+      // A target the person or an earlier tick set stays as it is.
+      const { error: upsertError } = await learn
+        .from('lens_targets')
+        .upsert(rows, { onConflict: 'lens_id,topic_id', ignoreDuplicates: true });
+      if (upsertError) throw new Error(`Setting the lens's targets failed: ${upsertError.message}`);
+      const { count } = await learn
+        .from('lens_targets')
+        .select('topic_id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('lens_id', lensId)
+        .in('topic_id', rows.map((r) => r.topic_id));
+      return count ?? rows.length;
+    },
+  });
+
+  const writeUnits = writeUnitsStep({
+    territory: (runId) => loadRunTerritory(learn, userId, runId),
+    async names(asks) {
+      const { data, error } = await learn.from('topics').select('asked, name').eq('user_id', userId).in('asked', [...asks]);
+      if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
+      return new Map(((data ?? []) as { asked: string; name: string }[]).map((t) => [t.asked.trim().toLowerCase(), t.name]));
+    },
+    async units(subjectId) {
+      const { data, error } = await learn
+        .from('curriculum_units')
+        .select('id, ordinal, title, placeholder')
+        .eq('user_id', userId)
+        .eq('subject_id', subjectId);
+      if (error) throw new Error(`Reading the curriculum failed: ${error.message}`);
+      const rows = (data ?? []) as { id: string; ordinal: number; title: string; placeholder: boolean }[];
+      const { data: pieces, error: piecesError } = await learn
+        .from('plan_pieces')
+        .select('unit_id')
+        .eq('user_id', userId)
+        .in('unit_id', rows.map((r) => r.id))
+        .not('passed_at', 'is', null);
+      if (piecesError) throw new Error(`Reading the curriculum's pieces failed: ${piecesError.message}`);
+      const passed = new Set(((pieces ?? []) as { unit_id: string }[]).map((p) => p.unit_id));
+      return rows.map((r): SubjectUnit => ({ ...r, passed: passed.has(r.id) }));
+    },
+    async write(input) {
+      if (!deps.anthropicApiKey) return { ok: false, detail: 'No ANTHROPIC_API_KEY is set.' };
+      const spent: SpendReport[] = [];
+      const result = await writeCurriculum({ ...input, anthropicApiKey: deps.anthropicApiKey, onSpend: (r) => spent.push(r) });
+      await ledger('write-curriculum', spent);
+      return result;
+    },
+    async replace(subjectId, { remove, units, kept }) {
+      const scoped = () => learn.from('curriculum_units');
+      if (remove.length > 0) {
+        // Their unpassed pieces go with them; a goal filed under one is filed under none.
+        const { error } = await scoped().delete().eq('user_id', userId).eq('subject_id', subjectId).in('id', remove);
+        if (error) throw new Error(`Clearing the placeholder units failed: ${error.message}`);
+      }
+      // The kept units move past every place first, so no row lands on one still taken.
+      const park = async (offset: number) => {
+        for (const [i, id] of kept.entries()) {
+          const { error } = await scoped().update({ ordinal: offset + i }).eq('user_id', userId).eq('id', id);
+          if (error) throw new Error(`Renumbering the kept units failed: ${error.message}`);
+        }
+      };
+      await park(10_000);
+      const { error: insertError } = await scoped().insert(
+        units.map((unit, i) => ({
+          user_id: userId,
+          subject_id: subjectId,
+          ordinal: i + 1,
+          title: unit.title,
+          covers: unit.covers,
+          outcome: unit.outcome,
+          write_model: CURRICULUM_MODEL,
+        })),
+      );
+      if (insertError) throw new Error(`Saving the opening units failed: ${insertError.message}`);
+      await park(units.length + 1);
+    },
+  });
+
   return {
     classify,
     pull_documents: pull,
     match_weeks: match,
     compile_territory: compile,
+    draft_topics: draftTopics,
+    write_units: writeUnits,
     finish: finishStep,
   };
 }
