@@ -8,6 +8,8 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { CompanyRoles } from './company-roles';
+import { MergeCompany } from './merge-company';
+import { sameCompany, type CompanyIdentity } from '@/lib/jobs/companies/same-company';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { PageColumn } from '@/components/shell/page-width';
 import { rowSubject } from '@/lib/core/subject';
@@ -41,7 +43,14 @@ export default async function CompanyDetailPage({
 
   if (!company) notFound();
 
-  const [{ data: roles }, { data: contacts }, { data: touches }, { data: notes }, { data: profile }] =
+  const [
+    { data: roles },
+    { data: contacts },
+    { data: touches },
+    { data: notes },
+    { data: profile },
+    { data: others },
+  ] =
     await Promise.all([
       supabase
         .from('roles')
@@ -68,7 +77,22 @@ export default async function CompanyDetailPage({
         .eq('company_id', company.id)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+      supabase
+        .from('companies')
+        .select('id, name, domains, website, ats_type, ats_board_token')
+        .eq('user_id', user.id)
+        .neq('id', company.id)
+        .order('name'),
     ]);
+
+  // The companies this one could absorb, the ones that look like it first.
+  const mergeCandidates = ((others ?? []) as unknown as Array<CompanyIdentity & { id: string }>).map(
+    (other) => ({
+      id: other.id,
+      name: other.name,
+      likely: sameCompany(company as unknown as CompanyIdentity, other),
+    }),
+  );
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
   const linkedTasks = await loadTasksFor(user.id, 'company', company.id as string);
@@ -151,6 +175,11 @@ export default async function CompanyDetailPage({
         }
         actions={
           <div className="flex items-center gap-2 text-ui">
+            <MergeCompany
+              companyId={company.id as string}
+              name={company.name as string}
+              candidates={mergeCandidates}
+            />
             <Chip>{company.priority as string}</Chip>
             {company.careers_url && (
               <a

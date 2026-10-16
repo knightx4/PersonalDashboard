@@ -126,6 +126,48 @@ export async function renameCompany(
   return { error: null, slug };
 }
 
+const mergeCompaniesSchema = z.object({
+  keepId: z.string().uuid(),
+  mergeId: z.string().uuid(),
+});
+
+/**
+ * Fold one company into another: the same employer recorded twice, such as
+ * Heron and Heron Data.
+ *
+ * The work is one database function, `job_search.merge_companies`, so a merge
+ * either moves everything or nothing. It reads which tables point at a company
+ * from the foreign keys rather than from a list here, so a table added later
+ * is carried along without this action changing. The merged company's slug
+ * stops resolving, so the caller is handed the kept one's to go to.
+ */
+// latency: pending
+export async function mergeCompanies(
+  input: z.input<typeof mergeCompaniesSchema>,
+): Promise<{ error: string | null; slug: string | null }> {
+  const parsed = mergeCompaniesSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a mergeable pair.', slug: null };
+  if (parsed.data.keepId === parsed.data.mergeId) {
+    return { error: 'Pick a different company to merge.', slug: null };
+  }
+
+  await requireUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('merge_companies', {
+    p_keep: parsed.data.keepId,
+    p_merge: parsed.data.mergeId,
+  });
+  if (error) return { error: error.message, slug: null };
+
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/contacts');
+  return { error: null, slug: ((data as { kept_slug?: string } | null)?.kept_slug ?? null) };
+}
+
 const lookupSchema = z.object({ companyId: z.string().uuid() });
 
 export interface EnrichmentProposal {

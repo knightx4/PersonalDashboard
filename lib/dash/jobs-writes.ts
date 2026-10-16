@@ -2167,7 +2167,7 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
     const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, companyGiven);
     if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
     companyId = company.id;
-    undo.company_added = company.id;
+    if (company.created) undo.company_added = company.id;
   }
 
   // Recruiter inbound only when the recruiter wrote first, as the page decides.
