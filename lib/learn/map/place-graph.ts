@@ -59,6 +59,18 @@ export type IdeaGraph = {
   edges: GraphEdge[];
   /** In a territory, each topic's ladder: its stars are topics, not ideas. */
   ladders?: Map<string, Ladder>;
+  /** In a territory, the route through the stars you are ready for, in the order to take them. */
+  route?: RouteStep[];
+};
+
+/** One stop on a territory's route (plan #2187.4): the star, the level to take there, and its cell. */
+export type RouteStep = {
+  /** Its place on the route, from 1. */
+  n: number;
+  topicId: string;
+  level: number;
+  /** The cell Start here asks about on the first stop. */
+  cellId: string;
 };
 
 /** How many ideas next door a place shows, and a neighbourhood. */
@@ -243,6 +255,9 @@ export type TerritoryLinkIn = {
   requiredLevel: number;
 };
 
+/** A cell inside the goal that you are ready for: one row of the fringe (lib/learn/levels/model.ts `fringe`). */
+export type TerritoryReadyIn = { topicId: string; level: number; cellId: string };
+
 /** A goal's territory: its topics and the requirement links between their cells. */
 export type SkyTerritory = {
   /** The lens the territory is the targets of. */
@@ -250,6 +265,12 @@ export type SkyTerritory = {
   name: string;
   topics: readonly TerritoryTopicIn[];
   links: readonly TerritoryLinkIn[];
+  /**
+   * The cells at or below the goal's targets that you are ready for, in the
+   * order the engine would ask them: the fringe, misses first, then what
+   * settles most. Absent when the loader has not read it.
+   */
+  ready?: readonly TerritoryReadyIn[];
 };
 
 /** What a requirement line carries: every pair of levels it binds, lowest required level first. */
@@ -261,6 +282,24 @@ export const NEXT_DOOR_TERRITORY = NEXT_DOOR_PLACE;
 const REQUIRES_PULL = 0.8;
 /** The weight a line to an idea next door pulls with. */
 const NEXT_DOOR_PULL = 0.5;
+
+/**
+ * The route through a territory: each star you are ready for once, at the
+ * cell the engine would ask first on it, numbered in the engine's order.
+ */
+export function routeFrom(
+  ready: readonly TerritoryReadyIn[] | undefined,
+  topics: ReadonlySet<string>,
+): RouteStep[] {
+  const seen = new Set<string>();
+  const route: RouteStep[] = [];
+  for (const cell of ready ?? []) {
+    if (!topics.has(cell.topicId) || seen.has(cell.topicId)) continue;
+    seen.add(cell.topicId);
+    route.push({ n: route.length + 1, topicId: cell.topicId, level: cell.level, cellId: cell.cellId });
+  }
+  return route;
+}
 
 /** The ladder a topic shows, read off the cells' statuses (lib/learn/levels/model.ts `readCells`). */
 export function ladderFrom(cells: readonly { level: number; status: CellStatus }[]): Pick<Ladder, 'tested' | 'held' | 'missed'> {
@@ -388,6 +427,7 @@ export function territoryGraph(
     doors,
     edges,
     ladders,
+    route: routeFrom(territory.ready, new Set(ladders.keys())),
   };
 }
 

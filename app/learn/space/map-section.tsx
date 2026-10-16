@@ -276,6 +276,12 @@ function MapNotes({
           dashed ring is the goal&rsquo;s target, and a red ring marks a level you missed. Point at or tap a star to
           see everything it requires and the level each needs.
         </p>
+        {graph.route && graph.route.length > 0 && (
+          <p>
+            A pulsing gold ring marks a star you are ready for now. The numbers and the dotted line are the order to
+            take them in, and Start here opens the first.
+          </p>
+        )}
         {graph.next.length > 0 && <p>The faint ideas round the edge are next door. Tap one to go there.</p>}
       </div>
     );

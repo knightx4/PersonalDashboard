@@ -11,6 +11,7 @@ import {
   openedFrom,
   paramsFor,
   readableName,
+  routeFrom,
   requirementText,
   spreadGraph,
   territoryGraph,
@@ -320,5 +321,19 @@ describe('a territory as a graph (plan #2187.3)', () => {
     expect(ladderText({ ...base, tested: 2, held: 5, target: 6 })).toBe('Level 5 of 8, 2 tested, target 6');
     expect(ladderText({ ...base, tested: 0, held: 3, target: null })).toBe('Level 3 of 8, none tested');
     expect(ladderText({ ...base, tested: 4, held: 4, target: 4 })).toBe('Level 4 of 8, target 4');
+  });
+
+  it('numbers the route one star at a time, in the order given, leaving out stars that are not in the territory', () => {
+    const ready = [
+      { topicId: 'b', level: 4, cellId: 'c1' },
+      { topicId: 'zz', level: 1, cellId: 'c2' },
+      { topicId: 'a', level: 2, cellId: 'c3' },
+      { topicId: 'b', level: 5, cellId: 'c4' },
+    ];
+    expect(routeFrom(ready, new Set(['a', 'b']))).toEqual([
+      { n: 1, topicId: 'b', level: 4, cellId: 'c1' },
+      { n: 2, topicId: 'a', level: 2, cellId: 'c3' },
+    ]);
+    expect(routeFrom(undefined, new Set(['a']))).toEqual([]);
   });
 });
