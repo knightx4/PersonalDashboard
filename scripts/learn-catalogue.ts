@@ -26,6 +26,12 @@
  * Up to eight results pages and three PDFs from utdirect.utexas.edu; no API
  * key, and no screen beyond the parser's three-unit floor.
  *
+ * `--practical` takes an address on the practical-skills allowlist
+ * (lib/learn/providers/practical.ts): an extension course page, an exam
+ * outline or a practitioner's guide such as
+ * https://a16z.com/16-startup-metrics/, and stores it as a structure document
+ * (plan #2247.6). One fetch, more for a course's handouts; no API key.
+ *
  * `--course` takes a YouTube playlist id and stores the course under it: one
  * item of kind `course`, one of kind `video` per lecture, and
  * `learn.catalogue_course_items` for the order the institution published them
@@ -76,12 +82,15 @@ import {
 import { pullOcwCourse } from '../lib/learn/catalogue/ocw-structure-pull';
 import { livePorts as utPorts, pullUtSearch, TERMS_SEARCHED } from '../lib/learn/catalogue/ut-austin-pull';
 import { recentTerms } from '../lib/learn/providers/ut-austin';
+import { pullPractical } from '../lib/learn/providers/practical';
+import { storeStructure } from '../lib/learn/catalogue/structure-store';
 
 type Args = {
   titles: string[];
   courses: string[];
   ocw: string[];
   ut: string[];
+  practical: string[];
   provider: string;
   embed: boolean;
   user: string | null;
@@ -93,6 +102,7 @@ function parse(argv: string[]): Args {
   const courses: string[] = [];
   const ocw: string[] = [];
   const ut: string[] = [];
+  const practical: string[] = [];
   let provider = DEFAULT_COURSE_PROVIDER;
   let embed = false;
   let user = process.env.CATALOGUE_USER ?? null;
@@ -106,6 +116,7 @@ function parse(argv: string[]): Args {
     else if (arg === '--course') courses.push(argv[(i += 1)] ?? '');
     else if (arg === '--ocw') ocw.push(argv[(i += 1)] ?? '');
     else if (arg === '--ut') ut.push(argv[(i += 1)] ?? '');
+    else if (arg === '--practical') practical.push(argv[(i += 1)] ?? '');
     else if (arg === '--provider') provider = argv[(i += 1)] ?? provider;
     else if (arg.trim() !== '') titles.push(arg);
   }
@@ -115,6 +126,7 @@ function parse(argv: string[]): Args {
     courses: courses.filter((id) => id.trim() !== ''),
     ocw: ocw.filter((number) => number.trim() !== ''),
     ut: ut.filter((search) => search.includes(':')),
+    practical: practical.filter((url) => url.trim() !== ''),
     provider,
     embed,
     user,
@@ -160,10 +172,10 @@ async function resolveUser(sql: postgres.Sql, wanted: string | null): Promise<st
 }
 
 async function main(): Promise<void> {
-  const { titles, courses, ocw, ut, provider, embed, user, limit } = parse(process.argv.slice(2));
-  if (titles.length === 0 && courses.length === 0 && ocw.length === 0 && ut.length === 0 && !embed) {
+  const { titles, courses, ocw, ut, practical, provider, embed, user, limit } = parse(process.argv.slice(2));
+  if (titles.length === 0 && courses.length === 0 && ocw.length === 0 && ut.length === 0 && practical.length === 0 && !embed) {
     console.error(
-      'Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...] [--course <playlist id>] [--provider <slug>] [--ocw <MIT course number>] [--ut <DEPT:title words>] [--embed]',
+      'Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...] [--course <playlist id>] [--provider <slug>] [--ocw <MIT course number>] [--ut <DEPT:title words>] [--practical <allowlisted address>] [--embed]',
     );
     process.exit(1);
   }
@@ -231,6 +243,18 @@ async function main(): Promise<void> {
         console.log(`  ${line.courseCode}, ${line.term}: ${line.status} ${line.url}`);
       }
     }
+  }
+
+  for (const url of practical) {
+    const pulled = await pullPractical(url);
+    if (!pulled.ok) {
+      failed += 1;
+      console.error(`${url}: ${pulled.reason} -- ${pulled.detail}`);
+      continue;
+    }
+    const stored = await storeStructure(sql, pulled.document);
+    const kept = stored.unchanged ? ' (unchanged since the last pull)' : '';
+    console.log(`${pulled.document.title}: ${pulled.document.units.length} units from ${pulled.document.canonicalUrl}${kept}`);
   }
 
   if (embed) {
