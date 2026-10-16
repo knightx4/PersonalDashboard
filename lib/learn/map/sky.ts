@@ -1,5 +1,14 @@
 import type { StateBasis } from '@/lib/learn/graph/model';
-import { spillOver, strengthWithEvidence, type EvidenceWeight, type StrengthInput } from '@/lib/learn/strength';
+import {
+  EVIDENCE_CEILING,
+  EVIDENCE_WEIGHT,
+  evidenceStrength,
+  isUntested,
+  spillOver,
+  strength as stateStrength,
+  type EvidenceWeight,
+  type StrengthInput,
+} from '@/lib/learn/strength';
 import type { Point } from './layout';
 import { DOMAIN_HUES } from './view';
 
@@ -9,9 +18,11 @@ import { DOMAIN_HUES } from './view';
  *
  * - The camera: a centre in the layout's units and a scale in pixels per
  *   unit. Zooming keeps the point under the finger still.
- * - How a star looks for its strength: brighter, larger and with a wider
- *   glow the better the idea is known. An idea you do not know yet is a dim
- *   point, with a haze around it when known ideas sit beside it.
+ * - How a star looks (plan #2187.1). Brightness, size and glow are its
+ *   tested strength: only an answer to a question lights a star. A soft gold
+ *   halo is exposure: a course, your work or your writing touched it, or you
+ *   said you know it, with no question asked yet. A blue haze is nearness:
+ *   an idea with no tested strength sitting beside ideas you were tested on.
  * - Which names show at a zoom, and where, so that no two overlap.
  * - Where a vault note's speck of dust sits beside its idea.
  *
@@ -35,6 +46,12 @@ export const SKY = {
   dustSwatch: 'rgba(168, 178, 214, 0.75)',
   /** The haze known ideas spill onto an unknown one beside them, as r, g, b. */
   haze: [120, 140, 255] as const,
+  /**
+   * The halo of exposure (plan #2187.1): a thin hollow ring of pale gold, as
+   * r, g, b. Paler than the Social sciences hue, so a ring never reads as a
+   * domain's colour.
+   */
+  halo: [242, 222, 160] as const,
   /** An idea held wrongly: a ring, since its strength is nought. */
   mixedUp: 'rgba(240, 114, 126, 0.75)',
   /** Names of places, ideas, and the idea pointed at. */
@@ -159,20 +176,32 @@ export type StarLook = {
   /** The glow around it, in pixels across; zero for none. */
   glow: number;
   glowAlpha: number;
-  /** The haze around an unknown idea, in pixels across; zero for none. */
+  /** The haze around an idea with no tested strength, in pixels across; zero for none. */
   haze: number;
   hazeAlpha: number;
+  /** The gold halo of exposure, in pixels across; zero for none. */
+  halo: number;
+  haloAlpha: number;
 };
 
+/** Below this, haze and exposure draw nothing. */
+export const FAINTEST_MARK = 0.02;
+
 /**
- * How a star looks for its strength (0 to 1) and, for an idea not known yet,
- * the haze its known neighbours give it (0 to 1). `zoom` is the camera's
- * scale over the whole-map scale: stars grow a little as you come closer, so
- * a close view does not read as empty.
+ * How a star looks for its tested strength (0 to 1), the haze its tested
+ * neighbours give it (0 to 1) and its exposure (0 to 1). `zoom` is the
+ * camera's scale over the whole-map scale: stars grow a little as you come
+ * closer, so a close view does not read as empty.
+ *
+ * Only strength makes a star brighter or larger. Exposure draws a thin
+ * hollow ring round the dim core, its size fixed and only its alpha rising
+ * with exposure, so it never reads as brightness.
  */
-export function starLook(strength: number, haze: number, zoom: number): StarLook {
+export function starLook(strength: number, haze: number, zoom: number, exposure = 0): StarLook {
   const grow = Math.min(Math.max(zoom, 1), 8) ** 0.3;
   const s = Math.min(Math.max(strength, 0), 1);
+  const e = Math.min(Math.max(exposure, 0), 1);
+  const halo = e > FAINTEST_MARK ? { halo: 12 * grow, haloAlpha: 0.45 + 0.4 * e } : { halo: 0, haloAlpha: 0 };
   if (s <= 0) {
     const h = Math.min(Math.max(haze, 0), 1);
     return {
@@ -180,8 +209,9 @@ export function starLook(strength: number, haze: number, zoom: number): StarLook
       coreAlpha: 0.8,
       glow: 0,
       glowAlpha: 0,
-      haze: h > 0.02 ? (14 + 16 * h) * grow : 0,
-      hazeAlpha: h > 0.02 ? 0.12 + 0.3 * h : 0,
+      haze: h > FAINTEST_MARK ? (14 + 16 * h) * grow : 0,
+      hazeAlpha: h > FAINTEST_MARK ? 0.12 + 0.3 * h : 0,
+      ...halo,
     };
   }
   const root = Math.sqrt(s);
@@ -192,6 +222,7 @@ export function starLook(strength: number, haze: number, zoom: number): StarLook
     glowAlpha: 0.3 + 0.7 * s,
     haze: 0,
     hazeAlpha: 0,
+    ...halo,
   };
 }
 
@@ -386,29 +417,64 @@ export type LightInput = {
   /** The idea's state row, or null when it has none (never seen). */
   stateRow: StrengthInput | null;
   neighbours: readonly { id: string; similarity: number }[];
-  /** Notes, courses and work that back it (plan #2006.6); an untested idea glows from them up to EVIDENCE_CEILING. */
+  /** Notes, courses and work that back it (plan #2006.6), which give it a halo and never brightness. */
   evidence?: readonly EvidenceWeight[];
 };
 
-export type Light = { strength: number; haze: number };
+/**
+ * How an idea is lit on a day (plan #2187.1). `strength` is what answers
+ * made it, 0 to 1: brightness. `haze` is how near it sits to ideas answers
+ * lit, for an idea with no strength of its own. `exposure` is how strongly a
+ * course, your work, your writing or your own word touched it, 0 to 1: the
+ * halo.
+ */
+export type Light = { strength: number; haze: number; exposure: number };
 
 /**
- * Every idea's strength on `on`, and the haze each idea not known yet takes
- * from the known ideas among its nearest (lib/learn/strength.ts). Takes the
- * date, so a timeline can light the map as it stood on any day. An untested
- * idea with evidence found by then takes its evidence's score when that is
- * higher than its own.
+ * The strength an idea's answers give it on `on`: its state's score when a
+ * question has been asked about it, and nothing otherwise. Saying you know an
+ * idea, or an idea above it being known, lights no star (plan #2187.1).
+ */
+export function testedStrength(row: StrengthInput | null, on: Date): number {
+  if (!row || isUntested(row)) return 0;
+  return stateStrength(row, on);
+}
+
+/**
+ * How strongly an idea was met without being tested, 0 to 1, and 0 once a
+ * question has been asked about it: the halo says "met, not tested yet", and
+ * a tested star says what it holds by its brightness. Its evidence
+ * counts as its share of EVIDENCE_CEILING, so the kinds keep their ranking
+ * (work and a graded course reach 1, a note a half, a clipping a quarter, a
+ * mention nothing). An untested state you declared, or one taken from an
+ * idea above it, counts its level and memory. An idea held wrongly has none,
+ * so its red ring reads alone.
+ */
+export function exposureOf(row: StrengthInput | null, evidence: readonly EvidenceWeight[], on: Date): number {
+  if (row?.state === 'misconception' || (row && !isUntested(row))) return 0;
+  const fromEvidence = evidence.length > 0 ? evidenceStrength(evidence, on) / EVIDENCE_CEILING : 0;
+  const fromWord = row && isUntested(row) ? stateStrength(row, on) / EVIDENCE_WEIGHT[row.established] : 0;
+  return Math.min(1, Math.max(fromEvidence, fromWord));
+}
+
+/**
+ * Every idea's light on `on`. Strength is tested only; exposure is the rest;
+ * haze is what the tested ideas among an idea's nearest spill onto it, when
+ * it has no strength of its own and is not held wrongly
+ * (lib/learn/strength.ts). Takes the date, so a timeline can light the map
+ * as it stood on any day.
  */
 export function lightOn(ideas: readonly LightInput[], on: Date): Map<string, Light> {
   const strengthOf = new Map<string, number>();
-  for (const idea of ideas) strengthOf.set(idea.id, strengthWithEvidence(idea.stateRow, idea.evidence ?? [], on));
+  for (const idea of ideas) strengthOf.set(idea.id, testedStrength(idea.stateRow, on));
   const out = new Map<string, Light>();
   for (const idea of ideas) {
-    const unknown = !idea.stateRow || idea.stateRow.state === 'unknown';
-    const haze = unknown
+    const strength = strengthOf.get(idea.id) ?? 0;
+    const near = strength <= 0 && idea.stateRow?.state !== 'misconception';
+    const haze = near
       ? spillOver(idea.neighbours.map((n) => ({ strength: strengthOf.get(n.id) ?? 0, similarity: n.similarity })))
       : 0;
-    out.set(idea.id, { strength: strengthOf.get(idea.id) ?? 0, haze });
+    out.set(idea.id, { strength, haze, exposure: exposureOf(idea.stateRow, idea.evidence ?? [], on) });
   }
   return out;
 }

@@ -77,8 +77,12 @@ export type Star = {
   at: Point;
   state: KnowledgeState;
   stateRow: StrengthInput | null;
+  /** Tested strength, 0 to 1: brightness (plan #2187.1). */
   strength: number;
+  /** Nearness to tested ideas, 0 to 1, for a star with no strength: the blue haze. */
   haze: number;
+  /** A course, your work, your writing or your word touched it, 0 to 1: the gold halo. */
+  exposure: number;
   /** The domain's colour slot, `other` for a domain without one, `none` for no domain. */
   slot: number | 'other' | 'none';
   domainId: string | null;
@@ -249,8 +253,15 @@ export function StarSky({
         ? stars.map((star): Star => {
             const then = replay.get(star.id);
             return then
-              ? { ...star, strength: then.strength, haze: then.haze, state: then.state, stateRow: then.stateRow }
-              : { ...star, strength: 0, haze: 0, absent: true };
+              ? {
+                  ...star,
+                  strength: then.strength,
+                  haze: then.haze,
+                  exposure: then.exposure,
+                  state: then.state,
+                  stateRow: then.stateRow,
+                }
+              : { ...star, strength: 0, haze: 0, exposure: 0, absent: true };
           })
         : stars,
     [stars, replay],
@@ -424,6 +435,10 @@ export function StarSky({
       if (x >= 0 && y >= 0 && x <= w && y <= h) inView += 1;
     }
     const crowd = crowding(inView);
+    // Rings overlap into a grey wash sooner than glow adds up to white, so
+    // the halo thins with the square: gone past a few thousand stars in
+    // view, back as you zoom in.
+    const haloCrowd = crowd * crowd;
 
     // Haze and glow are soft, so they are drawn at half the resolution on a
     // layer of their own and laid over the sky in one go: a quarter of the
@@ -452,20 +467,23 @@ export function StarSky({
     // path each, since a few fills cost less than ten thousand stamps.
     ctx.globalCompositeOperation = 'lighter';
     const unlit: number[] = [];
+    // Stars met without a test, ringed once the cores are down.
+    const haloed: number[] = [];
     const squares = new Map<string, number[]>();
     for (let i = 0; i < stars.length; i++) {
       const star = stars[i]!;
       if (star.absent || behind?.has(star.id)) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
-      const look = starLook(star.strength, star.haze, zoom);
-      const reach = Math.max(look.glow, look.haze) / 2 + 2;
+      const look = starLook(star.strength, star.haze, zoom, star.exposure);
+      const reach = Math.max(look.glow, look.haze, look.halo) / 2 + 2;
       if (x < -reach || y < -reach || x > w + reach || y > h + reach) continue;
       const dim = litUp(star) ? 1 : faded;
       if (look.haze > 0 && hazeSprite.current && look.hazeAlpha * dim * crowd >= FAINTEST_GLOW) {
         glow.globalAlpha = look.hazeAlpha * dim * crowd;
         glow.drawImage(hazeSprite.current, x - look.haze / 2, y - look.haze / 2, look.haze, look.haze);
       }
+      if (look.halo > 0 && look.haloAlpha * dim * haloCrowd >= FAINTEST_GLOW) haloed.push(i);
       if (star.strength <= 0) {
         unlit.push(i);
         continue;
@@ -517,6 +535,27 @@ export function StarSky({
         const y = sy(py[i]!);
         ctx.moveTo(x + unlitR, y);
         ctx.arc(x, y, unlitR, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Exposure: a thin hollow ring of pale gold round a star met in a course
+    // or your writing, or one you said you know, with no question asked yet
+    // (plan #2187.1). Stroked, never filled, so it adds no light to the core,
+    // and thinned faster than the glow in a crowd.
+    ctx.strokeStyle = `rgb(${SKY.halo.join(',')})`;
+    ctx.lineWidth = 1.2;
+    const haloR = starLook(0, 0, zoom, 1).halo / 2;
+    for (const pass of [true, false]) {
+      ctx.globalAlpha = haloCrowd * (pass ? 1 : faded) * 0.85;
+      ctx.beginPath();
+      for (const i of haloed) {
+        if (litUp(stars[i]!) !== pass) continue;
+        const x = sx(px[i]!);
+        const y = sy(py[i]!);
+        ctx.moveTo(x + haloR, y);
+        ctx.arc(x, y, haloR, 0, Math.PI * 2);
       }
       ctx.stroke();
     }
@@ -1304,7 +1343,8 @@ function StarCard({
   if (star.strength > 0) facts.push(['Strength', `${Math.round(star.strength * 100)}%`]);
   if (setAt) facts.push(['Last shown', whenDate(setAt, { timeZone: 'UTC' })]);
   if (halves) facts.push(['Next halves', whenDate(halves, { timeZone: 'UTC' })]);
-  if (star.strength <= 0 && star.haze > 0.05) facts.push(['Near', 'Ideas you know']);
+  if (star.strength <= 0 && star.exposure > 0.05) facts.push(['Halo', 'Met, not tested yet']);
+  if (star.strength <= 0 && star.haze > 0.05) facts.push(['Near', 'What you know']);
 
   return (
     <div

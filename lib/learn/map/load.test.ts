@@ -67,7 +67,7 @@ const ROWS = {
 };
 
 describe('loadIdeaMap evidence (plan #2006.6)', () => {
-  it('lights an untested idea from its evidence, capped, and keeps its links strongest first', async () => {
+  it('gives an untested idea a halo from its evidence, never brightness, and keeps its links strongest first', async () => {
     const link = (id: string, weight: number, similarity: number) => ({
       id,
       target_kind: 'idea',
@@ -86,8 +86,9 @@ describe('loadIdeaMap evidence (plan #2006.6)', () => {
     const view = await loadIdeaMap(client, undefined, new Date('2026-10-14T00:00:00Z'));
     const retention = view.ideas.find((i) => i.id === 'i2')!;
     expect(retention.state).toBe('unknown');
-    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling.
-    expect(retention.strength).toBeCloseTo((1 - 0.85 * 0.65) * EVIDENCE_CEILING);
+    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling (plan #2187.1).
+    expect(retention.strength).toBe(0);
+    expect(retention.exposure).toBeCloseTo(((1 - 0.85 * 0.65) * EVIDENCE_CEILING) / EVIDENCE_CEILING);
     expect(retention.evidence.map((e) => e.id)).toEqual(['own', 'clip']);
     expect(view.ideas.find((i) => i.id === 'i3')!.evidence).toEqual([]);
   });
