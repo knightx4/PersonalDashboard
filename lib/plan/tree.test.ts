@@ -962,7 +962,7 @@ describe('healthOf', () => {
     expect(healthOf(byId.get('shipped')!)).toBe('unanswered');
   });
 
-  it('reports the most pressing of several open rows beneath a closed one', () => {
+  it('reports what is left beneath a closed one, ready first', () => {
     const sections = tree([
       at('done', 'shipped'),
       at('not_started', 'todo', { parentId: 'shipped' }),
@@ -970,7 +970,7 @@ describe('healthOf', () => {
     ]);
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
 
-    expect(healthOf(byId.get('shipped')!)).toBe('blocked');
+    expect(healthOf(byId.get('shipped')!)).toBe('ready');
   });
 
   it('still calls a done step done when everything beneath it is closed', () => {
@@ -990,11 +990,11 @@ describe('healthOf', () => {
       [dep('b', 'a')],
     );
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
-    // 'a' has an open step beneath it, so it is not ready; 'b' waits on 'a';
-    // 'c' has nothing above or beneath it in the way.
+    // 'b' waits on 'a'; 'c' has nothing above or beneath it in the way, and
+    // 'a' reports it, because a step beneath it can be picked up.
     expect(healthOf(byId.get('c')!)).toBe('ready');
     expect(healthOf(byId.get('b')!)).toBe('waiting');
-    expect(healthOf(byId.get('a')!)).toBe('not_started');
+    expect(healthOf(byId.get('a')!)).toBe('ready');
   });
 
   it('stops saying blocked once every step a block on steps named is closed', () => {
@@ -1601,12 +1601,12 @@ describe('searchSections', () => {
 describe('healthOf, over a subtree that has started', () => {
   const feature = (children: PlanItem[]) => shopping(tree([at('not_started', 'f'), ...children]));
 
-  it('calls a feature in progress once a step beneath it is done', () => {
+  it('calls a feature ready while a step beneath it is ready, whatever is done', () => {
     const sections = feature([
       at('done', 's1', { parentId: 'f' }),
       at('not_started', 's2', { parentId: 'f' }),
     ]);
-    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+    expect(healthOf(sections.nodes[0])).toBe('ready');
   });
 
   it('calls it in progress while a step beneath it is being worked', () => {
@@ -1614,12 +1614,12 @@ describe('healthOf, over a subtree that has started', () => {
     expect(healthOf(sections.nodes[0])).toBe('in_progress');
   });
 
-  it('leaves a feature nobody has touched not started', () => {
+  it('calls a feature nobody has touched ready when its steps are', () => {
     const sections = feature([
       at('not_started', 's1', { parentId: 'f' }),
       at('not_started', 's2', { parentId: 'f' }),
     ]);
-    expect(healthOf(sections.nodes[0])).toBe('not_started');
+    expect(healthOf(sections.nodes[0])).toBe('ready');
   });
 
   // Answering the opening question is not building the thing.
@@ -1628,7 +1628,7 @@ describe('healthOf, over a subtree that has started', () => {
       at('done', 'q', { parentId: 'f', kind: 'decision' }),
       at('not_started', 's1', { parentId: 'f' }),
     ]);
-    expect(healthOf(sections.nodes[0])).toBe('not_started');
+    expect(healthOf(sections.nodes[0])).toBe('ready');
   });
 
   // 'ready' rather than 'not_started' because a feature with no live work
@@ -1653,12 +1653,48 @@ describe('healthOf, over a subtree that has started', () => {
     expect(healthOf(sections.nodes[0])).toBe('blocked');
   });
 
-  it('leaves it open while one step beneath it can still be worked', () => {
+  it('calls it ready while one step beneath it can still be worked', () => {
     const sections = feature([
       at('blocked', 's1', { parentId: 'f', blockKind: 'outside' }),
       at('not_started', 's2', { parentId: 'f' }),
     ]);
-    expect(healthOf(sections.nodes[0])).toBe('not_started');
+    expect(healthOf(sections.nodes[0])).toBe('ready');
+  });
+
+  it('calls it blocked over a blocked step and a waiting one', () => {
+    const sections = shopping(
+      tree(
+        [
+          at('not_started', 'f'),
+          at('not_started', 'other'),
+          at('blocked', 's1', { parentId: 'f', blockKind: 'outside' }),
+          at('not_started', 's2', { parentId: 'f' }),
+        ],
+        [dep('s2', 'other')],
+      ),
+    );
+    expect(healthOf(sections.nodes[0])).toBe('blocked');
+  });
+
+  // The Jev feature (#1172): most of it done, and all that is left is a step
+  // waiting on another one. It said "In progress"; it is waiting.
+  it('calls it waiting when all that is left beneath it waits', () => {
+    const sections = shopping(
+      tree(
+        [
+          at('not_started', 'f'),
+          at('not_started', 'other'),
+          at('done', 's1', { parentId: 'f' }),
+          at('not_started', 'mid', { parentId: 'f' }),
+          at('done', 's2', { parentId: 'mid' }),
+          at('not_started', 's3', { parentId: 'mid' }),
+        ],
+        [dep('s3', 'other')],
+      ),
+    );
+    const f = sections.nodes.find((node) => node.id === 'f')!;
+    expect(healthOf(f.children.find((node) => node.id === 'mid')!)).toBe('waiting');
+    expect(healthOf(f)).toBe('waiting');
   });
 
   it('does not call it blocked over a step whose named steps have all closed', () => {
@@ -1674,7 +1710,7 @@ describe('healthOf, over a subtree that has started', () => {
         [dep('s2', 's1')],
       ),
     );
-    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+    expect(healthOf(sections.nodes[0])).toBe('ready');
   });
 });
 
