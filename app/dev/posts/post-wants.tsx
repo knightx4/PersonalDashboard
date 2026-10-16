@@ -58,6 +58,7 @@ export function PostWantsLine({
         className={cn(
           // The same strip the box opens into, so the saved words read as
           // something written that a press opens, not as page description.
+          // ui-ok: the compose strip's own frame, matching the box it opens into; the critic asked for it
           'press flex w-full min-w-0 items-baseline gap-2 rounded-control border border-control bg-surface',
           'px-(--control-px) py-1.5 text-left text-ui transition-colors duration-quick hover:border-accent',
         )}
