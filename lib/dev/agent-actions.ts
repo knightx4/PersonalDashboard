@@ -81,6 +81,7 @@ export const devActions: ModuleActions = {
     dropPost: none('theirs'),
     restorePost: none('theirs'),
     writePost: none('own', 'A post the person wrote themselves.'),
+    savePostWants: none('theirs', 'What the person wants from their posts is theirs to say.'),
     editPostAngle: none('own', "The person's say on what their post is about; the posts skill writes the first angle."),
     addPostImage: none('own', 'Attaches a picture the person uploaded from their device.'),
     removePostImage: none('deletes'),
