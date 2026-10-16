@@ -75,6 +75,8 @@ export function RolesTable({
                     label={`Sort or filter by ${entry.label.toLowerCase()}`}
                     align="start"
                     defaultOpen={openFilter === entry.id}
+                    // The header row is not drawn on a phone, so neither is its menu.
+                    panelClassName="max-md:hidden"
                     // The heading alone, at the width the sort link had: a
                     // chevron on five headings pushed Comp off the card.
                     trigger={entry.label}

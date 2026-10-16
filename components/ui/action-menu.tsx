@@ -74,13 +74,6 @@ function useMenuPosition(
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    // A trigger that is not drawn (a table header hidden on a phone) has no
-    // place to hang the menu from, so the menu stays closed rather than
-    // floating over the top of the page.
-    if (rect.width === 0 && rect.height === 0) {
-      setPos(null);
-      return;
-    }
     const minWidth = Math.max(180, rect.width);
     const left =
       align === 'end'
@@ -139,6 +132,7 @@ export function ActionMenu({
   trigger,
   className,
   triggerClassName,
+  panelClassName,
   onOpenChange,
   defaultOpen = false,
 }: {
@@ -154,6 +148,12 @@ export function ActionMenu({
    * icon-sized square.
    */
   triggerClassName?: string;
+  /**
+   * Classes for the floating panel. A trigger hidden at some widths (a table
+   * header on a phone) hides its panel the same way, since the panel is in a
+   * portal and would otherwise float at the top of the page.
+   */
+  panelClassName?: string;
   onOpenChange?: (open: boolean) => void;
   /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
   defaultOpen?: boolean;
@@ -271,7 +271,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1')}
+            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1', panelClassName)}
           >
             {items.map((item) => {
               if (armed === item.id) {
