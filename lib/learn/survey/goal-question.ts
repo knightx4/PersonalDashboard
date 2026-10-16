@@ -8,7 +8,8 @@ import { embedIdeaClaim } from '@/lib/learn/embed/idea-embedding';
 import type { AimDepth } from '@/lib/learn/aims';
 import type { Depth } from '@/lib/learn/feed/depth';
 import { loadConcept } from '@/lib/learn/graph/load';
-import { nextMasteryCheck, recordExplainProbe } from '@/lib/learn/graph/session';
+import { nextMasteryCheck, recordExplainProbe, recordGoalCase } from '@/lib/learn/graph/session';
+import { LEVEL_CASE_MODEL, writeLevelCase } from '@/lib/learn/levels/case-call';
 import { explainPrompt } from '@/lib/learn/flow/explain';
 import type { SurveyIdea } from './idea';
 import { cardBasisPrefix, goalQuestionDepth, ideaForGoal, type GoalCardSource } from './goal-idea';
@@ -66,8 +67,14 @@ export type GoalQuestion = {
   question: string;
   /** Always empty: a goal question is answered in your own words. */
   options: string[];
-  /** Always true: a goal question is an explain prompt (plan #2164.2). */
-  explain: true;
+  /**
+   * True for an explain prompt (plan #2164.2), which the teach-back grader
+   * marks. False for a worked case with figures (plan #2164.3), which is
+   * answered with a number or two sentences and graded as the applied rung.
+   */
+  explain: boolean;
+  /** True for a worked case. Never true with `explain`. */
+  case: boolean;
 };
 
 export type WrittenGoalQuestion =
@@ -91,6 +98,23 @@ type Idea = {
   source: GoalQuestion['source'];
   cardTitle: string | null;
 };
+
+/** Every third question on a goal is a worked case, the third of each three. */
+export const CASE_EVERY = 3;
+
+/**
+ * Whether the next question on a goal is a worked case (plan #2164.3): about
+ * one in three, counted from the questions already written for the flow, so
+ * the share holds however many are written ahead before any is answered.
+ */
+export function caseDue(flowAsked: number): boolean {
+  return flowAsked % CASE_EVERY === CASE_EVERY - 1;
+}
+
+/** The level a worked case is pitched at: 4 given, 5 messy, 6 a trap. */
+export function caseLevel(depth: Depth): 4 | 5 | 6 {
+  return depth === 'specialist' ? 6 : depth === 'advanced' ? 5 : 4;
+}
 
 /** The newest card no idea in the subject was written from, or null. */
 export function unusedCard(
@@ -143,6 +167,8 @@ export async function writeGoalQuestion(input: {
   client?: Anthropic;
   /** The idea's model call. Record it as 'write-survey-idea'. */
   onIdeaSpend?: SpendSink;
+  /** The case writer's model call. Record it as 'write-goal-case'. */
+  onCaseSpend?: SpendSink;
 }): Promise<WrittenGoalQuestion> {
   const { supabase, userId, aim } = input;
   if (aim.listSource) {
@@ -191,6 +217,33 @@ export async function writeGoalQuestion(input: {
     };
   }
 
+  // About one question in three is a worked case with figures (plan
+  // #2164.3). A case that could not be written is an explain prompt instead,
+  // so the turn is not lost.
+  if (input.flow && caseDue(state.flowAsked ?? 0)) {
+    const asCase = await recordGoalCaseQuestion(supabase, userId, idea, depth, input);
+    if (asCase) {
+      return {
+        ok: true,
+        question: {
+          probeId: asCase.probeId,
+          conceptId: idea.conceptId,
+          conceptName: idea.name,
+          subjectId: subject.id,
+          aimId: aim.id,
+          aimName: aim.name,
+          depth,
+          source: idea.source,
+          cardTitle: idea.cardTitle,
+          question: asCase.question,
+          options: [],
+          explain: false,
+          case: true,
+        },
+      };
+    }
+  }
+
   const asked = await recordGoalExplain(supabase, userId, idea, input.flow);
   return {
     ok: true,
@@ -207,8 +260,62 @@ export async function writeGoalQuestion(input: {
       question: asked.question,
       options: [],
       explain: true,
+      case: false,
     },
   };
+}
+
+/**
+ * Write a worked case on a goal's idea and store it as one of Practice
+ * Flow's, or null when it could not be written. The case writer is the one
+ * the levels use (plan #2138.8), pointed at the idea's claim and checks; the
+ * case is stored at the applied rung, which `answerApplied` grades.
+ */
+async function recordGoalCaseQuestion(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  idea: { conceptId: string; name: string; claim: string; mastery: string[] },
+  depth: Depth,
+  input: {
+    flow?: { shownAt: string | null };
+    anthropicApiKey: string;
+    client?: Anthropic;
+    onCaseSpend?: SpendSink;
+  },
+): Promise<{ probeId: string; question: string } | null> {
+  if (!input.anthropicApiKey && !input.client) return null;
+  const check = nextMasteryCheck(idea.mastery, []);
+  const written = await writeLevelCase({
+    topicName: idea.name,
+    level: caseLevel(depth),
+    descriptor: idea.mastery.length > 0 ? idea.mastery : [idea.claim],
+    claim: idea.claim,
+    anthropicApiKey: input.anthropicApiKey,
+    client: input.client,
+    onSpend: input.onCaseSpend,
+  });
+  if (!written.ok) {
+    console.error('[learn flow] goal case', written.detail);
+    return null;
+  }
+  let picked;
+  if (input.flow) {
+    const concept = await loadConcept(supabase, idea.conceptId);
+    picked = {
+      pickedState: concept?.state ?? ('unknown' as const),
+      pickedRecheck: null,
+      shownAt: input.flow.shownAt,
+    };
+  }
+  const probeId = await recordGoalCase(supabase, userId, {
+    conceptId: idea.conceptId,
+    question: written.case.question,
+    expected: written.case.expected,
+    masteryCheck: check,
+    model: LEVEL_CASE_MODEL,
+    flow: picked,
+  });
+  return { probeId, question: written.case.question };
 }
 
 /**

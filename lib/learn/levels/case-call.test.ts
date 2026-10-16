@@ -39,3 +39,16 @@ describe('which levels are cases', () => {
     expect([3, 4, 5, 6, 7].map(questionFormat)).toEqual(['explain', 'case', 'case', 'case', 'explain']);
   });
 });
+
+describe('casePrompt for an idea on the claims graph', () => {
+  it('names the idea when it is given', () => {
+    const text = casePrompt({
+      topicName: 'Burn multiple',
+      level: 4,
+      descriptor: ['Works it out from net burn and new ARR'],
+      asked: [],
+      claim: 'Burn multiple is net burn over net new ARR.',
+    });
+    expect(text).toContain('The idea: Burn multiple is net burn over net new ARR.');
+  });
+});

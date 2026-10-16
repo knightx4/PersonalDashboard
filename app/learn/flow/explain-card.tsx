@@ -209,7 +209,7 @@ export function ExplainCard({
  * above the tab bar while a long card is read, as the deck pattern's forward
  * row does (components/patterns/deck.tsx); from lg it sits where it falls.
  */
-function ForwardRow({ children }: { children: React.ReactNode }) {
+export function ForwardRow({ children }: { children: React.ReactNode }) {
   return (
     <div className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link -mx-(--card-p) mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 bg-surface px-(--card-p) py-2 lg:static">
       {children}
