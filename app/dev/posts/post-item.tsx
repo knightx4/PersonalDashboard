@@ -24,11 +24,13 @@ import {
   addPostImage,
   confirmXMatch,
   dismissXMatch,
+  demotePost,
   dropPost,
   editPostAngle,
   editPostBody,
   markPostPosted,
   postToX,
+  promotePost,
   removePostImage,
   restorePost,
   type PostsActionState,
@@ -468,6 +470,20 @@ function RestoreButton({ id }: { id: string }) {
   );
 }
 
+/** Promote on a suggested draft, Demote on a planned one (plan #2261.3). */
+function MoveButton({ id, planned }: { id: string; planned: boolean }) {
+  const [state, action, pending] = useActionState(planned ? demotePost : promotePost, {} as PostsActionState);
+  return (
+    <form action={action} className="flex items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <Button type="submit" size="sm" variant="ghost" pending={pending}>
+        {planned ? (pending ? 'Moving…' : 'Demote') : pending ? 'Planning…' : 'Promote'}
+      </Button>
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
 function StatusLine({ card }: { card: PostCard }) {
   const { post, day } = card;
   if (post.status === 'posted') {
@@ -592,7 +608,11 @@ export function PostItem({
     <li id={`post-${post.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Angle id={post.id} angle={post.angle} editable={editable} />
-        <StatusLine card={card} />
+        {/* The day and the move sit on a line of their own, so the title keeps the card's width. */}
+        <div className={cn('flex items-center gap-x-3', editable && 'basis-full sm:basis-auto')}>
+          <StatusLine card={card} />
+          {editable && <MoveButton id={post.id} planned={post.status === 'planned'} />}
+        </div>
       </div>
 
       <ol className="flex flex-col gap-2" aria-label={thread ? 'The thread' : 'The post'}>
