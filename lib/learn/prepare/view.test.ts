@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { freshSteps, type PreparationRow, type PreparationStepRow } from './run';
 import type { PreparationStepKey } from './steps';
-import { countsLine, preparationView, tookLine } from './view';
+import { BRANCH_STEPS } from './branch';
+import { branchPreparationView, countsLine, preparationView, tookLine } from './view';
 
 function run(patch: Partial<PreparationRow> = {}): PreparationRow {
   return {
@@ -101,5 +102,32 @@ describe('countsLine and tookLine', () => {
     expect(tookLine('2026-10-16T09:00:00Z', '2026-10-16T09:00:20Z')).toBe('1 minute');
     expect(tookLine('2026-10-16T09:00:00Z', '2026-10-16T10:05:00Z')).toBe('1 hour 5 minutes');
     expect(tookLine(null, '2026-10-16T10:05:00Z')).toBeNull();
+  });
+});
+
+describe('branchPreparationView (plan #2276.7)', () => {
+  const branch = { key: 'unit-economics', frame: 'Unit economics', name: 'Unit economics', asks: [] };
+  const five = (patch: Partial<Record<PreparationStepKey, Partial<PreparationStepRow>>>) =>
+    steps(patch).filter((s) => BRANCH_STEPS.includes(s.key));
+
+  it('draws a branch run as its five steps', () => {
+    const view = branchPreparationView({
+      run: run({ branch, currentStep: 'match_weeks' }),
+      steps: five({ pull_documents: { status: 'done' } }),
+    });
+    expect(view?.name).toBe('Unit economics');
+    expect(view?.view.kind === 'working' && [view.view.position, view.view.total]).toEqual([2, 5]);
+  });
+
+  it('folds a finished branch run to a line that names the branch', () => {
+    const view = branchPreparationView({
+      run: run({ branch, status: 'done', finishedAt: '2026-10-16T09:07:00Z' }),
+      steps: five({ draft_topics: { status: 'done', counts: { drafted: 11 } } }),
+    });
+    expect(view?.view).toEqual({ kind: 'finished', summary: 'Went deeper on Unit economics: 11 topics drafted in 7 minutes.' });
+  });
+
+  it('is nothing for the subject’s own run', () => {
+    expect(branchPreparationView({ run: run(), steps: steps({}) })).toBeNull();
   });
 });

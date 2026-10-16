@@ -2,13 +2,15 @@
 
 import { PreparationBlock } from '@/app/learn/s/[id]/prepare';
 import { SourcesSection, StartHere } from '@/app/learn/s/[id]/sources';
+import { DirectionOffer } from '@/app/learn/s/[id]/direction';
+import { BRANCH_STEPS, type DirectionOffer as DirectionOfferData } from '@/lib/learn/prepare/branch';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import type { SubjectReading } from '@/lib/learn/chat/subject-load';
 import type { FinishDetail } from '@/lib/learn/prepare/finish-step';
 import type { PreparationRow, PreparationStepRow } from '@/lib/learn/prepare/run';
 import { PREPARATION_STEPS, type PreparationStepKey } from '@/lib/learn/prepare/steps';
-import { preparationSources, preparationView } from '@/lib/learn/prepare/view';
+import { branchPreparationView, preparationSources, preparationView } from '@/lib/learn/prepare/view';
 
 /**
  * A subject's preparation on its page (plan #2276.2), drawn at each stage of
@@ -353,5 +355,98 @@ export function LearnSubjectPrepareSourcesFoldedSurface() {
         readings={READINGS}
       />
     </div>
+  );
+}
+
+// Going deeper (plan #2276.7) ------------------------------------------------
+
+const BRANCH_OFFER: DirectionOfferData = {
+  answers: 34,
+  branches: [
+    {
+      key: 'customer-retention-and-the-economics-of-churn-in-subscription-businesses',
+      frame: 'Customer retention and the economics of churn in subscription businesses',
+      name: 'Customer retention and the economics of churn in subscription businesses',
+      asks: [],
+      topics: 9,
+      leadsTo: ['Gross revenue churn', 'Net revenue retention', 'Cohort retention curves'],
+    },
+    {
+      key: 'unit-economics',
+      frame: 'Unit economics',
+      name: 'Unit economics',
+      asks: [],
+      topics: 7,
+      leadsTo: ['Customer acquisition cost', 'Payback period', 'LTV to CAC ratio'],
+    },
+    {
+      key: 'revenue-recognition',
+      frame: 'Revenue recognition',
+      name: 'Revenue recognition',
+      asks: [],
+      topics: 4,
+      leadsTo: ['Deferred revenue', 'Bookings against billings', 'ASC 606 for subscriptions'],
+    },
+  ],
+};
+
+/** Past thirty graded answers: the offer under Start here, three branches to pick from. */
+export function LearnSubjectPrepareDirectionSurface() {
+  return (
+    <Page>
+      <StartHere
+        unit={UNIT}
+        topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: true, cellId: '00000000-0000-4000-8000-00000000f276' }}
+        draftedName="Monthly recurring revenue"
+      />
+      <DirectionOffer live={false} subjectId={SUBJECT_ID} offer={BRANCH_OFFER} />
+    </Page>
+  );
+}
+
+function branchSteps(steps: Partial<Record<PreparationStepKey, StepFixture>>): PreparationStepRow[] {
+  return prep({}, steps).steps.filter((s) => BRANCH_STEPS.includes(s.key));
+}
+
+/** A branch picked: its five steps running on the page, an earlier branch folded to its line. */
+export function LearnSubjectPrepareBranchSurface() {
+  const earlier = branchPreparationView({
+    run: {
+      ...prep({}, {}).run,
+      status: 'done',
+      startedAt: '2026-10-12T09:00:00Z',
+      finishedAt: '2026-10-12T09:07:00Z',
+      branch: { key: 'revenue-recognition', frame: 'Revenue recognition', name: 'Revenue recognition', asks: [] },
+    },
+    steps: branchSteps({
+      pull_documents: { status: 'done', counts: { documents: 2 } },
+      match_weeks: { status: 'done', counts: { weeks: 6 } },
+      compile_territory: { status: 'done' },
+      draft_topics: { status: 'done', counts: { drafted: 11 } },
+      finish: { status: 'done' },
+    }),
+  });
+  const working = branchPreparationView({
+    run: {
+      ...prep({}, {}).run,
+      currentStep: 'draft_topics',
+      branch: { key: 'unit-economics', frame: 'Unit economics', name: 'Unit economics', asks: [] },
+    },
+    steps: branchSteps({
+      pull_documents: { status: 'done', summary: 'Stored 3 documents from 2 sources.' },
+      match_weeks: { status: 'done', summary: 'Found 9 weeks that cover it, across 3 documents.' },
+      compile_territory: { status: 'done', summary: 'Laid out 14 topics from 3 documents: 5 canonical, 7 practitioner, 2 personal.' },
+      draft_topics: { status: 'running', summary: '6 of 14 topics drafted; carrying on in a fresh call.' },
+    }),
+  });
+  return (
+    <Page>
+      {earlier && (
+        <PreparationBlock live={false} subjectId={SUBJECT_ID} view={earlier.view} branch={{ key: earlier.key, name: earlier.name }} />
+      )}
+      {working && (
+        <PreparationBlock live={false} subjectId={SUBJECT_ID} view={working.view} branch={{ key: working.key, name: working.name }} />
+      )}
+    </Page>
   );
 }

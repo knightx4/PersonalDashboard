@@ -15,6 +15,7 @@ import {
   type TerritoryTopic,
 } from '@/lib/learn/levels/territory';
 import type { StepHandler } from './run';
+import type { PreparationBranch } from './branch';
 import type { MatchedWeek, PulledDocument } from './structure-steps';
 
 /**
@@ -51,6 +52,12 @@ export const MAX_TOPICS = 50;
 export const FRAMES_OFFERED = 40;
 /** Time the call is given; a step with less left pauses and starts it in the next call. */
 export const COMPILE_CALL_MS = 170_000;
+/**
+ * A branch run (plan #2276.7) lays out the deeper topics beneath one branch:
+ * fewer, and none repeating a topic the subject's own run laid out.
+ */
+export const BRANCH_MIN_TOPICS = 8;
+export const BRANCH_MAX_TOPICS = 20;
 /** Attempts at reaching MIN_TOPICS before a short territory is kept. */
 const ATTEMPTS = 2;
 
@@ -75,7 +82,17 @@ export type CompileDocument = {
 
 export type CompileSubject = { id: string; name: string; note: string | null; kind: string | null };
 
-export type CompileInput = { subject: CompileSubject; documents: CompileDocument[]; frames: string[] };
+export type CompileInput = {
+  subject: CompileSubject;
+  documents: CompileDocument[];
+  frames: string[];
+  /** Set on a branch run: lay out the topics beneath this branch only. */
+  branch?: PreparationBranch | null;
+};
+
+function topicRange(branch: PreparationBranch | null | undefined): [number, number] {
+  return branch ? [BRANCH_MIN_TOPICS, BRANCH_MAX_TOPICS] : [MIN_TOPICS, MAX_TOPICS];
+}
 
 export type CompileResult =
   | { ok: true; territory: Territory; dropped: { cites: number; topics: number } }
@@ -120,7 +137,7 @@ export function territoryTexts(documents: readonly CompileDocument[]): Territory
 
 // The call ---------------------------------------------------------------
 
-const SYSTEM = `You lay out the territory of a subject one person wants to learn: the
+const SYSTEM_WHOLE = `You lay out the territory of a subject one person wants to learn: the
 whole high-level plan of what knowing it means, before any topic is written.
 
 You are given the subject's name and the person's note on it, the syllabi and
@@ -154,6 +171,25 @@ Report through ${TOOL_NAME}:
 Cover what the documents teach before adding what they leave out, and keep
 the topics to what the person's note is after when it narrows the subject.`;
 
+/**
+ * The second pass, on one branch (plan #2276.7). The person has answered
+ * questions on the subject and chosen where to go deeper; the high-level
+ * topics under the branch are already laid out and drafted.
+ */
+const SYSTEM_BRANCH = `${SYSTEM_WHOLE}
+
+This time the subject's territory is already laid out at high level, and the
+person has chosen one branch of it to go deeper on. Lay out that branch only:
+eight to twenty topics beneath the high-level topics already listed under it,
+each narrower than they are and teachable once they are known. Never repeat a
+topic already listed, under its name or another. Every topic refines the one
+frame topic given, and the order runs from the first a learner of the branch
+would meet to the last. Ignore the count of thirty to fifty above.`;
+
+function systemFor(branch: PreparationBranch | null | undefined): string {
+  return branch ? SYSTEM_BRANCH : SYSTEM_WHOLE;
+}
+
 function documentsBlock(texts: readonly TerritoryText[]): string[] {
   if (texts.length === 0) {
     return [
@@ -171,19 +207,28 @@ function documentsBlock(texts: readonly TerritoryText[]): string[] {
 
 /** The user message for the call. Exported for the test. */
 export function compilePrompt(input: CompileInput, texts: readonly TerritoryText[]): string {
-  const { subject } = input;
+  const { subject, branch } = input;
   const kind = isGoalKind(subject.kind) ? GOAL_KIND_LABELS[subject.kind].label : null;
+  const [min, max] = topicRange(branch);
   return [
     `Subject: ${subject.name.trim()}`,
     subject.note?.trim() ? `The person's note: ${subject.note.trim()}` : 'The person left no note.',
     ...(kind ? [`Kind of subject: ${kind}`] : []),
+    ...(branch
+      ? [
+          '',
+          `Branch to go deeper on: ${branch.name}`,
+          'Topics already laid out under it, not to be repeated:',
+          ...branch.asks.map((a) => `- ${a}`),
+        ]
+      : []),
     '',
     ...documentsBlock(texts),
     '',
     'Frame topics:',
     ...input.frames.map((f) => `- ${f}`),
     '',
-    `Call ${TOOL_NAME} with three to five performances and ${MIN_TOPICS} to ${MAX_TOPICS} topics.`,
+    `Call ${TOOL_NAME} with three to five performances and ${min} to ${max} topics.`,
   ].join('\n');
 }
 
@@ -239,13 +284,15 @@ export function readCompiled(
     return text && item !== undefined ? `${text.key}: ${item}` : null;
   };
 
-  const seen = new Set<string>();
+  // A branch's own high-level topics are already drafted; a deeper topic of the same name is dropped.
+  const seen = new Set<string>((input.branch?.asks ?? []).map((a) => a.trim().toLowerCase()));
+  const [, max] = topicRange(input.branch);
   const topics: TerritoryTopic[] = [];
   for (const entry of Array.isArray(report.topics) ? report.topics : []) {
     const t = (entry ?? {}) as Record<string, unknown>;
     const ask = tidy(t.ask);
     const frame = frameOf.get(tidy(t.frame).toLowerCase());
-    if (!ask || !frame || seen.has(ask.toLowerCase()) || topics.length >= MAX_TOPICS) {
+    if (!ask || !frame || seen.has(ask.toLowerCase()) || topics.length >= max) {
       dropped.topics += 1;
       continue;
     }
@@ -265,11 +312,11 @@ export function readCompiled(
     .map(tidy)
     .filter((p) => p !== '')
     .slice(0, MAX_PERFORMANCES);
-  const { subject } = input;
+  const { subject, branch } = input;
   return {
     territory: {
-      key: `subject-${subject.id}`,
-      name: subject.name,
+      key: branch ? `subject-${subject.id}-${branch.key}` : `subject-${subject.id}`,
+      name: branch ? `${subject.name}: ${branch.name}` : subject.name,
       subjectLens: subject.name,
       performances,
       roles: [],
@@ -298,7 +345,7 @@ export async function compileTerritory(input: CompileInput & {
     response = await client.messages.create({
       model: TERRITORY_COMPILE_MODEL,
       max_tokens: 16_000,
-      system: SYSTEM,
+      system: systemFor(input.branch),
       tools: [tool(input.frames)],
       tool_choice: forceTool(TOOL_NAME, TERRITORY_COMPILE_MODEL),
       messages: [{ role: 'user', content: compilePrompt(input, texts) }],
@@ -396,22 +443,26 @@ export function compileStep(ports: CompilePorts): StepHandler {
     const weeks = ((ctx.steps.get('match_weeks')?.detail ?? {}) as { weeks?: MatchedWeek[] }).weeks ?? [];
     const items = documentsToRead(pulled, weeks);
     const documents = items.length > 0 ? await ports.documents(items) : [];
-    const frames = await ports.frames({ name: ctx.subject.name, note: ctx.subject.note });
+    // A branch run's topics all refine the branch's own frame (plan #2276.7).
+    const branch = ctx.subject.branch ?? null;
+    const frames = branch ? [branch.frame] : await ports.frames({ name: ctx.subject.name, note: ctx.subject.note });
 
     const result = await ports.compile({
       subject: { id: ctx.subject.id, name: ctx.subject.name, note: ctx.subject.note, kind: ctx.subject.kind },
       documents,
       frames,
+      branch,
     });
     if (!result.ok) throw new Error(`Laying out the territory failed: ${result.detail}`);
     const { territory, dropped } = result;
 
     const tries = attempts + 1;
-    if (territory.topics.length < MIN_TOPICS && tries < ATTEMPTS) {
+    const [min] = topicRange(branch);
+    if (territory.topics.length < min && tries < ATTEMPTS) {
       return {
         state: 'more',
         pause: true,
-        summary: `The first layout had ${plural(territory.topics.length, 'topic')}, short of ${MIN_TOPICS}; laying it out again.`,
+        summary: `The first layout had ${plural(territory.topics.length, 'topic')}, short of ${min}; laying it out again.`,
         detail: { attempts: tries },
       };
     }

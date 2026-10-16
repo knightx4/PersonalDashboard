@@ -2,6 +2,7 @@ import type { GoalKind, ProviderId } from '@/lib/learn/goal-kind';
 import { GOAL_KIND_LABELS, isGoalKind, KIND_REASON_MAX, providersForKind } from '@/lib/learn/goal-kind';
 import type { ProviderRun } from '@/lib/learn/catalogue/structure-pull-for-goal';
 import type { StepHandler } from './run';
+import { searchSubject } from './branch';
 
 /**
  * The first three preparation steps (plan #2276.3): classify the subject, pull
@@ -134,7 +135,8 @@ export function pullStep(ports: PullPorts, kindOf: (subjectId: string) => Promis
           detail: { ...state },
         };
       }
-      const run = await ports.run(id, { name: ctx.subject.name, note: ctx.subject.note });
+      // A branch run searches beneath its branch (plan #2276.7).
+      const run = await ports.run(id, searchSubject(ctx.subject));
       if (run && !run.ok) state.failed.push({ provider: id, detail: run.detail.slice(0, 200) });
       if (run?.ok) {
         for (const line of run.lines) {
@@ -196,7 +198,7 @@ export function matchStep(ports: MatchPorts): StepHandler {
     const embedded = await ports.embed(ctx.deadline);
     if (!embedded.finished) return { state: 'more', summary: 'Embedding the new weeks so they can be searched.' };
 
-    const found = await ports.find({ name: ctx.subject.name, note: ctx.subject.note });
+    const found = await ports.find(searchSubject(ctx.subject));
     if (!found.ok) throw new Error(`Matching the weeks failed: ${found.detail}`);
     const weeks = [...found.weeks].sort((a, b) => b.similarity - a.similarity).slice(0, MATCHED_WEEKS_KEPT);
     const documents = new Set(found.weeks.map((w) => w.itemId)).size;

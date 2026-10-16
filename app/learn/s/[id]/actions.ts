@@ -25,6 +25,8 @@ import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
 import { planGoalFor } from '@/lib/learn/lessons/plan-store';
 import { kickPreparation } from '@/lib/learn/prepare/kick';
+import { directionOffer, storedBranch } from '@/lib/learn/prepare/branch';
+import { loadDirection, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
@@ -558,8 +560,69 @@ export async function continuePreparation(_prev: PreparationPressState, formData
   const { data: subject } = await supabase.from('subjects').select('id').eq('id', subjectId.data).maybeSingle();
   if (!subject) return { error: 'That subject is gone.' };
 
-  const started = await kickPreparation(await requestOrigin(), subjectId.data);
+  // A branch run's Continue names its branch (plan #2276.7).
+  const branch = z.string().min(1).max(80).safeParse(formData.get('branch'));
+  const started = await kickPreparation(await requestOrigin(), subjectId.data, branch.success ? branch.data : null);
   if (!started) return { error: 'Dash could not start the preparation just now. Try again in a minute.' };
   revalidatePath(`/learn/s/${subjectId.data}`);
   return { started: true };
+}
+
+export type DirectionPressState = { error?: string; done?: 'picked' | 'dismissed' };
+
+/**
+ * The direction offer's two presses (plan #2276.7). The offer is read again
+ * here, as the page would draw it, so a press on a page left open past a
+ * change cannot pick a branch that is no longer offered.
+ */
+async function offerFor(subjectId: string) {
+  const user = await requireUser();
+  const supabase = await createLearnClient();
+  const [territory, direction] = await Promise.all([
+    loadSubjectTerritory(supabase, user.id, subjectId),
+    loadDirection(supabase, user.id, subjectId),
+  ]);
+  if (!direction) return { supabase, offer: null };
+  const offer = directionOffer({
+    answers: direction.answers,
+    direction: direction.direction,
+    territory,
+    taken: new Set(direction.branches.flatMap((b) => (b.run.branch ? [b.run.branch.key] : []))),
+    prepared: direction.prepared,
+  });
+  return { supabase, offer };
+}
+
+// latency: pending
+export async function chooseDirection(_prev: DirectionPressState, formData: FormData): Promise<DirectionPressState> {
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  const key = z.string().min(1).max(80).safeParse(formData.get('branch'));
+  if (!subjectId.success || !key.success) return { error: 'Could not work out which branch this was.' };
+
+  const { supabase, offer } = await offerFor(subjectId.data);
+  const branch = offer?.branches.find((b) => b.key === key.data);
+  if (!offer || !branch) return { error: 'That branch is no longer on offer. Reload the page to see what is.' };
+
+  const { error } = await supabase.rpc('choose_subject_direction', {
+    p_subject: subjectId.data,
+    p_branch: storedBranch(branch),
+    p_answers: offer.answers,
+  });
+  if (error) return { error: `Dash could not record the choice: ${error.message}` };
+  // The run's rows exist now, so a kick that does not land loses nothing: the daily cron starts it.
+  await kickPreparation(await requestOrigin(), subjectId.data, branch.key);
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { done: 'picked' };
+}
+
+// latency: pending
+export async function dismissDirection(_prev: DirectionPressState, formData: FormData): Promise<DirectionPressState> {
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+  const { supabase, offer } = await offerFor(subjectId.data);
+  if (!offer) return { done: 'dismissed' };
+  const { error } = await supabase.rpc('dismiss_subject_direction', { p_subject: subjectId.data, p_answers: offer.answers });
+  if (error) return { error: `Dash could not put the offer away: ${error.message}` };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { done: 'dismissed' };
 }

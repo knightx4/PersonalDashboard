@@ -249,6 +249,23 @@ describe('runPreparation', () => {
     const m = memory({});
     expect(await runPreparation(m.ports, 'another-subject')).toEqual({ outcome: 'busy' });
   });
+
+  it('claims a branch run by its key, and the subject’s own run without one (plan #2276.7)', async () => {
+    const m = memory({});
+    const asked: (string | null | undefined)[] = [];
+    const claim = m.ports.claim;
+    const ports: PreparationPorts = {
+      ...m.ports,
+      claim: (subjectId, leaseUntil, branch) => {
+        asked.push(branch);
+        return claim(subjectId, leaseUntil, branch);
+      },
+    };
+    await runPreparation(ports, SUBJECT, { branch: 'unit-economics' });
+    m.holdLease(-1);
+    await runPreparation(ports, SUBJECT);
+    expect(asked).toEqual(['unit-economics', null]);
+  });
 });
 
 describe('the route that works a run', () => {
