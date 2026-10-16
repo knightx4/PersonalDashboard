@@ -19,6 +19,13 @@
  * ordered units with their readings and its lecture notes as material
  * (plan #2247.3). About six fetches from ocw.mit.edu and no API key.
  *
+ * `--ut` takes a UT Austin department code and title words, `HIS:american
+ * revolution`, and stores the syllabi that search finds over the last eight
+ * terms, up to three, as structure documents with weekly units and textbook
+ * names (plan #2247.4). Sections on Simple Syllabus are named and skipped.
+ * Up to eight results pages and three PDFs from utdirect.utexas.edu; no API
+ * key, and no screen beyond the parser's three-unit floor.
+ *
  * `--course` takes a YouTube playlist id and stores the course under it: one
  * item of kind `course`, one of kind `video` per lecture, and
  * `learn.catalogue_course_items` for the order the institution published them
@@ -67,11 +74,14 @@ import {
   sweepYouTubeCourse,
 } from '../lib/learn/catalogue/sweep';
 import { pullOcwCourse } from '../lib/learn/catalogue/ocw-structure-pull';
+import { livePorts as utPorts, pullUtSearch, TERMS_SEARCHED } from '../lib/learn/catalogue/ut-austin-pull';
+import { recentTerms } from '../lib/learn/providers/ut-austin';
 
 type Args = {
   titles: string[];
   courses: string[];
   ocw: string[];
+  ut: string[];
   provider: string;
   embed: boolean;
   user: string | null;
@@ -82,6 +92,7 @@ function parse(argv: string[]): Args {
   const titles: string[] = [];
   const courses: string[] = [];
   const ocw: string[] = [];
+  const ut: string[] = [];
   let provider = DEFAULT_COURSE_PROVIDER;
   let embed = false;
   let user = process.env.CATALOGUE_USER ?? null;
@@ -94,6 +105,7 @@ function parse(argv: string[]): Args {
     else if (arg === '--limit') limit = Number(argv[(i += 1)]);
     else if (arg === '--course') courses.push(argv[(i += 1)] ?? '');
     else if (arg === '--ocw') ocw.push(argv[(i += 1)] ?? '');
+    else if (arg === '--ut') ut.push(argv[(i += 1)] ?? '');
     else if (arg === '--provider') provider = argv[(i += 1)] ?? provider;
     else if (arg.trim() !== '') titles.push(arg);
   }
@@ -102,6 +114,7 @@ function parse(argv: string[]): Args {
     titles,
     courses: courses.filter((id) => id.trim() !== ''),
     ocw: ocw.filter((number) => number.trim() !== ''),
+    ut: ut.filter((search) => search.includes(':')),
     provider,
     embed,
     user,
@@ -147,10 +160,10 @@ async function resolveUser(sql: postgres.Sql, wanted: string | null): Promise<st
 }
 
 async function main(): Promise<void> {
-  const { titles, courses, ocw, provider, embed, user, limit } = parse(process.argv.slice(2));
-  if (titles.length === 0 && courses.length === 0 && ocw.length === 0 && !embed) {
+  const { titles, courses, ocw, ut, provider, embed, user, limit } = parse(process.argv.slice(2));
+  if (titles.length === 0 && courses.length === 0 && ocw.length === 0 && ut.length === 0 && !embed) {
     console.error(
-      'Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...] [--course <playlist id>] [--provider <slug>] [--ocw <MIT course number>] [--embed]',
+      'Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...] [--course <playlist id>] [--provider <slug>] [--ocw <MIT course number>] [--ut <DEPT:title words>] [--embed]',
     );
     process.exit(1);
   }
@@ -197,6 +210,27 @@ async function main(): Promise<void> {
     if (line.status === 'not-on-ocw') console.error(`${number}: no such course in the OCW sitemap`);
     else if (line.status === 'no-structure') console.error(`${number}: ${line.courseUrl} has no session table to read`);
     else console.error(`${number}: ${line.detail}`);
+  }
+
+  for (const search of ut) {
+    const [department, ...rest] = search.split(':');
+    const ports = utPorts(sql, null, (detail) => console.error(`  utdirect.utexas.edu refused ${detail}`));
+    const pulled = await pullUtSearch(
+      { department: department.trim().toUpperCase(), title: rest.join(':').trim(), terms: recentTerms(new Date(), TERMS_SEARCHED) },
+      ports,
+    );
+    console.log(`${search}: ${pulled.termsRead} terms read`);
+    for (const line of pulled.lines) {
+      if (line.status === 'stored') {
+        const kept = line.unchanged ? ' (unchanged since the last pull)' : '';
+        console.log(`  ${line.courseCode}, ${line.term}: ${line.units} units, ${line.textbooks.length} textbooks from ${line.url}${kept}`);
+      } else if (line.status === 'failed') {
+        failed += 1;
+        console.error(`  ${line.detail}`);
+      } else {
+        console.log(`  ${line.courseCode}, ${line.term}: ${line.status} ${line.url}`);
+      }
+    }
   }
 
   if (embed) {

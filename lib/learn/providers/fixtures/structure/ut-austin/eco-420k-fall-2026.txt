@@ -1,0 +1,197 @@
+1
+Microeconomic Theory
+ECO 420K (36890)
+Fall 2026
+Class: Mon/Wed 12:30 – 2:00 UTC 3.122
+Friday 12:00 – 1:00 UTC 3.122
+Professor: Bruce Pflug
+Course Description:
+ECO 420K Microeconomic Theory is the study of the behavior of individuals, households, firms, and markets and
+the roles of relative prices and information with a focus on constrained optimization.
+Prerequisite Requirements:
+Economics 304K and 304L with a grade of at least a C- in each; Mathematics 408Q, or Mathematics 408K and
+408L, or 408C and 408D, or 408C and 408L, or 408N and 408S, or 408K and 408S, or 408C and 408S, or 408L
+and 408R, or 408R and 408S, or 408L and 408N, with a grade of at least C- in each; Economics 329 or Biomedical
+Engineering 335 or Chemical Engineering 253K or Electrical Engineering 351K or Mathematics 358K or 378K or
+Mechanical Engineering 335 or Statistics and Data Sciences 378 with a grade of at least C. Only one of the
+following may be counted: Finance 321K, Economics 420K, 420S, 421K.
+Textbook:
+Microeconomics Theory and Applications with Calculus. By Jeffrey M. Perloff. Fifth Edition. Pearson
+Publishing.
+Grading:
+• Homework: Homework problem sets are posted on Canvas. A homework submitted late
+cannot be accepted. Homework answer keys will be posted to Canvas immediately after
+submission. Student’s print and complete their homework on their printed hardcopy.
+Student’s submit to the professor stapled homework on the due date noted on the Course
+Schedule.
+• Mid-term Exams: There are three mid-term exams. No make-up exam is permitted unless:
+(1) the student is unable to take the exam on the exam scheduled date and time for a
+University approved reason and (2) the make-up must be approved and accepted by the
+professor prior to the exam scheduled date and time.
+• Final Exam: The final exam is comprehensive. No makeup for the Final Exam will be allowed.
+• Class participation. Students should be prepared for class in advance and participate.
+Students may be called upon in class.
+• Grading Rubric:
+% of final grade
+Mid-term exam one 15
+Mid-term exam two 20
+Mid-term exam three 20
+Homework total 10
+Final Exam 30
+Class participation 5
+Total 100
+• The two lowest homework scores will be dropped (there is a total of 12 homework
+assignments and the top 10 homework scores will count). If a student doesn’t turn in a
+homework that will be considered a dropped score. All exam scores will be used (ie., no
+exam scores will be dropped).
+• Final Grade process: Final grades will be derived using a curve:
+1. At semester end, I will calculate for each student their weighted average grade
+based on the grading rubric. Each student’s weighted average grade will be
+adjusted up for the highest student weighted average grade. This will derive for
+each student their adjusted curved grade.
+
+2
+2. Each student’s final letter grade will then be assigned based on their adjusted
+curved grade and the individual student’s performance relative to the rest of the
+class.
+• The professor is solely responsible for all final grades. For each exam, the median score and
+the lowest decile score will be disclosed to the class. Student grades in Canvas reflect the
+weighted average grade of the grading rubic and do not reflect any curving.
+What is allowed in Exams:
+• Only calculators and pencils/pens are allowed during exams. Phones/laptops are not
+allowed during exams. No extra paper or sheet paper is allowed during exams.
+Attendance:
+• Attendance is mandatory. Students are required to attend all sessions, including the Friday
+sessions.
+Resources for Student Success:
+• Professor: The Professor is available to help reinforce concepts and problem solving. The
+Professor may also schedule special sessions for exam review and also special sessions ad
+hoc to reinforce concepts and problem solving.
+• Teaching Assistants: The GTA is available to reinforce concepts and review problem sets and
+answers. Sample exams will be posted to Canvas which the GTA will review. The sample
+exams very closely mirror the exams.
+• Supplemental Instruction: (SI) is available through Sanger. This is voluntary. The SI sessions
+are led by SI Leader Carolina Salinas-Garcia (carolinasg@utexas.edu). SI is a guided group
+study session. Examples of SI sessions are working through practice problems and
+reinforcing concepts. Carolina will hold sessions Tuesday 5-6pm in room RLP 0.118 and
+Wednesday 5-6pm in room RLP 0.104.
+• Canvas: Students should access Canvas regularly for announcements, homework
+assignments, homework answer sheets, supplemental readings, chapter PowerPoint slides,
+sample exams, exam answer sheets, and other complimentary material and information.
+• Supplemental Readings: Supplemental readings are posted to Canvas to reinforce specific
+topics and compliment learning. Students are expected to stay current on Canvas for these
+posted readings and will be held accountable for their material.
+Course Schedule
+Date Topics Textbook Readings
+8/24 Intro, Syllabus overview, Supply and Demand Chap One
+8/26 Supply and Demand Chap Two
+8/31 Homework Chap 2 due
+8/31 Consumer’s Constrained Choice Chap Three
+9/2 Consumer’s Constrained Choice Chap Three
+
+3
+9/9 Homework Chap 3 due
+9/9 Demand Chap Four
+9/14 Demand Chap Four
+9/16 Homework Chap 4 due
+9/16 Consumer Welfare and Policy Analysis Chap Five
+9/21 Consumer Welfare and Policy Analysis Chap Five
+9/23 Homework Chap 5 due
+9/23 Exam One Chaps 1-5
+9/28 Firms and Production Chap Six
+9/30 Firms and Production Chap Six
+10/5 Homework Chap 6 due
+10/5 Costs Chap Seven
+10/7 Costs Chap Seven
+10/12 Homework Chap 7 due
+10/12 Competitive Firms and Markets Chap Eight
+10/14 Competitive Firms and Markets Chap Eight
+10/19 Homework Chap 8 due
+10/19 Competitive Model Chap Nine
+10/21 Competitive Model Chap Nine
+10/26 Homework Chap 9 due
+10/26 Exam Two Chaps 6-9
+10/28 Monopoly Chap Eleven
+11/2 Monopoly Chap Eleven
+11/4 Homework Chap 11 due
+11/4 Price Discrimination and Advertising Chap Twelve
+11/9 Price Discrimination and Advertising Chap Twelve
+11/11 Homework Chap 12 due
+11/11 Oligopoly and Monopolistic Comp Chap Fourteen
+11/16 Oligopoly and Monopolistic Comp Chap Fourteen
+11/18 Homework Chap 14 due
+11/18 Factor Markets Chap Fifteen
+11/30 Factor Markets Chap Fifteen
+12/2 Homework Chap 15 due
+12/2 Exam Three Chaps 11, 12, 14, 15
+12/7 Review
+TBD Final Exam
+Accommodations for Students with Disabilities
+The university is committed to creating an accessible and inclusive learning environment consistent
+with university policy and federal and state law. Please let me know if you experience any barriers to
+learning so I can work with you to ensure you have equal opportunity to participate fully in this
+course. If you are a student with a disability, or think you may have a disability, and need
+accommodations please contact Disability and Access (D&A). Please refer to D&A’s website for
+contact and more information: http://diversity.utexas.edu/disability/. If you are already registered
+with D&A, please deliver your Accommodation Letter to me as early as possible in the semester so
+
+4
+we can discuss your approved accommodations and needs in this course. If a student is registered
+with D&A, it is the responsibility of the student follow D&A and the University procedures. This
+includes the stated D&A and University procedures for timing of notification regarding exam
+procedures, which also includes procedures and policies required for a student to following
+regarding Register Blast.
+Statement on Academic Dishonesty
+All of your participation and submitted work in this class is expected to be in accordance with the UT
+Honor Code. Students who violate University rules on academic dishonesty are subject to disciplinary
+penalties, including the possibility of failure in the course and/or dismissal from the University. Since
+such dishonesty harms the individual, all students, and the integrity of the University, policies on
+academic dishonesty will be strictly enforced. For further information, please visit the Student
+Conduct and Academic Integrity website at: http://deanofstudents.utexas.edu/conduct
+Sharing of Course Materials is Prohibited
+No materials used in this class, including, but not limited to, lecture hand-outs, videos, assessments
+(quizzes, exams, papers, projects, homework assignments), in-class materials, review sheets, and
+additional problem sets, may be shared online or with anyone outside of the class unless you have
+my explicit, written permission. Unauthorized sharing of materials promotes cheating. It is a
+violation of the University’s Student Honor Code and an act of academic dishonesty. I am well aware
+of the sites used for sharing materials, and any materials found online that are associated with you,
+or any suspected unauthorized sharing of materials, will be reported to Student Conduct and
+Academic Integrity in the Office of the Dean of Students. These reports can result in sanctions,
+including failure in the course.
+Class Recordings
+Class recordings are reserved only for students in this class for educational purposes and are
+protected under FERPA. The recordings should not be shared outside the class in any form. Violation
+of this restriction by a student could lead to Student Misconduct proceedings. Class sessions are not
+recorded.
+
+5
+University Resources for Students:
+Counseling and Mental Health Center (CMHC)
+All of us benefit from support during times of struggle. Know you are not alone. If you or anyone you
+know is experiencing symptoms of stress, anxiety, depression, academic concerns, loneliness,
+difficulty sleeping, or any other concern impacting your wellbeing –you are strongly encouraged to
+connect with CMHC. The Counseling and Mental Health Center provides a wide variety of mental
+health services to all UT students including crisis services, counseling services with immediate
+support and well-being resources. Additionally, CARE Counselors are located within the academic
+schools and colleges. These counselors get to know the concerns that are unique to their college’s
+students. For more information on CMHC, visit https://cmhc.utexas.edu or call 512-471-3515.
+University Health Services (UHS)
+Your physical health and wellness are a priority. University Health Services is an on-campus high-
+quality medical facility providing care to all UT students. Services offered by UHS include general
+medicine, urgent care, a 24/7 nurse advice line, gynecology, sports medicine, physical therapy, lab
+and radiology services, COVID-19 testing and vaccinations and much more. For additional
+information, visit https://healthyhorns.utexas.edu or call 512-471-4955.
+Student Emergency Services (SES)
+Student Emergency Services in the Office of the Dean of Students helps students and their families
+during difficult or emergency situations. Assistance includes outreach, advocacy, intervention,
+support, and referrals to relevant campus and community resources. If you need to be absent from
+class due to a family emergency, medical or mental health concern, or academic difficulty due to
+crisis or an emergency situation, you can work with Student Emergency Services. SES will document
+your situation and notify your professors. Additional information is available at
+https://deanofstudents.utexas.edu/emergency/ or by calling 512-471-5017.
+Important Safety Information:
+Behavioral Concerns
+If you have concerns about the safety or behavior of fellow students, TAs or professors, contact
+BCCAL (the Behavior Concerns and COVID-19 Advice Line) at https://safety.utexas.edu/behavior-
+concerns-advice-line or by calling 512-232-5050. Confidentiality will be maintained as much as
+possible, however the university may be required to release some information to appropriate parties.
