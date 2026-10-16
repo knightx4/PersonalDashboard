@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError, Input } from '@/components/ui/field';
+import { FieldError, Input, Label } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -183,9 +183,13 @@ function QuickNoteCard({
   const [pending, startTransition] = useTransition();
   const [pressed, setPressed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A note of its own is named before it is made (note 24fd1e02): the name
+  // its first line would give it, for the person to keep or change.
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState(note.title);
 
-  /** `target` null makes it a note of its own. */
-  const file = (target: TriagePlace | null) => {
+  /** `target` null makes it a note of its own, named `title` when one is given. */
+  const file = (target: TriagePlace | null, title?: string) => {
     const key = target?.path ?? '';
     setPressed(key);
     setError(null);
@@ -193,6 +197,7 @@ function QuickNoteCard({
     form.set('quickPath', note.path);
     form.set('quickBlobSha', note.blobSha);
     if (target) form.set('targetPath', target.path);
+    else if (title?.trim()) form.set('title', title.trim());
     startTransition(async () => {
       const state = await actions.file({}, form);
       if (state.error) {
@@ -251,15 +256,44 @@ function QuickNoteCard({
               places.length > 0 ? <ul className="space-y-2">{places.map(placeButton)}</ul> : null
             }
           />
-          <Button
-            variant="secondary"
-            pending={pending && pressed === ''}
-            disabled={pending && pressed !== ''}
-            onClick={() => file(null)}
-          >
-            <FilePlus2 className="size-4" strokeWidth={1.75} aria-hidden />
-            {pending && pressed === '' ? 'Making it a note…' : 'Make it a note of its own'}
-          </Button>
+          {naming ? (
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                file(null, name);
+              }}
+            >
+              <Label htmlFor={`triage-name-${note.id}`}>Name the new note</Label>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id={`triage-name-${note.id}`}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={200}
+                  autoFocus
+                  className="h-11 min-w-0 flex-1 basis-48 sm:h-(--control-h)" /* ui-ok: 44px press target on a phone */
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  pending={pending && pressed === ''}
+                  disabled={pending && pressed !== ''}
+                >
+                  <FilePlus2 className="size-4" strokeWidth={1.75} aria-hidden />
+                  {pending && pressed === '' ? 'Making it a note…' : 'Make the note'}
+                </Button>
+                <Button type="button" variant="ghost" disabled={pending} onClick={() => setNaming(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Button variant="secondary" disabled={pending} onClick={() => setNaming(true)}>
+              <FilePlus2 className="size-4" strokeWidth={1.75} aria-hidden />
+              Make it a note of its own
+            </Button>
+          )}
           <FieldError>{error}</FieldError>
         </div>
       ) : (
