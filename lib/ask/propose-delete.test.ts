@@ -17,6 +17,7 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')
 const TABLE = 'job_search.application_answers';
 const NOTES = 'job_search.notes';
 const TASKS = 'todo.tasks';
+const ROLES = 'job_search.roles';
 const LONG = `Spoke to the hiring manager about the team. ${'They want someone who can own the data pipeline. '.repeat(3)}`;
 
 type Row = Record<string, unknown>;
@@ -48,7 +49,16 @@ function setup(opts: { enabled?: ProposeContext['enabledModules']; seen?: string
       { id: id(61), user_id: ME, text: 'Why this role?' },
     ],
     applications: [{ id: id(50), user_id: ME, role_id: id(70) }],
-    roles: [{ id: id(10), user_id: ME, title: 'Not deletable' }],
+    roles: [
+      { id: id(10), user_id: ME, title: 'Data Engineer', company_id: id(90) },
+      { id: id(11), user_id: ME, title: 'Analyst', company_id: id(90) },
+      { id: id(70), user_id: ME, title: 'Staff Engineer', company_id: id(90) },
+      { id: id(72), user_id: ME, title: 'Designer', company_id: id(90) },
+      { id: id(71), user_id: THEM, title: 'Not mine', company_id: id(91) },
+    ],
+    companies: [{ id: id(90), user_id: ME, name: 'Acme' }],
+    attachments: [{ id: id(95), user_id: ME, role_id: id(72) }],
+    suggestions: [],
   };
   const writes: string[] = [];
   const client = {
@@ -87,7 +97,7 @@ function setup(opts: { enabled?: ProposeContext['enabledModules']; seen?: string
     },
   } as unknown as SchemaClient;
   const kept: NewDashChange[] = [];
-  const seen = new Set((opts.seen ?? []).flatMap((n) => [`${TABLE} ${n}`, `${NOTES} ${n}`, `${TASKS} ${n}`]));
+  const seen = new Set((opts.seen ?? []).flatMap((n) => [`${TABLE} ${n}`, `${NOTES} ${n}`, `${TASKS} ${n}`, `${ROLES} ${n}`]));
   const ctx: ProposeContext = {
     userId: ME,
     today: '2026-10-15',
@@ -121,7 +131,7 @@ describe('propose_delete', () => {
 
   it('refuses a table outside the allowed list', async () => {
     const { ctx, kept } = setup({ seen: [id(10)] });
-    const result = await executeProposal('propose_delete', { table: 'job_search.roles', refs: [id(10)] }, ctx);
+    const result = await executeProposal('propose_delete', { table: 'job_search.contacts', refs: [id(10)] }, ctx);
     expect(result.ok).toBe(false);
     expect(kept).toEqual([]);
   });
@@ -235,6 +245,52 @@ describe('propose_delete on tasks (plan #2266.3)', () => {
     expect(tables.tasks.map((t) => t.id)).not.toContain(id(30));
     expect(await undoDeletedRows(ctx, removed.deleted as unknown as Record<string, unknown>)).toEqual({ ok: true });
     expect(tables.tasks.find((t) => t.id === id(30))).toMatchObject({ title: 'Book the dentist' });
+  });
+});
+
+describe('propose_delete on roles (plan #2266.4)', () => {
+  it('names each role with its company and links the role page', async () => {
+    const { ctx, kept, writes } = setup({ seen: [id(10)] });
+    const result = await executeProposal('propose_delete', { table: ROLES, refs: [id(10)] }, ctx);
+    expect(result.ok).toBe(true);
+    expect(writes).toEqual([]);
+    const input = kept[0].input as DeleteRowsInput;
+    expect(input.titles).toEqual(['Data Engineer at Acme']);
+    expect(input.href).toBe(`/jobs/roles/${id(10)}`);
+  });
+
+  it('declines a role with applications and notes, naming what is attached', async () => {
+    const { ctx, kept } = setup({ seen: [id(10), id(70)] });
+    const result = await executeProposal('propose_delete', { table: ROLES, refs: [id(10), id(70)] }, ctx);
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('Staff Engineer') });
+    expect(result).toMatchObject({ error: expect.stringContaining('1 application, 2 notes and 1 task link') });
+    expect(kept).toEqual([]);
+  });
+
+  it('declines a role with an attachment', async () => {
+    const { ctx } = setup({ seen: [id(72)] });
+    const result = await executeProposal('propose_delete', { table: ROLES, refs: [id(72)] }, ctx);
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('1 attachment') });
+  });
+
+  it('refuses a role that is not theirs', async () => {
+    const { ctx } = setup({ seen: [id(71)] });
+    expect(await executeProposal('propose_delete', { table: ROLES, refs: [id(71)] }, ctx)).toMatchObject({ ok: false });
+  });
+
+  it('deletes only on confirm, checks again then, and Undo restores it', async () => {
+    const { ctx, kept, tables, writes } = setup({ seen: [id(11)] });
+    await executeProposal('propose_delete', { table: ROLES, refs: [id(11)] }, ctx);
+    const input = kept[0].input as DeleteRowsInput;
+    tables.applications.push({ id: id(51), user_id: ME, role_id: id(11) });
+    expect(await deleteRows(ctx, input)).toMatchObject({ ok: false, error: expect.stringContaining('1 application') });
+    expect(writes).toEqual([]);
+    tables.applications = tables.applications.filter((a) => a.id !== id(51));
+    const removed = await deleteRows(ctx, input);
+    if (!removed.ok) throw new Error(removed.error);
+    expect(tables.roles.map((r) => r.id)).not.toContain(id(11));
+    expect(await undoDeletedRows(ctx, removed.deleted as unknown as Record<string, unknown>)).toEqual({ ok: true });
+    expect(tables.roles.find((r) => r.id === id(11))).toMatchObject({ title: 'Analyst' });
   });
 });
 

@@ -24,6 +24,7 @@ import { markPractice, WRITE_PRACTICE_MODEL, writePractice } from '@/lib/learn/l
 import { markPieceCheck, PIECE_CHECK_MODEL, writePieceCheck } from '@/lib/learn/lessons/write-piece-check';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { answerCell, askCell } from '@/lib/learn/levels/answer-store';
+import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { checkCell } from '@/lib/learn/lessons/piece-cells';
 import { loadCellCheck, loadPieceCells } from '@/lib/learn/lessons/piece-cells-store';
 
@@ -147,7 +148,7 @@ async function askCellCheck(
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const spend = collectSpend();
-  const asked = await askCell(learn, userId, cellId, apiKey ? { anthropicApiKey: apiKey, onSpend: spend.sink } : undefined, pieceId);
+  const asked = await askCell(learn, userId, cellId, apiKey ? { anthropicApiKey: apiKey, onSpend: spend.sink } : undefined, pieceId, roleLineFinder(learn, userId));
   await recordLearnSpend(userId, 'write-cell-case', spend.reports);
   if (!asked.ok) return { error: asked.error };
   const check = await loadCellCheck(learn, userId, pieceId, asked.asked.questionId);

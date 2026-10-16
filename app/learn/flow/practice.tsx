@@ -22,6 +22,8 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { CellAnswer } from '@/components/learn/cell-answer';
 import { CellQuestionSkeleton } from '@/components/learn/cell-answer-view';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { roleWhy } from '@/lib/learn/levels/role-line';
+import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { LevelsFlow } from './levels';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
@@ -104,17 +106,20 @@ export async function PracticeFlow({
     if (!cellId) redirect(practiceHref());
     const user = await requireUser();
     const spend = collectSpend();
+    const cellLearn = await createLearnClient();
     const asked = await askCell(
-      await createLearnClient(),
+      cellLearn,
       user.id,
       cellId,
       process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+      undefined,
+      roleLineFinder(cellLearn, user.id),
     );
     await recordLearnSpend(user.id, 'write-cell-case', spend.reports);
     return (
       <div className="mt-6">
         {asked.ok ? (
-          <CellAnswer key={asked.asked.questionId} asked={asked.asked} nextHref={practiceHref()} />
+          <CellAnswer key={asked.asked.questionId} asked={{ ...asked.asked, why: asked.asked.role ? roleWhy(asked.asked.role) : undefined }} nextHref={practiceHref()} />
         ) : (
           <EmptyState
             icon={Target}
