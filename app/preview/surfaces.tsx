@@ -261,6 +261,13 @@ import {
   LearnEssaysSurface,
 } from './essay-surfaces';
 import {
+  LearnSubjectPrepareEmptySurface,
+  LearnSubjectPrepareFailedSurface,
+  LearnSubjectPrepareFinishedSurface,
+  LearnSubjectPrepareStartingSurface,
+  LearnSubjectPrepareSurface,
+} from './learn-prepare-surfaces';
+import {
   LearnBriefFailedSurface,
   LearnBriefQuoteSourceSurface,
   LearnBriefResearchingSurface,
@@ -9149,6 +9156,41 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectConversationsSurface />,
+  },
+  {
+    id: 'learn-subject-prepare',
+    label: 'Subject · Being prepared, partway through',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-starting',
+    label: 'Subject · Just added, preparation starting',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartingSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-failed',
+    label: 'Subject · Preparation stopped on a step, with Continue',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareFailedSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-finished',
+    label: 'Subject · Preparation finished, one line',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareFinishedSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-empty',
+    label: 'Subject · Made before preparation, with Prepare',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareEmptySurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

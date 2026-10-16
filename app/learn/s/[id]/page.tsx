@@ -33,6 +33,9 @@ import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
 import { PullCourse } from './pull-course';
+import { PreparationBlock } from './prepare';
+import { loadPreparation } from '@/lib/learn/prepare/store';
+import { preparationView } from '@/lib/learn/prepare/view';
 import {
   countStates,
   learningOrder,
@@ -265,7 +268,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -279,6 +282,9 @@ export default async function SubjectPage({
     // Readings related to it and chats logged about it (plan #1814). Ones that
     // cannot be read leave the section out.
     loadSubjectLearning(supabase, id).catch((): SubjectLearning => ({ readings: [], sessions: [] })),
+    // The subject's preparation run (plan #2276.2): null for a subject made
+    // before preparation existed. One that cannot be read leaves the block out.
+    loadPreparation(supabase, user.id, id).catch(() => undefined),
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
@@ -389,10 +395,18 @@ export default async function SubjectPage({
         </p>
       )}
 
+      {/* The person's own words about the subject, on a quiet panel rather
+          than the bare page (taste:no-bare-text, raised on plan #2276.2). */}
       {subject.note && (
-        <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">
-          {subject.note}
-        </p>
+        <div className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
+          <p className="border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>
+        </div>
+      )}
+
+      {/* While the subject is being prepared this leads the page; once the run
+          is finished it is one line (plan #2276.2). */}
+      {preparation !== undefined && !showEverything && (
+        <PreparationBlock subjectId={id} view={preparationView(preparation)} />
       )}
 
       {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
