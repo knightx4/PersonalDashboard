@@ -12,6 +12,8 @@ import { askCell } from '@/lib/learn/levels/answer-store';
 import type { GradeMap } from '@/lib/learn/levels/grade';
 import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { pickCell, whyLine } from '@/lib/learn/levels/pick';
+import { roleWhy } from '@/lib/learn/levels/role-line';
+import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { countAnswered, loadLensScope, loadRunDoubts, type LensScope } from '@/lib/learn/levels/practice-store';
 import { runSummary, type RunSummary } from '@/lib/learn/levels/run';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -163,6 +165,8 @@ export async function LevelsFlow({
     userId,
     picked.cellId,
     process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+    undefined,
+    roleLineFinder(learn, userId),
   );
   await recordLearnSpend(userId, 'write-cell-case', spend.reports);
   if (!asked.ok) return <PracticeError message={asked.error} retryHref={practiceHref({ ...scopeHref, run: runStart })} />;
@@ -170,7 +174,7 @@ export async function LevelsFlow({
   return (
     <CellAnswer
       key={asked.asked.questionId}
-      asked={{ ...asked.asked, why: whyLine(picked, now) }}
+      asked={{ ...asked.asked, why: [whyLine(picked, now), asked.asked.role ? roleWhy(asked.asked.role) : null].filter(Boolean).join(' ') }}
       nextHref={practiceHref({ ...scopeHref, run: runStart, after: asked.asked.questionId })}
       endHref={practiceHref({ ...scopeHref, end: runStart })}
     />
