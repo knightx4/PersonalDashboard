@@ -78,6 +78,8 @@ export type PipelineParams = {
   questions?: string;
   /** `yes` has a cover letter, `no` marked as having none; unanswered is neither. */
   letter?: string;
+  /** A company's slug: only its applications, set from the table's Company column. */
+  company?: string;
   page?: string;
   sort?: string;
   group?: string;
@@ -101,6 +103,8 @@ export type PipelineState = {
   questions: boolean | null;
   /** Has a cover letter (true), marked as having none (false), or either (null). */
   letter: boolean | null;
+  /** A company's slug, or null for every company. */
+  company: string | null;
   /** One-based. */
   page: number;
 };
@@ -128,6 +132,7 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     ready: parseYesNo(params.ready),
     questions: parseYesNo(params.questions),
     letter: parseYesNo(params.letter),
+    company: params.company?.trim() || null,
     view,
     scope,
     source: APPLICATION_SOURCES.find((s) => s === params.source) ?? null,
@@ -158,6 +163,7 @@ export function filterPipeline(
   const filtered = scoped.filter(
     (row) =>
       (!state.source || row.source === state.source) &&
+      (!state.company || row.companySlug === state.company) &&
       (!state.stage || (state.stage.statuses as readonly ApplicationStatus[]).includes(row.status)) &&
       (state.sentDays === null || sentWithin(row, state.sentDays, now)) &&
       (state.ready === null || row.readyToApply === state.ready) &&
