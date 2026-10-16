@@ -63,3 +63,11 @@ export {
   parseTranscriptResponse,
 } from './transcriptapi';
 export type { TranscriptFailure, TranscriptOutcome, TranscriptResult } from './transcriptapi';
+
+export {
+  ARXIV_PROVIDER_SLUG,
+  arxivPdfUrl,
+  fetchArxivStructure,
+  parseArxivId,
+} from './arxiv';
+export type { ArxivFailure, ArxivResult } from './arxiv';
