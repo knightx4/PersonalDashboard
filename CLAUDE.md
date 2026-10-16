@@ -24,6 +24,8 @@ rows, rewriting data that cannot be recovered.
 
 Project ref: `asjztutnqxbecruvyrbj`.
 
+Main applies its own migrations. On every push to main that touches a supabase/migrations*/ folder, .github/workflows/migrations.yml runs scripts/apply-migrations.ts, which applies each file the live history lacks under the name described below, through the Management API with the SUPABASE_ACCESS_TOKEN repository secret. A failed migration turns that run red. So a migration the connector will not let you apply, such as one containing a delete, is not a reason to hold a feature off main or to raise it for the person: merge it and the workflow applies it. Apply through the connector when the code on your branch needs the change before it merges.
+
 Apply a migration under its file's own name: `0096_plan_main_deploy_and_migrations.sql`
 goes in as `plan_main_deploy_and_migrations`, or with its folder in front
 (`learn_0026_catalogue_judgements`). The status line's CI panel compares the
