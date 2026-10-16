@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
+import { createServiceSupabase as createJobsServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { liveHandlers } from '@/lib/learn/prepare/handlers';
 import { kickPreparation } from '@/lib/learn/prepare/kick';
@@ -41,7 +42,12 @@ export async function pumpPreparation(input: { subjectId: string; origin: string
   const result = await runPreparation(
     {
       ...preparationStore(learn, userId),
-      handlers: liveHandlers({ learn, userId, anthropicApiKey: process.env.ANTHROPIC_API_KEY }),
+      handlers: liveHandlers({
+        learn,
+        userId,
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+        jobs: createJobsServiceSupabase(),
+      }),
       now: () => Date.now(),
     },
     input.subjectId,

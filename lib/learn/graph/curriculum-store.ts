@@ -110,6 +110,9 @@ export async function ensureCurriculum(
         covers: unit.covers,
         outcome: unit.outcome,
         write_model: written ? CURRICULUM_MODEL : null,
+        // Written from the name alone, so the preparation may rewrite it from
+        // the territory (plan #2276.5). Units the person typed stay theirs.
+        placeholder: !ownUnits || ownUnits.length === 0,
       })),
     )
     .select('id, ordinal, title, covers, outcome');
