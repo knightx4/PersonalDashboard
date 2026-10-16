@@ -24,6 +24,25 @@ rows, rewriting data that cannot be recovered.
 
 Project ref: `asjztutnqxbecruvyrbj`.
 
+## Only the owner's account is touched
+
+The database holds more than one account. Every read, write, data fix and
+investigation a session does through the connector is scoped to the owner,
+**selveyknight4@gmail.com**, user id `d001bb0f-ffe8-4bfb-880f-17dd1a62b685`:
+put `user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'` (or the join that
+reaches it) in every query over a table that holds people's rows. The
+connector runs as a superuser and row-level security does not apply to it, so
+an unscoped query reads and changes everyone's rows. On 16 October 2026 a scan
+for duplicate companies read every account and a merge was run in another
+person's account. Never change another account's rows, and do not read them
+beyond the counts a schema change needs.
+
+Migrations follow the same rule. Schema changes (tables, columns, functions,
+policies) apply to the database as a whole, but an `update`, `delete` or
+`insert` over existing rows is written against the owner's id, never across
+all accounts. Migration 0056 of migrations-job-search cleaned every account's
+company domains; that is the kind of statement this rules out.
+
 Main applies its own migrations. On every push to main that touches a supabase/migrations*/ folder, .github/workflows/migrations.yml runs scripts/apply-migrations.ts, which applies each file the live history lacks under the name described below, through the Management API with the SUPABASE_ACCESS_TOKEN repository secret. A failed migration turns that run red. So a migration the connector will not let you apply, such as one containing a delete, is not a reason to hold a feature off main or to raise it for the person: merge it and the workflow applies it. Apply through the connector when the code on your branch needs the change before it merges.
 
 The connector does not refuse such a statement: it waits about 60 seconds for a confirmation that never reaches a cloud session, then times out with nothing applied. Do not retry it. A plain `select` of a function that deletes inside goes through.
