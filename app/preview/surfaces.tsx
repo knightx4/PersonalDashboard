@@ -3683,7 +3683,9 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers, marked ready',
     module: 'jobs',
     width: 'wide',
-    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1).
+    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1),
+    // with an answer and a letter written, so each shows Copy, and a comment under the
+    // answer (notes 69abdbad, be3c6616).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
@@ -3691,6 +3693,20 @@ export const SURFACES: readonly Surface[] = [
         readyToApply
         allQuestionsAdded
         hasCoverLetter
+        answers={[
+          {
+            ...rolePanels.answers[0],
+            answer:
+              'The payments risk team sits where the product meets the money, and the last two years of my work have been there: models that flag a bad merchant before the first chargeback.',
+            status: 'approved',
+          },
+        ]}
+        coverLetter={'Dear hiring team,\n\nI have spent the last two years building risk models for a payments platform, and Lattice Pay is the team I would most like to do that with next.'}
+        answerThreads={{
+          [`job_search.application_answers:${rolePanels.answers[0].id}`]: [
+            { id: 'c-1', author: 'me', body: 'Too long for their form, cut the second clause.', createdAt: '2026-10-14T09:00:00Z' },
+          ],
+        }}
         defaultTab={defaultRoleTab('drafting')}
       />
     ),

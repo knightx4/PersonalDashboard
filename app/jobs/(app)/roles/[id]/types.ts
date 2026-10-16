@@ -115,6 +115,12 @@ export interface PanelProps {
   coverLetterRun?: { pending: boolean; error: string | null };
   /** The comment thread on the role, oldest first: your notes and Dash's replies. */
   thread: DevComment[];
+  /**
+   * The threads under each answer and under the cover letter (note
+   * be3c6616), keyed by ref: job_search.application_answers:<id> and
+   * job_search.applications:<id>. Absent in the gallery means none.
+   */
+  answerThreads?: Record<string, DevComment[]>;
   /** The rounds of the process. Every interview is inside one of these. */
   interviewGroups: Array<{
     id: string;
