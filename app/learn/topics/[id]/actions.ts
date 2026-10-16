@@ -2,6 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
+import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
+import { settleBriefTopic } from '@/lib/learn/briefs/topics-store';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -34,7 +37,7 @@ const Id = z.string().uuid();
 
 // latency: pending
 export async function approveTopicDraft(_prev: ApproveState, formData: FormData): Promise<ApproveState> {
-  await requireUser();
+  const user = await requireUser();
   const id = Id.safeParse(formData.get('topicId'));
   if (!id.success) return { error: 'Could not work out which draft this was.' };
 
@@ -52,10 +55,20 @@ export async function approveTopicDraft(_prev: ApproveState, formData: FormData)
   }
 
   const supabase = await createLearnClient();
+  let fromBrief: { briefId: string; aimId: string } | null = null;
   try {
     await approveDraft(supabase, id.data, checks);
+    // A topic drafted from a research brief joins its goal's lens, and the
+    // brief's cards are written for that goal after the response (plan #2184.1).
+    fromBrief = await settleBriefTopic(supabase, user.id, id.data);
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Approving the topic failed.' };
+  }
+  if (fromBrief) {
+    const { briefId } = fromBrief;
+    after(() => writeCardsForBrief(user.id, briefId).then(() => undefined));
+    revalidatePath(`/learn/b/${briefId}`);
+    revalidatePath('/learn/now');
   }
 
   revalidatePath('/learn/topics');
@@ -117,6 +130,8 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
       goal: input.data.name,
       scope: input.data.scope || null,
       sources: drafting ? { sources: drafting.sources, performances: drafting.performances } : undefined,
+      // A topic a brief's draft needs is from that brief too (plan #2184.1).
+      ...(drafting?.brief ? { brief: drafting.brief } : {}),
       anthropicApiKey: apiKey,
     });
     if (!result.ok) return { error: result.detail };

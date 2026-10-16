@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadBrief } from '@/lib/learn/briefs/load';
+import { loadBriefGoalPanel } from '@/lib/learn/briefs/topics-store';
 import { BriefView } from './brief-view';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
@@ -27,5 +28,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function BriefPage({ params }: { params: Promise<{ id: string }> }) {
   const page = await read((await params).id);
   if (!page) notFound();
-  return <BriefView page={page} path={await rowSubject(toRef('learn.briefs', page.brief.id))} />;
+  // The goal section (plan #2184.1). A failed read leaves it out rather than taking the page.
+  const goal =
+    page.brief.status === 'ready'
+      ? await loadBriefGoalPanel(await createLearnClient(), page.brief.id).catch((error: unknown) => {
+          console.error('[learn brief] goal panel', error instanceof Error ? error.message : error);
+          return undefined;
+        })
+      : undefined;
+  return <BriefView page={page} goal={goal} path={await rowSubject(toRef('learn.briefs', page.brief.id))} />;
 }
