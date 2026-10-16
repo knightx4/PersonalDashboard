@@ -1,0 +1,40 @@
+{
+  "_note": "Hand-written, not fetched: the shape a structure provider hands storeStructure (lib/learn/catalogue/structure.ts), used by the store's tests. Each provider step (#2247.3 to #2247.9) adds its own fixtures here from live fetches.",
+  "providerSlug": "structure-store-test",
+  "externalId": "HIS-315K-fall-2024",
+  "title": "The United States, 1492 to 1865",
+  "canonicalUrl": "https://example.edu/courses/his-315k",
+  "sourceUrl": "https://example.edu/courses/his-315k/syllabus.pdf",
+  "author": "A. Instructor",
+  "institution": "Example University",
+  "courseCode": "HIS 315K",
+  "term": "Fall 2024",
+  "licenceMode": "structure_only",
+  "rawText": "HIS 315K The United States, 1492 to 1865\nFall 2024\nRequired: Give Me Liberty! (Foner)\nWeek 1 Colonial societies. Readings: Foner ch. 1-2\nWeek 2 The imperial crisis: the Stamp Act and the Townshend duties. Readings: Foner ch. 4\nWeek 3 The French alliance and the war for independence. Readings: Foner ch. 5; Treaty of Alliance (1778)\n",
+  "textbooks": ["Give Me Liberty! An American History, Eric Foner"],
+  "outcomes": ["Explain the causes of the American Revolution", "Read a primary source in its context"],
+  "prerequisites": [],
+  "units": [
+    {
+      "label": "Week 1",
+      "heading": "Colonial societies",
+      "topics": ["Chesapeake and New England", "Atlantic trade"],
+      "readings": [{ "title": "Give Me Liberty!", "detail": "ch. 1-2" }]
+    },
+    {
+      "label": "Week 2",
+      "heading": "The imperial crisis",
+      "topics": ["Stamp Act", "Townshend duties"],
+      "readings": [{ "title": "Give Me Liberty!", "detail": "ch. 4" }]
+    },
+    {
+      "label": "Week 3",
+      "heading": "The French alliance and the war for independence",
+      "topics": ["Treaty of Alliance 1778", "Saratoga"],
+      "readings": [
+        { "title": "Give Me Liberty!", "detail": "ch. 5" },
+        { "title": "Treaty of Alliance (1778)", "url": "https://example.edu/sources/treaty-of-alliance" }
+      ]
+    }
+  ]
+}
