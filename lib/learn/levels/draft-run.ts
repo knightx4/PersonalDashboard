@@ -12,6 +12,7 @@ import {
 } from '@/lib/learn/levels/draft-sources';
 import { loadFieldOptions, loadMapTopics, saveDraft } from '@/lib/learn/levels/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * One press of drafting: read the map, make the call, embed the scope, keep
@@ -33,12 +34,25 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  */
 export type DraftRunResult = { ok: true; id: string } | { ok: false; detail: string };
 
+/**
+ * How a run with no signed-in person does the two things that otherwise read
+ * the session: whose topics the call is told about, and where the cost goes.
+ * The territory drafter (plan #2172.6) runs on the service role, which sees
+ * every account, so it names the owner and brings its own ledger.
+ */
+export type DraftRunOptions = {
+  owner?: string;
+  ledger?: (operation: 'draft-topic' | 'embed-topic-scope', reports: SpendReport[]) => Promise<void>;
+};
+
 export async function runTopicDraft(
   client: LearnSupabaseClient,
   userId: string,
   input: { goal: string; scope?: string | null; sources?: DraftSources; anthropicApiKey: string },
+  options: DraftRunOptions = {},
 ): Promise<DraftRunResult> {
-  const [map, fields] = await Promise.all([loadMapTopics(client), loadFieldOptions(client)]);
+  const ledger = options.ledger ?? ((operation, reports) => recordLearnSpend(userId, operation, reports));
+  const [map, fields] = await Promise.all([loadMapTopics(client, options.owner), loadFieldOptions(client)]);
   const given = input.sources ?? NO_SOURCES;
 
   const drafting = collectSpend();
@@ -53,7 +67,7 @@ export async function runTopicDraft(
       onSpend: drafting.sink,
     });
   const [first, second] = await Promise.all([call(), call()]);
-  await recordLearnSpend(userId, 'draft-topic', drafting.reports);
+  await ledger('draft-topic', drafting.reports);
 
   const result = bothOrEither(first, second);
   if (!result.ok) {
@@ -72,7 +86,7 @@ export async function runTopicDraft(
 
   const embedding = collectSpend();
   const embedded = await embedOne(kept.scope, { inputType: 'document', onSpend: embedding.sink });
-  await recordLearnSpend(userId, 'embed-topic-scope', embedding.reports);
+  await ledger('embed-topic-scope', embedding.reports);
   if (!embedded.ok && embedded.reason !== 'no-key') {
     console.error('[learn topics] scope embedding', embedded.reason, embedded.detail);
   }

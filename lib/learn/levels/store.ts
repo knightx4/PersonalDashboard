@@ -118,9 +118,14 @@ export async function loadTopicMap(client: Client): Promise<TopicMap> {
   };
 }
 
-/** The map as the drafting call is told about it. */
-export async function loadMapTopics(client: Client): Promise<MapTopic[]> {
-  const { data, error } = await client.from('topics').select('id, name, scope, ceiling, status').order('name');
+/**
+ * The map as the drafting call is told about it. `owner` keeps a service-role
+ * read to the shared rows and that account's own, which RLS does otherwise.
+ */
+export async function loadMapTopics(client: Client, owner?: string): Promise<MapTopic[]> {
+  let query = client.from('topics').select('id, name, scope, ceiling, status');
+  if (owner) query = query.or(`user_id.is.null,user_id.eq.${owner}`);
+  const { data, error } = await query.order('name');
   if (error) throw new Error(`Reading your topics failed: ${error.message}`);
   return (data ?? []).map((t: { id: string; name: string; scope: string; ceiling: number; status: string }) => ({
     id: t.id,
