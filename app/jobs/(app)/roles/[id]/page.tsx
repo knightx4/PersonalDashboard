@@ -37,7 +37,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
-import { loadThread } from '@/lib/thread/store';
+import { loadThread, loadThreads } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { loadDrafts } from '@/lib/jobs/drafting/store';
 import { coverLetterView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
@@ -273,6 +274,14 @@ export default async function RoleDetailPage({
         .select('group_id, message_id')
         .in('group_id', groupIds)
     : { data: [] };
+
+  // The threads under each answer and under the cover letter (note
+  // be3c6616): a second read too, since the answer ids come out of the batch.
+  // A failed read leaves the threads empty rather than the page.
+  const answerThreads = await loadThreads(supabase, [
+    ...(answers ?? []).map((answer) => threadRef('answer', answer.id as string)),
+    threadRef('application', current.id as string),
+  ]).catch(() => new Map());
 
   const messageIdsByGroup = new Map<string, string[]>();
   for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
@@ -692,6 +701,7 @@ export default async function RoleDetailPage({
             bannedOrDefault(profile?.banned_constructions),
           )}
           thread={notes ?? []}
+          answerThreads={Object.fromEntries(answerThreads)}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
             id: group.id as string,
             label: (group.label as string | null) ?? null,

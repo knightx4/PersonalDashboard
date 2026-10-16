@@ -9,6 +9,8 @@ import { ladderLevel } from '@/lib/learn/levels/ladder';
 import type { TopicStanding } from '@/lib/learn/levels/standing';
 import type { TopicDetail, TopicMatch } from '@/lib/learn/levels/store';
 import { threadRef } from '@/lib/thread/subjects';
+import { draftProvenance } from '@/lib/learn/levels/provenance';
+import { CardNote, DraftChecks, MarkPersonalForm, RowSource } from './draft-checks';
 import { ApproveDraft, ApproveTopicButton, DraftMatch, WantedRow } from './draft-parts';
 import { LadderView, type LadderOpen } from './ladder-view';
 
@@ -48,11 +50,12 @@ export function TopicView({
   open?: LadderOpen;
 }) {
   const draft = topic.status === 'draft';
+  const provenance = draft ? draftProvenance(topic) : null;
   const levels = topic.ceiling === 1 ? '1' : `1 to ${topic.ceiling}`;
 
   return (
     <DetailPage
-      header={<PageHeader subject={path} title={topic.name} actions={draft ? <ApproveTopicButton /> : undefined} />}
+      header={<PageHeader subject={path} title={topic.name} actions={draft ? <ApproveTopicButton uncited={provenance?.uncited.length} /> : undefined} />}
       details={
         <DetailFacts>
           {standing && !draft ? (
@@ -86,10 +89,18 @@ export function TopicView({
           {topic.asked && topic.asked.toLowerCase() !== topic.name.toLowerCase() && (
             <p className="text-small text-ink-muted">Drafted from what you asked: “{topic.asked}”</p>
           )}
+          {draft && <RowSource kind="topic" id={topic.id} citation={topic.citation} />}
         </Card>
       }
     >
       {draft && match && <DraftMatch topicId={topic.id} match={match} />}
+
+      {draft && provenance && (
+        <>
+          <MarkPersonalForm topicId={topic.id} />
+          <DraftChecks drafting={topic.drafting} provenance={provenance} />
+        </>
+      )}
 
       {draft ? (
         <ApproveDraft topicId={topic.id} cells={topic.cells} links={topic.links} />
@@ -102,10 +113,8 @@ export function TopicView({
           <h2 id="wanted-heading" className="px-1 text-ui font-semibold text-ink">
             Topics it needs that you do not have
           </h2>
-          <p className="mb-2 px-1 text-small text-ink-muted">
-            Drafting one links it in at the level shown.
-          </p>
-          <Card padding="none">
+          <Card padding="none" className="mt-2">
+            <CardNote>Drafting one links it in at the level shown.</CardNote>
             <ul className="divide-y divide-border">
               {topic.wanted.map((wanted) => (
                 <WantedRow key={wanted.name} topicId={topic.id} wanted={wanted} />

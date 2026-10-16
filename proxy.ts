@@ -70,6 +70,10 @@ const PUBLIC_PATHS = [
   // capture token, never the cookie. The route checks the token itself and
   // answers 401 without one; the token can only add things.
   '/api/capture',
+  // The ask address. A Siri Shortcut carries a personal ask token, never the
+  // cookie. The route checks the token itself and answers 401 without one,
+  // then asks Dash on a session as the token's owner.
+  '/api/ask/voice',
 ];
 
 function isPublic(pathname: string): boolean {

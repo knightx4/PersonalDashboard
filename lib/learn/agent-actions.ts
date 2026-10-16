@@ -45,6 +45,11 @@ export const learnActions: ModuleActions = {
       note: 'Dash names the topic whose links want it as for_topic_id, and the levels that wanted it are linked to the draft.',
     },
     rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    markRowsPersonal: none('theirs', 'Whether an uncited row is the person’s own is theirs to say (plan #2138.11).'),
+  },
+  'app/learn/flow/theme-lens-actions.ts': {
+    makeLensFromTheme: none('theirs', 'Whether a vault theme becomes a lens of its own is the person’s to say (plan #2138.14).'),
+    declineLensFromTheme: none('theirs', 'Saying no to the offer of a lens is the person’s (plan #2138.14).'),
   },
   'app/learn/lens/[id]/actions.ts': {
     saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),
@@ -111,6 +116,12 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/flow/cell-actions.ts': {
     answerCellQuestion: none('own'),
+  },
+  'app/learn/flow/summary-action.ts': {
+    readRunSummary: none('page'),
+  },
+  'app/learn/now/piece-talk-actions.ts': {
+    talkPiece: none('own'),
   },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
@@ -267,6 +278,7 @@ export const learnActions: ModuleActions = {
     setWatchListPlaylistAction: none('setting'),
   },
   'app/learn/settings/actions.ts': {
+    setGoalsOnly: none('setting'),
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },

@@ -104,10 +104,18 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
+  'app/learn/now/piece-talk-actions.ts#talkPiece': [
+    'mark-teach-back',
+    'reply-about-card',
+    'write-piece-check',
+    'mark-piece-check',
+    'write-cell-case',
+    'grade-cell-answer',
+  ],
 
   // Learn: questions
-  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],
-  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check', 'write-cell-case'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check', 'grade-cell-answer'],
   'app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice': ['write-piece-practice'],
   'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': ['mark-piece-practice'],
   'app/learn/s/[id]/project-actions.ts#writePlanProject': ['write-plan-project'],
@@ -119,7 +127,12 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/flow/actions.ts#flowStep:answer': [
+    'name-misconception',
+    'grade-applied-answer',
+    'mark-teach-back',
+  ],
+  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
   'app/learn/flow/actions.ts#flowStep:start-track': [
     'generate-track-from-theme',
     'place-track',
@@ -239,6 +252,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/ask/voice/route.ts#POST':
+    'The ask address, called by a Siri Shortcut holding an ask token: one spoken question is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
     'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':

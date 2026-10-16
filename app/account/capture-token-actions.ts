@@ -6,14 +6,14 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { captureTokenLabel, createCaptureToken, revokeCaptureToken } from '@/lib/capture/tokens';
 
 /**
- * Make and revoke personal capture tokens (plan #1705). Both run on the
+ * Make and revoke personal capture and ask tokens (plan #1705). Both run on the
  * person's own session, so RLS and core.revoke_capture_token keep them to
  * their own tokens.
  */
 
 export type MakeTokenState = {
   /** The token just made, shown once and never readable again. */
-  made?: { label: string; token: string };
+  made?: { label: string; token: string; kind?: 'capture' | 'ask' };
   error?: string;
 };
 
@@ -24,12 +24,13 @@ export async function makeCaptureTokenAction(
 ): Promise<MakeTokenState> {
   const label = captureTokenLabel(String(formData.get('label') ?? ''));
   if (!label) return { error: 'Give the token a name, such as the phone or Shortcut it is for.' };
+  const kind = formData.get('kind') === 'ask' ? 'ask' : 'capture';
 
   const user = await requireUser();
   try {
-    const { token } = await createCaptureToken(await createCoreClient(), user.id, label);
+    const { token } = await createCaptureToken(await createCoreClient(), user.id, label, kind);
     revalidatePath('/account');
-    return { made: { label, token } };
+    return { made: { label, token, kind } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not make the token.' };
   }

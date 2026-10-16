@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Link from '@/components/ui/link';
@@ -62,12 +63,15 @@ export function RunSummaryView({
   summary,
   againHref,
   nothingLeft = false,
+  offer,
 }: {
   summary: RunSummary;
   /** A new run. */
   againHref: string;
   /** The run ended because there was nothing left to ask, not on a press. */
   nothingLeft?: boolean;
+  /** The lens offered for a vault theme the missed levels point to (plan #2138.14). */
+  offer?: ReactNode;
 }) {
   const groups = GROUPS.filter((g) => summary[g.key].length > 0);
   return (
@@ -94,6 +98,7 @@ export function RunSummaryView({
           </ul>
         </Card>
       )}
+      {offer}
       {!nothingLeft && (
         <Card
           padding="none"

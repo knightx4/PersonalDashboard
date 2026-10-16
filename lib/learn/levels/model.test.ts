@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   dueRechecks,
   fringe,
+  groupReach,
   lensProgress,
   nextQuestion,
   questionFormat,
   readCells,
   topicLevel,
+  topicReach,
   type CellEvidence,
   type CellLink,
   type LevelCell,
@@ -67,7 +69,11 @@ describe('readCells', () => {
     const readings = readCells(empty);
     expect(readings.size).toBe(0);
     expect(fringe(empty, readings)).toEqual([]);
-    expect(lensProgress(empty, readings, [])).toEqual({ held: 0, total: 0, fraction: 0, topics: [] });
+    expect(lensProgress(empty, readings, [])).toEqual({
+      held: { tested: 0, inferred: 0, declared: 0 },
+      total: 0,
+      topics: [],
+    });
   });
 
   it('implies the levels below and every cell down the links', () => {
@@ -244,10 +250,64 @@ describe('lensProgress', () => {
       { topicId: 'return', targetLevel: 4 },
     ]);
     expect(p.topics).toEqual([
-      { topicId: 'capm', targetLevel: 6, level: 3, held: 3, total: 6 },
-      { topicId: 'return', targetLevel: 4, level: 2, held: 2, total: 4 },
+      { topicId: 'capm', targetLevel: 6, level: 3, held: { tested: 1, inferred: 2, declared: 0 }, total: 6 },
+      { topicId: 'return', targetLevel: 4, level: 2, held: { tested: 0, inferred: 2, declared: 0 }, total: 4 },
     ]);
-    expect(p.fraction).toBe(5 / 10);
+    expect(p.total).toBe(10);
+  });
+
+  it('returns held-tested, held-inferred and declared apart and never their sum', () => {
+    const m = map([ev('capm3', 'met'), ev('rf1', 'declared')]);
+    const p = lensProgress(m, readCells(m), [
+      { topicId: 'capm', targetLevel: 6 },
+      { topicId: 'rf', targetLevel: 3 },
+    ]);
+    expect(p.held).toEqual({ tested: 1, inferred: 2, declared: 1 });
+    expect(Object.keys(p).sort()).toEqual(['held', 'topics', 'total']);
+  });
+});
+
+describe('topicReach and groupReach', () => {
+  // CAPM 3 shown: CAPM 1 and 2, Return 1 and 2, Beta 1 and 2 and Risk-free 1
+  // implied. Return 5 declared, which implies Return 1 to 4.
+  const m = map([ev('capm3', 'met'), ev('return5', 'declared')]);
+  const readings = readCells(m);
+
+  it('reports a topic’s breadth over its cells and its depth as two numbers, per kind', () => {
+    expect(topicReach(m, readings, 'capm')).toEqual({
+      children: 10,
+      breadth: { tested: 1, inferred: 2, declared: 0 },
+      depth: { tested: 3, inferred: 2, declared: 0 },
+    });
+    expect(topicReach(m, readings, 'return')).toEqual({
+      children: 6,
+      breadth: { tested: 0, inferred: 4, declared: 1 },
+      depth: { tested: 0, inferred: 4, declared: 5 },
+    });
+  });
+
+  it('never folds the two into one number, nor the kinds into one count', () => {
+    const reach = topicReach(m, readings, 'capm');
+    expect(Object.keys(reach).sort()).toEqual(['breadth', 'children', 'depth']);
+    expect(Object.keys(reach.breadth).sort()).toEqual(['declared', 'inferred', 'tested']);
+    expect(Object.keys(reach.depth).sort()).toEqual(['declared', 'inferred', 'tested']);
+  });
+
+  it('counts a group’s topics touched per kind and its best level beneath per kind', () => {
+    expect(groupReach(m, readings, ['capm', 'return', 'beta', 'rf', 'not-on-the-map'])).toEqual({
+      children: 5,
+      breadth: { tested: 1, inferred: 4, declared: 1 },
+      depth: { tested: 3, inferred: 4, declared: 5 },
+    });
+  });
+
+  it('reads an untouched topic as nothing on either measure', () => {
+    const empty = map();
+    expect(topicReach(empty, readCells(empty), 'beta')).toEqual({
+      children: 5,
+      breadth: { tested: 0, inferred: 0, declared: 0 },
+      depth: { tested: 0, inferred: 0, declared: 0 },
+    });
   });
 });
 

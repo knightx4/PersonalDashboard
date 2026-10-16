@@ -20,7 +20,7 @@ import { RewordChecks } from './reword-checks';
  */
 
 /** A hexagon filled by how held the level is; the word beside it says it. */
-const STATUS_GLYPH: Record<CellStatus, GlyphName> = {
+export const STATUS_GLYPH: Record<CellStatus, GlyphName> = {
   shown: 'full',
   implied: 'dashed',
   declared: 'check',

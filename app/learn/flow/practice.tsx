@@ -13,6 +13,7 @@ import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
 import { firstParam, practiceHref } from '@/lib/learn/flow/href';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
 import { loadOfferSubjects } from '@/lib/learn/offer-setting';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
@@ -65,7 +66,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * back to the empty states.
  *
  * `?only=goals` is the Goals only filter (plan #1387), which asks about your
- * goals and nothing else. `?goal=<aim id>` is a goal's Practise link on the
+ * goals and nothing else. While Goals only is on in Learn settings (plan
+ * #2164.1) it is the default in place of Mixed, `?only=all` is Everything,
+ * and no filter asks about a subject in the vault. `?goal=<aim id>` is a goal's Practise link on the
  * Goals page: it asks about that goal alone, with no filter shown, the way
  * `?track=` focuses a track. A goal with a track of its own goes to that
  * track's questions, and an archived or unknown goal back to the unfocused ones.
@@ -129,13 +132,24 @@ export async function PracticeFlow({
   const goalId =
     trackId === null && typeof goalParam === 'string' && UUID.test(goalParam) ? goalParam : null;
   if (trackId === null && goalParam !== undefined && goalId === null) redirect(practiceHref());
-  // A focused flow asks about one track or goal already, so the filter has nothing to add.
-  const filter: FlowOnly =
-    trackId === null && goalId === null && (only === 'tracks' || only === 'goals') ? only : null;
-  const tracksOnly = filter === 'tracks';
-
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  // Goals only on Learn settings (plan #2164.1): the flow opens on Goals only,
+  // and no filter asks a survey question.
+  const goalsOnly = await goalsOnlyOrDefault(supabase, user.id);
+
+  // A focused flow asks about one track or goal already, so the filter has
+  // nothing to add. With no filter named, Goals only is the default while the
+  // setting is on; Everything is written as `only=all` to get past it.
+  const filter: FlowOnly =
+    trackId !== null || goalId !== null
+      ? null
+      : only === 'tracks' || only === 'goals'
+        ? only
+        : only === undefined && goalsOnly
+          ? 'goals'
+          : null;
+  const tracksOnly = filter === 'tracks';
 
   // Once you have topics, the flow asks about their levels (plan #2138.6),
   // and the claims graph is no longer asked about or written from here. A
@@ -190,7 +204,7 @@ export async function PracticeFlow({
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
   // With no filter, a goal or the survey can still ask when the tracks have nothing.
-  const surveys = !track && !tracksOnly && !aboutGoals;
+  const surveys = !track && !tracksOnly && !aboutGoals && !goalsOnly;
 
   // Resumed rather than taken fresh, so a reload shows the question already
   // on the screen instead of spending another one.
@@ -204,6 +218,7 @@ export async function PracticeFlow({
             tracksOnly,
             goalsOnly: filter === 'goals',
             aim: goal?.id ?? null,
+            noSurvey: goalsOnly,
             vault,
           }),
         );
@@ -219,6 +234,8 @@ export async function PracticeFlow({
     !asking &&
     !track &&
     !aboutGoals &&
+    // A theme from your notes is not one of your goals (plan #2164.1).
+    !goalsOnly &&
     // Switched off on Learn settings (plan #1937.10); a failed read leaves it on.
     (await loadOfferSubjects(supabase, user.id).catch(() => true))
       ? await loadTrackOffer(supabase, vault)
@@ -259,7 +276,7 @@ export async function PracticeFlow({
             }
             action={
               goal
-                ? { label: 'Ask about everything', href: practiceHref() }
+                ? { label: 'Ask about everything', href: practiceHref({ only: 'all' }) }
                 : { label: 'Your learning goals', href: await loadLearnAreaHref() }
             }
           />
@@ -276,7 +293,7 @@ export async function PracticeFlow({
             description="You have answered everything in this subject for now. The other subjects may still have questions."
             tone="finished"
             seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-track`}
-            action={{ label: 'All subjects', href: practiceHref() }}
+            action={{ label: 'All subjects', href: practiceHref({ only: 'all' }) }}
           />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState
