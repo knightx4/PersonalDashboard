@@ -368,7 +368,7 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
+import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
@@ -6443,6 +6443,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadFilesSurface />,
+  },
+  {
+    /* A chat in the middle of an answer (plan #2262.2): Dash's earlier
+     * message once, your reply and the loading line. */
+    id: 'ask-dash-waiting',
+    label: 'Ask Dash · A chat waiting for an answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadWaitingSurface />,
   },
   {
     /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
