@@ -45,6 +45,15 @@ describe('the address', () => {
     expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, layout: 'axes', idea: 'x1' });
   });
 
+  it('carries a goal and the topic of its territory opened, and no topic without a goal', () => {
+    const href = mapHref(DEFAULT_PARAMS, { goal: 'g1', topic: 't1' });
+    expect(href).toBe('/learn/space?goal=g1&topic=t1');
+    const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
+    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, goal: 'g1', topic: 't1' });
+    expect(parseMapParams({ topic: 't1' })).toEqual(DEFAULT_PARAMS);
+    expect(mapHref({ ...DEFAULT_PARAMS, goal: 'g1', topic: 't1' }, { topic: null })).toBe('/learn/space?goal=g1');
+  });
+
   it('carries the domain picked in the legend, and drops it when set to null', () => {
     const href = mapHref(DEFAULT_PARAMS, { domain: 'd1' });
     expect(href).toBe('/learn/space?domain=d1');

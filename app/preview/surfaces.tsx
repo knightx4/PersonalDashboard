@@ -48,6 +48,8 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTerritoryHoverSurface,
+  IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
@@ -6693,6 +6695,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* A goal's territory opened on one of its topics (plan #2187.3): topics
+     * as stars with an arc for the level held and a dashed ring for the
+     * target, requirement links with arrowheads, a missed level ringed red. */
+    id: 'learn-idea-space-territory',
+    label: 'Learn · Idea Space, a territory opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritorySurface />,
+  },
+  {
+    /* The territory with its most linked star pointed at: all its links,
+     * the level each needs, and its own level line. */
+    id: 'learn-idea-space-territory-hover',
+    label: 'Learn · Idea Space, pointing at a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryHoverSurface />,
   },
   {
     /* The moment An idea lights up (plan #1997.10): three ideas set in the

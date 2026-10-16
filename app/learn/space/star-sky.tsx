@@ -932,13 +932,15 @@ export function StarSky({
     wasOpen.current = true;
     const ids = [...graph.core, ...graph.next];
     const h = graphHeight(w, ids.length, base);
-    const core = graph.core.map((id) => starOf.get(id)?.at).filter((p): p is Point => p !== undefined);
+    // A territory's stars are its topics, which the graph places itself (plan #2187.3).
+    const nodeAt = (id: string) => graph.ladders?.get(id)?.at ?? starOf.get(id)?.at;
+    const core = graph.core.map(nodeAt).filter((p): p is Point => p !== undefined);
     const fit = fitCamera(core, w, h, PLACE_INSET);
     const target = { ...fit, k: Math.min(fit.k, fitK.current * MAX_ZOOM) };
     const from = new Map<string, Point>();
     for (const id of ids) {
-      const star = starOf.get(id);
-      if (star) from.set(id, toScreen(target, star.at, w, h));
+      const at = nodeAt(id);
+      if (at) from.set(id, toScreen(target, at, w, h));
     }
     const key = graph.key;
     if (!drawnOnce.current || reducedMotion()) {
@@ -959,7 +961,7 @@ export function StarSky({
     (to: Opened) => set(paramsFor(to)),
     [set],
   );
-  const closeGraph = useCallback(() => set({ place: null, around: null }), [set]);
+  const closeGraph = useCallback(() => set({ place: null, around: null, topic: null }), [set]);
 
   // An idea opened from the rail is brought into view if it is off the edge.
   useEffect(() => {

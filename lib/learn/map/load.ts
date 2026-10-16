@@ -8,6 +8,7 @@ import { loadPlaces } from '@/lib/learn/places/load';
 import type { StrengthInput } from '@/lib/learn/strength';
 import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
 import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
+import type { SkyTerritory } from './place-graph';
 import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
@@ -90,6 +91,11 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
    * map's frame (plan #2016.5), or null when they could not be read.
    */
   topics: TopicFrame | null;
+  /**
+   * The goals' territories (plan #2187.3), each topic with its ladder, for
+   * the graph a chosen goal's topic opens. Undefined where nothing loads them.
+   */
+  territories?: SkyTerritory[];
 };
 
 type ConceptRow = {

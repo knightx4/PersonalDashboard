@@ -4,7 +4,13 @@ import Link from '@/components/ui/link';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import type { IdeaMapView } from '@/lib/learn/map/load';
-import { paramsFor, readableName, type IdeaGraph, type Opened } from '@/lib/learn/map/place-graph';
+import {
+  paramsFor,
+  readableName,
+  type IdeaGraph,
+  type Ladder,
+  type Opened,
+} from '@/lib/learn/map/place-graph';
 import { countText, mapHref } from '@/lib/learn/map/view';
 import { useOpenGraph } from './map-section';
 import { pickOnClick, usePick, viewOnClick } from './pick';
@@ -15,6 +21,8 @@ import { StarSwatch } from './swatch';
  * named place, each opening as a graph; with a place open, its ideas, best
  * known first, and the places next door. The map's places are drawn on a
  * canvas, so this list is also how they are reached from the keyboard.
+ * With a goal's territory open (plan #2187.3), its topics, furthest from
+ * their target first, each with the level held and the target.
  */
 
 /** How many rows show before the rest fold away. */
@@ -22,7 +30,53 @@ const SHOWN = 6;
 
 export function PlaceRail({ view }: { view: IdeaMapView }) {
   const graph = useOpenGraph(view);
+  if (graph?.ladders) return <OpenTerritory graph={graph} ladders={graph.ladders} />;
   return graph ? <OpenPlace view={view} graph={graph} /> : <Places view={view} />;
+}
+
+/** How far a topic is from its target; a topic with none sorts last. */
+function gap(ladder: Ladder): number {
+  return ladder.target === null ? -Infinity : ladder.target - ladder.held;
+}
+
+function OpenTerritory({ graph, ladders }: { graph: IdeaGraph; ladders: ReadonlyMap<string, Ladder> }) {
+  const { params, set } = usePick();
+  const opened = graph.opened.kind === 'territory' ? graph.opened : null;
+  const topics = [...ladders.values()].sort((a, b) => gap(b) - gap(a) || a.name.localeCompare(b.name));
+  const row = (ladder: Ladder) => {
+    const change = opened ? paramsFor({ ...opened, topic: ladder.id }) : {};
+    return (
+      <li key={ladder.id}>
+        <Link
+          href={mapHref(params, change)}
+          scroll={false}
+          onClick={viewOnClick(() => set(change))}
+          aria-current={opened?.topic === ladder.id ? 'true' : undefined}
+          className="flex min-h-11 items-center gap-2 py-1.5 text-ui text-ink hover:text-accent aria-[current]:font-medium"
+        >
+          <span className="min-w-0 flex-1">{ladder.name}</span>
+          <span className="tabular shrink-0 text-small text-ink-muted">
+            {ladder.target === null ? `level ${ladder.held}` : `${ladder.held} of ${ladder.target}`}
+          </span>
+        </Link>
+      </li>
+    );
+  };
+  return (
+    <Card padding="standard">
+      <h2 className="text-ui font-semibold text-ink">
+        In this goal
+        <span className="tabular ml-2 font-normal text-ink-muted">{topics.length}</span>
+      </h2>
+      <p className="text-small text-ink-muted">Furthest from the target first, with the level you hold of it.</p>
+      <ul className="mt-1 divide-y divide-border">{topics.slice(0, SHOWN).map(row)}</ul>
+      {topics.length > SHOWN && (
+        <Disclosure title={`${topics.length - SHOWN} more`} className="mt-1" bodyClassName="pl-0">
+          <ul className="divide-y divide-border">{topics.slice(SHOWN).map(row)}</ul>
+        </Disclosure>
+      )}
+    </Card>
+  );
 }
 
 function Places({ view }: { view: IdeaMapView }) {
