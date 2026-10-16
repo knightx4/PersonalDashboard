@@ -1,7 +1,7 @@
 'use client';
 
 import { closedToast } from '@/lib/core/lifecycle';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
+import { PaidCard, type PaidChange } from './paid-card';
 
 /**
  * The changes Dash made or proposed in one answer, drawn under it (plan
@@ -40,7 +41,11 @@ export type ChangePresses = {
   undo: (id: string) => Promise<ChangeOutcome>;
 };
 
-/** One answer's changes, as one sunken panel with a rule between rows. */
+/**
+ * One answer's changes, as one sunken panel with a rule between rows. What
+ * costs money is gathered on its own card under them (plan #2228.2), with
+ * one Accept all, so the free rows keep their own Confirm and Undo.
+ */
 export function DashChanges({
   changes,
   presses,
@@ -53,19 +58,27 @@ export function DashChanges({
   /** YYYY-MM-DD, so a due date this year leaves the year off. */
   today?: string;
 }) {
+  // Kept by identity, so the card's own state is reset only by a newer list.
+  const paid = useMemo(() => changes.filter((change): change is PaidChange => change.kind === 'paid_action'), [changes]);
   if (changes.length === 0) return null;
-  const verb = changes.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
+  const free = changes.filter((change) => change.kind !== 'paid_action');
+  const verb = free.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
   return (
-    <ul
-      aria-label={changes.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
-      className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
-    >
-      {changes.map((change) => (
-        <li key={change.id} className="py-2.5">
-          <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
-        </li>
-      ))}
-    </ul>
+    <>
+      {free.length > 0 && (
+        <ul
+          aria-label={free.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
+          className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
+        >
+          {free.map((change) => (
+            <li key={change.id} className="py-2.5">
+              <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {paid.length > 0 && <PaidCard changes={paid} presses={presses} onChanged={onChanged} />}
+    </>
   );
 }
 

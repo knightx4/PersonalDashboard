@@ -94,7 +94,14 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
 ];
 
 /**
- * Writes and proposals have their cards under the answer, a hand-off says so
+ * The paid tools (lib/dash/paid-tools.ts, plan #2228.1), named here for the
+ * same reason: each queues a press that has its line on the approval card
+ * under the answer (plan #2228.2). A test holds the two lists together.
+ */
+export const PAID_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = ['write_year_review'];
+
+/**
+ * Writes, proposals and paid presses have their cards under the answer, a hand-off says so
  * in the answer and a chart is drawn in it (plan #1655), so the lines are the
  * reads alone.
  */
@@ -103,7 +110,8 @@ export function isShownLookup(name: string): boolean {
     !name.startsWith('propose_') &&
     name !== 'hand_off' &&
     name !== CHART_TOOL &&
-    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
+    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name) &&
+    !PAID_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
   );
 }
 

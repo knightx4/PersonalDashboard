@@ -17,7 +17,7 @@ import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
-import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
+import { isShownLookup, PAID_TOOL_NAMES_SHOWN_AS_CARDS, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 const PAID_NAMES = PAID_TOOLS.map((tool) => tool.name);
 
@@ -212,5 +212,11 @@ describe('DASH_TOOLS', () => {
     expect([...WRITE_TOOL_NAMES_SHOWN_AS_CARDS]).toEqual(WRITE_TOOL_NAMES);
     for (const name of WRITE_TOOL_NAMES) expect(isShownLookup(name)).toBe(false);
     expect(isShownLookup('todos')).toBe(true);
+  });
+
+  it('keeps paid presses out of the lookup lines, since each has a line on the approval card', () => {
+    const names = PAID_TOOLS.map((tool) => tool.name);
+    expect([...PAID_TOOL_NAMES_SHOWN_AS_CARDS]).toEqual(names);
+    for (const name of names) expect(isShownLookup(name)).toBe(false);
   });
 });
