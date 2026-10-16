@@ -167,6 +167,29 @@ describe('runPreparation', () => {
     expect(m.run.status).toBe('done');
   });
 
+  it('ends the call at once when a step asks to pause, and starts it again on the next', async () => {
+    let asked = 0;
+    const m = memory({
+      compile_territory: async () => {
+        asked += 1;
+        return asked === 1
+          ? { state: 'more', summary: 'Waiting for a fresh call.', pause: true }
+          : { state: 'done', summary: 'Laid out 40 topics.' };
+      },
+      finish: finishStep,
+    });
+
+    const first = await runPreparation(m.ports, SUBJECT);
+    expect(first).toEqual({ outcome: 'paused', step: 'compile_territory', ran: ['classify', 'pull_documents', 'match_weeks', 'compile_territory'] });
+    expect(m.steps.get('compile_territory')).toMatchObject({ status: 'running', summary: 'Waiting for a fresh call.' });
+    expect(m.lease).toBeNull();
+
+    const second = await runPreparation(m.ports, SUBJECT);
+    expect(second.outcome).toBe('finished');
+    expect(asked).toBe(2);
+    expect(m.steps.get('compile_territory')).toMatchObject({ status: 'done', calls: 2 });
+  });
+
   it('skips a step whose code has not landed, saying which step builds it', async () => {
     const m = memory({ finish: finishStep });
     const result = await runPreparation(m.ports, SUBJECT);
