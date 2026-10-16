@@ -121,6 +121,15 @@ rest; and the whole-question research had cited vendor blogs and write-ups
 of a standard rather than the standard, and missed that SR 11-7 had been
 rescinded.
 
+**Vault notes.** A vault note can be attached to an essay's notes, by asking
+Dash in Ask or in another chat through the connector (`attach_vault_note`,
+`learn.essay_vault_notes`). Nothing is copied into the notes. Prepare lists
+the attached notes under the map, each linking to the note, with Remove.
+Update the map reads their text after the notes, and a passage quoted from one
+counts as the person's own words, as a passage from the notes does. Added on
+16 October 2026, so research kept in the vault from other chats can feed an
+essay without being pasted in.
+
 **Draft.** The writing surface below. On Prepare, **From your notes**:
 
 - **Assemble a draft** lays the person's own passages out in the map's order:

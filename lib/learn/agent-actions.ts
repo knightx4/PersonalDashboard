@@ -102,6 +102,9 @@ export const learnActions: ModuleActions = {
     publishEssay: none('outside', "Publishes to the person's website."),
     unpublishEssay: none('outside'),
   },
+  'app/learn/e/[id]/attached-actions.ts': {
+    detachVaultNote: none('theirs', 'Takes a vault note off the essay; one Dash attached is taken off with its Undo on Home.'),
+  },
   'app/learn/e/[id]/guide-actions.ts': {
     changeEssayPlan: none('own'),
     updateNoteMap: none('spends', IN_THE_ESSAY),

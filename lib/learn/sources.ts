@@ -262,6 +262,16 @@ export const learnSources: ModuleSources = {
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
     {
+      table: 'learn.brief_findings',
+      module: 'Learn',
+      holds: 'Findings they asked Dash to add to a research brief after its run, each with the sources it rests on.',
+      weight: 'intent',
+      search: ['body'],
+      title: 'body',
+      parent: parentBy('brief_id', 'learn.briefs'),
+      note: 'Each sits under the sub-question sub_question_id names on the brief, or under Added findings when it is null. sources holds each source\'s title, link and the words quoted from it; they are not readings.',
+    },
+    {
       table: 'learn.topics',
       module: 'Learn',
       holds: 'Topics they study, each with what it covers and how deep it goes, on a ladder of ten levels.',
@@ -314,6 +324,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.graph_moves', reason: 'Bookkeeping for moving each claims-graph subject onto topics: moved or failed, and the lens it became.' },
     { table: 'learn.move_reviews', reason: 'Bookkeeping for the placements and edges the move from the claims graph left for them to settle.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
+    { table: 'learn.essay_vault_notes', reason: 'Join rows attaching a vault note to an essay; the note is read from the vault source and the essay from learn.essays.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     { table: 'learn.essay_log', reason: 'Bookkeeping on how an essay was worked out: stages opened and the model calls made, with their responses.' },
     {

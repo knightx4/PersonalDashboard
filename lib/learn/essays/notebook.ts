@@ -171,8 +171,11 @@ out of order, and find the argument as they go. Your job is to show them
 what is in their notes so far, so they can keep writing. You never write
 any of their essay.
 
-Read all the notes. Reply with one JSON object and nothing else, in this
-shape:
+Read all the notes. Vault notes they attached to the essay come after them,
+each in its own <vault_note> tag: those are their own words too, so read
+them as part of the notes and quote them the same way.
+
+Reply with one JSON object and nothing else, in this shape:
 
 {
   "claims": ["..."],
@@ -211,6 +214,8 @@ export function mapNotesPrompt(input: {
   reader: string;
   notes: string;
   previous: NoteMap | null;
+  /** Vault notes attached to the essay (vault-notes.ts), read after the notes. */
+  attached?: readonly { title: string; body: string }[];
 }): string {
   const lines = [
     `The essay's question: ${input.question.trim() || '(not written yet)'}`,
@@ -224,7 +229,15 @@ export function mapNotesPrompt(input: {
     );
   }
   lines.push('', '<notes>', input.notes.trim(), '</notes>');
+  for (const note of input.attached ?? []) {
+    lines.push('', `<vault_note title="${note.title.replace(/"/g, '”')}">`, note.body.trim(), '</vault_note>');
+  }
   return lines.join('\n');
+}
+
+/** What the map's passages are checked against: the notes and the text of every attached vault note. */
+export function mapSourceText(notes: string, attached: readonly { body: string }[] = []): string {
+  return [notes, ...attached.map((note) => note.body)].join('\n\n');
 }
 
 /** The JSON object in a reply, fenced or bare. */

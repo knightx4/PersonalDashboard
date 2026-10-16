@@ -138,6 +138,14 @@ Topics they asked Dash to research: the question, why they want it and the short
 - Opens at `/learn/b/<id>`
 - Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.
 
+### `learn.brief_findings` (Learn)
+
+Findings they asked Dash to add to a research brief after its run, each with the sources it rests on.
+
+- Search: `body`
+- Name a row by `body`; link it by `id`
+- Each sits under the sub-question sub_question_id names on the brief, or under Added findings when it is null. sources holds each source's title, link and the words quoted from it; they are not readings.
+
 ### `learn.topics` (Learn)
 
 Topics they study, each with what it covers and how deep it goes, on a ladder of ten levels.

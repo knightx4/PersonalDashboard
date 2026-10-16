@@ -3,6 +3,8 @@
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadAttachedNoteText } from '@/lib/learn/essays/vault-notes';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { readBrief } from '@/lib/learn/essays/model';
 import { loadEssayDraftTarget, loadPlanContext, savePlanJson } from '@/lib/learn/essays/store';
@@ -16,6 +18,7 @@ import { evidencePrompt } from '@/lib/learn/essays/evidence';
 import { logEssayCall, logEssayStageVisit } from '@/lib/learn/essays/log-store';
 import {
   mapNotesPrompt,
+  mapSourceText,
   modelDraftPrompt,
   notesOf,
   NOTES_MAX,
@@ -128,7 +131,8 @@ export async function changeEssayPlan(id: string, change: PlanChange): Promise<P
 /**
  * Dash's map of the notes, on the press of Update the map. The notes it read
  * are saved with it, so an essay whose notes were only the seed from the old
- * stages keeps them.
+ * stages keeps them. The vault notes attached to the essay are read with
+ * them, and a passage quoted from one is kept as the person's own words.
  */
 // latency: pending
 export async function updateNoteMap(id: string): Promise<PlanResult> {
@@ -146,11 +150,17 @@ export async function updateNoteMap(id: string): Promise<PlanResult> {
         error: 'Write a little more first: the map needs a paragraph or two of notes.',
       };
     }
+    // Vault notes attached to the essay are read after the notes; the map goes on without them if they cannot be read.
+    const attached = await loadAttachedNoteText(now.supabase, await createVaultClient(), id).catch((error: unknown) => {
+      console.error('[essay map] attached notes', error instanceof Error ? error.message : error);
+      return [];
+    });
     const prompt = mapNotesPrompt({
       question: now.brief.question,
       reader: now.brief.reader,
       notes,
       previous: now.plan.noteMap,
+      attached,
     });
     const spend = collectSpend();
     const reply = await runNotesMap({ prompt, anthropicApiKey: apiKey, onSpend: spend.sink });
@@ -169,7 +179,7 @@ export async function updateNoteMap(id: string): Promise<PlanResult> {
       prompt,
       content: [{ type: 'text', text: reply.text }],
     });
-    const noteMap = readMapReply(reply.text, notes, new Date().toISOString());
+    const noteMap = readMapReply(reply.text, mapSourceText(notes, attached), new Date().toISOString());
     if (!noteMap) {
       console.error('[essay map] unreadable reply');
       return {

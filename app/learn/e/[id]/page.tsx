@@ -4,6 +4,8 @@ import { essayTitle } from '@/lib/learn/essays/model';
 import { loadEssay } from '@/lib/learn/essays/store';
 import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
 import { loadEssayResearch } from '@/lib/learn/essays/research-store';
+import { loadAttachedNotes } from '@/lib/learn/essays/vault-notes';
+import { createVaultClient } from '@/lib/vault/auth/server';
 import { EssayView } from './essay-view';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
@@ -26,6 +28,17 @@ async function readNotes(id: string, doc: string) {
   return loadEssayNotes(supabase, id, doc);
 }
 
+/** The vault notes attached to its notes; the page draws without them if they cannot be read. */
+async function readAttached(id: string) {
+  try {
+    const [learn, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+    return await loadAttachedNotes(learn, vault, id);
+  } catch (error) {
+    console.error('[essay attached notes]', error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const essay = await read((await params).id);
   return { title: essay ? essayTitle(essay.draftBody, essay.path) : 'Essay' };
@@ -43,15 +56,17 @@ export default async function EssayPage({
   const asked = (await searchParams).view;
   const view = Array.isArray(asked) ? asked[0] : asked;
   if (!essay) notFound();
-  const [notes, research] = await Promise.all([
+  const [notes, research, attachedNotes] = await Promise.all([
     readNotes(essay.id, essay.draftBody),
     createLearnClient().then((supabase) => loadEssayResearch(supabase, essay.id)),
+    readAttached(essay.id),
   ]);
   return (
     <EssayView
       essay={essay}
       notes={notes}
       research={research}
+      attachedNotes={attachedNotes}
       initialView={view === 'notes' || view === 'draft' ? view : null}
       path={await rowSubject(toRef('learn.essays', essay.id))}
     />

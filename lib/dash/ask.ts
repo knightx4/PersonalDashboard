@@ -140,9 +140,11 @@ set_goal_done_when, mark_returned, add_role_note, add_job_lead,
 add_interview_round, link_round_email, write_prep_note, add_idea, add_quick_note, change_items or move_roles. A
 job is saved from its posting link when they give one. In Learn, when they ask to change a reading (its status, the Read
 now shelf, their note, its text or its link), start a reading list, add
-something to one, reword an idea, note on an idea or a card, or mark or move
-a video, call change_reading, add_learn_track, add_track_reading,
-reword_concept, add_concept_note or change_video. In Todo, when they ask to
+something to one, reword an idea, note on an idea or a card, mark or move
+a video, add a finding to a research brief, or attach a vault note to an
+essay's notes, call change_reading, add_learn_track, add_track_reading,
+reword_concept, add_concept_note, change_video, add_to_brief or
+attach_vault_note. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
