@@ -123,6 +123,7 @@ function fakeDb(tables: Tables) {
           update: (value: Row) => ((op = 'update'), (payload = value), query),
           delete: () => ((op = 'delete'), query),
           eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), query),
+          in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), query),
           is: (c: string, v: null) => (filters.push((r) => (r[c] ?? null) === v), query),
           gt: (c: string, v: number) => (filters.push((r) => (r[c] as number) > v), query),
           // The few PostgREST `or` filters a paid press's claim uses (plan #2228.1).
@@ -663,5 +664,92 @@ describe('paid_action', () => {
     deps.paidTool = () => undefined;
     expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
     expect(ran).not.toHaveBeenCalled();
+  });
+});
+
+describe('delete_rows', () => {
+  const A1 = id(701);
+  const A2 = id(702);
+  const row = (rid: string, answer: string): Row => ({
+    id: rid,
+    user_id: ME,
+    application_id: id(50),
+    question_id: id(rid === A1 ? 60 : 61),
+    answer,
+    status: 'draft',
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  });
+  const input = () => ({
+    table: 'job_search.application_answers',
+    count: 2,
+    titles: ['Why us?', 'Why this role?'],
+    href: `/jobs/roles/${id(70)}`,
+    rows: [row(A1, 'Same'), row(A2, 'Same')],
+  });
+
+  function pending() {
+    const made = setup({ kind: 'delete_rows', input: input(), enabled: ['jobs'] });
+    made.tables['job_search.application_answers'] = [row(A1, 'Same'), row(A2, 'Same')];
+    return made;
+  }
+
+  it('confirming removes the named rows and records them for Undo; undoing puts them back', async () => {
+    const { tables, deps, change } = pending();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok && confirmed.change).toMatchObject({ status: 'done', writtenTable: 'job_search.application_answers', writtenRef: A1 });
+    expect(tables['job_search.application_answers']).toEqual([]);
+    const recorded = tables['core.dash_actions'][0];
+    expect(recorded.op).toBe('delete');
+    expect((recorded.undo as { rows: unknown[] }).rows).toHaveLength(2);
+
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok && undone.change.status).toBe('undone');
+    expect(tables['job_search.application_answers'].map((r) => r.id)).toEqual([A1, A2]);
+    expect(tables['job_search.application_answers'][0]).toMatchObject({ answer: 'Same', created_at: '2026-09-01T00:00:00Z' });
+  });
+
+  it('declining removes nothing', async () => {
+    const { tables, deps, change } = pending();
+    const declined = await declineChange(deps, change.id as string);
+    expect(declined.ok && declined.change.status).toBe('declined');
+    expect(tables['job_search.application_answers']).toHaveLength(2);
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
+    expect(tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it('removes nothing when a row changed since it was proposed, or the workspace is off', async () => {
+    const edited = pending();
+    edited.tables['job_search.application_answers'][1].answer = 'Rewritten';
+    const refused = await confirmChange(edited.deps, edited.change.id as string);
+    expect(refused).toMatchObject({ ok: false, error: expect.stringContaining('has changed') });
+    expect(edited.tables['job_search.application_answers']).toHaveLength(2);
+    expect(edited.tables['core.dash_actions'][0].status).toBe('proposed');
+
+    const off = setup({ kind: 'delete_rows', input: input(), enabled: [] });
+    off.tables['job_search.application_answers'] = [row(A1, 'Same'), row(A2, 'Same')];
+    expect((await confirmChange(off.deps, off.change.id as string)).ok).toBe(false);
+    expect(off.tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it("refuses a table outside the allowed list and never touches another person's row", async () => {
+    const other = setup({ kind: 'delete_rows', input: { ...input(), table: 'job_search.roles' }, enabled: ['jobs'] });
+    other.tables['job_search.roles'] = [{ id: A1, user_id: ME }];
+    expect((await confirmChange(other.deps, other.change.id as string)).ok).toBe(false);
+    expect(other.tables['job_search.roles']).toHaveLength(1);
+
+    const theirs = pending();
+    theirs.tables['job_search.application_answers'] = [{ ...row(A1, 'Same'), user_id: id(9) }, { ...row(A2, 'Same'), user_id: id(9) }];
+    expect((await confirmChange(theirs.deps, theirs.change.id as string)).ok).toBe(false);
+    expect(theirs.tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it('undo leaves a row that is already back and puts back the rest', async () => {
+    const { tables, deps, change } = pending();
+    await confirmChange(deps, change.id as string);
+    tables['job_search.application_answers'].push(row(A1, 'Back already'));
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.application_answers'].map((r) => r.id).sort()).toEqual([A1, A2]);
   });
 });

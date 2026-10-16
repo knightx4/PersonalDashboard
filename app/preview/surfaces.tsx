@@ -335,6 +335,7 @@ import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskBuildSurface,
+  AskDeleteSurface,
   AskPaidSurface,
   AskChangesSurface,
   AT_WORK_QUESTION,
@@ -6238,6 +6239,31 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AskBuildSurface />,
+  },
+  {
+    /* The "Are you sure?" popup Confirm opens on a proposed delete (plan
+     * #2232.2): the answers listed, Cancel focused, Delete beside it. */
+    id: 'ask-dash-delete-popup',
+    label: 'Ask Dash · Delete, are you sure',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface />,
+  },
+  {
+    /* The same popup after Delete was turned down: the reason inside, the rows kept. */
+    id: 'ask-dash-delete-popup-refused',
+    label: 'Ask Dash · Delete, refused',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="refused" />,
+  },
+  {
+    /* The popup while the delete runs: both buttons held, Delete working. */
+    id: 'ask-dash-delete-popup-deleting',
+    label: 'Ask Dash · Delete, running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="deleting" />,
   },
   {
     /* The build card after a Confirm the server refused, the reason under it. */

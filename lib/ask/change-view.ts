@@ -54,6 +54,8 @@ export function changeHref(change: DashChange): string {
     // A paid press (plan #2228.1): the page it writes on.
     case 'paid_action':
       return change.input.paths[0] ?? '/home';
+    case 'delete_rows':
+      return change.input.href;
   }
 }
 
@@ -249,6 +251,11 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
     // The tool wrote the whole line when it queued the press (plan #2228.1).
     case 'paid_action':
       return { verb: done ? 'Ran:' : 'Will run:', what: change.input.line, rest: '' };
+    case 'delete_rows': {
+      const { count, titles } = change.input;
+      const rows = `${count} ${count === 1 ? 'answer' : 'answers'}`;
+      return { verb: done ? 'Deleted' : 'Delete', what: rows, rest: titles.length > 0 ? `: ${namedItems(titles, count)}` : '' };
+    }
   }
 }
 
@@ -302,5 +309,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the step';
     case 'paid_action':
       return 'Open the page';
+    case 'delete_rows':
+      return 'Open the role';
   }
 }

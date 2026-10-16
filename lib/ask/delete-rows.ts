@@ -1,0 +1,217 @@
+import { parseRef, toRef } from '@/lib/core/refs';
+import type { AskDb, AskSchema } from './db';
+import type { ModuleId } from '@/lib/modules';
+
+/**
+ * Deleting rows Dash proposed (plan #2232.1, feature #2232).
+ *
+ * Dash never deletes on its own. propose_delete (lib/ask/propose.ts) keeps a
+ * `delete_rows` proposal in core.dash_actions with a snapshot of every row it
+ * would remove, and nothing is touched until the person confirms. Confirming
+ * (confirmChange in lib/ask/changes.ts) calls deleteRows below, which reads
+ * the rows again as the person, refuses if any has changed since the snapshot,
+ * deletes them, and hands back the values it removed so the record can keep
+ * them in `undo.rows`. Undo (undoDeletedRows) inserts those rows again.
+ *
+ * The tables Dash may propose deleting from are the short list DELETABLE.
+ * Application answers only, at first. Adding a table is adding an entry.
+ *
+ * No `server-only` and no clients made here: callers hand in the person's
+ * clients, and the tests hand in stubs.
+ */
+
+type Values = Record<string, unknown>;
+
+export type DeletableTable = 'job_search.application_answers';
+
+type Deletable = {
+  schema: AskSchema;
+  table: string;
+  /** The workspace that has to be on. */
+  module: ModuleId;
+  moduleLabel: string;
+  /** What the rows are called, singular and plural. */
+  noun: [string, string];
+  /** What each row is called on the card, and the page that shows them. */
+  describe: (db: AskDb, userId: string, rows: Values[]) => Promise<{ titles: string[]; href: string }>;
+};
+
+const clip = (text: string, max = 80) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
+async function readIn(db: AskDb, schema: AskSchema, table: string, columns: string, ids: string[], userId: string) {
+  if (ids.length === 0) return [] as Values[];
+  const client = await db(schema);
+  const { data, error } = await client.from(table).select(columns).in('id', ids).eq('user_id', userId);
+  if (error) throw new Error(`${table}: ${error.message}`);
+  return (data ?? []) as unknown as Values[];
+}
+
+export const DELETABLE: Record<DeletableTable, Deletable> = {
+  'job_search.application_answers': {
+    schema: 'job_search',
+    table: 'application_answers',
+    module: 'jobs',
+    moduleLabel: 'Jobs',
+    noun: ['answer', 'answers'],
+    async describe(db, userId, rows) {
+      const questionIds = [...new Set(rows.map((r) => r.question_id).filter((v): v is string => typeof v === 'string'))];
+      const applicationIds = [...new Set(rows.map((r) => r.application_id).filter((v): v is string => typeof v === 'string'))];
+      const [questions, applications] = await Promise.all([
+        readIn(db, 'job_search', 'questions', 'id, text', questionIds, userId),
+        readIn(db, 'job_search', 'applications', 'id, role_id', applicationIds, userId),
+      ]);
+      const text = new Map(questions.map((q) => [q.id as string, String(q.text ?? '')]));
+      const roles = new Set(applications.map((a) => a.role_id as string).filter(Boolean));
+      return {
+        titles: rows.map((r) => clip(text.get(r.question_id as string) || 'A question no longer in the bank')),
+        href: roles.size === 1 ? `/jobs/roles/${[...roles][0]}` : '/jobs/roles',
+      };
+    },
+  },
+};
+
+export function isDeletableTable(table: string): table is DeletableTable {
+  return Object.prototype.hasOwnProperty.call(DELETABLE, table);
+}
+
+/** The most rows one proposal may name. */
+export const MAX_DELETE_ROWS = 25;
+
+/** What a `delete_rows` proposal keeps in `input`: the card's words and the snapshot of each row. */
+export type DeleteRowsInput = {
+  table: DeletableTable;
+  count: number;
+  /** What each row is called, in the order of `rows`. */
+  titles: string[];
+  /** The page the rows are on. */
+  href: string;
+  /** Every column of each row as it was when Dash proposed removing it. */
+  rows: Values[];
+};
+
+export const DELETABLE_LIST = 'application answers';
+
+/** The rows asked for, as the person: nothing else is read, and a row that is not theirs is not found. */
+export async function snapshotRows(
+  deps: { userId: string; db: AskDb },
+  table: DeletableTable,
+  ids: string[],
+): Promise<Values[]> {
+  const spec = DELETABLE[table];
+  const client = await deps.db(spec.schema);
+  const { data, error } = await client.from(spec.table).select('*').in('id', ids).eq('user_id', deps.userId);
+  if (error) throw new Error(`${table}: ${error.message}`);
+  const found = new Map(((data ?? []) as Values[]).map((row) => [row.id as string, row]));
+  return ids.flatMap((id) => (found.has(id) ? [found.get(id) as Values] : []));
+}
+
+/** The card's input for rows already read. */
+export async function deleteInput(
+  deps: { userId: string; db: AskDb },
+  table: DeletableTable,
+  rows: Values[],
+): Promise<DeleteRowsInput> {
+  const { titles, href } = await DELETABLE[table].describe(deps.db, deps.userId, rows);
+  return { table, count: rows.length, titles, href, rows };
+}
+
+function same(a: Values, b: Values): boolean {
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+  return keys.every((key) => JSON.stringify(a[key] ?? null) === JSON.stringify(b[key] ?? null));
+}
+
+export type DeletedRows = { rows: { ref: string; values: Values }[] };
+
+/**
+ * Delete the rows a proposal named. Refused, with nothing deleted, when the
+ * table is not on the list, a row has changed since the snapshot, or none of
+ * them is there any more. A row already gone is left out.
+ */
+export async function deleteRows(
+  deps: { userId: string; db: AskDb },
+  input: DeleteRowsInput,
+): Promise<{ ok: true; deleted: DeletedRows } | { ok: false; error: string }> {
+  if (!isDeletableTable(input.table)) return { ok: false, error: 'Dash may not delete from that table.' };
+  const spec = DELETABLE[input.table];
+  const ids = input.rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
+  if (ids.length === 0 || ids.length !== input.rows.length) return { ok: false, error: 'This proposal names no rows to remove.' };
+
+  const current = await snapshotRows(deps, input.table, ids);
+  if (current.length === 0) return { ok: false, error: `Those ${spec.noun[1]} are already gone, so nothing was removed.` };
+  const snapshot = new Map(input.rows.map((row) => [row.id as string, row]));
+  if (current.some((row) => !same(row, snapshot.get(row.id as string) as Values))) {
+    return {
+      ok: false,
+      error: `One of those ${spec.noun[1]} has changed since Dash proposed removing it, so nothing was removed. Ask Dash again.`,
+    };
+  }
+
+  const client = await deps.db(spec.schema);
+  const { data, error } = await client
+    .from(spec.table)
+    .delete()
+    .in('id', current.map((row) => row.id as string))
+    .eq('user_id', deps.userId)
+    .select('id');
+  if (error) throw new Error(`${input.table}: ${error.message}`);
+  const gone = new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+  const removed = current.filter((row) => gone.has(row.id as string));
+  if (removed.length === 0) return { ok: false, error: `Those ${spec.noun[1]} could not be removed.` };
+  return {
+    ok: true,
+    deleted: { rows: removed.map((values) => ({ ref: toRef(input.table, values.id as string), values })) },
+  };
+}
+
+function recordedRows(recorded: Record<string, unknown> | null): DeletedRows['rows'] | null {
+  const rows = recorded?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const out: DeletedRows['rows'] = [];
+  for (const row of rows as { ref?: unknown; values?: unknown }[]) {
+    if (typeof row?.ref !== 'string' || !row.values || typeof row.values !== 'object') return null;
+    const parsed = parseRef(row.ref);
+    if (!parsed || !isDeletableTable(parsed.table)) return null;
+    out.push({ ref: row.ref, values: row.values as Values });
+  }
+  return out;
+}
+
+/** Insert the rows again as they were. Rows already back are left; a row that cannot go in takes the others back out. */
+export async function undoDeletedRows(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rows = recordedRows(recorded);
+  if (!rows) return { ok: false, error: 'Dash did not keep what this change removed, so it cannot be undone.' };
+
+  const inserted: { spec: Deletable; id: string }[] = [];
+  let alreadyBack = 0;
+  for (const { ref, values } of rows) {
+    const parsed = parseRef(ref);
+    if (!parsed || !isDeletableTable(parsed.table) || values.user_id !== deps.userId) {
+      return { ok: false, error: 'That change is not one of yours to undo.' };
+    }
+    const spec = DELETABLE[parsed.table];
+    const client = await deps.db(spec.schema);
+    const { data: held, error: readError } = await client.from(spec.table).select('id').eq('id', parsed.id).eq('user_id', deps.userId);
+    if (readError) throw new Error(`${parsed.table}: ${readError.message}`);
+    if ((held ?? []).length > 0) {
+      alreadyBack += 1;
+      continue;
+    }
+    const { error } = await client.from(spec.table).insert(values);
+    if (error) {
+      for (const done of inserted) {
+        const back = await deps.db(done.spec.schema);
+        await back.from(done.spec.table).delete().eq('id', done.id).eq('user_id', deps.userId);
+      }
+      return {
+        ok: false,
+        error: `Dash could not put the ${spec.noun[1]} back, probably because a newer one has taken the place of one of them (${error.message}).`,
+      };
+    }
+    inserted.push({ spec, id: parsed.id });
+  }
+  if (inserted.length === 0 && alreadyBack > 0) return { ok: false, error: 'Those rows are already back.' };
+  return { ok: true };
+}
