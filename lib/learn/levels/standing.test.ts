@@ -13,6 +13,8 @@ const topic: TopicDetail = {
   asked: null,
   createdAt: '2026-10-01T00:00:00Z',
   approvedAt: '2026-10-01T00:00:00Z',
+  citation: { source: null, canonicality: null },
+  drafting: null,
   fieldNames: [],
   cells: [1, 2, 3, 4].map((level) => ({
     id: `t${level}`,

@@ -26,9 +26,15 @@ describe('tests/flows in the gate', () => {
   });
 
   it('is inside what vitest runs', () => {
-    const include = config.test?.include ?? [];
+    // The suite is two projects: the database tests, one file at a time, and
+    // every other file in parallel. A flow test is in one or the other.
+    const projects = (config.test?.projects ?? []) as {
+      test?: { name?: string; include?: string[]; exclude?: string[] };
+    }[];
+    const unit = projects.find((project) => project.test?.name === 'unit')?.test;
+    const include = unit?.include ?? [];
     expect(include.some((glob) => matchesGlob('tests/flows/a.test.ts', glob))).toBe(true);
-    expect(config.test?.exclude ?? []).not.toContainEqual(expect.stringContaining('flows'));
+    expect(unit?.exclude ?? []).not.toContainEqual(expect.stringMatching(/^tests\/flows\/?\*/));
   });
 
   it('runs in the gate, which runs the whole suite', () => {
@@ -36,8 +42,10 @@ describe('tests/flows in the gate', () => {
     expect(read('scripts/gate.sh')).toMatch(/lane test "Test" npx vitest run &/);
   });
 
-  it('runs in CI, which runs the whole suite', () => {
-    expect(read('.github/workflows/ci.yml')).toMatch(/run: scripts\/ci-step\.sh Test npm test\n/);
+  it('runs in CI, which runs both projects of the suite', () => {
+    const ci = read('.github/workflows/ci.yml');
+    expect(ci).toMatch(/run: scripts\/ci-step\.sh Test npm test -- --project unit\n/);
+    expect(ci).toMatch(/run: scripts\/ci-step\.sh "Database tests" npm test -- --project db\n/);
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     expect(pkg.scripts.test).toBe('vitest run');
   });

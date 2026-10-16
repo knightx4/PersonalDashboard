@@ -8,7 +8,8 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { checksFromText } from '@/lib/learn/levels/draft-payload';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { MAX_LEVEL } from '@/lib/learn/levels/model';
-import { approveDraft, mergeDraftInto, settleWanted } from '@/lib/learn/levels/store';
+import { readDrafting } from '@/lib/learn/levels/draft-sources';
+import { approveDraft, markPersonal, mergeDraftInto, settleWanted, type CitedRowKind } from '@/lib/learn/levels/store';
 import { rewriteCell } from '@/lib/learn/levels/store-page';
 import { carryLensTargets } from '@/lib/learn/levels/lens-store';
 
@@ -109,9 +110,13 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
   const supabase = await createLearnClient();
   let id: string;
   try {
+    // A topic a draft's links need is drafted from the sources that draft was.
+    const { data: parent } = await supabase.from('topics').select('drafting').eq('id', input.data.topicId).maybeSingle();
+    const drafting = readDrafting(parent?.drafting);
     const result = await runTopicDraft(supabase, user.id, {
       goal: input.data.name,
       scope: input.data.scope || null,
+      sources: drafting ? { sources: drafting.sources, performances: drafting.performances } : undefined,
       anthropicApiKey: apiKey,
     });
     if (!result.ok) return { error: result.detail };
@@ -154,4 +159,43 @@ export async function rewordLevel(_prev: RewordState, formData: FormData): Promi
 
   revalidatePath(`/learn/topics/${topicId.data}`);
   return { saved: true };
+}
+
+export type MarkState = { error?: string };
+
+const MarkInput = z.object({
+  topicId: z.string().uuid(),
+  /** `cell:<id>`, `link:<id>` or `topic:<id>`, several joined by commas; `undo:` first takes the mark off. */
+  target: z.string().min(1).max(4_000),
+});
+
+/**
+ * Mark a draft's uncited rows personal, or take the mark off (plan #2138.11).
+ * A row that names no source cannot be approved until it is cited or marked;
+ * marking says it is the person's own, which is what `personal` means.
+ */
+// latency: pending
+export async function markRowsPersonal(_prev: MarkState, formData: FormData): Promise<MarkState> {
+  await requireUser();
+  const input = MarkInput.safeParse({ topicId: formData.get('topicId'), target: formData.get('target') });
+  if (!input.success) return { error: 'Could not work out which row this was.' };
+
+  const undo = input.data.target.startsWith('undo:');
+  const byKind = new Map<CitedRowKind, string[]>();
+  for (const part of input.data.target.replace(/^undo:/, '').split(',')) {
+    const [kind, id] = part.split(':');
+    if ((kind === 'topic' || kind === 'cell' || kind === 'link') && Id.safeParse(id).success) {
+      byKind.set(kind, [...(byKind.get(kind) ?? []), id]);
+    }
+  }
+  if (byKind.size === 0) return { error: 'Could not work out which row this was.' };
+
+  const supabase = await createLearnClient();
+  try {
+    for (const [kind, ids] of byKind) await markPersonal(supabase, kind, ids, !undo);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Marking it personal failed.' };
+  }
+  revalidatePath(`/learn/topics/${input.data.topicId}`);
+  return {};
 }

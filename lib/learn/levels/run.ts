@@ -10,7 +10,7 @@
 
 import { readCells, type TopicMap } from '@/lib/learn/levels/model';
 
-export type RunCell = { cellId: string; topicName: string; level: number };
+export type RunCell = { cellId: string; topicId: string; topicName: string; level: number };
 
 export type RunSummary = {
   /** Questions answered in the run. */
@@ -49,7 +49,7 @@ export function runSummary(input: {
   const missed: RunCell[] = [];
   for (const [id, now] of after) {
     const was = before.get(id)?.status ?? 'open';
-    const cell = { cellId: id, topicName: names.get(now.topicId) ?? '', level: now.level };
+    const cell = { cellId: id, topicId: now.topicId, topicName: names.get(now.topicId) ?? '', level: now.level };
     if (now.status === 'shown' && was !== 'shown') shown.push(cell);
     else if (now.status === 'implied' && was !== 'implied' && was !== 'shown' && was !== 'declared') implied.push(cell);
     else if (now.status === 'missed' && answeredIn.has(id)) missed.push(cell);
