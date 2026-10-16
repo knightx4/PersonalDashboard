@@ -9,7 +9,10 @@ import { mayFeedText, mayShowText, structureRow, unitRows } from '@/lib/learn/ca
  * The fixtures in fixtures/structure/practical/ come from live fetches on
  * 2026-10-16: the content of the Arkansas Complete Beekeeping Short Course
  * page, and the text of the ISA Certified Arborist examination outline PDF as
- * extractPdfPages returns it (fifteen pages joined by a blank line).
+ * extractPdfPages returns it (fifteen pages joined by a blank line). The two
+ * practitioner guides (plan #2247.6) are excerpts of the pages fetched the same
+ * day, from the h1 to the first of the site's own headings after the article,
+ * scripts and styles removed.
  */
 
 const fixture = (name: string) =>
@@ -19,6 +22,12 @@ const BEE = 'https://www.uaex.uada.edu/farm-ranch/special-programs/beekeeping/be
 const HANDOUT_1 =
   'https://www.uaex.uada.edu/farm-ranch/special-programs/beekeeping/documents/UADA%20BeeCourse_Lesson_01.pdf';
 const ISA = 'https://www.isa-arbor.com/Portals/0/Assets/PDF/Certification-Applications/Cert-Exam-Outline-CA.pdf';
+const SKOK = 'https://www.forentrepreneurs.com/saas-metrics-2/';
+const A16Z = 'https://a16z.com/16-startup-metrics/';
+const PAGES: Record<string, string> = {
+  [SKOK]: 'forentrepreneurs-saas-metrics-2.html',
+  [A16Z]: 'a16z-16-startup-metrics.html',
+};
 
 const fetched = vi.hoisted(() => ({ calls: [] as string[], missing: new Set<string>() }));
 
@@ -31,6 +40,10 @@ vi.mock('./fetch', () => ({
         new URL('./fixtures/structure/practical/uaex-beekeeping-short-course.html', import.meta.url),
         'utf8',
       );
+      return { ok: true, url, contentType: 'html', text, bytes: null, byteLength: text.length };
+    }
+    if (PAGES[url]) {
+      const text = readFileSync(new URL(`./fixtures/structure/practical/${PAGES[url]}`, import.meta.url), 'utf8');
       return { ok: true, url, contentType: 'html', text, bytes: null, byteLength: text.length };
     }
     if (url === ISA || url === HANDOUT_1) {
@@ -65,9 +78,16 @@ beforeEach(() => {
 });
 
 describe('the allowlist', () => {
-  it('accepts the two starting addresses and nothing else', () => {
+  it('accepts the listed addresses and nothing else', () => {
     expect(practical.practicalSourceFor(BEE)?.source.providerSlug).toBe('uaex');
     expect(practical.practicalSourceFor(ISA)?.source.providerSlug).toBe('isa-arbor');
+    expect(practical.practicalSourceFor(SKOK)?.source.providerSlug).toBe('forentrepreneurs');
+    expect(practical.practicalSourceFor(SKOK.replace(/\/$/, ''))?.source.providerSlug).toBe('forentrepreneurs');
+    expect(practical.practicalSourceFor(A16Z)?.source.providerSlug).toBe('a16z');
+    expect(practical.practicalSourceFor('https://a16z.com/another-post/')).toBeNull();
+    expect(practical.practicalSourceFor('https://www.forentrepreneurs.com/saas-metrics/')).toBeNull();
+    expect(practical.PRACTICAL_SOURCES.flatMap((source) => source.pages)).toEqual([BEE, ISA, SKOK, A16Z]);
+    expect(practical.PRACTICAL_SOURCES.flatMap((source) => source.pages).every((page) => practical.practicalSourceFor(page))).toBe(true);
     expect(practical.practicalSourceFor(BEE.replace('https', 'http'))).toBeNull();
     expect(practical.practicalSourceFor('https://example.com/Cert-Exam-Outline-CA.pdf')).toBeNull();
     expect(practical.practicalSourceFor('https://www.uaex.uada.edu/farm-ranch/')).toBeNull();
@@ -202,5 +222,137 @@ describe('the ISA Certified Arborist examination outline', () => {
 
   it('reports a file with no outline in it', async () => {
     expect(practical.parseExamOutline('A scanned page with nothing to read.').domains).toEqual([]);
+  });
+});
+
+describe("David Skok's SaaS Metrics 2.0", () => {
+  const article = () => practical.parsePractitionerText(fixture('forentrepreneurs-saas-metrics-2.html'), 2);
+
+  it('reads the h2 sections in order, ending before the acknowledgements', () => {
+    const { title, sections } = article();
+    expect(title).toBe('SaaS Metrics 2.0 – A Guide to Measuring and Improving what Matters');
+    expect(sections).toHaveLength(26);
+    expect(sections[0]).toEqual({ label: null, heading: 'What’s so different about SaaS?', topics: [] });
+    expect(sections[1]).toEqual({
+      label: null,
+      heading: 'The SaaS P&L / Cash Flow Trough',
+      topics: ['Why is growth important?'],
+    });
+    expect(sections.map((section) => section.heading)).toContain('Two kinds of SaaS business');
+    expect(sections.at(-1)?.heading).toBe('The High Level Picture: How to Run a SaaS Business');
+    expect(sections.map((section) => section.heading)).not.toContain('Acknowledgements');
+  });
+
+  it('takes the h3 headings under a section as its topics, and skips an image heading', () => {
+    const { sections } = article();
+    const byHeading = new Map(sections.map((section) => [section.heading, section.topics]));
+    expect(byHeading.get('Detailed definitions of the various metrics used')).toEqual([
+      'Revenue Churn vs Customer Churn – why are they different?',
+    ]);
+    expect(byHeading.get('More on Churn: Cohort Analysis')).toEqual(['Two ways to run Cohort Analysis']);
+    expect(byHeading.get('Unit Economics in Action: HubSpot Example')).toEqual([]);
+    expect(byHeading.get('What Levers are available to drive Growth')).toEqual([
+      'Churn',
+      'Product',
+      'Funnel metrics',
+      'Sales Metrics',
+      'Pricing/Upsell/Cross Sell',
+      'Customer Segmentation',
+      'International Markets',
+    ]);
+  });
+
+  it('stores as ordered units under structure_only, keeping the text it ends with', async () => {
+    const result = await practical.pullPractical(SKOK.replace(/\/$/, ''));
+    if (!result.ok) throw new Error(result.detail);
+    const doc = result.document;
+    expect(fetched.calls).toEqual([SKOK]);
+    expect(doc).toMatchObject({
+      providerSlug: 'forentrepreneurs',
+      externalId: 'saas-metrics-2',
+      canonicalUrl: SKOK,
+      author: 'David Skok',
+      licenceMode: 'structure_only',
+    });
+    expect(mayShowText(doc.licenceMode) || mayFeedText(doc.licenceMode)).toBe(false);
+    expect(doc.units).toHaveLength(26);
+    expect(doc.rawText).toContain('Negative Churn');
+    expect(doc.rawText).not.toContain('Want to stay updated?');
+    expect(doc.rawText).not.toMatch(/<[a-z]/i);
+    expect(unitRows(doc.units)[9].text).toBe('The Power of Negative Churn');
+  });
+});
+
+describe("a16z's 16 Startup Metrics", () => {
+  const article = () => practical.parsePractitionerText(fixture('a16z-16-startup-metrics.html'), 3);
+
+  it('reads the sixteen numbered h3 sections, the number as the label', () => {
+    const { title, sections } = article();
+    expect(title).toBe('16 Startup Metrics');
+    expect(sections.map((section) => section.label)).toEqual(Array.from({ length: 16 }, (_, i) => String(i + 1)));
+    expect(sections[0]).toMatchObject({ heading: 'Bookings vs. revenue' });
+    expect(sections[6].heading).toBe('Unearned or deferred revenue—and billings');
+    expect(sections[9].heading).toBe('Month-on-month (MoM) growth');
+    expect(sections[13].heading).toBe('Cumulative charts (vs. growth metrics)');
+    expect(sections[15].heading).toBe('Order of operations');
+  });
+
+  it('takes an h4 under a section as a topic, and leaves out the h2 parts and the author cards', () => {
+    const { sections, text } = article();
+    expect(sections[10]).toEqual({
+      label: '11',
+      heading: 'Churn',
+      topics: ['It is also important to differentiate between gross churn and net revenue churn'],
+    });
+    expect(sections.flatMap((section) => section.topics)).toHaveLength(1);
+    expect(sections.at(-1)?.heading).toBe('Order of operations');
+    expect(sections.map((section) => section.heading)).not.toContain('Business and financial metrics');
+    expect(text).toContain('Business and financial metrics');
+    expect(text).toContain('16. Order of operations');
+    expect(text).toContain('Be clear on how you define “active.”');
+  });
+
+  it('adds the terms a section sets in bold to its topics when asked, and no sentence set in bold', () => {
+    const { sections } = practical.parsePractitionerText(fixture('a16z-16-startup-metrics.html'), 3, { terms: true });
+    expect(sections[1].topics).toEqual(['ARR (annual recurring revenue)', 'ARR per customer', 'MRR (monthly recurring revenue)']);
+    expect(sections[10].topics).toEqual([
+      'Monthly unit churn',
+      'Retention by cohort',
+      'Month 1',
+      'Latest Month',
+      'It is also important to differentiate between gross churn and net revenue churn',
+      'Gross churn',
+      'Net churn',
+    ]);
+    expect(sections[2].topics).toEqual([]);
+    const all = sections.flatMap((section) => section.topics);
+    expect(all.some((topic) => /^Reminder|^Investors look/.test(topic))).toBe(false);
+    expect(all).not.toContain('Presenting metrics generally');
+  });
+
+  it('reads no attribution or sentence from Skok as a term', () => {
+    const { sections } = practical.parsePractitionerText(fixture('forentrepreneurs-saas-metrics-2.html'), 2, { terms: true });
+    const all = sections.flatMap((section) => section.topics);
+    expect(all.some((topic) => topic.includes('Ron Gill'))).toBe(false);
+    expect(all.some((topic) => /^[a-z]/.test(topic))).toBe(false);
+  });
+
+  it('stores under its own provider, with its terms as topics', async () => {
+    const result = await practical.pullPractical(A16Z);
+    if (!result.ok) throw new Error(result.detail);
+    expect(result.document).toMatchObject({
+      providerSlug: 'a16z',
+      externalId: '16-startup-metrics',
+      institution: 'Andreessen Horowitz',
+      licenceMode: 'structure_only',
+    });
+    expect(unitRows(result.document.units)[0].text).toBe('1: Bookings vs. revenue\nTopics: Bookings; Revenue');
+    expect(structureRow(result.document).raw_text.startsWith('16 Startup Metrics\n\nhttps://a16z.com/16-startup-metrics/')).toBe(true);
+  });
+
+  it('reports a page with no sections at the level asked for', async () => {
+    expect(practical.parsePractitionerText('<h1>A post</h1><p>Only prose.</p>', 2).sections).toEqual([]);
+    fetched.missing.add(A16Z);
+    expect(await practical.pullPractical(A16Z)).toMatchObject({ ok: false, reason: 'fetch-failed' });
   });
 });

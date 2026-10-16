@@ -1,0 +1,38 @@
+name: Migrations
+
+# Applies the migrations that reached main and are not yet in the live
+# database, as soon as they land, so the deploy Vercel starts on the same push
+# does not read columns the database lacks. scripts/apply-migrations.ts says
+# how it decides what is missing and what each file is named.
+#
+# It needs the SUPABASE_ACCESS_TOKEN repository secret, a Supabase personal
+# access token. Without it the job says so and passes.
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations*/**']
+  workflow_dispatch:
+
+# Two pushes close together must not apply the same file twice, and a run
+# halfway through its files must finish.
+concurrency:
+  group: migrations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx tsx scripts/apply-migrations.ts

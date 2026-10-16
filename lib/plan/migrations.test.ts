@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyOrder,
+  liveMigrationName,
   migrationApplied,
   unappliedMigrations,
   unappliedSentence,
@@ -71,5 +73,38 @@ describe('unappliedSentence', () => {
     const five = ['a', 'b', 'c', 'd', 'e'].map((x) => `migrations/${x}.sql`);
     expect(unappliedSentence(five)).toContain('migrations/c.sql and 2 more.');
     expect(unappliedSentence(five)).not.toContain('migrations/d.sql');
+  });
+});
+
+describe('liveMigrationName', () => {
+  it('names a file the way migrationApplied reads it back', () => {
+    const cases: Array<[string, string]> = [
+      ['migrations-learn/0154_merge_ideas.sql', 'learn_0154_merge_ideas'],
+      ['migrations/0251_post_preferences.sql', '0251_post_preferences'],
+      ['migrations-job-search/0055_application_all_questions_added.sql', 'job_search_0055_application_all_questions_added'],
+    ];
+    for (const [path, name] of cases) {
+      expect(liveMigrationName(path)).toBe(name);
+      const [dir, file] = path.split('/');
+      expect(migrationApplied({ dir, name: file }, new Set([name]))).toBe(true);
+    }
+  });
+});
+
+describe('applyOrder', () => {
+  it('puts the core folder first and keeps file order within a folder', () => {
+    expect(
+      applyOrder([
+        'migrations-learn/0155_b.sql',
+        'migrations/0252_a.sql',
+        'migrations-goals/0079_c.sql',
+        'migrations-learn/0154_a.sql',
+      ]),
+    ).toEqual([
+      'migrations/0252_a.sql',
+      'migrations-goals/0079_c.sql',
+      'migrations-learn/0154_a.sql',
+      'migrations-learn/0155_b.sql',
+    ]);
   });
 });
