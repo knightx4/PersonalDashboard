@@ -61,9 +61,9 @@ vi.mock('./level3-load', () => ({
 
 vi.mock('@/lib/learn/graph/session', () => ({
   nextMasteryCheck: (mastery: string[]) => mastery[0] ?? null,
-  recordProbe: vi.fn(
-    async (_s: unknown, _u: string, input: { conceptId: string; probe: { question: string } }) => {
-      state.probes.push({ conceptId: input.conceptId, question: input.probe.question });
+  recordExplainProbe: vi.fn(
+    async (_s: unknown, _u: string, input: { conceptId: string; question: string }) => {
+      state.probes.push({ conceptId: input.conceptId, question: input.question });
       return `probe-${state.probes.length}`;
     },
   ),
@@ -104,7 +104,10 @@ function stubModel() {
               name: 'The light reactions release oxygen from water',
               claim: 'In the light-dependent reactions water is split and oxygen released.',
               quote: 'water is split and oxygen is released as a by-product',
-              mastery: ['Says where the oxygen from photosynthesis comes from.'],
+              mastery: [
+                'Says where the oxygen from photosynthesis comes from.',
+                'Names what carries the energy on.',
+              ],
             }
           : {
               question: 'Where does the oxygen released in photosynthesis come from?',
@@ -192,8 +195,16 @@ describe('writeLevel3Question', () => {
       aimName: 'Every Level 3 vital article',
       source: 'card',
       cardTitle: 'Photosynthesis: Light reactions',
-      question: 'Where does the oxygen released in photosynthesis come from?',
+      // An explain question on the idea (plan #2164.2), with no model call.
+      question:
+        'Explain this idea to a friend in a few sentences: The light reactions release oxygen ' +
+        'from water. Say what it means, why it holds, and give an example of your own. ' +
+        'A full answer also says where the oxygen from photosynthesis comes from ' +
+        'and names what carries the energy on.',
+      options: [],
+      explain: true,
     });
+    expect(prompts.map((prompt) => prompt.tool)).toEqual(['report_idea']);
     expect(prompts[0]!.content).toContain('Their goal: Photosynthesis');
     expect(prompts[0]!.content).toContain('water is split');
     expect(state.concepts[0]).toMatchObject({ subject_id: 'level3-subject', user_id: 'user-1' });

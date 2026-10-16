@@ -35,6 +35,10 @@ import { NO_PREFERENCES, fieldWeight, goalWeight, themeWeight, type FeedPreferen
  * dismissals lean each goal as they lean a theme (`goalWeight`). Since plan
  * #972 only the Level 3 goal is given here: an open goal has a track, and its
  * one in three is a share of the lessons (`chooseLessons`).
+ *
+ * With `goalsOnly` (plan #2164.1, `learn.settings.goals_only`) every draw is
+ * a goal and no theme or gap is drawn at all, so a person with no goal the
+ * draw can use gets no cards from it.
  */
 
 /** A theme placed in a field. Themes placed at a domain, or nowhere, are not drawn. */
@@ -194,6 +198,8 @@ export type DrawInput = {
   recentAimIds?: ReadonlySet<string>;
   /** Saves and dismissals on earlier cards. None when left out. */
   preferences?: FeedPreferences;
+  /** Draw goals and nothing else: no theme, no gap (plan #2164.1). */
+  goalsOnly?: boolean;
   random?: () => number;
 };
 
@@ -262,6 +268,7 @@ export function createDrawer(input: DrawInput): Drawer {
 
   return {
     next: (wantGap, wantGoal = false) => {
+      if (input.goalsOnly) return drawGoal(true);
       const other = () => (wantGap ? (drawGap() ?? drawInterest()) : (drawInterest() ?? drawGap()));
       if (wantGoal) return drawGoal(true) ?? other();
       return other() ?? drawGoal(false);

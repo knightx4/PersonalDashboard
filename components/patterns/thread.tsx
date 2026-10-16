@@ -24,9 +24,16 @@ export function ThreadPanel({
   meta,
   children,
   className,
+  heading = false,
 }: {
   /** The row's name, as the person knows it. */
   title: string;
+  /**
+   * Set the name as the screen's heading, for a thread that is the page's
+   * main thing rather than one row among others: today's piece on Now
+   * (plan #2164.5).
+   */
+  heading?: boolean;
   /** Where the row opens. Left out when the thread is already on the row's own page. */
   href?: string;
   /** One line on the row's state: its status, who it waits on. */
@@ -35,19 +42,20 @@ export function ThreadPanel({
   children: React.ReactNode;
   className?: string;
 }) {
+  const name = heading
+    ? 'font-display text-title tracking-tight break-words text-ink'
+    : 'text-body font-medium text-ink';
+  const named = href ? (
+    <Link href={href} className={cn('inline-flex min-h-11 items-center hover:text-accent', name)}>
+      {title}
+    </Link>
+  ) : (
+    title
+  );
   return (
     <Card padding="dense" className={cn('space-y-2', className)}>
       <div className="min-w-0">
-        {href ? (
-          <Link
-            href={href}
-            className="inline-flex min-h-11 items-center text-body font-medium text-ink hover:text-accent"
-          >
-            {title}
-          </Link>
-        ) : (
-          <p className="text-body font-medium text-ink">{title}</p>
-        )}
+        {heading ? <h2 className={name}>{named}</h2> : href ? named : <p className={name}>{title}</p>}
         {meta && <p className="text-small text-ink-muted">{meta}</p>}
       </div>
       {children}

@@ -94,6 +94,12 @@ export const learnActions: ModuleActions = {
   'app/learn/flow/cell-actions.ts': {
     answerCellQuestion: none('own'),
   },
+  'app/learn/flow/summary-action.ts': {
+    readRunSummary: none('page'),
+  },
+  'app/learn/now/piece-talk-actions.ts': {
+    talkPiece: none('own'),
+  },
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
   },
@@ -240,6 +246,7 @@ export const learnActions: ModuleActions = {
     setWatchListPlaylistAction: none('setting'),
   },
   'app/learn/settings/actions.ts': {
+    setGoalsOnly: none('setting'),
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },

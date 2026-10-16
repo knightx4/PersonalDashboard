@@ -27,11 +27,12 @@ export const MAX_MATERIAL = 12_000;
  * conversation kind: every such thread is a `row` thread now (plan #1468), and
  * an `ask` question is answered by calling tools instead.
  */
-export type ReadingKind = 'feed_card' | 'news_story';
+export type ReadingKind = 'feed_card' | 'news_story' | 'piece';
 
 const SUBJECT_NAME: Record<ReadingKind, string> = {
   feed_card: 'a card from their reading feed',
   news_story: 'a newsletter story',
+  piece: 'a piece of the course they are working through',
 };
 
 const SYSTEM = `You are Dash, talking with somebody about something they are reading. The

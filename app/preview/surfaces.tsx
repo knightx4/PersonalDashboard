@@ -151,6 +151,8 @@ import {
 import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
+import { FlowExplainPreview } from './learn-flow-explain-surfaces';
+import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
   LearnTopicDraftCommentPreview,
   LearnTopicDraftMatchPreview,
@@ -243,6 +245,14 @@ import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import {
+  TodaysPieceCheckSurface,
+  TodaysPieceDoneSurface,
+  TodaysPieceErrorSurface,
+  TodaysPieceLoadingSurface,
+  TodaysPieceNoneSurface,
+  TodaysPieceSurface,
+} from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -5494,6 +5504,63 @@ export const SURFACES: readonly Surface[] = [
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
     ),
   },
+  /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
+   * (plan #2164.5), and its hidden parts: the check as the last turn, the
+   * finished thread, an answer being marked, a mark that failed, and a goal
+   * with no pieces yet. */
+  {
+    id: 'learn-now-deck-piece',
+    label: 'Now · Today’s piece, an idea marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-check',
+    label: 'Now · Today’s piece, the check as the last turn',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceCheckSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-done',
+    label: 'Now · Today’s piece, finished',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceDoneSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-loading',
+    label: 'Now · Today’s piece, an answer being marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceLoadingSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-error',
+    label: 'Now · Today’s piece, a mark that failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceErrorSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-none',
+    label: 'Now · A goal with no pieces yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      // Enough cards that the deck does not reach for more, which the gallery cannot load.
+      <TodaysPieceNoneSurface
+        cards={
+          <LearnNowFeed
+            first={[...deckCards, ...deckCards.map((card, index) => ({ ...card, id: `${card.id.slice(0, -1)}${'abc'[index]}` }))]}
+            ready={20}
+            low={10}
+          />
+        }
+      />
+    ),
+  },
   {
     /* Now opened from a subject's page (plan #1698), with nothing of it
      * ready, under the longest subject name: the link back naming the
@@ -5611,6 +5678,58 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowScopePreview />,
+  },
+  {
+    /* A goal question in Practice Flow (plan #2164.2): an idea to explain in a
+     * few sentences, with the box to write in, Mark it, I don't know and Later. */
+    id: 'learn-flow-explain',
+    label: 'Practice Flow · An explain question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="ask" />,
+  },
+  {
+    /* The explanation marked: what was right, what was missing, the example
+     * line, and the one follow-up with its own box. Next skips it. */
+    id: 'learn-flow-explain-marked',
+    label: 'Practice Flow · Explanation marked, with the follow-up',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="marked" />,
+  },
+  {
+    /* The follow-up marked too: where the idea now stands, the idea as
+     * written, and Next. */
+    id: 'learn-flow-explain-done',
+    label: 'Practice Flow · Follow-up marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="done" />,
+  },
+  {
+    /* Mark it pressed: the press held while Dash marks the explanation. */
+    id: 'learn-flow-explain-grading',
+    label: 'Practice Flow · Marking the explanation',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="grading" />,
+  },
+  {
+    /* What a session moved (plan #2164.6): the card that ends a Practice Flow
+     * run, with the ideas shown and missed quoted and what came onto the fringe. */
+    id: 'learn-flow-summary',
+    label: 'Practice Flow · What moved',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowSummaryPreview />,
+  },
+  {
+    /* Marking failed: the explanation stays in its box, with the reason under the card. */
+    id: 'learn-flow-explain-error',
+    label: 'Practice Flow · Marking failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="error" />,
   },
   {
     /* An explain question about one level of a topic, before an answer
@@ -7777,13 +7896,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
   },
   {
-    /* Learn settings (plan #1937.10): subject offers on, an explain-back card
-     * in every ten. */
+    /* Learn settings (plan #1937.10): goals only on (plan #2164.1), subject
+     * offers on, an explain-back card in every ten. */
     id: 'learn-settings',
     label: 'Learn · Settings',
     module: 'learn',
     width: 'page',
-    render: () => <LearnSettingsView settings={{ offerSubjects: true, teachBackEvery: 10 }} />,
+    render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a
