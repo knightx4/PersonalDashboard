@@ -483,6 +483,7 @@ import {
   VaultThemeSurface,
 } from './vault-page-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
+import { SONNET } from '@/lib/core/models';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -4157,7 +4158,7 @@ export const SURFACES: readonly Surface[] = [
             runs: 9,
             basis: 'measured',
             per: 'run',
-            models: ['claude-sonnet-5-5'],
+            models: [SONNET],
           },
           workspace: null,
           paths: ['/jobs/pipeline'],

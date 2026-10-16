@@ -959,7 +959,7 @@ export function AskPaidSurface({ moment = 'pending' }: { moment?: AskPaidMoment 
     runs: 9,
     basis: 'measured' as const,
     per: 'run' as const,
-    models: ['claude-sonnet-5-5'],
+    models: [SONNET],
   });
   const press = (id: string, line: string, medianMicros: number | null, paths: string[]): DashChange => ({
     ...CHANGE_BASE,
