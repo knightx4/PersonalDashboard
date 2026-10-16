@@ -253,7 +253,15 @@ async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, 
   ]);
   const plan = plans.find((p) => p.aimId === aim.id);
   return {
-    aim: { id: aim.id, name: aim.name, depth: aim.depth, level3 },
+    aim: {
+      id: aim.id,
+      name: aim.name,
+      depth: aim.depth,
+      level3,
+      kind: aim.kind,
+      kindReason: aim.kindReason,
+      kindBy: aim.kindBy,
+    },
     plan: plan
       ? { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress, plan.finished) }
       : null,

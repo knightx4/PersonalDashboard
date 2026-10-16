@@ -321,6 +321,7 @@ export const learnSources: ModuleSources = {
       reason:
         "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
+    { table: 'learn.topic_structure_pulls', reason: 'Bookkeeping for the daily pull of structure documents: which lit topics have had one, and the day.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
@@ -330,6 +331,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_passages', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_providers', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
+    { table: 'learn.catalogue_structures', reason: 'Syllabi and tables of contents pulled into the shared catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },

@@ -80,6 +80,10 @@ export const MODELS = {
   jobsDiscoverShortlist: SONNET,
   /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
   learnAreaPlace: SONNET,
+  /** lib/learn/goal-kind-call.ts; one call sorts every goal not yet sorted, with a reason each */
+  learnGoalKind: HAIKU,
+  /** lib/learn/catalogue/ocw-structure-pull.ts; names candidate courses for a goal, each confirmed by a fetch */
+  learnStructurePropose: HAIKU,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
   /** lib/learn/places/name.ts; a few words for each place on Idea Space, daily */

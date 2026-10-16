@@ -1,3 +1,4 @@
+import type { GoalKind, GoalToClassify } from '@/lib/learn/goal-kind';
 import { numbered, type DraftSource, type DraftSources } from '@/lib/learn/levels/draft-sources';
 
 /**
@@ -37,6 +38,13 @@ export type Territory = {
   roles: string[];
   texts: TerritoryText[];
   topics: TerritoryTopic[];
+  /**
+   * The goal the stored documents are searched and pulled for (plan
+   * #2247.10), as the learn aim words it; the territory's name when absent.
+   */
+  goal?: GoalToClassify;
+  /** The goal's kind, which decides the providers a first draft pulls from; none pulls nothing. */
+  kind?: GoalKind | null;
 };
 
 /**

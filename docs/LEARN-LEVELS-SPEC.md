@@ -430,6 +430,22 @@ not yet drafted, a few a call, each with the same two-draft call and checks
 as above, then sets the frame topic and adds the target to the subject's
 lens. It is fired by hand, since every call spends, and approves nothing.
 
+A territory also reads the structure store of syllabi, calendars and tables
+of contents (plan #2247.10). Its goal and performances are embedded as
+queries and searched against every stored unit, so a week is found by what it
+covers, and a goal narrower than any course takes weeks from several. The
+matched units join the sources after the territory's own, each document as
+one source with its units in the order taught, which the call reads as weak
+evidence for a link it then proposes for approval. Only a unit's label,
+heading and topics reach the call, never its readings or the document's text.
+Each row's canonicality is set by how many independent documents it cites:
+two or more is canonical, one is practitioner, and two terms of one course
+count once. The topic row cites every document its levels and links cite, and
+`topics.drafting` keeps the documents cited and the textbooks they name as the
+territory's canon. On the first tick, when fewer than two documents about the
+goal are stored, the providers the goal's kind names are run first
+(`lib/learn/catalogue/structure-pull-for-goal.ts`).
+
 ## Migration from the claims graph
 
 On 9 October 2026 the live data held 106 subjects, 384 concepts, 158 edges,

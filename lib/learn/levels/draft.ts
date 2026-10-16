@@ -91,7 +91,11 @@ were not given. A row that none of them supports gets no cites at all; do not
 stretch a citation to cover it. Set canonicality on each cited row: canonical
 when a syllabus, exam body or standard textbook says it; practitioner when it
 comes from how the work is done, such as a role's requirements or a
-practitioner's text; emerging when the field has not settled it.
+practitioner's text; emerging when the field has not settled it. A source
+marked (units in the order taught) is a stored course's weeks or chapters in
+its own order: cite the line a row came from, and read an earlier unit as weak
+evidence that a later one needs it. Propose a link on that alone only when
+what the later level asks for also needs the earlier one, and cite both lines.
 
 PERFORMANCES. For each performance, say under performances the lowest level
 of this topic it needs, or level null when this topic does not serve it.

@@ -121,6 +121,10 @@ export const LEARN_OPERATIONS = [
   // is retried by the next save; kept apart from 'place-track' so the cost of
   // goals can be read on its own.
   'place-aim',
+  // Sorting a learning goal into one of six kinds before any source is tried
+  // (plan #2247.2). One Haiku call carries every goal not yet sorted, run
+  // after a goal in the Learn area is saved or reworded.
+  'classify-goal-kind',
   // Naming the Wikipedia sections a Learn now card is made from (plan #806).
   // One Sonnet call per target, recorded through the service role from the
   // picking pass against the account the target belongs to.
@@ -414,6 +418,16 @@ export const LEARN_OPERATIONS = [
   // was named for. Apart from 'grade-cell-answer', whose answers are about
   // one level of one topic.
   'grade-course-explain',
+  // Proposing the structure documents a goal's kind calls for (plan
+  // #2247.10): one Haiku call per provider when a territory is drafted, each
+  // candidate then confirmed by a fetch before anything is stored.
+  'propose-structure-sources',
+  // Embedding a goal and its performances as queries to find the stored weeks
+  // and chapters about it (plan #2247.10). One call per territory tick.
+  'match-structure-units',
+  // Proposing and confirming one structure document for a topic that just lit
+  // (plan #2247.11): the daily run's own pulls, at most five a day.
+  'pull-lit-topic-structure',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
