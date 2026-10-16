@@ -284,6 +284,7 @@ export function ChipSelect({
   className,
   icon,
   placeholderValue,
+  touch,
   value,
   defaultValue,
   ...props
@@ -291,6 +292,8 @@ export function ChipSelect({
   /** A glyph that says which property this is, in place of a label. */
   icon?: React.ReactNode;
   placeholderValue?: string;
+  /** Pad the select to 44px tall on a phone, for a chip that stands alone as a press target. */
+  touch?: boolean;
 }) {
   const current = value ?? defaultValue;
   const unset = placeholderValue !== undefined && current === placeholderValue;
@@ -298,7 +301,7 @@ export function ChipSelect({
   return (
     <span
       className={cn(
-        'group/chip press press-area inline-flex max-w-full items-center gap-1.5 rounded-control',
+        'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
         'border border-transparent px-1.5 py-0.5 text-ui',
         'hover:bg-sunken',
         'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
@@ -317,6 +320,7 @@ export function ChipSelect({
           'field-sizing-content min-w-0 cursor-pointer appearance-none truncate bg-transparent',
           'text-ui outline-none',
           unset ? 'text-ink-ghost' : 'text-ink',
+          touch && 'max-sm:py-3',
         )}
         {...props}
       />

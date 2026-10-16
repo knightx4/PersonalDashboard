@@ -59,6 +59,7 @@ export function GoalLearn({
         <form action={save} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="aimId" value={aim.id} />
           <ChipSelect
+            touch
             name="depth"
             defaultValue={aim.depth}
             key={`depth-${aim.depth}`}
@@ -82,6 +83,7 @@ export function GoalLearn({
             <input type="hidden" name="aimId" value={aim.id} />
             <div className="flex flex-wrap items-center gap-2">
               <ChipSelect
+                touch
                 name="kind"
                 defaultValue={aim.kind ?? ''}
                 key={`kind-${aim.kind ?? 'none'}`}
