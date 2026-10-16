@@ -1,6 +1,9 @@
 import { parseRef, toRef } from '@/lib/core/refs';
 import type { AskDb, AskSchema } from './db';
 import type { ModuleId } from '@/lib/modules';
+import { DELETE_NOUNS, type DeletableTable } from './deletable';
+
+export type { DeletableTable } from './deletable';
 
 /**
  * Deleting rows Dash proposed (plan #2232.1, feature #2232).
@@ -13,16 +16,19 @@ import type { ModuleId } from '@/lib/modules';
  * deletes them, and hands back the values it removed so the record can keep
  * them in `undo.rows`. Undo (undoDeletedRows) inserts those rows again.
  *
- * The tables Dash may propose deleting from are the short list DELETABLE.
- * Application answers only, at first. Adding a table is adding an entry.
+ * The tables Dash may propose deleting from are the short list DELETABLE:
+ * application answers, job notes (plan #2266.2), roles (plan #2266.4) and tasks (plan #2266.3). Adding a table is adding
+ * its name and nouns in deletable.ts and an entry here. An entry whose rows can have other rows attached (a role with
+ * applications, a task with subtasks) gives a `refuse` check, and Dash
+ * declines those rows with its reason rather than deleting them (decision
+ * #2266.1): propose_delete calls it before keeping a card, and deleteRows
+ * again before deleting, since something may have been attached in between.
  *
  * No `server-only` and no clients made here: callers hand in the person's
  * clients, and the tests hand in stubs.
  */
 
 type Values = Record<string, unknown>;
-
-export type DeletableTable = 'job_search.application_answers';
 
 type Deletable = {
   schema: AskSchema;
@@ -31,12 +37,27 @@ type Deletable = {
   module: ModuleId;
   moduleLabel: string;
   /** What the rows are called, singular and plural. */
-  noun: [string, string];
+  noun: readonly [string, string];
   /** What each row is called on the card, and the page that shows them. */
   describe: (db: AskDb, userId: string, rows: Values[]) => Promise<{ titles: string[]; href: string }>;
+  /**
+   * Why these rows cannot be deleted, in a sentence the person can read, or
+   * null when they all can. Read as the person; a row with something attached
+   * to it is refused whole, never deleted with what hangs off it.
+   */
+  refuse?: (db: AskDb, userId: string, rows: Values[]) => Promise<string | null>;
 };
 
 const clip = (text: string, max = 80) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
+const ids = (rows: Values[], column: string) =>
+  [...new Set(rows.map((r) => r[column]).filter((v): v is string => typeof v === 'string'))];
+
+/** The one id every row shares in a column, or null when they differ or any is empty. */
+const onlyOne = (rows: Values[], column: string) => {
+  const found = ids(rows, column);
+  return found.length === 1 && rows.every((r) => r[column] === found[0]) ? found[0] : null;
+};
 
 async function readIn(db: AskDb, schema: AskSchema, table: string, columns: string, ids: string[], userId: string) {
   if (ids.length === 0) return [] as Values[];
@@ -52,7 +73,7 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
     table: 'application_answers',
     module: 'jobs',
     moduleLabel: 'Jobs',
-    noun: ['answer', 'answers'],
+    noun: DELETE_NOUNS['job_search.application_answers'],
     async describe(db, userId, rows) {
       const questionIds = [...new Set(rows.map((r) => r.question_id).filter((v): v is string => typeof v === 'string'))];
       const applicationIds = [...new Set(rows.map((r) => r.application_id).filter((v): v is string => typeof v === 'string'))];
@@ -66,6 +87,132 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
         titles: rows.map((r) => clip(text.get(r.question_id as string) || 'A question no longer in the bank')),
         href: roles.size === 1 ? `/jobs/roles/${[...roles][0]}` : '/jobs/roles',
       };
+    },
+    async refuse(_db, _userId, rows) {
+      return rows.some((row) => row.status === 'submitted')
+        ? 'A submitted answer is never removed.'
+        : null;
+    },
+  },
+  // A note on a company, role, application, contact or interview. Nothing
+  // hangs off a note, so it needs no refuse check.
+  'job_search.notes': {
+    schema: 'job_search',
+    table: 'notes',
+    module: 'jobs',
+    moduleLabel: 'Jobs',
+    noun: DELETE_NOUNS['job_search.notes'],
+    async describe(db, userId, rows) {
+      const titles = rows.map((r) => clip(String(r.body ?? '').replace(/\s+/g, ' ').trim() || 'An empty note'));
+      const role = onlyOne(rows, 'role_id');
+      if (role) return { titles, href: `/jobs/roles/${role}` };
+      const company = onlyOne(rows, 'company_id');
+      if (company && ids(rows, 'role_id').length === 0) {
+        const [found] = await readIn(db, 'job_search', 'companies', 'id, slug', [company], userId);
+        if (typeof found?.slug === 'string' && found.slug) return { titles, href: `/jobs/companies/${found.slug}` };
+      }
+      const contact = onlyOne(rows, 'contact_id');
+      if (contact && ids(rows, 'role_id').length === 0 && ids(rows, 'company_id').length === 0) {
+        return { titles, href: `/jobs/contacts/${contact}` };
+      }
+      return { titles, href: '/jobs' };
+    },
+  },
+  // A role. Its applications (and through them interviews, answers and so on),
+  // notes, attachments and task links cascade with it, and a suggestion that
+  // led to it loses its link, so a role with any of those is refused
+  // (decision #2266.1): Undo restores only the role row.
+  'job_search.roles': {
+    schema: 'job_search',
+    table: 'roles',
+    module: 'jobs',
+    moduleLabel: 'Jobs',
+    noun: DELETE_NOUNS['job_search.roles'],
+    async describe(db, userId, rows) {
+      const companies = await readIn(db, 'job_search', 'companies', 'id, name', ids(rows, 'company_id'), userId);
+      const name = new Map(companies.map((c) => [c.id as string, String(c.name ?? '')]));
+      const titles = rows.map((r) => {
+        const title = String(r.title ?? '').replace(/\s+/g, ' ').trim() || 'An untitled role';
+        const company = name.get(r.company_id as string);
+        return clip(company ? `${title} at ${company}` : title);
+      });
+      return { titles, href: rows.length === 1 ? `/jobs/roles/${rows[0].id}` : '/jobs/roles' };
+    },
+    async refuse(db, userId, rows) {
+      const roleIds = ids(rows, 'id');
+      if (roleIds.length === 0) return null;
+      const jobs = await db('job_search');
+      const todo = await db('todo');
+      const read = async (client: typeof jobs, table: string) => {
+        const { data, error } = await client.from(table).select('id, role_id').in('role_id', roleIds);
+        if (error) throw new Error(`${table}: ${error.message}`);
+        return (data ?? []) as unknown as Values[];
+      };
+      const [applications, notes, attachments, suggestions, links] = await Promise.all([
+        read(jobs, 'applications'),
+        read(jobs, 'notes'),
+        read(jobs, 'attachments'),
+        read(jobs, 'suggestions'),
+        read(todo, 'task_links'),
+      ]);
+      const count = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+      const has = [
+        applications.length > 0 && count(applications.length, 'application', 'applications'),
+        notes.length > 0 && count(notes.length, 'note', 'notes'),
+        attachments.length > 0 && count(attachments.length, 'attachment', 'attachments'),
+        links.length > 0 && count(links.length, 'task link', 'task links'),
+        suggestions.length > 0 && count(suggestions.length, 'job suggestion', 'job suggestions'),
+      ].filter((v): v is string => Boolean(v));
+      if (has.length === 0) return null;
+      const all = [...applications, ...notes, ...attachments, ...suggestions, ...links];
+      const attached = rows.filter((r) => all.some((a) => a.role_id === r.id));
+      const names = attached.map((r) => `"${clip(String(r.title ?? 'Untitled'), 40)}"`).join(', ');
+      const list = has.length > 1 ? `${has.slice(0, -1).join(', ')} and ${has[has.length - 1]}` : has[0];
+      const consequence = applications.length > 0
+        ? 'deleting it would delete those and everything under them (interviews, answers) too'
+        : 'deleting it would delete or detach those too';
+      return attached.length === 1
+        ? `The role ${names} has ${list} attached, and ${consequence}.`
+        : `These roles have ${list} attached between them, and ${consequence}: ${names}.`;
+    },
+  },
+  // A task. Its subtasks (parent_id) would be deleted with it by the cascade,
+  // so a task that has any is refused (decision #2266.1). So is a task with
+  // links (task_links) to a role, note and so on: they cascade too, and Undo
+  // restores only the task row.
+  'todo.tasks': {
+    schema: 'todo',
+    table: 'tasks',
+    module: 'todo',
+    moduleLabel: 'To-do',
+    noun: DELETE_NOUNS['todo.tasks'],
+    async describe(_db, _userId, rows) {
+      return {
+        titles: rows.map((r) => clip(String(r.title ?? '').replace(/\s+/g, ' ').trim() || 'An untitled task')),
+        href: '/todo/all?status=all',
+      };
+    },
+    async refuse(db, userId, rows) {
+      const taskIds = ids(rows, 'id');
+      if (taskIds.length === 0) return null;
+      const client = await db('todo');
+      const [subs, links] = await Promise.all([
+        client.from('tasks').select('id, parent_id').in('parent_id', taskIds).eq('user_id', userId),
+        client.from('task_links').select('id, task_id').in('task_id', taskIds),
+      ]);
+      if (subs.error) throw new Error(`tasks: ${subs.error.message}`);
+      if (links.error) throw new Error(`task_links: ${links.error.message}`);
+      const subtasks = (subs.data ?? []) as unknown as Values[];
+      const linked = (links.data ?? []) as unknown as Values[];
+      if (subtasks.length === 0 && linked.length === 0) return null;
+      const attached = rows.filter((r) => subtasks.some((s) => s.parent_id === r.id) || linked.some((l) => l.task_id === r.id));
+      const names = attached.map((r) => `"${clip(String(r.title ?? 'Untitled'), 40)}"`).join(', ');
+      const has: string[] = [];
+      if (subtasks.length > 0) has.push(subtasks.length === 1 ? 'a subtask' : `${subtasks.length} subtasks`);
+      if (linked.length > 0) has.push(linked.length === 1 ? 'a link to another item' : `${linked.length} links to other items`);
+      return attached.length === 1
+        ? `The task ${names} has ${has.join(' and ')}, and deleting it would delete them too.`
+        : `These tasks have ${has.join(' and ')} between them, and deleting them would delete those too: ${names}.`;
     },
   },
 };
@@ -89,7 +236,7 @@ export type DeleteRowsInput = {
   rows: Values[];
 };
 
-export const DELETABLE_LIST = 'application answers';
+export const DELETABLE_LIST = 'application answers (job_search.application_answers), notes on a job, company or contact (job_search.notes), job roles (job_search.roles) and tasks (todo.tasks)';
 
 /** The rows asked for, as the person: nothing else is read, and a row that is not theirs is not found. */
 export async function snapshotRows(
@@ -103,6 +250,16 @@ export async function snapshotRows(
   if (error) throw new Error(`${table}: ${error.message}`);
   const found = new Map(((data ?? []) as Values[]).map((row) => [row.id as string, row]));
   return ids.flatMap((id) => (found.has(id) ? [found.get(id) as Values] : []));
+}
+
+/** Why these rows cannot be deleted, from the table's own check, or null when they can. */
+export async function refusal(
+  deps: { userId: string; db: AskDb },
+  table: DeletableTable,
+  rows: Values[],
+): Promise<string | null> {
+  const check = DELETABLE[table].refuse;
+  return check && rows.length > 0 ? check(deps.db, deps.userId, rows) : null;
 }
 
 /** The card's input for rows already read. */
@@ -124,8 +281,9 @@ export type DeletedRows = { rows: { ref: string; values: Values }[] };
 
 /**
  * Delete the rows a proposal named. Refused, with nothing deleted, when the
- * table is not on the list, a row has changed since the snapshot, or none of
- * them is there any more. A row already gone is left out.
+ * table is not on the list, a row has changed since the snapshot, the table's
+ * refuse check names a reason, or none of them is there any more. A row
+ * already gone is left out.
  */
 export async function deleteRows(
   deps: { userId: string; db: AskDb },
@@ -145,6 +303,8 @@ export async function deleteRows(
       error: `One of those ${spec.noun[1]} has changed since Dash proposed removing it, so nothing was removed. Ask Dash again.`,
     };
   }
+  const refused = await refusal(deps, input.table, current);
+  if (refused) return { ok: false, error: `Nothing was removed. ${refused}` };
 
   const client = await deps.db(spec.schema);
   const { data, error } = await client
