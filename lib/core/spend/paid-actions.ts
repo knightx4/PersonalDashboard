@@ -255,7 +255,7 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/api/ask/voice/route.ts#POST':
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken question is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
-    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':
     "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
   'app/you/personality/actions.ts#restoreTypedAction':
@@ -272,6 +272,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/territory-draft/route.ts#GET':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
+  'app/api/cron/territory-draft/route.ts#POST':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
   'app/api/cron/startup-discovery/route.ts#GET':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/startup-discovery/route.ts#POST':

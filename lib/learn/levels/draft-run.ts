@@ -51,7 +51,13 @@ export async function runTopicDraft(
   input: { goal: string; scope?: string | null; sources?: DraftSources; anthropicApiKey: string },
   options: DraftRunOptions = {},
 ): Promise<DraftRunResult> {
-  const ledger = options.ledger ?? ((operation, reports) => recordLearnSpend(userId, operation, reports));
+  // Each operation spelled out, so the paid-action check can read what this records.
+  const ledger =
+    options.ledger ??
+    ((operation, reports) =>
+      operation === 'draft-topic'
+        ? recordLearnSpend(userId, 'draft-topic', reports)
+        : recordLearnSpend(userId, 'embed-topic-scope', reports));
   const [map, fields] = await Promise.all([loadMapTopics(client, options.owner), loadFieldOptions(client)]);
   const given = input.sources ?? NO_SOURCES;
 
