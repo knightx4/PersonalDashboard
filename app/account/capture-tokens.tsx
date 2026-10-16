@@ -68,8 +68,8 @@ export function CaptureTokensSection({
       </div>
       <p className="mt-0.5 text-ui text-ink-muted">
         A token lets a Siri Shortcut or another tool use Dash without signing in. A token that adds
-        only can never read anything. A token that asks Dash can read whatever Dash can, so keep it
-        to your own phone. You can revoke either here at any time.
+        only can never read anything. A token that asks Dash can read and change whatever Dash can,
+        so keep it to your own phone. You can revoke either here at any time.
       </p>
 
       {making && (

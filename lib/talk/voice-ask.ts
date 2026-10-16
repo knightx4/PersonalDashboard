@@ -5,16 +5,17 @@ import type { AskDashResult } from '@/lib/dash/ask';
 /**
  * The ask address (app/api/ask/voice/route.ts, docs/INPUT-CHANNELS.md):
  * `POST /api/ask/voice`, which a Siri Shortcut holding an ask token calls to
- * ask Dash a question and hear the answer.
+ * ask Dash something, or ask it to do something, and hear the answer.
  *
  * It takes `{ question }` and answers JSON whose `spoken` field is the
  * answer as a Shortcut can read it aloud: Markdown taken out, and a long
  * answer cut at a sentence with a pointer to the rest. The question and the
  * whole answer are kept as an Ask conversation, so `href` opens it in the app.
  *
- * Asked this way, Dash only looks things up. It makes and proposes no
- * changes, since nobody is there to see a proposal or press Undo; adding
- * things by voice is the capture address's job.
+ * Asked this way, Dash has its lookups and its writes, so "add milk to my
+ * todos" is done as it would be in Ask, and kept there with an Undo. It
+ * proposes nothing and hands nothing on, since nobody is there to confirm a
+ * proposal or hear a reply later.
  *
  * No client here: the token check and the asking are passed in, so every
  * refusal is tested without a database. lib/talk/voice-ask-server.ts binds them.
