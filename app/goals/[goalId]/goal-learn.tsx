@@ -108,11 +108,11 @@ export function GoalLearn({
               </span>
             </div>
             {aim.kind && aim.kindReason && (
-              <p className="px-1.5 text-small text-ink-muted">
+              <p className="text-small text-ink-muted">
                 {aim.kindBy === 'person' ? 'You chose this kind.' : `Why: ${aim.kindReason}`}
               </p>
             )}
-            {kindState.error && <p className="px-1.5 text-small text-danger">{kindState.error}</p>}
+            {kindState.error && <p className="text-small text-danger">{kindState.error}</p>}
           </form>
         )}
         {aim.level3 && (
