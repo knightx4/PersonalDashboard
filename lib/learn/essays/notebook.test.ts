@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { yourWords } from './authorship';
-import { answerBlock, assembleDraft, notesOf, readMapReply, seedNotes, sourceBlock } from './notebook';
+import { answerBlock, assembleDraft, mapNotesPrompt, mapSourceText, notesOf, readMapReply, seedNotes, sourceBlock } from './notebook';
 import { EMPTY_PLAN, withPoint } from './plan';
 
 const NOTES = `Prefer preventative controls wherever possible. Detective fills in the holes in the swiss cheese layout.
@@ -113,5 +113,25 @@ describe('the notes an essay starts with', () => {
     expect(sourceBlock({ quote: 'a "b"', sourceTitle: 'T', domain: 'd.org', url: 'https://d.org' })).toBe(
       '\n\n> “a ”b””\n> T · https://d.org\n',
     );
+  });
+});
+
+describe('vault notes attached to an essay', () => {
+  const attached = [{ title: 'Walzer "spheres"', body: 'Each good has its own sphere and its own rules of distribution.' }];
+
+  it('are read after the notes, each in its own tag', () => {
+    const prompt = mapNotesPrompt({ question: 'Q', reader: 'R', notes: 'My notes.', previous: null, attached });
+    expect(prompt).toContain('<notes>\nMy notes.\n</notes>\n\n<vault_note title="Walzer ”spheres”">\nEach good has');
+  });
+
+  it('let the map keep a passage quoted from one', () => {
+    const reply = JSON.stringify({
+      claims: ['Each good has its own sphere and its own rules of distribution.'],
+      clusters: [{ label: 'Spheres', quotes: ['Each good has its own sphere and its own rules of distribution.'], support: 'thin', gap: 'x' }],
+      tensions: [],
+      questions: [],
+    });
+    expect(readMapReply(reply, 'My notes, which say nothing of it.', 'now')).toBeNull();
+    expect(readMapReply(reply, mapSourceText('My notes, which say nothing of it.', attached), 'now')!.claims).toHaveLength(1);
   });
 });

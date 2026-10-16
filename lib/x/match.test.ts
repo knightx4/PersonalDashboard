@@ -97,6 +97,11 @@ describe('planMatches', () => {
     expect(plan.candidates).toEqual([{ draftId: 'd2', xPostId: '11' }]);
   });
 
+  it('matches a planned draft like a suggested one', () => {
+    const plan = planMatches({ drafts: [draft({ status: 'planned' })], posts: [post('10', DRAFT)] });
+    expect(plan.posted.map((p) => [p.draftId, p.post.xPostId])).toEqual([['d1', '10']]);
+  });
+
   it('matches a dropped draft too', () => {
     const plan = planMatches({ drafts: [draft({ status: 'dropped' })], posts: [post('10', DRAFT)] });
     expect(plan.posted).toHaveLength(1);

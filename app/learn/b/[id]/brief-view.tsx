@@ -17,6 +17,7 @@ import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
+import { LinkedText } from '@/components/ui/linked-text';
 import { watchLine } from '@/lib/learn/briefs/watch';
 import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
 import {
@@ -33,6 +34,7 @@ import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
 import { GoalPanel } from './goal-panel';
 import type { BriefGoalPanel } from '@/lib/learn/briefs/topics';
+import { groupFindings, type BriefFinding } from '@/lib/learn/briefs/findings';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
 import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
@@ -134,18 +136,58 @@ function Quote({
   );
 }
 
+/**
+ * Findings added after the run (add_to_brief), each with the sources it rests
+ * on: the source's title links out, and its quote sits under it.
+ */
+function AddedFindings({ findings }: { findings: readonly BriefFinding[] }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {findings.map((finding) => (
+        <li key={finding.id} className="flex flex-col gap-2">
+          <p className="max-w-prose whitespace-pre-line text-body text-ink">
+            <LinkedText text={finding.body} refs={false} />
+          </p>
+          {finding.sources.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {finding.sources.map((source, i) => (
+                <li key={i} className="flex flex-col gap-1">
+                  {source.quote && (
+                    <blockquote className="border-l-2 border-border pl-3 text-ui text-ink">&ldquo;{source.quote}&rdquo;</blockquote>
+                  )}
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn('inline-flex min-h-11 items-center text-ui lg:min-h-8', linkVariants())}
+                  >
+                    {source.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Section({
   index,
   text,
   section,
   sources,
   openQuote,
+  added = [],
 }: {
   index: number;
   text: string;
   section: BriefSection | undefined;
   sources: Record<string, BriefSource>;
   openQuote?: string;
+  /** Findings added since the run that answer this sub-question. */
+  added?: readonly BriefFinding[];
 }) {
   const from = section ? sectionSources(section, sources) : [];
   return (
@@ -192,7 +234,13 @@ function Section({
           )}
         </>
       ) : (
-        <p className="text-ui text-ink-muted">The sources found had nothing to say on this one.</p>
+        added.length === 0 && <p className="text-ui text-ink-muted">The sources found had nothing to say on this one.</p>
+      )}
+      {added.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-small text-ink-muted">Added since</h3>
+          <AddedFindings findings={added} />
+        </div>
       )}
     </Card>
   );
@@ -464,6 +512,11 @@ export function BriefView({
   const sourcesFound = Object.keys(sources).length;
   useLiveWhileResearching(brief.status === 'researching', live);
   const sections = new Map(brief.sections.map((section) => [section.sub_question_id, section]));
+  // Until the brief is ready its sub-questions are not drawn, so every added finding goes under Added findings.
+  const added = groupFindings(
+    page.findings ?? [],
+    brief.status === 'ready' ? brief.subQuestions.map((sub) => sub.id) : [],
+  );
 
   const main = (
     <div className="flex flex-col gap-4">
@@ -497,9 +550,16 @@ export function BriefView({
               section={sections.get(sub.id)}
               sources={sources}
               openQuote={openQuote}
+              added={added.bySub.get(sub.id)}
             />
           ))}
         </>
+      )}
+      {added.other.length > 0 && (
+        <Card padding="standard" className="flex flex-col gap-3">
+          <h2 className="text-body font-semibold text-ink">Added findings</h2>
+          <AddedFindings findings={added.other} />
+        </Card>
       )}
     </div>
   );

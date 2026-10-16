@@ -25,6 +25,8 @@ import {
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { findExistingCompany, settleNewCompany } from '@/lib/jobs/companies/ensure';
+import { isSharedHost } from '@/lib/jobs/companies/same-company';
 import { LABEL_ENDS_INGEST, reconcileClassification, triageWithModels } from '@/lib/jobs/inbox/tier-b';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import {
@@ -1271,12 +1273,12 @@ async function resolveCompanyId(
 
   const slug = slugify(company.name);
 
-  const { data: existing } = await supabase
-    .from('companies')
-    .select('id, domains')
-    .eq('user_id', userId)
-    .eq('slug', slug)
-    .maybeSingle();
+  // The slug, then the board, domain and name: a message naming "Heron" must
+  // land on the Heron Data already here rather than open a second company.
+  const existing = await findExistingCompany(supabase, userId, {
+    name: company.name,
+    domains: company.domain ? [company.domain] : [],
+  });
 
   if (existing) {
     // Top up the domain if this message taught us one. This is what makes the
@@ -1312,6 +1314,11 @@ async function resolveCompanyId(
     return null;
   }
 
+  // A message read alongside this one may have created the same employer
+  // under another spelling; the older row wins and this one is withdrawn.
+  const settled = await settleNewCompany(supabase, userId, data.id as string);
+  if (settled !== data.id) return { id: settled, created: false };
+
   // Recorded by the caller once the role and application are under it.
   return { id: data.id as string, created: true };
 }
@@ -1324,6 +1331,8 @@ async function learnDomain(
   domains: readonly string[],
   domain: string,
 ): Promise<void> {
+  // A board's host is never the employer's, whatever the message suggested.
+  if (isSharedHost(domain)) return;
   const before = await rec.before('companies', companyId);
   const { data } = await supabase
     .from('companies')

@@ -360,15 +360,13 @@ async function addDiscoveredCompany(env: JobsWriteEnv, args: Args): Promise<Jobs
   const name = String(startup.name);
   if (startup.company_id) throw new JobsRefused(`${name} is in their companies already.`);
 
-  const { data: held, error: heldError } = await env.jobs.from('companies').select('id').eq('user_id', env.userId).eq('slug', slugify(name)).maybeSingle();
-  if (heldError) throw new Error(`Reading their companies failed: ${heldError.message}`);
   const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, name, {
     website: (startup.website as string | null) ?? null,
     boardToken: (startup.board_token as string | null) ?? null,
     ats: (startup.board_vendor as string | null) ?? null,
   });
   if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
-  const undo: DiscoveredUndo = { watchlist_id: startup.id as string, company_id: company.id, added_company: !held };
+  const undo: DiscoveredUndo = { watchlist_id: startup.id as string, company_id: company.id, added_company: company.created };
 
   const { data, error } = await env.jobs
     .from('watchlist_startups')

@@ -126,6 +126,48 @@ export async function renameCompany(
   return { error: null, slug };
 }
 
+const mergeCompaniesSchema = z.object({
+  keepId: z.string().uuid(),
+  mergeId: z.string().uuid(),
+});
+
+/**
+ * Fold one company into another: the same employer recorded twice, such as
+ * Heron and Heron Data.
+ *
+ * The work is one database function, `job_search.merge_companies`, so a merge
+ * either moves everything or nothing. It reads which tables point at a company
+ * from the foreign keys rather than from a list here, so a table added later
+ * is carried along without this action changing. The merged company's slug
+ * stops resolving, so the caller is handed the kept one's to go to.
+ */
+// latency: pending
+export async function mergeCompanies(
+  input: z.input<typeof mergeCompaniesSchema>,
+): Promise<{ error: string | null; slug: string | null }> {
+  const parsed = mergeCompaniesSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a mergeable pair.', slug: null };
+  if (parsed.data.keepId === parsed.data.mergeId) {
+    return { error: 'Pick a different company to merge.', slug: null };
+  }
+
+  await requireUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('merge_companies', {
+    p_keep: parsed.data.keepId,
+    p_merge: parsed.data.mergeId,
+  });
+  if (error) return { error: error.message, slug: null };
+
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/contacts');
+  return { error: null, slug: ((data as { kept_slug?: string } | null)?.kept_slug ?? null) };
+}
+
 const lookupSchema = z.object({ companyId: z.string().uuid() });
 
 export interface EnrichmentProposal {
@@ -406,93 +448,30 @@ const mergeRolesSchema = z.object({
 });
 
 /**
- * Tables that hang off one specific application rather than the role as a
- * whole. Consolidating duplicate applications means moving every one of
- * these onto the survivor before the loser can be deleted, or its history —
- * events, interviews, attachments — would go with it.
+ * The application a merge keeps: the one furthest along, ties broken by
+ * whichever is older. Ranking status is lib/jobs/pipeline.ts's job, so it is
+ * decided here and handed to the database.
  */
-const APPLICATION_CHILD_TABLES = [
-  'application_events',
-  'application_answers',
-  'attachments',
-  'contact_touches',
-  'cover_letters',
-  'interviews',
-  'message_link_dismissals',
-  'notes',
-] as const;
-
-/**
- * Roles being merged are the same posting, so their applications are the same
- * application, not separate attempts. Keep the one furthest along — ties
- * broken by whichever is older — move every other one's history onto it, and
- * delete the rest. `apps` must already include every application on the
- * survivor and every merged role.
- */
-async function consolidateApplications(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  survivorRoleId: string,
-  apps: Array<{
-    id: string;
-    role_id: string;
-    attempt: number;
-    status: string;
-    status_manual_override: string | null;
-    created_at: string;
-  }>,
-): Promise<{ error: string | null }> {
-  if (apps.length === 0) return { error: null };
-
-  const target = apps.reduce((best, app) => {
+function keptApplication(
+  apps: Array<{ id: string; status: string; created_at: string }>,
+): string | null {
+  if (apps.length === 0) return null;
+  return apps.reduce((best, app) => {
     const appRank = statusRank(app.status as ApplicationStatus);
     const bestRank = statusRank(best.status as ApplicationStatus);
     if (appRank !== bestRank) return appRank > bestRank ? app : best;
     return new Date(app.created_at) < new Date(best.created_at) ? app : best;
-  });
-
-  const losers = apps.filter((app) => app.id !== target.id);
-  let overrideToApply: string | null = null;
-
-  for (const loser of losers) {
-    for (const table of APPLICATION_CHILD_TABLES) {
-      const { error } = await supabase
-        .from(table)
-        .update({ application_id: target.id })
-        .eq('application_id', loser.id);
-      if (error) return { error: error.message };
-    }
-    // A manual override is a deliberate human decision — keep it rather than
-    // silently dropping it because it happened to be on the losing row.
-    if (!target.status_manual_override && !overrideToApply && loser.status_manual_override) {
-      overrideToApply = loser.status_manual_override;
-    }
-    const { error } = await supabase.from('applications').delete().eq('id', loser.id);
-    if (error) return { error: error.message };
-  }
-
-  if (overrideToApply) {
-    const { error } = await supabase
-      .from('applications')
-      .update({ status_manual_override: overrideToApply })
-      .eq('id', target.id);
-    if (error) return { error: error.message };
-  }
-
-  if (target.role_id !== survivorRoleId || target.attempt !== 1) {
-    const { error } = await supabase
-      .from('applications')
-      .update({ role_id: survivorRoleId, attempt: 1 })
-      .eq('id', target.id);
-    if (error) return { error: error.message };
-  }
-
-  return { error: null };
+  }).id;
 }
 
 /**
  * Fold one or more duplicate role rows into the survivor. They are the same
- * posting, so their applications are consolidated into one rather than piled
- * up as separate attempts — see consolidateApplications.
+ * posting, so their applications become one, the one furthest along.
+ *
+ * The moving is `job_search.merge_roles`, in one transaction, and it reads
+ * which tables to move from the foreign keys. This action used to move eight
+ * tables from a list of its own while fourteen point at an application, so a
+ * merge deleted the rest with the duplicate (migration 0058 says which).
  */
 // latency: pending
 export async function mergeRoles(
@@ -525,33 +504,18 @@ export async function mergeRoles(
 
   const { data: apps, error: appsError } = await supabase
     .from('applications')
-    .select('id, role_id, attempt, status, status_manual_override, created_at')
+    .select('id, status, created_at')
     .in('role_id', [survivorRoleId, ...mergedRoleIds]);
   if (appsError) return { error: appsError.message };
 
-  const { error: consolidateError } = await consolidateApplications(
-    supabase,
-    survivorRoleId,
-    apps ?? [],
-  );
-  if (consolidateError) return { error: consolidateError };
-
-  for (const mergedRoleId of mergedRoleIds) {
-    const { error: notesError } = await supabase
-      .from('notes')
-      .update({ role_id: survivorRoleId })
-      .eq('role_id', mergedRoleId);
-    if (notesError) return { error: notesError.message };
-
-    const { error: attachmentsError } = await supabase
-      .from('attachments')
-      .update({ role_id: survivorRoleId })
-      .eq('role_id', mergedRoleId);
-    if (attachmentsError) return { error: attachmentsError.message };
-
-    const { error: deleteError } = await supabase.from('roles').delete().eq('id', mergedRoleId);
-    if (deleteError) return { error: deleteError.message };
-  }
+  const { error } = await supabase.rpc('merge_roles', {
+    p_keep_role: survivorRoleId,
+    p_merge_roles: mergedRoleIds,
+    p_keep_application: keptApplication(
+      (apps ?? []) as Array<{ id: string; status: string; created_at: string }>,
+    ),
+  });
+  if (error) return { error: error.message };
 
   revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/companies');

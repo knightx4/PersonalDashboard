@@ -46,6 +46,8 @@ describe('runConnectorWrite', () => {
       'add_concept_note',
       'change_video',
       'research_topic',
+      'add_to_brief',
+      'attach_vault_note',
       'edit_todo',
       'add_todo_item',
       'link_todo',

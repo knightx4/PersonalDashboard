@@ -991,11 +991,14 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
  * The rows that hang off an application, by `schema.table`, with the column
  * that names it, whether the table keeps a user_id, and the columns that,
  * with the application, may hold only one row. Every one is moved onto the
- * application kept, so nothing goes with the duplicates. The company page's
- * own merge moves fewer, and its reminders, rounds groups and quiet marks go
- * with the row it deletes.
+ * application kept, so nothing goes with the duplicates. A table added
+ * with a foreign key to applications or roles and left out of these lists
+ * fails tests/merge-children-jobs.test.ts, which reads the keys from the
+ * database. The company page merges through job_search.merge_roles, which
+ * reads them itself.
  */
-const APPLICATION_CHILDREN = [
+export const APPLICATION_CHILDREN = [
+  { table: 'job_search.application_drafts', column: 'application_id', owned: true, unique: 'kind' },
   { table: 'job_search.application_events', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.application_answers', column: 'application_id', owned: true, unique: 'question_id' },
   { table: 'job_search.attachments', column: 'application_id', owned: true, unique: null },
@@ -1011,8 +1014,12 @@ const APPLICATION_CHILDREN = [
   { table: 'todo.task_links', column: 'application_id', owned: false, unique: null },
 ] as const;
 
-/** The rows that hang off a role itself, moved onto the role kept. Its applications are handled on their own. */
-const ROLE_CHILDREN = [
+/**
+ * The rows that hang off a role itself, moved onto the role kept. Its
+ * applications are handled on their own, and a role's old thread notes
+ * (job_search.notes.role_id) refuse the merge (refuseThreads).
+ */
+export const ROLE_CHILDREN = [
   { table: 'job_search.attachments', column: 'role_id', owned: true },
   { table: 'job_search.suggestions', column: 'role_id', owned: true },
   { table: 'todo.task_links', column: 'role_id', owned: false },
@@ -2167,7 +2174,7 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
     const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, companyGiven);
     if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
     companyId = company.id;
-    undo.company_added = company.id;
+    if (company.created) undo.company_added = company.id;
   }
 
   // Recruiter inbound only when the recruiter wrote first, as the page decides.

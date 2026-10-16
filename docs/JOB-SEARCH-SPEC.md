@@ -160,7 +160,9 @@ The cost is one more join and the risk of the UI feeling bureaucratic. Neutraliz
 | research | text | markdown. The one long-form field, for what you know about the place |
 | status | enum | derived: `no_activity`, `active`, `closed_out` |
 
-`domains` is what lets a message from a recruiter's personal work address find its company. Populate it from the careers URL on create and let it be edited.
+`domains` is what lets a message from a recruiter's personal work address find its company. Populate it from the website, or from the careers URL when that is on the employer's own host, and let it be edited. A board or job-site host (jobs.ashbyhq.com, a Greenhouse board, Built In) is never stored there: it is shared by every employer on that board, and while one sat in Heron Data's list the mail from herondata.io went to a second Heron row instead. `isSharedHost` in `lib/jobs/companies/same-company.ts` and `job_search.is_shared_host` hold the list.
+
+One employer is one row. Every path that creates a company goes through `ensureCompany` or the inbox's `resolveCompanyId`, and both ask `findExistingCompany` first: the slug, then the same ATS board, then an employer domain in common, then the same name once suffixes like Inc, Labs, AI and Data come off (acted on only when one row carries it). A row inserted at the same moment as a twin settles afterwards: the older row wins and the new one is deleted while it is still empty. What still slips through is listed above the table on the Companies page, and the Merge button on a company page folds another company into it through `job_search.merge_companies`, which moves every row that points at the merged company in one transaction. Merge roles on the same page goes through `job_search.merge_roles` the same way: what to move is read from the foreign keys, so a table added later is carried along, and a row whose twin the kept application already has (an answer to the same question) is dropped. Dash's merge_roles keeps its own lists so it can offer an Undo, and `tests/merge-children-jobs.test.ts` fails when they miss a table.
 
 ### `roles`
 | column | type | notes |

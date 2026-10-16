@@ -15,6 +15,7 @@ export const jobsActions: ModuleActions = {
     proposeAiCompanyEnrichment: none('spends', 'Shows a proposal on the page and keeps nothing, so a run by Dash would spend and leave nothing; the person applies it with applyAiCompanyEnrichment.'),
     applyAiCompanyEnrichment: none('theirs'),
     mergeRoles: tool('merge_roles'),
+    mergeCompanies: none('deletes', 'Folds one company into another and deletes the emptied row, which nothing can put back.'),
   },
   'app/jobs/(app)/_home/actions.ts': {
     completeReminder: tool('change_reminder'),

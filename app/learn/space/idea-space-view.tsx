@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NEIGHBOURS_PER_IDEA } from '@/lib/learn/map/idea-map';
+import { PAIRS_HREF } from '@/lib/learn/map/idea-pairs';
 import type { IdeaMapView } from '@/lib/learn/map/load';
 import { countText, mapHref, similarityText, type MapParams } from '@/lib/learn/map/view';
 import { ChosenIdea } from './chosen-idea';
@@ -182,10 +183,13 @@ function RailList<T>({
   title,
   rows,
   render,
+  foot,
 }: {
   title: string;
   rows: readonly T[];
   render: (row: T) => React.ReactNode;
+  /** A line under the list, such as where to act on it. */
+  foot?: React.ReactNode;
 }) {
   if (rows.length === 0) return null;
   const shown = rows.slice(0, LIST_SHOWN);
@@ -202,20 +206,41 @@ function RailList<T>({
           <ul className="divide-y divide-border">{rest.map(render)}</ul>
         </Disclosure>
       )}
+      {foot}
     </Card>
   );
 }
 
 function SameIdeas({ view, nameOf }: { view: IdeaMapView; nameOf: Map<string, string> }) {
+  // The subject (track) each idea was written under, so a pair across two
+  // subjects says so: those are the ones the pairs page settles (plan #2147.2).
+  const trackOf = new Map(view.ideas.map((idea) => [idea.id, idea.track]));
+  const across = (a: string, b: string) => {
+    const ta = trackOf.get(a);
+    const tb = trackOf.get(b);
+    return ta && tb && ta.id !== tb.id ? `${ta.name} · ${tb.name}` : null;
+  };
+  const anyAcross = view.similarPairs.some((pair) => across(pair.a, pair.b));
   return (
     <RailList
       title="Probably the same idea"
       rows={view.similarPairs}
+      foot={
+        // Pairs in two subjects are settled on a page of their own (plan #2147.2).
+        anyAcross ? (
+          <Link href={PAIRS_HREF} className="press-area mt-2 block text-small text-ink-muted hover:text-accent">
+            Merge or keep the pairs that sit in two subjects
+          </Link>
+        ) : undefined
+      }
       render={(pair) => (
         <li key={`${pair.a}:${pair.b}`} className="flex items-start gap-2 py-2">
           <span className="min-w-0 flex-1 space-y-1">
             <IdeaLink id={pair.a} name={nameOf.get(pair.a)} />
             <IdeaLink id={pair.b} name={nameOf.get(pair.b)} />
+            {across(pair.a, pair.b) && (
+              <span className="block text-small text-ink-muted">{across(pair.a, pair.b)}</span>
+            )}
           </span>
           <span className="tabular shrink-0 text-small text-ink-muted">
             {similarityText(pair.similarity)}

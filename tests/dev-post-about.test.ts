@@ -29,7 +29,7 @@ vi.mock('@/lib/auth/server', () => ({
   createClient: async () => ({
     from(table: string) {
       const builder: Record<string, unknown> = {};
-      for (const key of ['select', 'eq', 'contains', 'limit']) builder[key] = () => builder;
+      for (const key of ['select', 'eq', 'in', 'contains', 'limit']) builder[key] = () => builder;
       builder.maybeSingle = async () => ({ data: state.step, error: null });
       builder.then = (resolve: (value: unknown) => unknown) =>
         resolve({ data: table === 'social_posts' ? state.waiting : null, error: null });

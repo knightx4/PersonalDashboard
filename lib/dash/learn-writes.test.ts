@@ -19,6 +19,9 @@ const ME = 'me';
 const READING = '11111111-1111-4111-8111-111111111111';
 const TRACK = '22222222-2222-4222-8222-222222222222';
 const CONCEPT = '33333333-3333-4333-8333-333333333333';
+const BRIEF = '44444444-4444-4444-8444-444444444444';
+const ESSAY = '55555555-5555-4555-8555-555555555555';
+const NOTE = '66666666-6666-4666-8666-666666666666';
 
 /** A learn client over in-memory tables, enough of the query builder for these writes. */
 function fakeLearn(tables: Record<string, Row[]>) {
@@ -245,6 +248,126 @@ describe('the Learn writes', () => {
         ok: false,
         error: 'depth must be one of quick, standard, deep.',
       });
+    });
+  });
+
+  describe('add_to_brief', () => {
+    const brief = (extra: Row = {}): Row => ({
+      id: BRIEF,
+      user_id: ME,
+      question: 'How do SOX controls apply to AI?',
+      sub_questions: [
+        { id: 'q1', text: 'What does SOX require of controls over AI outputs?' },
+        { id: 'q2', text: 'How do auditors test model changes?' },
+      ],
+      archived_at: null,
+      ...extra,
+    });
+    const source = { title: 'PCAOB AS 2201', url: 'https://pcaobus.org/as2201', quote: 'The auditor should test the design.' };
+
+    it('adds the finding under the sub-question it names, with its sources', async () => {
+      const tables: Record<string, Row[]> = { briefs: [brief()] };
+      const made = await runLearnWrite(write('add_to_brief'), { userId: ME, learn: fakeLearn(tables) }, {
+        brief_id: BRIEF,
+        finding: 'Auditors test model changes as they test any change to a key control.',
+        sub_question: 2,
+        sources: [source],
+      });
+      if ('ok' in made) throw new Error(made.error);
+      expect(tables.brief_findings).toEqual([
+        expect.objectContaining({ user_id: ME, brief_id: BRIEF, sub_question_id: 'q2', sources: [source] }),
+      ]);
+      expect(made).toMatchObject({
+        kind: 'add_to_brief',
+        op: 'insert',
+        subjectRef: `learn.brief_findings:${made.after.id}`,
+        before: null,
+        row: { href: `/learn/b/${BRIEF}` },
+      });
+      expect(made.summary).toBe(
+        'Dash added a finding to the brief "How do SOX controls apply to AI?" under "How do auditors test model changes?", with one source: ' +
+          'Auditors test model changes as they test any change to a key control.',
+      );
+    });
+
+    it('keeps a finding that answers no sub-question, and one with no sources', async () => {
+      const tables: Record<string, Row[]> = { briefs: [brief()] };
+      const made = await runLearnWrite(write('add_to_brief'), { userId: ME, learn: fakeLearn(tables) }, {
+        brief_id: BRIEF,
+        finding: 'The SEC has said nothing on this yet.',
+      });
+      if ('ok' in made) throw new Error(made.error);
+      expect(tables.brief_findings).toEqual([expect.objectContaining({ sub_question_id: null, sources: [] })]);
+    });
+
+    it('refuses a sub-question the brief does not have, a link that is not https, and an archived brief', async () => {
+      const env = { userId: ME, learn: fakeLearn({ briefs: [brief()] }) };
+      expect(await runLearnWrite(write('add_to_brief'), env, { brief_id: BRIEF, finding: 'x', sub_question: 3 })).toEqual({
+        ok: false,
+        error: 'sub_question must be a number from 1 to 2, as the brief numbers them, or left out.',
+      });
+      expect(
+        await runLearnWrite(write('add_to_brief'), env, { brief_id: BRIEF, finding: 'x', sources: [{ title: 'A page', url: 'http://a.example' }] }),
+      ).toEqual({ ok: false, error: 'link must start with https://.' });
+      const archived = { userId: ME, learn: fakeLearn({ briefs: [brief({ archived_at: '2026-10-01' })] }) };
+      expect(await runLearnWrite(write('add_to_brief'), archived, { brief_id: BRIEF, finding: 'x' })).toEqual({
+        ok: false,
+        error: 'That brief is archived. Nothing was added.',
+      });
+    });
+
+    it('refuses a brief that is not theirs', async () => {
+      const env = { userId: ME, learn: fakeLearn({ briefs: [brief({ user_id: 'someone else' })] }) };
+      expect(await runLearnWrite(write('add_to_brief'), env, { brief_id: BRIEF, finding: 'x' })).toEqual({
+        ok: false,
+        error: 'There is no brief of theirs with that id. Look it up first.',
+      });
+    });
+  });
+
+  describe('attach_vault_note', () => {
+    const essay: Row = { id: ESSAY, user_id: ME, path: 'Essays/Controls over AI.md', draft_body: '# Controls over AI\n', note_id: null };
+    const note: Row = { id: NOTE, user_id: ME, path: 'Ideas/Walzer on spheres.md', title: 'Walzer on spheres', deleted_at: null };
+    const env = (learn: Record<string, Row[]>, vault: Record<string, Row[]> = { notes: [{ ...note }] }) =>
+      ({ userId: ME, learn: fakeLearn(learn), vault: fakeLearn(vault) as unknown as LearnWriteEnv['vault'] });
+
+    it('attaches the note named by its path, with why', async () => {
+      const tables: Record<string, Row[]> = { essays: [{ ...essay }] };
+      const made = await runLearnWrite(write('attach_vault_note'), env(tables), {
+        essay_id: ESSAY,
+        note: 'Ideas/Walzer on spheres.md',
+        why: 'The counter-argument.',
+      });
+      if ('ok' in made) throw new Error(made.error);
+      expect(tables.essay_vault_notes).toEqual([
+        expect.objectContaining({ user_id: ME, essay_id: ESSAY, note_id: NOTE, why: 'The counter-argument.' }),
+      ]);
+      expect(made).toMatchObject({ kind: 'attach_vault_note', op: 'insert', row: { href: `/learn/e/${ESSAY}` } });
+      expect(made.summary).toBe('Dash attached the vault note "Walzer on spheres" to the notes of the essay "Controls over AI".');
+    });
+
+    it('refuses a note already attached, the essay\'s own note, and a note not in the vault', async () => {
+      const attached = env({ essays: [{ ...essay }], essay_vault_notes: [{ id: 'a1', user_id: ME, essay_id: ESSAY, note_id: NOTE }] });
+      expect(await runLearnWrite(write('attach_vault_note'), attached, { essay_id: ESSAY, note: NOTE })).toEqual({
+        ok: false,
+        error: 'That note is already attached to this essay. Nothing was changed.',
+      });
+      const own = env({ essays: [{ ...essay, note_id: NOTE }] });
+      expect(await runLearnWrite(write('attach_vault_note'), own, { essay_id: ESSAY, note: NOTE })).toEqual({
+        ok: false,
+        error: 'That note is the essay itself. Nothing was attached.',
+      });
+      const missing = env({ essays: [{ ...essay }] }, { notes: [] });
+      expect(await runLearnWrite(write('attach_vault_note'), missing, { essay_id: ESSAY, note: 'Ideas/Nothing.md' })).toEqual({
+        ok: false,
+        error: 'There is no vault note of theirs at that ref. Find it with vault_notes or search first.',
+      });
+    });
+
+    it('is refused where the vault cannot be reached', async () => {
+      expect(
+        await runLearnWrite(write('attach_vault_note'), { userId: ME, learn: fakeLearn({ essays: [{ ...essay }] }) }, { essay_id: ESSAY, note: NOTE }),
+      ).toEqual({ ok: false, error: 'Vault notes cannot be reached from here. Tell them nothing was attached.' });
     });
   });
 });

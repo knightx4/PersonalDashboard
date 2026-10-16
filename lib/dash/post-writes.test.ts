@@ -134,6 +134,14 @@ describe('rewrite_post', () => {
     expect(result.input).toMatchObject({ verb: 'Rewrote the post draft', paths: ['/dev/posts', '/home'] });
   });
 
+  it('rewrites a planned draft the same way as a suggested one', async () => {
+    post().status = 'planned';
+    const result = ok(await rewrite({ post_ref: POST, posts: ['Shorter.'] }));
+    expect(post().body).toEqual(['Shorter.']);
+    expect(post().status).toBe('planned');
+    expect(result).toMatchObject({ kind: 'rewrite_post', op: 'update' });
+  });
+
   it('refuses a posted draft and changes nothing', async () => {
     const error = refused(await rewrite({ post_ref: POSTED, posts: ['Shorter.'] }));
     expect(error).toMatch(/posted/);

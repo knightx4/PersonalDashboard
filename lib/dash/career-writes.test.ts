@@ -175,6 +175,18 @@ describe('add_discovered_company (plan #1894.6.7)', () => {
     expect(tables['job_search.companies']).toHaveLength(1);
   });
 
+  it('files the startup under the company holding its board, whatever it is called, and Undo leaves that company', async () => {
+    const tables = find();
+    tables['job_search.companies'].push({
+      id: COMPANY, user_id: ME, name: 'Tiny Labs Inc', slug: 'tiny-labs-inc', domains: [], ats_type: 'ashby', ats_board_token: 'tinylabs',
+    });
+    const change = await made('add_discovered_company', tables, { startup_ref: STARTUP });
+    expect(tables['job_search.companies']).toHaveLength(1);
+    expect(change.undo).toEqual({ watchlist_id: STARTUP, company_id: COMPANY, added_company: false });
+    await undoDiscoveredCompany(deps(tables), change.undo);
+    expect(tables['job_search.companies']).toHaveLength(1);
+  });
+
   it('keeps a company that a role has come to hang on', async () => {
     const tables = find();
     const change = await made('add_discovered_company', tables, { name: 'Tiny Labs' });

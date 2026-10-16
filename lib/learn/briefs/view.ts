@@ -29,6 +29,7 @@ import {
   type FoundKind,
 } from './model';
 import { whenDate } from '@/lib/core/when';
+import type { BriefFinding } from './findings';
 
 /** A reading the brief found, with what the quote popover says about it. */
 export type BriefSource = {
@@ -53,7 +54,12 @@ export type BriefSource = {
 export type BriefOnPage = Brief & { trackTitle: string | null };
 
 /** The brief with the readings its run found, by reading id. */
-export type BriefPage = { brief: BriefOnPage; sources: Record<string, BriefSource> };
+export type BriefPage = {
+  brief: BriefOnPage;
+  sources: Record<string, BriefSource>;
+  /** Findings added after the run (lib/learn/briefs/findings.ts); absent where none were read. */
+  findings?: BriefFinding[];
+};
 
 /** One open brief in Learn's list. */
 export type BriefSummary = {

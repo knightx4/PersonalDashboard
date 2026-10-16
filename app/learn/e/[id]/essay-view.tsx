@@ -66,6 +66,8 @@ import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 import { deviceTimeZone, whenTime } from '@/lib/core/when';
+import { AttachedNotesCard } from './attached-notes';
+import type { AttachedNote } from '@/lib/learn/essays/vault-notes';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -570,6 +572,7 @@ export function EssayView({
   path: subject,
   initialView,
   planFrozen = false,
+  attachedNotes = [],
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -597,6 +600,8 @@ export function EssayView({
   initialView?: EssayMode | null;
   /** The plan drawn and never saved, for the gallery. */
   planFrozen?: boolean;
+  /** Vault notes attached to the essay's notes (attach_vault_note). */
+  attachedNotes?: readonly AttachedNote[];
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -895,6 +900,7 @@ export function EssayView({
         className="mb-0"
       />
       <NoteMapCard essayId={essay.id} api={planApi} append={appendToNotes} />
+      <AttachedNotesCard essayId={essay.id} initial={attachedNotes} />
       <FromNotesCard
         essayId={essay.id}
         api={planApi}
