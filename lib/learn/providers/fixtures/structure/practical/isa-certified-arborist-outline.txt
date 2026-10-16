@@ -1,0 +1,738 @@
+Text of https://www.isa-arbor.com/Portals/0/Assets/PDF/Certification-Applications/Cert-Exam-Outline-CA.pdf as extractPdfPages returns it, fetched 2026-10-16, pages joined by a blank line.
+
+Based on Job Task Analysis 2022 | 1
+Domains
+Domains are the major responsibilities or duties that characterize the practice of arboriculture. The weight or percentages
+denote the amount of the exam that is devoted to each domain.
+• Tree Biology (11%)
+• Tree Identification and Selection (9%)
+• Soil Management (7%)
+• Installation and Establishment (9%)
+• Pruning (14%)
+• Diagnosis and Treatment (9%)
+• Trees and Construction (9%)
+• Tree Risk (11%)
+• Safe Work Practices (15%)
+• Urban Forestry (6%)
+ISA Certified
+Arborist ®
+ISA certification is a voluntary program that tests and certifies a professional’s achievement of an industry-accepted
+standard level of knowledge and skill in the field of arboriculture. When a professional becomes an ISA Certified Arborist,
+they should be recognized by their peers and the public as a tree care professional who has attained a generally-accepted
+level of knowledge in core and broad areas of arboriculture field as identified through periodic job task analyses.
+EXAMINATION OUTLINE
+About the Program
+Tree Biology Weight: 11%
+Task A: Specify and recommend tree work based on knowledge of tree anatomy, physiology, and biomechanics.
+1. Root anatomy and functions
+2. Trunk, branch, twig, and leaf anatomy and functions
+3. Respiration, photosynthesis, and energy allocation and
+storage within the tree
+4. Water movement within the tree (i.e., root uptake,
+transpiration, and water transport structures)
+5. Tree identification, tree profiles (i.e., form,
+architecture), growth habits and stages,
+morphophysiology, and silhouettes
+6. Compartmentalization of decay in trees (CODIT)
+7. Mechanical stress and response growth
+1. Identifying trees
+2. Making management and maintenance
+recommendations based on tree developmental stage
+and structural and physiological needs
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 2
+Task B: Explain a tree’s life cycle and develop tree work recommendations based on tree growth and developmental needs.
+1. Vegetative growth
+2. Reproduction (i.e., sexual, asexual)
+3. Propagation (e.g., softwood cuttings, layering, grafting)
+4. Phenology (e.g., dormancy, flowering, bud break,
+senescence)
+5. Tree death (e.g., dying process, mortality/decline
+spiral)
+6. Environmental effects and responses (e.g., fall colors,
+halophytes, desert adaptations, pneumatophores)
+1. Developing pruning and other maintenance
+recommendations based on life cycle and condition
+(i.e., pruning young versus mature and veteran trees)
+Knowledge of: Skill in:
+Tree Identification and Selection Weight: 9%
+Task A: Describe the importance of proper tree identification in tree management.
+1. The relationship between accurate tree identification,
+tree species characteristics and needs, and problem
+diagnosis
+1. Using tree identification reference materials and tree
+identification systems
+Knowledge of: Skill in:
+Task B: Explain tree classification systems and utilize appropriate nomenclature during tree identification and communication.
+1. General tree classification (e.g., angiosperms,
+gymnosperms, monocots, eudicots, deciduous, semi-
+deciduous, evergreens)
+1. Using and notating plant scientific names (i.e.,
+binomial nomenclature) in report writing and
+communication
+Knowledge of: Skill in:
+Task C: Describe important morphological and physical structures used to identify tree species.
+1. Root, trunk, and branch anatomy
+2. Twig anatomy (e.g., buds, nodes, internodes, leaf scars,
+lenticels)
+3. Leaf anatomy (e.g., blade, midrib, petiole)
+4. Leaf types, characteristics, and arrangements (e.g.,
+leaf type and arrangement on branches/stems, apices,
+margins, bases, leaflet arrangement on compound
+leaves)
+5. Flower and inflorescence types
+6. Fruits, seeds, and seedpods
+7. Tree profiles (i.e., form, architecture), growth habits,
+and silhouettes
+8. Characteristics of tropical and desert trees (e.g.,
+anatomical, morphological, and physiological
+adaptations)
+1. Recognizing notable features in key anatomical
+structures (e.g., roots, trunk, bark, leaves, buds, flowers,
+fruit) associated with tree classification
+2. Collecting tree samples that aid in tree identification
+3. Utilizing available tree identification tools and
+resources (e.g., dichotomous keys, field guides,
+software, apps, expert advice)
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 3
+Task D: Select tree(s) appropriate for a given planting site and project needs taking into consideration short- and long-term
+tree requirements and maintenance goals.
+1. Characteristics of tree species (e.g., cultural needs, size,
+growth pattern and rate, flower and fruiting, wildlife
+use, air quality and sustainability, maintenance needs,
+benefit-cost ratio, invasiveness)
+2. Species-specific considerations and potential
+vulnerabilities (i.e., biotic factors, abiotic factors, site
+characteristics)
+1. Collecting soil samples
+2. Analyzing soil characteristics (e.g., soil texture,
+drainage, available rooting space)
+3. Assessing site characteristics (e.g., sun and wind
+exposure, water availability and drainage, soil-available
+space)
+4. Selecting a tree species that will thrive at the planting
+site
+5. Recommending tree species for the planting site
+to other parties (e.g., project managers, customers,
+engineers, general public)
+6. Communicating tree requirements and site
+considerations to other parties (e.g., project managers,
+customers, engineers, general public).
+7. Making recommendations based on tree requirements
+and site considerations to other parties (e.g., project
+managers, customers, engineers, general public).
+Knowledge of: Skill in:
+Soil Management Weight: 7%
+Task A: Assess soil’s physical, chemical, and biological components and its relationship in supporting the tree development
+and growth.
+1. Industry-accepted standards related to soil
+management (e.g., ANSI A300 Soil Management – Part
+2 accompanying ISA Best Management Practices)
+2. Soil formation and horizons
+3. Physical characteristics of soil (e.g., texture, structure,
+bulk density)
+4. Chemical characteristics of soil (e.g., pH, buffering
+capacity, cation exchange capacity)
+5. Biological components of soil (e.g., mycorrhizae,
+rhizosphere, macroinvertebrates, organic matter)
+6. Urban soils (i.e., types of disturbances and degradation
+of soils found in urban landscapes)
+7. Methods for sampling soil
+8. Relationship between soil and root distribution
+1. Collecting soil samples
+2. Interpreting soil test results
+3. Analyzing soil characteristics (e.g., determining soil
+texture, drainage)
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 4
+Task B: Explain the interaction between water and soil and how it affects tree growth and development, assess site conditions,
+and list management options when needed.
+1. Water movement and drainage (e.g., surface,
+underground, storm water)
+2. Soil structure and water behavior in soil
+3. Relationship between drainage, available water and soil
+characteristics
+4. Water budgets (i.e., rate of change of water stored in
+an area or soil surrounding trees and balanced by the
+quantity and rate at which water flows in and out of the
+same area)
+5. Supplemental water, irrigation and water harvesting
+systems (e.g., application, scheduling, recycled water)
+6. Local climatic condition affecting availability and
+uptake of water from soil (e.g., humidity, temperature,
+average rainfall)
+1. Assessing drainage and water-holding capacity
+2. Recommending methods for effective water
+management for trees
+Knowledge of: Skill in:
+Task C: Identify trees’ soil volume, structure, and nutrition requirements and recommend mitigation strategies when needed.
+1. Tree nutritional and uptake requirements (i.e., macro-
+and micronutrient requirements)
+2. Soil management and amendments (e.g., mulching, soil
+amendments)
+3. Soil volume and structure requirements for trees
+4. Types of fertilizer (e.g., natural/synthetic, liquid/dry,
+soluble/controlled release) and soil nutrition strategies
+5. Fertilization application strategies, timing, and
+techniques (e.g., surface, subsurface, foliar, injection)
+1. Recommending soil management and development
+strategies to support tree growth and development in
+urban spaces (e.g., root paths, soil trenches, soil vaults,
+structural soils, structural cells)
+2. Identifying soil improvement and remediation
+strategies (e.g., mulching, aeration, vertical mulching,
+pH remediation, soil replacement and amendments,
+biochar)
+3. Recommending and applying fertilizer on a needs
+basis and according to applicable, industry-accepted
+standards and best practices
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 5
+Installation and Establishment Weight: 9%
+Task A: Plant and transplant trees according to industry-accepted standards and best practices.
+1. Industry-accepted planting and transplanting
+standards (e.g., BSI/BS 8545 Trees – From nursery
+to independence in the landscape; ANSI A300
+Transplanting Standard – Part 6; ISA Best Management
+Practices – Tree Planting; Z60.1 American Nursery
+Stock Standard; BSI/BS 3936-1 Nursery stock – Part
+1: Specification for trees and shrubs; CSLA Canadian
+Landscape Standard)
+2. How trees are propagated and grown by the nursery
+industry
+3. Planting timing (e.g., season, stock type, water
+availability, temperature, sunlight availability)
+4. Proper placement of the tree
+5. Impact of soil amendments
+6. Backfilling
+7. Root ball interaction with planting hole and soil (e.g.,
+impact of soil amendments, soil settlement, potential
+for root burn, desiccation, or drainage issues)
+8. Advantages and disadvantages of different types of
+nursery stock
+1. Assessing the quality and health of planting stock
+2. Inspecting the root system of the planting stock before
+purchasing
+3. Handling of planting stock
+4. Selecting appropriate sites for tree planting to ensure
+long-term survival and service
+5. Preparing the planting site (e.g., determining planting
+hole width and depth)
+6. Pruning roots and shaving rootballs to prevent girdling
+and/or circling roots
+7. Planting a tree according to industry-accepted
+standards and best practices
+8. Removing rootball package materials (e.g., wire
+baskets, burlap and twine/straps, wood crates, plastic
+containers)
+9. Backfilling and adding a soil and/or mulch berm to
+support tree establishment
+10. Transplanting trees (e.g., transport, site choice and
+preparation, viability, post-planting care)
+Knowledge of: Skill in:
+Task B: Provide care for newly planted trees to ensure survival, growth, and good structure.
+1. Characteristics of tree species (e.g., pest susceptibility,
+growth patterns, mature form)
+2. Cultural and environmental requirements associated
+with different tree species (e.g., sun and heat exposure;
+soil type, water, and drainage needs; available root
+space; pest susceptibility; nutrition)
+3. Trunk wrap and support systems
+1. Determining watering requirements for establishment
+2. Selecting and applying mulch
+3. Installing support for newly planted trees when needed
+4. Pruning young trees for good structure
+5. Pruning and making pruning recommendations (i.e.,
+developing a pruning plan)
+6. Recommending and/or discussing a plant health care
+plan
+7. Recognizing inappropriate planting techniques
+8. Including and engaging local stakeholders to ensure
+plant survival and long-term maintenance (e.g., local
+communities, residents, students, NGOs)
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 6
+Pruning Weight: 14%
+Task A: Explain why pruning is undertaken and list the main industry-accepted pruning systems, objectives, types of cuts,
+and general practices.
+1. Accepted industry standards for tree pruning
+(e.g., ANSI A300 Pruning Standard - Part 1 and
+accompanying ISA Best Management Practices, BSI/BS
+3998 Tree Work - Recommendations)
+2. Pruning practices and considerations associated with
+optimal timing and quantity depending on species
+type, condition, and environmental factors
+3. Outcomes of tree pruning (e.g., benefits, consequences,
+cost, flowering, fruiting)
+4. Wound response
+5. Pruning objectives (e.g., structural development, risk
+mitigation, clearance, density reduction, restoration,
+size management)
+1. Assessing tree and site conditions that influence
+pruning decisions and short- versus long-term
+outcomes
+2. Communicating how pruning trees promotes good
+structure (e.g., reduce the likelihood of failure) while
+minimizing the impact on tree health to a lay audience
+3. Explaining the difference between unacceptable and
+acceptable pruning techniques to a lay audience
+Knowledge of: Skill in:
+Task B: List commonly used industry-accepted pruning tools and their use.
+1. Scissor-type pruning tools (e.g., pruning shears,
+loppers, shears, pole pruners)
+2. Pruning saws (i.e., hand saw, pole saw)
+3. Chainsaws
+1. Cleaning and maintaining pruning tools
+2. Selecting the appropriate pruning tool for a given
+scenario
+3. Handling pruning tools according to industry-accepted
+practices
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 7
+Task D: Explain pruning practices that are detrimental to tree health and longevity.
+1. Harmful pruning practices (i.e., topping, over-
+thinning, lion-tailing, flush cutting)
+2. Consequences of improper cuts on tree health and
+structure
+1. Anticipating potential impacts of detrimental pruning
+practices to tree health and structure
+2. Explaining why certain pruning strategies, cuts, and
+wound dressings may be detrimental to tree health and
+longevity
+Knowledge of: Skill in:
+Task C: Recommend and execute tree pruning in a manner which minimizes the impact on tree health and promotes
+longevity and recognize signs and symptoms of improper pruning practices.
+1. Anatomy and physiology of tree parts, branches, and
+branch unions/structures (e.g., branch collar, branch
+bark ridge, codominant stems, branch weight)
+2. Compartmentalization of decay in trees (CODIT)
+3. Pruning systems (e.g., natural, pollarding, espalier, for
+fruit production and harvesting)
+4. Improper pruning techniques (e.g., topping or stub
+cuts, lion-tailing and excessive thinning)
+5. Root pruning
+6. Utility pruning
+7. Types of pruning cuts (e.g., branch removal cut,
+reduction cut, heading cut, shearing cut)
+8. Industry-accepted safety standards and requirements
+(e.g., ANSI Z133 Safety Requirements for
+Arboricultural Operations, local requirements)
+9. ISO 11681-2:2011/AMD 1:2017 (Machinery for
+forestry — Portable chain-saw safety requirements
+and testing — Part 2: Chain-saws for tree service —
+Amendment 1)
+10. Industry-accepted safety standards and requirements
+regarding working near electrical systems (e.g.,
+ANSI Z133 Safety Requirements for Arboricultural
+Operations, local requirements)
+11. Disinfection of tools (e.g., use of alcohol-based
+disinfecting solutions)
+1. Writing pruning objectives and specifications
+2. Performing pruning cuts (e.g., branch removal cut,
+reduction cut, heading cut, shearing cut)
+3. Determining where the pruning cut should be located
+according to branch union anatomy and industry-
+accepted best management practices
+4. Predicting tree response to pruning cuts depending on
+tree species, age, wound size, timing, and overall tree
+health
+5. Sequencing cuts to facilitate ease of handling removed
+material and to minimize the potential for bark tearing
+beyond the point of branch attachment
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 8
+Diagnosis and Treatment Weight: 9%
+Task A: Explain and implement diagnostic principles and practices.
+1. Tree identification
+2. Difference between signs and symptoms
+3. Difference between biotic and abiotic disorders
+4. Key/common biotic stresses and disorders (e.g.,
+insects, mites, nematodes, vectors, other animals,
+diseases)
+5. Key/common abiotic stresses and disorders (e.g.,
+extreme weather and climate, compaction, limited
+rooting space, nutrient deficiency, improper planting,
+mechanical damage, chemical damage, competition)
+6. Diseases (e.g., disease cycle, fungi infections, bacterial
+diseases, and vectors)
+1. Identifying emerging regional problems and trends in
+plant pests and disease recognition and monitoring
+2. Identifying common causes of tree health problems
+(e.g., pests, diseases, and abiotic disorders)
+Knowledge of: Skill in:
+Task B: Explain plant health care (PHC) and integrated pest management (IPM) principles.
+1. PHC principles (e.g., prevention, early detection, treatment)
+2. IPM principles (e.g., action thresholds, monitoring, pest control tactics, documentation and record keeping)
+3. Stress factors (e.g., compaction, excessive pruning, improper planting)
+4. Compounding factors (e.g., combination of factors, primary versus secondary pests and diseases)
+Knowledge of:
+Task C: Develop and implement a plant health care (PHC) management plan that takes integrated pest management (IPM)
+into consideration and a holistic view of the client, landscape, and environmental needs.
+1. PHC principles (e.g., prevention, early detection,
+treatment)
+2. IPM principles (e.g., action thresholds, monitoring,
+pest control tactics, documentation and record
+keeping)
+3. Industry and regional standards and laws associated
+with chemical control use, storage, proper waste
+management, and application
+4. Tree identification
+5. Tree diagnostics and treatment
+1. Developing a PHC management plan
+2. Implementing a PHC management plan
+3. Communicating findings and associated management
+plan and recommendations to key stakeholders (e.g.,
+project managers, tree owners)
+4. Monitoring pest resurgence, treatment success, and
+follow-up care
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 9
+Trees and Construction Weight: 9%
+Task A: Develop and implement tree protection plans for individual trees or population of trees on or near construction,
+development, or demolition sites.
+1. Accepted industry standards related to trees and
+construction (e.g., ANSI A300 Construction
+Management Standard – Part 5 and accompanying ISA
+Best Management Practices, BSI/BS 5837 – Trees in
+Relation to Design, Demolition and Construction)
+2. Site plans
+3. Construction phases (i.e., planning, design, pre-
+construction, construction, post- construction)
+4. Tree Protection Zone (TPZ)
+5. Critical Root Zone (CRZ)
+6. Species-specific resilience/vulnerability to construction
+7. Methods for soil and root protection
+8. Roles of developers and contractors within a tree
+protection plan
+9. Tree protection measures (e.g., trunk/canopy
+protection, limiting ingress/egress, fences and signage)
+1. Interpreting a site plan
+2. Utilizing the site plan to aid in implementing the tree
+protection plan
+3. Recommending measures to protect trees from damage
+before and during construction
+4. Coordinating tree protection activities with
+developers/contractors
+5. Assessing the effectiveness of tree protection plans
+Knowledge of: Skill in:
+Task C: Recommend treatments for trees that have been impacted during construction.
+1. Short- and long-term impact of construction to the
+longevity of a tree
+2. Conditions when tree removal and replacement is
+necessary
+1. Assessing risk related to construction injury to the tree
+2. Developing a treatment and mitigation plan
+3. Providing care to the tree to promote recovery (e.g.,
+mulching, watering, soil/drainage remediation, pest/
+disease management)
+4. Recommending short- and long-term treatments to
+promote recovery
+Knowledge of: Skill in:
+Task B: Predict the impact of construction activities on tree health and stability.
+1. Construction practices and techniques
+2. Construction activity’s impact on tree root systems (e.g., soil compaction, root severing, drainage changes and water
+stress, chemical pollution)
+3. Construction activity’s impact on tree trunk and branches (e.g., wounding, scald, mechanical damage)
+4. Construction activity’s impact on tree health and stability (e.g., destabilization, secondary pests/infection, cultural
+and environmental changes)
+Knowledge of:
+
+Based on Job Task Analysis 2022 | 10
+Tree Risk Weight: 11%
+Task A: Identify and communicate the roles and responsibilities of different parties involved in tree risk management.
+1. Roles and responsibilities of the tree owner/manager
+2. Roles and responsibilities of the risk assessor
+3. Roles and responsibilities of the arborist
+1. Communicating risk and risk management with
+audiences of diverse gender, gender identity, ethnicity,
+race, educational background, level of knowledge of
+arboriculture, positions, and interests
+Knowledge of: Skill in:
+Task C: Perform a limited visual tree risk assessment of an individual tree or a population of trees near specified targets.
+1. Levels of assessment (i.e., Limited visual, Basic,
+Advanced)
+2. Target analysis
+3. Site analysis (e.g., interpret site evaluation, soils,
+exposure)
+4. Tree analysis (e.g., identify tree defects and conditions
+that could increase the likelihood of failure)
+5. Tree-based measures for mitigating tree risk (e.g.,
+pruning, structural support systems)
+6. Target-based measures for mitigating tree risk (e.g.,
+relocation, restrict access)
+7. Tree stability
+8. Tree risk mitigation measures
+1. Determining which level of tree risk assessment is
+necessary under various circumstances
+2. Identifying obvious tree defects and conditions that
+could increase the likelihood of failure
+3. Recommending measure to mitigate tree risk
+4. Determining the inspection interval
+Knowledge of: Skill in:
+Task B: List the types of risk associated with trees.
+1. Whole tree versus tree part failure
+2. Tripping, slipping
+3. Branch/leaf/fruit/flowers and associated risks
+4. Other potential sources of risk (e.g., damage to structures and property, impaired visibility associated with traffic
+signage and security, power lines, air quality and allergens, poisoning, wildlife)
+Knowledge of:
+
+Based on Job Task Analysis 2022 | 11
+Safe Work Practices Weight: 15%
+Task A: Explain and comply with industry accepted safety standards, local laws, directives, and regulations for performing
+tree work and ensuring the safety of climbers, workers, and other persons near the work zone.
+1. Industry-accepted safety standards and requirements
+(e.g., ANSI Z133 Safety Requirements for
+Arboricultural Operations, BSI/BS3998 Tree work -
+Recommendations)
+2. ISO 11681-2:2011/AMD 1:2017 (Machinery for
+forestry — Portable chain-saw safety requirements
+and testing — Part 2: Chain-saws for tree service —
+Amendment 1)
+3. Industry-accepted safety standards and requirements
+regarding working near electrical systems (e.g.,
+ANSI Z133 Safety Requirements for Arboricultural
+Operations)
+4. Fire safety (i.e., safe use of gas-powered and electric
+tools)
+5. Work-zone security, work planning, and
+communication best practices
+1. Referring to relevant laws and regulations from all
+levels of government
+2. Accessing and maintaining reference materials
+Knowledge of: Skill in:
+Task B: Develop safety protocols to mitigate risk present within the tree of interest, work site, or equipment being used.
+1. Signs and symptoms of trunk and/or root decay (e.g.,
+crown dieback, fungal fruiting bodies, sloughing bark,
+termites, boring insects, carpenter ants)
+2. Mechanical or physical damage done to a tree and/or
+root system (e.g., trenching, broken tree parts, trunk
+damage, soil heaving)
+3. Species-related patterns of whole tree or tree part
+failure
+4. Local insects, animals, and plants that are potential
+hazards to workers (e.g., arboreal mammals, bees,
+ticks and Lyme disease, mosquitoes and dengue fever,
+snakes and other reptiles, poison ivy, poison oak)
+5. Visual tree inspection
+6. Common structural/mechanical defects in trees
+7. Ergonomics
+8. Fire safety (i.e., safe use of gas-powered and electric
+tools)
+9. Command and response communication system
+1. Reviewing documentation regarding the work, creating
+a safe work plan, job briefing
+2. Visually identifying obvious tree defects and conditions
+that could impact trees structural integrity and stability
+3. Assessing tree structure (i.e., shape, lean, cracks, splits,
+excessive weight)
+4. Visually inspecting the area immediately surrounding
+the tree
+5. Determining if the tree can withstand the forces to be
+applied during the work
+6. Managing traffic hazards
+7. Preparing the work zone
+8. Communicating hazards identified and seeking
+alternative measures and/or next steps with pertinent
+stakeholders
+9. Developing and communicating a job briefing
+10. Securing hazardous materials (e.g., fuel, chemicals)
+when not in use
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 12
+Task C: Comply with safety standards when working near electrical hazards.
+1. Common electrical systems and other services
+structures and hardware (e.g., pole/line hardware)
+2. Basic properties of electricity (e.g., voltage,
+conductance)
+3. Sources of electrical shock (i.e., direct and indirect
+contact)
+4. Minimum approach distances
+1. Identifying what stage of electrical distribution is
+being carried by the line (e.g., transmission, primary
+distribution, secondary distribution)
+2. Identifying electrical hardware and line features (e.g.,
+bare wires, insulated wires)
+3. Maintaining minimum approach distances and
+wearing industry-accepted personal protection
+equipment (e.g., hydro gloves, flame-resistant clothing)
+Knowledge of: Skill in:
+Task D: Utilize tools and equipment to safely conduct tree work.
+1. Scissor-type tools (e.g., pruning shears, loppers, shears,
+pole pruners)
+2. Pruning saws (i.e., hand saw, pole saw)
+3. Chainsaws and applicable safety standards and best
+practices (e.g., ISO 11681- 2:2011/AMD 1:2017)
+4. Chippers and stump grinders
+5. Aerial lifts (i.e., Mobile Elevating Work Platform
+[MEWP])
+6. Large equipment/vehicle applications (e.g., crane)
+1. Inspecting tools and equipment for suitability prior to
+usage
+2. Recognizing operational flaws
+3. Selecting the appropriate hand or mechanical tools to
+perform arboricultural work
+4. Using hand and mechanical tools in accordance with
+manufacturing specifications
+5. Coordinating arboriculture work with large
+equipment/vehicle operators
+Knowledge of: Skill in:
+Task E: Utilize appropriate personal protective equipment (PPE) to protect the health and safety of the arborist.
+1. Head protection systems (e.g., climbing helmets,
+hardhats)
+2. Eye protection systems (e.g., protective glasses, goggles,
+face shields)
+3. Hearing protection (e.g., earplugs, earmuffs)
+4. Leg protection (e.g., chainsaw protective chaps,
+chainsaw protective pants)
+5. Foot protection (e.g., working boots, adequate ankle
+support)
+6. Hand protection (e.g., cut resistant, flame resistant, and
+anti-vibration gloves)
+7. Industry-accepted tree climbing saddle/harness,
+connecting links, work positioning lanyard friction
+management devices, and spurs/gaffs
+8. Other PPE according to local regulations
+1. Selecting appropriate PPE
+2. Inspecting PPE for usage
+3. Wearing and adjusting PPE
+4. Maintaining PPE
+5. Selecting tree climbing equipment that is appropriate
+for specifications of the project and meets regulations
+and industry-accepted standards for tree climbing
+Knowledge of: Skill in:
+
+Based on Job Task Analysis 2022 | 13
+Task G: Explain methods and techniques for tree rigging used in arboriculture.
+1. Tree rigging hardware (e.g., lowering devices, blocks, pulleys, double sheave pulleys)
+2. Tree rigging systems and techniques (e.g., tag line, butt tie/tip tie)
+3. Tree characteristics and strength in relation to anchor point and anticipated forces in use during rigging
+Knowledge of:
+Task H: Remove trees using appropriate techniques to ensure accuracy and safety as well as processing the tree parts.
+1. Techniques for felling (e.g., assisted fell)
+2. Techniques for aerial dismantlement (e.g., free fall, cut
+and fall)
+3. Chainsaw safety features
+4. Cutting techniques (e.g., directional notch, spear cut,
+drop cut, snap cut)
+5. Tree removal safety hazards (e.g., barber chair, loss of
+directional control, lean, wind, power lines)
+6. Work positioning techniques to reduce repetitive strain
+injuries and minimize exposure to chainsaw kickback
+1. Developing a felling strategy considering terrain, built
+structures, lean, wind, natural direction of fall, targets,
+and direction of safe drop zone to aid the workflow
+2. Developing a felling escape route strategy
+3. Selecting and recommending appropriate tools to
+achieve directional control (e.g., tagline, rigging rope
+and mechanical advantage, falling wedges)
+4. Work positioning to maximize comfort and control
+and minimize exposure to kickback while handling a
+chainsaw
+Knowledge of: Skill in:
+Task I: Aid in providing care or oversight during emergency situations involving physical harm or hazardous conditions that
+pose a safety risk to the arborist, other workers, and other persons near the work zone.
+1. Emergency action plan
+2. First aid
+3. CPR
+4. Aerial rescue
+1. Assessing environmental hazards
+2. Securing the emergency site/scene
+3. Communicating with emergency responders during an
+emergency
+4. Documenting and communicating with stakeholders
+after the emergency
+Knowledge of: Skill in:
+Task J: Promote the importance of safety and training of safety procedures and behaviors.
+1. Safety procedures
+2. Relevant guidelines and standards for arboriculture
+work
+3. Importance of safety training (e.g., injury prevention,
+emergency preparedness, productivity)
+1. Communicating the benefits of safety training and
+procedures to coworkers, leadership, and other
+stakeholders
+Knowledge of: Skill in:
+Task F: Explain critical climbing tasks necessary to perform tree work safely.
+1. Climbing ropes and rope systems used in arboriculture
+2. Knots or rope tools which provide safe entry and activity in the tree
+3. Climbing techniques used for tie in and ascent
+4. Procedures for a safe and controlled ascent, descent, and tree work while aloft
+Knowledge of:
+
+Based on Job Task Analysis 2022 | 14
+Urban Forestry Weight: 6%
+Task A: Discuss the ecological, environmental, economic, social, health, and aesthetic benefits of urban forests and trees.
+1. Environmental benefits of trees (e.g., air quality, storm
+water retention, wildlife habitat)
+2. Economic benefits of trees (e.g., property value, return
+on investment)
+3. Sociological benefits of trees (e.g., recreation, quality of
+life, crime reduction)
+4. Health benefits of trees
+5. Aesthetic benefits of trees
+6. Benefit-cost ratio (BCR) and return on investment
+(ROI) associated with trees (e.g., benefits, maintenance
+and removal, risk management)
+1. Discussing benefits, tradeoffs and investment
+associated with trees with different stakeholders (e.g.,
+general public, tree owners, public servants, engineers)
+2. Recording appropriate tree attributes for calculating
+tree value
+3. Using established tree value calculators to determine
+the value of tree
+Knowledge of: Skill in:
+Task B: Explain accepted plant appraisal principles and approaches.
+1. Appraisal approaches
+2. Real estate value improvement
+3. Community tree benefits
+Knowledge of:
+
+Based on Job Task Analysis 2022 | 15
+Task E: Inform the public and various stakeholders regarding proper tree care and management practices.
+1. Industry-accepted tree care and maintenance practices
+for trees in an urban environment (e.g., planting,
+transplanting, pruning, plant health care, risk
+assessment, removal)
+1. Communicating with audiences of diverse gender,
+gender identity, ethnicity, race, educational
+background, level of knowledge of arboriculture,
+positions, and interests
+Knowledge of: Skill in:
+Task C: List possible regulatory ordinances and laws concerning trees.
+1. Ordinances and tree preservation orders (e.g., tree
+protection orders, by-laws, tree acts, tree protection
+law)
+2. Regional permitting and licensing procedures
+3. Regional laws concerning wildlife management and
+habitat protection
+4. Potential local laws and regulations (e.g., tree
+ordinances, wildlife protection ordinances, property
+and zoning laws)
+1. Referring to relevant laws and regulations from all
+levels of government
+2. Accessing and maintaining reference materials
+Knowledge of: Skill in:
+Task D: Explain the importance and benefits of developing and implementing an urban forestry management plan.
+1. Tree inventories
+2. Planting plans, initiatives, and canopy cover goals
+3. Sustainable initiatives (e.g., air quality improvement,
+waste reduction and recycling, emissions reduction,
+wildlife and habitat protection)
+4. Pruning/maintenance cycle
+5. Diversity of species management and planning
+6. Invasive species management
+7. Pests and diseases management
+1. Collecting tree data onsite (e.g., diameter, height,
+condition)
+Knowledge of: Skill in:
