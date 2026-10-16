@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
 import {
+  ASK_TOKEN_RATE,
   CAPTURE_TOKEN_RATE,
   captureTokenLabel,
   captureTokenVerdict,
   checkCaptureToken,
+  checkDashToken,
   hashCaptureToken,
   isCaptureTokenShape,
   makeCaptureToken,
@@ -66,8 +68,9 @@ describe('checking a presented token', () => {
       error: null,
     });
     expect(await checkCaptureToken(client, token, NOW)).toEqual({ ok: true, userId: 'u1', tokenId: 't1' });
-    expect(rpc).toHaveBeenCalledWith('use_capture_token', {
+    expect(rpc).toHaveBeenCalledWith('use_dash_token', {
       p_hash: hash,
+      p_kind: 'capture',
       p_per_minute: CAPTURE_TOKEN_RATE.perMinute,
       p_per_day: CAPTURE_TOKEN_RATE.perDay,
       p_now: new Date(NOW).toISOString(),
@@ -85,6 +88,31 @@ describe('checking a presented token', () => {
       status: 401,
       reason: 'revoked',
     });
+  });
+
+  it('checks an ask token for its own kind, under its own limits', async () => {
+    const { client, rpc } = rpcStub({
+      data: [{ outcome: 'ok', user_id: 'u1', token_id: 't1', retry_at: null }],
+      error: null,
+    });
+    await checkDashToken(client, makeCaptureToken().token, 'ask', NOW);
+    expect(rpc).toHaveBeenCalledWith('use_dash_token', expect.objectContaining({
+      p_kind: 'ask',
+      p_per_minute: ASK_TOKEN_RATE.perMinute,
+      p_per_day: ASK_TOKEN_RATE.perDay,
+    }));
+  });
+
+  it('refuses a token of the other kind and says which one is needed', async () => {
+    const { client } = rpcStub({
+      data: [{ outcome: 'other_kind', user_id: null, token_id: null, retry_at: null }],
+      error: null,
+    });
+    const asking = await checkDashToken(client, makeCaptureToken().token, 'ask', NOW);
+    expect(asking).toMatchObject({ ok: false, status: 401, reason: 'other_kind' });
+    if (!asking.ok) expect(asking.message).toMatch(/capture token, which can only add/);
+    const adding = await checkCaptureToken(client, makeCaptureToken().token, NOW);
+    if (!adding.ok) expect(adding.message).toMatch(/ask token/);
   });
 
   it('throws when the database cannot be asked, rather than letting the capture through', async () => {
@@ -110,6 +138,16 @@ describe('the verdict on a burst', () => {
     );
     if (verdict.ok) throw new Error('expected a refusal');
     expect(verdict.message).toContain('Try again in 5 hours');
+  });
+
+  it('names questions, not captures, when an ask token is full', () => {
+    const verdict = captureTokenVerdict(
+      { outcome: 'limited', user_id: 'u1', token_id: 't1', retry_at: new Date(NOW + 30_000).toISOString() },
+      NOW,
+      'ask',
+    );
+    if (verdict.ok) throw new Error('expected a refusal');
+    expect(verdict.message).toContain(`ask ${ASK_TOKEN_RATE.perMinute} a minute`);
   });
 
   it('treats no row as an unknown token', () => {
