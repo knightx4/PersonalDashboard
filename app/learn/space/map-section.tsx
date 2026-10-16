@@ -9,7 +9,14 @@ import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
-import { ideaGraph, openedFrom, paramsFor, type IdeaGraph } from '@/lib/learn/map/place-graph';
+import {
+  ideaGraph,
+  openedFrom,
+  paramsFor,
+  territoryGraph,
+  type IdeaGraph,
+  type Ladder,
+} from '@/lib/learn/map/place-graph';
 import { TOUR_DWELL_MS, tourScript, type TourScript } from '@/lib/learn/map/tour';
 import { dustAt } from '@/lib/learn/map/sky';
 import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/learn/map/lights-up';
@@ -259,6 +266,19 @@ function MapNotes({
   const bright = past
     ? 'A star is as bright as you knew the idea on the day shown.'
     : 'A star is as bright as you know the idea today.';
+  if (graph?.ladders) {
+    return (
+      <div className="mt-2 space-y-1 text-ui text-ink-muted">
+        <p>
+          Every topic of this goal is a star, and each line points at a topic it requires. The arc round a star is how
+          far up its ladder you are, solid as far as an answer showed and faint where you hold it without one; the
+          dashed ring is the goal&rsquo;s target, and a red ring marks a level you missed. Point at or tap a star to
+          see everything it requires and the level each needs.
+        </p>
+        {graph.next.length > 0 && <p>The faint ideas round the edge are next door. Tap one to go there.</p>}
+      </div>
+    );
+  }
   if (graph) {
     return (
       <div className="mt-2 space-y-1 text-ui text-ink-muted">
@@ -463,8 +483,12 @@ export function useOpenGraph(view: IdeaMapView): IdeaGraph | null {
   const { params } = usePick();
   return useMemo(() => {
     const opened = openedFrom(params);
+    if (opened?.kind === 'territory') {
+      const territory = view.territories?.find((t) => t.id === opened.id);
+      return territory ? territoryGraph(territory, opened.topic, view.ideas, view.places, params.layout) : null;
+    }
     return opened ? ideaGraph(view.ideas, view.places, opened) : null;
-  }, [view.ideas, view.places, params]);
+  }, [view.ideas, view.places, view.territories, params]);
 }
 
 /** Above an open graph: the way back to the whole map, and what is open. */
@@ -481,7 +505,7 @@ function GraphBar({
   set: (change: Partial<MapParams>) => void;
   tour: Tour;
 }) {
-  const back = { place: null, around: null };
+  const back = { place: null, around: null, topic: null };
   const strengthOf = new Map(view.ideas.map((idea) => [idea.id, idea.strength]));
   const known = graph.core.filter((id) => (strengthOf.get(id) ?? 0) > 0).length;
   return (
@@ -496,14 +520,23 @@ function GraphBar({
         Whole map
       </Link>
       <h2 className="min-w-0 text-body font-medium text-ink">
-        {graph.opened.kind === 'place' ? graph.title : `Around \u201c${graph.title}\u201d`}
+        {graph.opened.kind === 'around' ? `Around \u201c${graph.title}\u201d` : graph.title}
         <span className="tabular ml-2 text-ui font-normal text-ink-muted">
-          {plural(graph.core.length, 'idea')}, {countText(known)} known
+          {graph.ladders
+            ? `${plural(graph.core.length, 'topic')}, ${countText(atTarget(graph.ladders))} at target`
+            : `${plural(graph.core.length, 'idea')}, ${countText(known)} known`}
         </span>
       </h2>
       <TourButton tour={tour} />
     </div>
   );
+}
+
+/** How many of a territory's topics hold their target level; a topic with no target is not counted. */
+function atTarget(ladders: ReadonlyMap<string, Ladder>): number {
+  let n = 0;
+  for (const ladder of ladders.values()) if (ladder.target !== null && ladder.held >= ladder.target) n += 1;
+  return n;
 }
 
 // -- An idea lights up (plan #1997.10) -----------------------------------------

@@ -35,6 +35,14 @@ export type MapParams = {
    */
   place: string | null;
   around: string | null;
+  /**
+   * The goal whose territory is chosen (plan #2187), by its lens's id, and
+   * the topic of it opened as the territory's graph (plan #2187.3). A topic
+   * opens only with a goal, and its graph takes the place of `place` and
+   * `around`.
+   */
+  goal: string | null;
+  topic: string | null;
 };
 
 /**
@@ -48,6 +56,8 @@ export const DEFAULT_PARAMS: MapParams = {
   domain: null,
   place: null,
   around: null,
+  goal: null,
+  topic: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -61,12 +71,16 @@ export function parseMapParams(search: Search): MapParams {
   const domain = one(search.domain)?.trim();
   const place = one(search.place)?.trim();
   const around = one(search.around)?.trim();
+  const goal = one(search.goal)?.trim() || null;
+  const topic = (goal && one(search.topic)?.trim()) || null;
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
     idea: idea ? idea : null,
     domain: domain ? domain : null,
     place: place ? place : null,
     around: !place && around ? around : null,
+    goal,
+    topic,
   };
 }
 
@@ -79,6 +93,10 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   if (next.domain) query.set('domain', next.domain);
   if (next.place) query.set('place', next.place);
   else if (next.around) query.set('around', next.around);
+  if (next.goal) {
+    query.set('goal', next.goal);
+    if (next.topic) query.set('topic', next.topic);
+  }
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }

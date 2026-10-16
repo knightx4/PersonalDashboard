@@ -12,6 +12,7 @@ import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
+import { TERRITORY_GOAL, TERRITORY_OPEN, TERRITORY_POINTED, territoryFixture } from './idea-space-territory';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -596,6 +597,23 @@ export function IdeaSpaceReplaySurface() {
 export function IdeaSpaceAroundSurface() {
   const loose = VIEW.ideas.find((idea) => idea.name === 'Write the summary before the detail')!.id;
   return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, around: loose }} />;
+}
+
+/**
+ * A goal's territory opened on one of its topics (plan #2187.3): the topics as
+ * stars with their arcs and target rings, requirement links with arrowheads,
+ * and the ideas next door round the edge.
+ */
+const TERRITORY_VIEW = { ...VIEW, territories: [territoryFixture(VIEW.ideas)] };
+const TERRITORY_PARAMS = { ...DEFAULT_PARAMS, goal: TERRITORY_GOAL, topic: TERRITORY_OPEN };
+
+export function IdeaSpaceTerritorySurface() {
+  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} />;
+}
+
+/** The same territory with its most linked star pointed at: every link it has, the level each needs, and its level line. */
+export function IdeaSpaceTerritoryHoverSurface() {
+  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} pointingAt={TERRITORY_POINTED} />;
 }
 
 export function IdeaSpaceDenseSurface() {

@@ -317,6 +317,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-replay': ['/learn/space'],
   'learn-idea-space-lights': ['/learn/space'],
   'learn-idea-space-around': ['/learn/space'],
+  'learn-idea-space-territory': ['/learn/space'],
+  'learn-idea-space-territory-hover': ['/learn/space'],
   'learn-idea-space-recording': ['/learn/space'],
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],

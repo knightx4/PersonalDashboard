@@ -84,7 +84,7 @@ export function IdeaSpaceView({
         path: [
           { label: 'Learn', href: '/learn' },
           { label: 'Know', href: '/learn/know' },
-          { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null }) },
+          { label: 'Idea Space', href: mapHref(params, { idea: null, place: null, around: null, topic: null }) },
         ],
       }}
       title="Idea Space"
