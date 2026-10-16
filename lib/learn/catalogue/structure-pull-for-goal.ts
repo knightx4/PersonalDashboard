@@ -67,7 +67,7 @@ export type CandidateProvider = {
 const hostList = (hosts: readonly { host: string }[]) => [...new Set(hosts.map((h) => `https://${h.host}/`))].join(', ');
 
 const ALLOWLISTED_EXPLAINERS = `Name pages on these sites only: ${hostList(EXPLAINER_HOSTS)}. The Federal Reserve's "The Fed Explained" index (https://www.federalreserve.gov/aboutthefed/the-fed-explained.htm) and the Avalon Project's century menus (https://avalon.law.yale.edu/subject_menus/18th.asp and the like) are what is read.`;
-const ALLOWLISTED_PRACTICAL = `Name pages on these sites only: ${hostList(PRACTICAL_SOURCES)}. Extension short-course pages and certification exam outlines are what is read.`;
+const ALLOWLISTED_PRACTICAL = `Name only these pages, and only those that teach this skill: ${PRACTICAL_SOURCES.flatMap((s) => s.pages).join(', ')}. They are extension short-course pages, certification exam outlines and practitioners' guides.`;
 
 export const CANDIDATE_PROVIDERS: Partial<Record<ProviderId, CandidateProvider>> = {
   yale: {
@@ -103,13 +103,13 @@ export const CANDIDATE_PROVIDERS: Partial<Record<ProviderId, CandidateProvider>>
   },
   extension: {
     id: 'extension',
-    ask: `Name cooperative extension short-course pages that teach this skill lesson by lesson. ${ALLOWLISTED_PRACTICAL}`,
+    ask: `Name cooperative extension short-course pages or practitioners' guides that teach this skill lesson by lesson or section by section. ${ALLOWLISTED_PRACTICAL}`,
     read: (value) => (practicalSourceFor(value.trim()) ? value.trim() : null),
     pull: async (url) => pullPractical(url),
   },
   certification: {
     id: 'certification',
-    ask: `Name certification exam outlines for this skill. ${ALLOWLISTED_PRACTICAL}`,
+    ask: `Name certification exam outlines or practitioners' guides for this skill. ${ALLOWLISTED_PRACTICAL}`,
     read: (value) => (practicalSourceFor(value.trim()) ? value.trim() : null),
     pull: async (url) => pullPractical(url),
   },
