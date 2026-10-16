@@ -298,7 +298,7 @@ export function ChipSelect({
   return (
     <span
       className={cn(
-        'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
+        'group/chip press press-area inline-flex max-w-full items-center gap-1.5 rounded-control',
         'border border-transparent px-1.5 py-0.5 text-ui',
         'hover:bg-sunken',
         'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',

@@ -10,6 +10,7 @@ import { AIM_DEPTHS, AIM_DEPTH_LABELS, type AimDepth, type Level3Counts } from '
 import { GOAL_KINDS, GOAL_KIND_LABELS, type GoalKind, type GoalKindBy } from '@/lib/learn/goal-kind';
 import { setLearnDepth, setLearnKind, type LearnDepthState, type LearnKindState } from './learn-actions';
 import { formatNumber } from '@/lib/money';
+import { cn } from '@/lib/cn';
 
 const initial: LearnDepthState = {};
 const initialKind: LearnKindState = {};
@@ -126,7 +127,7 @@ export function GoalLearn({
           {plan && (
             <span className="flex items-center gap-1">
               <Route className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-              <Link href={plan.href} className={linkVariants()}>
+              <Link href={plan.href} className={cn(linkVariants(), 'press-area')}>
                 Open the plan
               </Link>
               <span className="tabular-nums">· {plan.line}</span>
@@ -137,7 +138,7 @@ export function GoalLearn({
             <Link
               href={practiceHref({ goal: aim.id })}
               aria-label={`Practise ${aim.name}`}
-              className={linkVariants()}
+              className={cn(linkVariants(), 'press-area')}
             >
               Practise
             </Link>

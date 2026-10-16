@@ -172,6 +172,7 @@ describe('RLS coverage', () => {
       'subjects',
       'theme_fields',
       'topic_cells',
+      'topic_structure_pulls',
       'topics',
       'track_offers',
       'tracks',
