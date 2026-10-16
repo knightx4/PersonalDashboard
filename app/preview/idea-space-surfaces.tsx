@@ -450,6 +450,8 @@ function fixture(): IdeaMapView {
     },
     similarPairs: [
       pair('Annual recurring revenue', 'Net revenue retention above 100%', 0.91),
+      // Across two subjects, so the card names them and links to the pairs page (plan #2147.2).
+      pair('Working capital ties up cash', 'Opportunity cost', 0.9),
       pair('Spacing effect in memory', 'Retrieval practice beats rereading', 0.9),
       pair('Customer acquisition cost payback', 'Lifetime value to CAC ratio', 0.89),
       pair('Discounted cash flow valuation', 'Terminal value dominates a DCF', 0.88),

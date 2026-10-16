@@ -342,6 +342,10 @@ export const learnSources: ModuleSources = {
     },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
+    {
+      table: 'learn.idea_pair_reviews',
+      reason: 'Which near-identical pairs of ideas were merged or kept, so a settled pair is not listed again.',
+    },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },
     { table: 'learn.note_reads', reason: 'Counts from reading a note for concepts, for the report on approval.' },
     { table: 'learn.opening_questions', reason: 'Placement questions for a new subject.' },
