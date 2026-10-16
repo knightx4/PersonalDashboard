@@ -1,4 +1,6 @@
+import { sourceDocuments, type FinishDetail, type SourceDocument } from './finish-step';
 import type { PreparationRow, PreparationStepRow } from './run';
+import type { PulledDocument } from './structure-steps';
 import { PREPARATION_STEP_LABELS, type PreparationStepKey } from './steps';
 
 /**
@@ -96,6 +98,32 @@ function lineFor(step: PreparationStepRow, current: boolean, starting: boolean):
 }
 
 /**
+ * What a finished run found, one count from the step that owns it (plan
+ * #2276.6). Summing every step's counts counted documents three times (the
+ * pull, the match and the territory each record one) and added the pull's
+ * stored weeks to the units written, so each count is read from its own step:
+ * documents stored by the pull, weeks matched, topics drafted, units written.
+ * A zero is left out; the Sources list says when nothing was stored.
+ */
+const FINISHED_COUNTS: [step: PreparationStepKey, from: string, as: string][] = [
+  ['pull_documents', 'documents', 'documents'],
+  ['match_weeks', 'weeks', 'weeks'],
+  ['draft_topics', 'drafted', 'topics'],
+  ['write_units', 'units', 'units'],
+];
+
+function finishedCounts(steps: readonly PreparationStepRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, from, as] of FINISHED_COUNTS) {
+    const counts = steps.find((s) => s.key === key)?.counts ?? {};
+    // A run from before draft_topics recorded `drafted` kept the drafted count under `topics`.
+    const n = counts[from] ?? (key === 'draft_topics' ? counts.topics : undefined);
+    if (typeof n === 'number' && Number.isFinite(n) && n > 0) out[as] = n;
+  }
+  return out;
+}
+
+/**
  * The page's reading of a run. `null` is a subject with no run, which only a
  * subject made before preparation existed has.
  */
@@ -109,12 +137,7 @@ export function preparationView(
 
   if (run.status === 'done') {
     const took = tookLine(run.startedAt, run.finishedAt);
-    const found = countsLine(
-      steps.reduce<Record<string, number>>((all, step) => {
-        for (const [key, n] of Object.entries(step.counts)) all[key] = (all[key] ?? 0) + n;
-        return all;
-      }, {}),
-    );
+    const found = countsLine(finishedCounts(steps));
     const head = took ? `Prepared in ${took}` : 'Prepared';
     return { kind: 'finished', summary: found ? `${head} · ${found}` : head };
   }
@@ -143,4 +166,51 @@ export function preparationView(
 
   const lines = steps.map((s) => lineFor(s, s.key === currentKey, starting));
   return { kind: 'working', lines, position, total, starting };
+}
+
+/**
+ * Where a finished preparation says to start and what it came from (plan
+ * #2276.6), read from the finish step's detail. A run that finished before
+ * the finish step kept these still lists the documents the pull stored. Null
+ * until the run is done.
+ */
+export type PreparationSources = {
+  /** The finished line, as the folded block shows it. */
+  summary: string;
+  start: FinishDetail['start'];
+  documents: SourceDocument[];
+  frames: string[];
+};
+
+const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
+
+function readStart(value: unknown): FinishDetail['start'] {
+  const start = (value && typeof value === 'object' ? value : {}) as { unit?: unknown; topic?: unknown };
+  const topic = start.topic as { id?: unknown; name?: unknown; ask?: unknown } | null | undefined;
+  return {
+    unit: typeof start.unit === 'string' ? start.unit : null,
+    topic:
+      topic && typeof topic.id === 'string' && typeof topic.name === 'string'
+        ? { id: topic.id, name: topic.name, ask: typeof topic.ask === 'string' ? topic.ask : topic.name }
+        : null,
+  };
+}
+
+export function preparationSources(
+  prep: { run: PreparationRow; steps: PreparationStepRow[] } | null,
+): PreparationSources | null {
+  if (!prep || prep.run.status !== 'done') return null;
+  const view = preparationView(prep);
+  const summary = view.kind === 'finished' ? view.summary : 'Prepared';
+  const finish = prep.steps.find((s) => s.key === 'finish')?.detail ?? {};
+  const pulled = prep.steps.find((s) => s.key === 'pull_documents')?.detail?.documents;
+  const documents = Array.isArray(finish.documents)
+    ? (finish.documents as SourceDocument[])
+    : sourceDocuments(Array.isArray(pulled) ? (pulled as PulledDocument[]) : [], null);
+  return {
+    summary,
+    start: readStart(finish.start),
+    documents: documents.filter((d) => d && typeof d.title === 'string'),
+    frames: isStrings(finish.frames) ? finish.frames : [],
+  };
 }
