@@ -17,6 +17,7 @@ import {
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
+import { DELETE_NOUNS } from '@/lib/ask/deletable';
 import { DeleteDialog } from './delete-dialog';
 import { PaidCard, type PaidChange } from './paid-card';
 
@@ -254,6 +255,7 @@ export function DashChangeRow({
         <DeleteDialog
           count={change.input.count}
           titles={change.input.titles}
+          noun={DELETE_NOUNS[change.input.table]}
           pending={pressing === 'confirm'}
           error={error}
           onDelete={() => press('confirm')}
