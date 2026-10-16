@@ -119,9 +119,9 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
     },
   },
   // A task. Its subtasks (parent_id) would be deleted with it by the cascade,
-  // so a task that has any is refused (decision #2266.1). Its links to a role,
-  // note and so on cascade too but are not attachments: Undo puts the task
-  // back without them.
+  // so a task that has any is refused (decision #2266.1). So is a task with
+  // links (task_links) to a role, note and so on: they cascade too, and Undo
+  // restores only the task row.
   'todo.tasks': {
     schema: 'todo',
     table: 'tasks',
@@ -138,15 +138,23 @@ export const DELETABLE: Record<DeletableTable, Deletable> = {
       const taskIds = ids(rows, 'id');
       if (taskIds.length === 0) return null;
       const client = await db('todo');
-      const { data, error } = await client.from('tasks').select('id, parent_id').in('parent_id', taskIds).eq('user_id', userId);
-      if (error) throw new Error(`tasks: ${error.message}`);
-      const subtasks = (data ?? []) as unknown as Values[];
-      if (subtasks.length === 0) return null;
-      const withSubtasks = rows.filter((r) => subtasks.some((s) => s.parent_id === r.id));
-      const names = withSubtasks.map((r) => `"${clip(String(r.title ?? 'Untitled'), 40)}"`).join(', ');
-      return withSubtasks.length === 1
-        ? `The task ${names} has ${subtasks.length === 1 ? 'a subtask' : `${subtasks.length} subtasks`}, and deleting it would delete them too.`
-        : `These tasks have subtasks, and deleting them would delete the subtasks too: ${names}.`;
+      const [subs, links] = await Promise.all([
+        client.from('tasks').select('id, parent_id').in('parent_id', taskIds).eq('user_id', userId),
+        client.from('task_links').select('id, task_id').in('task_id', taskIds),
+      ]);
+      if (subs.error) throw new Error(`tasks: ${subs.error.message}`);
+      if (links.error) throw new Error(`task_links: ${links.error.message}`);
+      const subtasks = (subs.data ?? []) as unknown as Values[];
+      const linked = (links.data ?? []) as unknown as Values[];
+      if (subtasks.length === 0 && linked.length === 0) return null;
+      const attached = rows.filter((r) => subtasks.some((s) => s.parent_id === r.id) || linked.some((l) => l.task_id === r.id));
+      const names = attached.map((r) => `"${clip(String(r.title ?? 'Untitled'), 40)}"`).join(', ');
+      const has: string[] = [];
+      if (subtasks.length > 0) has.push(subtasks.length === 1 ? 'a subtask' : `${subtasks.length} subtasks`);
+      if (linked.length > 0) has.push(linked.length === 1 ? 'a link to another item' : `${linked.length} links to other items`);
+      return attached.length === 1
+        ? `The task ${names} has ${has.join(' and ')}, and deleting it would delete them too.`
+        : `These tasks have ${has.join(' and ')} between them, and deleting them would delete those too: ${names}.`;
     },
   },
 };
