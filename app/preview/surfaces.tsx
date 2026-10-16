@@ -65,6 +65,13 @@ import {
   IdeaSpaceThenPickSurface,
   IdeaSpaceThenThinSurface,
 } from './idea-space-surfaces';
+import {
+  IdeaPairSurface,
+  IdeaPairsEmptySurface,
+  IdeaPairsErrorSurface,
+  IdeaPairsLoadingSurface,
+  IdeaPairsSurface,
+} from './idea-pairs-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
@@ -6831,6 +6838,49 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceRecordingSurface />,
+  },
+  {
+    /* The same idea in two subjects (plan #2147.2): the pairs still to
+     * settle, closest first, each named by the idea a merge would keep.
+     * Fixtures in idea-pairs-surfaces.tsx. */
+    id: 'learn-idea-pairs',
+    label: 'Learn · Same idea twice',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsSurface />,
+  },
+  {
+    /* One pair open: the two ideas side by side, the tested one kept on a
+     * merge, and keeping both carrying Known across. */
+    id: 'learn-idea-pairs-pair',
+    label: 'Learn · Same idea twice, a pair open',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairSurface />,
+  },
+  {
+    /* No pair left to settle. */
+    id: 'learn-idea-pairs-empty',
+    label: 'Learn · Same idea twice, none',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsEmptySurface />,
+  },
+  {
+    /* While the pairs are read. */
+    id: 'learn-idea-pairs-loading',
+    label: 'Learn · Same idea twice, loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsLoadingSurface />,
+  },
+  {
+    /* The pairs could not be read. */
+    id: 'learn-idea-pairs-error',
+    label: 'Learn · Same idea twice, not read',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsErrorSurface />,
   },
   {
     /* Recording mode off, two places ticked to hide, in the rail's card. */

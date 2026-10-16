@@ -138,6 +138,7 @@ describe('RLS coverage', () => {
       'feed_cards',
       'goals',
       'graph_moves',
+      'idea_pair_reviews',
       'idea_place_members',
       'idea_places',
       'idea_topic_parents',
@@ -2344,6 +2345,23 @@ describe('places on Idea Space (plan #1997.2)', () => {
     ).rejects.toThrow();
     await admin`delete from concepts where id = ${conceptA}`;
     expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(0);
+  });
+});
+
+describe('settled idea pairs (plan #2147.2)', () => {
+  it('shows the owner their reviews and nobody else, and leaves the writing to the functions', async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Pairs subject') returning id`;
+    const ids = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      select ${userA}, ${subject.id}, n, 'A claim.', 'Written by hand for this test.'
+      from unnest(array['Pair one', 'Pair two']) n returning id`;
+    const [low, high] = ids.map((r) => r.id).sort();
+    await admin`insert into idea_pair_reviews (user_id, concept_low, concept_high, decision, similarity)
+                values (${userA}, ${low}, ${high}, 'kept', 0.9)`;
+    expect(await asUser(userA, (tx) => tx`select 1 from idea_pair_reviews`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select 1 from idea_pair_reviews`)).toHaveLength(0);
+    await expect(asUser(userA, (tx) => tx`delete from idea_pair_reviews`)).rejects.toThrow();
   });
 });
 

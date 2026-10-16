@@ -97,6 +97,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/learn/settings/external',
   '/learn/settings/external/[id]',
   '/learn/space',
+  '/learn/space/pairs',
+  '/learn/space/pairs/[a]/[b]',
   '/learn/t/[id]',
   '/learn/today',
   '/learn/topics',

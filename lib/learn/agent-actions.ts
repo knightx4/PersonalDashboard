@@ -127,6 +127,10 @@ export const learnActions: ModuleActions = {
   'app/learn/space/actions.ts': {
     saveRecordingAction: none('setting'),
   },
+  'app/learn/space/pairs/actions.ts': {
+    mergeIdeasAction: none('theirs', 'Whether two ideas are one is the person\'s call; closeness only found the pair.'),
+    keepBothIdeasAction: none('theirs', 'Whether two ideas are one is the person\'s call; closeness only found the pair.'),
+  },
   'app/learn/know/actions.ts': {
     proposeGoal: {
       tool: 'draft_topic',
