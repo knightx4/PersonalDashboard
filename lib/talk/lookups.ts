@@ -98,7 +98,28 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
  * same reason: each queues a press that has its line on the approval card
  * under the answer (plan #2228.2). A test holds the two lists together.
  */
-export const PAID_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = ['write_year_review'];
+export const PAID_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
+  'write_year_review',
+  'draft_answer',
+  'draft_application_answers',
+  'draft_cover_letter',
+  'find_startups',
+  'suggest_people',
+  'find_openings',
+  'match_role_requirements',
+  'draft_topic',
+  'make_learn_subject',
+  'write_subject_curriculum',
+  'add_plan_unit',
+  'summarize_reading',
+  'retry_research_brief',
+  'write_quiz_questions',
+  'read_personality_again',
+  'read_resume_jobs',
+  'ask_maya',
+  'price_items_for_sale',
+  'remake_newsletter_picks',
+];
 
 /**
  * Writes, proposals and paid presses have their cards under the answer, a hand-off says so

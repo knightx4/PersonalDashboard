@@ -216,7 +216,7 @@ describe('DASH_TOOLS', () => {
 
   it('keeps paid presses out of the lookup lines, since each has a line on the approval card', () => {
     const names = PAID_TOOLS.map((tool) => tool.name);
-    expect([...PAID_TOOL_NAMES_SHOWN_AS_CARDS]).toEqual(names);
+    expect([...PAID_TOOL_NAMES_SHOWN_AS_CARDS].sort()).toEqual([...names].sort());
     for (const name of names) expect(isShownLookup(name)).toBe(false);
   });
 });
