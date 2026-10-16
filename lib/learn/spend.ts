@@ -425,6 +425,9 @@ export const LEARN_OPERATIONS = [
   // Embedding a goal and its performances as queries to find the stored weeks
   // and chapters about it (plan #2247.10). One call per territory tick.
   'match-structure-units',
+  // Proposing and confirming one structure document for a topic that just lit
+  // (plan #2247.11): the daily run's own pulls, at most five a day.
+  'pull-lit-topic-structure',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

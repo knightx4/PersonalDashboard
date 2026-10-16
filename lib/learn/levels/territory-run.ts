@@ -2,6 +2,7 @@ import 'server-only';
 
 import type postgres from 'postgres';
 import type { SpendReport } from '@/lib/core/spend/pricing';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { recordSpend } from '@/lib/core/spend/record';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
@@ -173,9 +174,10 @@ export async function draftTerritoryTick(
         },
         pull: async () => {
           const spent: SpendReport[] = [];
+          const jevEnabled = await jevEnabledFor(core, owner);
           const pulled = await pullStructureForGoal(
             territory.kind ?? null,
-            liveGoalPullPorts({ sql: catalogue, goal, anthropicApiKey: input.anthropicApiKey, onSpend: (r) => spent.push(r) }),
+            liveGoalPullPorts({ sql: catalogue, goal, anthropicApiKey: input.anthropicApiKey, jevEnabled, onSpend: (r) => spent.push(r) }),
           );
           await ledger('propose-structure-sources', spent);
           return pulled;
