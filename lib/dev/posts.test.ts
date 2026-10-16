@@ -208,6 +208,9 @@ describe('socialPostFromRow and sortPosts', () => {
     const suggested = socialPostFromRow({ ...base, id: '2', status: 'suggested' });
     expect(posted.sourceFeedbackIds).toEqual([]);
     expect(sortPosts([posted, suggested]).map((p) => p.id)).toEqual(['2', '1']);
+    const planned = socialPostFromRow({ ...base, id: '3', status: 'planned' });
+    expect(planned.status).toBe('planned');
+    expect(sortPosts([posted, suggested, planned]).map((p) => p.id)).toEqual(['3', '2', '1']);
   });
 });
 

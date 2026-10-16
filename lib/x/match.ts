@@ -96,7 +96,7 @@ export type MatchPost = { xPostId: string; text: string; createdAt: string; url:
 /** A draft, as the match reads it. */
 export type MatchDraft = {
   id: string;
-  status: 'suggested' | 'posted' | 'dropped';
+  status: 'suggested' | 'planned' | 'posted' | 'dropped';
   /** The first post of the thread as it stands now. */
   firstPost: string;
   /** The first post as Dash first wrote it, also compared. */
@@ -269,7 +269,7 @@ export async function matchXPosts(db: Db, userId: string): Promise<MatchResult> 
       })
       .eq('user_id', userId)
       .eq('id', draftId)
-      .in('status', ['suggested', 'dropped'])
+      .in('status', ['suggested', 'planned', 'dropped'])
       .is('posted_url', null)
       .select('id');
     if (e) throw new Error(`Could not mark a draft posted: ${e.message}`);

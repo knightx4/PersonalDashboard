@@ -100,6 +100,20 @@ const ROWS = [
   },
 ];
 
+/** Planned, the longest angle the tab allows and a source, so the section heads a full card. */
+const PLANNED_ROW = {
+  ...base,
+  id: 'p6',
+  angle: 'Planned for Thursday: a promoted draft sits above the suggestions until it is posted or demoted',
+  status: 'planned',
+  draft: ['d'],
+  body: [
+    'A draft I want to post this week gets a Promote button. It moves into a Planned section above the rest, and Demote sends it back if I change my mind.',
+  ],
+  source_plan_item_ids: ['s4'],
+  created_at: '2026-10-01T09:00:00Z',
+};
+
 const STEPS = [
   { id: 's1', number: 917, title: 'Price every paid press in Learn', outline: '905.3' },
   { id: 's2', number: 918, title: 'Price the paid presses in the other workspaces', outline: '905.4' },
@@ -115,7 +129,7 @@ export function PostsSurface({
   wantsPreview?: { open?: boolean; pending?: boolean; error?: string };
 } = {}) {
   const page = buildPostsPage({
-    posts: ROWS.map((row) => socialPostFromRow(row)),
+    posts: [...ROWS, PLANNED_ROW].map((row) => socialPostFromRow(row)),
     steps: STEPS,
     notes: [],
     run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, note: null, drafts: 2 },
