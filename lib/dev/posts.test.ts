@@ -172,6 +172,26 @@ describe('postsRunText', () => {
   });
 });
 
+describe('postsRunText with saved wants', () => {
+  it('quotes the saved text under its own heading, line by line', () => {
+    const text = postsRunText({ userId: 'u', wants: 'More about the gate\nLess about plans' });
+    expect(text).toContain('What the person wants from their posts');
+    expect(text).toContain('> More about the gate\n> Less about plans');
+  });
+
+  it('quotes it in every kind of run', () => {
+    expect(postsRunText({ userId: 'u', focus: { number: 5 }, wants: 'short' })).toContain('> short');
+    expect(postsRunText({ userId: 'u', focus: { ask: 'x' }, wants: 'short' })).toContain('> short');
+  });
+
+  it('is unchanged when nothing is saved', () => {
+    const plain = postsRunText({ userId: 'u' });
+    expect(plain).not.toContain('What the person wants');
+    expect(postsRunText({ userId: 'u', wants: '' })).toBe(plain);
+    expect(postsRunText({ userId: 'u', wants: '  \n ' })).toBe(plain);
+  });
+});
+
 describe('socialPostFromRow and sortPosts', () => {
   it('reads a row and puts suggested ones first', () => {
     const base = {

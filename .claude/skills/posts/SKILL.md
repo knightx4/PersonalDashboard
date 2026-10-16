@@ -55,6 +55,12 @@ order by created_at desc limit 1;
 
 Run by hand with no row, `run_id` stays null.
 
+When the turn quotes what the person wants from their posts (plan #2227), read
+it before choosing angles, in every kind of run. Count it as direction on
+topic and tone. The voice guide's privacy and length checks win where they
+disagree with it. A turn with no such quote means nothing is saved: choose
+angles as you otherwise would.
+
 ## 1. Read the guide
 
 Read `docs/X-POSTS.md` in full before drafting anything, and
