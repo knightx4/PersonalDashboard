@@ -36,11 +36,13 @@ function setup(opts: { enabled?: ProposeContext['enabledModules']; seen?: string
       { id: id(23), user_id: THEM, body: 'Not mine', role_id: id(71), company_id: null, contact_id: null, pinned: false },
     ],
     tasks: [
+      { id: id(35), user_id: ME, title: 'Renew passport', parent_id: null, status: 'open' },
       { id: id(30), user_id: ME, title: 'Book the dentist', parent_id: null, status: 'open' },
       { id: id(31), user_id: ME, title: 'Plan the move', parent_id: null, status: 'open' },
       { id: id(32), user_id: ME, title: 'Find a van', parent_id: id(31), status: 'open' },
       { id: id(33), user_id: THEM, title: 'Not mine', parent_id: null, status: 'open' },
     ],
+    task_links: [{ id: id(40), task_id: id(35), role_id: id(70) }],
     questions: [
       { id: id(60), user_id: ME, text: 'Why us?' },
       { id: id(61), user_id: ME, text: 'Why this role?' },
@@ -200,6 +202,17 @@ describe('propose_delete on tasks (plan #2266.3)', () => {
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining('Plan the move') });
     expect(result).toMatchObject({ error: expect.stringContaining('a subtask') });
     expect(kept).toEqual([]);
+  });
+
+  it('declines a task with links, reporting subtasks and links together', async () => {
+    const linked = setup({ seen: [id(35)], enabled: ['todo'] });
+    const result = await executeProposal('propose_delete', { table: TASKS, refs: [id(35)] }, linked.ctx);
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('Renew passport') });
+    expect(result).toMatchObject({ error: expect.stringContaining('a link to another item') });
+    expect(linked.kept).toEqual([]);
+    const both = setup({ seen: [id(31), id(35)], enabled: ['todo'] });
+    const mixed = await executeProposal('propose_delete', { table: TASKS, refs: [id(31), id(35)] }, both.ctx);
+    expect(mixed).toMatchObject({ error: expect.stringContaining('a subtask and a link') });
   });
 
   it('refuses a task that is not theirs, and the workspace off', async () => {
