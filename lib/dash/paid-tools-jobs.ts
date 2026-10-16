@@ -1,6 +1,8 @@
 import { parseRef, toRef } from '@/lib/core/refs';
 import { draftAnswerFor, draftApplicationAs, draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
-import type { DashPaidCheckContext, DashPaidTool } from './registry';
+import { matchRoleRequirementsFor } from '@/lib/jobs/evidence/match-run';
+import { findStartupsFor, startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
+import type { DashPaidCheckContext, DashPaidRunContext, DashPaidTool } from './registry';
 
 /**
  * Dash's paid tools for the Jobs drafting buttons (plan #2228.3): Draft on one
@@ -270,5 +272,195 @@ export const draftCoverLetterTool: DashPaidTool = {
   },
 };
 
+const NO_INPUT = { type: 'object', properties: {}, additionalProperties: false } as const;
+
+function jobsOff(ctx: DashPaidCheckContext): Refusal | null {
+  return ctx.enabledModules.includes('jobs')
+    ? null
+    : { ok: false, error: 'The Jobs workspace is switched off, so nothing can be searched there.' };
+}
+
+/** The id of the person's newest row in a table, by a column, optionally of one kind. */
+async function newestId(
+  ctx: DashPaidRunContext,
+  table: string,
+  by: string,
+  kind?: string,
+): Promise<string | null> {
+  const jobs = await ctx.db('job_search');
+  let query = jobs.from(table).select('id').eq('user_id', ctx.userId);
+  if (kind) query = query.eq('kind', kind);
+  const [row] = await rows<{ id: string }>(query.order(by, { ascending: false }).limit(1));
+  return row?.id ?? null;
+}
+
+/** The Find startups button on Find (plan #2228.3). */
+export const findStartupsTool: DashPaidTool = {
+  name: 'find_startups',
+  kind: 'paid',
+  inAppOnly: true,
+  action: 'app/jobs/(app)/find/actions.ts#findStartups',
+  runs: 'lib/jobs/suggest/press.ts#findStartupsFor',
+  workspace: 'jobs',
+  definition: {
+    name: 'find_startups',
+    description: `Find startups for them to follow: a new shortlist from the YC and Hacker News hiring lists, scored for fit with their aims, then the job boards of what it found. The startups land on Find for them to add to their companies. ${QUEUED}`,
+    input_schema: NO_INPUT,
+  },
+  async prepare(ctx) {
+    return (
+      jobsOff(ctx) ?? {
+        ok: true,
+        args: {},
+        line: 'Find new startups to follow from the YC and Hacker News hiring lists.',
+        paths: ['/jobs/find'],
+      }
+    );
+  },
+  async run(ctx) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { ok: false, error: 'The startup search is not configured.' };
+    const result = await findStartupsFor(ctx.userId, apiKey);
+    if (result.error) return { ok: false, error: result.error };
+    if (result.message?.includes('already running')) return { ok: false, error: result.message };
+    const id = await newestId(ctx, 'discovery_runs', 'started_at');
+    if (!id) return { ok: false, error: 'Dash searched, but the run could not be read back.' };
+    return { ok: true, subjectRef: toRef('job_search.discovery_runs', id), op: 'insert', summary: result.message ?? 'Dash searched for startups.' };
+  },
+};
+
+/** The Suggest people button on Find (plan #2228.3). */
+export const suggestPeopleTool: DashPaidTool = {
+  name: 'suggest_people',
+  kind: 'paid',
+  inAppOnly: true,
+  action: 'app/jobs/(app)/find/recommend-actions.ts#suggestPeople',
+  runs: 'lib/jobs/suggest/press.ts#suggestPeopleFor',
+  workspace: 'jobs',
+  definition: {
+    name: 'suggest_people',
+    description: `Look for new people for them to meet, from their career goals and roles, and add them to the people to meet on Find. Nothing is sent to anyone. ${QUEUED}`,
+    input_schema: NO_INPUT,
+  },
+  async prepare(ctx) {
+    return (
+      jobsOff(ctx) ?? { ok: true, args: {}, line: 'Look for new people for them to meet.', paths: ['/jobs/find'] }
+    );
+  },
+  async run(ctx) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { ok: false, error: 'Suggestions are not configured.' };
+    const result = await suggestPeopleFor(ctx.userId, apiKey);
+    if (result.error || result.written === 0) {
+      return { ok: false, error: result.error ?? result.message ?? 'Dash found no new people worth suggesting right now.' };
+    }
+    const id = await newestId(ctx, 'suggestions', 'created_at', 'reach_out');
+    if (!id) return { ok: false, error: 'Dash made suggestions, but they could not be read back.' };
+    return {
+      ok: true,
+      subjectRef: toRef('job_search.suggestions', id),
+      op: 'insert',
+      summary: `Dash suggested ${result.written} ${result.written === 1 ? 'person' : 'people'} to meet.`,
+    };
+  },
+};
+
+/** The Search now button on Recommended roles on Find (plan #2228.3). */
+export const suggestOpeningsTool: DashPaidTool = {
+  name: 'find_openings',
+  kind: 'paid',
+  inAppOnly: true,
+  action: 'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings',
+  runs: 'lib/jobs/suggest/press.ts#startOpeningSearchFor',
+  workspace: 'jobs',
+  definition: {
+    name: 'find_openings',
+    description: `Search now for roles that fit them: the boards of companies they follow and the web, read and scored, then shown under Recommended roles on Find. The search starts at once and finishes in a few minutes. ${QUEUED}`,
+    input_schema: NO_INPUT,
+  },
+  async prepare(ctx) {
+    return (
+      jobsOff(ctx) ?? { ok: true, args: {}, line: 'Search now for roles that fit them.', paths: ['/jobs/find'] }
+    );
+  },
+  async run(ctx) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { ok: false, error: 'Suggestions are not configured.' };
+    const started = await startOpeningSearchFor(ctx.userId, apiKey);
+    if (started.error || !started.runId) {
+      return { ok: false, error: started.error ?? started.message ?? 'The search could not be started.' };
+    }
+    return {
+      ok: true,
+      subjectRef: toRef('job_search.search_runs', started.runId),
+      op: 'insert',
+      summary: 'Dash started the search for roles. They show under Recommended roles on Find as it finishes.',
+    };
+  },
+};
+
+/** The Match button on a role's requirements (plan #2228.3). */
+export const matchRoleRequirementsTool: DashPaidTool = {
+  name: 'match_role_requirements',
+  kind: 'paid',
+  inAppOnly: true,
+  action: 'app/jobs/(app)/roles/[id]/posting-actions.ts#matchRoleRequirements',
+  runs: 'lib/jobs/evidence/match-run.ts#matchRoleRequirementsFor',
+  workspace: 'jobs',
+  definition: {
+    name: 'match_role_requirements',
+    description: `Match a role's requirements against their evidence bank, and keep the match on the role. The role needs a description whose requirements have been read, and a bank with something in it. Give the role_ref a lookup returned. ${QUEUED}`,
+    input_schema: {
+      type: 'object',
+      properties: { role_ref: { type: 'string', description: 'The role, as a lookup returned it.' } },
+      required: ['role_ref'],
+      additionalProperties: false,
+    },
+  },
+  async prepare(ctx, input) {
+    const off = jobsOff(ctx);
+    if (off) return off;
+    const roleId = idOf(asArgs(input).role_ref);
+    if (!roleId) return { ok: false, error: 'role_ref is missing: give the ref a lookup returned.' };
+    if (!ctx.seen(ROLES, roleId)) return { ok: false, error: NOT_SEEN(ROLES, roleId) };
+    const jobs = await ctx.db('job_search');
+    const [role] = await rows<{ title: string; requirements: unknown[] | null; companies: { name: string } | null }>(
+      jobs.from('roles').select('title, requirements, companies ( name )').eq('id', roleId).eq('user_id', ctx.userId).limit(1),
+    );
+    if (!role) return { ok: false, error: 'That role is not one of theirs, or it has been deleted.' };
+    if (!role.requirements || role.requirements.length === 0) {
+      return { ok: false, error: "No requirements have been read from this role's description yet, so there is nothing to match." };
+    }
+    const label = role.companies?.name ? `${role.title} at ${role.companies.name}` : role.title;
+    return {
+      ok: true,
+      args: { roleId },
+      line: `Match the requirements of ${label} against their evidence bank.`,
+      paths: [`/jobs/roles/${roleId}`],
+    };
+  },
+  async run(ctx, args) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { ok: false, error: 'Matching is not configured.' };
+    const roleId = String(args.roleId);
+    const result = await matchRoleRequirementsFor(ctx.userId, apiKey, roleId);
+    if (result.error || !result.matches) return { ok: false, error: result.error ?? 'No match came back.' };
+    return {
+      ok: true,
+      subjectRef: toRef(ROLES, roleId),
+      op: 'update',
+      summary: `Dash matched ${result.matches.length} requirements against their evidence bank and kept the match on the role.`,
+    };
+  },
+};
+
 /** The Jobs paid tools, in the order the model is sent them. */
-export const JOBS_PAID_TOOLS: readonly DashPaidTool[] = [draftAnswerTool, draftApplicationAnswersTool, draftCoverLetterTool];
+export const JOBS_PAID_TOOLS: readonly DashPaidTool[] = [
+  draftAnswerTool,
+  draftApplicationAnswersTool,
+  draftCoverLetterTool,
+  findStartupsTool,
+  suggestPeopleTool,
+  suggestOpeningsTool,
+  matchRoleRequirementsTool,
+];

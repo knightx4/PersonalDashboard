@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
-import { draftAnswerTool, draftApplicationAnswersTool, draftCoverLetterTool } from './paid-tools-jobs';
+import {
+  draftAnswerTool,
+  draftApplicationAnswersTool,
+  draftCoverLetterTool,
+  findStartupsTool,
+  matchRoleRequirementsTool,
+  suggestOpeningsTool,
+  suggestPeopleTool,
+} from './paid-tools-jobs';
 import type { DashPaidCheckContext } from './registry';
 
 /** The Jobs drafting tools check what they are asked to draft, as the buttons' actions would (plan #2228.3). */
@@ -91,6 +99,28 @@ describe('draft_application_answers', () => {
   it('wants one of application_ref and role_ref', async () => {
     expect((await draftApplicationAnswersTool.prepare(context(TABLES), {})).ok).toBe(false);
     expect((await draftApplicationAnswersTool.prepare(context(TABLES), { application_ref: APP, role_ref: ROLE })).ok).toBe(false);
+  });
+});
+
+describe('match_role_requirements', () => {
+  it('queues a role whose requirements have been read, and refuses one whose have not', async () => {
+    const read: Tables = { roles: [{ title: 'Designer', requirements: [{ text: 'Figma' }], companies: { name: 'Acme' } }] };
+    expect(await matchRoleRequirementsTool.prepare(context(read), { role_ref: ROLE })).toEqual({
+      ok: true,
+      args: { roleId: ROLE },
+      line: 'Match the requirements of Designer at Acme against their evidence bank.',
+      paths: [`/jobs/roles/${ROLE}`],
+    });
+    const unread: Tables = { roles: [{ title: 'Designer', requirements: [], companies: null }] };
+    expect((await matchRoleRequirementsTool.prepare(context(unread), { role_ref: ROLE })).ok).toBe(false);
+    expect((await matchRoleRequirementsTool.prepare(context(read, false), { role_ref: ROLE })).ok).toBe(false);
+  });
+});
+
+describe('the search tools', () => {
+  it.each([findStartupsTool, suggestPeopleTool, suggestOpeningsTool])('$name takes no input and needs Jobs on', async (tool) => {
+    expect((await tool.prepare(context({}), {})).ok).toBe(true);
+    expect((await tool.prepare(context({}, true, []), {})).ok).toBe(false);
   });
 });
 
