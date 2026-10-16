@@ -514,11 +514,13 @@ function standingOf(topic: TopicDetail, evidence: CellEvidenceView[], linksIn: t
 }
 
 /* What backs the frame topic DCF refines (plan #2172.2): a mark of each
- * kind, each with the most it can count for. */
+ * kind, each with the most it can count for. The course was named for the
+ * topic, so it carries a band of likely levels and its reason (plan
+ * #2172.4.1). */
 const BACKING: EvidenceLink[] = (
   [
     ['work', 1, 0.66, 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"'],
-    ['course', 0.92, 0.71, 'named in MGT 541 Corporate Finance, HH, 2026'],
+    ['course', 1, 0.8, 'from MGT 541 Corporate Finance, HH, 2026: an advanced course reaches level 4 at most, and the grade keeps 4.'],
     ['note', 1, 0.62, 'named in your note Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation'],
     ['note', 0.25, 0.58, 'close to your note Valuation clippings'],
   ] as const
@@ -532,7 +534,8 @@ const BACKING: EvidenceLink[] = (
   ...kindAndCeiling({ source_kind: source, weight }),
   basis,
   foundAt: '2026-10-14T06:00:00Z',
-  matchedBy: 'name' as const,
+  matchedBy: source === 'course' ? null : ('name' as const),
+  band: source === 'course' ? { low: 1, high: 4 } : null,
 }));
 
 function ApprovedTopic({

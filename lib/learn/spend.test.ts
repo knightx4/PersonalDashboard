@@ -152,6 +152,7 @@ describe('the operation names', () => {
       'draft-topic',
       'embed-topic-scope',
       'assign-topics',
+      'name-course-topics',
     ]);
   });
 });

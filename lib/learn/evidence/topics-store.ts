@@ -31,6 +31,10 @@ import {
  *    and the topic links this run did not find are removed: a link to a
  *    topic has no row to go with, so this is what clears it.
  *
+ * A course whose topics a call has named is left out: it marks those topics
+ * as a band instead (plan #2172.4.1), and its band links are never cleared
+ * here.
+ *
  * No model is called. Runs under the service role, so every query names the
  * person.
  */
@@ -74,6 +78,13 @@ async function loadArticles(learn: LearnSupabaseClient): Promise<TopicArticle[]>
   }
 }
 
+/** The courses whose topics a call has named (learn.course_topics, learn 0157). */
+async function loadNamedCourses(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const { data, error } = await learn.from('course_topics').select('course_id').eq('user_id', userId);
+  if (error) throw new Error(`Reading the named courses failed: ${error.message}`);
+  return new Set(((data ?? []) as { course_id: string }[]).map((row) => row.course_id));
+}
+
 export async function refreshTopicUnlocks(
   learn: LearnSupabaseClient,
   userId: string,
@@ -82,6 +93,9 @@ export async function refreshTopicUnlocks(
   const rpc = learn.rpc.bind(learn) as unknown as Rpc;
   const index = buildTopicNames(await loadArticles(learn));
   const nowYear = now.getUTCFullYear();
+  // A course whose topics a call named marks them as a band (./course-band-store),
+  // so its name and vector matches are left out here (plan #2172.4.1).
+  const namedCourses = await loadNamedCourses(learn, userId);
 
   // 1 and 2. Names in each source's text.
   const sources = new Map<string, TopicSource>();
@@ -95,7 +109,7 @@ export async function refreshTopicUnlocks(
       const rows = data ?? [];
       for (const row of rows) {
         const source = topicSource(kind, row, nowYear);
-        if (!source) continue;
+        if (!source || (kind === 'course' && namedCourses.has(source.id))) continue;
         sources.set(`${kind} ${source.id}`, source);
         for (const [topicId, name] of findTopicNames(index, source.text)) {
           hits.push({ topicId, source, name, similarity: null });
@@ -146,11 +160,11 @@ export async function refreshTopicUnlocks(
     if (error) throw new Error(`Writing topic unlocks failed: ${error.message}`);
   }
 
-  const existing: { id: string; target_id: string; source_kind: string; source_id: string }[] = [];
+  const existing: { id: string; target_id: string; source_kind: string; source_id: string; band_high: number | null }[] = [];
   for (let from = 0; ; from += ARTICLE_PAGE) {
     const { data, error } = await learn
       .from('evidence_links')
-      .select('id, target_id, source_kind, source_id')
+      .select('id, target_id, source_kind, source_id, band_high')
       .eq('user_id', userId)
       .eq('target_kind', 'topic')
       .order('id')
@@ -160,7 +174,11 @@ export async function refreshTopicUnlocks(
     existing.push(...page);
     if (page.length < ARTICLE_PAGE) break;
   }
-  const stale = staleTopicLinkIds(existing, rows);
+  // A course's band links are the band stage's to keep or clear.
+  const stale = staleTopicLinkIds(
+    existing.filter((row) => row.band_high === null),
+    rows,
+  );
   for (let start = 0; start < stale.length; start += DELETE_CHUNK) {
     const { error } = await learn
       .from('evidence_links')

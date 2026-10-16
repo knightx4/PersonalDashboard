@@ -5,6 +5,7 @@ import {
   type EvidenceLink,
   type EvidenceSourceKind,
 } from '@/lib/learn/evidence/model';
+import { bandWords } from '@/lib/learn/evidence/course-bands';
 import { KIND_WORDS } from '@/lib/learn/evidence/kinds';
 import { EVIDENCE_CEILING } from '@/lib/learn/strength';
 
@@ -18,10 +19,15 @@ const KIND_ICON: Record<EvidenceSourceKind, LucideIcon> = {
 
 const CEILING_PERCENT = Math.round(EVIDENCE_CEILING * 100);
 
-/** The most one link can add, on the same scale as the line above the list (plan #2172.2). */
-function markLine(link: Pick<EvidenceLink, 'kind' | 'ceiling'>): string {
+/**
+ * The most one link can add, on the same scale as the line above the list
+ * (plan #2172.2), and for a course named for the topic the band of levels it
+ * likely reached (plan #2172.4.1). The basis above it gives the reason.
+ */
+function markLine(link: Pick<EvidenceLink, 'kind' | 'ceiling' | 'band'>): string {
   const percent = Math.round(Math.max(0, link.ceiling) * EVIDENCE_CEILING * 100);
-  return `${KIND_WORDS[link.kind]} · counts up to ${percent}%`;
+  const band = link.band ? ` · ${bandWords(link.band)}` : '';
+  return `${KIND_WORDS[link.kind]}${band} · counts up to ${percent}%`;
 }
 
 /**

@@ -30,6 +30,9 @@ export type EvidenceRow = {
   found_at: string;
   /** Links to topics only: how the source touched it (plan #2016.3). */
   matched_by?: 'name' | 'similarity' | null;
+  /** A course's link to a topic it was named for: the likely levels (plan #2172.4.1, learn 0157). */
+  band_low?: number | null;
+  band_high?: number | null;
 };
 
 export type EvidenceLink = {
@@ -50,6 +53,8 @@ export type EvidenceLink = {
   foundAt: string;
   /** For a link to a topic, whether the source names it or its vector agreed; null otherwise. */
   matchedBy?: 'name' | 'similarity' | null;
+  /** A course's band of likely levels on a topic it was named for (plan #2172.4.1); absent otherwise. */
+  band?: { low: number; high: number } | null;
 };
 
 /**
@@ -70,6 +75,8 @@ export function evidenceFromRows(rows: EvidenceRow[]): EvidenceLink[] {
       basis: row.basis,
       foundAt: row.found_at,
       matchedBy: row.matched_by ?? null,
+      band:
+        row.band_low != null && row.band_high != null ? { low: row.band_low, high: row.band_high } : null,
     }))
     .sort(
       (a, b) =>

@@ -402,6 +402,10 @@ export const LEARN_OPERATIONS = [
   // subject placing its concepts on topics and levels. The topics it names
   // that the map lacks are drafted under 'draft-topic'.
   'assign-topics',
+  // Naming the frame topics a graded course covered, its depth with them
+  // (plan #2172.4.1): one Haiku call per course, from the daily run, and again
+  // only when what the course is known by changes.
+  'name-course-topics',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

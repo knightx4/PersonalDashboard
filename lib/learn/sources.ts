@@ -340,6 +340,10 @@ export const learnSources: ModuleSources = {
       table: 'learn.course_embeddings',
       reason: 'Each transcript course as the text and vector it is matched to ideas by; the course is in you.courses and the links in evidence_links.',
     },
+    {
+      table: 'learn.course_topics',
+      reason: 'The topics a model call named for each graded course, worked out from the course; the course is in you.courses and its bands in evidence_links.',
+    },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },
