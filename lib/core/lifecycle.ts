@@ -372,6 +372,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   watches_status_ck: 'state of a Dash watch',
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
   briefs_status_check: 'state of a research run',
+  subject_preparations_status_ck: 'state of a subject\'s preparation run',
+  subject_preparation_steps_status_ck: 'state of a step in a subject\'s preparation run',
   video_transcripts_state_ck: 'state of a transcript fetch',
   inspiration_videos_transcript_state_ck: 'state of a transcript fetch',
   knowledge_state: 'how well something is known, a ladder with no ending',

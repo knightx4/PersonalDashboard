@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { placeTrackAfterResponse, type TrackTheme } from '@/lib/learn/areas/place-track';
+import { prepareSubjectAfterResponse } from '@/lib/learn/prepare/kick';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedIdeaClaims } from '@/lib/learn/embed/idea-embedding';
 import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
@@ -92,6 +93,8 @@ export async function findOrCreateSubject(
         .update({ survey: false })
         .eq('id', found.id);
       if (takeError) throw fail('Turning the survey topic into a subject', takeError);
+      // Now a subject, it is prepared like a new one (plan #2276.1).
+      prepareSubjectAfterResponse(found.id);
     }
     return { id: found.id, created: false, placed: Boolean(found.placed_at) };
   }
@@ -106,7 +109,10 @@ export async function findOrCreateSubject(
   if (createError || !created) {
     throw fail('Creating the subject', createError ?? { message: 'no row' });
   }
-  return { id: (created as { id: string }).id, created: true, placed: false };
+  const id = (created as { id: string }).id;
+  // The insert opened its preparation run (0167); start it once the response has gone.
+  prepareSubjectAfterResponse(id);
+  return { id, created: true, placed: false };
 }
 
 /**

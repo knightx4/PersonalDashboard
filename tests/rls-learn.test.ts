@@ -172,6 +172,8 @@ describe('RLS coverage', () => {
       'settings',
       'sources',
       'subject_channels',
+      'subject_preparation_steps',
+      'subject_preparations',
       'subjects',
       'theme_fields',
       'topic_cells',
@@ -241,6 +243,57 @@ describe('what a chat adds (plan #1807)', () => {
       asUser(userB, (tx) => tx`
         insert into reading_subjects (user_id, reading_id, subject_id)
         values (${userB}, ${readingA}, ${subjectB})`),
+    ).rejects.toThrow();
+  });
+});
+
+describe('a subject\'s preparation run (plan #2276.1)', () => {
+  // The trigger on subjects opens a run with its seven steps for a subject
+  // made any way; the person may read theirs, and only the service role writes.
+  let subjectA = '';
+
+  beforeAll(async () => {
+    [{ id: subjectA }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Urban economics') returning id`;
+  });
+
+  it('opens a run with its seven steps when a subject is made', async () => {
+    const runs = await admin<{ id: string; status: string }[]>`
+      select id, status from subject_preparations where subject_id = ${subjectA}`;
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe('pending');
+    const steps = await admin<{ key: string }[]>`
+      select key from subject_preparation_steps where preparation_id = ${runs[0].id} order by ordinal`;
+    expect(steps.map((s) => s.key)).toEqual([
+      'classify', 'pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'write_units', 'finish',
+    ]);
+  });
+
+  it('opens none for a hidden survey subject until it becomes a real one', async () => {
+    const [{ id }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name, survey) values (${userA}, 'A survey theme', true) returning id`;
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(0);
+    await admin`update subjects set survey = false where id = ${id}`;
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(1);
+  });
+
+  it('shows the owner their run and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(1);
+    // B has runs of their own, for B's subjects; none of A's shows.
+    const mine = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparations`);
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((r) => r.user_id === userB)).toBe(true);
+    const steps = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparation_steps`);
+    expect(steps.every((r) => r.user_id === userB)).toBe(true);
+    expect(await asUser(userB, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(0);
+  });
+
+  it('lets no session write a run, even its owner', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`update subject_preparations set status = 'done' where subject_id = ${subjectA}`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`insert into subject_preparations (user_id, subject_id) values (${userA}, ${subjectA})`),
     ).rejects.toThrow();
   });
 });
