@@ -128,7 +128,7 @@ export const PROPOSAL_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'propose_delete',
-    description: `Propose deleting rows of the person's, when they ask you to remove or delete them (duplicate application answers, or a note on a job, say). Only ${DELETABLE_LIST} can be proposed for now, one table per proposal. Name each row by the ref a lookup returned for it in this conversation (application_answers returns one per answer; list_rows on job_search.notes or recall one per note); look them up first, at most ${MAX_DELETE_ROWS} at once. Nothing is deleted: the person sees the rows listed on a card and confirms or declines, and a confirmed delete can be undone. Never propose rows they did not ask to remove, and say in your answer which you proposed and why. ${PROPOSE_NOTE}`,
+    description: `Propose deleting rows of the person's, when they ask you to remove or delete them (duplicate application answers, a note on a job, or a task, say). Only ${DELETABLE_LIST} can be proposed for now, one table per proposal. Name each row by the ref a lookup returned for it in this conversation (application_answers returns one per answer; list_rows on job_search.notes or recall one per note; search and todos return one per task, and a task with subtasks is refused); look them up first, at most ${MAX_DELETE_ROWS} at once. Nothing is deleted: the person sees the rows listed on a card and confirms or declines, and a confirmed delete can be undone. Never propose rows they did not ask to remove, and say in your answer which you proposed and why. ${PROPOSE_NOTE}`,
     input_schema: {
       type: 'object',
       properties: {
