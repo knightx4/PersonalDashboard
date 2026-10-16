@@ -93,6 +93,8 @@ export type PostsPage = {
   onX: { posts: XPostView[]; total: number };
   /** What the person wants from their posts (plan #2227); empty until they write it. */
   wants: PostWants;
+  /** The day `wants` was last saved, as 2 Oct; null when nothing is saved. */
+  wantsDay: string | null;
 };
 
 /** The longest "what I want from posts" text (post_preferences_wants_ck). */
@@ -182,6 +184,7 @@ export function buildPostsPage(input: {
     runState: postsRunState(input.run, input.now),
     onX: { posts: (input.x?.listed ?? []).map(xView), total: input.x?.total ?? 0 },
     wants: input.wants ?? NO_POST_WANTS,
+    wantsDay: input.wants?.text && input.wants.updatedAt ? dayLabel(input.wants.updatedAt, today) : null,
   };
 }
 

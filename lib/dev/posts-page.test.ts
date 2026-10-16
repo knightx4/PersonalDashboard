@@ -154,6 +154,20 @@ describe('buildPostsPage', () => {
   });
 });
 
+describe('buildPostsPage wants', () => {
+  const input = { posts: [], steps: [], notes: [], run: null, now: Date.parse('2026-10-02T12:00:00Z') };
+
+  it('says the day saved text was last saved', () => {
+    const page = buildPostsPage({ ...input, wants: { text: 'No hashtags', updatedAt: '2026-10-01T18:30:00Z' } });
+    expect(page.wants.text).toBe('No hashtags');
+    expect(page.wantsDay).toBe('1 Oct');
+  });
+
+  it('has no day when nothing is saved', () => {
+    expect(buildPostsPage(input).wantsDay).toBeNull();
+  });
+});
+
 describe('loadPostWants', () => {
   const db = (result: { data: unknown; error: { message: string } | null }) => {
     const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => result };
