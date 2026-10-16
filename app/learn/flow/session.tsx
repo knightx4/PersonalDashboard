@@ -16,6 +16,7 @@ import { AskButton, DontKnowButton, EndHereButton, NotNowButton } from './button
 import { RunSummaryPanel } from './summary-card';
 import { Button } from '@/components/ui/button';
 import { ExplainCard } from './explain-card';
+import { CaseCard } from './case-card';
 import {
   answerTrackOffer,
   fillFlowQueue,
@@ -296,6 +297,19 @@ export function FlowSession({
         {/* Nothing left to ask ends the run: say what it moved. */}
         {live.nothing && <RunSummaryPanel />}
       </div>
+    );
+  }
+
+  // A worked case (plan #2164.3): figures and a task, graded as applied.
+  if (live.case) {
+    return (
+      <CaseCard
+        key={live.probeId}
+        live={live}
+        step={step}
+        fields={<TrackField track={track} only={only} goal={goal} />}
+        onEnd={() => setEnded(true)}
+      />
     );
   }
 

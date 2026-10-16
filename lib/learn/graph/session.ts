@@ -606,6 +606,53 @@ export async function recordAppliedCase(
   return (data as { id: string }).id;
 }
 
+/**
+ * Write a worked case on a goal's idea as asked in Practice Flow (plan
+ * #2164.3): figures and a task in one piece of text, no options, at the
+ * applied rung, so it is answered and graded the way an applied case is
+ * (`answerApplied`). `expected` stays on the row for the grader and is shown
+ * only after the answer. `flow` is as for `recordProbe`.
+ */
+export async function recordGoalCase(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: {
+    conceptId: string;
+    question: string;
+    expected: string;
+    masteryCheck: string | null;
+    model: string;
+    flow?: {
+      pickedState: KnowledgeState;
+      pickedRecheck: 'tested' | 'declared' | null;
+      shownAt: string | null;
+    };
+  },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('probes')
+    .insert({
+      ...(input.flow && {
+        picked_state: input.flow.pickedState,
+        picked_recheck: input.flow.pickedRecheck,
+        shown_at: input.flow.shownAt,
+      }),
+      user_id: userId,
+      concept_id: input.conceptId,
+      rung: 'apply',
+      question: input.question,
+      expected: input.expected,
+      mastery_check: input.masteryCheck,
+      model: input.model,
+    })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw fail('Saving the case', error ?? { message: 'no row' });
+  return (data as { id: string }).id;
+}
+
 export type AnswerOutcome = {
   correct: boolean;
   reason: string;

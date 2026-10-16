@@ -131,6 +131,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // (plan #2172.4.2): twenty-four cells in, a verdict on each out.
   'grade-course-explain': run(HAIKU, 4_000, 2_400),
   'write-cell-case': run(HAIKU, 1_200, 500),
+  'write-goal-case': background(unit(HAIKU, 1_200, 500)),
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),

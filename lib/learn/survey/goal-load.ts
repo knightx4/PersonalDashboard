@@ -106,6 +106,8 @@ export type GoalSubjectState = {
   ideas: GoalSubjectIdea[];
   /** Questions on the goal answered right. */
   rightAnswers: number;
+  /** Questions written for Practice Flow on the goal, answered or not. */
+  flowAsked?: number;
 };
 
 /** Whether an answered question was answered right, multiple choice or written. */
@@ -141,7 +143,7 @@ export async function loadGoalSubjectState(
     basis: string | null;
     mastery: string[] | null;
   }[];
-  if (concepts.length === 0) return { ideas: [], rightAnswers: 0 };
+  if (concepts.length === 0) return { ideas: [], rightAnswers: 0, flowAsked: 0 };
 
   const probes = await inChunks<{
     concept_id: string;
@@ -149,12 +151,13 @@ export async function loadGoalSubjectState(
     chosen_index: number | null;
     dont_know: boolean | null;
     response_correct: boolean | null;
+    picked_state: string | null;
   }>(
     concepts.map((concept) => concept.id),
     (chunk) =>
       supabase
         .from('probes')
-        .select('concept_id, correct_index, chosen_index, dont_know, response_correct')
+        .select('concept_id, correct_index, chosen_index, dont_know, response_correct, picked_state')
         .eq('user_id', userId)
         .in('concept_id', chunk),
     "Reading the goal's questions",
@@ -162,7 +165,9 @@ export async function loadGoalSubjectState(
 
   const asked = new Map<string, number>();
   let rightAnswers = 0;
+  let flowAsked = 0;
   for (const probe of probes) {
+    if (probe.picked_state !== null) flowAsked += 1;
     asked.set(probe.concept_id, (asked.get(probe.concept_id) ?? 0) + 1);
     if (answeredRight(probe)) rightAnswers += 1;
   }
@@ -176,5 +181,6 @@ export async function loadGoalSubjectState(
       asked: asked.get(concept.id) ?? 0,
     })),
     rightAnswers,
+    flowAsked,
   };
 }

@@ -169,6 +169,7 @@ import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import { FlowExplainPreview } from './learn-flow-explain-surfaces';
+import { FlowCasePreview } from './learn-flow-case-surfaces';
 import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
   LearnTopicDraftCommentPreview,
@@ -5911,6 +5912,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowExplainPreview stage="grading" />,
+  },
+  {
+    /* A worked case on a goal's idea (plan #2164.3): figures and a task, the
+     * box to write a number or two sentences in, and Later. */
+    id: 'learn-flow-case',
+    label: 'Practice Flow · A worked case',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowCasePreview stage="ask" />,
+  },
+  {
+    /* The case answered: Dash's sentence, the answer expected, and Next. */
+    id: 'learn-flow-case-answered',
+    label: 'Practice Flow · Case answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowCasePreview stage="answered" />,
   },
   {
     /* What a session moved (plan #2164.6): the card that ends a Practice Flow

@@ -176,6 +176,11 @@ export type FlowQuestion = {
    * marked the way a teach-back is, rather than picked from `options`.
    */
   explain?: true;
+  /**
+   * Set on a worked case (plan #2164.3): figures and a task, answered with a
+   * number or two sentences and graded as the applied rung.
+   */
+  case?: true;
 };
 
 export type SurveyAbout = { themeName: string; fieldName: string };
@@ -204,6 +209,11 @@ const QUEUED_COLUMNS =
 /** An explain question: no options, at the rung the teach-back marks at. */
 function isExplain(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
   return row.options === null && row.rung === 'defend';
+}
+
+/** A worked case on a goal's idea: no options, at the applied rung. */
+function isCase(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
+  return row.options === null && row.rung === 'apply';
 }
 
 function fail(action: string, error: { message: string }): Error {
@@ -413,7 +423,8 @@ async function claimsNow(
 
 function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
   const explain = isExplain(row);
-  if (!row.options && !explain) return null;
+  const worked = isCase(row);
+  if (!row.options && !explain && !worked) return null;
   return {
     probeId: row.id,
     conceptId: row.concept_id,
@@ -426,6 +437,7 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
     question: row.question,
     options: row.options ?? [],
     ...(explain ? { explain: true as const } : {}),
+    ...(worked ? { case: true as const } : {}),
   };
 }
 
@@ -437,7 +449,7 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
 function holds(row: QueuedRow, claims: Map<string, ClaimNow>): boolean {
   const claim = claims.get(row.concept_id);
   if (claim === undefined || claim.state !== row.picked_state) return false;
-  if (isExplain(row)) return true;
+  if (isExplain(row) || isCase(row)) return true;
   if (row.options === null) return false;
   return claim.goal === null || row.picked_recheck !== null;
 }
@@ -785,6 +797,7 @@ async function writeGoals(input: {
 
   // The idea is a model call; the question is not (plan #2164.2).
   const ideaSpend = collectSpend();
+  const caseSpend = collectSpend();
   try {
     // Rotated after each question, so the next goal turn goes to the next
     // goal. A goal that cannot be written for is dropped for this round.
@@ -801,6 +814,7 @@ async function writeGoals(input: {
         anthropicApiKey: input.apiKey,
         flow: { shownAt: input.shownAt },
         onIdeaSpend: ideaSpend.sink,
+        onCaseSpend: caseSpend.sink,
       });
       if (!result.ok) {
         if (result.reason === 'error') console.error('[learn flow] goal question', result.detail);
@@ -817,13 +831,16 @@ async function writeGoals(input: {
         goal: { aimId: question.aimId, aimName: question.aimName },
         question: question.question,
         options: question.options,
-        explain: true,
+        ...(question.case ? { case: true as const } : { explain: true as const }),
       });
     }
   } catch (error) {
     console.error('[learn flow] goal question', error instanceof Error ? error.message : error);
   }
-  await recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports);
+  await Promise.all([
+    recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports),
+    recordLearnSpend(input.userId, 'write-goal-case', caseSpend.reports),
+  ]);
   return written;
 }
 

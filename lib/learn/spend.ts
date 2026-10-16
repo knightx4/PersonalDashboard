@@ -74,6 +74,9 @@ export const LEARN_OPERATIONS = [
   // Writing the case a level 4 to 6 cell is asked as (plan #2138.8): one Haiku
   // call when the cell is first asked, none when an unanswered one is reused.
   'write-cell-case',
+  // A worked case with figures on a goal's idea, one in three of a goal's
+  // Practice Flow questions (plan #2164.3), written ahead like the idea.
+  'write-goal-case',
   // The catalogue embedding sweep, which records through its own postgres
   // connection rather than through `recordLearnSpend`: it runs from a script,
   // and reaching the ledger the usual way would pull `next/headers` in. The
