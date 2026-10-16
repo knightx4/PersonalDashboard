@@ -25,6 +25,11 @@ export const learnActions: ModuleActions = {
     mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
     draftWantedTopic: none('spends'),
     rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    markRowsPersonal: none('theirs', 'Whether an uncited row is the person’s own is theirs to say (plan #2138.11).'),
+  },
+  'app/learn/flow/theme-lens-actions.ts': {
+    makeLensFromTheme: none('theirs', 'Whether a vault theme becomes a lens of its own is the person’s to say (plan #2138.14).'),
+    declineLensFromTheme: none('theirs', 'Saying no to the offer of a lens is the person’s (plan #2138.14).'),
   },
   'app/learn/lens/[id]/actions.ts': {
     saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),

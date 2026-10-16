@@ -23,6 +23,7 @@ import {
   type PracticeResult,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -181,6 +182,7 @@ export function PiecePassing({
   passedAt: initialPassedAt,
   practicePassed: initialPracticePassed,
   checkPassed: initialCheckPassed,
+  checkOn = null,
 }: {
   subjectId: string;
   pieceId: string;
@@ -189,6 +191,8 @@ export function PiecePassing({
   passedAt: string | null;
   practicePassed: boolean;
   checkPassed: boolean;
+  /** The cell the check asks about, when the piece names one it can ask (plan #2138.13). */
+  checkOn?: { topicName: string; level: number } | null;
 }) {
   const router = useRouter();
   const [passedAt, setPassedAt] = useState(initialPassedAt);
@@ -224,6 +228,7 @@ export function PiecePassing({
           passedAt={passedAt}
           practicePassed={practicePassed}
           checkPassed={checkPassed}
+          checkOn={checkOn}
           onAnswered={(result) => {
             if (result.check?.correct) setCheckPassed(true);
             if (result.practicePassed) setPracticePassed(true);
@@ -472,6 +477,7 @@ function PieceCheckCard({
   passedAt,
   practicePassed,
   checkPassed,
+  checkOn,
   onAnswered,
 }: {
   subjectId: string;
@@ -480,6 +486,7 @@ function PieceCheckCard({
   passedAt: string | null;
   practicePassed: boolean;
   checkPassed: boolean;
+  checkOn: { topicName: string; level: number } | null;
   onAnswered: (result: AnswerResult) => void;
 }) {
   const [check, setCheck] = useState(initialCheck);
@@ -517,6 +524,12 @@ function PieceCheckCard({
 
   const answered = check !== null && check.correct !== null;
   const canAsk = !checkPassed && (check === null || check.correct === false);
+  // The cell the question is on: the asked question's own, else the one the
+  // piece would ask about. Null on a piece that names no cells.
+  const on = check?.cell ?? checkOn;
+  const what = on
+    ? `One question on ${on.topicName} at level ${on.level}, the level this piece reaches, answered from memory.`
+    : 'One question needing this piece’s ideas together, answered from memory.';
 
   return (
     <Card padding="standard">
@@ -527,8 +540,8 @@ function PieceCheckCard({
           : checkPassed
             ? 'You have answered the check right. Pass the practice above to pass the piece.'
             : practicePassed
-              ? 'One question needing this piece’s ideas together, answered from memory. A right answer passes the piece.'
-              : 'One question needing this piece’s ideas together, answered from memory. The piece passes when this and the practice are both right.'}
+              ? `${what} A right answer passes the piece.`
+              : `${what} The piece passes when this and the practice are both right.`}
       </p>
 
       {check && (
@@ -577,6 +590,15 @@ function PieceCheckCard({
           </p>
           {check.why && <p className="text-ui text-ink">{check.why}</p>}
           {check.expected && <p className="text-ui text-ink-muted">Expected: {check.expected}</p>}
+          {check.cell && (
+            <p className="text-ui text-ink-muted">
+              {check.correct ? 'Shown on ' : 'Recorded on '}
+              <Link href={`/learn/topics/${check.cell.topicId}`} className={linkVariants()}>
+                {check.cell.topicName}&rsquo;s ladder
+              </Link>
+              {check.correct ? `, at level ${check.cell.level}.` : '.'}
+            </p>
+          )}
           {check.correct && tested !== null && (
             <p className="text-small text-ink-muted">
               {passedAt ? 'Piece passed. ' : ''}

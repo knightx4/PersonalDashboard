@@ -165,6 +165,8 @@ import {
   LearnTopicQuotesPreview,
   LearnTopicEditPreview,
   LearnTopicLoadingPreview,
+  LearnTopicDraftChecksPreview,
+  LearnTopicsSourcesPreview,
 } from './learn-topic-surfaces';
 import {
   LearnKnowLensesEmptyPreview,
@@ -193,6 +195,7 @@ import {
   LearnListsSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
+  LearnPieceCellCheckSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -5805,6 +5808,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PracticeRunPreview state="end" />,
   },
   {
+    /* The end of a run with a lens offered for a vault theme no lens covers. */
+    id: 'learn-practice-run-end-offer',
+    label: 'Practice Flow · End of a run, lens offered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer" />,
+  },
+  {
+    /* The same offer with the longest names it has to hold. */
+    id: 'learn-practice-run-end-offer-long',
+    label: 'Practice Flow · End of a run, lens offered, long names',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer-long" />,
+  },
+  {
     /* A run ended before anything was answered. */
     id: 'learn-practice-run-end-empty',
     label: 'Practice Flow · End of a run, nothing answered',
@@ -8084,6 +8103,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnTopicsErrorPreview />,
   },
   {
+    /* What a topic is drafted from, open on Edit sources (plan #2138.11). */
+    id: 'learn-topics-sources',
+    label: 'Topics · The sources a draft is compiled from',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsSourcesPreview />,
+  },
+  {
     /* A draft topic to read, reword and approve (plan #2138.2). */
     id: 'learn-topic-draft',
     label: 'Topic · A draft to approve',
@@ -8097,6 +8124,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    /* The five checks with every row cited or marked personal (plan #2138.11). */
+    id: 'learn-topic-draft-checks',
+    label: 'Topic · A draft whose checks let it be approved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftChecksPreview />,
   },
   {
     id: 'learn-topic-draft-comment',
@@ -8328,6 +8363,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceSurface />,
+  },
+  {
+    id: 'learn-piece-cell-check',
+    label: 'Plan · One piece, its check answered on a cell',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCellCheckSurface />,
   },
   {
     id: 'learn-probe',

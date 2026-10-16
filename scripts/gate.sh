@@ -7,7 +7,7 @@
 # before merging, which left out tests/ (it needs a database) and the UI-law
 # and contrast checks. On 23 September 2026 every one of the seven failures
 # that kept main red came through those gaps. This is the same list as
-# .github/workflows/ci.yml's check and design jobs, so a merge that passes here
+# .github/workflows/ci.yml's three jobs, so a merge that passes here
 # should pass there. When a step is added to CI, add it here too.
 #
 # Run it after merging origin/main into the working branch, so it checks what

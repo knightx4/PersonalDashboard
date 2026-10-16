@@ -97,7 +97,15 @@ describe('normaliseDraft', () => {
       FIELDS,
     );
     expect(result.ok && result.draft.links).toEqual([
-      { fromLevel: 3, topicId: 't-return', topicName: 'Return', level: 2, why: 'Needs what a return is.' },
+      {
+        fromLevel: 3,
+        topicId: 't-return',
+        topicName: 'Return',
+        level: 2,
+        why: 'Needs what a return is.',
+        cites: [],
+        canonicality: null,
+      },
     ]);
   });
 
@@ -142,8 +150,51 @@ describe('normaliseDraft', () => {
       FIELDS,
     );
     expect(result.ok && result.draft.wanted).toEqual([
-      { name: 'Risk-free rate', scope: 'The return on a riskless asset.', from_level: 3, level: 1, why: 'The intercept.' },
+      {
+        name: 'Risk-free rate',
+        scope: 'The return on a riskless asset.',
+        from_level: 3,
+        level: 1,
+        why: 'The intercept.',
+        cites: [],
+      },
     ]);
+  });
+
+  it('keeps the sources each row cites, drops invented ones and leaves an uncited row with none', () => {
+    const given = {
+      sources: [{ id: 'S1', label: 'CFA syllabus', items: ['Explain CAPM', 'Calculate beta'] }],
+      performances: ['Price a stock'],
+    };
+    const result = normaliseDraft(
+      payload({
+        cites: ['S1'],
+        canonicality: 'canonical',
+        levels: levels(4).map((l) =>
+          l.level === 1 ? { ...l, cites: ['s1.1', 'S7'], canonicality: 'folk' } : l.level === 2 ? { ...l, cites: ['S9'] } : l,
+        ),
+        links: [{ from_level: 2, topic: 'Return', level: 1, cites: ['P1'], canonicality: 'practitioner' }],
+        performances: [{ performance: 1, level: 3 }, { performance: 2, level: 2 }],
+        out_of_scope: ['S1.2', 'S4.1'],
+        checklist: ['  Does level 4 cover the security market line? ', ''],
+      }),
+      MAP,
+      FIELDS,
+      given,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft).toMatchObject({
+      topicCites: ['S1'],
+      canonicality: 'canonical',
+      performanceLevels: [3],
+      outOfScope: ['S1.2'],
+      checklist: ['Does level 4 cover the security market line?'],
+    });
+    // An unknown canonicality on a cited row reads as practitioner.
+    expect(result.draft.cells[0]).toMatchObject({ cites: ['S1.1'], canonicality: 'practitioner' });
+    expect(result.draft.cells[1]).toMatchObject({ cites: [], canonicality: null });
+    expect(result.draft.links[0]).toMatchObject({ cites: ['P1'], canonicality: 'practitioner' });
   });
 
   it('never lists a topic already on the map as wanted', () => {
