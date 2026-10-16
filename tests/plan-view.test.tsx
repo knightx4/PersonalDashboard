@@ -33,7 +33,6 @@ vi.mock('@/components/ui/tooltip', async () => {
   };
 });
 
-
 // The server actions pull in the session client, which has no business in a
 // render test; the page only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/plan/actions', () => {
@@ -277,7 +276,7 @@ describe('PlanView', () => {
     expect(html).not.toContain('Hand to Dash');
   });
 
-  it('marks the steps you kept, and leaves the runner\'s own rows unmarked', () => {
+  it("marks the steps you kept, and leaves the runner's own rows unmarked", () => {
     // #693: the mark used to be a robot on every step handed to Dash. The
     // runner now takes anything approved that is not yours, so the fact worth
     // reading off a resting row is which steps it will skip.
@@ -310,7 +309,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion<span hidden=""></span></a><span title="Yours, so the runner will not take it.'
+      '>Account deletion<span hidden=""></span></a><span title="Yours, so the runner will not take it.',
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -340,7 +339,9 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core<span hidden=""></span></a><span title="An overhaul:');
+    expect(html).toContain(
+      '>Move threads onto the core<span hidden=""></span></a><span title="An overhaul:',
+    );
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });
@@ -366,7 +367,14 @@ describe('PlanView', () => {
             state: 'counting',
             spec: 'Core and Dash',
             counts: [
-              { rule: 1, counter: 'thread-tables', label: 'thread tables', start: 6, target: 1, now: 4 },
+              {
+                rule: 1,
+                counter: 'thread-tables',
+                label: 'thread tables',
+                start: 6,
+                target: 1,
+                now: 4,
+              },
             ],
             unread: [],
           },
@@ -377,7 +385,7 @@ describe('PlanView', () => {
     expect(html).not.toContain('No rule counts yet');
   });
 
-  it('reads an underway step as a session\'s unless you kept it', () => {
+  it("reads an underway step as a session's unless you kept it", () => {
     // #693: the tooltip used to say "Dash has been on this" only for a step
     // handed over. A session can start on anything approved, so the reading
     // flips -- underway is Dash's unless the step is yours.
@@ -549,7 +557,9 @@ describe('PlanView', () => {
 
   it('leaves a zero out of the count strip, except open', () => {
     const html = render('open');
-    expect(html).not.toMatch(/>0<\/span> (on you|ready|proposed|waiting|not specified|underway|Dash|done)/);
+    expect(html).not.toMatch(
+      />0<\/span> (on you|ready|proposed|waiting|not specified|underway|Dash|done)/,
+    );
   });
 
   it('draws five views and the table as chips and leaves the rest to the menu', () => {
@@ -610,7 +620,10 @@ describe('PlanView', () => {
   });
 
   it('says plainly when a narrow view has nothing in it', () => {
-    const nothing = buildPlanTree({ items: [item({ id: 'a', title: 'Underway', status: 'in_progress' })], dependencies: [] });
+    const nothing = buildPlanTree({
+      items: [item({ id: 'a', title: 'Underway', status: 'in_progress' })],
+      dependencies: [],
+    });
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nothing, 'ready')}
@@ -763,6 +776,46 @@ describe('PlanView', () => {
  * Needs line, and no column says "Dash is on it", "With Dash" or "Waiting on".
  */
 describe('the Status and Assignee columns', () => {
+  // A feature whose only open step waits for a check-back draws that step's
+  // clock and names the day, not the dashed hexagon of a wait on a step.
+  it('gives a feature waiting on a check-back beneath it the clock', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'jev', title: 'Use Jev for mail' }),
+        item({ id: 'sorted', title: 'Sort the mail', parentId: 'jev', status: 'done' }),
+        item({ id: 'later', title: 'Shorten the rules', parentId: 'jev', status: 'in_progress' }),
+      ],
+      dependencies: [],
+      checkWaits: [
+        {
+          id: 'check',
+          planItemId: 'later',
+          title: 'Two weeks of agreeing',
+          dueAt: '2026-10-26T09:00:00Z',
+        },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={sections}
+        finished={[]}
+        summary={summarize(sections)}
+        view="open"
+        catalog={catalogOf(sections)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded={false}
+      />,
+    );
+    const from = html.indexOf('Status of #');
+    expect(from).toBeGreaterThan(-1);
+    const row = html.slice(from, html.indexOf('Use Jev for mail') > from ? from + 3000 : undefined);
+    expect(row).toContain('Waiting');
+    expect(row).toContain('Waits until');
+  });
+
   it('heads the columns Step, Status, Assignee, Priority, Steps', () => {
     const html = render('all');
     const heads = ['Step', 'Status', 'Assignee', 'Priority', 'Steps'].map((word) =>
@@ -824,7 +877,7 @@ describe('the Status and Assignee columns', () => {
     expect(html).toContain('Yours. You kept it, so the runner leaves it for you.');
     expect(html).toContain('Yours to answer.');
     expect(html).toContain('Yours to approve. Dash builds it once you do.');
-    expect(html).toContain("Dash&#x27;s. The runner takes it when it is ready.");
+    expect(html).toContain('Dash&#x27;s. The runner takes it when it is ready.');
   });
 
   it('draws both on a feature whose open steps are split, with the counts', () => {
@@ -886,7 +939,6 @@ describe('the Status and Assignee columns', () => {
     expect((html.match(/data-dash-state="working"/g) ?? []).length).toBe(2);
     expect(html).toContain('A session is working on it now.');
   });
-
 });
 
 /**
@@ -900,7 +952,12 @@ describe('the CI mark on a closed step', () => {
   const shipped = buildPlanTree({
     items: [
       item({ id: 'red', title: 'Landed on a red commit', status: 'done', commitSha: 'aaaaaaa' }),
-      item({ id: 'green', title: 'Landed on a green commit', status: 'done', commitSha: 'bbbbbbb' }),
+      item({
+        id: 'green',
+        title: 'Landed on a green commit',
+        status: 'done',
+        commitSha: 'bbbbbbb',
+      }),
       item({ id: 'new', title: 'Nobody has looked yet', status: 'done', commitSha: 'ccccccc' }),
     ],
     dependencies: [],
@@ -960,7 +1017,12 @@ describe('a claim, drawn from what its run did', () => {
   /** The page, for one step claimed `minutes` ago with no run recorded. */
   function drawClaim(minutes: number) {
     const items = [
-      item({ id: 'a', title: 'Being worked', status: 'in_progress', startedAt: minutesAgo(minutes) }),
+      item({
+        id: 'a',
+        title: 'Being worked',
+        status: 'in_progress',
+        startedAt: minutesAgo(minutes),
+      }),
     ];
     const liveness = planLiveness(items, {}, NOW);
     const tree = buildPlanTree({ items, dependencies: [] }, liveness);
@@ -1297,14 +1359,22 @@ describe('a step a session added under an approved feature', () => {
 
     it('offers it on a blocked or underway step as well', () => {
       for (const status of ['in_progress', 'blocked'] as const) {
-        expect(withSessionDrop({ id: 'a', status, comment: stamp }, rest, () => {})[0].label).toBe('Drop');
+        expect(withSessionDrop({ id: 'a', status, comment: stamp }, rest, () => {})[0].label).toBe(
+          'Drop',
+        );
       }
     });
 
     it('leaves the menu alone on a closed step or one without the stamp', () => {
-      expect(withSessionDrop({ id: 'a', status: 'done', comment: stamp }, rest, () => {})).toBe(rest);
-      expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest, () => {})).toBe(rest);
-      expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest, () => {})).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'done', comment: stamp }, rest, () => {})).toBe(
+        rest,
+      );
+      expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest, () => {})).toBe(
+        rest,
+      );
+      expect(
+        withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest, () => {}),
+      ).toBe(rest);
     });
   });
 });

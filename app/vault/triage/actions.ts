@@ -38,6 +38,8 @@ const FileInput = z.object({
   /** A note's path, or empty to make the quick note a note of its own. */
   targetPath: path.optional(),
   targetBlobSha: z.string().trim().min(1).optional(),
+  /** The name for a note of its own, when the person changed it (note 24fd1e02). */
+  title: z.string().trim().max(200).optional(),
 });
 
 /** How long the embedding after a filing may run, as after a save. */
@@ -51,7 +53,7 @@ function field(formData: FormData, name: string): string | undefined {
 /**
  * Takes `quickPath` and `quickBlobSha` (the quick note as shown), and either
  * `targetPath` with `targetBlobSha` (the note to add it to) or neither, to
- * make it a note of its own.
+ * make it a note of its own, named `title` when one is given.
  */
 // latency: pending
 export async function fileQuickNoteAction(
@@ -65,6 +67,7 @@ export async function fileQuickNoteAction(
     quickBlobSha: field(formData, 'quickBlobSha'),
     targetPath: field(formData, 'targetPath'),
     targetBlobSha: field(formData, 'targetBlobSha'),
+    title: field(formData, 'title'),
   });
   if (!input.success) return { reason: 'error', error: 'Dash could not tell which quick note that was.' };
 
@@ -95,7 +98,7 @@ export async function fileQuickNoteAction(
         quickBlobSha: input.data.quickBlobSha,
         target: input.data.targetPath
           ? { kind: 'note', path: input.data.targetPath, blobSha: input.data.targetBlobSha }
-          : { kind: 'own' },
+          : { kind: 'own', title: input.data.title },
       },
     );
   } catch (error) {

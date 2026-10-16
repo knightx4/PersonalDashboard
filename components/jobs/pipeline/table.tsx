@@ -1,10 +1,12 @@
 import { RowLink } from '@/components/shell/back-link';
+import { ActionMenu } from '@/components/ui/action-menu';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatCompBand, formatDate, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
+import type { ColumnFilter } from '@/lib/jobs/pipeline-columns';
 import type { DisplayChoice } from '@/lib/list-display';
 import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -21,6 +23,8 @@ export function RolesTable({
   rows,
   sorts,
   hidden = [],
+  filters = {},
+  openFilter,
 }: {
   rows: PipelineRow[];
   /**
@@ -31,6 +35,14 @@ export function RolesTable({
   sorts: DisplayChoice[];
   /** Column ids turned off in the Display panel. Never the role title. */
   hidden?: readonly string[];
+  /**
+   * The filter each column offers, by column id (note f05f5f04). A column
+   * with one opens a menu from its header, holding its sort and its filter;
+   * a column without one is the sort link alone.
+   */
+  filters?: Readonly<Record<string, ColumnFilter>>;
+  /** For the gallery: the column whose menu is drawn open. */
+  openFilter?: string;
 }) {
   const showing = (property: string) => !hidden.includes(property);
   // Tighter than the table's own padding, so every column fits inside a
@@ -58,15 +70,36 @@ export function RolesTable({
             .filter((entry) => showing(entry.id))
             .map((entry) => (
               <TH key={entry.id} className={cn(cell, entry.id === 'applied' && narrowHidden)}>
-                <Link
-                  href={entry.href}
-                  className={cn(
-                    'transition-colors duration-quick',
-                    entry.chosen ? 'text-accent' : 'hover:text-ink',
-                  )}
-                >
-                  {entry.label}
-                </Link>
+                {filters[entry.id] ? (
+                  <ActionMenu
+                    label={`Sort or filter by ${entry.label.toLowerCase()}`}
+                    align="start"
+                    defaultOpen={openFilter === entry.id}
+                    // The header row is not drawn on a phone, so neither is its menu.
+                    panelClassName="max-md:hidden"
+                    // The heading alone, at the width the sort link had: a
+                    // chevron on five headings pushed Comp off the card.
+                    trigger={entry.label}
+                    triggerClassName={cn(
+                      'h-auto w-auto justify-start p-0 text-left text-micro font-semibold uppercase tracking-wider',
+                      entry.chosen || filters[entry.id].active ? 'text-accent' : 'text-ink-muted hover:text-ink',
+                    )}
+                    items={[
+                      { id: 'sort', label: `Sort by ${entry.label.toLowerCase()}`, href: entry.href, current: entry.chosen },
+                      ...filters[entry.id].choices,
+                    ]}
+                  />
+                ) : (
+                  <Link
+                    href={entry.href}
+                    className={cn(
+                      'transition-colors duration-quick',
+                      entry.chosen ? 'text-accent' : 'hover:text-ink',
+                    )}
+                  >
+                    {entry.label}
+                  </Link>
+                )}
               </TH>
             ))}
           {/* Comp is a column without a sort, so it is not in the list above

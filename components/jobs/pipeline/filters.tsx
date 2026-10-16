@@ -36,6 +36,7 @@ export function PipelineFilters({
   sources,
   scored,
   marks,
+  companyName,
 }: {
   params: PipelineParams;
   state: PipelineState;
@@ -53,6 +54,8 @@ export function PipelineFilters({
     letter: number;
     noLetter: number;
   };
+  /** The company the table's Company column narrowed to, by name. */
+  companyName?: string;
 }) {
   const router = useRouter();
   // On a phone the line holds status, source and More; the other three come
@@ -70,6 +73,7 @@ export function PipelineFilters({
       {params.q && <input type="hidden" name="q" value={params.q} />}
       {state.stage && <input type="hidden" name="stage" value={state.stage.key} />}
       {state.sentDays !== null && <input type="hidden" name="sent" value={state.sentDays} />}
+      {state.company && <input type="hidden" name="company" value={state.company} />}
       {/* What a number on Today narrowed the page to (plan #1591), each with
           its own way out, ahead of the chips anybody can set here. */}
       {state.stage && (
@@ -80,6 +84,9 @@ export function PipelineFilters({
           href={pipelineHref(params, { sent: undefined })}
           label={`Sent in the last ${state.sentDays} ${state.sentDays === 1 ? 'day' : 'days'}`}
         />
+      )}
+      {state.company && (
+        <ClearChip href={pipelineHref(params, { company: undefined })} label={companyName ?? state.company} />
       )}
       <PressChip
         name="status"
