@@ -22,6 +22,7 @@ import {
 import { POST_CHANGE_KINDS, type PostChangeInput, type PostChangeKind } from '@/lib/ask/post-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PaidActionInput } from '@/lib/dash/paid-input';
+import type { DeleteRowsInput } from '@/lib/ask/delete-rows';
 
 /**
  * The changes Dash proposes in an Ask Dash answer (feature #1186), kept in
@@ -63,6 +64,8 @@ export const DASH_CHANGE_KINDS = [
   'start_build',
   // A paid button Dash pressed for an approval (plan #2228.1, lib/dash/paid.ts).
   'paid_action',
+  // Rows Dash proposed deleting, removed only on a Confirm (plan #2232.1, lib/ask/delete-rows.ts).
+  'delete_rows',
   // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
   ...LEARN_CHANGE_KINDS,
   // Todo's newer ones, in the same shape (lib/ask/todo-changes.ts, plan #1894.9.1).
@@ -158,6 +161,11 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  checked arguments its run takes, the line the card shows,
  *                  and the estimate the button's hint would show. Approving
  *                  runs the function the button calls; it cannot be undone.
+ * delete_rows      rows of an allowed table Dash proposed removing (plan
+ *                  #2232.1, lib/ask/delete-rows.ts): the table, a snapshot of
+ *                  every row, what each is called and the page they are on.
+ *                  Confirming deletes them and keeps the removed rows in
+ *                  `undo.rows`, which Undo inserts again.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -209,6 +217,7 @@ export type DashChangeInput = {
   add_quick_note: { noteId: string; title: string; path: string; body: string };
   start_build: { stepId: string; number: number; outline: string; title: string; quiet: boolean };
   paid_action: PaidActionInput;
+  delete_rows: DeleteRowsInput;
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
   Record<YouChangeKind, YouChangeInput> &

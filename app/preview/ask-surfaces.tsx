@@ -1113,6 +1113,93 @@ export function AskBuildSurface({ refused = false }: { refused?: boolean }) {
   );
 }
 
+const ANSWERS = [
+  'Why do you want to work at Northwind?',
+  'Why us?',
+  'Why are you interested in this role?',
+  'What draws you to Northwind Logistics?',
+  'Tell us about a time you led a project under a tight deadline and had to change the plan halfway through',
+  'Describe your biggest strength',
+  'What is your biggest strength?',
+  'Where do you see yourself in five years?',
+  'Why this role?',
+  'What would you bring to the team?',
+  'What are you looking for in your next role?',
+  'Why now?',
+];
+
+/**
+ * The "Are you sure?" popup for a proposed delete (plan #2232.2): Confirm on
+ * the card opens it over the thread, listing the answers with Cancel and
+ * Delete. `refused` presses Delete too, for the popup after the server turned
+ * the delete down, with the reason inside it and the rows kept; `deleting`
+ * presses it and leaves the delete running, for the pending buttons.
+ */
+export function AskDeleteSurface({ mode = 'open' }: { mode?: 'open' | 'refused' | 'deleting' }) {
+  const at = (minute: number) => `2026-10-15T09:${String(minute).padStart(2, '0')}:00Z`;
+  const change: DashChange = {
+    ...CHANGE_BASE,
+    id: 'rd-delete',
+    turnId: 'rd',
+    status: 'proposed',
+    kind: 'delete_rows',
+    createdAt: at(1),
+    input: {
+      table: 'job_search.application_answers',
+      count: ANSWERS.length,
+      titles: ANSWERS,
+      href: '/jobs/answers',
+      rows: [],
+    },
+  };
+  const turns: TalkTurn[] = [
+    { id: 'pd', role: 'user', body: 'Remove my duplicate application answers', createdAt: at(0) },
+    { id: 'rd', role: 'assistant', body: 'These answer the same questions as ones you kept.', createdAt: at(1) },
+  ];
+  const source: AskSource =
+    mode === 'refused'
+      ? {
+          ...FIXTURES,
+          confirm: async () => ({
+            ok: false,
+            error: '“Why us?” was edited after Dash found it. Nothing was deleted; ask again to see the current list.',
+            change,
+          }),
+        }
+      : mode === 'deleting'
+        ? { ...FIXTURES, confirm: () => new Promise<ChangeOutcome>(() => {}) }
+        : FIXTURES;
+  return (
+    <AskDashProvider source={source}>
+      <PageColumn className="py-4">
+        <PressInOrder labels={mode === 'open' ? ['Confirm'] : ['Confirm', 'Delete']} />
+        <AskThread
+          id="ask-delete-preview"
+          conversationRef="00000000-0000-4000-8000-000000000021"
+          turns={turns}
+          changes={[change]}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+        />
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+/** Presses the buttons reading `labels` in turn once the page has arrived. */
+function PressInOrder({ labels }: { labels: string[] }) {
+  useEffect(() => {
+    const timers = labels.map((label, index) =>
+      setTimeout(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        buttons.find((b) => b.textContent?.trim() === label)?.click();
+      }, 100 * index),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [labels]);
+  return null;
+}
+
 /** Presses the first button reading `label` once the page has arrived: a state only a press reaches. */
 function PressOnArrival({ label }: { label: string }) {
   useEffect(() => {

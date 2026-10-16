@@ -260,7 +260,7 @@ export type DashTool = DashLookupTool | DashProposalTool | DashHandoffTool | Das
 const IN_APP = new Set<string>(IN_APP_ONLY_TOOLS);
 
 /** The proposals still offered: the rest became writes (plan #1440). */
-const REGISTERED_PROPOSALS = new Set<string>(['propose_watch', 'propose_build']);
+const REGISTERED_PROPOSALS = new Set<string>(['propose_watch', 'propose_build', 'propose_delete']);
 
 /** The tools in the order the model is sent them, which keeps the cached prefix stable. */
 export const DASH_TOOLS: readonly DashTool[] = [
