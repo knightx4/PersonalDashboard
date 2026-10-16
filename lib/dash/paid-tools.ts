@@ -6,6 +6,7 @@ import { writeYearReviewFor, yearReviewRefusal } from '@/lib/timeline/year-revie
 import { JOBS_PAID_TOOLS } from './paid-tools-jobs';
 import type { DashPaidTool } from './registry';
 import { LEARN_PAID_TOOLS } from './paid-tools-learn';
+import { OTHER_PAID_TOOLS } from './paid-tools-other';
 
 /**
  * Dash's paid tools (plan #2228.1): each one a button that spends money,
@@ -101,4 +102,5 @@ export const PAID_TOOLS: readonly DashPaidTool[] = [
   writeYearReviewTool,
   ...JOBS_PAID_TOOLS,
   ...LEARN_PAID_TOOLS,
+  ...OTHER_PAID_TOOLS,
 ];
