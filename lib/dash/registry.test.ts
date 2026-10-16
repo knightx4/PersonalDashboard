@@ -35,7 +35,17 @@ describe('DASH_TOOLS', () => {
       HAND_OFF_TOOL_NAME,
     ]);
     // A paid press is queued for an approval (plan #2228.1).
-    expect(dashToolsOf('paid').map((t) => t.name)).toEqual(['write_year_review']);
+    expect(dashToolsOf('paid').map((t) => t.name)).toEqual([
+      'write_year_review',
+      // Learn (plan #2228.4)
+      'draft_topic',
+      'make_learn_subject',
+      'write_subject_curriculum',
+      'add_plan_unit',
+      'summarize_reading',
+      'retry_research_brief',
+      'write_quiz_questions',
+    ]);
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
     // The other three proposals became writes (plan #1440); a watch acts outside
     // the app, and a build starts a session that cannot be undone (plan #2106.1).
