@@ -424,6 +424,22 @@ function approvedMockups(
   return { links: [...links], pictures: drawn };
 }
 
+/**
+ * The drawings approved for a step, by the same rule the brief lists them:
+ * on the step and the rows above it, and the chosen option on each decision
+ * answered under its feature. The plan row pairs one with the build's
+ * pictures (plan #2215.10).
+ */
+export function approvedDrawings<P extends BriefPicture>(
+  sections: readonly PlanSection[],
+  node: PlanNode,
+  pictures: Readonly<Record<string, readonly P[]>>,
+): (P & { on: PlanNode })[] {
+  const ancestors = ancestorsOf(sections, node.id);
+  const decided = decidedSoFar(featureOf(node, ancestors), node);
+  return approvedMockups(node, ancestors, decided, pictures).pictures as (P & { on: PlanNode })[];
+}
+
 function referenceLines(
   node: PlanNode,
   surfaces: readonly string[],

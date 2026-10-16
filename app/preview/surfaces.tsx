@@ -304,6 +304,7 @@ import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
   PlanScreenChangeSurface,
+  PlanScreenMockupSurface,
   PlanSendBackSurface,
   PlanOpenedSurface,
   PlanFeatureSurface,
@@ -4460,6 +4461,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanSendBackSurface />,
+  },
+  {
+    /* A finished step's screens with the mockup you approved beside the
+     * build (plan #2215.10): the mockup first, Send back under each pair,
+     * and a surface with no mockup drawn as before. */
+    id: 'dev-plan-screen-mockup',
+    label: 'Plan · a step’s screens beside their mockup',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanScreenMockupSurface />,
   },
   {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
