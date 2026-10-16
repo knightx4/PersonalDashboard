@@ -7,6 +7,10 @@ import { DashAction } from '@/components/ui/dash-action';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
+import { CopyText } from './copy-text';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import type { StoredAsk } from '@/lib/jobs/drafting/store';
 import {
@@ -39,6 +43,7 @@ export function CoverLetter({
   initialDraft,
   initialRun,
   onMarkedYes,
+  thread = [],
 }: {
   applicationId: string;
   roleId: string;
@@ -51,6 +56,8 @@ export function CoverLetter({
   initialRun?: { pending: boolean; error: string | null };
   /** Saving an inserted draft set the Cover letter mark to Yes. */
   onMarkedYes?: () => void;
+  /** The comments under the letter (note be3c6616). */
+  thread?: DevComment[];
 }) {
   const [text, setText] = useState(initial);
   const [editing, setEditing] = useState(false);
@@ -90,7 +97,10 @@ export function CoverLetter({
 
   return (
     <>
-      <CardSection title="Cover letter">
+      <CardSection
+        title="Cover letter"
+        action={!editing && text.trim() ? <CopyText text={text} what="cover letter" /> : undefined}
+      >
         {editing ? (
           <Textarea
             rows={12}
@@ -176,7 +186,8 @@ export function CoverLetter({
 
         {running ? (
           <Note role="status" className="mt-2 px-3 py-2 text-small text-ink-muted">
-            Dash is writing the letter from everything on file, which takes a minute. You can keep working.
+            Dash is writing the letter from everything on file, which takes a minute. You can keep
+            working.
           </Note>
         ) : (
           runError && (
@@ -209,6 +220,16 @@ export function CoverLetter({
             }}
           />
         )}
+
+        {/* Comments on the letter: a note to yourself, or @dash to ask for a
+            change (note be3c6616). */}
+        <div className="mt-3">
+          <Thread
+            subject={threadRef('application', applicationId)}
+            turns={thread}
+            placeholder="A note on the letter, or @dash make the opening warmer."
+          />
+        </div>
       </CardSection>
 
       {showDraft && draft.asks.length > 0 && (
@@ -219,9 +240,14 @@ export function CoverLetter({
           aboutLabel={() => 'About the cover letter'}
           hint="A line each is enough. Redraft writes the letter again with your replies."
           onSaveReply={async (askId, reply) => {
-            const result = await saveCoverLetterReplies({ applicationId, replies: { [askId]: reply } });
+            const result = await saveCoverLetterReplies({
+              applicationId,
+              replies: { [askId]: reply },
+            });
             if (!result.error) {
-              setAsks((asks) => asks.map((ask) => (ask.id === askId ? { ...ask, reply: reply || null } : ask)));
+              setAsks((asks) =>
+                asks.map((ask) => (ask.id === askId ? { ...ask, reply: reply || null } : ask)),
+              );
             }
             return result.error;
           }}
