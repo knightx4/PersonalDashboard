@@ -380,6 +380,9 @@ import {
 import {
   PostsCommentSurface,
   PostsDraftingSurface,
+  PostsWantsEditSurface,
+  PostsWantsSavingSurface,
+  PostsWantsSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
   PostsSendSurface,
@@ -6762,6 +6765,32 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsSurface />,
+  },
+  {
+    /* What I want from posts (plan #2227.2), saved: the line under the
+     * heading holds the text on one line and the day it was saved. With
+     * nothing saved it is the one-line prompt dev-posts draws. */
+    id: 'dev-posts-wants',
+    label: 'Dev · Posts, what you want from them',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsSurface />,
+  },
+  {
+    /* The wants line pressed: the box open on the saved text. */
+    id: 'dev-posts-wants-edit',
+    label: 'Dev · Posts, changing what you want',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsEditSurface />,
+  },
+  {
+    /* Save pressed on the wants box: mid-save, then refused. */
+    id: 'dev-posts-wants-saving',
+    label: 'Dev · Posts, saving what you want',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsSavingSurface />,
   },
   {
     /* The first press: Dash drafting, nothing written yet. */
