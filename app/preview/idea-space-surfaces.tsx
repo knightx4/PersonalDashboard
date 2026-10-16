@@ -491,7 +491,12 @@ const OPEN = VIEW.ideas.find((idea) => idea.name === 'Price elasticity of demand
 
 /** The neighbour map with its places named, one idea open with its nearest six. */
 export function IdeaSpaceSurface() {
-  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
+  // The open idea was tested, and a note and a piece of work touch it too.
+  const view = {
+    ...VIEW,
+    ideas: VIEW.ideas.map((idea) => (idea.id === OPEN ? { ...idea, evidence: linksFor(idea.id, 1, 2) } : idea)),
+  };
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
 }
 
 /**
@@ -628,6 +633,7 @@ const THIN_VIEW = {
       topics: THIN.topics.map((topic) => ({ ...topic, tested: 0, held: 0, missed: [] })),
       links: THIN.links.slice(0, 1),
       ready: [],
+      standing: [],
     },
   ],
 };
@@ -638,7 +644,21 @@ export function IdeaSpaceTerritoryThinSurface() {
 
 /** The same territory with its most linked star pointed at: every link it has, the level each needs, and its level line. */
 export function IdeaSpaceTerritoryHoverSurface() {
-  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} pointingAt={TERRITORY_POINTED} />;
+  return (
+    <IdeaSpaceView
+      view={TERRITORY_VIEW}
+      params={{ ...TERRITORY_PARAMS, topic: TERRITORY_POINTED }}
+      pointingAt={TERRITORY_POINTED}
+    />
+  );
+}
+
+/**
+ * The open topic's words (plan #2187.5): the quote of the answer that showed
+ * the level, folded in the rail until tapped, drawn open here.
+ */
+export function IdeaSpaceTerritoryQuoteSurface() {
+  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} holdQuote />;
 }
 
 export function IdeaSpaceDenseSurface() {
@@ -784,7 +804,7 @@ const EVIDENCE_FIXTURE: IdeaMapView = (() => {
 
 export function IdeaSpaceEvidenceSurface() {
   const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
-  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} />;
+  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} holdMore />;
 }
 
 /**
@@ -831,4 +851,20 @@ export function IdeaSpaceGoalSurface() {
 export function IdeaSpaceGoalNextSurface() {
   const view = useMemo(() => denseWithGoals(), []);
   return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} holdNext="goal-accounts" />;
+}
+
+/**
+ * The layer switch (plan #2187.5) with courses and work turned off: the idea
+ * no question has been asked about loses the ring those gave it, the ones
+ * your notes back keep theirs, and its list says only what is on.
+ */
+export function IdeaSpaceLayersSurface() {
+  const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
+  return (
+    <IdeaSpaceView
+      view={EVIDENCE_FIXTURE}
+      params={{ ...DEFAULT_PARAMS, idea: open }}
+      layersOn={{ answers: true, courses: false, writing: true }}
+    />
+  );
 }

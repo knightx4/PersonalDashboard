@@ -152,6 +152,46 @@ describe('territoriesOnMap', () => {
   });
 });
 
+describe('territory standing', () => {
+  const GOAL = [lens('g', 'goal', [['capm', 4], ['return', 3]])];
+  const standingOf = (m: TopicMap, topic: string) =>
+    territoriesOnMap(GOAL, m, readCells(m), PLACED, new Map())[0]!.standing!.find((s) => s.topicId === topic);
+
+  it('says a level shown by an answer is tested, with its quote and the day a re-check falls due', () => {
+    const m = map([{ cellId: 'return2', verdict: 'met', observedAt: '2026-10-01T09:00:00.000Z', quote: 'Return is what you earn for waiting.' }]);
+    expect(standingOf(m, 'return')).toMatchObject({
+      level: 2,
+      how: 'tested',
+      cellId: 'return2',
+      quote: 'Return is what you earn for waiting.',
+      via: null,
+      dueOn: '2026-10-31T09:00:00.000Z',
+    });
+  });
+
+  it('names the answer that implies a level held by inference', () => {
+    const m = map([{ cellId: 'capm3', verdict: 'met', observedAt: '2026-10-01T09:00:00.000Z', quote: 'CAPM prices risk through beta.' }]);
+    expect(standingOf(m, 'return')).toMatchObject({
+      level: 2,
+      how: 'inferred',
+      quote: 'CAPM prices risk through beta.',
+      via: { topicName: 'CAPM', level: 3 },
+    });
+  });
+
+  it('has no quote for a declaration and none for a topic with nothing held', () => {
+    const m = map([{ cellId: 'return1', verdict: 'declared', observedAt: '2026-10-01T09:00:00.000Z' }]);
+    expect(standingOf(m, 'return')).toMatchObject({ how: 'declared', quote: null });
+    expect(standingOf(m, 'capm')).toBeUndefined();
+  });
+
+  it('puts the reason a cell is ready on the ready row', () => {
+    const m = map();
+    const [territory] = territoriesOnMap(GOAL, m, readCells(m), PLACED, new Map());
+    expect(territory!.ready!.every((r) => typeof r.why === 'string' && r.why.length > 0)).toBe(true);
+  });
+});
+
 describe('ringRadius', () => {
   it('widens with the target and stays within the ladder', () => {
     expect(ringRadius(2)).toBeLessThan(ringRadius(5));

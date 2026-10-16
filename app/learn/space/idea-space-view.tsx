@@ -22,6 +22,7 @@ import { GoalRail } from './goal-rail';
 import { NextTopicsCard } from './next-topics-card';
 import type { NextTopic } from '@/lib/learn/map/next-topics';
 import { NOT_RECORDING, viewFor, type Recording } from '@/lib/learn/map/recording';
+import { ALL_LAYERS, layeredView, type Layers } from '@/lib/learn/map/layers';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -54,6 +55,9 @@ export function IdeaSpaceView({
   zoomOn,
   nextTopics,
   holdNext,
+  layersOn = ALL_LAYERS,
+  holdQuote,
+  holdMore,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -77,10 +81,19 @@ export function IdeaSpaceView({
   nextTopics?: NextTopic[] | null;
   /** The gallery holds this goal's next rung open in the rail (plan #2187.2). */
   holdNext?: string | null;
+  /** The gallery draws the layers as they were left: answers, courses and work, writing (plan #2187.5). */
+  layersOn?: Layers;
+  /** The gallery draws the open topic's quote open, as a tap would. */
+  holdQuote?: boolean;
+  /** The gallery draws the open idea's fold of further evidence open. */
+  holdMore?: boolean;
 }) {
   const [recording, setRecording] = useState(saved);
-  // Names are made private here, once, so nothing below can draw one.
-  const view = useMemo(() => (whole ? viewFor(whole, recording) : null), [whole, recording]);
+  const [layers, setLayers] = useState(layersOn);
+  // Names are made private here, once, so nothing below can draw one. The
+  // layers are applied after, so a layer off hides what it drew under the
+  // stand-in names too.
+  const view = useMemo(() => (whole ? layeredView(viewFor(whole, recording), layers) : null), [whole, recording, layers]);
   const header = (
     <PageHeader
       subject={{
@@ -141,9 +154,9 @@ export function IdeaSpaceView({
         }
         rail={
           <>
-            <ChosenIdea ideas={view.ideas} places={view.places} />
+            <ChosenIdea ideas={view.ideas} places={view.places} asOf={view.asOf} layers={layers} onLayers={setLayers} moreOpen={holdMore} />
             <GoalRail goals={view.goals} holdNext={holdNext} />
-            <PlaceRail view={view} />
+            <PlaceRail view={view} layers={layers} onLayers={setLayers} holdQuote={holdQuote} />
             <TopicRail frame={view.topics} />
             <NextTopicsCard topics={nextTopics} />
             <RecordingCard places={whole?.places ?? []} recording={recording} onChange={setRecording} save={save} chooseOpen={chooseOpen} />

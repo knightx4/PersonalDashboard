@@ -13,8 +13,8 @@ import { iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { openFor, paramsFor } from '@/lib/learn/map/place-graph';
 import { ValueList } from '@/components/ui/value-row';
-import { EvidenceList } from '@/components/learn/evidence-list';
-import { isUntested } from '@/lib/learn/strength';
+import type { Layers } from '@/lib/learn/map/layers';
+import { IdeaWhy } from './why-lit';
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 
@@ -26,9 +26,17 @@ const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 export function ChosenIdea({
   ideas,
   places,
+  asOf,
+  layers,
+  onLayers,
+  moreOpen,
 }: {
   ideas: readonly IdeaOnMap[];
   places: readonly { id: string; name: string }[];
+  asOf: string;
+  layers: Layers;
+  onLayers: (next: Layers) => void;
+  moreOpen?: boolean;
 }) {
   const { selectedId, params, pick, set } = usePick();
   const idea = selectedId ? ideas.find((other) => other.id === selectedId) : undefined;
@@ -95,7 +103,7 @@ export function ChosenIdea({
         </Link>
       )}
 
-      <EvidenceList links={idea.evidence} untested={isUntested(idea.stateRow)} className="mt-4" />
+      <IdeaWhy idea={idea} asOf={asOf} layers={layers} onLayers={onLayers} moreOpen={moreOpen} className="mt-4" />
 
       {idea.neighbours.length > 0 && (
         <>

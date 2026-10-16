@@ -26,7 +26,7 @@ export type GoalRows = {
 };
 
 export async function loadGoalRows(learn: LearnSupabaseClient): Promise<GoalRows> {
-  const [all, map] = await Promise.all([listLenses(learn), loadTopicMap(learn)]);
+  const [all, map] = await Promise.all([listLenses(learn), loadTopicMap(learn, { quotes: true })]);
   const lenses = all.filter((lens) => lens.origin === 'goal');
   const ids = [...new Set(lenses.flatMap((lens) => lens.targets.map((t) => t.topicId)))].sort();
   const chunks: string[][] = [];

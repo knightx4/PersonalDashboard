@@ -50,6 +50,8 @@ import {
   IdeaSpaceSurface,
   IdeaSpaceTerritoryHoverSurface,
   IdeaSpaceTerritoryThinSurface,
+  IdeaSpaceTerritoryQuoteSurface,
+  IdeaSpaceLayersSurface,
   IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
   IdeaSpaceGoalSurface,
@@ -6728,6 +6730,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceTerritoryThinSurface />,
   },
   {
+    /* The open topic's quote (plan #2187.5): the words of the answer that
+     * showed its level, folded until tapped, drawn open. */
+    id: 'learn-idea-space-territory-quote',
+    label: 'Learn · Idea Space, the words behind a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryQuoteSurface />,
+  },
+  {
     /* The moment An idea lights up (plan #1997.10): three ideas set in the
      * last two days brighten from dark to their strength when the map opens.
      * The button opens it again, which the recorder presses. */
@@ -6778,6 +6789,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceEvidenceSurface />,
+  },
+  {
+    /* The layer switch with courses and work off (plan #2187.5): the rings
+     * they gave leave the sky, and the idea's list says only what is on. */
+    id: 'learn-idea-space-layers',
+    label: 'Learn · Idea Space, courses and work turned off',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceLayersSurface />,
   },
   {
     /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
