@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyOrder,
+  cannotRehearse,
   liveMigrationName,
+  LOOSE_NAMES_THROUGH,
+  rehearsalScript,
   migrationApplied,
   unappliedMigrations,
   unappliedSentence,
@@ -106,5 +109,58 @@ describe('applyOrder', () => {
       'migrations-learn/0154_a.sql',
       'migrations-learn/0155_b.sql',
     ]);
+  });
+});
+
+describe('migrationApplied past the loose line', () => {
+  const next = (dir: string, stem: string) => ({
+    dir,
+    name: `${String(LOOSE_NAMES_THROUGH[dir] + 1).padStart(4, '0')}_${stem}.sql`,
+  });
+
+  it('is not fooled by the same name in another folder', () => {
+    const file = next('migrations-vault', 'merge_ideas');
+    expect(migrationApplied(file, new Set(['learn_0154_merge_ideas']))).toBe(false);
+  });
+
+  it('takes the name the workflow writes, or the core folder name without its number', () => {
+    const vault = next('migrations-vault', 'merge_ideas');
+    expect(migrationApplied(vault, new Set([liveMigrationName(`${vault.dir}/${vault.name}`)]))).toBe(true);
+    expect(migrationApplied(vault, new Set(['vault_merge_ideas']))).toBe(true);
+    const core = next('migrations', 'post_preferences_two');
+    expect(migrationApplied(core, new Set(['post_preferences_two']))).toBe(true);
+    expect(migrationApplied(core, new Set(['learn_post_preferences_two']))).toBe(false);
+  });
+
+  it('keeps the loose rule for files already on main', () => {
+    // migrations-job-search/0044 went in as a bare name with no folder.
+    expect(
+      migrationApplied({ dir: 'migrations-job-search', name: '0044_message_role_hint.sql' }, new Set(['message_role_hint'])),
+    ).toBe(true);
+  });
+});
+
+describe('cannotRehearse', () => {
+  it('lets a function with its own begin and end through', () => {
+    const sql = `create function f() returns void language plpgsql as $$\nbegin\n  delete from t;\nend;\n$$;\nupdate t set a = 1;`;
+    expect(cannotRehearse(sql)).toBeNull();
+  });
+
+  it('stops a file that would end the transaction or cannot run in one', () => {
+    expect(cannotRehearse('begin;\ncreate table t (id int);\ncommit;')).toMatch(/begin/);
+    expect(cannotRehearse('create index concurrently i on t (a);')).toMatch(/concurrently/);
+    expect(cannotRehearse('-- commit in a comment\nselect 1;')).toBeNull();
+  });
+});
+
+describe('rehearsalScript', () => {
+  it('runs every file inside one transaction and rolls it back', () => {
+    const script = rehearsalScript([
+      { path: 'migrations/0252_a.sql', sql: 'create table a (id int);' },
+      { path: 'migrations/0253_b.sql', sql: 'insert into a values (1);' },
+    ]);
+    expect(script.startsWith('begin;')).toBe(true);
+    expect(script.trimEnd().endsWith('rollback;')).toBe(true);
+    expect(script.indexOf('create table a')).toBeLessThan(script.indexOf('insert into a'));
   });
 });

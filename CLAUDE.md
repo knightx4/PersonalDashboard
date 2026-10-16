@@ -26,12 +26,19 @@ Project ref: `asjztutnqxbecruvyrbj`.
 
 Main applies its own migrations. On every push to main that touches a supabase/migrations*/ folder, .github/workflows/migrations.yml runs scripts/apply-migrations.ts, which applies each file the live history lacks under the name described below, through the Management API with the SUPABASE_ACCESS_TOKEN repository secret. A failed migration turns that run red. So a migration the connector will not let you apply, such as one containing a delete, is not a reason to hold a feature off main or to raise it for the person: merge it and the workflow applies it. Apply through the connector when the code on your branch needs the change before it merges.
 
+The connector does not refuse such a statement: it waits about 60 seconds for a confirmation that never reaches a cloud session, then times out with nothing applied. Do not retry it. A plain `select` of a function that deletes inside goes through.
+
+Before merging a migration to main, push the branch and read its **Rehearse migrations** run (.github/workflows/migrations-rehearse.yml). It runs the branch's unapplied files against the live database in one transaction and rolls it back, so a migration that only fails on the real rows, such as an index the existing data violates or a cleanup that catches more than it meant to, shows red on the branch instead of on main after the code that needs it has deployed. Fix a red rehearsal before merging. A file with its own `begin`/`commit` or `create index concurrently` cannot be rehearsed and the run says so.
+
 Apply a migration under its file's own name: `0096_plan_main_deploy_and_migrations.sql`
 goes in as `plan_main_deploy_and_migrations`, or with its folder in front
 (`learn_0026_catalogue_judgements`). The status line's CI panel compares the
 files on main with the live history by that name
 ([lib/plan/migrations.ts](lib/plan/migrations.ts)), and reports a migration
-applied under any other name as missing.
+applied under any other name as missing. For files newer than
+`LOOSE_NAMES_THROUGH`, a module folder's file must carry its folder in front:
+a bare `merge_ideas` would match a file of that name in any folder, so it no
+longer counts, and the workflow on main would apply the file again.
 
 The connector is the claude.ai **`Supabase`** one, whose tools are
 `mcp__Supabase__*` and are loaded through ToolSearch before the first call.

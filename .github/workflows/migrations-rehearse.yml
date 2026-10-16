@@ -1,0 +1,37 @@
+name: Rehearse migrations
+
+# Runs a branch's new migrations against the live database inside one
+# transaction and rolls it back, so a migration that passes on the empty test
+# database and fails on the real rows turns the branch red before main applies
+# it (scripts/apply-migrations.ts --rehearse says how). Nothing it runs is kept.
+#
+# migrations.yml applies them once they reach main. A session checks this
+# run on its branch before merging a migration, as CLAUDE.md says.
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['supabase/migrations*/**']
+  workflow_dispatch:
+
+# A newer push to the same branch makes the older rehearsal pointless.
+concurrency:
+  group: rehearse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Rehearse migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx tsx scripts/apply-migrations.ts --rehearse
