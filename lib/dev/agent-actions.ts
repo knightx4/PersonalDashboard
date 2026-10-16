@@ -1,15 +1,23 @@
 import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
+/**
+ * Why a dev page's press that spends has no paid tool (plan #2228.5): the
+ * paid tools are for the workspaces, and feature #2228 kept the dev routines
+ * out of them.
+ */
+const DEV_SPENDS =
+  "Starts a dev routine or a model run on the app's own development (the overnight runner, a feature routine, shaping, a review), which stays a press on the dev pages rather than a paid tool Dash queues.";
+
 /** What the Dev pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const devActions: ModuleActions = {
   'app/dev/bugs/actions.ts': {
     submitFeedback: tool('file_note'),
-    triageFiled: none('spends'),
+    triageFiled: none('spends', DEV_SPENDS),
     updateFeedbackStatus: none('session', 'scripts/notes.ts start, done, block and decline.'),
     editFeedback: tool('reword'),
     respondToFeedback: none('theirs'),
     deleteFeedback: none('deletes'),
-    runFeatureRoutine: none('spends'),
+    runFeatureRoutine: none('spends', DEV_SPENDS),
     routineRun: none('page'),
     openFeedbackCount: none('page'),
     setFeedbackPriority: none('session', 'scripts/notes.ts priority.'),
@@ -22,12 +30,12 @@ export const devActions: ModuleActions = {
     dismissIdea: none('theirs'),
     restoreIdea: none('theirs'),
     deleteIdea: none('deletes'),
-    shapeIdea: none('spends'),
+    shapeIdea: none('spends', DEV_SPENDS),
   },
   'app/dev/inspiration/actions.ts': {
     setInspirationPlaylist: none('setting'),
-    checkInspirationNow: none('spends'),
-    craftTakeaway: none('spends'),
+    checkInspirationNow: none('spends', DEV_SPENDS),
+    craftTakeaway: none('spends', DEV_SPENDS),
     dismissTakeaway: none('theirs'),
     restoreTakeaway: none('theirs'),
   },
@@ -49,16 +57,16 @@ export const devActions: ModuleActions = {
     removePlanDependency: none('session', 'scripts/plan.ts undepend.'),
     sendPlanItemToClaude: tool('send_step'),
     sendPlanFeatureToClaude: none('spends', 'Starts sessions on every ready step of a feature; send_step starts one from its thread.'),
-    reshapePlanFeature: none('spends'),
+    reshapePlanFeature: none('spends', DEV_SPENDS),
     seedPlan: none('setting', 'Fills an empty plan once.'),
-    startOvernightRunner: none('spends'),
-    pauseOvernightRunner: none('spends'),
-    resumeOvernightRunner: none('spends'),
-    stopOvernightRunner: none('spends'),
+    startOvernightRunner: none('spends', DEV_SPENDS),
+    pauseOvernightRunner: none('spends', DEV_SPENDS),
+    resumeOvernightRunner: none('spends', DEV_SPENDS),
+    stopOvernightRunner: none('spends', DEV_SPENDS),
     addFeature: none('theirs', "A feature written ready is the person's say-so; add_step writes one for them to approve."),
     updateFeature: tool('reword'),
     sendScreenBack: none('theirs'),
-    workPlanOverhaul: none('spends'),
+    workPlanOverhaul: none('spends', DEV_SPENDS),
     setAutoApproveAction: none('setting'),
   },
   'app/dev/plan/run-actions.ts': {
@@ -66,8 +74,8 @@ export const devActions: ModuleActions = {
     answerPlanRunAction: none('theirs'),
   },
   'app/dev/posts/actions.ts': {
-    suggestPosts: none('spends'),
-    suggestPostAbout: none('spends'),
+    suggestPosts: none('spends', DEV_SPENDS),
+    suggestPostAbout: none('spends', DEV_SPENDS),
     editPostBody: tool('rewrite_post'),
     markPostPosted: none('theirs', 'Says the person posted it; Dash never posts.'),
     dropPost: none('theirs'),
@@ -103,7 +111,7 @@ export const devActions: ModuleActions = {
     undeclineSpecChange: none('theirs', 'Undo: takes back their own decline.'),
   },
   'app/dev/specs/interview-actions.ts': {
-    startInterview: none('spends'),
+    startInterview: none('spends', DEV_SPENDS),
     answerInterviewQuestion: none('theirs'),
     stopInterview: none('theirs'),
   },
@@ -115,7 +123,7 @@ export const devActions: ModuleActions = {
     restoreTaste: none('setting'),
   },
   'app/dev/ui/review/actions.ts': {
-    startUiReview: none('spends'),
+    startUiReview: none('spends', DEV_SPENDS),
     decideUiFinding: none('theirs'),
     confirmAllUiFindings: none('theirs'),
   },
@@ -124,6 +132,6 @@ export const devActions: ModuleActions = {
     deleteComment: none('deletes'),
   },
   'app/dev/ci-fix-action.ts': {
-    sendCiFixToDash: none('spends'),
+    sendCiFixToDash: none('spends', DEV_SPENDS),
   },
 };

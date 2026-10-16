@@ -53,6 +53,12 @@ describe('DASH_TOOLS', () => {
       'summarize_reading',
       'retry_research_brief',
       'write_quiz_questions',
+      // Vault, News, Shopping and You (plan #2228.5)
+      'read_personality_again',
+      'read_resume_jobs',
+      'ask_maya',
+      'price_items_for_sale',
+      'remake_newsletter_picks',
     ]);
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
     // The other three proposals became writes (plan #1440); a watch acts outside

@@ -5,7 +5,10 @@ export const goalsActions: ModuleActions = {
   'app/goals/actions.ts': {
     renameAreaAction: tool('change_goal_area'),
     setAreaNoteAction: tool('change_goal_area'),
-    planAreaAction: none('spends'),
+    planAreaAction: none(
+      'spends',
+      "Only the app's owner can press it, since it starts the goals routine on the owner's routine allowance, and it has no PAID_ACTIONS key to price a card by.",
+    ),
     approveAreaAction: none('theirs'),
     moveAreaAction: tool('change_goal_area'),
     archiveAreaAction: tool('change_goal_area'),
@@ -49,7 +52,10 @@ export const goalsActions: ModuleActions = {
     setLearnDepth: none('setting'),
   },
   'app/goals/[goalId]/document-actions.ts': {
-    readIntoFormAction: none('spends'),
+    readIntoFormAction: none(
+      'spends',
+      'Reads pasted text or a document into rows the form shows for the person to check, and keeps nothing until they save them, so a run from Dash would spend on a result no one sees.',
+    ),
     addSuggestedFieldAction: none('theirs'),
     saveDocumentKindAction: tool('change_goal_form'),
     forgetDocumentKindAction: tool('change_goal_form'),
@@ -117,7 +123,10 @@ export const goalsActions: ModuleActions = {
     setAsideAction: tool('change_goal_step'),
     restoreAsideAction: tool('change_goal_step'),
     bringBackAction: tool('change_goal_step'),
-    askDashAction: none('spends'),
+    askDashAction: none(
+      'spends',
+      'Asks Dash from the Goals home, as an @dash comment on a goal or by handing it an errand; an agent asking is already the one asking.',
+    ),
   },
   'app/goals/capture-actions.ts': {
     fileGoalCapture: tool('file_close', 'file_count', 'file_progress', 'file_reading', 'file_add'),
