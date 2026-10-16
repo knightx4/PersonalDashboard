@@ -13,6 +13,7 @@ import {
   type PostsRun,
   type PostsRunState,
   type SocialPost,
+  OPEN_POST_STATUSES,
 } from './posts';
 
 /**
@@ -81,6 +82,8 @@ export type PostCard = {
 export const POSTS_TABLE = 'public.social_posts';
 
 export type PostsPage = {
+  /** Posts set aside to post, above the suggestions (plan #2261.3). */
+  planned: PostCard[];
   suggested: PostCard[];
   posted: PostCard[];
   dropped: PostCard[];
@@ -171,12 +174,14 @@ export function buildPostsPage(input: {
     const when = post.status === 'posted' ? post.postedAt : post.status === 'dropped' ? post.droppedAt : null;
     const candidate =
       post.status !== 'posted' && post.xCandidateId ? (candidates.get(post.xCandidateId) ?? null) : null;
-    const send = post.status === 'suggested' ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
+    const send = OPEN_POST_STATUSES.includes(post.status)
+      ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
     const thread = post.status === 'dropped' ? [] : (input.threads?.get(rowRef(POSTS_TABLE, post.id)) ?? []);
     return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send, thread };
   };
 
   return {
+    planned: input.posts.filter((post) => post.status === 'planned').map(card),
     suggested: input.posts.filter((post) => post.status === 'suggested').map(card),
     posted: input.posts.filter((post) => post.status === 'posted').map(card),
     dropped: input.posts.filter((post) => post.status === 'dropped').map(card),

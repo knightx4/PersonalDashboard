@@ -77,7 +77,7 @@ export function PostsScreen({
   /** The surface gallery's way to draw the wants box open, mid-save or refused. */
   wantsPreview?: { open?: boolean; pending?: boolean; error?: string };
 }) {
-  const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
+  const none = page.planned.length + page.suggested.length + page.posted.length + page.dropped.length === 0;
   // Who a draft is posted as from the tab: only a sign-in that carries
   // tweet.write (plan #2072). Without it the X row says how to get one.
   const postAs = x?.state === 'connected' && x.canPost ? x.handle : null;
@@ -114,11 +114,25 @@ export function PostsScreen({
           description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, then press Post to send it to X, or post it yourself and paste the link back here."
         />
       ) : (
-        page.suggested.length > 0 && <PostList cards={page.suggested} postAs={postAs} />
+        <>
+          {page.planned.length > 0 && (
+            <SectionFold title="Planned" count={page.planned.length} defaultOpen>
+              <PostList cards={page.planned} postAs={postAs} />
+            </SectionFold>
+          )}
+          {page.suggested.length > 0 &&
+            (page.planned.length > 0 ? (
+              <SectionFold title="Suggested" count={page.suggested.length} defaultOpen>
+                <PostList cards={page.suggested} postAs={postAs} />
+              </SectionFold>
+            ) : (
+              <PostList cards={page.suggested} postAs={postAs} />
+            ))}
+        </>
       )}
 
       {page.posted.length > 0 && (
-        <SectionFold title="Posted" count={page.posted.length} defaultOpen={page.suggested.length === 0}>
+        <SectionFold title="Posted" count={page.posted.length} defaultOpen={page.suggested.length + page.planned.length === 0}>
           <PostList cards={page.posted} />
         </SectionFold>
       )}
@@ -128,7 +142,7 @@ export function PostsScreen({
           <SectionFold
             title="Posted on X"
             count={page.onX.total}
-            defaultOpen={page.suggested.length === 0}
+            defaultOpen={page.suggested.length + page.planned.length === 0}
           >
             <XPostList posts={page.onX.posts} total={page.onX.total} />
           </SectionFold>

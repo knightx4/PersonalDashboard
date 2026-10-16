@@ -104,7 +104,7 @@ async function rewritePost(ctx: DashWriteContext, args: Args): Promise<DashWrite
   if (before.status === 'posted') {
     throw new Refused('That draft has been posted, so its text is what went out on X. Nothing was changed.');
   }
-  if (before.status !== 'suggested') {
+  if (before.status !== 'suggested' && before.status !== 'planned') {
     throw new Refused('That draft was put aside. Bringing it back is theirs to do on the Posts tab; nothing was changed.');
   }
   if (before.x_sending_at || strings(before.x_thread_ids).length > 0) {
@@ -129,7 +129,7 @@ async function rewritePost(ctx: DashWriteContext, args: Args): Promise<DashWrite
     .update({ body: posts })
     .eq('id', ref)
     .eq('user_id', ctx.userId)
-    .eq('status', 'suggested')
+    .in('status', ['suggested', 'planned'])
     .select('*');
   if (error) throw new Error(`Rewriting the post draft failed: ${error.message}`);
   const after = (Array.isArray(data) ? data[0] : data) as Row | undefined;

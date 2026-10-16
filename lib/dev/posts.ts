@@ -21,8 +21,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * The row
  * ---------------------------------------------------------------------- */
 
-export type PostStatus = 'suggested' | 'posted' | 'dropped';
-export const POST_STATUSES: readonly PostStatus[] = ['suggested', 'posted', 'dropped'];
+export type PostStatus = 'suggested' | 'planned' | 'posted' | 'dropped';
+export const POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned', 'posted', 'dropped'];
+/** The statuses of a draft still waiting to be posted: the card actions work on either. */
+export const OPEN_POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned'];
 
 export type SocialPost = {
   id: string;
@@ -89,9 +91,9 @@ export function socialPostFromRow(row: Record<string, unknown>): SocialPost {
   };
 }
 
-/** Suggested first, newest first within each status, then posted, then dropped. */
+/** Planned first, then suggested, newest first within each status, then posted, then dropped. */
 export function sortPosts(posts: readonly SocialPost[]): SocialPost[] {
-  const rank: Record<PostStatus, number> = { suggested: 0, posted: 1, dropped: 2 };
+  const rank: Record<PostStatus, number> = { planned: 0, suggested: 1, posted: 2, dropped: 3 };
   return [...posts].sort(
     (a, b) => rank[a.status] - rank[b.status] || b.createdAt.localeCompare(a.createdAt),
   );
