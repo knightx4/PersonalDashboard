@@ -1,10 +1,8 @@
 'use client';
 
-import { ChangeSet } from '@codemirror/state';
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
-import { MainRail } from '@/components/patterns/main-rail';
 import { PageColumn } from '@/components/shell/page-width';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { DashAction } from '@/components/ui/dash-action';
@@ -26,7 +24,6 @@ import { essayParagraphs } from '@/lib/learn/essays/checks';
 import type { EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
   draftMarksJson,
-  mapMarks,
   yourWords,
   YOUR_WORDS_RULE,
   type AuthorMark,
@@ -523,42 +520,33 @@ function TargetForm({
 }
 
 /**
- * One essay in the quiet editor (plan #1865; docs/LEARN-ESSAYS-SPEC.md, "The
- * writing surface"), on the main-plus-rail pattern.
+ * One essay (plan #1865; docs/LEARN-ESSAYS-SPEC.md, "Notes first" and "The
+ * writing surface"), in three tabs over one column: Prepare, Notes and Draft.
  *
- * The column you write in is about 66 characters at 19px. Typing hides the
- * tools above it and the rail beside it; moving the mouse, or Escape, brings
- * them back. Focus mode dims every paragraph but the one you are in. The
- * word count stays at the foot, against the target when there is one, beside
- * where the essay was last saved.
+ * Notes and Draft are each an editor and nothing else, so the page you write
+ * on holds only your text, the word count and where it was last saved. The
+ * tools stay where they are while you type: hiding them on the first
+ * keystroke moved the page under the person (note of 16 October 2026).
+ * Focus mode dims every paragraph but the one you are in.
  *
- * A new essay opens on its interview (plan #1867), one question at a time
- * above the draft; once it is done or skipped the brief sits folded there
- * instead, and every answer can be edited in place.
+ * Prepare holds everything that used to sit in the rail beside them, one
+ * card under another at the same width: the brief, Dash's map of the notes
+ * with its questions and sources, From your notes (Assemble and the model
+ * draft), the checks and their margin notes (plan #1869, essay-notes.tsx),
+ * From your study (plan #1863.8, essay-study.tsx), research (plan #1863.9,
+ * essay-research.tsx), the length and the vault note (plan #1866), Finish
+ * (plan #1873) and Publish (plan #1863.11, essay-publish.tsx).
  *
- * The rail holds the length and the vault note (plan #1866), Finish (plan #1873) and Publish
- * (plan #1863.11, essay-publish.tsx); later steps add
- * the margin notes and what you studied. On a phone it follows the text, so
- * the vault note and its save are there too; focus mode is laptop only.
+ * All three tabs stay mounted and the two away are hidden, so the editors
+ * keep their cursor and history, and Prepare can still put text into the
+ * draft: a study link, a quote or a footnote goes in where the cursor was
+ * and the page moves to the Draft tab to show it. Pressing a margin note's
+ * marker in the draft moves to Prepare with that note open.
  *
  * Select some text and Rephrase asks Dash for one rewording of it (rung 4,
  * plan #1868), shown struck through and replaced, with Accept and Reject.
- * Accepted text is marked as Dash's, and the rail says what share of the
+ * Accepted text is marked as Dash's, and Prepare says what share of the
  * words are yours.
- *
- * The rail opens with the checks and the margin notes they raised (plan
- * #1869, essay-notes.tsx); each open note is a marker in the editor's right
- * margin. On a phone they follow the text, above the length and the vault.
- *
- * Below the checks, From your study (plan #1863.8, essay-study.tsx) lists
- * what you already have on the paragraph the cursor is in, searched two
- * seconds after you pause; its buttons insert a link or a quote at the
- * cursor. It is laptop only, as the spec says.
- *
- * After it, research (plan #1863.9, essay-research.tsx): a first pass on the
- * question and a deeper pass on the draft's claims, each run only by its
- * button, with its price beside it. A quote it found becomes a numbered
- * footnote at the cursor.
  *
  * `initialVault`, `briefOpen`, `initialSuggestion`, `initialAskMarks`,
  * `initialNoteOpen` and `study` are for the gallery, which draws a save that
@@ -640,7 +628,6 @@ export function EssayView({
   const [target, setTarget] = useState(essay.wordTarget);
   // Finish in this visit makes Publish available without a reload.
   const [finishedAt, setFinishedAt] = useState(essay.finishedAt);
-  const [typing, setTyping] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [brief, setBrief] = useState(essay.brief);
   const onBrief = useCallback((next: EssayBrief) => {
@@ -652,17 +639,22 @@ export function EssayView({
   const [mode, setModeState] = useState<EssayMode>(
     () => initialView ?? (countWords(essay.draftBody) >= 150 ? 'draft' : 'notes'),
   );
-  // What the editor last held, so coming back to the draft opens it on the newest text.
-  const latestDoc = useRef<{ text: string; marks: AuthorMark[] }>({
-    text: essay.draftBody,
-    marks: essay.marks,
-  });
-  const setMode = useCallback(
-    (next: EssayMode) => {
-      if (next === mode) return;
-      if (next === 'draft') setDoc((now) => ({ ...latestDoc.current, version: now.version + 1 }));
+  const [openedOn] = useState(mode);
+  // What to do once a tab change has been drawn: an editor can only take the
+  // cursor, and a note can only scroll into view, once its tab is showing.
+  const afterSwitch = useRef<(() => void) | null>(null);
+  const go = useCallback(
+    (next: EssayMode, then?: () => void) => {
+      afterSwitch.current = then ?? null;
+      if (next === mode) {
+        afterSwitch.current = null;
+        then?.();
+        return;
+      }
       setModeState(next);
-      if (!planFrozen) void logEssayView(essay.id, next).catch(() => undefined);
+      // The log counts the notes and the draft (learn.essay_log); Prepare is not a view of the text.
+      if (!planFrozen && next !== 'prepare')
+        void logEssayView(essay.id, next).catch(() => undefined);
       try {
         const url = new URL(window.location.href);
         url.searchParams.set('view', next);
@@ -673,9 +665,23 @@ export function EssayView({
     },
     [essay.id, mode, planFrozen],
   );
+  useEffect(() => {
+    const then = afterSwitch.current;
+    afterSwitch.current = null;
+    then?.();
+  }, [mode]);
+  // A tab pressed by the person puts the cursor back in the editor it shows.
+  const setMode = useCallback(
+    (next: EssayMode) =>
+      go(next, () => {
+        if (next === 'draft') editor.current?.focus();
+        else if (next === 'notes') notesEditor.current?.focus();
+      }),
+    [go],
+  );
   // The view the page opened on counts as a visit too.
   useEffect(() => {
-    if (!planFrozen) void logEssayView(essay.id, mode).catch(() => undefined);
+    if (!planFrozen && mode !== 'prepare') void logEssayView(essay.id, mode).catch(() => undefined);
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -690,7 +696,6 @@ export function EssayView({
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
     (next: Draft, ask: boolean) => {
-      latestDoc.current = next;
       setDoc((now) => ({ text: next.text, marks: next.marks, version: now.version + 1 }));
       setWords(countWords(next.text));
       setShare(yourWords(next.text, next.marks).percent);
@@ -704,7 +709,6 @@ export function EssayView({
 
   const onChange = useCallback(
     (text: string, marks: AuthorMark[]) => {
-      latestDoc.current = { text, marks };
       setWords(countWords(text));
       setParagraphs(essayParagraphs(text).length);
       setShare(yourWords(text, marks).percent);
@@ -756,47 +760,21 @@ export function EssayView({
     editor.current?.setMarks([]);
     setAskMarks(false);
   }, []);
-  const onTyping = useCallback(() => setTyping(true), []);
   const onSaveNow = useCallback(() => void saveToVault(true), [saveToVault]);
-
-  // The tools come back when the mouse moves or Escape is pressed.
-  useEffect(() => {
-    if (!typing) return;
-    const show = () => setTyping(false);
-    const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setTyping(false);
-    };
-    window.addEventListener('mousemove', show, { once: true });
-    window.addEventListener('keydown', key);
-    return () => {
-      window.removeEventListener('mousemove', show);
-      window.removeEventListener('keydown', key);
-    };
-  }, [typing]);
 
   const writing = mode === 'draft';
   const [renaming, setRenaming] = useState(false);
-  // Renaming rewrites the draft's title line (note 1c956878). While writing,
-  // the change goes through the editor, which hands the text up as typing
-  // does; on the other stages it is made to the text the editor last held.
+  // Renaming rewrites the draft's title line (note 1c956878), through the
+  // draft's editor, which stays mounted on every tab and hands the text up as
+  // typing does.
   const rename = useCallback(
     (next: string) => {
       setRenaming(false);
       if (!next.trim() || next.trim() === title) return;
-      const open = writing ? editor.current : null;
-      const text = open ? open.doc() : latestDoc.current.text;
-      const change = retitleEssay(text, next);
-      if (open) {
-        open.replace(change);
-        return;
-      }
-      const set = ChangeSet.of(change, text.length);
-      onChange(
-        text.slice(0, change.from) + change.insert + text.slice(change.to),
-        mapMarks(latestDoc.current.marks, set),
-      );
+      const open = editor.current;
+      if (open) open.replace(retitleEssay(open.doc(), next));
     },
-    [onChange, title, writing],
+    [title],
   );
   // The path ends in the essay's name as it is now, not as the page was served.
   const crumbs = subject?.path.map((crumb, i, all) =>
@@ -806,179 +784,117 @@ export function EssayView({
     (next: { text: string; marks: AuthorMark[] }) => {
       setDoc((now) => ({ text: next.text, marks: next.marks, version: now.version + 1 }));
       onChange(next.text, next.marks);
+      go('draft');
     },
-    [onChange],
+    [go, onChange],
   );
-  const quiet = cn(
-    'transition-opacity duration-quick focus-within:opacity-100',
-    typing && 'pointer-events-none opacity-0 focus-within:pointer-events-auto',
+  // What Prepare puts into the draft goes in where the cursor was, and the
+  // page moves to the draft to show it.
+  const insertInDraft = useCallback(
+    (text: string, quote?: { name: string }) => go('draft', () => onInsert(text, quote)),
+    [go, onInsert],
   );
+  const cite = researchApi.cite;
+  const researchCard = useMemo(
+    () => ({
+      ...researchApi,
+      cite: (...args: Parameters<typeof cite>) => go('draft', () => cite(...args)),
+    }),
+    [cite, go, researchApi],
+  );
+  const openNote = noteApi.open;
+  const onOpenNote = useCallback((id: string) => go('prepare', () => openNote(id)), [go, openNote]);
   const countLabel = wordCountLabel(words, target);
 
-  const main = (
-    // As wide as the 33em text column at 19px plus the panel's inset, so the
-    // panel ends where the text does.
-    <div className="flex max-w-2xl flex-col">
-      <h1 className="sr-only">{title}</h1>
-      <div className={cn('mb-6 flex min-h-11 items-center justify-between gap-3', quiet)}>
-        {/* The path, workspace › Essays › this essay, and the one back link
-            (plans #1931.2, #1931.3). */}
-        {renaming ? (
-          <InlineInput
-            autoFocus
-            defaultValue={title}
-            aria-label="Essay name"
-            onBlur={(event) => rename(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                rename(event.currentTarget.value);
-              } else if (event.key === 'Escape') {
-                // Put the name back first, so the blur as it closes changes nothing.
-                event.currentTarget.value = title;
-                setRenaming(false);
-              }
-            }}
-            className="min-h-11 min-w-0 flex-1 lg:min-h-0"
-          />
-        ) : subject && crumbs ? (
-          <PathLine crumbs={crumbs} fallback={parentCrumb(subject.path)} />
-        ) : (
-          <span />
-        )}
-        <div className="flex items-center gap-1">
-          {!renaming && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
-              Rename
-            </Button>
-          )}
-          <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
-            <DashAction
-              paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
-              what="Cost of a rephrase"
-              hintFirst
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={!selected || rephrase.kind === 'asking'}
-              pending={rephrase.kind === 'asking'}
-              // Keeps the editor's selection showing while the button is pressed.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => void askRephrase()}
-              title={selected ? undefined : 'Select some text to have Dash reword it'}
-            >
-              {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
-            </DashAction>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-pressed={focusMode}
-              onClick={() => setFocusMode((on) => !on)}
-              className="hidden lg:inline-flex"
-            >
-              {focusMode ? 'Focus on' : 'Focus'}
-            </Button>
-          </div>
-        </div>
-      </div>
+  const header = (
+    <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
+      {/* The path, workspace › Essays › this essay, and the one back link
+          (plans #1931.2, #1931.3). */}
+      {renaming ? (
+        <InlineInput
+          autoFocus
+          defaultValue={title}
+          aria-label="Essay name"
+          onBlur={(event) => rename(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              rename(event.currentTarget.value);
+            } else if (event.key === 'Escape') {
+              // Put the name back first, so the blur as it closes changes nothing.
+              event.currentTarget.value = title;
+              setRenaming(false);
+            }
+          }}
+          className="min-h-11 min-w-0 flex-1 lg:min-h-0"
+        />
+      ) : subject && crumbs ? (
+        <PathLine crumbs={crumbs} fallback={parentCrumb(subject.path)} />
+      ) : (
+        <span />
+      )}
+      {!renaming && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+          Rename
+        </Button>
+      )}
+    </div>
+  );
+
+  // The tabs on the left; on the right, what the draft's tab can do to its text.
+  const tabs = (
+    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
       <Segmented
-        label="Notes or draft"
+        label="Prepare, notes or draft"
         value={mode}
         onChange={setMode}
         options={[
+          { value: 'prepare', label: 'Prepare' },
           { value: 'notes', label: 'Notes' },
           { value: 'draft', label: 'Draft' },
         ]}
-        className={cn('mb-4 self-start', writing && quiet)}
       />
-      {mode === 'notes' && (
-        <>
-          <EssayBriefFold
-            essayId={essay.id}
-            brief={brief}
-            onChange={onBrief}
-            defaultOpen={briefOpen}
-          />
-          <NotesEditor brief={brief} api={planApi} handle={notesEditor} />
-        </>
-      )}
-      {writing && (
-        <>
-          {askMarks && (
-            <Card padding="standard" role="alert" className="mb-3 flex flex-col items-start gap-3">
-              <p className="text-ui text-ink">
-                This note was edited outside Dash after the marks saying who wrote what were saved,
-                so they may not line up any more. Keep them, moved to where the same words are now,
-                or clear them and count every word as yours.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setAskMarks(false)}
-                >
-                  Keep the marks
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={clearMarks}>
-                  Clear the marks
-                </Button>
-              </div>
-            </Card>
-          )}
-          <EssayBriefFold
-            essayId={essay.id}
-            brief={brief}
-            onChange={onBrief}
-            defaultOpen={briefOpen}
-            className={quiet}
-          />
-          <Card padding="standard">
-            <MarkdownEditor
-              key={doc.version}
-              handle={editor}
-              initialDoc={doc.text}
-              initialMarks={doc.marks}
-              initialSuggestion={doc.version === 0 ? initialSuggestion : null}
-              initialNotes={initialNotes}
-              onOpenNote={noteApi.open}
-              label={`Essay: ${title}`}
-              placeholder="Start with a title, like # Why money is the odd good out"
-              focusMode={focusMode}
-              autoFocus={doc.version > 0}
-              onChange={onChange}
-              onTyping={onTyping}
-              onSaveNow={onSaveNow}
-              onSelect={onSelect}
-              onCaret={studyApi.onCaret}
-            />
-          </Card>
-          {rephrase.kind === 'failed' && (
-            <p role="alert" className="mt-2 px-1 text-small text-danger">
-              {rephrase.error}
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-small text-ink-muted">
-            <span className="tabular-nums">{countLabel}</span>
-            <span role="status" className={cn(draft.kind === 'failed' && 'text-danger')}>
-              {saveLine(draft, vault)}
-            </span>
-          </div>
-          <VaultSaveError vault={vault} reloadError={reloadError} onReload={reload} />
-          <ModelDraftPanel draft={plan.modelDraft} />
-        </>
-      )}
+      <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
+        <DashAction
+          paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
+          what="Cost of a rephrase"
+          hintFirst
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={!selected || rephrase.kind === 'asking'}
+          pending={rephrase.kind === 'asking'}
+          // Keeps the editor's selection showing while the button is pressed.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => void askRephrase()}
+          title={selected ? undefined : 'Select some text to have Dash reword it'}
+        >
+          {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
+        </DashAction>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={focusMode}
+          onClick={() => setFocusMode((on) => !on)}
+          className="hidden lg:inline-flex"
+        >
+          {focusMode ? 'Focus on' : 'Focus'}
+        </Button>
+      </div>
     </div>
   );
 
-  const rail = !writing ? (
+  const prepare = (
     <div className="flex flex-col gap-4">
+      <EssayBriefFold
+        essayId={essay.id}
+        brief={brief}
+        onChange={onBrief}
+        defaultOpen={briefOpen}
+        className="mb-0"
+      />
       <NoteMapCard essayId={essay.id} api={planApi} append={appendToNotes} />
-      <EssayResearchCard api={researchApi} />
-    </div>
-  ) : (
-    <div className={cn('flex flex-col gap-4', quiet)}>
       <FromNotesCard
         essayId={essay.id}
         api={planApi}
@@ -991,10 +907,10 @@ export function EssayView({
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
       <EssayStudyCard
         state={studyApi.state}
-        onInsert={onInsert}
+        onInsert={insertInDraft}
         onHide={(key) => void onHideStudy(key)}
       />
-      <EssayResearchCard api={researchApi} />
+      <EssayResearchCard api={researchCard} />
       <Card padding="none">
         <CardSection title="Length">
           {target !== null && (
@@ -1059,16 +975,87 @@ export function EssayView({
     </div>
   );
 
-  // The essay keeps its reading measure (max-w-2xl), so the pair is held to
-  // a one-column page's width (PageColumn, about the essay, the gap and the
-  // 18rem rail) and centred, rather than leaving the shell's spare width as a
-  // gap between the essay and its rail (note 740f8532).
+  const draftTab = (
+    <>
+      {askMarks && (
+        <Card padding="standard" role="alert" className="mb-3 flex flex-col items-start gap-3">
+          <p className="text-ui text-ink">
+            This note was edited outside Dash after the marks saying who wrote what were saved, so
+            they may not line up any more. Keep them, moved to where the same words are now, or
+            clear them and count every word as yours.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => setAskMarks(false)}>
+              Keep the marks
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={clearMarks}>
+              Clear the marks
+            </Button>
+          </div>
+        </Card>
+      )}
+      <Card padding="standard">
+        <MarkdownEditor
+          key={doc.version}
+          handle={editor}
+          initialDoc={doc.text}
+          initialMarks={doc.marks}
+          initialSuggestion={doc.version === 0 ? initialSuggestion : null}
+          initialNotes={initialNotes}
+          onOpenNote={onOpenNote}
+          label={`Essay: ${title}`}
+          placeholder="Start with a title, like # Why money is the odd good out"
+          focusMode={focusMode}
+          autoFocus={doc.version > 0 || openedOn === 'draft'}
+          onChange={onChange}
+          onSaveNow={onSaveNow}
+          onSelect={onSelect}
+          onCaret={studyApi.onCaret}
+        />
+      </Card>
+      {rephrase.kind === 'failed' && (
+        <p role="alert" className="mt-2 px-1 text-small text-danger">
+          {rephrase.error}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-small text-ink-muted">
+        <span className="tabular-nums">{countLabel}</span>
+        <span role="status" className={cn(draft.kind === 'failed' && 'text-danger')}>
+          {saveLine(draft, vault)}
+        </span>
+      </div>
+      <ModelDraftPanel draft={plan.modelDraft} />
+    </>
+  );
+
+  // One column at the essay's reading measure (max-w-2xl, the 33em text at
+  // 19px plus the card's inset) on every tab, so changing tab moves nothing
+  // sideways. Each tab is drawn once and the two away are hidden.
   return (
-    <PageColumn>
-      <MainRail main={main} rail={rail} />
+    <PageColumn className="flex max-w-2xl flex-col">
+      <h1 className="sr-only">{title}</h1>
+      {header}
+      {tabs}
+      <div className="mb-4 empty:hidden">
+        <VaultSaveError vault={vault} reloadError={reloadError} onReload={reload} />
+      </div>
+      <section aria-label="Prepare" hidden={mode !== 'prepare'}>
+        {prepare}
+      </section>
+      <section aria-label="Notes" hidden={mode !== 'notes'}>
+        <NotesEditor
+          brief={brief}
+          api={planApi}
+          handle={notesEditor}
+          autoFocus={openedOn === 'notes'}
+        />
+      </section>
+      <section aria-label="Draft" hidden={!writing}>
+        {draftTab}
+      </section>
     </PageColumn>
   );
 }
 
-/** The two views of an essay (LEARN-ESSAYS-SPEC, "Notes first"). */
-export type EssayMode = 'notes' | 'draft';
+/** The three tabs of an essay (LEARN-ESSAYS-SPEC, "Notes first"). */
+export type EssayMode = 'prepare' | 'notes' | 'draft';
