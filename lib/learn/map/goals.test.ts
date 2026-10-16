@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LensRecord } from '@/lib/learn/levels/lenses';
 import { readCells, type CellEvidence, type LevelCell, type LevelTopic, type TopicMap } from '@/lib/learn/levels/model';
-import { goalsOnMap, ringRadius, type TopicPlacement } from './goals';
+import { goalsOnMap, ringRadius, territoriesOnMap, type TopicPlacement } from './goals';
 
 /** CAPM 3 needs Return 2; DCF is a draft; Beta is on no goal. */
 const TOPICS: LevelTopic[] = [
@@ -97,6 +97,58 @@ describe('goalsOnMap', () => {
     const [drafts] = goalsOnMap([lens('d', 'goal', [['dcf', 5]])], m, readCells(m), PLACED);
     expect(drafts!.next).toBeNull();
     expect(drafts!.line).toBe('A draft topic to approve');
+  });
+});
+
+describe('territoriesOnMap', () => {
+  const AROUND = new Map([['capm', { ideaIds: ['i1', 'i2'], slot: 3 as const }]]);
+
+  it('gives each placed topic its ladder and target, and links at topic and level', () => {
+    const m = map([
+      { cellId: 'return2', verdict: 'met', observedAt: '2026-10-10T09:00:00Z' },
+      { cellId: 'capm1', verdict: 'not_met', observedAt: '2026-10-11T09:00:00Z' },
+    ]);
+    const [territory] = territoriesOnMap(
+      [lens('g', 'goal', [['capm', 4], ['return', 3], ['dcf', 5]]), lens('s', 'subject', [['beta', 3]])],
+      m,
+      readCells(m),
+      PLACED,
+      AROUND,
+    );
+    expect(territory!.id).toBe('g');
+    const byId = new Map(territory!.topics.map((t) => [t.id, t]));
+    expect([...byId.keys()].sort()).toEqual(['capm', 'dcf', 'return']);
+    expect(byId.get('return')).toMatchObject({ tested: 2, held: 2, target: 3, ceiling: 6, slot: 'none', ideaIds: [] });
+    expect(byId.get('capm')).toMatchObject({ missed: [1], target: 4, slot: 3, ideaIds: ['i1', 'i2'] });
+    // Beta is on no goal, so its link is left off.
+    expect(territory!.links).toEqual([
+      { requiringTopicId: 'capm', requiringLevel: 3, requiredTopicId: 'return', requiredLevel: 2 },
+      { requiringTopicId: 'capm', requiringLevel: 5, requiredTopicId: 'return', requiredLevel: 4 },
+    ]);
+  });
+
+  it('lists what is ready inside the targets in engine order, the miss first and never a draft', () => {
+    const m = map([{ cellId: 'capm1', verdict: 'not_met', observedAt: '2026-10-11T09:00:00Z' }]);
+    const readings = readCells(m);
+    const [territory] = territoriesOnMap([lens('g', 'goal', [['capm', 4], ['return', 3], ['dcf', 5]])], m, readings, PLACED, AROUND);
+    const ready = territory!.ready!;
+    expect(ready[0]).toMatchObject({ topicId: 'capm', level: 1, cellId: 'capm1' });
+    expect(ready.some((r) => r.topicId === 'dcf')).toBe(false);
+    expect(ready.every((r) => r.topicId === 'capm' || r.topicId === 'return')).toBe(true);
+  });
+
+  it('leaves a topic with no place out, and its links with it', () => {
+    const m = map();
+    const [territory] = territoriesOnMap(
+      [lens('g', 'goal', [['capm', 4], ['return', 3]])],
+      m,
+      readCells(m),
+      new Map([['capm', at(0.1)]]),
+      AROUND,
+    );
+    expect(territory!.topics.map((t) => t.id)).toEqual(['capm']);
+    expect(territory!.links).toEqual([]);
+    expect(territory!.ready!.every((r) => r.topicId === 'capm')).toBe(true);
   });
 });
 

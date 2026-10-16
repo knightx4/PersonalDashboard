@@ -1,7 +1,8 @@
 import { ladderLevel } from '@/lib/learn/levels/ladder';
 import { lensDetail, lensLine, summariseLens, type LensRecord, type TopicName } from '@/lib/learn/levels/lenses';
-import type { Readings, TopicMap } from '@/lib/learn/levels/model';
+import { fringe, type CellStatus, type Readings, type TopicMap } from '@/lib/learn/levels/model';
 import type { Point } from './layout';
+import { ladderFrom, type SkyTerritory, type TerritoryLinkIn, type TerritoryTopicIn } from './place-graph';
 
 /**
  * Your learning goals on Idea Space (plan #2187.2).
@@ -128,5 +129,80 @@ export function goalsOnMap(
         stars,
         links,
       };
+    });
+}
+
+/** What a territory's topic takes from the sky beyond its place: the ideas it sits among and their colour. */
+export type TopicSurroundings = { ideaIds: readonly string[]; slot: TerritoryTopicIn['slot'] };
+
+/**
+ * Each open learning goal as the territory a tap on one of its ringed stars
+ * opens (plan #2187.7): its placed topics with their ladders and targets,
+ * the requirement links between their cells read at topic and level, and the
+ * cells you are ready for inside its targets, in the order the engine would
+ * ask them, read as `lensDetail` reads them (lib/learn/levels/lenses.ts).
+ */
+export function territoriesOnMap(
+  lenses: readonly LensRecord[],
+  map: TopicMap,
+  readings: Readings,
+  placed: ReadonlyMap<string, TopicPlacement>,
+  around: ReadonlyMap<string, TopicSurroundings>,
+): SkyTerritory[] {
+  const names = new Map<string, TopicName>(
+    map.topics.map((t) => [t.id, { id: t.id, name: t.name, approved: t.approved, ceiling: t.ceiling }]),
+  );
+  const cellOf = new Map(map.cells.map((cell) => [cell.id, cell]));
+  const cellsOf = new Map<string, { level: number; status: CellStatus }[]>();
+  for (const reading of readings.values()) {
+    const list = cellsOf.get(reading.topicId) ?? [];
+    list.push({ level: reading.level, status: reading.status });
+    cellsOf.set(reading.topicId, list);
+  }
+  const day = { today: '', dayOf: () => '-' };
+
+  return lenses
+    .filter((lens) => lens.origin === 'goal')
+    .map((lens) => {
+      const detail = lensDetail(lens, map, readings, names, day);
+      const topics: TerritoryTopicIn[] = detail.topics.flatMap((topic) => {
+        const at = placed.get(topic.topicId);
+        if (!at) return [];
+        const near = around.get(topic.topicId);
+        return [
+          {
+            id: topic.topicId,
+            name: topic.name,
+            ceiling: topic.ceiling,
+            ...ladderFrom(cellsOf.get(topic.topicId) ?? []),
+            target: topic.target,
+            slot: near?.slot ?? 'none',
+            pca: at.pca,
+            neighbourMap: at.neighbourMap,
+            ideaIds: near?.ideaIds ?? [],
+          },
+        ];
+      });
+      const on = new Set(topics.map((t) => t.id));
+
+      const links: TerritoryLinkIn[] = [];
+      for (const link of map.links) {
+        const requiring = cellOf.get(link.requiringCellId);
+        const required = cellOf.get(link.requiredCellId);
+        if (!requiring || !required || !on.has(requiring.topicId) || !on.has(required.topicId)) continue;
+        links.push({
+          requiringTopicId: requiring.topicId,
+          requiringLevel: requiring.level,
+          requiredTopicId: required.topicId,
+          requiredLevel: required.level,
+        });
+      }
+
+      const targets = new Map(detail.topics.filter((t) => t.approved).map((t) => [t.topicId, t.target]));
+      const ready = fringe(map, readings, { lensTargets: targets })
+        .filter((row) => row.inLens && targets.has(row.topicId) && on.has(row.topicId))
+        .map((row) => ({ topicId: row.topicId, level: row.level, cellId: row.cellId }));
+
+      return { id: lens.id, name: lens.name, topics, links, ready };
     });
 }

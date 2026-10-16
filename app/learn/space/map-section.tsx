@@ -285,19 +285,26 @@ function MapNotes({
     ? 'A star is as bright as your answers said you knew the idea on the day shown. A gold ring is one met in a course or your writing, or one you said you know.'
     : 'A star is as bright as your answers say you know the idea today. A gold ring is one met in a course or your writing, or one you said you know.';
   if (graph?.ladders) {
+    const requires = graph.edges.some((edge) => edge.requires);
+    const missed = [...graph.ladders.values()].some((ladder) => ladder.missed.length > 0);
     return (
       <div className="mt-2 space-y-1 text-ui text-ink-muted">
         <p>
-          Every topic of this goal is a star, and each line points at a topic it requires. The arc round a star is how
-          far up its ladder you are, solid as far as an answer showed and faint where you hold it without one; the
-          dashed ring is the goal&rsquo;s target, and a red ring marks a level you missed. Point at or tap a star to
-          see everything it requires and the level each needs.
+          {requires
+            ? 'Every topic of this goal is a star, and each line points at a topic it requires.'
+            : 'Every topic of this goal is a star. None of them requires another yet, so no line joins them.'}{' '}
+          The arc round a star is how far up its ladder you are, solid as far as an answer showed and faint where you
+          hold it without one; the dashed ring is the goal&rsquo;s target
+          {missed ? ', and a red ring marks a level you missed.' : '.'}
+          {requires && ' Point at or tap a star to see everything it requires and the level each needs.'}
         </p>
-        {graph.route && graph.route.length > 0 && (
+        {graph.route && graph.route.length > 0 ? (
           <p>
             A pulsing gold ring marks a star you are ready for now. The numbers and the dotted line are the order to
             take them in, and Start here opens the first.
           </p>
+        ) : (
+          <p>Nothing in this goal is ready to practise yet.</p>
         )}
         {graph.next.length > 0 && <p>The faint ideas round the edge are next door. Tap one to go there.</p>}
       </div>

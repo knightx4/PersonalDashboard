@@ -48,16 +48,21 @@ function mean(points: readonly Point[]): Point {
   return { x: points.reduce((s, p) => s + p.x, 0) / n, y: points.reduce((s, p) => s + p.y, 0) / n };
 }
 
+/** The six ideas nearest a vector, most alike first. */
+function nearestIdeas(vector: readonly number[], ideas: readonly IdeaVector[]): { id: string; similarity: number }[] {
+  return ideas
+    .map((idea) => ({ id: idea.id, similarity: cosine(vector, idea.vector) }))
+    .sort((a, b) => b.similarity - a.similarity || byId(a.id, b.id))
+    .slice(0, NEIGHBOURS_PER_IDEA);
+}
+
 /** The point the six nearest ideas pull a vector to, weighted by similarity. */
 function weightedNearest(
   vector: readonly number[],
   ideas: readonly IdeaVector[],
   positions: ReadonlyMap<string, Point>,
+  scored: readonly { id: string; similarity: number }[] = nearestIdeas(vector, ideas),
 ): Point {
-  const scored = ideas
-    .map((idea) => ({ id: idea.id, similarity: cosine(vector, idea.vector) }))
-    .sort((a, b) => b.similarity - a.similarity || byId(a.id, b.id))
-    .slice(0, NEIGHBOURS_PER_IDEA);
   let weight = 0;
   let x = 0;
   let y = 0;
@@ -77,20 +82,25 @@ function weightedNearest(
  * placed: projected onto the axes, and pulled to its six nearest ideas on the
  * neighbour map. Learn's topics go on the sky this way from their scope's
  * embedding (plan #2187.2). With no ideas nothing can be placed, and the
- * result is empty.
+ * result is empty. Each placement also names the six ideas it was pulled
+ * to, which a goal's territory draws next door (plan #2187.7).
  */
 export function placeVectors(
   ideas: readonly IdeaVector[],
   map: IdeaMap,
   vectors: readonly { id: string; vector: readonly number[] }[],
-): AreaPlacement[] {
+): (AreaPlacement & { nearest: string[] })[] {
   if (ideas.length === 0) return [];
   const positions = new Map(map.ideas.map((idea) => [idea.id, idea.neighbourMap]));
-  return vectors.map((v) => ({
-    id: v.id,
-    pca: project(v.vector, map.projection),
-    neighbourMap: weightedNearest(v.vector, ideas, positions),
-  }));
+  return vectors.map((v) => {
+    const scored = nearestIdeas(v.vector, ideas);
+    return {
+      id: v.id,
+      pca: project(v.vector, map.projection),
+      neighbourMap: weightedNearest(v.vector, ideas, positions, scored),
+      nearest: scored.map((s) => s.id),
+    };
+  });
 }
 
 /**

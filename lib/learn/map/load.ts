@@ -11,11 +11,12 @@ import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/lea
 import type { SkyTerritory } from './place-graph';
 import { readCells } from '@/lib/learn/levels/model';
 import { placeAreas, placeVectors, type DomainPlacement, type FieldPlacement } from './area-map';
-import { goalsOnMap, type GoalOnMap, type TopicPlacement } from './goals';
+import { goalsOnMap, territoriesOnMap, type GoalOnMap, type TopicPlacement, type TopicSurroundings } from './goals';
 import { loadGoalRows } from './goals-load';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
 import { lightOn } from './sky';
+import { domainSlot } from './view';
 import { buildTopicFrame, type TopicFrame } from './topics';
 import { loadTopicRows } from './topics-load';
 
@@ -312,15 +313,38 @@ export async function loadIdeaMap(
     : null;
 
   let goals: GoalOnMap[] | null | undefined;
+  let territories: SkyTerritory[] | undefined;
   if (goalRows) {
     const vectors = goalRows.vectors.flatMap((row) => {
       const vector = parseVector(row.embedding);
       return vector ? [{ id: row.id, vector }] : [];
     });
+    const placements = placeVectors(ideaVectors, map, vectors);
     const placedTopics = new Map<string, TopicPlacement>(
-      placeVectors(ideaVectors, map, vectors).map((p) => [p.id, { pca: p.pca, neighbourMap: p.neighbourMap }]),
+      placements.map((p) => [p.id, { pca: p.pca, neighbourMap: p.neighbourMap }]),
     );
-    goals = goalsOnMap(goalRows.lenses, goalRows.map, readCells(goalRows.map), placedTopics);
+    // A territory's topic is coloured as most of the ideas it was placed among (plan #2187.7).
+    const domainNameOf = (id: string): string | null => {
+      const row = rowOf.get(id);
+      const subject = row?.subject_id ? subjectOf.get(row.subject_id) : undefined;
+      const field = subject?.field_id ? fieldOf.get(subject.field_id) : undefined;
+      const domainId = subject?.domain_id ?? field?.domain_id ?? null;
+      return domainId ? (domainOf.get(domainId)?.name ?? null) : null;
+    };
+    const around = new Map<string, TopicSurroundings>(
+      placements.map((p) => {
+        const counts = new Map<string, number>();
+        for (const id of p.nearest) {
+          const name = domainNameOf(id);
+          if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+        const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+        return [p.id, { ideaIds: p.nearest, slot: top ? domainSlot(top[0]) : 'none' }];
+      }),
+    );
+    const readings = readCells(goalRows.map);
+    goals = goalsOnMap(goalRows.lenses, goalRows.map, readings, placedTopics);
+    territories = territoriesOnMap(goalRows.lenses, goalRows.map, readings, placedTopics, around);
   } else if (!userId) {
     goals = null;
   }
@@ -329,6 +353,7 @@ export async function loadIdeaMap(
     ...map,
     topics,
     goals,
+    territories,
     missing: concepts.length - embedded.length,
     asOf: asOf.toISOString(),
     places,
