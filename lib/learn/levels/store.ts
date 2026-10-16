@@ -82,7 +82,10 @@ export async function listTopics(client: Client): Promise<TopicRow[]> {
  * and evidence, reduced to the columns its rules use. Drafts are included and
  * marked, since the model itself leaves them out of what it asks.
  */
-export async function loadTopicMap(client: Client, options: { userId?: string } = {}): Promise<TopicMap> {
+export async function loadTopicMap(
+  client: Client,
+  options: { userId?: string; quotes?: boolean } = {},
+): Promise<TopicMap> {
   // Under the service role, which RLS does not narrow, `userId` keeps the
   // map to the shared territory and that account's rows (plan #2172.2).
   const { userId } = options;
@@ -90,7 +93,9 @@ export async function loadTopicMap(client: Client, options: { userId?: string } 
   const topicRead = client.from('topics').select('id, name, ceiling, status');
   const cellRead = client.from('topic_cells').select('id, topic_id, level');
   const linkRead = client.from('cell_links').select('requiring_cell_id, required_cell_id');
-  const evidenceRead = client.from('cell_evidence').select('cell_id, verdict, observed_at');
+  const evidenceRead = client
+    .from('cell_evidence')
+    .select(options.quotes ? 'cell_id, verdict, observed_at, quote' : 'cell_id, verdict, observed_at');
   const [topics, cells, links, evidence] = await Promise.all(
     userId
       ? [
@@ -121,10 +126,11 @@ export async function loadTopicMap(client: Client, options: { userId?: string } 
       requiredCellId: l.required_cell_id,
     })),
     evidence: (evidence.data ?? []).map(
-      (e: { cell_id: string; verdict: Verdict; observed_at: string }): CellEvidence => ({
+      (e: { cell_id: string; verdict: Verdict; observed_at: string; quote?: string | null }): CellEvidence => ({
         cellId: e.cell_id,
         verdict: e.verdict,
         observedAt: e.observed_at,
+        ...(options.quotes ? { quote: e.quote ?? null } : {}),
       }),
     ),
   };

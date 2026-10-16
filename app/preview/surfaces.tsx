@@ -48,7 +48,22 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTerritoryHoverSurface,
+  IdeaSpaceTerritoryThinSurface,
+  IdeaSpaceTerritoryQuoteSurface,
+  IdeaSpaceLayersSurface,
+  IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
+  IdeaSpaceGoalSurface,
+  IdeaSpaceGoalNextSurface,
+  IdeaSpaceFadeSurface,
+  IdeaSpaceFadeEmptySurface,
+  IdeaSpaceGapsSurface,
+  IdeaSpaceGapsThinSurface,
+  IdeaSpaceGapsEmptySurface,
+  IdeaSpaceThenSurface,
+  IdeaSpaceThenPickSurface,
+  IdeaSpaceThenThinSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
@@ -6725,6 +6740,43 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceAroundSurface />,
   },
   {
+    /* A goal's territory opened on one of its topics (plan #2187.3): topics
+     * as stars with an arc for the level held and a dashed ring for the
+     * target, requirement links with arrowheads, a missed level ringed red. */
+    id: 'learn-idea-space-territory',
+    label: 'Learn · Idea Space, a territory opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritorySurface />,
+  },
+  {
+    /* The territory with its most linked star pointed at: all its links,
+     * the level each needs, and its own level line. */
+    id: 'learn-idea-space-territory-hover',
+    label: 'Learn · Idea Space, pointing at a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryHoverSurface />,
+  },
+  {
+    /* A territory as thin as the live one (plan #2187.7): nothing held,
+     * one requirement line, nothing ready, so no route and no Start here. */
+    id: 'learn-idea-space-territory-thin',
+    label: 'Learn · Idea Space, a territory with little in it',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryThinSurface />,
+  },
+  {
+    /* The open topic's quote (plan #2187.5): the words of the answer that
+     * showed its level, folded until tapped, drawn open. */
+    id: 'learn-idea-space-territory-quote',
+    label: 'Learn · Idea Space, the words behind a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryQuoteSurface />,
+  },
+  {
     /* The moment An idea lights up (plan #1997.10): three ideas set in the
      * last two days brighten from dark to their strength when the map opens.
      * The button opens it again, which the recorder presses. */
@@ -6777,6 +6829,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceEvidenceSurface />,
   },
   {
+    /* The layer switch with courses and work off (plan #2187.5): the rings
+     * they gave leave the sky, and the idea's list says only what is on. */
+    id: 'learn-idea-space-layers',
+    label: 'Learn · Idea Space, courses and work turned off',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceLayersSurface />,
+  },
+  {
     /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
      * its Level 4 topics drawn and seven of them named, strongest first,
      * with the rest counted under the Level 3 name. */
@@ -6785,6 +6846,92 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceTopicsSurface />,
+  },
+  {
+    /* A learning goal chosen in the rail on the sky of ten thousand ideas
+     * (plan #2187.2): its topics ringed at their targets and joined where
+     * one requires another. Fixtures in idea-space-goals.tsx. */
+    id: 'learn-idea-space-goal',
+    label: 'Learn · Idea Space, a goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalSurface />,
+  },
+  {
+    /* The goals in the rail with none chosen, and one row's next rung held
+     * open as hovering it shows it (plan #2187.2). */
+    id: 'learn-idea-space-goal-next',
+    label: 'Learn · Idea Space, the next rung of a goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalNextSurface />,
+  },
+  {
+    /* The panels under the map (plan #2187.6) on a territory opened, the
+     * first tab: the ideas round the goal whose strength halves soonest,
+     * each with a re-check that opens Practice Flow. */
+    id: 'learn-idea-space-fade',
+    label: 'Learn · Idea Space, what will fade',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeSurface />,
+  },
+  {
+    /* The fade tab with none of the goal's ideas held, so nothing fades. */
+    id: 'learn-idea-space-fade-empty',
+    label: 'Learn · Idea Space, nothing fading',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeEmptySurface />,
+  },
+  {
+    /* The gaps tab: the open topic at its target, and the levels under it
+     * that are not held, the ready ones with Practise and a miss marked. */
+    id: 'learn-idea-space-gaps',
+    label: 'Learn · Idea Space, the gaps to a target',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsSurface />,
+  },
+  {
+    /* The gaps tab as thin as the live goal: a draft with every level open. */
+    id: 'learn-idea-space-gaps-thin',
+    label: 'Learn · Idea Space, the gaps on a draft goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsThinSurface />,
+  },
+  {
+    /* The gaps tab with no goal chosen. */
+    id: 'learn-idea-space-gaps-empty',
+    label: 'Learn · Idea Space, gaps with no goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsEmptySurface />,
+  },
+  {
+    /* The then and now tab: the goal four weeks ago beside today. */
+    id: 'learn-idea-space-then',
+    label: 'Learn · Idea Space, then and now',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenSurface />,
+  },
+  {
+    /* Then and now with its day picker open, as tapping the day opens it. */
+    id: 'learn-idea-space-then-pick',
+    label: 'Learn · Idea Space, choosing the earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenPickSurface />,
+  },
+  {
+    /* Then and now on the thin goal: nothing held on either day. */
+    id: 'learn-idea-space-then-thin',
+    label: 'Learn · Idea Space, then and now with nothing held',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenThinSurface />,
   },
   {
     /* Clips before any are cut. */

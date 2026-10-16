@@ -45,6 +45,15 @@ describe('the address', () => {
     expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, layout: 'axes', idea: 'x1' });
   });
 
+  it('carries a goal and the topic of its territory opened, and no topic without a goal', () => {
+    const href = mapHref(DEFAULT_PARAMS, { goal: 'g1', topic: 't1' });
+    expect(href).toBe('/learn/space?goal=g1&topic=t1');
+    const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
+    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, goal: 'g1', topic: 't1' });
+    expect(parseMapParams({ topic: 't1' })).toEqual(DEFAULT_PARAMS);
+    expect(mapHref({ ...DEFAULT_PARAMS, goal: 'g1', topic: 't1' }, { topic: null })).toBe('/learn/space?goal=g1');
+  });
+
   it('carries the domain picked in the legend, and drops it when set to null', () => {
     const href = mapHref(DEFAULT_PARAMS, { domain: 'd1' });
     expect(href).toBe('/learn/space?domain=d1');
@@ -60,6 +69,14 @@ describe('the address', () => {
     // A place wins over a neighbourhood, so only one graph is ever open.
     expect(parseMapParams({ place: 'p1', around: 'i1' })).toEqual({ ...DEFAULT_PARAMS, place: 'p1' });
     expect(mapHref({ ...DEFAULT_PARAMS, place: 'p1' }, { place: null })).toBe('/learn/space');
+  });
+
+  it('carries the goal chosen in the rail beside the rest, and drops it when set to null (plan #2187.2)', () => {
+    const href = mapHref({ ...DEFAULT_PARAMS, idea: 'x1' }, { goal: 'lens-1' });
+    expect(href).toBe('/learn/space?idea=x1&goal=lens-1');
+    const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
+    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, idea: 'x1', goal: 'lens-1' });
+    expect(mapHref({ ...DEFAULT_PARAMS, goal: 'lens-1' }, { goal: null })).toBe('/learn/space');
   });
 
   it('closes an idea by setting it to null', () => {

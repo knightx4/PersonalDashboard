@@ -57,6 +57,8 @@ export type CellEvidence = {
   verdict: Verdict;
   /** ISO time. The latest row for a cell decides its own status. */
   observedAt: string;
+  /** The span of the answer that met the cell, verbatim, where the loader read it (plan #2187.5). */
+  quote?: string | null;
 };
 
 export type TopicMap = {
@@ -169,6 +171,19 @@ function cone(ix: Indexed, from: readonly string[]): Set<string> {
   for (const [topicId, top] of reached) {
     for (const [l, cell] of ix.byTopic.get(topicId) ?? []) if (l <= top) out.add(cell.id);
   }
+  return out;
+}
+
+/**
+ * Every cell a performance needs: the cell itself, every level below it on
+ * its topic, and everything those require through the links, as `cone`
+ * walks them (plan #2187.6). A cell not on the map needs nothing.
+ */
+export function cellsUnder(map: TopicMap, cellId: string): Set<string> {
+  const ix = index(map);
+  if (!ix.cells.has(cellId)) return new Set();
+  const out = cone(ix, [cellId]);
+  out.add(cellId);
   return out;
 }
 
