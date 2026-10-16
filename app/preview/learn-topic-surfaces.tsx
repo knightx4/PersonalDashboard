@@ -2,6 +2,8 @@
 
 import { TopicsView } from '@/app/learn/topics/topics-view';
 import { TopicView } from '@/app/learn/topics/[id]/topic-view';
+import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { TopicSkeleton } from '@/app/learn/topics/[id]/topic-skeleton';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
@@ -511,12 +513,34 @@ function standingOf(topic: TopicDetail, evidence: CellEvidenceView[], linksIn: t
   return topicStanding(topic, mapOf(topic, model), evidence, linksIn);
 }
 
+/* What backs the frame topic DCF refines (plan #2172.2): a mark of each
+ * kind, each with the most it can count for. */
+const BACKING: EvidenceLink[] = (
+  [
+    ['work', 1, 0.66, 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"'],
+    ['course', 0.92, 0.71, 'named in MGT 541 Corporate Finance, HH, 2026'],
+    ['note', 1, 0.62, 'named in your note Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation'],
+    ['note', 0.25, 0.58, 'close to your note Valuation clippings'],
+  ] as const
+).map(([source, weight, similarity, basis], i) => ({
+  id: `b-${i}`,
+  targetKind: 'topic' as const,
+  targetId: 'frame-dcf',
+  sourceKind: source,
+  sourceId: `s-${i}`,
+  similarity,
+  ...kindAndCeiling({ source_kind: source, weight }),
+  basis,
+  foundAt: '2026-10-14T06:00:00Z',
+  matchedBy: 'name' as const,
+}));
+
 function ApprovedTopic({
   evidence,
   open,
 }: {
   evidence: CellEvidenceView[];
-  open?: { quotes?: number; edit?: number };
+  open?: { quotes?: number; edit?: number; backing?: boolean };
 }) {
   // With nothing asked yet no level has been reworded either.
   const topic = evidence.length > 0 ? APPROVED : { ...APPROVED, cells: DCF.cells };
@@ -529,13 +553,14 @@ function ApprovedTopic({
       timezone={ZONE}
       now={NOW}
       standing={standingOf(topic, evidence, evidence.length > 0 ? LINKS_IN : [])}
+      backing={evidence.length > 0 ? BACKING : []}
       open={open}
     />
   );
 }
 
 export function LearnTopicPreview() {
-  return <ApprovedTopic evidence={EVIDENCE} />;
+  return <ApprovedTopic evidence={EVIDENCE} open={{ backing: true }} />;
 }
 
 export function LearnTopicEmptyPreview() {

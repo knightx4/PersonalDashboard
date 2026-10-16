@@ -248,7 +248,8 @@ export async function loadIdeaMap(
       stateRow: stateRowOf(idea.id),
       neighbours: idea.neighbours,
       evidence: evidenceOf.get(idea.id)?.map((row) => ({
-        weight: row.weight,
+        kind: row.kind,
+        ceiling: row.ceiling,
         similarity: row.similarity,
         foundAt: row.found_at,
       })),

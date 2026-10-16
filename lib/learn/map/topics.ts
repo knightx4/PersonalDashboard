@@ -1,3 +1,4 @@
+import type { EvidenceKind } from '@/lib/learn/evidence/kinds';
 import { topicStates, type TopicIdea, type TopicLink, type TopicNode } from '@/lib/learn/evidence/topic-state';
 import type { StrengthInput } from '@/lib/learn/strength';
 import type { Point } from './layout';
@@ -86,7 +87,8 @@ export type TopicRows = {
   /** The evidence links written to topics. */
   links: {
     target_id: string;
-    weight: number;
+    kind: EvidenceKind;
+    ceiling: number;
     similarity: number;
     found_at: string;
     matched_by: 'name' | 'similarity' | null;
@@ -155,7 +157,7 @@ export function buildTopicFrame(
   const linksByTopic = new Map<string, TopicLink[]>();
   for (const r of rows.links) {
     const list = linksByTopic.get(r.target_id) ?? [];
-    list.push({ weight: r.weight, similarity: r.similarity, foundAt: r.found_at, matchedBy: r.matched_by });
+    list.push({ kind: r.kind, ceiling: r.ceiling, similarity: r.similarity, foundAt: r.found_at, matchedBy: r.matched_by });
     linksByTopic.set(r.target_id, list);
   }
   const states = topicStates(nodes, topicIdeas, linksByTopic, on);
