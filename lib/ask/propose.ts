@@ -347,6 +347,9 @@ async function checkDelete(ctx: CheckContext, args: Record<string, unknown>): Pr
   if (rows.length !== ids.length) {
     throw new Refused(`${ids.length - rows.length} of those ${spec.noun[1]} are not one of theirs, or are gone.`);
   }
+  if (table === 'job_search.application_answers' && rows.some((row) => row.status === 'submitted')) {
+    throw new Refused('A submitted answer is never removed. Leave those out and propose the others.');
+  }
   return { kind: 'delete_rows', input: await deleteInput(ctx, table, rows) };
 }
 
