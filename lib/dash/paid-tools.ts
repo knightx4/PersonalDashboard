@@ -3,6 +3,7 @@ import { toRef } from '@/lib/core/refs';
 import { currentYear, parseYear } from '@/lib/timeline/year-review';
 import { yearReviewPorts } from '@/lib/timeline/year-review-ports';
 import { writeYearReviewFor, yearReviewRefusal } from '@/lib/timeline/year-review-run';
+import { JOBS_PAID_TOOLS } from './paid-tools-jobs';
 import type { DashPaidTool } from './registry';
 
 /**
@@ -95,4 +96,4 @@ export const writeYearReviewTool: DashPaidTool = {
 };
 
 /** Every paid tool, in the order the model is sent them. */
-export const PAID_TOOLS: readonly DashPaidTool[] = [writeYearReviewTool];
+export const PAID_TOOLS: readonly DashPaidTool[] = [writeYearReviewTool, ...JOBS_PAID_TOOLS];
