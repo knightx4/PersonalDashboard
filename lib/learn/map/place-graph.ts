@@ -256,7 +256,31 @@ export type TerritoryLinkIn = {
 };
 
 /** A cell inside the goal that you are ready for: one row of the fringe (lib/learn/levels/model.ts `fringe`). */
-export type TerritoryReadyIn = { topicId: string; level: number; cellId: string };
+export type TerritoryReadyIn = {
+  topicId: string;
+  level: number;
+  cellId: string;
+  /** Why it is ready, in a sentence (`fringeWhy`), where the loader wrote it (plan #2187.5). */
+  why?: string;
+};
+
+/**
+ * Why a territory's topic stands where it does (plan #2187.5): the highest
+ * level held on it, how it is held, since when, the quote of the answer that
+ * shows it, and the day it falls due a re-check. `via` names the answer that
+ * implies a level held by inference.
+ */
+export type TerritoryStanding = {
+  topicId: string;
+  level: number;
+  how: 'tested' | 'inferred' | 'declared';
+  /** The cell at that level, which a re-check asks about. */
+  cellId: string;
+  since: string;
+  dueOn: string;
+  quote: string | null;
+  via: { topicName: string; level: number } | null;
+};
 
 /** A goal's territory: its topics and the requirement links between their cells. */
 export type SkyTerritory = {
@@ -271,6 +295,8 @@ export type SkyTerritory = {
    * settles most. Absent when the loader has not read it.
    */
   ready?: readonly TerritoryReadyIn[];
+  /** Why each topic with a level held stands there (plan #2187.5). */
+  standing?: readonly TerritoryStanding[];
 };
 
 /** What a requirement line carries: every pair of levels it binds, lowest required level first. */

@@ -57,6 +57,8 @@ export type CellEvidence = {
   verdict: Verdict;
   /** ISO time. The latest row for a cell decides its own status. */
   observedAt: string;
+  /** The span of the answer that met the cell, verbatim, where the loader read it (plan #2187.5). */
+  quote?: string | null;
 };
 
 export type TopicMap = {

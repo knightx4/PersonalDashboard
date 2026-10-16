@@ -1,8 +1,14 @@
 import { ladderLevel } from '@/lib/learn/levels/ladder';
 import { lensDetail, lensLine, summariseLens, type LensRecord, type TopicName } from '@/lib/learn/levels/lenses';
-import { fringe, type CellStatus, type Readings, type TopicMap } from '@/lib/learn/levels/model';
+import { RECHECK_AFTER_DAYS, fringe, isHeld, type CellStatus, type Readings, type TopicMap } from '@/lib/learn/levels/model';
 import type { Point } from './layout';
-import { ladderFrom, type SkyTerritory, type TerritoryLinkIn, type TerritoryTopicIn } from './place-graph';
+import {
+  ladderFrom,
+  type SkyTerritory,
+  type TerritoryLinkIn,
+  type TerritoryStanding,
+  type TerritoryTopicIn,
+} from './place-graph';
 
 /**
  * Your learning goals on Idea Space (plan #2187.2).
@@ -199,10 +205,60 @@ export function territoriesOnMap(
       }
 
       const targets = new Map(detail.topics.filter((t) => t.approved).map((t) => [t.topicId, t.target]));
+      const why = new Map(detail.topics.flatMap((t) => t.fringe.map((cell) => [cell.cellId, cell.why] as const)));
       const ready = fringe(map, readings, { lensTargets: targets })
         .filter((row) => row.inLens && targets.has(row.topicId) && on.has(row.topicId))
-        .map((row) => ({ topicId: row.topicId, level: row.level, cellId: row.cellId }));
+        .map((row) => ({ topicId: row.topicId, level: row.level, cellId: row.cellId, why: why.get(row.cellId) }));
 
-      return { id: lens.id, name: lens.name, topics, links, ready };
+      const standing = topics.flatMap((topic) => {
+        const one = standingOf(topic.id, map, readings, cellOf, names);
+        return one ? [one] : [];
+      });
+
+      return { id: lens.id, name: lens.name, topics, links, ready, standing };
     });
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Why a topic stands where it does (plan #2187.5): its highest held level,
+ * how that level is held and since when. A level shown by an answer carries
+ * the quote of that answer. A level held by inference carries the answer that
+ * implies it: the evidence written at the instant it has been held since.
+ * It falls due a re-check RECHECK_AFTER_DAYS after that (the engine's rule,
+ * lib/learn/levels/model.ts `dueRechecks`). Null when nothing is held.
+ */
+export function standingOf(
+  topicId: string,
+  map: TopicMap,
+  readings: Readings,
+  cellOf: ReadonlyMap<string, { topicId: string; level: number }>,
+  names: ReadonlyMap<string, TopicName>,
+): TerritoryStanding | null {
+  let top: ReturnType<Readings['get']> = undefined;
+  for (const reading of readings.values()) {
+    if (reading.topicId !== topicId || !isHeld(reading.status) || reading.heldSince === null) continue;
+    if (!top || reading.level > top.level) top = reading;
+  }
+  if (!top || top.heldSince === null) return null;
+  const since = top.heldSince;
+  const own = map.evidence
+    .filter((row) => row.cellId === top.cellId && row.verdict !== 'not_met')
+    .sort((a, b) => (a.observedAt < b.observedAt ? 1 : -1))[0];
+  const how: TerritoryStanding['how'] =
+    top.status === 'shown' ? 'tested' : top.status === 'declared' ? 'declared' : 'inferred';
+  let quote: string | null = null;
+  let via: TerritoryStanding['via'] = null;
+  if (how === 'tested') quote = own?.quote ?? null;
+  if (how === 'inferred') {
+    const seed = map.evidence.find((row) => row.verdict !== 'not_met' && row.observedAt === since && cellOf.has(row.cellId));
+    if (seed) {
+      const cell = cellOf.get(seed.cellId)!;
+      quote = seed.quote ?? null;
+      via = { topicName: names.get(cell.topicId)?.name ?? 'another topic', level: cell.level };
+    }
+  }
+  const dueOn = new Date(Date.parse(since) + RECHECK_AFTER_DAYS * DAY_MS).toISOString();
+  return { topicId, level: top.level, how, cellId: top.cellId, since, dueOn, quote, via };
 }

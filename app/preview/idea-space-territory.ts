@@ -1,5 +1,5 @@
 import type { IdeaOnMap } from '@/lib/learn/map/load';
-import type { SkyTerritory, TerritoryLinkIn, TerritoryTopicIn } from '@/lib/learn/map/place-graph';
+import type { SkyTerritory, TerritoryLinkIn, TerritoryStanding, TerritoryTopicIn } from '@/lib/learn/map/place-graph';
 import { domainSlot } from '@/lib/learn/map/view';
 
 /**
@@ -158,6 +158,38 @@ const READY: [string, number][] = [
   ['tp-unit', 1],
 ];
 
+const DAY_MS = 86_400_000;
+/** The day the gallery's Idea Space stands on (idea-space-surfaces.tsx AS_OF). */
+const TODAY = Date.parse('2026-10-13T12:00:00Z');
+
+/**
+ * Why each topic with a level held stands there (plan #2187.5): answers with
+ * the words that showed them, a level held by inference from an answer on
+ * another topic, one with no quote, one overdue a re-check.
+ */
+const STANDING: [string, TerritoryStanding['how'], number, number, string | null, TerritoryStanding['via']][] = [
+  ['tp-arr', 'inferred', 5, 12, null, { topicName: 'Gross margin', level: 5 }],
+  [
+    'tp-churn',
+    'tested',
+    3,
+    45,
+    'Two percent a month sounds small, but it compounds: a thousand customers become about 780 after a year, so the base shrinks unless sales replace them.',
+    null,
+  ],
+  [
+    'tp-nrr',
+    'inferred',
+    2,
+    20,
+    'Net revenue retention above 100% means the customers who stay spend more than the ones who leave.',
+    { topicName: 'Recurring revenue', level: 3 },
+  ],
+  ['tp-cac', 'tested', 2, 5, 'Payback is the months of gross margin it takes to earn back what a customer cost to win.', null],
+  ['tp-margin', 'inferred', 6, 33, null, { topicName: 'Unit economics of a subscription business', level: 3 }],
+  ['tp-burn', 'tested', 1, 9, null, null],
+];
+
 /** A cell's id, as Practice wants one. */
 const cellId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -180,6 +212,27 @@ export function territoryFixture(ideas: readonly IdeaOnMap[]): SkyTerritory {
     requiredTopicId: b,
     requiredLevel: needs,
   }));
-  const ready = READY.map(([topicId, level], i) => ({ topicId, level, cellId: cellId(i + 1) }));
-  return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links, ready };
+  const ready = READY.map(([topicId, level], i) => ({
+    topicId,
+    level,
+    cellId: cellId(i + 1),
+    why:
+      i === 0
+        ? 'Missed before, and what it needs is held now, and opens 2 more levels.'
+        : 'What it needs is held, so it can start here, and opens 1 more level.',
+  }));
+  const standing: TerritoryStanding[] = STANDING.map(([topicId, how, level, daysAgo, quote, via], i) => {
+    const since = new Date(TODAY - daysAgo * DAY_MS).toISOString();
+    return {
+      topicId,
+      how,
+      level,
+      cellId: cellId(100 + i),
+      since,
+      dueOn: new Date(TODAY - daysAgo * DAY_MS + 30 * DAY_MS).toISOString(),
+      quote,
+      via,
+    };
+  });
+  return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links, ready, standing };
 }

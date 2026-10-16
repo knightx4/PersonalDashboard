@@ -15,6 +15,8 @@ import { countText, mapHref } from '@/lib/learn/map/view';
 import { useOpenGraph } from './map-section';
 import { pickOnClick, usePick, viewOnClick } from './pick';
 import { StarSwatch } from './swatch';
+import { TopicWhy } from './why-lit';
+import type { Layers } from '@/lib/learn/map/layers';
 
 /**
  * The rail beside Idea Space's places (plan #1997.7): on the whole map, every
@@ -28,9 +30,31 @@ import { StarSwatch } from './swatch';
 /** How many rows show before the rest fold away. */
 const SHOWN = 6;
 
-export function PlaceRail({ view }: { view: IdeaMapView }) {
+export function PlaceRail({
+  view,
+  layers,
+  onLayers,
+  holdQuote,
+}: {
+  view: IdeaMapView;
+  layers: Layers;
+  onLayers: (next: Layers) => void;
+  /** The gallery draws the open topic's quote open, as a tap would. */
+  holdQuote?: boolean;
+}) {
   const graph = useOpenGraph(view);
-  if (graph?.ladders) return <OpenTerritory graph={graph} ladders={graph.ladders} />;
+  if (graph?.ladders) {
+    return (
+      <OpenTerritory
+        view={view}
+        graph={graph}
+        ladders={graph.ladders}
+        layers={layers}
+        onLayers={onLayers}
+        holdQuote={holdQuote}
+      />
+    );
+  }
   return graph ? <OpenPlace view={view} graph={graph} /> : <Places view={view} />;
 }
 
@@ -39,10 +63,26 @@ function gap(ladder: Ladder): number {
   return ladder.target === null ? -Infinity : ladder.target - ladder.held;
 }
 
-function OpenTerritory({ graph, ladders }: { graph: IdeaGraph; ladders: ReadonlyMap<string, Ladder> }) {
+function OpenTerritory({
+  view,
+  graph,
+  ladders,
+  layers,
+  onLayers,
+  holdQuote,
+}: {
+  view: IdeaMapView;
+  graph: IdeaGraph;
+  ladders: ReadonlyMap<string, Ladder>;
+  layers: Layers;
+  onLayers: (next: Layers) => void;
+  holdQuote?: boolean;
+}) {
   const { params, set } = usePick();
   const opened = graph.opened.kind === 'territory' ? graph.opened : null;
-  const topics = [...ladders.values()].sort((a, b) => gap(b) - gap(a) || a.name.localeCompare(b.name));
+  const topics = [...ladders.values()].sort(
+    (a, b) => gap(b) - gap(a) || a.name.localeCompare(b.name),
+  );
   const row = (ladder: Ladder) => {
     const change = opened ? paramsFor({ ...opened, topic: ladder.id }) : {};
     return (
@@ -62,20 +102,35 @@ function OpenTerritory({ graph, ladders }: { graph: IdeaGraph; ladders: Readonly
       </li>
     );
   };
+  const territory = opened ? view.territories?.find((t) => t.id === opened.id) : undefined;
   return (
-    <Card padding="standard">
-      <h2 className="text-ui font-semibold text-ink">
-        In this goal
-        <span className="tabular ml-2 font-normal text-ink-muted">{topics.length}</span>
-      </h2>
-      <p className="text-small text-ink-muted">Furthest from the target first, with the level you hold of it.</p>
-      <ul className="mt-1 divide-y divide-border">{topics.slice(0, SHOWN).map(row)}</ul>
-      {topics.length > SHOWN && (
-        <Disclosure title={`${topics.length - SHOWN} more`} className="mt-1" bodyClassName="pl-0">
-          <ul className="divide-y divide-border">{topics.slice(SHOWN).map(row)}</ul>
-        </Disclosure>
+    <>
+      {territory && opened && (
+        <TopicWhy
+          territory={territory}
+          topicId={opened.topic}
+          asOf={view.asOf}
+          layers={layers}
+          onLayers={onLayers}
+          holdQuote={holdQuote}
+        />
       )}
-    </Card>
+      <Card padding="standard">
+        <h2 className="text-ui font-semibold text-ink">
+          In this goal
+          <span className="tabular ml-2 font-normal text-ink-muted">{topics.length}</span>
+        </h2>
+        <p className="text-small text-ink-muted">
+          Furthest from the target first, with the level you hold of it.
+        </p>
+        <ul className="mt-1 divide-y divide-border">{topics.slice(0, SHOWN).map(row)}</ul>
+        {topics.length > SHOWN && (
+          <Disclosure title={`${topics.length - SHOWN} more`} className="mt-1" bodyClassName="pl-0">
+            <ul className="divide-y divide-border">{topics.slice(SHOWN).map(row)}</ul>
+          </Disclosure>
+        )}
+      </Card>
+    </>
   );
 }
 
