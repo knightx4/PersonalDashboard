@@ -879,6 +879,19 @@ export function withIncoming(own: readonly TalkTurn[], incoming: readonly TalkTu
 }
 
 /**
+ * The part of `written` that belongs to the answer on its way. Dash's last
+ * answer is already a turn in the thread, so streamed words that open with it
+ * are left over from that answer and are not drawn again under the question
+ * (plan #2262.1).
+ */
+export function replyOnItsWay(written: string, turns: readonly TalkTurn[]): string {
+  const before = turns.findLast((turn) => turn.role === 'assistant')?.body.trim();
+  if (!before || !written) return written;
+  const text = written.trimStart();
+  return text.startsWith(before) ? text.slice(before.length).trimStart() : written;
+}
+
+/**
  * Who answers in the thread: Dash unless the caller says otherwise. Maya's
  * threads in the vault (plan #1286) pass Maya's name and its owl, so the
  * thread never names Dash for words Maya wrote.
@@ -1030,6 +1043,12 @@ type TalkThreadProps = {
   working?: React.ReactNode;
   /** The reply as far as it has been written, while it is coming (plan #1902). */
   written?: string;
+  /**
+   * For the gallery and tests: the thread drawn with this question on its way
+   * and the waiting line under it, nothing sent. A real send holds that state
+   * only for the seconds an answer takes, too short to photograph (plan #2262).
+   */
+  pendingQuestion?: string;
   /** Offer "Add a file" beside Send; the files go to `send` (plan #1715). */
   withFiles?: boolean;
   /** For the preview gallery: the box opens with these words in it. */
@@ -1088,6 +1107,7 @@ function TalkThread({
   incoming,
   working,
   written = '',
+  pendingQuestion,
   withFiles = false,
   initialDraft = '',
   initialFiles = [],
@@ -1100,7 +1120,9 @@ function TalkThread({
   questionCitations,
   dock = false,
 }: TalkThreadProps) {
-  const [own, setTurns] = useState<TalkTurn[]>([...initial]);
+  const [own, setTurns] = useState<TalkTurn[]>(() =>
+    pendingQuestion ? [...initial, { id: PENDING, role: 'user', body: pendingQuestion, createdAt: '' }] : [...initial],
+  );
   const turns = useMemo(() => withIncoming(own, incoming), [own, incoming]);
   const [writing, setWriting] = useState(dock || (startWriting && !ask));
   const [draft, setDraft] = useState(initialDraft);
@@ -1109,7 +1131,9 @@ function TalkThread({
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
-  const [sending, startSend] = useTransition();
+  const [inFlight, startSend] = useTransition();
+  // The gallery's question on its way stays on its way until something replaces it.
+  const sending = inFlight || (Boolean(pendingQuestion) && own.some((turn) => turn.id === PENDING));
   const form = useRef<HTMLFormElement>(null);
   // Keep the box, and with it Stop, in view while the answer is written
   // beneath the question: a phone's screen is shorter than the lookups and
@@ -1181,6 +1205,7 @@ function TalkThread({
   };
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
+  const fresh = sending ? replyOnItsWay(written, turns) : '';
   const stopping = sending && Boolean(onStop);
 
   /**
@@ -1331,15 +1356,15 @@ function TalkThread({
             <ThreadTurn
               voice="dash"
               name={assistant.name}
-              muted={!written}
+              muted={!fresh}
               now={now}
               aria-live="polite"
-              aria-busy={written ? true : undefined}
-              mark={mark('working', written ? 'writing' : activity)}
+              aria-busy={fresh ? true : undefined}
+              mark={mark('working', fresh ? 'writing' : activity)}
             >
-              {!written && <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>}
+              {!fresh && <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>}
               {working}
-              {written && <Words body={written} refs="outlines" />}
+              {fresh && <Words body={fresh} refs="outlines" />}
             </ThreadTurn>
           )}
           {!sending && failed && (

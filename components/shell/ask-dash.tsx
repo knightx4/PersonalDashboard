@@ -451,6 +451,8 @@ export function AskThread({
   ask?: string;
   /** For the preview gallery: the box opens with these words in it. */
   initialDraft?: string;
+  /** For the preview gallery: the thread drawn with this question on its way (plan #2262.1). */
+  pendingQuestion?: string;
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
 }) {
@@ -513,10 +515,16 @@ export function AskThread({
       // Heard as the question is sent, outside the transition that waits for
       // the answer, so what it changes (the sheet's opening message going)
       // happens with the press rather than when the answer lands (plan #1899.8).
-      onSubmit={onSend}
-      send={async (body, files) => {
+      // The last answer's lookups and words are emptied here for the same
+      // reason: emptied inside the transition, they stayed up until the new
+      // answer landed, and the waiting line drew the last answer again
+      // beneath your question (plan #2262.1).
+      onSubmit={() => {
         setLive([]);
         setWritten('');
+        onSend?.();
+      }}
+      send={async (body, files) => {
         const controller = new AbortController();
         running.current = controller;
         const result = await send(body, files).finally(() => onAnswered?.());
