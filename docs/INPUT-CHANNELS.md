@@ -77,13 +77,13 @@ extension would all call it.
 
 A second route, `POST /api/ask/voice` (`lib/talk/voice-ask.ts`), takes
 `{ question }` and answers it the way Ask Dash does, so "Hey Siri, ask Dash"
-can be followed by "how many jobs did I apply to today?" and the answer read
-aloud.
+can be followed by "how many jobs did I apply to today?" or "add call the
+dentist to my todos", and the answer read aloud.
 
 It takes an ask token: a row in the same table with `kind = 'ask'`
 (`supabase/migrations/0248_ask_tokens.sql`), made on the account page by
 choosing "Asks Dash". The two kinds refuse each other, so a capture token
-still cannot read anything. An ask token can read whatever Dash can, which
+still cannot read anything. An ask token can read and change whatever Dash can, which
 is why it is its own kind and not a widened capture token. It is limited to
 5 questions a minute and 60 a day.
 
@@ -94,10 +94,12 @@ session is ended once the answer is kept. The lookups therefore run under
 the person's own row level security, as they do in the browser and for the
 connector, and not on the service role.
 
-Asked this way, Dash only looks things up. It is given no writes, no
-proposals and no hand-offs, since nobody is there to confirm a change or
-press Undo; adding by voice stays with the capture address. The question
-and the whole answer are kept as an Ask conversation.
+Asked this way, Dash has the lookups and the writes it has in Ask, run on
+that session: a todo, a quick note, a goal step and the rest are made at
+once and kept in the Ask conversation with an Undo. It is given no
+proposals and no hand-offs, since nobody is there to confirm one or hear
+the reply later. One Shortcut therefore covers asking and adding; the
+capture address stays for tools that should only add.
 
 A reply is JSON. An answer is 200 with `spoken` (the answer without
 Markdown, cut at a sentence after 600 characters with a pointer to Ask),

@@ -96,8 +96,9 @@ export function AskShortcutSection({ address }: { address: string }) {
       >
         <p className="text-ui text-ink-muted">
           Build this once in the Shortcuts app on your iPhone. Then say &ldquo;Hey Siri, ask
-          Dash&rdquo;, wait for Siri to listen, and ask your question, such as &ldquo;how many jobs
-          did I apply to today?&rdquo; Make an Asks Dash token above first and keep it copied.
+          Dash&rdquo;, wait for Siri to listen, and say what you want: a question such as &ldquo;how
+          many jobs did I apply to today?&rdquo;, or something to do, such as &ldquo;add call the
+          dentist to my todos.&rdquo; Make an Asks Dash token above first and keep it copied.
         </p>
 
         <ol className="mt-4 list-decimal space-y-3 pl-5 text-ui text-ink marker:text-ink-muted">
@@ -141,11 +142,12 @@ export function AskShortcutSection({ address }: { address: string }) {
             and Shortcuts waits for it.
           </li>
           <li>
-            Asked this way, Dash only looks things up and changes nothing. To add something by
-            voice, use Add to Dash.
+            Dash does what it would do in Ask: it looks things up, adds todos and quick notes, and
+            makes the other changes it can make there. Each change is kept in Ask with an Undo.
+            Anything Ask would show you to confirm first, Dash says it cannot do by voice.
           </li>
           <li>
-            Each question is kept in Ask, with the whole answer. A long answer is cut short when it
+            Each request is kept in Ask, with the whole answer. A long answer is cut short when it
             is read out, and the rest is there.
           </li>
           <li>
