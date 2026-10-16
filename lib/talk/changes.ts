@@ -249,6 +249,8 @@ export type DashChange = NewDashChange & {
   doneAt: string | null;
   declinedAt: string | null;
   undoneAt: string | null;
+  /** What the write said it did, once done: a paid press's result line (plan #2228.2). */
+  summary?: string | null;
 };
 
 type DashChangeRow = {
@@ -264,10 +266,11 @@ type DashChangeRow = {
   done_at: string | null;
   declined_at: string | null;
   undone_at: string | null;
+  summary?: string | null;
 };
 
 export const DASH_CHANGE_SELECT =
-  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at';
+  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary';
 
 export function toDashChange(row: DashChangeRow): DashChange {
   const subject = row.subject_ref ? parseRef(row.subject_ref) : null;
@@ -286,6 +289,7 @@ export function toDashChange(row: DashChangeRow): DashChange {
     doneAt: row.done_at,
     declinedAt: row.declined_at,
     undoneAt: row.undone_at,
+    summary: row.summary ?? null,
   } as DashChange;
 }
 

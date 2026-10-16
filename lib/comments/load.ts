@@ -14,6 +14,8 @@
  * rather than a crash.
  */
 
+import type { DashChange } from '@/lib/talk/changes';
+
 /** Which row a comment is about. */
 export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec', 'takeaway', 'change', 'post'] as const;
 export type CommentTarget = (typeof COMMENT_TARGETS)[number];
@@ -93,6 +95,12 @@ export type DevComment = {
    * set on the person's own comments; absent or null on all others.
    */
   acknowledgedAt?: string | null;
+  /**
+   * The paid presses Dash queued from this comment (plan #2228.1), for the
+   * approval card under it (plan #2228.2). Only on the person's own comments,
+   * and only from the loaders built on the shared store (lib/thread/store.ts).
+   */
+  paid?: DashChange[];
 };
 
 /**
@@ -114,6 +122,7 @@ export function threadFrom(value: unknown): DevComment[] {
       acknowledgedAt: (row.acknowledged_at ?? row.acknowledgedAt)
         ? String(row.acknowledged_at ?? row.acknowledgedAt)
         : null,
+      ...(Array.isArray(row.paid) && row.paid.length > 0 ? { paid: row.paid as DashChange[] } : {}),
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

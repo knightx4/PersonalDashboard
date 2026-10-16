@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
+import type { DashChange } from '@/lib/talk/changes';
 
 /**
  * Reading and writing the thread under any row, in core.conversations
@@ -90,7 +91,97 @@ export async function loadThreads(
       return (data ?? []) as TurnRow[];
     }),
   );
-  return group(rows.flat());
+  return withPaid(client, group(rows.flat()), options);
+}
+
+/** What core.dash_actions holds of a queued paid press, as read for a thread's card. */
+const PAID_COLUMNS =
+  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary';
+
+type PaidRow = {
+  id: string;
+  conversation_id: string;
+  turn_id: string | null;
+  kind: string;
+  input: Record<string, unknown>;
+  status: string;
+  subject_ref: string | null;
+  undo: Record<string, unknown> | null;
+  created_at: string;
+  done_at: string | null;
+  declined_at: string | null;
+  undone_at: string | null;
+  summary?: string | null;
+};
+
+function toPaid(row: PaidRow): DashChange {
+  const colon = row.subject_ref?.lastIndexOf(':') ?? -1;
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    turnId: row.turn_id,
+    kind: 'paid_action',
+    input: row.input,
+    status: row.status,
+    subjectRef: row.subject_ref,
+    writtenTable: row.subject_ref && colon > 0 ? row.subject_ref.slice(0, colon) : null,
+    writtenRef: row.subject_ref && colon > 0 ? row.subject_ref.slice(colon + 1) : null,
+    undo: row.undo,
+    createdAt: row.created_at,
+    doneAt: row.done_at,
+    declinedAt: row.declined_at,
+    undoneAt: row.undone_at,
+    summary: row.summary ?? null,
+  } as DashChange;
+}
+
+/**
+ * The paid presses Dash queued from a comment (plan #2228.1), set on that
+ * comment as `paid` so the thread can draw their approval card (plan
+ * #2228.2). Only the person's own comments carry them. A read that fails
+ * leaves the thread without cards rather than failing the page.
+ */
+async function withPaid(
+  client: AnyClient,
+  byRef: Map<string, DevComment[]>,
+  options: { userId?: string },
+): Promise<Map<string, DevComment[]>> {
+  const mine = [...byRef.values()].flat().filter((comment) => comment.author === 'me');
+  if (mine.length === 0) return byRef;
+  const ids = mine.map((comment) => comment.id);
+  try {
+    const chunks: string[][] = [];
+    for (let at = 0; at < ids.length; at += REFS_PER_READ) chunks.push(ids.slice(at, at + REFS_PER_READ));
+    const rows = await Promise.all(
+      chunks.map(async (chunk) => {
+        let query = client
+          .schema('core')
+          .from('dash_actions')
+          .select(PAID_COLUMNS)
+          .eq('surface', 'thread')
+          .eq('kind', 'paid_action')
+          .in('turn_id', chunk);
+        if (options.userId) query = query.eq('user_id', options.userId);
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return (data ?? []) as PaidRow[];
+      }),
+    );
+    const byTurn = new Map<string, DashChange[]>();
+    for (const row of rows.flat()) {
+      if (row.kind !== 'paid_action' || !row.turn_id || !row.input) continue;
+      byTurn.set(row.turn_id, [...(byTurn.get(row.turn_id) ?? []), toPaid(row)]);
+    }
+    if (byTurn.size === 0) return byRef;
+    for (const list of byTurn.values()) list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (const comment of mine) {
+      const paid = byTurn.get(comment.id);
+      if (paid) comment.paid = paid;
+    }
+  } catch (error) {
+    console.error('Reading the paid presses under the threads failed', error);
+  }
+  return byRef;
 }
 
 /**
@@ -107,7 +198,7 @@ export async function loadTableThreads(
   if (options.userId) query = query.eq('user_id', options.userId);
   const { data, error } = await query;
   if (error) throw new Error(`Reading the threads failed: ${error.message}`);
-  return group((data ?? []) as TurnRow[]);
+  return withPaid(client, group((data ?? []) as TurnRow[]), options);
 }
 
 /** The thread under one row, oldest first; empty when there is none. */
