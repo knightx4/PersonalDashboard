@@ -38,6 +38,8 @@ export type PreparationStepRow = {
   finishedAt: string | null;
   summary: string | null;
   counts: Record<string, number>;
+  /** What the step found, as its own code shapes it (documents stored, weeks matched). */
+  detail?: Record<string, unknown>;
   calls: number;
   error: string | null;
 };
@@ -70,9 +72,9 @@ export type ClaimedPreparation = {
 };
 
 export type StepOutcome =
-  | { state: 'done'; summary?: string; counts?: Record<string, number> }
-  | { state: 'more'; summary?: string; counts?: Record<string, number> }
-  | { state: 'skipped'; reason: string };
+  | { state: 'done'; summary?: string; counts?: Record<string, number>; detail?: Record<string, unknown> }
+  | { state: 'more'; summary?: string; counts?: Record<string, number>; detail?: Record<string, unknown> }
+  | { state: 'skipped'; reason: string; detail?: Record<string, unknown> };
 
 export type StepContext = {
   subject: PreparedSubject;
@@ -213,12 +215,18 @@ export async function runPreparation(
 
     const patch: StepPatch =
       outcome.state === 'skipped'
-        ? { status: 'skipped', summary: clip(outcome.reason, SUMMARY_MAX), finishedAt: iso(ports.now()) }
+        ? {
+            status: 'skipped',
+            summary: clip(outcome.reason, SUMMARY_MAX),
+            finishedAt: iso(ports.now()),
+            ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+          }
         : {
             status: outcome.state === 'done' ? 'done' : 'running',
             calls: step.calls + (handler ? 1 : 0),
             ...(outcome.summary !== undefined ? { summary: clip(outcome.summary, SUMMARY_MAX) } : {}),
             ...(outcome.counts !== undefined ? { counts: outcome.counts } : {}),
+            ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
             ...(outcome.state === 'done' ? { finishedAt: iso(ports.now()) } : {}),
           };
     Object.assign(step, patch);

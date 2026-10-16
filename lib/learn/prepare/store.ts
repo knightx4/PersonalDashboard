@@ -38,12 +38,13 @@ type StepDb = {
   finished_at: string | null;
   summary: string | null;
   counts: Record<string, number> | null;
+  detail: Record<string, unknown> | null;
   calls: number;
   error: string | null;
 };
 
 const RUN_COLUMNS = 'id, user_id, subject_id, status, current_step, started_at, finished_at, error, failures';
-const STEP_COLUMNS = 'key, ordinal, status, started_at, finished_at, summary, counts, calls, error';
+const STEP_COLUMNS = 'key, ordinal, status, started_at, finished_at, summary, counts, detail, calls, error';
 
 /** A run left this many failures behind is left for the person's Continue. */
 export const CRON_RETRIES = 3;
@@ -73,6 +74,7 @@ function toSteps(rows: StepDb[]): PreparationStepRow[] {
       finishedAt: r.finished_at,
       summary: r.summary,
       counts: r.counts ?? {},
+      detail: r.detail ?? {},
       calls: r.calls,
       error: r.error,
     }))
@@ -98,6 +100,7 @@ function stepColumns(patch: StepPatch): Record<string, unknown> {
   if (patch.finishedAt !== undefined) out.finished_at = patch.finishedAt;
   if (patch.summary !== undefined) out.summary = patch.summary;
   if (patch.counts !== undefined) out.counts = patch.counts;
+  if (patch.detail !== undefined) out.detail = patch.detail;
   if (patch.calls !== undefined) out.calls = patch.calls;
   if (patch.error !== undefined) out.error = patch.error;
   return out;
