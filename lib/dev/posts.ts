@@ -23,6 +23,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type PostStatus = 'suggested' | 'planned' | 'posted' | 'dropped';
 export const POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned', 'posted', 'dropped'];
+/** The statuses of a draft still waiting to be posted: the card actions work on either. */
+export const OPEN_POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned'];
 
 export type SocialPost = {
   id: string;

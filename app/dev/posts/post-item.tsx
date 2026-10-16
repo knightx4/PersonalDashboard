@@ -571,7 +571,7 @@ export function PostItem({
   commentOpen?: boolean;
 }) {
   const { post } = card;
-  const editable = post.status === 'suggested';
+  const editable = post.status === 'suggested' || post.status === 'planned';
   const [editing, setEditing] = useState<number | null>(null);
   const { copied, copy } = useCopy();
   const thread = post.body.length > 1;
