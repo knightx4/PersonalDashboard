@@ -11,7 +11,14 @@ import {
   type DraftSources,
 } from '@/lib/learn/levels/draft-sources';
 import { loadFieldOptions, loadMapTopics, saveDraft } from '@/lib/learn/levels/store';
+import {
+  draftedDocuments,
+  withDocumentCanonicality,
+  type CanonText,
+  type StoredSourceRef,
+} from '@/lib/learn/levels/stored-sources';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * One press of drafting: read the map, make the call, embed the scope, keep
@@ -30,15 +37,47 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  * as `drafting`. Both calls go on the ledger under draft-topic, so a draft
  * costs twice what one call did. When one call fails the other is kept and
  * the overlap says why it is missing.
+ *
+ * When some of the sources are stored documents (plan #2247.10), `documents`
+ * says which source ids they are. Both drafts are then read back against
+ * them: the topic row cites every document its levels and links cite, each
+ * row's canonicality follows the count of independent documents it cites, and
+ * the documents and the territory's canon go on the topic's `drafting`.
  */
 export type DraftRunResult = { ok: true; id: string } | { ok: false; detail: string };
+
+/**
+ * How a run with no signed-in person does the two things that otherwise read
+ * the session: whose topics the call is told about, and where the cost goes.
+ * The territory drafter (plan #2172.6) runs on the service role, which sees
+ * every account, so it names the owner and brings its own ledger.
+ */
+export type DraftRunOptions = {
+  owner?: string;
+  ledger?: (operation: 'draft-topic' | 'embed-topic-scope', reports: SpendReport[]) => Promise<void>;
+};
 
 export async function runTopicDraft(
   client: LearnSupabaseClient,
   userId: string,
-  input: { goal: string; scope?: string | null; sources?: DraftSources; anthropicApiKey: string },
+  input: {
+    goal: string;
+    scope?: string | null;
+    sources?: DraftSources;
+    documents?: readonly StoredSourceRef[];
+    canon?: readonly CanonText[];
+    anthropicApiKey: string;
+  },
+  options: DraftRunOptions = {},
 ): Promise<DraftRunResult> {
-  const [map, fields] = await Promise.all([loadMapTopics(client), loadFieldOptions(client)]);
+  // Each operation spelled out, so the paid-action check can read what this records.
+  const ledger =
+    options.ledger ??
+    ((operation, reports) =>
+      operation === 'draft-topic'
+        ? recordLearnSpend(userId, 'draft-topic', reports)
+        : recordLearnSpend(userId, 'embed-topic-scope', reports));
+  const [map, fields] = await Promise.all([loadMapTopics(client, options.owner), loadFieldOptions(client)]);
   const given = input.sources ?? NO_SOURCES;
 
   const drafting = collectSpend();
@@ -53,7 +92,7 @@ export async function runTopicDraft(
       onSpend: drafting.sink,
     });
   const [first, second] = await Promise.all([call(), call()]);
-  await recordLearnSpend(userId, 'draft-topic', drafting.reports);
+  await ledger('draft-topic', drafting.reports);
 
   const result = bothOrEither(first, second);
   if (!result.ok) {
@@ -67,12 +106,19 @@ export async function runTopicDraft(
     };
   }
 
-  const kept = result.other ? pickDraft(result.draft, result.other, given) : result.draft;
-  const record = draftingRecord(kept, kept === result.draft ? result.other : result.draft, result.failed, given);
+  const refs = input.documents ?? [];
+  const draft = withDocumentCanonicality(result.draft, refs);
+  const other = result.other ? withDocumentCanonicality(result.other, refs) : null;
+  const kept = other ? pickDraft(draft, other, given) : draft;
+  const record = draftingRecord(kept, kept === draft ? other : draft, result.failed, given);
+  if (refs.length > 0) {
+    record.documents = draftedDocuments(kept, refs);
+    record.canon = [...(input.canon ?? [])];
+  }
 
   const embedding = collectSpend();
   const embedded = await embedOne(kept.scope, { inputType: 'document', onSpend: embedding.sink });
-  await recordLearnSpend(userId, 'embed-topic-scope', embedding.reports);
+  await ledger('embed-topic-scope', embedding.reports);
   if (!embedded.ok && embedded.reason !== 'no-key') {
     console.error('[learn topics] scope embedding', embedded.reason, embedded.detail);
   }

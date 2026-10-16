@@ -38,7 +38,7 @@ import { Tooltip } from '@/components/ui/tooltip';
  * when both the practice and the check are passed, in either order.
  */
 
-type Writing = { state: 'waiting' | 'writing' } | { state: 'failed'; detail: string };
+export type Writing = { state: 'waiting' | 'writing' } | { state: 'failed'; detail: string };
 
 export function PieceLessons({
   subjectId,
@@ -49,15 +49,43 @@ export function PieceLessons({
   pieceId: string;
   ideas: PieceIdea[];
 }) {
+  const { ideas, writing } = useWrittenLessons(subjectId, pieceId, initial);
+
+  return (
+    <ol className="space-y-4">
+      {ideas.map((idea, index) => (
+        <li key={idea.conceptId}>
+          <LessonCard idea={idea} number={index + 1} writing={writing[idea.conceptId] ?? null} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * A piece's ideas, with the lessons still missing written one after another
+ * as the view opens, first idea first. Shared by the piece's page and by
+ * today's piece on Now (plan #2164.4).
+ */
+export function useWrittenLessons(
+  subjectId: string,
+  pieceId: string,
+  initial: PieceIdea[],
+  /** False draws the first missing lesson as being written and writes nothing; the gallery's loading state. */
+  write = true,
+) {
   const [ideas, setIdeas] = useState(initial);
   const [writing, setWriting] = useState<Record<string, Writing>>(() =>
     Object.fromEntries(
       initial
         .filter((idea) => !idea.lesson && !idea.dropped)
-        .map((idea) => [idea.conceptId, { state: 'waiting' } as Writing]),
+        .map((idea, index) => [
+          idea.conceptId,
+          { state: !write && index === 0 ? 'writing' : 'waiting' } as Writing,
+        ]),
     ),
   );
-  const started = useRef(false);
+  const started = useRef(!write);
 
   useEffect(() => {
     if (started.current) return;
@@ -85,18 +113,10 @@ export function PieceLessons({
     })();
   }, [initial, pieceId, subjectId]);
 
-  return (
-    <ol className="space-y-4">
-      {ideas.map((idea, index) => (
-        <li key={idea.conceptId}>
-          <LessonCard idea={idea} number={index + 1} writing={writing[idea.conceptId] ?? null} />
-        </li>
-      ))}
-    </ol>
-  );
+  return { ideas, writing };
 }
 
-function LessonCard({ idea, number, writing }: { idea: PieceIdea; number: number; writing: Writing | null }) {
+export function LessonCard({ idea, number, writing }: { idea: PieceIdea; number: number; writing: Writing | null }) {
   const { lesson } = idea;
   return (
     <Card padding="standard">

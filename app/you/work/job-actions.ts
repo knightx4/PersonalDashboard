@@ -4,13 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
-import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createYouClient } from '@/lib/you/auth/server';
 import { EDUCATION_HREF } from '@/lib/you/education';
-import { resumeHash } from '@/lib/you/resume-hash';
-import { parseJob, planRead, type Job } from '@/lib/you/work-history';
-import { askWorkHistoryModel, WORK_HISTORY_OPERATION } from '@/lib/you/work-history-model';
-import { readWorkHistory } from '@/lib/you/work-history-read';
+import { parseJob } from '@/lib/you/work-history';
+import { readResumeIntoWorkHistory } from '@/lib/you/work-history-run';
 
 /**
  * The jobs on You's Work & school tab (plan #1991.4).
@@ -35,68 +32,16 @@ export async function readResumeAction(): Promise<ReadResumeState> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot read your résumé.' };
 
-  const jobs = await createJobsClient();
-  const { data: resume } = await jobs
-    .from('resume_versions')
-    .select('id, label, text_content')
-    .eq('user_id', user.id)
-    .not('text_content', 'is', null)
-    .order('is_default', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const text = (resume as { text_content: string | null } | null)?.text_content ?? '';
-  if (!resume || text.trim() === '') {
-    return { error: 'There is no résumé with text in Jobs to read. Add one there first.' };
-  }
-  const { id: resumeId, label } = resume as { id: string; label: string };
-
-  const spend = collectSpend();
-  let read;
-  try {
-    read = await readWorkHistory(text, (body) => askWorkHistoryModel({ apiKey, onSpend: spend.sink }, body));
-  } catch {
-    read = { ok: false as const, error: 'Your résumé could not be read. Try again.' };
-  }
-  await recordLearnSpend(user.id, WORK_HISTORY_OPERATION, spend.reports);
-  if (!read.ok) return { error: read.error };
-
-  const you = await createYouClient();
-  const { data: existing, error: loadError } = await you
-    .from('work_history')
-    .select('id, employer, title, started, edited');
-  if (loadError) return { error: 'Your jobs could not be loaded. Try again.' };
-  const plan = planRead((existing ?? []) as Pick<Job, 'id' | 'employer' | 'title' | 'started' | 'edited'>[], read.jobs);
-  const hash = resumeHash(text);
-
-  // Add the new read before taking the old one out, so a failure leaves the list as it was.
-  if (plan.add.length > 0) {
-    const { error } = await you.from('work_history').insert(
-      plan.add.map((job, position) => ({
-        ...job,
-        user_id: user.id,
-        edited: false,
-        resume_id: resumeId,
-        resume_hash: hash,
-        position,
-      })),
-    );
-    if (error) return { error: 'The jobs were not saved. Try again.' };
-  }
-  if (plan.remove.length > 0) {
-    await you.from('work_history').delete().in('id', plan.remove).eq('edited', false).eq('user_id', user.id);
-  }
-  if (plan.confirmed.length > 0) {
-    // Your rows that this résumé also lists: marked as found on it, with what they say unchanged.
-    await you
-      .from('work_history')
-      .update({ resume_id: resumeId, resume_hash: hash })
-      .in('id', plan.confirmed)
-      .eq('user_id', user.id);
-  }
+  const result = await readResumeIntoWorkHistory({
+    jobs: await createJobsClient(),
+    you: await createYouClient(),
+    userId: user.id,
+    apiKey,
+  });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath(EDUCATION_HREF);
-  return { read: { added: plan.add.length, kept: plan.kept, resume: label } };
+  return { read: { added: result.added, kept: result.kept, resume: result.resume } };
 }
 
 export type JobEditState = { error?: string; field?: string; saved?: boolean };

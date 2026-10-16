@@ -2,6 +2,7 @@ import 'server-only';
 
 import { placeAims } from '@/lib/learn/areas/place-aim';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { classifyAims } from '@/lib/learn/goal-kind-store';
 import { giveAimsTracks } from '@/lib/learn/lessons/aim-tracks';
 
 /**
@@ -32,6 +33,8 @@ export async function steerLearnAfterGoalSaved(
     if (error) throw new Error(error.message);
     if (!data) return;
     await placeAims(supabase, userId);
+    // Sorted into a kind before any source is tried (plan #2247.2).
+    await classifyAims(supabase, userId);
     await giveAimsTracks(supabase, userId);
   } catch (error) {
     console.error('[learn goal saved]', error instanceof Error ? error.message : error);

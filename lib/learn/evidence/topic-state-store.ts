@@ -1,8 +1,18 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { readCells } from '@/lib/learn/levels/model';
+import { loadTopicMap } from '@/lib/learn/levels/store';
 import type { StrengthInput } from '@/lib/learn/strength';
-import { topicStates, type TopicIdea, type TopicLink, type TopicNode, type TopicState } from './topic-state';
+import type { EvidenceKind } from './kinds';
+import {
+  topicStates,
+  type TopicIdea,
+  type TopicLevels,
+  type TopicLink,
+  type TopicNode,
+  type TopicState,
+} from './topic-state';
 
 /**
  * Reading what topicStates needs and returning every topic's state on a day
@@ -71,16 +81,17 @@ export async function loadTopicStates(
 
   const rows = await pages<{
     target_id: string;
-    weight: number;
+    kind: EvidenceKind;
+    ceiling: number;
     similarity: number;
     found_at: string;
     matched_by: 'name' | 'similarity' | null;
   }>((a, b) => {
     let q = learn
       .from('evidence_links')
-      .select('target_id, weight, similarity, found_at, matched_by')
+      .select('target_id, kind, ceiling, similarity, found_at, matched_by')
       .eq('target_kind', 'topic')
-      .is('held_reason', null)
+      .neq('kind', 'mention')
       .order('id')
       .range(a, b);
     if (userId) q = q.eq('user_id', userId);
@@ -89,9 +100,31 @@ export async function loadTopicStates(
   const linksByTopic = new Map<string, TopicLink[]>();
   for (const r of rows) {
     const list = linksByTopic.get(r.target_id) ?? [];
-    list.push({ weight: r.weight, similarity: r.similarity, foundAt: r.found_at, matchedBy: r.matched_by });
+    list.push({ kind: r.kind, ceiling: r.ceiling, similarity: r.similarity, foundAt: r.found_at, matchedBy: r.matched_by });
     linksByTopic.set(r.target_id, list);
   }
 
-  return topicStates(topics, ideas, linksByTopic, on);
+  return topicStates(topics, ideas, linksByTopic, on, await loadTopicLevels(learn, userId));
+}
+
+/**
+ * The topics on your map that refine a frame topic, and the levels model to
+ * read them by, for breadth and depth (plan #2172.2). Nothing is read past
+ * the first query when no topic refines one.
+ */
+export async function loadTopicLevels(learn: LearnSupabaseClient, userId?: string): Promise<TopicLevels | undefined> {
+  let q = learn.from('topics').select('id, refines_article_id').not('refines_article_id', 'is', null);
+  if (userId) q = q.or(`user_id.is.null,user_id.eq.${userId}`);
+  const { data, error } = await q;
+  if (error) throw new Error(`Reading which topics refine the frame failed: ${error.message}`);
+  const rows = (data ?? []) as { id: string; refines_article_id: string }[];
+  if (rows.length === 0) return undefined;
+  const refining = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = refining.get(row.refines_article_id) ?? [];
+    list.push(row.id);
+    refining.set(row.refines_article_id, list);
+  }
+  const map = await loadTopicMap(learn, { userId });
+  return { map, readings: readCells(map), refining };
 }

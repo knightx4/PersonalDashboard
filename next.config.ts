@@ -55,6 +55,9 @@ const nextConfig: NextConfig = {
     '/api/mcp': ['./docs/**/*.md'],
     // The sheet asks through this route, which streams the lookups (plan #1438).
     '/api/ask': ['./docs/**/*.md'],
+    // A screen step's row shows the mockup registered for the screen, whose
+    // pictures are kept under docs/references (plan #2215.10).
+    '/dev/plan/reference': ['./docs/references/**/*.{png,jpg,jpeg,webp}'],
   },
 
   async redirects() {

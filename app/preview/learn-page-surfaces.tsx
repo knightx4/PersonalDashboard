@@ -5,6 +5,8 @@ import { ListsView } from '@/app/learn/lists/lists-view';
 import { OpeningView } from '@/app/learn/opening/[id]/opening-view';
 import { QuizView } from '@/app/learn/quiz/[id]/quiz-view';
 import { TakeQuizView } from '@/app/learn/quiz/[id]/take/take-view';
+import { ExternalChecksView } from '@/app/learn/settings/external/external-view';
+import { ExternalItemView, ExternalScoreView } from '@/app/learn/settings/external/sit-view';
 import { ReadingView } from '@/app/learn/r/[id]/reading-view';
 import { SetTab } from './set-tab';
 import { PiecePageView } from '@/app/learn/s/[id]/p/[piece]/piece-page-view';
@@ -23,6 +25,7 @@ import type { CardNote } from '@/lib/learn/notes/notes';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
 import type { TrackSummary, ReadingDetail } from '@/lib/learn/tracks/load';
 import type { Quiz } from '@/lib/learn/quiz/model';
+import type { ExternalCheck, ExternalCheckListItem, ExternalItem } from '@/lib/learn/external/model';
 import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
 import type { PracticeView } from '@/lib/learn/lessons/practice';
@@ -255,7 +258,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'course',
     sourceId: 'course-1',
     similarity: 0.71,
-    weight: 0.95,
+    kind: 'course',
+    ceiling: 0.95,
     basis: 'from MGT 541 Corporate Finance, HH, 2026',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -266,7 +270,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'note',
     sourceId: 'note-1',
     similarity: 0.68,
-    weight: 0.9,
+    kind: 'note',
+    ceiling: 0.5,
     basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -277,7 +282,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'work',
     sourceId: 'work-1',
     similarity: 0.63,
-    weight: 0.85,
+    kind: 'work',
+    ceiling: 0.85,
     basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -515,6 +521,65 @@ export function LearnQuizSurface() {
 
 export function LearnQuizTakeSurface() {
   return <TakeQuizView quiz={quiz} current={quiz.questions[3]} />;
+}
+
+// ---- External check (plan #2179.4) ----------------------------------------------
+// Fixtures only: the preview draws the page with placeholder items, not a real set.
+
+const externalSample: Array<[string, string]> = [
+  ['Sample question one, written to fill the card the way a long published question would, with a clause and a figure in it?', 'The sample answer the set gives for question one.'],
+  ['Sample question two?', 'The sample answer for question two.'],
+  ['Sample question three?', 'The sample answer for question three.'],
+  ['Sample question four?', 'The sample answer for question four.'],
+  ['Sample question five?', 'The sample answer for question five.'],
+  ['Sample question six?', 'The sample answer for question six.'],
+];
+
+function externalItems(answered: number, rightUpTo: number): ExternalItem[] {
+  return externalSample.map(([question, expected], at) => ({
+    question,
+    expected,
+    response: at < answered ? (at === 3 ? '' : `What was written for question ${at + 1}.`) : null,
+    correct: at < answered ? at < rightUpTo : null,
+  }));
+}
+
+const externalSitting: ExternalCheck = {
+  id: 'ec1',
+  name: 'Sample set, six questions',
+  items: externalItems(3, 3),
+  correctCount: null,
+  scoredAt: null,
+  createdAt: '2026-10-15T09:00:00Z',
+  updatedAt: '2026-10-15T09:10:00Z',
+};
+
+const externalScored: ExternalCheck = {
+  ...externalSitting,
+  items: externalItems(6, 3),
+  correctCount: 3,
+  scoredAt: '2026-10-15T09:30:00Z',
+};
+
+const externalList: ExternalCheckListItem[] = [
+  { id: 'ec1', name: 'Sample set, six questions', total: 6, answered: 3, correctCount: null, on: '2026-10-15T09:00:00Z', scored: false },
+  { id: 'ec2', name: 'A sample set with a name long enough to need cutting short on a phone screen', total: 30, answered: 30, correctCount: 21, on: '2026-09-28T09:00:00Z', scored: true },
+];
+
+export function LearnExternalSurface() {
+  return <ExternalChecksView checks={externalList} />;
+}
+
+export function LearnExternalNewSurface() {
+  return <ExternalChecksView checks={[]} />;
+}
+
+export function LearnExternalItemSurface() {
+  return <ExternalItemView check={externalSitting} index={3} />;
+}
+
+export function LearnExternalScoreSurface() {
+  return <ExternalScoreView check={externalScored} />;
 }
 
 // ---- One reading ---------------------------------------------------------------

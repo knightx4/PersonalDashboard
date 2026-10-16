@@ -77,8 +77,12 @@ export type Star = {
   at: Point;
   state: KnowledgeState;
   stateRow: StrengthInput | null;
+  /** Tested strength, 0 to 1: brightness (plan #2187.1). */
   strength: number;
+  /** Nearness to tested ideas, 0 to 1, for a star with no strength: the blue haze. */
   haze: number;
+  /** A course, your work, your writing or your word touched it, 0 to 1: the gold halo. */
+  exposure: number;
   /** The domain's colour slot, `other` for a domain without one, `none` for no domain. */
   slot: number | 'other' | 'none';
   domainId: string | null;
@@ -91,6 +95,16 @@ export type Star = {
 
 /** A topic of the frame (plan #2016.5) where the current layout puts it. */
 export type SkyTopic = TopicOnMap & { at: Point };
+
+/**
+ * A chosen goal's topics on the sky (plan #2187.2): each where the layout
+ * puts it with the radius of its target ring in pixels, and the lines where
+ * one requires another.
+ */
+export type Constellation = {
+  stars: readonly { id: string; name: string; at: Point; ring: number }[];
+  lines: readonly { from: Point; to: Point }[];
+};
 
 /** A name for the zoomed-out sky: a place, or a domain while no place is named. */
 export type SkyName = { id: string; kind: 'place' | 'domain'; text: string; at: Point; weight: number };
@@ -184,6 +198,7 @@ export function StarSky({
   replay = null,
   topics = [],
   zoomOn = null,
+  constellation = null,
 }: {
   stars: readonly Star[];
   names: readonly SkyName[];
@@ -203,6 +218,8 @@ export function StarSky({
   graph?: IdeaGraph | null;
   /** The map as it stood on the day the timeline shows, or null for today. */
   replay?: ReadonlyMap<string, LightThen> | null;
+  /** The goal chosen in the rail, drawn as lines and rings, or null for the plain sky. */
+  constellation?: Constellation | null;
 }) {
   const { selectedId, pick, params, clearDomain, set } = usePick();
   const frame = useRef<HTMLDivElement>(null);
@@ -249,8 +266,15 @@ export function StarSky({
         ? stars.map((star): Star => {
             const then = replay.get(star.id);
             return then
-              ? { ...star, strength: then.strength, haze: then.haze, state: then.state, stateRow: then.stateRow }
-              : { ...star, strength: 0, haze: 0, absent: true };
+              ? {
+                  ...star,
+                  strength: then.strength,
+                  haze: then.haze,
+                  exposure: then.exposure,
+                  state: then.state,
+                  stateRow: then.stateRow,
+                }
+              : { ...star, strength: 0, haze: 0, exposure: 0, absent: true };
           })
         : stars,
     [stars, replay],
@@ -271,9 +295,9 @@ export function StarSky({
   const focusIndex = focusId ? (byId.get(focusId) ?? -1) : -1;
 
   // Kept for the draw, which runs outside React.
-  const latest = useRef({ stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind });
+  const latest = useRef({ stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind, constellation });
   useEffect(() => {
-    latest.current = { stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind };
+    latest.current = { stars: lit, names, topics, dust, focusIndex, domain: params.domain, size, pointingAt, open, behind, constellation };
   });
 
   // -- Measuring the frame --------------------------------------------------
@@ -299,7 +323,7 @@ export function StarSky({
   const draw = useCallback(() => {
     raf.current = null;
     const el = canvas.current;
-    const { stars, names, topics, dust, focusIndex, domain, size, pointingAt, open, behind } = latest.current;
+    const { stars, names, topics, dust, focusIndex, domain, size, pointingAt, open, behind, constellation } = latest.current;
     if (!el || !size || !camera.current || !shown.current) return;
     const ctx = el.getContext('2d');
     if (!ctx) return;
@@ -404,6 +428,9 @@ export function StarSky({
     // Who stands out: the idea in focus and its six nearest, or the domain picked in the legend.
     const focus = focusIndex >= 0 && !stars[focusIndex]!.absent ? stars[focusIndex] : undefined;
     const near = new Set(focus?.neighbours ?? []);
+    // A chosen goal steps the sky back, as a domain picked out does, so its
+    // rings and lines read over ten thousand stars (plan #2187.2).
+    const goalOn = !open && !!constellation && constellation.stars.length > 0;
     const litUp = (star: Star) =>
       behind
         ? false
@@ -411,7 +438,7 @@ export function StarSky({
           ? star.id === focus.id || near.has(star.id)
           : domain
             ? star.domainId === domain
-            : true;
+            : !goalOn;
     const faded = behind ? BEHIND_GRAPH : FADED;
 
     // A crowded view would add up to white, so the glow and haze thin out
@@ -424,6 +451,10 @@ export function StarSky({
       if (x >= 0 && y >= 0 && x <= w && y <= h) inView += 1;
     }
     const crowd = crowding(inView);
+    // Rings overlap into a grey wash sooner than glow adds up to white, so
+    // the halo thins with the square: gone past a few thousand stars in
+    // view, back as you zoom in.
+    const haloCrowd = crowd * crowd;
 
     // Haze and glow are soft, so they are drawn at half the resolution on a
     // layer of their own and laid over the sky in one go: a quarter of the
@@ -452,20 +483,23 @@ export function StarSky({
     // path each, since a few fills cost less than ten thousand stamps.
     ctx.globalCompositeOperation = 'lighter';
     const unlit: number[] = [];
+    // Stars met without a test, ringed once the cores are down.
+    const haloed: number[] = [];
     const squares = new Map<string, number[]>();
     for (let i = 0; i < stars.length; i++) {
       const star = stars[i]!;
       if (star.absent || behind?.has(star.id)) continue;
       const x = sx(px[i]!);
       const y = sy(py[i]!);
-      const look = starLook(star.strength, star.haze, zoom);
-      const reach = Math.max(look.glow, look.haze) / 2 + 2;
+      const look = starLook(star.strength, star.haze, zoom, star.exposure);
+      const reach = Math.max(look.glow, look.haze, look.halo) / 2 + 2;
       if (x < -reach || y < -reach || x > w + reach || y > h + reach) continue;
       const dim = litUp(star) ? 1 : faded;
       if (look.haze > 0 && hazeSprite.current && look.hazeAlpha * dim * crowd >= FAINTEST_GLOW) {
         glow.globalAlpha = look.hazeAlpha * dim * crowd;
         glow.drawImage(hazeSprite.current, x - look.haze / 2, y - look.haze / 2, look.haze, look.haze);
       }
+      if (look.halo > 0 && look.haloAlpha * dim * haloCrowd >= FAINTEST_GLOW) haloed.push(i);
       if (star.strength <= 0) {
         unlit.push(i);
         continue;
@@ -522,6 +556,27 @@ export function StarSky({
     }
     ctx.globalAlpha = 1;
 
+    // Exposure: a thin hollow ring of pale gold round a star met in a course
+    // or your writing, or one you said you know, with no question asked yet
+    // (plan #2187.1). Stroked, never filled, so it adds no light to the core,
+    // and thinned faster than the glow in a crowd.
+    ctx.strokeStyle = `rgb(${SKY.halo.join(',')})`;
+    ctx.lineWidth = 1.2;
+    const haloR = starLook(0, 0, zoom, 1).halo / 2;
+    for (const pass of [true, false]) {
+      ctx.globalAlpha = haloCrowd * (pass ? 1 : faded) * 0.85;
+      ctx.beginPath();
+      for (const i of haloed) {
+        if (litUp(stars[i]!) !== pass) continue;
+        const x = sx(px[i]!);
+        const y = sy(py[i]!);
+        ctx.moveTo(x + haloR, y);
+        ctx.arc(x, y, haloR, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
     // An idea held wrongly wears a ring, faded with the rest outside the
     // focus or the domain picked out.
     ctx.strokeStyle = SKY.mixedUp;
@@ -541,6 +596,47 @@ export function StarSky({
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+
+    // The goal chosen in the rail (plan #2187.2): faint lines where one of
+    // its topics requires another, then a thin dashed ring round each topic,
+    // wider for a higher target, with a point at its middle. Stroked only,
+    // so a goal adds no light, and hidden while a graph is open.
+    const goalStars = goalOn ? constellation!.stars : [];
+    if (goalStars.length > 0) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = SKY.constellation;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const line of constellation!.lines) {
+        ctx.moveTo(sx(line.from.x), sy(line.from.y));
+        ctx.lineTo(sx(line.to.x), sy(line.to.y));
+      }
+      ctx.stroke();
+      ctx.strokeStyle = SKY.target;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      for (const star of goalStars) {
+        const x = sx(star.at.x);
+        const y = sy(star.at.y);
+        if (!onScreen(x, y)) continue;
+        ctx.moveTo(x + star.ring, y);
+        ctx.arc(x, y, star.ring, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = SKY.target;
+      ctx.beginPath();
+      for (const star of goalStars) {
+        const x = sx(star.at.x);
+        const y = sy(star.at.y);
+        if (!onScreen(x, y)) continue;
+        ctx.moveTo(x + 1.5, y);
+        ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
 
     // The idea in focus: threads to its six nearest and rings round them.
     // No name goes under the zoom buttons in the corner.
@@ -594,6 +690,8 @@ export function StarSky({
       if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
       marks.add(x, y, (topic.level === 3 ? TOPIC3_R : TOPIC4_R) + 1);
     }
+    // Nor over a chosen goal's ring.
+    for (const star of goalStars) marks.add(sx(star.at.x), sy(star.at.y), star.ring + 1);
     fontFamily.current ??= getComputedStyle(el).fontFamily || 'sans-serif';
     const family = fontFamily.current;
     const measure = (font: string, text: string) => {
@@ -633,6 +731,34 @@ export function StarSky({
       );
       taken.push(...placed.map((p) => p.box));
       write(placed, FOCUS_FONT, SKY.focusName);
+    }
+    // A chosen goal's topics are named before anything else but the focus,
+    // seven at most, so you can read which ring is which.
+    if (goalStars.length > 0) {
+      const placed = placeNames(
+        goalStars.map((star) => ({
+          id: `goal:${star.id}`,
+          text: star.name,
+          at: { x: sx(star.at.x), y: sy(star.at.y) },
+          priority: 1,
+          width: measure(PLACE_FONT, star.name),
+          gap: star.ring + 3,
+        })),
+        w,
+        h,
+        NAME_LINE,
+        taken,
+        MAX_PLACE_NAMES,
+        // Over the stepped-back sky a name may cross a faint star, never a ring.
+        (box) => goalStars.some((star) => {
+          const x = sx(star.at.x);
+          const y = sy(star.at.y);
+          const r = star.ring + 1;
+          return x + r > box.x && x - r < box.x + box.w && y + r > box.y && y - r < box.y + box.h;
+        }),
+      );
+      write(placed, PLACE_FONT, SKY.ideaName);
+      taken.push(...placed.map((p) => p.box));
     }
     nameBoxes.current = [];
     if (open) {
@@ -831,7 +957,7 @@ export function StarSky({
   // Anything else drawn changed: the focus, the domain picked out, the names.
   useEffect(() => {
     redraw();
-  }, [focusIndex, params.domain, names, topics, dust, behind, open, lit, redraw]);
+  }, [focusIndex, params.domain, names, topics, dust, behind, open, lit, constellation, redraw]);
 
   // -- Moving the camera ---------------------------------------------------
   const flyTo = useCallback(
@@ -893,13 +1019,15 @@ export function StarSky({
     wasOpen.current = true;
     const ids = [...graph.core, ...graph.next];
     const h = graphHeight(w, ids.length, base);
-    const core = graph.core.map((id) => starOf.get(id)?.at).filter((p): p is Point => p !== undefined);
+    // A territory's stars are its topics, which the graph places itself (plan #2187.3).
+    const nodeAt = (id: string) => graph.ladders?.get(id)?.at ?? starOf.get(id)?.at;
+    const core = graph.core.map(nodeAt).filter((p): p is Point => p !== undefined);
     const fit = fitCamera(core, w, h, PLACE_INSET);
     const target = { ...fit, k: Math.min(fit.k, fitK.current * MAX_ZOOM) };
     const from = new Map<string, Point>();
     for (const id of ids) {
-      const star = starOf.get(id);
-      if (star) from.set(id, toScreen(target, star.at, w, h));
+      const at = nodeAt(id);
+      if (at) from.set(id, toScreen(target, at, w, h));
     }
     const key = graph.key;
     if (!drawnOnce.current || reducedMotion()) {
@@ -920,7 +1048,7 @@ export function StarSky({
     (to: Opened) => set(paramsFor(to)),
     [set],
   );
-  const closeGraph = useCallback(() => set({ place: null, around: null }), [set]);
+  const closeGraph = useCallback(() => set({ place: null, around: null, topic: null }), [set]);
 
   // An idea opened from the rail is brought into view if it is off the edge.
   useEffect(() => {
@@ -1021,6 +1149,24 @@ export function StarSky({
     }
     return null;
   };
+  /** The chosen goal's topic whose ring is under a point, if any: a tap opens its territory (plan #2187.7). */
+  const goalStarAt = (at: Point, reach: number): string | null => {
+    const goalStars = latest.current.constellation?.stars;
+    if (!goalStars || !camera.current || !size || open) return null;
+    const cam = camera.current;
+    let best: string | null = null;
+    let bestDistance = Infinity;
+    for (const star of goalStars) {
+      const x = size.w / 2 + (star.at.x - cam.x) * cam.k;
+      const y = size.h / 2 - (star.at.y - cam.y) * cam.k;
+      const d = Math.hypot(x - at.x, y - at.y);
+      if (d <= Math.max(reach, star.ring + 4) && d < bestDistance) {
+        best = star.id;
+        bestDistance = d;
+      }
+    }
+    return best;
+  };
   const [overName, setOverName] = useState(false);
 
   const down = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1041,7 +1187,7 @@ export function StarSky({
     if (!last) {
       // A mouse passing over: the star under it is pointed at, and a name shows it can be pressed.
       if (event.pointerType !== 'mouse') return;
-      const onName = nameAt(at) !== null || topicAt(at) !== null;
+      const onName = nameAt(at) !== null || topicAt(at) !== null || goalStarAt(at, POINT_REACH) !== null;
       if (onName !== overName) setOverName(onName);
       const i = onName ? -1 : nearest(at, POINT_REACH);
       const id = i >= 0 ? stars[i]!.id : null;
@@ -1092,7 +1238,14 @@ export function StarSky({
       flyToTopic(topicId);
       return;
     }
-    const i = nearest(at, event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH);
+    const reach = event.pointerType === 'mouse' ? POINT_REACH : TAP_REACH;
+    // A ringed topic of the chosen goal opens its territory, keeping the goal.
+    const goalTopic = params.goal ? goalStarAt(at, reach) : null;
+    if (goalTopic) {
+      openGraph({ kind: 'territory', id: params.goal!, topic: goalTopic });
+      return;
+    }
+    const i = nearest(at, reach);
     if (i < 0) {
       // Empty sky lets go of the open idea, then of a domain picked out in the legend.
       if (selectedId) pick(null);
@@ -1304,7 +1457,8 @@ function StarCard({
   if (star.strength > 0) facts.push(['Strength', `${Math.round(star.strength * 100)}%`]);
   if (setAt) facts.push(['Last shown', whenDate(setAt, { timeZone: 'UTC' })]);
   if (halves) facts.push(['Next halves', whenDate(halves, { timeZone: 'UTC' })]);
-  if (star.strength <= 0 && star.haze > 0.05) facts.push(['Near', 'Ideas you know']);
+  if (star.strength <= 0 && star.exposure > 0.05) facts.push(['Halo', 'Met, not tested yet']);
+  if (star.strength <= 0 && star.haze > 0.05) facts.push(['Near', 'What you know']);
 
   return (
     <div

@@ -8,10 +8,16 @@ import { loadPlaces } from '@/lib/learn/places/load';
 import type { StrengthInput } from '@/lib/learn/strength';
 import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
 import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
-import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
+import type { SkyTerritory } from './place-graph';
+import type { GoalLevels } from './panels';
+import { readCells } from '@/lib/learn/levels/model';
+import { placeAreas, placeVectors, type DomainPlacement, type FieldPlacement } from './area-map';
+import { goalsOnMap, territoriesOnMap, type GoalOnMap, type TopicPlacement, type TopicSurroundings } from './goals';
+import { loadGoalRows } from './goals-load';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
 import { lightOn } from './sky';
+import { domainSlot } from './view';
 import { buildTopicFrame, type TopicFrame } from './topics';
 import { loadTopicRows } from './topics-load';
 
@@ -41,17 +47,19 @@ export type IdeaOnMap = MapIdea & {
   domain: Named | null;
   /** The columns of its state row the strength score reads, or null for an idea never seen. */
   stateRow: StrengthInput | null;
-  /** How well you know it on `asOf`, from 0 to 1 (plan #1997.6). */
+  /** How well your answers say you know it on `asOf`, from 0 to 1 (plan #1997.6): tested only (plan #2187.1). */
   strength: number;
-  /** For an idea not known yet, the light its known neighbours spill onto it, from 0 to 1. */
+  /** For an idea with no tested strength, the light its tested neighbours spill onto it, from 0 to 1. */
   haze: number;
+  /** How strongly a course, your work, your writing or your own word touched it, from 0 to 1: the gold halo. */
+  exposure: number;
   /** The place it is in (plan #1997.3), or null for an idea in none. */
   placeId: string | null;
   /** When the idea was written, which the timeline replays from (plan #1997.8). */
   createdAt: string | null;
   /**
    * The notes, courses and work that back it, strongest first (plan #2006.6).
-   * The strength above already counts them; the card lists the first three.
+   * They give it a halo (exposure above), never strength; the card lists the first three.
    */
   evidence: EvidenceLink[];
 };
@@ -88,6 +96,24 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
    * map's frame (plan #2016.5), or null when they could not be read.
    */
   topics: TopicFrame | null;
+  /**
+   * The goals' territories (plan #2187.3), each topic with its ladder, for
+   * the graph a chosen goal's topic opens. Undefined where nothing loads them.
+   */
+  territories?: SkyTerritory[];
+  /**
+   * Your open learning goals, each with its topics placed on the sky and the
+   * requirements between them (plan #2187.2). Null when they could not be
+   * read; left out where nothing reads them, as in most gallery entries.
+   */
+  goals?: GoalOnMap[] | null;
+  /**
+   * The topic map and each goal's targets, for the panels under the map
+   * (plan #2187.6), which work the gaps and an earlier day's levels out in
+   * the browser. Null when they could not be read; left out where nothing
+   * reads them, and then the panels are not drawn.
+   */
+  levels?: GoalLevels | null;
 };
 
 type ConceptRow = {
@@ -141,7 +167,7 @@ export async function loadIdeaMap(
       return query.order(order).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
     };
 
-  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows, topicRows] = await Promise.all([
+  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows, topicRows, goalRows] = await Promise.all([
     readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding, created_at', 'id')),
     readAll<StateRow>(
       own(
@@ -177,6 +203,14 @@ export async function loadIdeaMap(
       console.error('[learn idea map] topics', error instanceof Error ? error.message : error);
       return null;
     }),
+    // Your goals (plan #2187.2), read through the session only. Without them
+    // the rail has no goals to choose and the sky draws as before.
+    userId
+      ? Promise.resolve(null)
+      : loadGoalRows(learn).catch((error: unknown) => {
+          console.error('[learn idea map] goals', error instanceof Error ? error.message : error);
+          return null;
+        }),
   ]);
 
   const evidenceOf = new Map<string, EvidenceRow[]>();
@@ -248,7 +282,8 @@ export async function loadIdeaMap(
       stateRow: stateRowOf(idea.id),
       neighbours: idea.neighbours,
       evidence: evidenceOf.get(idea.id)?.map((row) => ({
-        weight: row.weight,
+        kind: row.kind,
+        ceiling: row.ceiling,
         similarity: row.similarity,
         foundAt: row.found_at,
       })),
@@ -285,9 +320,59 @@ export async function loadIdeaMap(
       )
     : null;
 
+  let goals: GoalOnMap[] | null | undefined;
+  let territories: SkyTerritory[] | undefined;
+  let levels: GoalLevels | null | undefined;
+  if (goalRows) {
+    const vectors = goalRows.vectors.flatMap((row) => {
+      const vector = parseVector(row.embedding);
+      return vector ? [{ id: row.id, vector }] : [];
+    });
+    const placements = placeVectors(ideaVectors, map, vectors);
+    const placedTopics = new Map<string, TopicPlacement>(
+      placements.map((p) => [p.id, { pca: p.pca, neighbourMap: p.neighbourMap }]),
+    );
+    // A territory's topic is coloured as most of the ideas it was placed among (plan #2187.7).
+    const domainNameOf = (id: string): string | null => {
+      const row = rowOf.get(id);
+      const subject = row?.subject_id ? subjectOf.get(row.subject_id) : undefined;
+      const field = subject?.field_id ? fieldOf.get(subject.field_id) : undefined;
+      const domainId = subject?.domain_id ?? field?.domain_id ?? null;
+      return domainId ? (domainOf.get(domainId)?.name ?? null) : null;
+    };
+    const around = new Map<string, TopicSurroundings>(
+      placements.map((p) => {
+        const counts = new Map<string, number>();
+        for (const id of p.nearest) {
+          const name = domainNameOf(id);
+          if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+        const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+        return [p.id, { ideaIds: p.nearest, slot: top ? domainSlot(top[0]) : 'none' }];
+      }),
+    );
+    const readings = readCells(goalRows.map);
+    goals = goalsOnMap(goalRows.lenses, goalRows.map, readings, placedTopics);
+    territories = territoriesOnMap(goalRows.lenses, goalRows.map, readings, placedTopics, around);
+    levels = {
+      map: goalRows.map,
+      lenses: goalRows.lenses.map((lens) => ({
+        id: lens.id,
+        name: lens.name,
+        targets: lens.targets.map((t) => ({ topicId: t.topicId, targetLevel: t.targetLevel })),
+      })),
+    };
+  } else if (!userId) {
+    goals = null;
+    levels = null;
+  }
+
   return {
     ...map,
     topics,
+    goals,
+    territories,
+    levels,
     missing: concepts.length - embedded.length,
     asOf: asOf.toISOString(),
     places,
@@ -327,6 +412,7 @@ export async function loadIdeaMap(
         stateRow: stateRowOf(idea.id),
         strength: light.get(idea.id)?.strength ?? 0,
         haze: light.get(idea.id)?.haze ?? 0,
+        exposure: light.get(idea.id)?.exposure ?? 0,
         placeId: placeRead?.placeOf.get(idea.id) ?? null,
         createdAt: row.created_at ?? null,
         evidence: linksOf(idea.id),

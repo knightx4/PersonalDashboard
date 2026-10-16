@@ -5,6 +5,7 @@ import {
   crowding,
   dustAt,
   DUST_SPREAD,
+  exposureOf,
   fitCamera,
   lightOn,
   markGrid,
@@ -15,6 +16,7 @@ import {
   rgbOf,
   starColour,
   starLook,
+  testedStrength,
   toScreen,
   toWorld,
   zoomAbout,
@@ -106,6 +108,24 @@ describe('how a star looks', () => {
     expect(hazed.hazeAlpha).toBeGreaterThan(0);
   });
 
+  it('draws a halo only where there is exposure, and exposure never brightens or grows a star', () => {
+    expect(starLook(0, 0, 1).halo).toBe(0);
+    expect(starLook(0.6, 0, 1).halo).toBe(0);
+    const met = starLook(0, 0, 1, 1);
+    expect(met.halo).toBeGreaterThan(0);
+    expect(met.haloAlpha).toBeGreaterThan(0);
+    for (const s of [0, 0.3, 1]) {
+      const bare = starLook(s, 0, 2);
+      const haloed = starLook(s, 0, 2, 1);
+      expect([haloed.core, haloed.coreAlpha, haloed.glow, haloed.glowAlpha]).toEqual([
+        bare.core,
+        bare.coreAlpha,
+        bare.glow,
+        bare.glowAlpha,
+      ]);
+    }
+  });
+
   it('gives a star its domain colour, and a plain one without a domain', () => {
     expect(starColour(2)).toBe(DOMAIN_HUES[2]!.dark);
     expect(starColour('none')).toBe(starColour('other'));
@@ -176,7 +196,7 @@ describe('lighting the ideas', () => {
 
   it('gives a known idea its strength and no haze, and an unknown one haze from it', () => {
     const light = lightOn([known, unknown], on);
-    expect(light.get('k')).toEqual({ strength: 0.8, haze: 0 });
+    expect(light.get('k')).toEqual({ strength: 0.8, haze: 0, exposure: 0 });
     expect(light.get('u')!.strength).toBe(0);
     expect(light.get('u')!.haze).toBeCloseTo(0.8 * 0.64, 9);
   });
@@ -184,6 +204,53 @@ describe('lighting the ideas', () => {
   it('dims as the days pass', () => {
     const later = lightOn([known, unknown], new Date('2026-11-12T12:00:00Z'));
     expect(later.get('k')!.strength).toBeCloseTo(0.4, 9);
+  });
+
+  // plan #2187.1: brightness is what answers made it; the rest is a halo.
+  const declared = {
+    id: 'd',
+    stateRow: {
+      state: 'known' as const,
+      established: 'declared' as const,
+      tested_at: null,
+      declared_at: '2026-10-13T12:00:00Z',
+      review_interval_days: null,
+    },
+    neighbours: [{ id: 'u', similarity: 0.8 }],
+  };
+  const work = (similarity: number) => ({ kind: 'work' as const, ceiling: 1, similarity });
+
+  it('lights no star you only said you know, and gives it a halo instead', () => {
+    const light = lightOn([declared, unknown], on);
+    expect(light.get('d')!.strength).toBe(0);
+    expect(light.get('d')!.exposure).toBeCloseTo(0.8, 9);
+    // Nor does it spill haze: only tested ideas are what you know.
+    expect(light.get('u')!.haze).toBe(0);
+  });
+
+  it('keeps an untested idea dark whatever backs it, with a halo as strong as its evidence', () => {
+    const backed = { ...unknown, evidence: [work(1)] };
+    const light = lightOn([backed, known], on);
+    expect(light.get('u')!.strength).toBe(0);
+    expect(light.get('u')!.exposure).toBeCloseTo(1, 9);
+    expect(light.get('u')!.haze).toBeGreaterThan(0);
+    const clipped = lightOn([{ ...unknown, evidence: [{ kind: 'clipping' as const, ceiling: 0.25, similarity: 1 }] }], on);
+    expect(clipped.get('u')!.exposure).toBeCloseTo(0.25, 9);
+    const mention = lightOn([{ ...unknown, evidence: [{ kind: 'mention' as const, ceiling: 0, similarity: 1 }] }], on);
+    expect(mention.get('u')!.exposure).toBe(0);
+  });
+
+  it('never makes a tested star brighter than its answers, and gives it no halo', () => {
+    const backed = { ...known, evidence: [work(1)] };
+    const light = lightOn([backed], on);
+    expect(light.get('k')!.strength).toBe(testedStrength(known.stateRow, on));
+    expect(light.get('k')!.exposure).toBe(0);
+  });
+
+  it('gives an idea held wrongly no halo, so its ring reads alone', () => {
+    const wrong = { ...known.stateRow, state: 'misconception' as const };
+    expect(exposureOf(wrong, [work(1)], on)).toBe(0);
+    expect(testedStrength(wrong, on)).toBe(0);
   });
 });
 

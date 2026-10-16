@@ -55,7 +55,11 @@ export type FileQuickNoteInput = {
         /** The blob SHA the target was shown at; defaults to the stored one. */
         blobSha?: string;
       }
-    | { kind: 'own' };
+    | {
+        kind: 'own';
+        /** The new note's name; its first line names it when this is empty (note 24fd1e02). */
+        title?: string;
+      };
 };
 
 export type FileQuickNoteFailure =
@@ -141,7 +145,7 @@ export async function fileQuickNote(
     }
     placed = { path: target.path, title: target.title };
   } else {
-    const created = await createCapturedNote(ports.create, quick.body, undefined, '');
+    const created = await createCapturedNote(ports.create, quick.body, input.target.title, '');
     if (!created.ok) return { ok: false, reason: created.reason, error: created.error };
     placed = { path: created.path, title: created.title };
   }

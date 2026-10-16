@@ -132,6 +132,7 @@ export function ActionMenu({
   trigger,
   className,
   triggerClassName,
+  panelClassName,
   onOpenChange,
   defaultOpen = false,
 }: {
@@ -147,6 +148,12 @@ export function ActionMenu({
    * icon-sized square.
    */
   triggerClassName?: string;
+  /**
+   * Classes for the floating panel. A trigger hidden at some widths (a table
+   * header on a phone) hides its panel the same way, since the panel is in a
+   * portal and would otherwise float at the top of the page.
+   */
+  panelClassName?: string;
   onOpenChange?: (open: boolean) => void;
   /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
   defaultOpen?: boolean;
@@ -264,7 +271,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1')}
+            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1', panelClassName)}
           >
             {items.map((item) => {
               if (armed === item.id) {

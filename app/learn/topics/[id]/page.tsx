@@ -4,6 +4,8 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { toRef } from '@/lib/core/refs';
 import { rowSubject } from '@/lib/core/subject';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadEvidenceForTargets } from '@/lib/learn/evidence/links';
+import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import type { TopicDetail } from '@/lib/learn/levels/store';
 import { topicStanding } from '@/lib/learn/levels/standing';
 import { loadTopicDetail, loadTopicMap, nearestTopics } from '@/lib/learn/levels/store';
@@ -30,7 +32,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   const topic = await loadTopicDetail(learn, id);
   if (!topic) notFound();
 
-  const [matches, comments, path, standing] = await Promise.all([
+  const [matches, comments, path, standing, backing] = await Promise.all([
     topic.status === 'draft'
       ? nearestTopics(learn, id).catch((error: unknown) => {
           console.error('[learn topic] match', error instanceof Error ? error.message : error);
@@ -40,6 +42,12 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
     loadThread(core, threadRef('topic', id), { userId: user.id }).catch(() => []),
     rowSubject(toRef('learn.topics', id)),
     topic.status === 'approved' ? readStanding(learn, topic) : Promise.resolve(null),
+    topic.status === 'approved'
+      ? readBacking(learn, id).catch((error: unknown) => {
+          console.error('[learn topic] backing', error instanceof Error ? error.message : error);
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -51,6 +59,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
       timezone={settings.timezone}
       now={new Date().getTime()}
       standing={standing}
+      backing={backing}
     />
   );
 }
@@ -65,4 +74,17 @@ async function readStanding(learn: Awaited<ReturnType<typeof createLearnClient>>
     loadLinksIn(learn, topic.cells),
   ]);
   return topicStanding(topic, map, evidence, linksIn);
+}
+
+/**
+ * The evidence on the frame topic this one refines (plan #2172.2), each link
+ * with its kind and ceiling. Mentions count for nothing, so they are left out.
+ */
+async function readBacking(learn: Awaited<ReturnType<typeof createLearnClient>>, id: string): Promise<EvidenceLink[]> {
+  const { data, error } = await learn.from('topics').select('refines_article_id').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Reading the topic's frame failed: ${error.message}`);
+  const frame = (data as { refines_article_id: string | null } | null)?.refines_article_id;
+  if (!frame) return [];
+  const links = await loadEvidenceForTargets(learn, 'topic', [frame]);
+  return (links.get(frame) ?? []).filter((link) => link.kind !== 'mention');
 }

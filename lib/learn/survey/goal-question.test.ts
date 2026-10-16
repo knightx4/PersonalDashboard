@@ -7,12 +7,12 @@ import type { GoalSubjectState } from './goal-load';
  * Writing a Practice Flow question for a learning goal (plan #1383), with the
  * model stubbed and the goal's rows held in memory.
  *
- * The idea and question calls are the real ones, `ideaForGoal` and
- * `writeProbe`, talking to a stub client that answers by tool name. What is
- * checked: a goal with one Got it card gets an idea quoting that card's
- * section and a question on it; a goal with no cards gets one from its own
- * wording; and two right answers on a familiar goal pitch the next idea a
- * level up.
+ * The idea call is the real one, `ideaForGoal`, talking to a stub client
+ * that answers by tool name. What is checked: a goal with one Got it card
+ * gets an idea quoting that card's section and an explain question on it
+ * (plan #2164.2), written with no model call; a goal with no cards gets one
+ * from its own wording; and two right answers on a familiar goal pitch the
+ * next idea a level up.
  */
 
 const SECTION =
@@ -39,6 +39,7 @@ const state = vi.hoisted(() => ({
   subject: { ideas: [], rightAnswers: 0 } as GoalSubjectState,
   concepts: [] as Record<string, unknown>[],
   probes: [] as { conceptId: string; question: string }[],
+  cases: [] as { conceptId: string; question: string; expected: string; rung?: string }[],
 }));
 
 vi.mock('./subject', () => ({
@@ -53,9 +54,19 @@ vi.mock('./goal-load', async (importOriginal) => ({
 
 vi.mock('@/lib/learn/graph/session', () => ({
   nextMasteryCheck: (mastery: string[]) => mastery[0] ?? null,
-  recordProbe: vi.fn(
-    async (_s: unknown, _u: string, input: { conceptId: string; probe: { question: string } }) => {
-      state.probes.push({ conceptId: input.conceptId, question: input.probe.question });
+  recordGoalCase: vi.fn(
+    async (
+      _s: unknown,
+      _u: string,
+      input: { conceptId: string; question: string; expected: string },
+    ) => {
+      state.cases.push({ ...input, rung: 'apply' });
+      return `case-${state.cases.length}`;
+    },
+  ),
+  recordExplainProbe: vi.fn(
+    async (_s: unknown, _u: string, input: { conceptId: string; question: string }) => {
+      state.probes.push({ conceptId: input.conceptId, question: input.question });
       return `probe-${state.probes.length}`;
     },
   ),
@@ -68,7 +79,7 @@ vi.mock('@/lib/learn/graph/load', () => ({
 // Each idea is saved with its claim's embedding (plan #1853).
 vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
 
-const { writeGoalQuestion, unusedCard } = await import('./goal-question');
+const { writeGoalQuestion, unusedCard, caseDue, caseLevel } = await import('./goal-question');
 const { goalQuestionDepth, cardBasisPrefix } = await import('./goal-idea');
 const { answeredRight } = await import('./goal-load');
 
@@ -102,7 +113,13 @@ function stubModel(...ideas: Idea[]) {
       const input =
         tool === 'report_idea'
           ? ideas.shift()
-          : {
+          : tool === 'report_case'
+            ? {
+                question:
+                  'A startup burned $6m last year and added $2m of new ARR. This year it burns $6m and adds $1.5m. What is the burn multiple now, and which way did it move?',
+                expected: 'Four, up from three: the same burn bought less new ARR.',
+              }
+            : {
               question: 'A startup burns $3m to add $1m of new ARR. What do investors conclude?',
               options: ['It is efficient', 'It is a warning sign', 'Nothing yet'],
               correct_index: 1,
@@ -118,7 +135,10 @@ const FROM_CARD: Idea = {
   name: 'A burn multiple above two is a warning sign',
   claim: 'Investors treat burning more than two dollars per new dollar of ARR as a warning.',
   quote: 'investors read anything above two as a warning sign',
-  mastery: ['Works out the burn multiple from net burn and new ARR.'],
+  mastery: [
+    'Works out the burn multiple from net burn and new ARR.',
+    'Says why a slowing growth rate worsens it.',
+  ],
 };
 
 const FROM_WORDING: Idea = {
@@ -135,10 +155,76 @@ beforeEach(() => {
   state.subject = { ideas: [], rightAnswers: 0 };
   state.concepts = [];
   state.probes = [];
+  state.cases = [];
+});
+
+describe('worked cases on a goal (plan #2164.3)', () => {
+  const flowCall = (client: never) =>
+    writeGoalQuestion({
+      supabase,
+      userId: 'user-1',
+      aim: AIM,
+      anthropicApiKey: 'key',
+      client,
+      flow: { shownAt: null },
+    });
+
+  it('makes the third of every three questions a case', () => {
+    expect([0, 1, 2, 3, 4, 5].map(caseDue)).toEqual([false, false, true, false, false, true]);
+  });
+
+  it('pitches the case a level up with the goal', () => {
+    expect([caseLevel('working'), caseLevel('advanced'), caseLevel('specialist')]).toEqual([4, 5, 6]);
+  });
+
+  it('writes a case with figures at the applied rung when one is due', async () => {
+    state.subject = { ideas: [], rightAnswers: 0, flowAsked: 2 };
+    const { client, prompts } = stubModel(FROM_WORDING);
+
+    const written = await flowCall(client);
+
+    expect(written.ok).toBe(true);
+    if (!written.ok) return;
+    expect(written.question).toMatchObject({ case: true, explain: false, options: [] });
+    expect(prompts.map((p) => p.tool)).toEqual(['report_idea', 'report_case']);
+    expect(prompts[1]!.content).toContain(`The idea: ${FROM_WORDING.claim}`);
+    expect(state.cases).toHaveLength(1);
+    expect(state.cases[0]).toMatchObject({ conceptId: 'concept-1', rung: 'apply' });
+    expect(state.cases[0]!.expected).toContain('Four');
+    expect(state.probes).toHaveLength(0);
+  });
+
+  it('asks an explain prompt when no case is due', async () => {
+    state.subject = { ideas: [], rightAnswers: 0, flowAsked: 1 };
+    const { client, prompts } = stubModel(FROM_WORDING);
+
+    const written = await flowCall(client);
+
+    expect(written.ok && written.question).toMatchObject({ explain: true, case: false });
+    expect(prompts.map((p) => p.tool)).toEqual(['report_idea']);
+    expect(state.cases).toHaveLength(0);
+  });
+
+  it('falls back to an explain prompt when the case cannot be written', async () => {
+    state.subject = { ideas: [], rightAnswers: 0, flowAsked: 2 };
+    const { client } = stubModel(FROM_WORDING);
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } }).messages.create;
+    const answer = create.getMockImplementation() as (request: unknown) => Promise<unknown>;
+    create.mockImplementation(async (request: { tools: { name: string }[] }) => {
+      if (request.tools[0]!.name === 'report_case') throw new Error('down');
+      return answer(request);
+    });
+
+    const written = await flowCall(client);
+
+    expect(written.ok && written.question).toMatchObject({ explain: true, case: false });
+    expect(state.cases).toHaveLength(0);
+    expect(state.probes).toHaveLength(1);
+  });
 });
 
 describe('writeGoalQuestion', () => {
-  it('writes the idea from a Got it card, quoting its section, and a question on it', async () => {
+  it('writes the idea from a Got it card, quoting its section, and an explain question on it', async () => {
     state.cards = [CARD];
     const { client, prompts } = stubModel(FROM_CARD);
 
@@ -163,9 +249,15 @@ describe('writeGoalQuestion', () => {
       `${cardBasisPrefix(CARD.title)} in Learn now: "${FROM_CARD.quote}"`,
     );
     expect(SECTION).toContain(FROM_CARD.quote!);
-    // And the question is about that idea.
-    expect(prompts[1]!.tool).toBe('report_question');
-    expect(prompts[1]!.content).toContain(FROM_CARD.claim!);
+    // And the question asks for the idea explained, naming its check, with
+    // nothing to pick from and no second model call.
+    expect(prompts.map((p) => p.tool)).toEqual(['report_idea']);
+    expect(written.question).toMatchObject({ explain: true, options: [] });
+    expect(written.question.question).toBe(
+      `Explain this idea to a friend in a few sentences: ${FROM_CARD.name}. Say what it means, ` +
+        'why it holds, and give an example of your own. A full answer also works out the burn multiple from net burn ' +
+        'and new ARR and says why a slowing growth rate worsens it.',
+    );
     expect(state.probes).toEqual([{ conceptId: 'concept-1', question: written.question.question }]);
   });
 
@@ -195,7 +287,7 @@ describe('writeGoalQuestion', () => {
     const written = await call(client);
 
     expect(written.ok && written.question.source).toBe('wording');
-    expect(prompts.map((p) => p.tool)).toEqual(['report_idea', 'report_idea', 'report_question']);
+    expect(prompts.map((p) => p.tool)).toEqual(['report_idea', 'report_idea']);
   });
 
   it('refuses a quote that is not in the section, then uses the wording', async () => {
@@ -233,7 +325,7 @@ describe('writeGoalQuestion', () => {
     expect(prompts[0]!.content).toContain(`- ${FROM_CARD.name}`);
   });
 
-  it('asks again about an idea whose question was never written, without a new idea', async () => {
+  it('asks about an idea with no question on it yet, without a new idea or a model call', async () => {
     state.subject = {
       ideas: [{ conceptId: 'waiting', name: 'An idea', claim: 'A claim.', basis: null, mastery: [], asked: 0 }],
       rightAnswers: 0,
@@ -243,7 +335,7 @@ describe('writeGoalQuestion', () => {
     const written = await call(client);
 
     expect(written.ok && written.question.conceptId).toBe('waiting');
-    expect(prompts.map((p) => p.tool)).toEqual(['report_question']);
+    expect(prompts).toHaveLength(0);
     expect(state.concepts).toHaveLength(0);
   });
 

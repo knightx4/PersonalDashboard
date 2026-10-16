@@ -3,7 +3,6 @@ import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { SpendSink } from '@/lib/core/spend/pricing';
-import { runDash } from '@/lib/dash/loop';
 import type { MayaMaterial } from './retrieve';
 import { MAX_SEARCHES, MAYA_MODEL, mayaVoice } from './voice';
 
@@ -329,6 +328,9 @@ export async function callThoughtModel(
 ): Promise<ThoughtCall> {
   if (!options.client && !options.anthropicApiKey) return { ok: false, detail: 'ANTHROPIC_API_KEY is not set.' };
   const { prompt, labels } = buildThoughtPrompt(material);
+  // Loaded here rather than at the top: Dash's ask_maya reaches this file
+  // through the paid tools, which the loop's registry imports (plan #2228.5).
+  const { runDash } = await import('@/lib/dash/loop');
   const answer = await runDash({
     voice: mayaVoice({ system: MAYA_SYSTEM, tools: [], finish: REPORT_TOOL, maxTokens: 6_000 }),
     context: {

@@ -104,6 +104,7 @@ export const devSources: ModuleSources = {
     'public.plan_dependencies',
     'public.plan_history',
     'public.plan_item_pictures',
+    'public.post_preferences',
     'public.plan_runs',
     'public.plan_commit_checks',
     'public.plan_main_checks',
@@ -131,9 +132,11 @@ export const devSources: ModuleSources = {
     reason:
       table === 'public.x_accounts'
         ? 'The X connection and its encrypted tokens.'
-        : table === 'public.x_reads'
-          ? 'A log of each request made to X and how many posts it read, for checking the bill.'
-          : ABOUT_THE_APP,
+        : table === 'public.post_preferences'
+          ? 'A setting: the text they wrote about what they want from their posts.'
+          : table === 'public.x_reads'
+            ? 'A log of each request made to X and how many posts it read, for checking the bill.'
+            : ABOUT_THE_APP,
     page: PAGES[table],
   })),
 };

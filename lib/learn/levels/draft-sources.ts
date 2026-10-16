@@ -1,4 +1,5 @@
 import type { DraftResult } from '@/lib/learn/levels/draft';
+import type { CanonText, DraftedDocument } from '@/lib/learn/levels/stored-sources';
 
 /**
  * The sources a topic is drafted from, and the five checks shown before it is
@@ -29,6 +30,11 @@ export type DraftSource = {
   label: string;
   /** One line each, numbered from 1 in the order given. */
   items: string[];
+  /**
+   * A stored course's units in the order it teaches them (plan #2247.10),
+   * which the call reads as weak evidence of what comes before what.
+   */
+  ordered?: boolean;
 };
 
 export type DraftSources = {
@@ -122,7 +128,7 @@ export function sourcesPrompt(given: DraftSources): string[] {
   if (given.sources.length > 0) {
     lines.push('', 'Sources. Cite a whole source as S1, or one of its lines as S1.3:');
     for (const source of given.sources) {
-      lines.push(`${source.id}. ${source.label}`);
+      lines.push(`${source.id}. ${source.label}${source.ordered ? ' (units in the order taught)' : ''}`);
       source.items.forEach((item, i) => lines.push(`  ${source.id}.${i + 1} ${item}`));
     }
   }
@@ -382,6 +388,10 @@ export type DraftingRecord = {
   overlapMissing: string | null;
   /** Questions a practitioner would put to the top levels. */
   checklist: string[];
+  /** The stored documents the draft cites (plan #2247.10); absent when none were read. */
+  documents?: DraftedDocument[];
+  /** The textbooks the stored documents name, with how many name each; absent when none were read. */
+  canon?: CanonText[];
 };
 
 /** `topics.drafting` as read back; null for a topic drafted before sources (or a shape not written here). */
@@ -397,6 +407,8 @@ export function readDrafting(value: unknown): DraftingRecord | null {
     overlap: typeof v.overlap === 'number' ? v.overlap : null,
     overlapMissing: typeof v.overlapMissing === 'string' ? v.overlapMissing : null,
     checklist: Array.isArray(v.checklist) ? v.checklist.filter((c): c is string => typeof c === 'string') : [],
+    ...(Array.isArray(v.documents) ? { documents: v.documents } : {}),
+    ...(Array.isArray(v.canon) ? { canon: v.canon } : {}),
   };
 }
 

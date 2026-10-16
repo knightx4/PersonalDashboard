@@ -1,4 +1,5 @@
 import type { GoalAbout, NextQuestion, SurveyAbout } from '@/lib/learn/flow/ahead';
+import type { Explained, FollowedUp } from '@/lib/learn/flow/explain';
 import type { NothingToAsk } from '@/lib/learn/graph/pick';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import type { TrackMove } from '@/lib/learn/flow/track';
@@ -33,6 +34,24 @@ export type FlowState = AskState & {
    * Its subject is hidden too, so it has no track line either.
    */
   goal?: GoalAbout;
+  /**
+   * Set on an explain question (plan #2164.2): answered in a few sentences
+   * and marked, with one follow-up, instead of picked from options.
+   */
+  explain?: true;
+  /**
+   * Set on a worked case (plan #2164.3): figures and a task, answered with a
+   * number or two sentences and graded as the applied rung, so the answer
+   * comes back with the grader's sentence and the answer expected.
+   */
+  case?: true;
+  /** The marks on the explanation and the follow-up, once it is marked. */
+  explained?: Explained;
+  /** The marks on the follow-up, once that is marked too. */
+  followedUp?: FollowedUp;
+  /** What was written, kept on screen while it is marked and after. */
+  explanation?: string;
+  followUpAnswer?: string;
   /**
    * The track's settled count before and after the answer. Set by the answer
    * and nowhere else, so a question on screen never carries the last one's.

@@ -80,6 +80,10 @@ export const MODELS = {
   jobsDiscoverShortlist: SONNET,
   /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
   learnAreaPlace: SONNET,
+  /** lib/learn/goal-kind-call.ts; one call sorts every goal not yet sorted, with a reason each */
+  learnGoalKind: HAIKU,
+  /** lib/learn/catalogue/ocw-structure-pull.ts; names candidate courses for a goal, each confirmed by a fetch */
+  learnStructurePropose: HAIKU,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
   /** lib/learn/places/name.ts; a few words for each place on Idea Space, daily */
@@ -126,6 +130,8 @@ export const MODELS = {
   learnLevelGrade: HAIKU,
   /** lib/learn/levels/grade-call.ts, the second grader of the same answer; kept for agreement, writes no evidence */
   learnLevelGradeSecond: SONNET,
+  /** lib/learn/evidence/course-band-call.ts, the frame topics one graded course covered (plan #2172.4.1) */
+  learnCourseTopics: HAIKU,
   /** lib/learn/levels/case-call.ts, a case written for a level 4 to 6 cell */
   learnLevelCase: HAIKU,
   /** lib/learn/lessons/match-piece-cells.ts, the cells each piece of a unit teaches */

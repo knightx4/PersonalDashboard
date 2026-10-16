@@ -5,12 +5,7 @@ import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import {
-  essayHighlight,
-  essayTheme,
-  focusParagraph,
-  typewriterScroll,
-} from '@/lib/learn/essays/editor';
+import { caretRoom, essayHighlight, essayTheme, focusParagraph } from '@/lib/learn/essays/editor';
 import type { AuthorMark } from '@/lib/learn/essays/authorship';
 import { definitionInsert } from '@/lib/learn/essays/research';
 import {
@@ -68,6 +63,8 @@ export type MarkdownEditorHandle = {
   footnote(ref: string, definition: string | null, source: { name: string }): void;
   /** Replace a range with the person's own text, such as a renamed title (note 1c956878). */
   replace(change: { from: number; to: number; insert: string }): void;
+  /** Put the cursor back in the editor, where it was. */
+  focus(): void;
 };
 
 /** From laptop width the essay page is the calm one; below it a plain editor. */
@@ -99,7 +96,6 @@ export function MarkdownEditor({
   focusMode = false,
   autoFocus = false,
   onChange,
-  onTyping,
   onSaveNow,
   onSelect,
   onCaret,
@@ -124,8 +120,6 @@ export function MarkdownEditor({
   onChange?: (doc: string, marks: AuthorMark[]) => void;
   /** Whether some text is selected, as it changes. */
   onSelect?: (selected: boolean) => void;
-  /** Called on each keystroke that changes the text, to hide the tools. */
-  onTyping?: () => void;
   /** Cmd-S or Ctrl-S. */
   onSaveNow?: () => void;
   /** Where the cursor is, whenever it moves or the text changes (plan #1863.8). */
@@ -134,11 +128,11 @@ export function MarkdownEditor({
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const focus = useRef(new Compartment());
-  const callbacks = useRef({ onChange, onTyping, onSaveNow, onSelect, onOpenNote, onCaret });
+  const callbacks = useRef({ onChange, onSaveNow, onSelect, onOpenNote, onCaret });
   // Written after render, never during it, so the editor always calls the
   // newest callbacks without being rebuilt for them.
   useEffect(() => {
-    callbacks.current = { onChange, onTyping, onSaveNow, onSelect, onOpenNote, onCaret };
+    callbacks.current = { onChange, onSaveNow, onSelect, onOpenNote, onCaret };
   });
   const firstDoc = useRef(initialDoc);
   const firstMarks = useRef(initialMarks);
@@ -181,22 +175,20 @@ export function MarkdownEditor({
             autocapitalize: 'sentences',
           }),
           firstPlaceholder.current ? placeholderText(firstPlaceholder.current) : [],
-          typewriterScroll(wide),
+          caretRoom(wide),
           focus.current.of(firstFocus.current ? focusParagraph : []),
           authorship(firstMarks.current, firstSuggestion.current),
           essayNotes(firstNotes.current, (id) => callbacks.current.onOpenNote?.(id)),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet || update.docChanged) {
               const selected = !update.state.selection.main.empty;
-              if (selected !== !update.startState.selection.main.empty) callbacks.current.onSelect?.(selected);
+              if (selected !== !update.startState.selection.main.empty)
+                callbacks.current.onSelect?.(selected);
               callbacks.current.onCaret?.(update.state.selection.main.head);
             }
             const marks = update.state.field(authorMarks);
             if (!update.docChanged && marks === update.startState.field(authorMarks)) return;
             callbacks.current.onChange?.(update.state.doc.toString(), marks);
-            if (update.transactions.some((tr) => tr.isUserEvent('input') || tr.isUserEvent('delete'))) {
-              callbacks.current.onTyping?.();
-            }
           }),
         ],
       }),
@@ -249,6 +241,9 @@ export function MarkdownEditor({
       replace(change) {
         view.current?.dispatch({ changes: change });
       },
+      focus() {
+        view.current?.focus();
+      },
       insert(text, quote) {
         const editor = view.current;
         if (!editor || !text) return;
@@ -261,7 +256,6 @@ export function MarkdownEditor({
         editor.dispatch({
           changes: { from: at, insert },
           selection: { anchor: at + insert.length },
-          // No `input` event: an insert from the rail is not typing, so the tools stay.
           annotations: quote ? insertedBy.of({ author: 'quote', name: quote.name }) : undefined,
           scrollIntoView: true,
         });

@@ -55,8 +55,15 @@ export function casePrompt(input: {
   level: number;
   descriptor: readonly string[];
   asked: readonly string[];
+  /**
+   * The idea the case is about, when the topic is one idea on the claims
+   * graph (a goal question, plan #2164.3) rather than a cell of a territory.
+   */
+  claim?: string;
 }): string {
-  const lines = [`Topic: ${input.topicName}`, `Level: ${input.level}`, '', 'The checks for this level:'];
+  const lines = [`Topic: ${input.topicName}`, `Level: ${input.level}`];
+  if (input.claim) lines.push(`The idea: ${input.claim}`);
+  lines.push('', 'The checks for this level:');
   for (const check of input.descriptor) lines.push(`- ${check}`);
   if (input.asked.length > 0) {
     lines.push('', 'Cases already asked on this level, so write a different one:');
@@ -72,6 +79,7 @@ export async function writeLevelCase(input: {
   level: number;
   descriptor: readonly string[];
   asked?: readonly string[];
+  claim?: string;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

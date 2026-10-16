@@ -631,6 +631,45 @@ export function PlanSendBackSurface() {
 }
 
 /**
+ * The approved mockup in miniature: the after's layout drawn as a designer
+ * would, with the title a size larger and the button wider, so the pair shows
+ * a difference to send back.
+ * ui-ok-file: raw-hex -- the colours are a picture of a page, not the page's own theme.
+ */
+function mockupShot(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 693"><rect width="390" height="693" fill="#f4f2ee"/><rect x="14" y="20" width="362" height="260" rx="16" fill="#ffffff"/><circle cx="60" cy="72" r="28" fill="#8a7fd6"/><rect x="100" y="52" width="210" height="22" rx="5" fill="#b7b3aa"/><rect x="100" y="82" width="130" height="10" rx="4" fill="#c9c6bf"/><rect x="30" y="124" width="320" height="10" rx="4" fill="#c9c6bf"/><rect x="30" y="144" width="280" height="10" rx="4" fill="#c9c6bf"/><rect x="30" y="200" width="200" height="44" rx="22" fill="#8a7fd6"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * A finished step's screens with the mockup you approved beside the build
+ * (plan #2215.10): one surface with a registered mockup, its before as a
+ * link, and one with no mockup, drawn as before. Send back under each.
+ */
+export function PlanScreenMockupSurface() {
+  const [withBefore, newSurface] = screenChangeFixtures[changedNumber];
+  const changes: ScreenChangeView[] = [
+    {
+      ...withBefore,
+      mockup: {
+        src: mockupShot(),
+        from: 'registered by #1541.2',
+        link: 'https://claude.ai/artifact/D6FHNYY3HdyaWCXt2U2yQU',
+      },
+    },
+    newSurface,
+  ];
+  return (
+    <div className="max-w-2xl p-4">
+      <ScreenChanges
+        changes={changes}
+        footer={(change) => <SendScreenBack id="pictures-shipped" surface={change.surface} />}
+      />
+    </div>
+  );
+}
+
+/**
  * A feature's own page (plan #1664), from fixtures: a feature partway
  * through, with a long title, a question still open, a step it waits on in
  * another feature, a note from Dash on its thread, and steps in every state

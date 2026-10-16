@@ -1,6 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
-import { CardSection } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import {
   ESTABLISHED_LABEL,
@@ -275,9 +275,12 @@ export function ConceptPageView({
       {/* What having this claim looks like, and what the questions about it are
           written against. Its own section rather than a line under the claim:
           it is a list, and the card above is about where the claim stands. */}
-      <CardSection title="What understanding it looks like" className="mb-5">
-        <MasteryChecks checks={concept.mastery} answers={probes} />
-      </CardSection>
+      {/* Left out when no checks were written: an empty card says nothing. */}
+      {concept.mastery.length > 0 && (
+        <CardSection title="What understanding it looks like" className="mb-5">
+          <MasteryChecks checks={concept.mastery} answers={probes} />
+        </CardSection>
+      )}
 
       {connected && (
         <CardSection title="How it connects" className="mb-5">
@@ -350,31 +353,32 @@ export function ConceptPageView({
         </CardSection>
       )}
 
-      <CardSection
-        title="Questions asked"
-        meta={`· ${probes.length}`}
-        fold="learn.fold.Questions asked"
-        defaultOpen={false}
-      >
-        {probes.length === 0 ? (
+      {/* With nothing asked yet there is nothing to fold: the route to a
+          first question stands on its own line instead of behind a zero. */}
+      {probes.length === 0 ? (
+        <Card padding="standard" className="mb-5">
           <p className="text-ui text-ink-muted">
             Nothing has been asked about this yet.{' '}
-            <Link
-              href={`/learn/s/${subject.id}/probe`}
-              className={linkVariants({ tone: 'quiet' })}
-            >
+            <Link href={`/learn/s/${subject.id}/probe`} className={linkVariants({ tone: 'quiet' })}>
               Ask about this subject
             </Link>{' '}
             and it will come up.
           </p>
-        ) : (
+        </Card>
+      ) : (
+        <CardSection
+          title="Questions asked"
+          meta={`· ${probes.length}`}
+          fold="learn.fold.Questions asked"
+          defaultOpen={false}
+        >
           <ul className="space-y-3">
             {probes.map((probe) => (
               <Probe key={probe.id} probe={probe} claimRewrittenAt={concept.claimRewrittenAt} />
             ))}
           </ul>
-        )}
-      </CardSection>
+        </CardSection>
+      )}
     </PageColumn>
   );
 }

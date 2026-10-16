@@ -3,6 +3,9 @@ import {
   nextQuestion,
   readCells,
   topicLevel,
+  topicReach,
+  HELD_KINDS,
+  type Reach,
   type CellStatus,
   type NextQuestion,
   type TopicMap,
@@ -43,6 +46,8 @@ export type TopicStanding = {
   rows: LevelRow[];
   /** No evidence on any cell: nothing has been asked yet. */
   untouched: boolean;
+  /** Breadth over the levels and the best level, each per kind, never folded into one (plan #2172.2). */
+  reach: Reach;
 };
 
 export function topicStanding(
@@ -76,7 +81,7 @@ export function topicStanding(
     };
   });
 
-  return { level, heldAboveGap, rows, untouched: evidence.length === 0 };
+  return { level, heldAboveGap, rows, untouched: evidence.length === 0, reach: topicReach(map, readings, topic.id) };
 }
 
 /** How a cell's status reads on the page. */
@@ -87,6 +92,20 @@ export const STATUS_WORDS: Record<CellStatus, string> = {
   missed: 'Missed',
   open: 'Open',
 };
+
+/**
+ * Breadth and depth as the topic page says them (plan #2172.2): each kind on
+ * its own, a kind with nothing left out. "2 tested · 1 declared of 10" and
+ * "4 tested · 3 declared of 10".
+ */
+export function reachWords(reach: Reach): { breadth: string; depth: string } {
+  const kinds = HELD_KINDS.filter((kind) => reach.breadth[kind] > 0);
+  if (kinds.length === 0) return { breadth: `None of ${reach.children}`, depth: `None of ${reach.children}` };
+  return {
+    breadth: `${kinds.map((kind) => `${reach.breadth[kind]} ${kind}`).join(' · ')} of ${reach.children}`,
+    depth: `${kinds.map((kind) => `${reach.depth[kind]} ${kind}`).join(' · ')} of ${reach.children}`,
+  };
+}
 
 export const VERDICT_WORDS: Record<Verdict, string> = {
   met: 'Met',

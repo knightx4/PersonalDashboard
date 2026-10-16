@@ -18,8 +18,8 @@ import {
   searchCatalogueIfNew,
   searchCompleted,
 } from '@/lib/learn/catalogue/search';
-import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
-import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
+import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { writeSubjectCurriculum } from '@/lib/learn/graph/curriculum-run';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
 import { planGoalFor } from '@/lib/learn/lessons/plan-store';
@@ -466,22 +466,9 @@ export async function writeTrackCurriculum(_prev: CurriculumState, formData: For
   if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
 
   const supabase = await createLearnClient();
-  const [subject, goals] = await Promise.all([
-    loadSubject(supabase, subjectId.data),
-    loadGoals(supabase, subjectId.data),
-  ]);
-  if (!subject) return { error: 'That subject is gone.' };
-
-  // The oldest goal is what the track was started for.
-  const first = goals.at(-1) ?? null;
-  const result = await ensureCurriculum(
-    supabase,
-    user.id,
-    { id: subject.id, name: subject.name },
-    first?.asked ?? subject.note ?? null,
-  );
+  const result = await writeSubjectCurriculum(supabase, user.id, subjectId.data);
   if (!result.ok) return { error: result.detail };
-  if (result.goalUnitId && first && !first.unitId) await fileGoalUnder(supabase, first.id, result.goalUnitId);
+  const subject = result.subject;
 
   revalidatePath(`/learn/s/${subject.id}`);
   return {};

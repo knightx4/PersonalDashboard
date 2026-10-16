@@ -299,6 +299,11 @@ export const learnSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'learn.external_checks',
+      reason:
+        'Published question sets the person sat once, kept with their score as an anchor for lens progress. The questions are not theirs and nothing on the map reads or changes because of a row.',
+    },
     { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
     { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
     { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
@@ -316,6 +321,7 @@ export const learnSources: ModuleSources = {
       reason:
         "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
+    { table: 'learn.topic_structure_pulls', reason: 'Bookkeeping for the daily pull of structure documents: which lit topics have had one, and the day.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
@@ -325,6 +331,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_passages', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_providers', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
+    { table: 'learn.catalogue_structures', reason: 'Syllabi and tables of contents pulled into the shared catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
@@ -339,6 +346,14 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.course_embeddings',
       reason: 'Each transcript course as the text and vector it is matched to ideas by; the course is in you.courses and the links in evidence_links.',
+    },
+    {
+      table: 'learn.course_topics',
+      reason: 'The topics a model call named for each graded course, worked out from the course; the course is in you.courses and its bands in evidence_links.',
+    },
+    {
+      table: 'learn.course_explains',
+      reason: 'The one explain prompt answered about each graded course and its grade; what each answer showed is read through evidence_links, as cell_questions is read through cell_evidence.',
     },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },

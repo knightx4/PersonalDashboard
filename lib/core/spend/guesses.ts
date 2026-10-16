@@ -102,9 +102,19 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // calls' worth.
   'draft-topic': run(SONNET, 12_000, 9_000),
   'embed-topic-scope': run(VOYAGE_LITE, 60, 0),
+  // Drafting a territory from stored documents (plan #2247.10): a goal and
+  // its performances embedded as queries, and one Haiku call per provider
+  // naming documents to fetch.
+  'match-structure-units': run(VOYAGE_LITE, 200, 0),
+  'propose-structure-sources': run(HAIKU, 400, 200),
+  // The daily pull for a topic that just lit (plan #2247.11): one proposing call.
+  'pull-lit-topic-structure': background(run(HAIKU, 400, 200)),
   // Moving a subject from the claims graph (plan #2138.4): its claims and the
   // map's topics go in, a topic and level per claim come out.
   'assign-topics': run(SONNET, 4_000, 1_500),
+  // One graded course and its shortlist of frame topics in, a depth and up to
+  // eight topics out (plan #2172.4.1). From the daily run.
+  'name-course-topics': background(unit(HAIKU, 1_500, 200)),
   'write-probe': run(HAIKU, 2_000, 200),
   'write-probe-ahead': background(unit(HAIKU, 1_800, 170)),
   'name-misconception': run(HAIKU, 1_500, 200),
@@ -124,12 +134,17 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
   'grade-cell-answer': run(HAIKU, 3_000, 600),
+  // An explanation of one course against levels 1 to 3 of up to eight topics
+  // (plan #2172.4.2): twenty-four cells in, a verdict on each out.
+  'grade-course-explain': run(HAIKU, 4_000, 2_400),
   'write-cell-case': run(HAIKU, 1_200, 500),
+  'write-goal-case': background(unit(HAIKU, 1_200, 500)),
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),
   'place-track': run(SONNET, 3_000, 400),
   'place-aim': run(SONNET, 2_500, 300),
+  'classify-goal-kind': run(HAIKU, 1_500, 250),
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.

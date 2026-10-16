@@ -104,6 +104,14 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
+  'app/learn/now/piece-talk-actions.ts#talkPiece': [
+    'mark-teach-back',
+    'reply-about-card',
+    'write-piece-check',
+    'mark-piece-check',
+    'write-cell-case',
+    'grade-cell-answer',
+  ],
 
   // Learn: questions
   'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check', 'write-cell-case'],
@@ -119,7 +127,12 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/flow/actions.ts#flowStep:answer': [
+    'name-misconception',
+    'grade-applied-answer',
+    'mark-teach-back',
+  ],
+  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
   'app/learn/flow/actions.ts#flowStep:start-track': [
     'generate-track-from-theme',
     'place-track',
@@ -130,6 +143,7 @@ export const PAID_ACTIONS = {
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
+  'app/learn/settings/external/actions.ts#answerExternal': ['grade-quiz-answer'],
 
   // Learn: reading lists
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],
@@ -176,6 +190,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // The one explain prompt on a graded course (plan #2172.4.2)
+  'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it
@@ -203,7 +219,7 @@ export const PAID_ACTIONS = {
   // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
   // placed and given a plan after the response (plan #1490), as one added
   // from the old New goal form was.
-  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'write-curriculum'],
+  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
   // The header's notes button (plan #1950.5): the note is triaged once it
   // has saved (plan #1179), as it was from the old popover.
   'app/capture-actions.ts#makeAimedCapture:dev-note': ['triage-note'],
@@ -218,7 +234,7 @@ export const PAID_ACTIONS = {
   'app/goals/home-actions.ts#askDashAction': ['reply-to-goal-comment'],
   // A new goal from Ask Dash in the Learn area is placed and given a plan, as
   // Add goal's is (plan #1490). The hint shows for that area alone.
-  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim', 'write-curriculum'],
+  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
 
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)
@@ -239,8 +255,10 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/ask/voice/route.ts#POST':
+    'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
-    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':
     "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
   'app/you/personality/actions.ts#restoreTypedAction':
@@ -257,6 +275,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/territory-draft/route.ts#GET':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
+  'app/api/cron/territory-draft/route.ts#POST':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
   'app/api/cron/startup-discovery/route.ts#GET':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/startup-discovery/route.ts#POST':

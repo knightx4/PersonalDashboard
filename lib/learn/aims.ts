@@ -20,6 +20,7 @@
  */
 
 import type { Depth } from './feed/depth';
+import { isGoalKind, type GoalKind, type GoalKindBy } from './goal-kind';
 
 /** How well the person wants to know it, as the page offers it. */
 export type AimDepth = 'familiar' | 'solid' | 'deep';
@@ -42,13 +43,22 @@ export type Aim = {
   archivedAt: string | null;
   /** The goal in the Learn area on /goals that owns this aim's wording; null only if that goal was deleted. */
   goalId: string | null;
+  /** What kind of goal it is, which decides the sources a draft tries (plan #2247.2); null until classified. */
+  kind: GoalKind | null;
+  /** One sentence on why the kind was chosen. */
+  kindReason: string | null;
+  /** Who chose it. A kind the person set is never replaced by the classifying call. */
+  kindBy: GoalKindBy | null;
+  /** The wording the classifying call read, to tell when the kind has gone stale. */
+  kindReadName: string | null;
+  kindReadAbout: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 /** The columns `toAim` reads, for a `.select()`. */
 export const AIM_COLUMNS =
-  'id, name, about, depth, list_source, field_id, domain_id, placed_at, archived_at, goal_id, created_at, updated_at';
+  'id, name, about, depth, list_source, field_id, domain_id, placed_at, archived_at, goal_id, kind, kind_reason, kind_by, kind_read_name, kind_read_about, created_at, updated_at';
 
 export type AimRow = {
   id: string;
@@ -61,6 +71,11 @@ export type AimRow = {
   placed_at: string | null;
   archived_at: string | null;
   goal_id: string | null;
+  kind: string | null;
+  kind_reason: string | null;
+  kind_by: string | null;
+  kind_read_name: string | null;
+  kind_read_about: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -81,6 +96,11 @@ export function toAim(row: AimRow): Aim {
     placedAt: row.placed_at,
     archivedAt: row.archived_at,
     goalId: row.goal_id ?? null,
+    kind: isGoalKind(row.kind) ? row.kind : null,
+    kindReason: row.kind_reason ?? null,
+    kindBy: row.kind_by === 'model' || row.kind_by === 'person' ? row.kind_by : null,
+    kindReadName: row.kind_read_name ?? null,
+    kindReadAbout: row.kind_read_about ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

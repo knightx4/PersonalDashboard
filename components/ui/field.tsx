@@ -284,6 +284,7 @@ export function ChipSelect({
   className,
   icon,
   placeholderValue,
+  touch,
   value,
   defaultValue,
   ...props
@@ -291,6 +292,8 @@ export function ChipSelect({
   /** A glyph that says which property this is, in place of a label. */
   icon?: React.ReactNode;
   placeholderValue?: string;
+  /** Pad the select to 44px tall on a phone, for a chip that stands alone as a press target. */
+  touch?: boolean;
 }) {
   const current = value ?? defaultValue;
   const unset = placeholderValue !== undefined && current === placeholderValue;
@@ -317,6 +320,7 @@ export function ChipSelect({
           'field-sizing-content min-w-0 cursor-pointer appearance-none truncate bg-transparent',
           'text-ui outline-none',
           unset ? 'text-ink-ghost' : 'text-ink',
+          touch && 'max-sm:py-3',
         )}
         {...props}
       />
